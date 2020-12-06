@@ -18,8 +18,11 @@
 //!
 //! TODO Elaborate
 
+use super::source::*;
 use super::syntax::*;
 use std::fmt;
+use std::num::NonZeroU64;
+use std::rc::Rc;
 
 /// Types of errors that may happen in parsing.
 #[derive(Debug, Eq, PartialEq)]
@@ -36,17 +39,23 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Set of intermediate data used in parsing.
 pub struct Parser {
-    input: String,
+    source: Vec<SourceChar>,
 }
 
 impl Parser {
     /// Creates a new parser.
     pub fn new(input: String) -> Parser {
-        Parser { input }
+        let line = Line {
+            value: input,
+            number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown,
+        };
+        Parser {
+            source: Rc::new(line).enumerate().collect(),
+        }
     }
     pub async fn parse_command(&mut self) -> Result<Command> {
-        Ok(Command {
-            content: std::mem::replace(&mut self.input, String::new()),
-        })
+        let s = self.source.iter().map(|sc| sc.value).collect();
+        Ok(Command { content: s })
     }
 }

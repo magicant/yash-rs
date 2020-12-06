@@ -17,6 +17,7 @@
 //! TODO Elaborate
 
 pub mod parser;
+pub mod source;
 pub mod syntax;
 
 // TODO Allow user to select input source
@@ -42,9 +43,9 @@ async fn parse_and_print() {
 
 pub fn bin_main() {
     let mut pool = futures::executor::LocalPool::new();
-    use futures::task::SpawnExt;
+    use futures::task::LocalSpawnExt;
     pool.spawner()
-        .spawn(parse_and_print())
+        .spawn_local(parse_and_print())
         .expect("spawn should succeed");
     pool.run();
 }
