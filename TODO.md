@@ -6,51 +6,58 @@
     - prompt
     - input
     - parser
-	- alias
-	- heredoc
-    	- lex
-	- syntax
+        - buffer
+        - alias
+            - definition table
+            - substitution
+            - reparsing
+        - heredoc
+            - waitlist
+            - filling
+        - lex
+            - cmdsub
+        - syntax
     - env
-	- alias
-	- cwd
-	- function
-	- history
-	- io
-	    - fd
-	    - file
-	- job
-	- option
-	- signal/trap
-	- ulimit
-	- umask
+        - alias
+        - cwd
+        - function
+        - history
+        - io
+            - fd
+            - file
+        - job
+        - option
+        - signal/trap
+        - ulimit
+        - umask
         - variable
     - fnmatch
     - expansion
         - tilde
-	- param
-	    - special
-	    - array
-	    - modifier
-	- cmdsub
-	- arith
-	- brace
-	- split
-	- glob
-	- rmquote
+        - param
+            - special
+            - array
+            - modifier
+        - cmdsub
+        - arith
+        - brace
+        - split
+        - glob
+        - rmquote
     - redir
     - exec
-	- andor
-	- pipe
-	- async
+        - andor
+        - pipe
+        - async
         - simple
-	    - search
-	- group
-	- subshell
-	- for
-	- case
-	- if
-	- while/until
-	- funcdef
+            - search
+        - group
+        - subshell
+        - for
+        - case
+        - if
+        - while/until
+        - funcdef
     - locale
     - mail
     - getopt
@@ -106,12 +113,12 @@
         - unset
         - wait
     - lineedit
-	- terminfo
-	- keymap
-	- editor
-	    - vi
-	    - emacs
-	- renderer
+        - terminfo
+        - keymap
+        - editor
+            - vi
+            - emacs
+        - renderer
         - completion
-	    - parser
-	    - generator
+            - parser
+            - generator
