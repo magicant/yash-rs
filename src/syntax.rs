@@ -131,10 +131,9 @@ pub struct SimpleCommand {
 
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.words.is_empty() {
-            return Ok(());
-        }
-        write!(f, "{}", self.words.iter().format(" "))
+        let i1 = self.words.iter().map(|x| x as &dyn fmt::Display);
+        let i2 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
+        write!(f, "{}", i1.chain(i2).format(" "))
     }
 }
 
