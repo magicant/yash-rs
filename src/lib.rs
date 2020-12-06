@@ -15,7 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub fn bin_main() {
-    println!("Hello, world!");
+    let mut pool = futures::executor::LocalPool::new();
+    async fn print() {
+        println!("Hello, world!");
+    }
+    use futures::task::SpawnExt;
+    pool.spawner().spawn(print()).expect("spawn should succeed");
+    pool.run();
 }
 
 #[cfg(test)]
