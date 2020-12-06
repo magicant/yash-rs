@@ -21,16 +21,18 @@
 use super::syntax::*;
 
 /// Set of intermediate data used in parsing.
-pub struct Parser {}
+pub struct Parser {
+    input: String,
+}
 
 impl Parser {
     /// Creates a new parser.
-    pub fn new() -> Parser {
-        Parser {}
+    pub fn new(input: String) -> Parser {
+        Parser { input }
     }
     pub fn parse_command(&mut self) -> Command {
         Command {
-            content: "echo hello world".to_string(),
+            content: std::mem::replace(&mut self.input, String::new()),
         }
     }
 }

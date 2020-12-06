@@ -22,7 +22,7 @@ pub mod syntax;
 // TODO Read input from stdin or file
 // TODO Execute the command after parsing
 async fn parse_and_print() {
-    let mut parser = parser::Parser::new();
+    let mut parser = parser::Parser::new("echo hello world".to_string());
     println!("{}", parser.parse_command());
 }
 
