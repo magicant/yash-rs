@@ -14,31 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Syntax parser for the shell language.
+//!
 //! TODO Elaborate
 
-pub mod parser;
-pub mod syntax;
+use super::syntax::*;
 
-// TODO Read input from stdin or file
-// TODO Execute the command after parsing
-async fn parse_and_print() {
-    let mut parser = parser::Parser::new();
-    println!("{}", parser.parse_command());
-}
+/// Set of intermediate data used in parsing.
+pub struct Parser {}
 
-pub fn bin_main() {
-    let mut pool = futures::executor::LocalPool::new();
-    use futures::task::SpawnExt;
-    pool.spawner()
-        .spawn(parse_and_print())
-        .expect("spawn should succeed");
-    pool.run();
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+impl Parser {
+    /// Creates a new parser.
+    pub fn new() -> Parser {
+        Parser {}
+    }
+    pub fn parse_command(&mut self) -> Command {
+        Command {
+            content: "echo hello world".to_string(),
+        }
     }
 }
