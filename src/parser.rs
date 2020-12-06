@@ -19,6 +19,20 @@
 //! TODO Elaborate
 
 use super::syntax::*;
+use std::fmt;
+
+/// Types of errors that may happen in parsing.
+#[derive(Debug, Eq, PartialEq)]
+pub enum Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+/// Result of parsing.
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Set of intermediate data used in parsing.
 pub struct Parser {
@@ -30,9 +44,9 @@ impl Parser {
     pub fn new(input: String) -> Parser {
         Parser { input }
     }
-    pub fn parse_command(&mut self) -> Command {
-        Command {
+    pub fn parse_command(&mut self) -> Result<Command> {
+        Ok(Command {
             content: std::mem::replace(&mut self.input, String::new()),
-        }
+        })
     }
 }
