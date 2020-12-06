@@ -23,7 +23,7 @@ pub mod syntax;
 // TODO Execute the command after parsing
 async fn parse_and_print() {
     let mut parser = parser::Parser::new("echo hello world".to_string());
-    match parser.parse_command() {
+    match parser.parse_command().await {
         Ok(command) => println!("{}", command),
         Err(e) => print!("{}", e),
     }

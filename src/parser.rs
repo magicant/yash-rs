@@ -44,7 +44,7 @@ impl Parser {
     pub fn new(input: String) -> Parser {
         Parser { input }
     }
-    pub fn parse_command(&mut self) -> Result<Command> {
+    pub async fn parse_command(&mut self) -> Result<Command> {
         Ok(Command {
             content: std::mem::replace(&mut self.input, String::new()),
         })
