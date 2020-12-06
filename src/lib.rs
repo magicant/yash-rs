@@ -19,13 +19,24 @@
 pub mod parser;
 pub mod syntax;
 
-// TODO Read input from stdin or file
+// TODO Allow user to select input source
 // TODO Execute the command after parsing
 async fn parse_and_print() {
-    let mut parser = parser::Parser::new("echo hello world".to_string());
-    match parser.parse_command().await {
-        Ok(command) => println!("{}", command),
-        Err(e) => print!("{}", e),
+    let input = std::io::stdin();
+    loop {
+        let mut code = String::new();
+        if input
+            .read_line(&mut code)
+            .expect("input should be readable")
+            == 0
+        {
+            break;
+        }
+        let mut parser = parser::Parser::new(code);
+        match parser.parse_command().await {
+            Ok(command) => println!("{}", command),
+            Err(e) => print!("{}", e),
+        }
     }
 }
 
