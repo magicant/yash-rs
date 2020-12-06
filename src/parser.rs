@@ -58,10 +58,23 @@ impl Parser {
     /// Parses a simple command.
     pub async fn parse_simple_command(&mut self) -> Result<SimpleCommand> {
         let s = self.source.iter().map(|sc| sc.value).collect::<String>();
-        let words = s.split_whitespace().map(|w| Word(w.to_string())).collect();
-        Ok(SimpleCommand {
-            words,
-            redirs: vec![],
-        }) // TODO redirs
+        let mut words = vec![];
+        let mut redirs = vec![];
+        for token in s.split_whitespace() {
+            if let Some(tail) = token.strip_prefix("<<") {
+                redirs.push(Redir {
+                    fd: None,
+                    body: RedirBody::HereDoc {
+                        delimiter: Word::with_str(tail),
+                        remove_tabs: false,
+                        content: Word::with_str(""),
+                    },
+                })
+            } else {
+                words.push(Word::with_str(token))
+            }
+        }
+        Ok(SimpleCommand { words, redirs })
+        // TODO add redirections to waitlist
     }
 }
