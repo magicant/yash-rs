@@ -21,18 +21,6 @@
 use itertools::Itertools;
 use std::fmt;
 
-// TODO Support full syntax
-#[derive(Debug)]
-pub struct Command {
-    pub content: String,
-}
-
-impl fmt::Display for Command {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.content)
-    }
-}
-
 /// Token that may involve expansion.
 ///
 /// It depends on context whether an empty word is valid or not. It is your responsibility to

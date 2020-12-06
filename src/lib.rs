@@ -34,7 +34,7 @@ async fn parse_and_print() {
             break;
         }
         let mut parser = parser::Parser::new(code);
-        match parser.parse_command().await {
+        match parser.parse_simple_command().await {
             Ok(command) => println!("{}", command),
             Err(e) => print!("{}", e),
         }
