@@ -16,32 +16,16 @@
 
 //! TODO Elaborate
 
-pub mod syntax;
+use std::fmt;
 
-// TODO Read input from stdin or file
-// TODO Execute the command after parsing
-async fn parse_and_print() {
-    println!(
-        "{}",
-        syntax::Command {
-            content: "echo hello world".to_string()
-        }
-    );
+// TODO Support full syntax
+#[derive(Debug)]
+pub struct Command {
+    pub content: String,
 }
 
-pub fn bin_main() {
-    let mut pool = futures::executor::LocalPool::new();
-    use futures::task::SpawnExt;
-    pool.spawner()
-        .spawn(parse_and_print())
-        .expect("spawn should succeed");
-    pool.run();
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.content)
     }
 }
