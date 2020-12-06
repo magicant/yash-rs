@@ -59,6 +59,9 @@ impl Parser {
     pub async fn parse_simple_command(&mut self) -> Result<SimpleCommand> {
         let s = self.source.iter().map(|sc| sc.value).collect::<String>();
         let words = s.split_whitespace().map(|w| Word(w.to_string())).collect();
-        Ok(SimpleCommand { words })
+        Ok(SimpleCommand {
+            words,
+            redirs: vec![],
+        }) // TODO redirs
     }
 }

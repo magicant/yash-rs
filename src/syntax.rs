@@ -48,6 +48,7 @@ impl fmt::Display for Word {
 }
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
+#[derive(Debug)]
 pub enum RedirBody {
     // TODO filename-based redirections
     /// Here-document.
@@ -84,6 +85,7 @@ impl fmt::Display for RedirBody {
 }
 
 /// Redirection.
+#[derive(Debug)]
 pub struct Redir {
     /// File descriptor that is modified by this redirection.
     pub fd: Option<RawFd>,
@@ -123,7 +125,8 @@ impl fmt::Display for Redir {
 #[derive(Debug)]
 pub struct SimpleCommand {
     pub words: Vec<Word>,
-    // TODO Assignments and redirections
+    pub redirs: Vec<Redir>,
+    // TODO Assignments
 }
 
 impl fmt::Display for SimpleCommand {
