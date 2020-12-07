@@ -182,4 +182,44 @@ mod tests {
         };
         assert_eq!(format!("{}", redir), "9<<END");
     }
+
+    #[test]
+    fn simple_command_display() {
+        let mut command = SimpleCommand {
+            words: vec![],
+            redirs: vec![],
+        };
+        assert_eq!(format!("{}", command), "");
+
+        command.words.push(Word::with_str("echo"));
+        assert_eq!(format!("{}", command), "echo");
+
+        command.words.push(Word::with_str("foo"));
+        assert_eq!(format!("{}", command), "echo foo");
+
+        command.redirs.push(Redir {
+            fd: None,
+            body: RedirBody::HereDoc {
+                delimiter: Word::with_str("END"),
+                remove_tabs: false,
+                content: Word::with_str(""),
+            },
+        });
+        assert_eq!(format!("{}", command), "echo foo <<END");
+
+        command.words.clear();
+        assert_eq!(format!("{}", command), "<<END");
+
+        command.redirs.push(Redir {
+            fd: Some(1),
+            body: RedirBody::HereDoc {
+                delimiter: Word::with_str("here"),
+                remove_tabs: true,
+                content: Word::with_str("ignored"),
+            },
+        });
+        assert_eq!(format!("{}", command), "<<END 1<<-here");
+
+        // TODO Assignments
+    }
 }
