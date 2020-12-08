@@ -44,17 +44,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Placeholder for a here-document missing from the AST.
 ///
 /// This appears in intermediate ASTs when a here-document operator has been parsed. Since the
-/// content of the here-document appears apart from the operator in the source code, the final AST
-/// cannot be produced until the content is parsed. The `MissingHereDoc` fills the missing part
-/// in the intermediate ATS and is replaced with an actual [HereDoc] in the final step of parsing.
+/// content of the here-document appears apart from the operator in the source code, the complete
+/// AST for the here-document cannot be produced when the operator has just been parsed. The
+/// `MissingHereDoc` fills the missing part in the intermediate AST and is replaced with an
+/// actual [HereDoc] after the content has been parsed.
 pub struct MissingHereDoc;
 
 /// Partial AST that can be filled with missing parts to create the whole, final AST.
 pub trait Fill<T = HereDoc> {
     /// Final AST created by filling `self`.
     type Full;
-    /// Takes some items from the iterator to fill the missing parts of `self` to create the
-    /// complete AST.
+    /// Takes some items from the iterator and fills the missing parts of `self` to create
+    /// the complete AST.
     fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
 }
 
