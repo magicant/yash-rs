@@ -24,9 +24,13 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
+// TODO Should be a struct to include error Location.
 /// Types of errors that may happen in parsing.
 #[derive(Debug, Eq, PartialEq)]
-pub enum Error {}
+pub enum Error {
+    /// A here-document operator is missing its corresponding content.
+    MissingHereDocContent,
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -36,6 +40,35 @@ impl fmt::Display for Error {
 
 /// Result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Placeholder for a here-document missing from the AST.
+///
+/// This appears in intermediate ASTs when a here-document operator has been parsed. Since the
+/// content of the here-document appears apart from the operator in the source code, the final AST
+/// cannot be produced until the content is parsed. The `MissingHereDoc` fills the missing part
+/// in the intermediate ATS and is replaced with an actual [HereDoc] in the final step of parsing.
+pub struct MissingHereDoc;
+
+/// Partial AST that can be filled with missing parts to create the whole, final AST.
+pub trait Fill<T = HereDoc> {
+    /// Final AST created by filling `self`.
+    type Full;
+    /// Takes some items from the iterator to fill the missing parts of `self` to create the
+    /// complete AST.
+    fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
+}
+
+impl Fill for RedirBody<MissingHereDoc> {
+    type Full = RedirBody;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
+        match self {
+            RedirBody::HereDoc(MissingHereDoc) => {
+                let h = i.next().ok_or(Error::MissingHereDocContent)?;
+                Ok(RedirBody::HereDoc(h))
+            }
+        }
+    }
+}
 
 /// Set of intermediate data used in parsing.
 pub struct Parser {
