@@ -47,40 +47,50 @@ impl fmt::Display for Word {
     }
 }
 
+/// Here-document.
+#[derive(Debug)]
+pub struct HereDoc {
+    /// Token that marks the end of the content of the here-document.
+    pub delimiter: Word,
+
+    /// Whether leading tab characters should be removed from each line of the
+    /// here-document content. This value is `true` for the `<<-` operator and
+    /// `false` for `<<`.
+    pub remove_tabs: bool,
+
+    /// Content of the here-document.
+    ///
+    /// The content ends with a newline unless it is empty. If the delimiter
+    /// is quoted, the content must not contain any expansion.
+    pub content: Word,
+}
+
+impl fmt::Display for HereDoc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.remove_tabs { "<<-" } else { "<<" })?;
+        write!(f, "{}", self.delimiter)
+    }
+}
+
 /// Part of a redirection that defines the nature of the resulting file descriptor.
 #[derive(Debug)]
 pub enum RedirBody {
     // TODO filename-based redirections
     /// Here-document.
-    HereDoc {
-        /// Token that marks the end of the content of the here-document.
-        delimiter: Word,
-
-        /// Whether leading tab characters should be removed from each line of the
-        /// here-document content. This value is `true` for the `<<-` operator and
-        /// `false` for `<<`.
-        remove_tabs: bool,
-
-        /// Content of the here-document.
-        ///
-        /// The content ends with a newline unless it is empty. If the delimiter
-        /// is quoted, the content must not contain any expansion.
-        content: Word,
-    },
+    HereDoc(HereDoc),
 }
 
 impl fmt::Display for RedirBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RedirBody::HereDoc {
-                delimiter,
-                remove_tabs,
-                ..
-            } => {
-                f.write_str(if *remove_tabs { "<<-" } else { "<<" })?;
-                write!(f, "{}", *delimiter)
-            }
+            RedirBody::HereDoc(h) => write!(f, "{}", h),
         }
+    }
+}
+
+impl From<HereDoc> for RedirBody {
+    fn from(h: HereDoc) -> Self {
+        RedirBody::HereDoc(h)
     }
 }
 
@@ -142,15 +152,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn redir_body_here_doc_display() {
-        let heredoc = RedirBody::HereDoc {
+    fn here_doc_display() {
+        let heredoc = HereDoc {
             delimiter: Word::with_str("END"),
             remove_tabs: true,
             content: Word::with_str("here"),
         };
         assert_eq!(format!("{}", heredoc), "<<-END");
 
-        let heredoc = RedirBody::HereDoc {
+        let heredoc = HereDoc {
             delimiter: Word::with_str("XXX"),
             remove_tabs: false,
             content: Word::with_str("there"),
@@ -160,7 +170,7 @@ mod tests {
 
     #[test]
     fn redir_display() {
-        let heredoc = RedirBody::HereDoc {
+        let heredoc = HereDoc {
             delimiter: Word::with_str("END"),
             remove_tabs: false,
             content: Word::with_str("here"),
@@ -168,7 +178,7 @@ mod tests {
 
         let redir = Redir {
             fd: None,
-            body: heredoc,
+            body: heredoc.into(),
         };
         assert_eq!(format!("{}", redir), "<<END");
         let redir = Redir {
@@ -199,11 +209,11 @@ mod tests {
 
         command.redirs.push(Redir {
             fd: None,
-            body: RedirBody::HereDoc {
+            body: RedirBody::from(HereDoc {
                 delimiter: Word::with_str("END"),
                 remove_tabs: false,
                 content: Word::with_str(""),
-            },
+            }),
         });
         assert_eq!(format!("{}", command), "echo foo <<END");
 
@@ -212,11 +222,11 @@ mod tests {
 
         command.redirs.push(Redir {
             fd: Some(1),
-            body: RedirBody::HereDoc {
+            body: RedirBody::from(HereDoc {
                 delimiter: Word::with_str("here"),
                 remove_tabs: true,
                 content: Word::with_str("ignored"),
-            },
+            }),
         });
         assert_eq!(format!("{}", command), "<<END 1<<-here");
 

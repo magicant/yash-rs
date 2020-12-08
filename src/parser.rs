@@ -64,11 +64,11 @@ impl Parser {
             if let Some(tail) = token.strip_prefix("<<") {
                 redirs.push(Redir {
                     fd: None,
-                    body: RedirBody::HereDoc {
+                    body: RedirBody::from(HereDoc {
                         delimiter: Word::with_str(tail),
                         remove_tabs: false,
                         content: Word::with_str(""),
-                    },
+                    }),
                 })
             } else {
                 words.push(Word::with_str(token))
