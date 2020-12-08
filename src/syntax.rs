@@ -16,6 +16,13 @@
 
 //! Shell command language syntax.
 //!
+//! This module contains types that represent abstract syntax trees (ASTs) of the shell language.
+//!
+//! Some types in this module has the type parameter `<H = HereDoc>`. As a user of the AST, you
+//! will never have to specify the parameter other than the default `HereDoc`. The parameter is
+//! used by the parser to create intermediate ASTs that lack sub-trees for here-documents, since
+//! the contents of here-documents have to be parsed separately from the normal flow of source code.
+//!
 //! TODO Elaborate
 
 use itertools::Itertools;
@@ -74,10 +81,10 @@ impl fmt::Display for HereDoc {
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
 #[derive(Debug)]
-pub enum RedirBody {
+pub enum RedirBody<H = HereDoc> {
     // TODO filename-based redirections
     /// Here-document.
-    HereDoc(HereDoc),
+    HereDoc(H),
 }
 
 impl fmt::Display for RedirBody {
