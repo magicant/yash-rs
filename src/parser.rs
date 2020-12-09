@@ -28,6 +28,8 @@ use std::rc::Rc;
 /// Types of errors that may happen in parsing.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {
+    /// End of input is reached while more characters are expected to be read.
+    EndOfInput,
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
 }
@@ -98,6 +100,7 @@ impl Fill for SimpleCommand<MissingHereDoc> {
 /// Set of intermediate data used in parsing.
 pub struct Parser {
     source: Vec<SourceChar>,
+    index: usize,
 }
 
 impl Parser {
@@ -110,16 +113,43 @@ impl Parser {
         };
         Parser {
             source: Rc::new(line).enumerate().collect(),
+            index: 0,
+        }
+    }
+
+    /// Parses a word token.
+    pub async fn parse_word(&mut self) -> Result<Word> {
+        while self.index < self.source.len() && self.source[self.index].value.is_whitespace() {
+            self.index += 1;
+        }
+
+        let mut chars = String::new();
+        while self.index < self.source.len() && !self.source[self.index].value.is_whitespace() {
+            chars.push(self.source[self.index].value);
+            self.index += 1;
+        }
+
+        if chars.is_empty() {
+            Err(Error::EndOfInput)
+        } else {
+            Ok(Word(chars))
         }
     }
 
     /// Parses a simple command.
     pub async fn parse_simple_command(&mut self) -> Result<SimpleCommand> {
-        let s = self.source.iter().map(|sc| sc.value).collect::<String>();
+        let mut tokens = vec![];
+        loop {
+            let word = self.parse_word().await;
+            if let Err(Error::EndOfInput) = word {
+                break;
+            }
+            tokens.push(word?);
+        }
         let mut words = vec![];
         let mut redirs = vec![];
-        for token in s.split_whitespace() {
-            if let Some(tail) = token.strip_prefix("<<") {
+        for token in tokens {
+            if let Some(tail) = token.0.strip_prefix("<<") {
                 redirs.push(Redir {
                     fd: None,
                     body: RedirBody::from(HereDoc {
@@ -129,7 +159,7 @@ impl Parser {
                     }),
                 })
             } else {
-                words.push(Word::with_str(token))
+                words.push(token)
             }
         }
         Ok(SimpleCommand { words, redirs })
