@@ -103,18 +103,18 @@ impl From<HereDoc> for RedirBody {
 
 /// Redirection.
 #[derive(Debug)]
-pub struct Redir {
+pub struct Redir<H = HereDoc> {
     /// File descriptor that is modified by this redirection.
     pub fd: Option<RawFd>,
     /// Nature of the resulting file descriptor.
-    pub body: RedirBody,
+    pub body: RedirBody<H>,
 }
 
 // TODO Should be somewhere else.
 const STDIN_FD: RawFd = 0;
 // const STDOUT_FD: RawFd = 1;
 
-impl Redir {
+impl<H> Redir<H> {
     /// Computes the file descriptor that is modified by this redirection.
     ///
     /// If `self.fd` is `Some(_)`, the `RawFd` value is returned intact. Otherwise,
@@ -140,9 +140,9 @@ impl fmt::Display for Redir {
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Debug)]
-pub struct SimpleCommand {
+pub struct SimpleCommand<H = HereDoc> {
     pub words: Vec<Word>,
-    pub redirs: Vec<Redir>,
+    pub redirs: Vec<Redir<H>>,
     // TODO Assignments
 }
 

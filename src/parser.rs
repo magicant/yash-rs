@@ -71,6 +71,30 @@ impl Fill for RedirBody<MissingHereDoc> {
     }
 }
 
+impl Fill for Redir<MissingHereDoc> {
+    type Full = Redir;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Redir> {
+        Ok(Redir {
+            fd: self.fd,
+            body: self.body.fill(i)?,
+        })
+    }
+}
+
+impl Fill for SimpleCommand<MissingHereDoc> {
+    type Full = SimpleCommand;
+    fn fill(mut self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
+        let redirs = self.redirs.drain(..).try_fold(vec![], |mut vec, redir| {
+            vec.push(redir.fill(i)?);
+            Ok(vec)
+        })?;
+        Ok(SimpleCommand {
+            words: self.words,
+            redirs,
+        })
+    }
+}
+
 /// Set of intermediate data used in parsing.
 pub struct Parser {
     source: Vec<SourceChar>,
