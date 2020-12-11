@@ -46,8 +46,8 @@ impl fmt::Display for ErrorCause {
 /// Explanation of a failure in parsing.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Error {
-    cause: ErrorCause,
-    location: Location,
+    pub cause: ErrorCause,
+    pub location: Location,
 }
 
 impl fmt::Display for Error {
@@ -60,17 +60,27 @@ impl fmt::Display for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::num::NonZeroU64;
-    use std::rc::Rc;
     use crate::source::Line;
     use crate::source::Source;
+    use std::num::NonZeroU64;
+    use std::rc::Rc;
 
     #[test]
     fn display_for_error() {
         let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line{value:"".to_string(),number,source:Source::Unknown});
-        let location = Location{line,column:number};
-        let error = Error{cause:ErrorCause::EndOfInput, location};
+        let line = Rc::new(Line {
+            value: "".to_string(),
+            number,
+            source: Source::Unknown,
+        });
+        let location = Location {
+            line,
+            column: number,
+        };
+        let error = Error {
+            cause: ErrorCause::EndOfInput,
+            location,
+        };
         assert_eq!(&format!("{}", error), "Incomplete command");
     }
 }

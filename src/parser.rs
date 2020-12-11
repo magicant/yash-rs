@@ -22,24 +22,24 @@ mod core;
 
 use super::source::*;
 use super::syntax::*;
-use std::fmt;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
-// TODO Should be a struct to include error Location.
-/// Types of errors that may happen in parsing.
-#[derive(Debug, Eq, PartialEq)]
-pub enum Error {
-    /// End of input is reached while more characters are expected to be read.
-    EndOfInput,
-    /// A here-document operator is missing its corresponding content.
-    MissingHereDocContent,
-}
+pub use self::core::Error;
+pub use self::core::ErrorCause;
 
-impl fmt::Display for Error {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
-    }
+// TODO remove dummy location and use actual locations
+fn dummy_location() -> Location {
+    let value = "".to_string();
+    let number = NonZeroU64::new(1).unwrap();
+    let source = Source::Unknown;
+    let line = Rc::new(Line {
+        value,
+        number,
+        source,
+    });
+    let column = number;
+    Location { line, column }
 }
 
 /// Result of parsing.
@@ -68,7 +68,11 @@ impl Fill for RedirBody<MissingHereDoc> {
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
         match self {
             RedirBody::HereDoc(MissingHereDoc) => {
-                let h = i.next().ok_or(Error::MissingHereDocContent)?;
+                // TODO Actual location should be provided by the iterator
+                let h = i.next().ok_or(Error {
+                    cause: ErrorCause::MissingHereDocContent,
+                    location: dummy_location(),
+                })?;
                 Ok(RedirBody::HereDoc(h))
             }
         }
@@ -132,7 +136,11 @@ impl Parser {
         }
 
         if chars.is_empty() {
-            Err(Error::EndOfInput)
+            // TODO Report the actual location
+            Err(Error {
+                cause: ErrorCause::EndOfInput,
+                location: dummy_location(),
+            })
         } else {
             Ok(Word(chars))
         }
@@ -143,7 +151,11 @@ impl Parser {
         let mut tokens = vec![];
         loop {
             let word = self.parse_word().await;
-            if let Err(Error::EndOfInput) = word {
+            if let Err(Error {
+                cause: ErrorCause::EndOfInput,
+                ..
+            }) = word
+            {
                 break;
             }
             tokens.push(word?);
