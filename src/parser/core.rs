@@ -57,8 +57,76 @@ impl fmt::Display for Error {
     }
 }
 
-/// Result of parsing.
+/// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Modifier that makes a result of parsing optional to trigger the parser to restart after alias
+/// substitution.
+///
+/// `Rec` stands for "recursion", as its method allows automatic recursion of parsers.
+#[derive(Debug, Eq, PartialEq)]
+pub enum Rec<T> {
+    /// Result of alias substitution.
+    ///
+    /// After alias substitution occurred, the substituted source code has to be parsed by the
+    /// parser that caused the alias substitution.
+    AliasSubstituted,
+    /// Successful result that was produced without consuming any input characters.
+    Empty(T),
+    /// Successful result that was produced by consuming one or more input characters.
+    NonEmpty(T),
+}
+
+/// Repeatedly applies the parser that may involve alias substitution until the final result is
+/// obtained.
+pub fn finish<T, F>(mut f: F) -> Result<T>
+where
+    F: FnMut() -> Result<Rec<T>>,
+{
+    loop {
+        if let Rec::Empty(t) | Rec::NonEmpty(t) = f()? {
+            return Ok(t);
+        }
+    }
+}
+
+impl<T> Rec<T> {
+    /// Combines `self` with another parser.
+    ///
+    /// If `self` is `AliasSubstituted`, `zip` returns `AliasSubstituted` without calling `f`.
+    /// Otherwise, `f` is called with the result contained in `self`. If `self` is `NonEmpty`, `f`
+    /// is called as many times until it returns a result that is not `AliasSubstituted`. Lastly,
+    /// the values of the two `Rec` objects are merged into one.
+    pub fn zip<U, F>(self, mut f: F) -> Result<Rec<(T, U)>>
+    where
+        F: FnMut(&T) -> Result<Rec<U>>,
+    {
+        match self {
+            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
+            Rec::Empty(t) => match f(&t)? {
+                Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
+                Rec::Empty(u) => Ok(Rec::Empty((t, u))),
+                Rec::NonEmpty(u) => Ok(Rec::NonEmpty((t, u))),
+            },
+            Rec::NonEmpty(t) => {
+                let u = finish(|| f(&t))?;
+                Ok(Rec::NonEmpty((t, u)))
+            }
+        }
+    }
+
+    /// Transforms the result value in `self`.
+    pub fn map<U, F>(self, f: F) -> Result<Rec<U>>
+    where
+        F: FnOnce(T) -> Result<U>,
+    {
+        match self {
+            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
+            Rec::Empty(t) => Ok(Rec::Empty(f(t)?)),
+            Rec::NonEmpty(t) => Ok(Rec::NonEmpty(f(t)?)),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
