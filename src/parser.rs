@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 mod core;
+mod fill;
 
 use super::source::*;
 use super::syntax::*;
@@ -41,64 +42,6 @@ fn dummy_location() -> Location {
     });
     let column = number;
     Location { line, column }
-}
-
-/// Placeholder for a here-document missing from the AST.
-///
-/// This appears in intermediate ASTs when a here-document operator has been parsed. Since the
-/// content of the here-document appears apart from the operator in the source code, the complete
-/// AST for the here-document cannot be produced when the operator has just been parsed. The
-/// `MissingHereDoc` fills the missing part in the intermediate AST and is replaced with an
-/// actual [HereDoc] after the content has been parsed.
-pub struct MissingHereDoc;
-
-/// Partial AST that can be filled with missing parts to create the whole, final AST.
-pub trait Fill<T = HereDoc> {
-    /// Final AST created by filling `self`.
-    type Full;
-    /// Takes some items from the iterator and fills the missing parts of `self` to create
-    /// the complete AST.
-    fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
-}
-
-impl Fill for RedirBody<MissingHereDoc> {
-    type Full = RedirBody;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
-        match self {
-            RedirBody::HereDoc(MissingHereDoc) => {
-                // TODO Actual location should be provided by the iterator
-                let h = i.next().ok_or(Error {
-                    cause: ErrorCause::MissingHereDocContent,
-                    location: dummy_location(),
-                })?;
-                Ok(RedirBody::HereDoc(h))
-            }
-        }
-    }
-}
-
-impl Fill for Redir<MissingHereDoc> {
-    type Full = Redir;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Redir> {
-        Ok(Redir {
-            fd: self.fd,
-            body: self.body.fill(i)?,
-        })
-    }
-}
-
-impl Fill for SimpleCommand<MissingHereDoc> {
-    type Full = SimpleCommand;
-    fn fill(mut self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
-        let redirs = self.redirs.drain(..).try_fold(vec![], |mut vec, redir| {
-            vec.push(redir.fill(i)?);
-            Ok(vec)
-        })?;
-        Ok(SimpleCommand {
-            words: self.words,
-            redirs,
-        })
-    }
 }
 
 /// Set of intermediate data used in parsing.
