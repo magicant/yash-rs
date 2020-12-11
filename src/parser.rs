@@ -27,6 +27,7 @@ use std::rc::Rc;
 
 pub use self::core::Error;
 pub use self::core::ErrorCause;
+pub use self::core::Result;
 
 // TODO remove dummy location and use actual locations
 fn dummy_location() -> Location {
@@ -41,9 +42,6 @@ fn dummy_location() -> Location {
     let column = number;
     Location { line, column }
 }
-
-/// Result of parsing.
-pub type Result<T> = std::result::Result<T, Error>;
 
 /// Placeholder for a here-document missing from the AST.
 ///

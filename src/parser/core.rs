@@ -57,6 +57,9 @@ impl fmt::Display for Error {
     }
 }
 
+/// Result of parsing.
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
