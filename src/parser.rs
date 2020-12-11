@@ -18,6 +18,8 @@
 //!
 //! TODO Elaborate
 
+mod core;
+
 use super::source::*;
 use super::syntax::*;
 use std::fmt;
