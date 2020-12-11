@@ -25,7 +25,6 @@
 //! This module contains tools to support such a multi-step parsing.
 
 use super::core::*;
-use super::dummy_location;
 use crate::syntax::*;
 
 /// Placeholder for a here-document that is not yet fully parsed.
@@ -36,33 +35,33 @@ pub struct MissingHereDoc;
 
 /// Partial abstract syntax tree (AST) that can be filled with missing parts to create the whole,
 /// final AST.
-pub trait Fill<T = HereDoc> {
+pub trait Fill<T = Result<HereDoc>> {
     /// Final AST created by filling `self`.
     type Full;
+
     /// Takes some items from the iterator and fills the missing parts of `self` to create
     /// the complete AST.
+    ///
+    /// # Panics
+    ///
+    /// May panic if a value has to be filled but the iterator returns `None`.
     fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
 }
 
 impl Fill for RedirBody<MissingHereDoc> {
     type Full = RedirBody;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
+    fn fill(self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<RedirBody> {
         match self {
-            RedirBody::HereDoc(MissingHereDoc) => {
-                // TODO Actual location should be provided by the iterator
-                let h = i.next().ok_or(Error {
-                    cause: ErrorCause::MissingHereDocContent,
-                    location: dummy_location(),
-                })?;
-                Ok(RedirBody::HereDoc(h))
-            }
+            RedirBody::HereDoc(MissingHereDoc) => Ok(RedirBody::HereDoc(
+                i.next().expect("missing value to fill")?,
+            )),
         }
     }
 }
 
 impl Fill for Redir<MissingHereDoc> {
     type Full = Redir;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Redir> {
+    fn fill(self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<Redir> {
         Ok(Redir {
             fd: self.fd,
             body: self.body.fill(i)?,
@@ -72,7 +71,7 @@ impl Fill for Redir<MissingHereDoc> {
 
 impl Fill for SimpleCommand<MissingHereDoc> {
     type Full = SimpleCommand;
-    fn fill(mut self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
+    fn fill(mut self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<SimpleCommand> {
         let redirs = self.redirs.drain(..).try_fold(vec![], |mut vec, redir| {
             vec.push(redir.fill(i)?);
             Ok(vec)
