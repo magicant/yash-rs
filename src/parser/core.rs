@@ -231,7 +231,24 @@ impl Lexer {
         }
     }
 
-    // TODO next_if
+    /// Peeks the next character and, if the given decider function returns true for it, advances
+    /// the position.
+    ///
+    /// Returns the consumed character `Ok(Some(_))` if the function returned true. Returns
+    /// `Ok(None)` if the function returned false. Returns `Err(_)` if the input function returned
+    /// an error, including the end-of-input case.
+    pub async fn next_if<F>(&mut self, f: F) -> Result<Option<SourceChar>>
+    where
+        F: FnOnce(char) -> bool,
+    {
+        let c = self.peek().await?;
+        if f(c.value) {
+            self.index += 1;
+            Ok(Some(c))
+        } else {
+            Ok(None)
+        }
+    }
 
     /// Reads the next character, advancing the position.
     ///
@@ -380,5 +397,65 @@ mod tests {
         assert_eq!(e, e2);
         let e2 = runner.run_until(lexer.peek()).unwrap_err();
         assert_eq!(e, e2);
+    }
+
+    #[test]
+    fn lexer_next_if() {
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, "word\n");
+
+        let mut called = 0;
+        let c = runner
+            .run_until(lexer.next_if(|c| {
+                assert_eq!(c, 'w');
+                called += 1;
+                true
+            }))
+            .unwrap()
+            .unwrap();
+        assert_eq!(called, 1);
+        assert_eq!(c.value, 'w');
+        assert_eq!(c.location.line.value, "word\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+
+        let mut called = 0;
+        let o = runner
+            .run_until(lexer.next_if(|c| {
+                assert_eq!(c, 'o');
+                called += 1;
+                false
+            }))
+            .unwrap();
+        assert_eq!(called, 1);
+        assert!(o.is_none());
+
+        let mut called = 0;
+        let o = runner
+            .run_until(lexer.next_if(|c| {
+                assert_eq!(c, 'o');
+                called += 1;
+                false
+            }))
+            .unwrap();
+        assert_eq!(called, 1);
+        assert!(o.is_none());
+
+        let mut called = 0;
+        let c = runner
+            .run_until(lexer.next_if(|c| {
+                assert_eq!(c, 'o');
+                called += 1;
+                true
+            }))
+            .unwrap()
+            .unwrap();
+        assert_eq!(called, 1);
+        assert_eq!(c.value, 'o');
+        assert_eq!(c.location.line.value, "word\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 2);
     }
 }
