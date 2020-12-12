@@ -45,15 +45,75 @@ pub struct Line {
     pub source: Source,
 }
 
+/// Iterator created by [lines].
+pub struct Lines<'a> {
+    source: Source,
+    code: &'a str,
+    number: u64,
+}
+
+impl<'a> Iterator for Lines<'a> {
+    type Item = Line;
+
+    fn next(&mut self) -> Option<Line> {
+        if self.code.is_empty() {
+            return None;
+        }
+
+        self.number += 1;
+        let number = NonZeroU64::new(self.number).unwrap();
+        let source = self.source.clone();
+
+        let value = match self.code.find('\n') {
+            None => {
+                let value_range = self.code;
+                self.code = &self.code[self.code.len()..];
+                value_range
+            }
+            Some(mut i) => {
+                i += 1;
+                let value_range = &self.code[..i];
+                self.code = &self.code[i..];
+                value_range
+            }
+        }
+        .to_string();
+
+        Some(Line {
+            value,
+            number,
+            source,
+        })
+    }
+}
+
+/// Converts a source code string into an iterator of [Line]s.
+pub fn lines(source: Source, code: &str) -> Lines<'_> {
+    Lines {
+        source,
+        code,
+        number: 0,
+    }
+}
+
 /// Position of a character in source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
     /// Line that contains the character.
     pub line: Rc<Line>,
+
     /// Character position in the line. Counted from 1.
     ///
     /// Characters are counted in the number of Unicode scalar values, not bytes.
     pub column: NonZeroU64,
+}
+
+impl Location {
+    /// Increases the column number
+    pub fn advance(&mut self, count: u64) {
+        let column = self.column.get().checked_add(count).unwrap();
+        self.column = NonZeroU64::new(column).unwrap();
+    }
 }
 
 /// Character with source description.
@@ -84,6 +144,86 @@ impl Line {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lines_empty() {
+        assert_eq!(lines(Source::Unknown, "").next(), None);
+    }
+
+    #[test]
+    fn lines_one_line() {
+        let mut l = lines(Source::Unknown, "foo\n");
+
+        let line = l.next().expect("first line should exist");
+        assert_eq!(&line.value, "foo\n");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+
+        // No second line
+        assert_eq!(l.next(), None);
+    }
+
+    #[test]
+    fn lines_three_lines() {
+        let mut l = lines(Source::Unknown, "foo\nbar\n\n");
+
+        let line = l.next().expect("first line should exist");
+        assert_eq!(&line.value, "foo\n");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = l.next().expect("second line should exist");
+        assert_eq!(&line.value, "bar\n");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = l.next().expect("third line should exist");
+        assert_eq!(&line.value, "\n");
+        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.source, Source::Unknown);
+
+        // No more lines
+        assert_eq!(l.next(), None);
+    }
+
+    #[test]
+    fn lines_without_trailing_newline() {
+        let mut l = lines(Source::Unknown, "one\ntwo");
+
+        let line = l.next().expect("first line should exist");
+        assert_eq!(&line.value, "one\n");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = l.next().expect("second line should exist");
+        assert_eq!(&line.value, "two");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
+
+        // No more lines
+        assert_eq!(l.next(), None);
+    }
+
+    #[test]
+    fn location_advance() {
+        let line = Rc::new(lines(Source::Unknown, "line\n").next().unwrap());
+        let column = NonZeroU64::new(1).unwrap();
+        let mut location = Location {
+            line: line.clone(),
+            column,
+        };
+
+        location.advance(1);
+        assert_eq!(location.column.get(), 2);
+        location.advance(2);
+        assert_eq!(location.column.get(), 4);
+
+        // The advance function does not check the line length.
+        location.advance(5);
+        assert_eq!(location.column.get(), 9);
+
+        assert!(Rc::ptr_eq(&location.line, &line));
+    }
 
     #[test]
     fn line_enumerate() {

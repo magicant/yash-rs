@@ -19,13 +19,16 @@
 //! This module includes common types that are used as building blocks for constructing the syntax
 //! parser.
 
+use crate::source::lines;
 use crate::source::Line;
 use crate::source::Location;
+use crate::source::Source;
 use crate::source::SourceChar;
 use std::fmt;
-use std::future::Future;
 use std::future::ready;
+use std::future::Future;
 use std::num::NonZeroU64;
+use std::rc::Rc;
 
 /// Types of errors that may happen in parsing.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,6 +153,54 @@ pub struct Lexer {
     index: usize,
 }
 
+impl Lexer {
+    /// Creates a new lexer with a fixed source code.
+    pub fn with_source(source: Source, code: &str) -> Lexer {
+        let lines = lines(source, code).map(Rc::new).collect::<Vec<_>>();
+        let source = lines
+            .iter()
+            .map(Line::enumerate)
+            .flatten()
+            .collect::<Vec<_>>();
+        let location = match source.last() {
+            None => {
+                let value = String::new();
+                let one = NonZeroU64::new(1).unwrap();
+                let source = Source::Unknown;
+                let line = Rc::new(Line {
+                    value,
+                    number: one,
+                    source,
+                });
+                Location { line, column: one }
+            }
+            Some(source_char) => {
+                let mut location = source_char.location.clone();
+                location.advance(1);
+                location
+            }
+        };
+        let error = Error {
+            cause: ErrorCause::EndOfInput,
+            location,
+        };
+        Lexer {
+            input: Box::new(move |_| Box::new(ready(Err(error.clone())))),
+            source,
+            index: 0,
+        }
+    }
+
+    // TODO Probably we don't need this function
+    /// Creates a new lexer with a fixed source code from unknown origin.
+    ///
+    /// This function is mainly for quick debugging purpose. Using in productions is not
+    /// recommended because it does not provide meaning [Source] on error.
+    pub fn with_unknown_source(code: &str) -> Lexer {
+        Lexer::with_source(Source::Unknown, code)
+    }
+}
+
 impl fmt::Debug for Lexer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
         f.debug_struct("Lexer")
@@ -170,9 +221,6 @@ pub struct Parser<'l> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Line;
-    use crate::source::Source;
-    use std::num::NonZeroU64;
     use std::rc::Rc;
 
     #[test]
@@ -192,5 +240,16 @@ mod tests {
             location,
         };
         assert_eq!(&format!("{}", error), "Incomplete command");
+    }
+
+    #[test]
+    fn lexer_with_empty_source() {
+        let _lexer = Lexer::with_source(Source::Unknown, "");
+        // TODO Test
+    }
+
+    #[test]
+    fn lexer_with_multiline_source() {
+        // TODO Test
     }
 }
