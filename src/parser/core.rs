@@ -28,6 +28,7 @@ use std::fmt;
 use std::future::ready;
 use std::future::Future;
 use std::num::NonZeroU64;
+use std::pin::Pin;
 use std::rc::Rc;
 
 /// Types of errors that may happen in parsing.
@@ -148,13 +149,15 @@ pub struct Context;
 
 /// Set of data used in lexical parsing.
 pub struct Lexer {
-    input: Box<dyn FnMut(&Context) -> Box<dyn Future<Output = Result<Line>>>>,
+    input: Box<dyn FnMut(&Context) -> Pin<Box<dyn Future<Output = Result<Line>>>>>,
     source: Vec<SourceChar>,
     index: usize,
+    end_of_input: Option<Error>,
 }
 
 impl Lexer {
     /// Creates a new lexer with a fixed source code.
+    #[must_use]
     pub fn with_source(source: Source, code: &str) -> Lexer {
         let lines = lines(source, code).map(Rc::new).collect::<Vec<_>>();
         let source = lines
@@ -185,9 +188,10 @@ impl Lexer {
             location,
         };
         Lexer {
-            input: Box::new(move |_| Box::new(ready(Err(error.clone())))),
+            input: Box::new(move |_| Box::pin(ready(Err(error.clone())))),
             source,
             index: 0,
+            end_of_input: None,
         }
     }
 
@@ -196,8 +200,48 @@ impl Lexer {
     ///
     /// This function is mainly for quick debugging purpose. Using in productions is not
     /// recommended because it does not provide meaning [Source] on error.
+    #[must_use]
     pub fn with_unknown_source(code: &str) -> Lexer {
         Lexer::with_source(Source::Unknown, code)
+    }
+
+    /// Peeks the next character.
+    ///
+    /// Returns [Error::EndOfInput] if reached the end of input.
+    #[must_use]
+    pub async fn peek(&mut self) -> Result<SourceChar> {
+        if let Some(ref e) = self.end_of_input {
+            assert_eq!(self.index, self.source.len());
+            return Err(e.clone());
+        }
+
+        loop {
+            if let Some(c) = self.source.get(self.index) {
+                return Ok(c.clone());
+            }
+
+            // Read more input
+            match (self.input)(&Context).await {
+                Ok(line) => self.source.extend(Rc::new(line).enumerate()),
+                Err(e) => {
+                    self.end_of_input = Some(e.clone());
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    // TODO next_if
+
+    /// Reads the next character, advancing the position.
+    ///
+    /// Returns [Error::EndOfInput] if reached the end of input.
+    pub async fn next(&mut self) -> Result<SourceChar> {
+        let r = self.peek().await;
+        if r.is_ok() {
+            self.index += 1;
+        }
+        r
     }
 }
 
@@ -239,17 +283,102 @@ mod tests {
             cause: ErrorCause::EndOfInput,
             location,
         };
-        assert_eq!(&format!("{}", error), "Incomplete command");
+        assert_eq!(format!("{}", error), "Incomplete command");
     }
 
     #[test]
     fn lexer_with_empty_source() {
-        let _lexer = Lexer::with_source(Source::Unknown, "");
-        // TODO Test
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let e = futures::executor::LocalPool::new()
+            .run_until(lexer.peek())
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.location.line.value, "");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
     fn lexer_with_multiline_source() {
-        // TODO Test
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo\nbar\n");
+
+        let c = runner.run_until(lexer.peek()).unwrap();
+        assert_eq!(c.value, 'f');
+        assert_eq!(c.location.line.value, "foo\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+
+        let c2 = runner.run_until(lexer.peek()).unwrap();
+        assert_eq!(c, c2);
+        let c2 = runner.run_until(lexer.peek()).unwrap();
+        assert_eq!(c, c2);
+        let c2 = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c, c2);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'o');
+        assert_eq!(c.location.line.value, "foo\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 2);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'o');
+        assert_eq!(c.location.line.value, "foo\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 3);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, '\n');
+        assert_eq!(c.location.line.value, "foo\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 4);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'b');
+        assert_eq!(c.location.line.value, "bar\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'a');
+        assert_eq!(c.location.line.value, "bar\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 2);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'r');
+        assert_eq!(c.location.line.value, "bar\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 3);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, '\n');
+        assert_eq!(c.location.line.value, "bar\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 4);
+
+        let e = runner.run_until(lexer.peek()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.location.line.value, "bar\n");
+        assert_eq!(e.location.line.number.get(), 2);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+
+        let e2 = runner.run_until(lexer.peek()).unwrap_err();
+        assert_eq!(e, e2);
+        let e2 = runner.run_until(lexer.next()).unwrap_err();
+        assert_eq!(e, e2);
+        let e2 = runner.run_until(lexer.peek()).unwrap_err();
+        assert_eq!(e, e2);
     }
 }
