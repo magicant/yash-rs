@@ -44,6 +44,9 @@ fn dummy_location() -> Location {
     Location { line, column }
 }
 
+pub use self::core::Lexer;
+pub use self::core::Parser as Parser2; // TODO
+
 /// Set of intermediate data used in parsing.
 pub struct Parser {
     source: Vec<SourceChar>,

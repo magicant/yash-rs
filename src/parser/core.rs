@@ -19,11 +19,16 @@
 //! This module includes common types that are used as building blocks for constructing the syntax
 //! parser.
 
+use crate::source::Line;
 use crate::source::Location;
+use crate::source::SourceChar;
 use std::fmt;
+use std::future::Future;
+use std::future::ready;
+use std::num::NonZeroU64;
 
 /// Types of errors that may happen in parsing.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
     /// End of input is reached while more characters are expected to be read.
     EndOfInput,
@@ -44,7 +49,7 @@ impl fmt::Display for ErrorCause {
 }
 
 /// Explanation of a failure in parsing.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
@@ -126,6 +131,40 @@ impl<T> Rec<T> {
             Rec::NonEmpty(t) => Ok(Rec::NonEmpty(f(t)?)),
         }
     }
+}
+
+/// Current state in which input is read.
+///
+/// The context is passed to the input function so that it can read the input in a
+/// context-dependent way.
+///
+/// Currently, this structure is empty. It may be extended to provide with some useful data in
+/// future versions.
+#[derive(Debug)]
+pub struct Context;
+
+/// Set of data used in lexical parsing.
+pub struct Lexer {
+    input: Box<dyn FnMut(&Context) -> Box<dyn Future<Output = Result<Line>>>>,
+    source: Vec<SourceChar>,
+    index: usize,
+}
+
+impl fmt::Debug for Lexer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        f.debug_struct("Lexer")
+            .field("source", &self.source)
+            .field("index", &self.index)
+            .finish()
+        // TODO Call finish_non_exhaustive instead of finish
+    }
+}
+
+/// Set of data used in syntax parsing.
+#[derive(Debug)]
+pub struct Parser<'l> {
+    lexer: &'l Lexer,
+    // TODO Alias definitions, pending here-document contents, token to peek
 }
 
 #[cfg(test)]
