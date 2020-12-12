@@ -45,6 +45,20 @@ fn dummy_location() -> Location {
 }
 
 pub use self::core::Lexer;
+
+impl Lexer {
+    /// Skips blank characters until reaching a non-blank.
+    pub async fn skip_blanks(&mut self) {
+        loop {
+            // TODO Support locale-dependent decision
+            match self.next_if(|c| c != '\n' && c.is_whitespace()).await {
+                Ok(Some(_)) => continue,
+                _ => break,
+            }
+        }
+    }
+}
+
 pub use self::core::Parser as Parser2; // TODO
 
 /// Set of intermediate data used in parsing.
@@ -122,5 +136,55 @@ impl Parser {
         }
         Ok(SimpleCommand { words, redirs })
         // TODO add redirections to waitlist
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lexer_skip_blanks() {
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, " \t w");
+
+        let c = runner
+            .run_until(async {
+                lexer.skip_blanks().await;
+                lexer.peek().await
+            })
+            .unwrap();
+        assert_eq!(c.value, 'w');
+        assert_eq!(c.location.line.value, " \t w");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 4);
+
+        // Test idempotence
+        let c = runner
+            .run_until(async {
+                lexer.skip_blanks().await;
+                lexer.peek().await
+            })
+            .unwrap();
+        assert_eq!(c.value, 'w');
+        assert_eq!(c.location.line.value, " \t w");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 4);
+    }
+
+    #[test]
+    fn lexer_skip_blanks_does_not_skip_newline() {
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+
+        let (c1, c2) = runner.run_until(async {
+                let c1 = lexer.peek().await;
+                lexer.skip_blanks().await;
+                let c2 = lexer.peek().await;
+                (c1, c2)
+            });
+        assert_eq!(c1, c2);
     }
 }
