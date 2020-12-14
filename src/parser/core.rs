@@ -494,7 +494,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "abc");
 
         async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next().await;
+            l.next().await?;
             l.next().await
         }
         let x = lexer.maybe(f);
@@ -510,7 +510,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "abc");
 
         async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next().await;
+            l.next().await?;
             let SourceChar { location, .. } = l.next().await.unwrap();
             let cause = ErrorCause::EndOfInput;
             Err(Error { cause, location })
