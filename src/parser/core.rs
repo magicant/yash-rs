@@ -319,6 +319,7 @@ pub struct Parser<'l> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use std::rc::Rc;
 
     #[test]
@@ -343,9 +344,7 @@ mod tests {
     #[test]
     fn lexer_with_empty_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
-        let e = futures::executor::LocalPool::new()
-            .run_until(lexer.peek())
-            .unwrap_err();
+        let e = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::EndOfInput);
         assert_eq!(e.location.line.value, "");
         assert_eq!(e.location.line.number.get(), 1);
@@ -355,101 +354,98 @@ mod tests {
 
     #[test]
     fn lexer_with_multiline_source() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "foo\nbar\n");
 
-        let c = runner.run_until(lexer.peek()).unwrap();
+        let c = block_on(lexer.peek()).unwrap();
         assert_eq!(c.value, 'f');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
-        let c2 = runner.run_until(lexer.peek()).unwrap();
+        let c2 = block_on(lexer.peek()).unwrap();
         assert_eq!(c, c2);
-        let c2 = runner.run_until(lexer.peek()).unwrap();
+        let c2 = block_on(lexer.peek()).unwrap();
         assert_eq!(c, c2);
-        let c2 = runner.run_until(lexer.next()).unwrap();
+        let c2 = block_on(lexer.next()).unwrap();
         assert_eq!(c, c2);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 3);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'b');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'a');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'r');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 3);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
 
-        let e = runner.run_until(lexer.peek()).unwrap_err();
+        let e = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::EndOfInput);
         assert_eq!(e.location.line.value, "bar\n");
         assert_eq!(e.location.line.number.get(), 2);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
 
-        let e2 = runner.run_until(lexer.peek()).unwrap_err();
+        let e2 = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e, e2);
-        let e2 = runner.run_until(lexer.next()).unwrap_err();
+        let e2 = block_on(lexer.next()).unwrap_err();
         assert_eq!(e, e2);
-        let e2 = runner.run_until(lexer.peek()).unwrap_err();
+        let e2 = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e, e2);
     }
 
     #[test]
     fn lexer_next_if() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "word\n");
 
         let mut called = 0;
-        let c = runner
-            .run_until(lexer.next_if(|c| {
-                assert_eq!(c, 'w');
-                called += 1;
-                true
-            }))
-            .unwrap()
-            .unwrap();
+        let c = block_on(lexer.next_if(|c| {
+            assert_eq!(c, 'w');
+            called += 1;
+            true
+        }))
+        .unwrap()
+        .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.line.value, "word\n");
@@ -458,36 +454,33 @@ mod tests {
         assert_eq!(c.location.column.get(), 1);
 
         let mut called = 0;
-        let o = runner
-            .run_until(lexer.next_if(|c| {
-                assert_eq!(c, 'o');
-                called += 1;
-                false
-            }))
-            .unwrap();
+        let o = block_on(lexer.next_if(|c| {
+            assert_eq!(c, 'o');
+            called += 1;
+            false
+        }))
+        .unwrap();
         assert_eq!(called, 1);
         assert!(o.is_none());
 
         let mut called = 0;
-        let o = runner
-            .run_until(lexer.next_if(|c| {
-                assert_eq!(c, 'o');
-                called += 1;
-                false
-            }))
-            .unwrap();
+        let o = block_on(lexer.next_if(|c| {
+            assert_eq!(c, 'o');
+            called += 1;
+            false
+        }))
+        .unwrap();
         assert_eq!(called, 1);
         assert!(o.is_none());
 
         let mut called = 0;
-        let c = runner
-            .run_until(lexer.next_if(|c| {
-                assert_eq!(c, 'o');
-                called += 1;
-                true
-            }))
-            .unwrap()
-            .unwrap();
+        let c = block_on(lexer.next_if(|c| {
+            assert_eq!(c, 'o');
+            called += 1;
+            true
+        }))
+        .unwrap()
+        .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.line.value, "word\n");
@@ -498,7 +491,6 @@ mod tests {
 
     #[test]
     fn lexer_maybe_success() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "abc");
 
         async fn f(l: &mut Lexer) -> Result<SourceChar> {
@@ -506,16 +498,15 @@ mod tests {
             l.next().await
         }
         let x = lexer.maybe(f);
-        let c = runner.run_until(x).unwrap();
+        let c = block_on(x).unwrap();
         assert_eq!(c.value, 'b');
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'c');
     }
 
     #[test]
     fn lexer_maybe_failure() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "abc");
 
         async fn f(l: &mut Lexer) -> Result<SourceChar> {
@@ -525,11 +516,11 @@ mod tests {
             Err(Error { cause, location })
         }
         let x = lexer.maybe(f);
-        let Error { cause, location } = runner.run_until(x).unwrap_err();
+        let Error { cause, location } = block_on(x).unwrap_err();
         assert_eq!(cause, ErrorCause::EndOfInput);
         assert_eq!(location.column.get(), 2);
 
-        let c = runner.run_until(lexer.next()).unwrap();
+        let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'a');
         assert_eq!(c.location.column.get(), 1);
     }

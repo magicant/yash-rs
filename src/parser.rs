@@ -162,18 +162,17 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
 
     #[test]
     fn lexer_skip_blanks() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, " \t w");
 
-        let c = runner
-            .run_until(async {
-                lexer.skip_blanks().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_blanks().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.line.value, " \t w");
         assert_eq!(c.location.line.number.get(), 1);
@@ -181,12 +180,11 @@ mod tests {
         assert_eq!(c.location.column.get(), 4);
 
         // Test idempotence
-        let c = runner
-            .run_until(async {
-                lexer.skip_blanks().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_blanks().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.line.value, " \t w");
         assert_eq!(c.location.line.number.get(), 1);
@@ -196,10 +194,8 @@ mod tests {
 
     #[test]
     fn lexer_skip_blanks_does_not_skip_newline() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-
-        let (c1, c2) = runner.run_until(async {
+        let (c1, c2) = block_on(async {
             let c1 = lexer.peek().await;
             lexer.skip_blanks().await;
             let c2 = lexer.peek().await;
@@ -210,10 +206,8 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_no_comment() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-
-        let (c1, c2) = runner.run_until(async {
+        let (c1, c2) = block_on(async {
             let c1 = lexer.peek().await;
             lexer.skip_comment().await;
             let c2 = lexer.peek().await;
@@ -224,15 +218,13 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_empty_comment() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "#\n");
 
-        let c = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "#\n");
         assert_eq!(c.location.line.number.get(), 1);
@@ -240,12 +232,11 @@ mod tests {
         assert_eq!(c.location.column.get(), 2);
 
         // Test idempotence
-        let c = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "#\n");
         assert_eq!(c.location.line.number.get(), 1);
@@ -255,15 +246,13 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_non_empty_comment() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "### foo bar\\\n");
 
-        let c = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
         assert_eq!(c.location.line.number.get(), 1);
@@ -271,12 +260,11 @@ mod tests {
         assert_eq!(c.location.column.get(), 13);
 
         // Test idempotence
-        let c = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap();
+        let c = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
         assert_eq!(c.location.line.number.get(), 1);
@@ -286,15 +274,13 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_not_ending_with_newline() {
-        let mut runner = futures::executor::LocalPool::new();
         let mut lexer = Lexer::with_source(Source::Unknown, "#comment");
 
-        let e = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap_err();
+        let e = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap_err();
         assert_eq!(e.cause, ErrorCause::EndOfInput);
         assert_eq!(e.location.line.value, "#comment");
         assert_eq!(e.location.line.number.get(), 1);
@@ -302,12 +288,11 @@ mod tests {
         assert_eq!(e.location.column.get(), 9);
 
         // Test idempotence
-        let e = runner
-            .run_until(async {
-                lexer.skip_comment().await;
-                lexer.peek().await
-            })
-            .unwrap_err();
+        let e = block_on(async {
+            lexer.skip_comment().await;
+            lexer.peek().await
+        })
+        .unwrap_err();
         assert_eq!(e.cause, ErrorCause::EndOfInput);
         assert_eq!(e.location.line.value, "#comment");
         assert_eq!(e.location.line.number.get(), 1);
