@@ -147,6 +147,26 @@ impl<T> Rec<T> {
 #[derive(Debug)]
 pub struct Context;
 
+/// Dummy trait for working around type error.
+///
+/// cf. https://stackoverflow.com/a/64325742
+pub trait MyFnOnce<'a, T, R> {
+    type Output: Future<Output = R>;
+    fn call(self, t: &'a mut T) -> Self::Output;
+}
+
+impl<'a, T, F, R, Fut> MyFnOnce<'a, T, R> for F
+where
+    T: 'a,
+    F: FnOnce(&'a mut T) -> Fut,
+    Fut: Future<Output = R>,
+{
+    type Output = Fut;
+    fn call(self, t: &'a mut T) -> Fut {
+        self(t)
+    }
+}
+
 /// Set of data used in lexical parsing.
 pub struct Lexer {
     input: Box<dyn FnMut(&Context) -> Pin<Box<dyn Future<Output = Result<Line>>>>>,
@@ -257,6 +277,23 @@ impl Lexer {
         let r = self.peek().await;
         if r.is_ok() {
             self.index += 1;
+        }
+        r
+    }
+
+    /// Applies the given parser and updates the current position only if the parser succeeds.
+    ///
+    /// This function can be used to cancel the effect of failed parsing so that the consumed
+    /// characters can be parsed by another parser. Note that `maybe` only rewinds the position. It
+    /// does not undo the effect on the buffer containing the characters read while parsing.
+    pub async fn maybe<F, R>(&mut self, f: F) -> Result<R>
+    where
+        F: for<'a> MyFnOnce<'a, Lexer, Result<R>>,
+    {
+        let old_index = self.index;
+        let r = f.call(self).await;
+        if r.is_err() {
+            self.index = old_index;
         }
         r
     }
@@ -457,5 +494,43 @@ mod tests {
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
+    }
+
+    #[test]
+    fn lexer_maybe_success() {
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+
+        async fn f(l: &mut Lexer) -> Result<SourceChar> {
+            l.next().await;
+            l.next().await
+        }
+        let x = lexer.maybe(f);
+        let c = runner.run_until(x).unwrap();
+        assert_eq!(c.value, 'b');
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'c');
+    }
+
+    #[test]
+    fn lexer_maybe_failure() {
+        let mut runner = futures::executor::LocalPool::new();
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+
+        async fn f(l: &mut Lexer) -> Result<SourceChar> {
+            l.next().await;
+            let SourceChar { location, .. } = l.next().await.unwrap();
+            let cause = ErrorCause::EndOfInput;
+            Err(Error { cause, location })
+        }
+        let x = lexer.maybe(f);
+        let Error { cause, location } = runner.run_until(x).unwrap_err();
+        assert_eq!(cause, ErrorCause::EndOfInput);
+        assert_eq!(location.column.get(), 2);
+
+        let c = runner.run_until(lexer.next()).unwrap();
+        assert_eq!(c.value, 'a');
+        assert_eq!(c.location.column.get(), 1);
     }
 }
