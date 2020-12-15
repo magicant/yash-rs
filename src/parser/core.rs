@@ -34,6 +34,11 @@ use std::rc::Rc;
 /// Types of errors that may happen in parsing.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
+    /// Uncategorized type of error.
+    ///
+    /// This error cause is used when the error type is so generic that it lacks meaning
+    /// description.
+    Unknown,
     /// End of input is reached while more characters are expected to be read.
     EndOfInput,
     // TODO Include the corresponding here-doc operator.
@@ -44,6 +49,7 @@ pub enum ErrorCause {
 impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ErrorCause::Unknown => f.write_str("Unknown error"),
             ErrorCause::EndOfInput => f.write_str("Incomplete command"),
             ErrorCause::MissingHereDocContent => {
                 f.write_str("Content of the here-document is missing")
@@ -230,14 +236,14 @@ impl Lexer {
     /// Returns [Error::EndOfInput] if reached the end of input.
     #[must_use]
     pub async fn peek(&mut self) -> Result<SourceChar> {
-        if let Some(ref e) = self.end_of_input {
-            assert_eq!(self.index, self.source.len());
-            return Err(e.clone());
-        }
-
         loop {
             if let Some(c) = self.source.get(self.index) {
                 return Ok(c.clone());
+            }
+
+            if let Some(ref e) = self.end_of_input {
+                assert_eq!(self.index, self.source.len());
+                return Err(e.clone());
             }
 
             // Read more input
