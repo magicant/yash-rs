@@ -52,7 +52,7 @@ impl Lexer {
     where
         F: FnOnce(char) -> bool,
     {
-        matches!(self.next_if(f).await, Ok(Some(_)))
+        self.next_if(f).await.is_ok()
     }
 
     /// Skips a line continuation, if any.

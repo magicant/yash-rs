@@ -260,19 +260,22 @@ impl Lexer {
     /// Peeks the next character and, if the given decider function returns true for it, advances
     /// the position.
     ///
-    /// Returns the consumed character `Ok(Some(_))` if the function returned true. Returns
-    /// `Ok(None)` if the function returned false. Returns `Err(_)` if the input function returned
-    /// an error, including the end-of-input case.
-    pub async fn next_if<F>(&mut self, f: F) -> Result<Option<SourceChar>>
+    /// Returns the consumed character if the function returned true. Returns an
+    /// [Unknown](ErrorCause::Unknown) error if the function returned false. Returns the error
+    /// intact if the input function returned an error, including the end-of-input case.
+    pub async fn next_if<F>(&mut self, f: F) -> Result<SourceChar>
     where
         F: FnOnce(char) -> bool,
     {
         let c = self.peek().await?;
         if f(c.value) {
             self.index += 1;
-            Ok(Some(c))
+            Ok(c)
         } else {
-            Ok(None)
+            Err(Error {
+                cause: ErrorCause::Unknown,
+                location: c.location,
+            })
         }
     }
 
@@ -450,7 +453,6 @@ mod tests {
             called += 1;
             true
         }))
-        .unwrap()
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'w');
@@ -460,24 +462,32 @@ mod tests {
         assert_eq!(c.location.column.get(), 1);
 
         let mut called = 0;
-        let o = block_on(lexer.next_if(|c| {
+        let e = block_on(lexer.next_if(|c| {
             assert_eq!(c, 'o');
             called += 1;
             false
         }))
-        .unwrap();
+        .unwrap_err();
         assert_eq!(called, 1);
-        assert!(o.is_none());
+        assert_eq!(e.cause, ErrorCause::Unknown);
+        assert_eq!(e.location.line.value, "word\n");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
 
         let mut called = 0;
-        let o = block_on(lexer.next_if(|c| {
+        let e = block_on(lexer.next_if(|c| {
             assert_eq!(c, 'o');
             called += 1;
             false
         }))
-        .unwrap();
+        .unwrap_err();
         assert_eq!(called, 1);
-        assert!(o.is_none());
+        assert_eq!(e.cause, ErrorCause::Unknown);
+        assert_eq!(e.location.line.value, "word\n");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
 
         let mut called = 0;
         let c = block_on(lexer.next_if(|c| {
@@ -485,7 +495,6 @@ mod tests {
             called += 1;
             true
         }))
-        .unwrap()
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'o');
