@@ -62,15 +62,9 @@ impl Lexer {
     /// any characters.
     pub async fn maybe_line_continuation(&mut self) -> Result<()> {
         async fn line_continuation(this: &mut Lexer) -> Result<()> {
-            if this.skip_if(|c| c == '\\').await && this.skip_if(|c| c == '\n').await {
-                Ok(())
-            } else {
-                let s = this.peek().await?;
-                Err(Error {
-                    cause: ErrorCause::Unknown,
-                    location: s.location,
-                })
-            }
+            this.next_if(|c| c == '\\').await?;
+            this.next_if(|c| c == '\n').await?;
+            Ok(())
         }
         self.maybe(line_continuation).await
     }
