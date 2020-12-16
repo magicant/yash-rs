@@ -26,6 +26,8 @@ use super::syntax::*;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
+pub use self::core::AsyncFnMut;
+pub use self::core::AsyncFnOnce;
 pub use self::core::Error;
 pub use self::core::ErrorCause;
 pub use self::core::Result;
