@@ -68,12 +68,21 @@ impl Lexer {
         }
         self.maybe(line_continuation).await
     }
+    // TODO Change maybe_line_continuation to line_continuation or remove implicit `maybe` effect
+    // from `many`, as current `many(maybe_line_continuation)` doubles the `maybe` effect
+    // redundantly.
 
-    // TODO skip line continuations
     /// Skips blank characters until reaching a non-blank.
+    ///
+    /// This function also skips line continuations.
     pub async fn skip_blanks(&mut self) {
         // TODO Support locale-dependent decision
-        while self.skip_if(|c| c != '\n' && c.is_whitespace()).await {}
+        loop {
+            let _ = self.many(Lexer::maybe_line_continuation).await;
+            if !self.skip_if(|c| c != '\n' && c.is_whitespace()).await {
+                break;
+            }
+        }
     }
 
     /// Skips a comment, if any.
@@ -90,6 +99,9 @@ impl Lexer {
     }
 
     /// Skips blank characters and a comment, if any.
+    ///
+    /// This function also skips line continuations between blanks. It is the same as doing
+    /// [skip_blanks](Lexer::skip_blanks) followed by [skip_comment](Lexer::skip_comment).
     pub async fn skip_blanks_and_comment(&mut self) {
         self.skip_blanks().await;
         self.skip_comment().await;
@@ -297,6 +309,33 @@ mod tests {
             (c1, c2)
         });
         assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn lexer_skip_blanks_skips_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n  \\\n\\\n\\\n \\\nX");
+        let c = block_on(async {
+            lexer.skip_blanks().await;
+            lexer.peek().await
+        })
+        .unwrap();
+        assert_eq!(c.value, 'X');
+        assert_eq!(c.location.line.value, "X");
+        assert_eq!(c.location.line.number.get(), 6);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "  \\\n\\\n  \\\n Y");
+        let c = block_on(async {
+            lexer.skip_blanks().await;
+            lexer.peek().await
+        })
+        .unwrap();
+        assert_eq!(c.value, 'Y');
+        assert_eq!(c.location.line.value, " Y");
+        assert_eq!(c.location.line.number.get(), 4);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 2);
     }
 
     #[test]
