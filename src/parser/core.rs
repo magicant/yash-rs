@@ -253,7 +253,7 @@ impl Lexer {
 
     /// Peeks the next character.
     ///
-    /// Returns [Error::EndOfInput] if reached the end of input.
+    /// Returns [EndOfInput](ErrorCause::EndOfInput) if reached the end of input.
     #[must_use]
     pub async fn peek(&mut self) -> Result<SourceChar> {
         loop {
@@ -301,7 +301,7 @@ impl Lexer {
 
     /// Reads the next character, advancing the position.
     ///
-    /// Returns [Error::EndOfInput] if reached the end of input.
+    /// Returns [EndOfInput](ErrorCause::EndOfInput) if reached the end of input.
     pub async fn next(&mut self) -> Result<SourceChar> {
         let r = self.peek().await;
         if r.is_ok() {
