@@ -173,6 +173,26 @@ where
     }
 }
 
+/// Dummy trait for working around type error.
+///
+/// cf. https://stackoverflow.com/a/64325742
+pub trait MyFnMut<'a, T, R> {
+    type Output: Future<Output = R>;
+    fn call(&mut self, t: &'a mut T) -> Self::Output;
+}
+
+impl<'a, T, F, R, Fut> MyFnMut<'a, T, R> for F
+where
+    T: 'a,
+    F: FnMut(&'a mut T) -> Fut,
+    Fut: Future<Output = R>,
+{
+    type Output = Fut;
+    fn call(&mut self, t: &'a mut T) -> Fut {
+        self(t)
+    }
+}
+
 /// Set of data used in lexical parsing.
 pub struct Lexer {
     input: Box<dyn FnMut(&Context) -> Pin<Box<dyn Future<Output = Result<Line>>>>>,
@@ -305,6 +325,29 @@ impl Lexer {
             self.index = old_index;
         }
         r
+    }
+
+    /// Applies the given parser repeatedly until it fails.
+    ///
+    /// This function implicitly applies [Lexer::maybe] so that the position is left just after the last
+    /// successful parse.
+    ///
+    /// Returns a vector of the successful results and the error that stopped the repetition.
+    pub async fn many<F, R>(&mut self, mut f: F) -> (Vec<R>, Error)
+    where
+        F: for<'a> MyFnMut<'a, Lexer, Result<R>>,
+    {
+        let mut results = vec![];
+        loop {
+            let old_index = self.index;
+            match f.call(self).await {
+                Ok(r) => results.push(r),
+                Err(e) => {
+                    self.index = old_index;
+                    break (results, e);
+                }
+            }
+        }
     }
 }
 
@@ -538,5 +581,59 @@ mod tests {
         let c = block_on(lexer.next()).unwrap();
         assert_eq!(c.value, 'a');
         assert_eq!(c.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_many_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+
+        async fn f(l: &mut Lexer) -> Result<SourceChar> {
+            l.next_if(|c| c == 'a').await?;
+            l.next_if(|c| c == 'b').await
+        }
+        let (r, e) = block_on(lexer.many(f));
+        assert!(r.is_empty());
+        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.location.line.value, "");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_many_one() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "ab");
+
+        async fn f(l: &mut Lexer) -> Result<SourceChar> {
+            l.next_if(|c| c == 'a').await?;
+            l.next_if(|c| c == 'b').await
+        }
+        let (r, e) = block_on(lexer.many(f));
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].value, 'b');
+        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.location.line.value, "ab");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
+    }
+    #[test]
+    fn lexer_many_three() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "xyxyxyxz");
+
+        async fn f(l: &mut Lexer) -> Result<SourceChar> {
+            l.next_if(|c| c == 'x').await?;
+            l.next_if(|c| c == 'y').await
+        }
+        let (r, e) = block_on(lexer.many(f));
+        assert_eq!(r.len(), 3);
+        assert_eq!(r[0].value, 'y');
+        assert_eq!(r[1].value, 'y');
+        assert_eq!(r[2].value, 'y');
+        assert_eq!(e.cause, ErrorCause::Unknown);
+        assert_eq!(e.location.line.value, "xyxyxyxz");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 8);
     }
 }
