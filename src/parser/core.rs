@@ -36,8 +36,8 @@ use std::rc::Rc;
 pub enum ErrorCause {
     /// Uncategorized type of error.
     ///
-    /// This error cause is used when the error type is so generic that it lacks meaning
-    /// description.
+    /// This error cause is used when the error type is so generic that no meaningful
+    /// explanation can be provided.
     Unknown,
     /// End of input is reached while more characters are expected to be read.
     EndOfInput,
