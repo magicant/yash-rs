@@ -193,7 +193,16 @@ where
     }
 }
 
-/// Set of data used in lexical parsing.
+/// Lexical analyzer.
+///
+/// A lexer reads lines using an input function and parses the characters into tokens. It has an
+/// internal buffer containing the characters that have been read and the position (or the
+/// index) of the character that is to be parsed next.
+///
+/// `Lexer` has primitive functions such as [`peek`](Lexer::peek) and [`next`](Lexer::next) that
+/// provide access to the character at the current position. Derived functions such as
+/// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
+/// parse more complex structures in the source code.
 pub struct Lexer {
     input: Box<dyn FnMut(&Context) -> Pin<Box<dyn Future<Output = Result<Line>>>>>,
     source: Vec<SourceChar>,
