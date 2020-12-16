@@ -156,12 +156,12 @@ pub struct Context;
 /// Dummy trait for working around type error.
 ///
 /// cf. https://stackoverflow.com/a/64325742
-pub trait MyFnOnce<'a, T, R> {
+pub trait AsyncFnOnce<'a, T, R> {
     type Output: Future<Output = R>;
     fn call(self, t: &'a mut T) -> Self::Output;
 }
 
-impl<'a, T, F, R, Fut> MyFnOnce<'a, T, R> for F
+impl<'a, T, F, R, Fut> AsyncFnOnce<'a, T, R> for F
 where
     T: 'a,
     F: FnOnce(&'a mut T) -> Fut,
@@ -176,12 +176,12 @@ where
 /// Dummy trait for working around type error.
 ///
 /// cf. https://stackoverflow.com/a/64325742
-pub trait MyFnMut<'a, T, R> {
+pub trait AsyncFnMut<'a, T, R> {
     type Output: Future<Output = R>;
     fn call(&mut self, t: &'a mut T) -> Self::Output;
 }
 
-impl<'a, T, F, R, Fut> MyFnMut<'a, T, R> for F
+impl<'a, T, F, R, Fut> AsyncFnMut<'a, T, R> for F
 where
     T: 'a,
     F: FnMut(&'a mut T) -> Fut,
@@ -317,7 +317,7 @@ impl Lexer {
     /// does not undo the effect on the buffer containing the characters read while parsing.
     pub async fn maybe<F, R>(&mut self, f: F) -> Result<R>
     where
-        F: for<'a> MyFnOnce<'a, Lexer, Result<R>>,
+        F: for<'a> AsyncFnOnce<'a, Lexer, Result<R>>,
     {
         let old_index = self.index;
         let r = f.call(self).await;
@@ -335,7 +335,7 @@ impl Lexer {
     /// Returns a vector of the successful results and the error that stopped the repetition.
     pub async fn many<F, R>(&mut self, mut f: F) -> (Vec<R>, Error)
     where
-        F: for<'a> MyFnMut<'a, Lexer, Result<R>>,
+        F: for<'a> AsyncFnMut<'a, Lexer, Result<R>>,
     {
         let mut results = vec![];
         loop {
