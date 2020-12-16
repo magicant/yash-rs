@@ -58,7 +58,7 @@ impl Lexer {
     /// Skips a line continuation, if any.
     ///
     /// If there is a line continuation at the current position, this function skips it and returns
-    /// `Ok(())`. Otherwise, it returns an [Unknown](ErrorCause::Unknown) error without consuming
+    /// `Ok(())`. Otherwise, it returns an [`Unknown`](ErrorCause::Unknown) error without consuming
     /// any characters.
     pub async fn maybe_line_continuation(&mut self) -> Result<()> {
         async fn line_continuation(this: &mut Lexer) -> Result<()> {
@@ -100,8 +100,8 @@ impl Lexer {
 
     /// Skips blank characters and a comment, if any.
     ///
-    /// This function also skips line continuations between blanks. It is the same as doing
-    /// [skip_blanks](Lexer::skip_blanks) followed by [skip_comment](Lexer::skip_comment).
+    /// This function also skips line continuations between blanks. It is the same as
+    /// [`skip_blanks`](Lexer::skip_blanks) followed by [`skip_comment`](Lexer::skip_comment).
     pub async fn skip_blanks_and_comment(&mut self) {
         self.skip_blanks().await;
         self.skip_comment().await;

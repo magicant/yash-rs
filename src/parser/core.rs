@@ -245,7 +245,7 @@ impl Lexer {
     /// Creates a new lexer with a fixed source code from unknown origin.
     ///
     /// This function is mainly for quick debugging purpose. Using in productions is not
-    /// recommended because it does not provide meaning [Source] on error.
+    /// recommended because it does not provide meaningful [`Source`] on error.
     #[must_use]
     pub fn with_unknown_source(code: &str) -> Lexer {
         Lexer::with_source(Source::Unknown, code)
@@ -253,7 +253,7 @@ impl Lexer {
 
     /// Peeks the next character.
     ///
-    /// Returns [EndOfInput](ErrorCause::EndOfInput) if reached the end of input.
+    /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
     #[must_use]
     pub async fn peek(&mut self) -> Result<SourceChar> {
         loop {
@@ -281,7 +281,7 @@ impl Lexer {
     /// the position.
     ///
     /// Returns the consumed character if the function returned true. Returns an
-    /// [Unknown](ErrorCause::Unknown) error if the function returned false. Returns the error
+    /// [`Unknown`](ErrorCause::Unknown) error if the function returned false. Returns the error
     /// intact if the input function returned an error, including the end-of-input case.
     pub async fn next_if<F>(&mut self, f: F) -> Result<SourceChar>
     where
@@ -301,7 +301,7 @@ impl Lexer {
 
     /// Reads the next character, advancing the position.
     ///
-    /// Returns [EndOfInput](ErrorCause::EndOfInput) if reached the end of input.
+    /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
     pub async fn next(&mut self) -> Result<SourceChar> {
         let r = self.peek().await;
         if r.is_ok() {
@@ -329,7 +329,7 @@ impl Lexer {
 
     /// Applies the given parser repeatedly until it fails.
     ///
-    /// This function implicitly applies [Lexer::maybe] so that the position is left just after the last
+    /// This function implicitly applies [`Lexer::maybe`] so that the position is left just after the last
     /// successful parse.
     ///
     /// Returns a vector of the successful results and the error that stopped the repetition.
