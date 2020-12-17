@@ -25,6 +25,7 @@
 //!
 //! TODO Elaborate
 
+use crate::source::Location;
 use itertools::Itertools;
 use std::fmt;
 use std::os::unix::io::RawFd;
@@ -76,7 +77,15 @@ impl fmt::Display for WordUnit {
 /// It depends on context whether an empty word is valid or not. It is your responsibility to
 /// ensure a word is non-empty in a context where it cannot.
 #[derive(Debug)]
-pub struct Word(pub String); // TODO Redefine as a vector of word elements.
+pub struct Word(pub String); // TODO Replace with Word2
+
+#[derive(Debug)]
+pub struct Word2 {
+    /// Word units that constitute the word.
+    pub units: Vec<WordUnit>,
+    /// Location of the first character of the word.
+    pub location: Location,
+}
 
 impl Word {
     /// Creates a constant word with unknown source.

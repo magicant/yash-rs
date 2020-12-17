@@ -108,6 +108,22 @@ impl Lexer {
         self.skip_blanks().await;
         self.skip_comment().await;
     }
+
+    /// Parses a word token.
+    pub async fn word(&mut self) -> Result<Word2> {
+        let SourceChar { location, .. } = self.peek().await?;
+
+        let mut units = vec![];
+        loop {
+            // TODO Parse the word correctly
+            match self.next_if(|c| c != '\n' && !c.is_whitespace()).await {
+                Ok(sc) => units.push(Unquoted(Literal(sc.value))),
+                Err(Error { cause, .. }) if cause == ErrorCause::Unknown => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(Word2 { units, location })
+    }
 }
 
 pub use self::core::Parser as Parser2; // TODO
