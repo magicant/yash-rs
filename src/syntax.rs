@@ -29,6 +29,48 @@ use itertools::Itertools;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
+/// Element of a [Word] that can be double-quoted.
+#[derive(Debug)]
+pub enum DoubleQuotable {
+    /// Literal single character.
+    Literal(char),
+    // /// Backslash-escaped single character.
+    // TODO Backslashed(char),
+    // Parameter(TODO),
+    // CommandSubst(TODO),
+    // Backquote(TODO),
+    // Arith(TODO),
+}
+
+pub use DoubleQuotable::*;
+
+impl fmt::Display for DoubleQuotable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Literal(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+/// Element of a [Word].
+#[derive(Debug)]
+pub enum WordUnit {
+    /// Unquoted [`DoubleQuotable`] as a word unit.
+    Unquoted(DoubleQuotable),
+    // TODO DoubleQuote(Vec<DoubleQuotable>),
+    // TODO SingleQuote(String),
+}
+
+pub use WordUnit::*;
+
+impl fmt::Display for WordUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Unquoted(ref dq) => write!(f, "{}", dq),
+        }
+    }
+}
+
 /// Token that may involve expansion.
 ///
 /// It depends on context whether an empty word is valid or not. It is your responsibility to
