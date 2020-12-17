@@ -373,8 +373,47 @@ impl fmt::Debug for Lexer {
 /// Set of data used in syntax parsing.
 #[derive(Debug)]
 pub struct Parser<'l> {
-    lexer: &'l Lexer,
-    // TODO Alias definitions, pending here-document contents, token to peek
+    /// Lexer that provides tokens.
+    lexer: &'l mut Lexer,
+
+    /// Token to parse next.
+    ///
+    /// This value is an option of a result. It is `None` when the next token is not yet parsed by
+    /// the lexer. It is `Some(Err(_))` if the lexer has failed.
+    token: Option<Result<crate::syntax::Word2>>,
+    // TODO Alias definitions, pending here-document contents
+}
+
+impl Parser<'_> {
+    /// Creates a new parser based on the given lexer.
+    pub fn new(lexer: &mut Lexer) -> Parser {
+        Parser { lexer, token: None }
+    }
+
+    // TODO Replace Word2 in the return type with Token
+    /// Reads a next token if the current token is `None`.
+    async fn require_token(&mut self) {
+        if self.token.is_none() {
+            self.lexer.skip_blanks_and_comment().await;
+            self.token = Some(self.lexer.word().await);
+        }
+    }
+
+    // TODO Replace Word2 in the return type with Token
+    /// Returns a reference to the current token.
+    ///
+    /// If the current token is not yet read from the underlying lexer, it is read.
+    pub async fn peek_token(&mut self) -> &Result<crate::syntax::Word2> {
+        self.require_token().await;
+        self.token.as_ref().unwrap()
+    }
+
+    // TODO Replace Word2 in the return type with Token
+    /// Consumes the current token.
+    pub async fn take_token(&mut self) -> Result<crate::syntax::Word2> {
+        self.require_token().await;
+        self.token.take().unwrap()
+    }
 }
 
 #[cfg(test)]
