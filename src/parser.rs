@@ -23,8 +23,6 @@ mod fill;
 
 use super::source::*;
 use super::syntax::*;
-use std::num::NonZeroU64;
-use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
 pub use self::core::AsyncFnOnce;
@@ -33,20 +31,6 @@ pub use self::core::ErrorCause;
 pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
-
-// TODO remove dummy location and use actual locations
-fn dummy_location() -> Location {
-    let value = "".to_string();
-    let number = NonZeroU64::new(1).unwrap();
-    let source = Source::Unknown;
-    let line = Rc::new(Line {
-        value,
-        number,
-        source,
-    });
-    let column = number;
-    Location { line, column }
-}
 
 pub use self::core::Lexer;
 
@@ -112,7 +96,7 @@ impl Lexer {
     }
 
     /// Parses a word token.
-    pub async fn word(&mut self) -> Result<Word2> {
+    pub async fn word(&mut self) -> Result<Word> {
         let SourceChar { location, .. } = self.peek().await?;
 
         let mut units = vec![];
@@ -124,7 +108,7 @@ impl Lexer {
                 Err(e) => return Err(e),
             }
         }
-        Ok(Word2 { units, location })
+        Ok(Word { units, location })
     }
 }
 
@@ -147,7 +131,7 @@ impl Parser<'_> {
             words.push(word?);
         }
         Ok(SimpleCommand {
-            words: todo!(),
+            words,
             redirs: vec![],
         })
     }

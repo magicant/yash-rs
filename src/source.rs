@@ -109,6 +109,25 @@ pub struct Location {
 }
 
 impl Location {
+    /// Creates a dummy location.
+    ///
+    /// The returned location has [unknown](Source::Unknown) source and the given line value. The
+    /// line and column numbers are 1.
+    ///
+    /// This function is mainly for use in testing.
+    pub fn dummy(line: String) -> Location {
+        let number = NonZeroU64::new(1).unwrap();
+        let line = Rc::new(Line {
+            value: line,
+            number,
+            source: Source::Unknown,
+        });
+        Location {
+            line,
+            column: number,
+        }
+    }
+
     /// Increases the column number
     pub fn advance(&mut self, count: u64) {
         let column = self.column.get().checked_add(count).unwrap();

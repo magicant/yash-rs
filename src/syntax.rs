@@ -77,10 +77,7 @@ impl fmt::Display for WordUnit {
 /// It depends on context whether an empty word is valid or not. It is your responsibility to
 /// ensure a word is non-empty in a context where it cannot.
 #[derive(Debug)]
-pub struct Word(pub String); // TODO Replace with Word2
-
-#[derive(Debug)]
-pub struct Word2 {
+pub struct Word {
     /// Word units that constitute the word.
     pub units: Vec<WordUnit>,
     /// Location of the first character of the word.
@@ -94,14 +91,21 @@ impl Word {
     /// purpose.
     ///
     /// The resulting word elements are not quoted even if they would be usually special.
-    pub fn with_str(s: &str) -> Word {
-        Word(s.to_string())
+    pub fn with_str(s: String) -> Word {
+        let mut units = vec![];
+        for c in s.chars() {
+            units.push(WordUnit::Unquoted(DoubleQuotable::Literal(c)));
+        }
+        Word {
+            units,
+            location: Location::dummy(s),
+        }
     }
 }
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
     }
 }
 
@@ -212,16 +216,16 @@ mod tests {
     #[test]
     fn here_doc_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END"),
+            delimiter: Word::with_str("END".to_string()),
             remove_tabs: true,
-            content: Word::with_str("here"),
+            content: Word::with_str("here".to_string()),
         };
         assert_eq!(format!("{}", heredoc), "<<-END");
 
         let heredoc = HereDoc {
-            delimiter: Word::with_str("XXX"),
+            delimiter: Word::with_str("XXX".to_string()),
             remove_tabs: false,
-            content: Word::with_str("there"),
+            content: Word::with_str("there".to_string()),
         };
         assert_eq!(format!("{}", heredoc), "<<XXX");
     }
@@ -229,9 +233,9 @@ mod tests {
     #[test]
     fn redir_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END"),
+            delimiter: Word::with_str("END".to_string()),
             remove_tabs: false,
-            content: Word::with_str("here"),
+            content: Word::with_str("here".to_string()),
         };
 
         let redir = Redir {
@@ -259,18 +263,18 @@ mod tests {
         };
         assert_eq!(format!("{}", command), "");
 
-        command.words.push(Word::with_str("echo"));
+        command.words.push(Word::with_str("echo".to_string()));
         assert_eq!(format!("{}", command), "echo");
 
-        command.words.push(Word::with_str("foo"));
+        command.words.push(Word::with_str("foo".to_string()));
         assert_eq!(format!("{}", command), "echo foo");
 
         command.redirs.push(Redir {
             fd: None,
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("END"),
+                delimiter: Word::with_str("END".to_string()),
                 remove_tabs: false,
-                content: Word::with_str(""),
+                content: Word::with_str("".to_string()),
             }),
         });
         assert_eq!(format!("{}", command), "echo foo <<END");
@@ -281,9 +285,9 @@ mod tests {
         command.redirs.push(Redir {
             fd: Some(1),
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("here"),
+                delimiter: Word::with_str("here".to_string()),
                 remove_tabs: true,
-                content: Word::with_str("ignored"),
+                content: Word::with_str("ignored".to_string()),
             }),
         });
         assert_eq!(format!("{}", command), "<<END 1<<-here");
