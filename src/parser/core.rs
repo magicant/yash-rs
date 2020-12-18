@@ -395,7 +395,19 @@ impl Parser<'_> {
     async fn require_token(&mut self) {
         if self.token.is_none() {
             self.lexer.skip_blanks_and_comment().await;
-            self.token = Some(self.lexer.word().await);
+            let result = self.lexer.word().await;
+            self.token = Some(if let Ok(word) = result {
+                if word.units.is_empty() {
+                    Err(Error {
+                        cause: ErrorCause::EndOfInput,
+                        location: word.location,
+                    })
+                } else {
+                    Ok(word)
+                }
+            } else {
+                result
+            });
         }
     }
 

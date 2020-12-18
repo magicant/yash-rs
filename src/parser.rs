@@ -105,6 +105,11 @@ impl Lexer {
             match self.next_if(|c| c != '\n' && !c.is_whitespace()).await {
                 Ok(sc) => units.push(Unquoted(Literal(sc.value))),
                 Err(Error { cause, .. }) if cause == ErrorCause::Unknown => break,
+                Err(Error { cause, .. })
+                    if cause == ErrorCause::EndOfInput && !units.is_empty() =>
+                {
+                    break
+                }
                 Err(e) => return Err(e),
             }
         }
