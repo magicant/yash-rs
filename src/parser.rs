@@ -31,6 +31,8 @@ pub use self::core::AsyncFnOnce;
 pub use self::core::Error;
 pub use self::core::ErrorCause;
 pub use self::core::Result;
+pub use self::fill::Fill;
+pub use self::fill::MissingHereDoc;
 
 // TODO remove dummy location and use actual locations
 fn dummy_location() -> Location {
@@ -127,6 +129,29 @@ impl Lexer {
 }
 
 pub use self::core::Parser as Parser2; // TODO
+
+impl Parser2<'_> {
+    /// Parses a simple command.
+    pub async fn simple_command(&mut self) -> Result<SimpleCommand<MissingHereDoc>> {
+        // TODO Support assignments and redirections. Stop on a delimiter token.
+        let mut words = vec![];
+        loop {
+            let word = self.take_token().await;
+            if let Err(Error {
+                cause: ErrorCause::EndOfInput,
+                ..
+            }) = word
+            {
+                break;
+            }
+            words.push(word?);
+        }
+        Ok(SimpleCommand {
+            words: todo!(),
+            redirs: vec![],
+        })
+    }
+}
 
 /// Set of intermediate data used in parsing.
 pub struct Parser {
