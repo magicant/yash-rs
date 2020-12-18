@@ -33,9 +33,16 @@ async fn parse_and_print() {
         {
             break;
         }
-        let mut parser = parser::Parser::new(code);
-        match parser.parse_simple_command().await {
-            Ok(command) => println!("{}", command),
+        let mut lexer = parser::Lexer::with_unknown_source(&code);
+        let mut parser = parser::Parser::new(&mut lexer);
+        match parser.simple_command().await {
+            Ok(command) => {
+                use parser::Fill;
+                match command.fill(&mut std::iter::empty()) {
+                    Ok(command) => println!("{}", command),
+                    Err(e) => print!("{}", e),
+                }
+            }
             Err(e) => print!("{}", e),
         }
     }

@@ -128,9 +128,9 @@ impl Lexer {
     }
 }
 
-pub use self::core::Parser as Parser2; // TODO
+pub use self::core::Parser;
 
-impl Parser2<'_> {
+impl Parser<'_> {
     /// Parses a simple command.
     pub async fn simple_command(&mut self) -> Result<SimpleCommand<MissingHereDoc>> {
         // TODO Support assignments and redirections. Stop on a delimiter token.
@@ -150,84 +150,6 @@ impl Parser2<'_> {
             words: todo!(),
             redirs: vec![],
         })
-    }
-}
-
-/// Set of intermediate data used in parsing.
-pub struct Parser {
-    source: Vec<SourceChar>,
-    index: usize,
-}
-
-impl Parser {
-    /// Creates a new parser.
-    pub fn new(input: String) -> Parser {
-        let line = Line {
-            value: input,
-            number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
-        };
-        Parser {
-            source: Rc::new(line).enumerate().collect(),
-            index: 0,
-        }
-    }
-
-    /// Parses a word token.
-    pub async fn parse_word(&mut self) -> Result<Word> {
-        while self.index < self.source.len() && self.source[self.index].value.is_whitespace() {
-            self.index += 1;
-        }
-
-        let mut chars = String::new();
-        while self.index < self.source.len() && !self.source[self.index].value.is_whitespace() {
-            chars.push(self.source[self.index].value);
-            self.index += 1;
-        }
-
-        if chars.is_empty() {
-            // TODO Report the actual location
-            Err(Error {
-                cause: ErrorCause::EndOfInput,
-                location: dummy_location(),
-            })
-        } else {
-            Ok(Word(chars))
-        }
-    }
-
-    /// Parses a simple command.
-    pub async fn parse_simple_command(&mut self) -> Result<SimpleCommand> {
-        let mut tokens = vec![];
-        loop {
-            let word = self.parse_word().await;
-            if let Err(Error {
-                cause: ErrorCause::EndOfInput,
-                ..
-            }) = word
-            {
-                break;
-            }
-            tokens.push(word?);
-        }
-        let mut words = vec![];
-        let mut redirs = vec![];
-        for token in tokens {
-            if let Some(tail) = token.0.strip_prefix("<<") {
-                redirs.push(Redir {
-                    fd: None,
-                    body: RedirBody::from(HereDoc {
-                        delimiter: Word::with_str(tail),
-                        remove_tabs: false,
-                        content: Word::with_str(""),
-                    }),
-                })
-            } else {
-                words.push(token)
-            }
-        }
-        Ok(SimpleCommand { words, redirs })
-        // TODO add redirections to waitlist
     }
 }
 
