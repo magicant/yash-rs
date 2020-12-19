@@ -6,7 +6,9 @@
     - prompt
     - input
     - parser
-        - buffer
+        - core
+        - lex
+            - cmdsub
         - alias
             - definition table
             - substitution
@@ -14,8 +16,6 @@
         - heredoc
             - waitlist
             - filling
-        - lex
-            - cmdsub
         - syntax
     - env
         - alias
