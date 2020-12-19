@@ -33,7 +33,7 @@ async fn parse_and_print() {
         {
             break;
         }
-        let mut lexer = parser::Lexer::with_unknown_source(&code);
+        let mut lexer = parser::Lexer::with_source(source::Source::Unknown, &code);
         let mut parser = parser::Parser::new(&mut lexer);
         match parser.simple_command().await {
             Ok(command) => {

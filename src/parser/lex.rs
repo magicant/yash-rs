@@ -137,16 +137,6 @@ mod core {
             }
         }
 
-        // TODO Probably we don't need this function
-        /// Creates a new lexer with a fixed source code from unknown origin.
-        ///
-        /// This function is mainly for quick debugging purpose. Using in productions is not
-        /// recommended because it does not provide meaningful [`Source`] on error.
-        #[must_use]
-        pub fn with_unknown_source(code: &str) -> Lexer {
-            Lexer::with_source(Source::Unknown, code)
-        }
-
         /// Peeks the next character.
         ///
         /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
