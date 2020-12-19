@@ -30,6 +30,7 @@ mod core {
     use crate::source::Location;
     use crate::source::Source;
     use crate::source::SourceChar;
+    use crate::syntax::Word;
     use std::fmt;
     use std::future::ready;
     use std::future::Future;
@@ -47,6 +48,36 @@ mod core {
     /// future versions.
     #[derive(Debug)]
     pub struct Context;
+
+    /// Token identifier, or classification of tokens.
+    ///
+    /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
+    /// Conventions, but does not reflect further distinction defined in POSIX XCU 2.10.2 Shell
+    /// Grammar Rules.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum TokenId {
+        /// `TOKEN`
+        Token,
+        // TODO other token identifiers: operators and IO_NUMBER
+    }
+
+    /// Result of lexical analysis produced by the [`Lexer`].
+    #[derive(Debug)]
+    pub struct Token {
+        /// Content of the token.
+        ///
+        /// The word value always contains at least one [unit](crate::syntax::WordUnit), regardless
+        /// of whether the token is an operator.
+        pub word: Word,
+        /// Token identifier.
+        pub id: TokenId,
+    }
+
+    impl fmt::Display for Token {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.word)
+        }
+    }
 
     /// Lexical analyzer.
     ///
