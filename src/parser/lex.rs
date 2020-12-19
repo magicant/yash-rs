@@ -316,6 +316,9 @@ impl Lexer {
         self.skip_comment().await;
     }
 
+    // TODO Need more parameters to control how the word should be parsed. Especially:
+    //  * What delimiter ends the word?
+    //  * Allow tilde expansion?
     /// Parses a word token.
     pub async fn word(&mut self) -> Result<Word> {
         let SourceChar { location, .. } = self.peek().await?;
