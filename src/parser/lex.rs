@@ -341,12 +341,16 @@ impl Lexer {
     }
 
     /// Parses a token.
+    ///
+    /// A successfully parsed token's word cannot be empty.
     pub async fn token(&mut self) -> Result<Token> {
         // TODO parse operators and IO_NUMBER
-        Ok(Token {
-            word: self.word().await?,
-            id: TokenId::Token,
-        })
+        let word = self.word().await?;
+        if word.units.is_empty() {
+            Err(Error{cause: ErrorCause::EndOfInput, location: word.location})
+        } else {
+            Ok(Token { word, id: TokenId::Token })
+        }
     }
 }
 
@@ -840,5 +844,34 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 9);
+    }
+
+    #[test]
+    fn lexer_token_empty() {
+        // If there's no word unit that can be parsed, it is the end of input.
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+
+        let e = block_on(lexer.token()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.location.line.value, "");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_token_non_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc ");
+
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(t.word.units.len(), 3);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(DoubleQuotable::Literal('a')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(DoubleQuotable::Literal('b')));
+        assert_eq!(t.word.units[2], WordUnit::Unquoted(DoubleQuotable::Literal('c')));
+        assert_eq!(t.word.location.line.value, "abc ");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Token);
     }
 }

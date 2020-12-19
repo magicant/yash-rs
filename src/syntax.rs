@@ -53,8 +53,16 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
+impl PartialEq for DoubleQuotable {
+    fn eq(&self, other: &DoubleQuotable) -> bool {
+        match self {
+            Literal(c1) => matches!(other, Literal(c2) if c1 == c2),
+        }
+    }
+}
+
 /// Element of a [Word].
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
