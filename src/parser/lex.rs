@@ -346,6 +346,15 @@ impl Lexer {
         }
         Ok(Word { units, location })
     }
+
+    /// Parses a token.
+    pub async fn token(&mut self) -> Result<Token> {
+        // TODO parse operators and IO_NUMBER
+        Ok(Token {
+            word: self.word().await?,
+            id: TokenId::Token,
+        })
+    }
 }
 
 #[cfg(test)]
