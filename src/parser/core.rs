@@ -20,6 +20,7 @@
 //! parser.
 
 use super::lex::Lexer;
+use super::lex::Token;
 use crate::source::Location;
 use std::fmt;
 use std::future::Future;
@@ -186,7 +187,7 @@ pub struct Parser<'l> {
     ///
     /// This value is an option of a result. It is `None` when the next token is not yet parsed by
     /// the lexer. It is `Some(Err(_))` if the lexer has failed.
-    token: Option<Result<crate::syntax::Word>>,
+    token: Option<Result<Token>>,
     // TODO Alias definitions, pending here-document contents
 }
 
@@ -196,20 +197,19 @@ impl Parser<'_> {
         Parser { lexer, token: None }
     }
 
-    // TODO Replace Word in the return type with Token
     /// Reads a next token if the current token is `None`.
     async fn require_token(&mut self) {
         if self.token.is_none() {
             self.lexer.skip_blanks_and_comment().await;
-            let result = self.lexer.word().await;
-            self.token = Some(if let Ok(word) = result {
-                if word.units.is_empty() {
+            let result = self.lexer.token().await;
+            self.token = Some(if let Ok(token) = result {
+                if token.word.units.is_empty() {
                     Err(Error {
                         cause: ErrorCause::EndOfInput,
-                        location: word.location,
+                        location: token.word.location,
                     })
                 } else {
-                    Ok(word)
+                    Ok(token)
                 }
             } else {
                 result
@@ -217,18 +217,16 @@ impl Parser<'_> {
         }
     }
 
-    // TODO Replace Word in the return type with Token
     /// Returns a reference to the current token.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
-    pub async fn peek_token(&mut self) -> &Result<crate::syntax::Word> {
+    pub async fn peek_token(&mut self) -> &Result<Token> {
         self.require_token().await;
         self.token.as_ref().unwrap()
     }
 
-    // TODO Replace Word in the return type with Token
     /// Consumes the current token.
-    pub async fn take_token(&mut self) -> Result<crate::syntax::Word> {
+    pub async fn take_token(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
     }

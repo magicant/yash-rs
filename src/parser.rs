@@ -33,6 +33,7 @@ pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 pub use self::lex::Lexer;
+pub use self::lex::Token;
 
 impl Parser<'_> {
     /// Parses a simple command.
@@ -40,15 +41,15 @@ impl Parser<'_> {
         // TODO Support assignments and redirections. Stop on a delimiter token.
         let mut words = vec![];
         loop {
-            let word = self.take_token().await;
+            let token = self.take_token().await;
             if let Err(Error {
                 cause: ErrorCause::EndOfInput,
                 ..
-            }) = word
+            }) = token
             {
                 break;
             }
-            words.push(word?);
+            words.push(token?.word);
         }
         Ok(SimpleCommand {
             words,
