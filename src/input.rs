@@ -16,9 +16,16 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
+use crate::source::lines;
 use crate::source::Line;
+use crate::source::Location;
+use crate::source::Source;
+use std::collections::VecDeque;
+use std::future::ready;
 use std::future::Future;
+use std::num::NonZeroU64;
 use std::pin::Pin;
+use std::rc::Rc;
 
 /// Current state in which source code is read.
 ///
@@ -29,6 +36,9 @@ use std::pin::Pin;
 /// future versions.
 #[derive(Debug)]
 pub struct Context;
+
+/// Error returned by the [Input] function.
+pub type Error = (Location, std::io::Error);
 
 /// Line-oriented source code reader.
 ///
@@ -49,5 +59,106 @@ pub trait Input {
     fn next_line(
         &mut self,
         context: &Context,
-    ) -> Pin<Box<dyn Future<Output = Result<Line, std::io::Error>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Rc<Line>, Error>>>>;
+}
+
+/// Input function that reads from a string in memory.
+pub struct Memory {
+    lines: VecDeque<Rc<Line>>,
+    end: Rc<Line>,
+}
+
+impl Memory {
+    /// Creates a new `Memory` that reads the given string.
+    pub fn new(source: Source, code: &str) -> Memory {
+        let lines = lines(source.clone(), code)
+            .map(Rc::new)
+            .collect::<VecDeque<_>>();
+
+        let end = Rc::new(Line {
+            value: "".to_string(),
+            number: if let Some(last_line) = lines.back() {
+                // TODO Not correct if the last line does not end with a newline
+                NonZeroU64::new(last_line.number.get() + 1).expect("too long source code line")
+            } else {
+                NonZeroU64::new(1).unwrap()
+            },
+            source,
+        });
+
+        Memory { lines, end }
+    }
+
+    fn next_line_sync(&mut self, _: &Context) -> Result<Rc<Line>, Error> {
+        Ok(self
+            .lines
+            .pop_front()
+            .unwrap_or_else(|| Rc::clone(&self.end)))
+    }
+}
+
+impl Input for Memory {
+    fn next_line(
+        &mut self,
+        context: &Context,
+    ) -> Pin<Box<dyn Future<Output = Result<Rc<Line>, Error>>>> {
+        Box::pin(ready(self.next_line_sync(context)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::source::Source;
+    use futures::executor::block_on;
+
+    #[test]
+    fn memory_empty_source() {
+        let mut input = Memory::new(Source::Unknown, "");
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+    }
+
+    #[test]
+    fn memory_one_line() {
+        let mut input = Memory::new(Source::Unknown, "one\n");
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "one\n");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
+    }
+
+    #[test]
+    fn memory_three_lines() {
+        let mut input = Memory::new(Source::Unknown, "one\ntwo\nthree");
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "one\n");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "two\n");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "three");
+        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.source, Source::Unknown);
+
+        let line = block_on(input.next_line(&Context)).unwrap();
+        assert_eq!(line.value, "");
+        assert_eq!(line.number.get(), 4);
+        assert_eq!(line.source, Source::Unknown);
+    }
 }
