@@ -16,6 +16,7 @@
 
 //! TODO Elaborate
 
+pub mod input;
 pub mod parser;
 pub mod source;
 pub mod syntax;

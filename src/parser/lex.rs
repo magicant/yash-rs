@@ -38,7 +38,7 @@ mod core {
     use std::pin::Pin;
     use std::rc::Rc;
 
-    // TODO Move to crate::input
+    // TODO Remove this and use crate::input::Context
     /// Current state in which input is read.
     ///
     /// The context is passed to the input function so that it can read the input in a
