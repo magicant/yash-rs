@@ -85,16 +85,22 @@ mod core {
     }
 
     impl Lexer {
-        /// Creates a new lexer with a fixed source code.
+        /// Creates a new lexer that reads using the given input function.
         #[must_use]
-        pub fn with_source(source: Source, code: &str) -> Lexer {
+        pub fn new(input: Box<dyn Input>) -> Lexer {
             Lexer {
-                input: Box::new(Memory::new(source, code)),
+                input,
                 source: Vec::new(),
                 index: 0,
                 end_of_input: None,
                 io_error: None,
             }
+        }
+
+        /// Creates a new lexer with a fixed source code.
+        #[must_use]
+        pub fn with_source(source: Source, code: &str) -> Lexer {
+            Lexer::new(Box::new(Memory::new(source, code)))
         }
 
         /// Peeks the next character.
@@ -352,8 +358,17 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::Context;
+    use crate::input::Input;
+    use crate::source::Line;
+    use crate::source::Location;
     use crate::source::Source;
     use futures::executor::block_on;
+    use std::fmt;
+    use std::future::ready;
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::rc::Rc;
 
     #[test]
     fn lexer_with_empty_source() {
@@ -448,7 +463,36 @@ mod tests {
         assert_eq!(e, e2);
     }
 
-    // TODO test fn lexer_peek_io_error()
+    #[test]
+    fn lexer_peek_io_error() {
+        #[derive(Debug)]
+        struct Failing;
+        impl fmt::Display for Failing {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "Failing")
+            }
+        }
+        impl std::error::Error for Failing {}
+        impl Input for Failing {
+            fn next_line(
+                &mut self,
+                _: &Context,
+            ) -> Pin<Box<dyn Future<Output = std::result::Result<Rc<Line>, crate::input::Error>>>>
+            {
+                let location = Location::dummy("line".to_string());
+                let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
+                Box::pin(ready(Err((location, error))))
+            }
+        }
+        let mut lexer = Lexer::new(Box::new(Failing));
+
+        let e = block_on(lexer.peek()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::IoError);
+        assert_eq!(e.location.line.value, "line");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
 
     #[test]
     fn lexer_next_if() {
