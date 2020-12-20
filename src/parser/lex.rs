@@ -20,34 +20,20 @@
 
 mod core {
 
+    use crate::input::Context;
+    use crate::input::Input;
+    use crate::input::Memory;
     use crate::parser::core::AsyncFnMut;
     use crate::parser::core::AsyncFnOnce;
     use crate::parser::core::Error;
     use crate::parser::core::ErrorCause;
     use crate::parser::core::Result;
-    use crate::source::lines;
-    use crate::source::Line;
     use crate::source::Location;
     use crate::source::Source;
     use crate::source::SourceChar;
     use crate::syntax::Word;
     use std::fmt;
-    use std::future::ready;
-    use std::future::Future;
     use std::num::NonZeroU64;
-    use std::pin::Pin;
-    use std::rc::Rc;
-
-    // TODO Remove this and use crate::input::Context
-    /// Current state in which input is read.
-    ///
-    /// The context is passed to the input function so that it can read the input in a
-    /// context-dependent way.
-    ///
-    /// Currently, this structure is empty. It may be extended to provide with some useful data in
-    /// future versions.
-    #[derive(Debug)]
-    pub struct Context;
 
     /// Token identifier, or classification of tokens.
     ///
@@ -91,49 +77,23 @@ mod core {
     /// parse more complex structures in the source code.
     pub struct Lexer {
         // TODO The input function type should be defined in crate::input
-        input: Box<dyn FnMut(&Context) -> Pin<Box<dyn Future<Output = Result<Line>>>>>,
+        input: Box<dyn Input>,
         source: Vec<SourceChar>,
         index: usize,
         end_of_input: Option<Error>,
+        io_error: Option<std::io::Error>,
     }
 
     impl Lexer {
         /// Creates a new lexer with a fixed source code.
         #[must_use]
         pub fn with_source(source: Source, code: &str) -> Lexer {
-            let lines = lines(source, code).map(Rc::new).collect::<Vec<_>>();
-            let source = lines
-                .iter()
-                .map(Line::enumerate)
-                .flatten()
-                .collect::<Vec<_>>();
-            let location = match source.last() {
-                None => {
-                    let value = String::new();
-                    let one = NonZeroU64::new(1).unwrap();
-                    let source = Source::Unknown;
-                    let line = Rc::new(Line {
-                        value,
-                        number: one,
-                        source,
-                    });
-                    Location { line, column: one }
-                }
-                Some(source_char) => {
-                    let mut location = source_char.location.clone();
-                    location.advance(1);
-                    location
-                }
-            };
-            let error = Error {
-                cause: ErrorCause::EndOfInput,
-                location,
-            };
             Lexer {
-                input: Box::new(move |_| Box::pin(ready(Err(error.clone())))),
-                source,
+                input: Box::new(Memory::new(source, code)),
+                source: Vec::new(),
                 index: 0,
                 end_of_input: None,
+                io_error: None,
             }
         }
 
@@ -153,11 +113,40 @@ mod core {
                 }
 
                 // Read more input
-                match (self.input)(&Context).await {
-                    Ok(line) => self.source.extend(Rc::new(line).enumerate()),
-                    Err(e) => {
-                        self.end_of_input = Some(e.clone());
-                        return Err(e);
+                match self.input.next_line(&Context).await {
+                    Ok(line) => {
+                        if line.value.is_empty() {
+                            // End of input
+                            let location = if let Some(c) = self.source.last() {
+                                // TODO correctly count line number after newline
+                                //if sc.value == '\n' {
+                                //} else {
+                                let mut location = c.location.clone();
+                                location.advance(1);
+                                location
+                            //}
+                            } else {
+                                // Completely empty source
+                                Location {
+                                    line,
+                                    column: NonZeroU64::new(1).unwrap(),
+                                }
+                            };
+                            self.end_of_input = Some(Error {
+                                cause: ErrorCause::EndOfInput,
+                                location,
+                            });
+                        } else {
+                            // Successful read
+                            self.source.extend(line.enumerate())
+                        }
+                    }
+                    Err((location, io_error)) => {
+                        self.io_error = Some(io_error);
+                        self.end_of_input = Some(Error {
+                            cause: ErrorCause::IoError,
+                            location,
+                        });
                     }
                 }
             }
@@ -458,6 +447,8 @@ mod tests {
         let e2 = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e, e2);
     }
+
+    // TODO test fn lexer_peek_io_error()
 
     #[test]
     fn lexer_next_if() {

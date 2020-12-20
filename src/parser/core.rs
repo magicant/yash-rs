@@ -35,6 +35,8 @@ pub enum ErrorCause {
     Unknown,
     /// End of input is reached while more characters are expected to be read.
     EndOfInput,
+    /// Error in an underlying input function.
+    IoError,
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
@@ -45,6 +47,7 @@ impl fmt::Display for ErrorCause {
         match self {
             ErrorCause::Unknown => f.write_str("Unknown error"),
             ErrorCause::EndOfInput => f.write_str("Incomplete command"),
+            ErrorCause::IoError => f.write_str("Error while reading commands"),
             ErrorCause::MissingHereDocContent => {
                 f.write_str("Content of the here-document is missing")
             }
@@ -65,6 +68,8 @@ impl fmt::Display for Error {
         // TODO Print Location
     }
 }
+
+// TODO Consider implementing std::error::Error for self::Error
 
 /// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
