@@ -347,9 +347,15 @@ impl Lexer {
         // TODO parse operators and IO_NUMBER
         let word = self.word().await?;
         if word.units.is_empty() {
-            Err(Error{cause: ErrorCause::EndOfInput, location: word.location})
+            Err(Error {
+                cause: ErrorCause::EndOfInput,
+                location: word.location,
+            })
         } else {
-            Ok(Token { word, id: TokenId::Token })
+            Ok(Token {
+                word,
+                id: TokenId::Token,
+            })
         }
     }
 }
@@ -865,9 +871,18 @@ mod tests {
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 3);
-        assert_eq!(t.word.units[0], WordUnit::Unquoted(DoubleQuotable::Literal('a')));
-        assert_eq!(t.word.units[1], WordUnit::Unquoted(DoubleQuotable::Literal('b')));
-        assert_eq!(t.word.units[2], WordUnit::Unquoted(DoubleQuotable::Literal('c')));
+        assert_eq!(
+            t.word.units[0],
+            WordUnit::Unquoted(DoubleQuotable::Literal('a'))
+        );
+        assert_eq!(
+            t.word.units[1],
+            WordUnit::Unquoted(DoubleQuotable::Literal('b'))
+        );
+        assert_eq!(
+            t.word.units[2],
+            WordUnit::Unquoted(DoubleQuotable::Literal('c'))
+        );
         assert_eq!(t.word.location.line.value, "abc ");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);

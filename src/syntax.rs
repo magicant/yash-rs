@@ -62,7 +62,7 @@ impl PartialEq for DoubleQuotable {
 }
 
 /// Element of a [Word].
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
