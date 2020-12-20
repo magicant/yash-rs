@@ -24,27 +24,47 @@ pub mod syntax;
 // TODO Allow user to select input source
 // TODO Execute the command after parsing
 async fn parse_and_print() {
-    let input = std::io::stdin();
-    loop {
-        let mut code = String::new();
-        if input
-            .read_line(&mut code)
-            .expect("input should be readable")
-            == 0
-        {
-            break;
+    use std::future::ready;
+    use std::future::Future;
+    use std::num::NonZeroU64;
+    use std::pin::Pin;
+    use std::rc::Rc;
+
+    struct Stdin;
+
+    impl input::Input for Stdin {
+        fn next_line(
+            &mut self,
+            _: &input::Context,
+        ) -> Pin<Box<dyn Future<Output = Result<Rc<source::Line>, input::Error>>>> {
+            Box::pin(ready({
+                let mut code = String::new();
+                std::io::stdin()
+                    .read_line(&mut code)
+                    .map(|_|
+                    // TODO correct line number
+                    Rc::new(source::Line {
+                        value:code,
+                        number:NonZeroU64::new(1).unwrap(),
+                        source:source::Source::Unknown,
+                    }))
+                    .map_err(|e| (source::Location::dummy("".to_string()), e))
+            }))
         }
-        let mut lexer = parser::Lexer::with_source(source::Source::Unknown, &code);
+    }
+
+    loop {
+        let mut lexer = parser::Lexer::new(Box::new(Stdin));
         let mut parser = parser::Parser::new(&mut lexer);
         match parser.simple_command().await {
             Ok(command) => {
                 use parser::Fill;
                 match command.fill(&mut std::iter::empty()) {
                     Ok(command) => println!("{}", command),
-                    Err(e) => print!("{}", e),
+                    Err(e) => println!("{}", e),
                 }
             }
-            Err(e) => print!("{}", e),
+            Err(e) => println!("{}", e),
         }
     }
 }
