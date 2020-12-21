@@ -81,7 +81,6 @@ mod core {
         source: Vec<SourceChar>,
         index: usize,
         end_of_input: Option<Error>,
-        io_error: Option<std::io::Error>,
     }
 
     impl Lexer {
@@ -93,7 +92,6 @@ mod core {
                 source: Vec::new(),
                 index: 0,
                 end_of_input: None,
-                io_error: None,
             }
         }
 
@@ -148,7 +146,6 @@ mod core {
                         }
                     }
                     Err((location, io_error)) => {
-                        self.io_error = Some(io_error);
                         self.end_of_input = Some(Error {
                             cause: ErrorCause::IoError,
                             location,
@@ -156,11 +153,6 @@ mod core {
                     }
                 }
             }
-        }
-
-        /// Access the IO error that has been returned from the input function, if any.
-        pub fn io_error(&self) -> &Option<std::io::Error> {
-            return &self.io_error;
         }
 
         /// Peeks the next character and, if the given decider function returns true for it, advances
@@ -384,7 +376,6 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
-        assert!(lexer.io_error().is_none());
     }
 
     #[test]
@@ -397,7 +388,6 @@ mod tests {
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
-        assert!(lexer.io_error().is_none());
 
         let c2 = block_on(lexer.peek()).unwrap();
         assert_eq!(c, c2);
@@ -468,8 +458,6 @@ mod tests {
         assert_eq!(e, e2);
         let e2 = block_on(lexer.peek()).unwrap_err();
         assert_eq!(e, e2);
-
-        assert!(lexer.io_error().is_none());
     }
 
     #[test]
@@ -501,9 +489,6 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
-
-        let e2 = lexer.io_error().as_ref().unwrap();
-        assert_eq!(format!("{}", e2), "Failing");
     }
 
     #[test]
