@@ -24,9 +24,10 @@ use super::lex::Token;
 use crate::source::Location;
 use std::fmt;
 use std::future::Future;
+use std::rc::Rc;
 
 /// Types of errors that may happen in parsing.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum ErrorCause {
     /// Uncategorized type of error.
     ///
@@ -36,10 +37,21 @@ pub enum ErrorCause {
     /// End of input is reached while more characters are expected to be read.
     EndOfInput,
     /// Error in an underlying input function.
-    IoError,
+    IoError(Rc<std::io::Error>),
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
+}
+
+impl PartialEq for ErrorCause {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ErrorCause::Unknown, ErrorCause::Unknown)
+            | (ErrorCause::EndOfInput, ErrorCause::EndOfInput)
+            | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for ErrorCause {
@@ -47,7 +59,7 @@ impl fmt::Display for ErrorCause {
         match self {
             ErrorCause::Unknown => f.write_str("Unknown error"),
             ErrorCause::EndOfInput => f.write_str("Incomplete command"),
-            ErrorCause::IoError => f.write_str("Error while reading commands"),
+            ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
             ErrorCause::MissingHereDocContent => {
                 f.write_str("Content of the here-document is missing")
             }
@@ -56,7 +68,7 @@ impl fmt::Display for ErrorCause {
 }
 
 /// Explanation of a failure in parsing.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,

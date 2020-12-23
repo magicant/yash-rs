@@ -34,6 +34,7 @@ mod core {
     use crate::syntax::Word;
     use std::fmt;
     use std::num::NonZeroU64;
+    use std::rc::Rc;
 
     /// Token identifier, or classification of tokens.
     ///
@@ -147,7 +148,7 @@ mod core {
                     }
                     Err((location, io_error)) => {
                         self.end_of_input = Some(Error {
-                            cause: ErrorCause::IoError,
+                            cause: ErrorCause::IoError(Rc::new(io_error)),
                             location,
                         });
                     }
@@ -484,7 +485,11 @@ mod tests {
         let mut lexer = Lexer::new(Box::new(Failing));
 
         let e = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::IoError);
+        if let ErrorCause::IoError(io_error) = e.cause {
+            assert_eq!(io_error.kind(), std::io::ErrorKind::Other);
+        } else {
+            panic!("expected IoError, but actually {}", e.cause)
+        }
         assert_eq!(e.location.line.value, "line");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
