@@ -36,6 +36,16 @@ mod core {
     use std::num::NonZeroU64;
     use std::rc::Rc;
 
+    /// Operator token identifier.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum Operator {
+        /// `<<`
+        LessLess,
+        /// `<<-`
+        LessLessDash,
+        // TODO Other operators
+    }
+
     /// Token identifier, or classification of tokens.
     ///
     /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
@@ -45,7 +55,9 @@ mod core {
     pub enum TokenId {
         /// `TOKEN`
         Token,
-        // TODO other token identifiers: operators and IO_NUMBER
+        /// Operator
+        Operator(Operator),
+        // TODO IO_NUMBER
     }
 
     /// Result of lexical analysis produced by the [`Lexer`].
