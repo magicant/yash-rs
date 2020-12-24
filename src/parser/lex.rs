@@ -77,7 +77,6 @@ mod core {
     /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
     /// parse more complex structures in the source code.
     pub struct Lexer {
-        // TODO The input function type should be defined in crate::input
         input: Box<dyn Input>,
         source: Vec<SourceChar>,
         index: usize,
