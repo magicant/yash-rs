@@ -18,8 +18,11 @@
 //!
 //! TODO Elaborate
 
+mod op;
+
 mod core {
 
+    use super::op::Operator;
     use crate::input::Context;
     use crate::input::Input;
     use crate::input::Memory;
@@ -35,16 +38,6 @@ mod core {
     use std::fmt;
     use std::num::NonZeroU64;
     use std::rc::Rc;
-
-    /// Operator token identifier.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub enum Operator {
-        /// `<<`
-        LessLess,
-        /// `<<-`
-        LessLessDash,
-        // TODO Other operators
-    }
 
     /// Token identifier, or classification of tokens.
     ///

@@ -8,6 +8,7 @@
     - parser
         - core
         - lex
+            - op
             - cmdsub
         - alias
             - definition table
