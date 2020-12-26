@@ -143,7 +143,7 @@ impl fmt::Display for HereDoc {
 }
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RedirBody<H = HereDoc> {
     // TODO filename-based redirections
     /// Here-document.

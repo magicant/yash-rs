@@ -22,7 +22,7 @@ mod op;
 
 mod core {
 
-    use super::op::Operator;
+    pub use super::op::Operator;
     use super::op::Trie;
     use crate::input::Context;
     use crate::input::Input;

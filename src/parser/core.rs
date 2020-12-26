@@ -38,6 +38,8 @@ pub enum ErrorCause {
     EndOfInput,
     /// Error in an underlying input function.
     IoError(Rc<std::io::Error>),
+    /// A here-document operator is missing its delimiter token.
+    MissingHereDocDelimiter,
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
@@ -48,6 +50,7 @@ impl PartialEq for ErrorCause {
         match (self, other) {
             (ErrorCause::Unknown, ErrorCause::Unknown)
             | (ErrorCause::EndOfInput, ErrorCause::EndOfInput)
+            | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
             | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
             _ => false,
         }
@@ -60,6 +63,9 @@ impl fmt::Display for ErrorCause {
             ErrorCause::Unknown => f.write_str("Unknown error"),
             ErrorCause::EndOfInput => f.write_str("Incomplete command"),
             ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
+            ErrorCause::MissingHereDocDelimiter => {
+                f.write_str("The here-document operator is missing its delimiter")
+            }
             ErrorCause::MissingHereDocContent => {
                 f.write_str("Content of the here-document is missing")
             }
