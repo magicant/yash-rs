@@ -47,6 +47,8 @@ mod core {
     /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
     /// Conventions, but does not reflect further distinction defined in POSIX XCU 2.10.2 Shell
     /// Grammar Rules.
+    ///
+    /// For convenience, the special token identifier `EndOfInput` is included.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TokenId {
         /// `TOKEN`
@@ -54,6 +56,8 @@ mod core {
         /// Operator
         Operator(Operator),
         // TODO IO_NUMBER
+        /// Imaginary token identifier for the end of input.
+        EndOfInput,
     }
 
     /// Result of lexical analysis produced by the [`Lexer`].
@@ -400,6 +404,7 @@ impl Lexer {
         Ok(Token { word, id })
     }
 
+    // TODO Should return an empty word if the current position is the end of input.
     // TODO Need more parameters to control how the word should be parsed. Especially:
     //  * What delimiter ends the word?
     //  * Allow tilde expansion?
@@ -426,7 +431,8 @@ impl Lexer {
 
     /// Parses a token.
     ///
-    /// A successfully parsed token's word cannot be empty.
+    /// If there is no more token that can be parsed, the result is a token with an empty word and
+    /// [`EndOfInput`](TokenId::EndOfInput) token identifier.
     pub async fn token(&mut self) -> Result<Token> {
         // TODO parse IO_NUMBER
         let op = self.operator().await;
@@ -434,18 +440,23 @@ impl Lexer {
             return op;
         }
 
-        let word = self.word().await?;
-        if word.units.is_empty() {
+        let word = match self.word().await {
+            Ok(word) => word,
             Err(Error {
                 cause: ErrorCause::EndOfInput,
-                location: word.location,
-            })
+                location,
+            }) => Word {
+                units: vec![],
+                location,
+            },
+            Err(e) => return Err(e),
+        };
+        let id = if word.units.is_empty() {
+            TokenId::EndOfInput
         } else {
-            Ok(Token {
-                word,
-                id: TokenId::Token,
-            })
-        }
+            TokenId::Token
+        };
+        Ok(Token { word, id })
     }
 }
 
@@ -1091,12 +1102,12 @@ mod tests {
         // If there's no word unit that can be parsed, it is the end of input.
         let mut lexer = Lexer::with_source(Source::Unknown, "");
 
-        let e = block_on(lexer.token()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(t.word.location.line.value, "");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::EndOfInput);
     }
 
     #[test]

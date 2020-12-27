@@ -65,14 +65,12 @@ impl Parser<'_> {
         let operand = self.take_token().await?;
         match operand.id {
             Token => (),
-            Operator(_) => {
+            Operator(_) | EndOfInput => {
                 return Err(Error {
                     cause: ErrorCause::MissingHereDocDelimiter,
                     location: operator.word.location,
                 })
-            }
-            // TODO what if the operand is missing (end of input)
-            // TODO IoNumber => reject if posixly-correct,
+            } // TODO IoNumber => reject if posixly-correct,
         }
 
         Ok(Redir {
@@ -86,15 +84,11 @@ impl Parser<'_> {
         // TODO Support assignments and redirections. Stop on a delimiter token.
         let mut words = vec![];
         loop {
-            let token = self.take_token().await;
-            if let Err(Error {
-                cause: ErrorCause::EndOfInput,
-                ..
-            }) = token
-            {
+            let token = self.take_token().await?;
+            if token.id != Token {
                 break;
             }
-            words.push(token?.word);
+            words.push(token.word);
         }
         Ok(SimpleCommand {
             words,
@@ -163,10 +157,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
+        assert_eq!(e.cause, ErrorCause::MissingHereDocDelimiter);
         assert_eq!(e.location.line.value, "<<");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        assert_eq!(e.location.column.get(), 1);
     }
 }
