@@ -42,6 +42,37 @@ mod core {
     use std::pin::Pin;
     use std::rc::Rc;
 
+    /// Enum of [`SourceChar`] and end-of-input.
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum OptionChar {
+        Char(SourceChar),
+        EndOfInput(Location),
+    }
+
+    impl OptionChar {
+        /// Returns the `SourceChar` in this `OptionChar`.
+        ///
+        /// Panics if `self` is an `EndOfInput`.
+        pub fn unwrap(self) -> SourceChar {
+            match self {
+                OptionChar::Char(c) => c,
+                OptionChar::EndOfInput(location) => {
+                    panic!("Unexpected OptionChar::EndOfInput({:?})", location)
+                }
+            }
+        }
+
+        /// Returns the `Location` assuming `self` is an `EndOfInput`.
+        ///
+        /// Panics if `self` is a `Char`.
+        pub fn unwrap_end_of_input(self) -> Location {
+            match self {
+                OptionChar::Char(c) => panic!("Unexpected OptionChar::Char({:?})", c),
+                OptionChar::EndOfInput(location) => location,
+            }
+        }
+    }
+
     /// Token identifier, or classification of tokens.
     ///
     /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
@@ -122,23 +153,17 @@ mod core {
         }
 
         /// Peeks the next character.
-        ///
-        /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
         #[must_use]
-        pub async fn peek(&mut self) -> Result<SourceChar> {
+        pub async fn peek(&mut self) -> Result<OptionChar> {
             loop {
                 if let Some(c) = self.source.get(self.index) {
-                    return Ok(c.clone());
+                    return Ok(OptionChar::Char(c.clone()));
                 }
 
                 match self.state {
                     InputState::Alive => (),
                     InputState::EndOfInput(ref location) => {
-                        // TODO Return OptionChar::EndOfInput
-                        return Err(Error {
-                            cause: ErrorCause::EndOfInput,
-                            location: location.clone(),
-                        });
+                        return Ok(OptionChar::EndOfInput(location.clone()))
                     }
                     InputState::Error(ref error) => return Err(error.clone()),
                 }
@@ -189,15 +214,22 @@ mod core {
         where
             F: FnOnce(char) -> bool,
         {
-            let c = self.peek().await?;
-            if f(c.value) {
-                self.index += 1;
-                Ok(c)
-            } else {
-                Err(Error {
-                    cause: ErrorCause::Unknown,
-                    location: c.location,
-                })
+            match self.peek().await? {
+                OptionChar::Char(c) => {
+                    if f(c.value) {
+                        self.index += 1;
+                        Ok(c)
+                    } else {
+                        Err(Error {
+                            cause: ErrorCause::Unknown,
+                            location: c.location,
+                        })
+                    }
+                }
+                OptionChar::EndOfInput(location) => Err(Error {
+                    cause: ErrorCause::EndOfInput,
+                    location,
+                }),
             }
         }
 
@@ -205,11 +237,7 @@ mod core {
         ///
         /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
         pub async fn next(&mut self) -> Result<SourceChar> {
-            let r = self.peek().await;
-            if r.is_ok() {
-                self.index += 1;
-            }
-            r
+            self.next_if(|_| true).await
         }
 
         /// Applies the given parser and updates the current position only if the parser succeeds.
@@ -336,7 +364,6 @@ use self::op::OPERATORS;
 use crate::parser::core::Error;
 use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
-use crate::source::SourceChar;
 use crate::syntax::*;
 
 impl Lexer {
@@ -422,7 +449,16 @@ impl Lexer {
     //  * Allow tilde expansion?
     /// Parses a word token.
     pub async fn word(&mut self) -> Result<Word> {
-        let SourceChar { location, .. } = self.peek().await?;
+        let location = match self.peek().await {
+            Ok(OptionChar::Char(c)) => c.location,
+            Ok(OptionChar::EndOfInput(location)) => {
+                return Err(Error {
+                    cause: ErrorCause::EndOfInput,
+                    location,
+                });
+            }
+            Err(e) => return Err(e),
+        };
 
         let mut units = vec![];
         loop {
@@ -481,6 +517,7 @@ mod tests {
     use crate::source::Line;
     use crate::source::Location;
     use crate::source::Source;
+    use crate::source::SourceChar;
     use futures::executor::block_on;
     use std::fmt;
     use std::future::ready;
@@ -491,28 +528,27 @@ mod tests {
     #[test]
     fn lexer_with_empty_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
-        let e = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location.line.value, "");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
     }
 
     #[test]
     fn lexer_with_multiline_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo\nbar\n");
 
-        let c = block_on(lexer.peek()).unwrap();
+        let c = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c.value, 'f');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
-        let c2 = block_on(lexer.peek()).unwrap();
+        let c2 = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c, c2);
-        let c2 = block_on(lexer.peek()).unwrap();
+        let c2 = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c, c2);
         let c2 = block_on(lexer.next()).unwrap();
         assert_eq!(c, c2);
@@ -566,19 +602,18 @@ mod tests {
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
 
-        let e = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "bar\n");
-        assert_eq!(e.location.line.number.get(), 2);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location.line.value, "bar\n");
+        assert_eq!(location.line.number.get(), 2);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 5);
 
-        let e2 = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e, e2);
-        let e2 = block_on(lexer.next()).unwrap_err();
-        assert_eq!(e, e2);
-        let e2 = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e, e2);
+        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location, location2);
+        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location, location2);
+        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location, location2);
     }
 
     #[test]
@@ -774,12 +809,11 @@ mod tests {
 
         assert!(block_on(lexer.maybe_line_continuation()).is_ok());
 
-        let e = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "\\\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location.line.value, "\\\n");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 3);
     }
 
     #[test]
@@ -793,9 +827,8 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
 
-        let e = block_on(lexer.peek()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.column.get(), 1);
+        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
+        assert_eq!(location.column.get(), 1);
     }
 
     #[test]
@@ -809,7 +842,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
 
-        let c = block_on(lexer.peek()).unwrap();
+        let c = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -825,7 +858,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
 
-        let c = block_on(lexer.peek()).unwrap();
+        let c = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -841,7 +874,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
 
-        let c = block_on(lexer.peek()).unwrap();
+        let c = block_on(lexer.peek()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -854,6 +887,7 @@ mod tests {
             lexer.skip_blanks().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.line.value, " \t w");
@@ -866,6 +900,7 @@ mod tests {
             lexer.skip_blanks().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.line.value, " \t w");
@@ -893,6 +928,7 @@ mod tests {
             lexer.skip_blanks().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, 'X');
         assert_eq!(c.location.line.value, "X");
@@ -905,6 +941,7 @@ mod tests {
             lexer.skip_blanks().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, 'Y');
         assert_eq!(c.location.line.value, " Y");
@@ -933,6 +970,7 @@ mod tests {
             lexer.skip_comment().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "#\n");
@@ -945,6 +983,7 @@ mod tests {
             lexer.skip_comment().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "#\n");
@@ -961,6 +1000,7 @@ mod tests {
             lexer.skip_comment().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
@@ -973,6 +1013,7 @@ mod tests {
             lexer.skip_comment().await;
             lexer.peek().await
         })
+        .unwrap()
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
@@ -985,28 +1026,28 @@ mod tests {
     fn lexer_skip_comment_not_ending_with_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "#comment");
 
-        let e = block_on(async {
+        let location = block_on(async {
             lexer.skip_comment().await;
             lexer.peek().await
         })
-        .unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "#comment");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 9);
+        .unwrap()
+        .unwrap_end_of_input();
+        assert_eq!(location.line.value, "#comment");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 9);
 
         // Test idempotence
-        let e = block_on(async {
+        let location = block_on(async {
             lexer.skip_comment().await;
             lexer.peek().await
         })
-        .unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "#comment");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 9);
+        .unwrap()
+        .unwrap_end_of_input();
+        assert_eq!(location.line.value, "#comment");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 9);
     }
 
     #[test]
