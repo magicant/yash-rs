@@ -78,6 +78,14 @@ mod core {
         }
     }
 
+    /// State of the input function in a lexer.
+    #[derive(Clone, Debug)]
+    enum InputState {
+        Alive,
+        EndOfInput(Location),
+        Error(Error),
+    }
+
     /// Lexical analyzer.
     ///
     /// A lexer reads lines using an input function and parses the characters into tokens. It has an
@@ -90,9 +98,9 @@ mod core {
     /// parse more complex structures in the source code.
     pub struct Lexer {
         input: Box<dyn Input>,
+        state: InputState,
         source: Vec<SourceChar>,
         index: usize,
-        end_of_input: Option<Error>,
     }
 
     impl Lexer {
@@ -101,9 +109,9 @@ mod core {
         pub fn new(input: Box<dyn Input>) -> Lexer {
             Lexer {
                 input,
+                state: InputState::Alive,
                 source: Vec::new(),
                 index: 0,
-                end_of_input: None,
             }
         }
 
@@ -123,9 +131,16 @@ mod core {
                     return Ok(c.clone());
                 }
 
-                if let Some(ref e) = self.end_of_input {
-                    assert_eq!(self.index, self.source.len());
-                    return Err(e.clone());
+                match self.state {
+                    InputState::Alive => (),
+                    InputState::EndOfInput(ref location) => {
+                        // TODO Return OptionChar::EndOfInput
+                        return Err(Error {
+                            cause: ErrorCause::EndOfInput,
+                            location: location.clone(),
+                        });
+                    }
+                    InputState::Error(ref error) => return Err(error.clone()),
                 }
 
                 // Read more input
@@ -148,17 +163,14 @@ mod core {
                                     column: NonZeroU64::new(1).unwrap(),
                                 }
                             };
-                            self.end_of_input = Some(Error {
-                                cause: ErrorCause::EndOfInput,
-                                location,
-                            });
+                            self.state = InputState::EndOfInput(location);
                         } else {
                             // Successful read
                             self.source.extend(line.enumerate())
                         }
                     }
                     Err((location, io_error)) => {
-                        self.end_of_input = Some(Error {
+                        self.state = InputState::Error(Error {
                             cause: ErrorCause::IoError(Rc::new(io_error)),
                             location,
                         });
