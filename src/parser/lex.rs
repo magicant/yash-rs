@@ -153,63 +153,6 @@ mod core {
         }
 
         /// Peeks the next character.
-        ///
-        /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
-        #[must_use]
-        pub async fn peek(&mut self) -> Result<SourceChar> {
-            loop {
-                if let Some(c) = self.source.get(self.index) {
-                    return Ok(c.clone());
-                }
-
-                match self.state {
-                    InputState::Alive => (),
-                    InputState::EndOfInput(ref location) => {
-                        return Err(Error {
-                            cause: ErrorCause::EndOfInput,
-                            location: location.clone(),
-                        });
-                    }
-                    InputState::Error(ref error) => return Err(error.clone()),
-                }
-
-                // Read more input
-                match self.input.next_line(&Context).await {
-                    Ok(line) => {
-                        if line.value.is_empty() {
-                            // End of input
-                            let location = if let Some(c) = self.source.last() {
-                                // TODO correctly count line number after newline
-                                //if sc.value == '\n' {
-                                //} else {
-                                let mut location = c.location.clone();
-                                location.advance(1);
-                                location
-                            //}
-                            } else {
-                                // Completely empty source
-                                Location {
-                                    line,
-                                    column: NonZeroU64::new(1).unwrap(),
-                                }
-                            };
-                            self.state = InputState::EndOfInput(location);
-                        } else {
-                            // Successful read
-                            self.source.extend(line.enumerate())
-                        }
-                    }
-                    Err((location, io_error)) => {
-                        self.state = InputState::Error(Error {
-                            cause: ErrorCause::IoError(Rc::new(io_error)),
-                            location,
-                        });
-                    }
-                }
-            }
-        }
-
-        /// Peeks the next character.
         #[must_use]
         pub async fn peek2(&mut self) -> Result<OptionChar> {
             loop {
