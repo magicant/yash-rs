@@ -35,7 +35,9 @@ pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 pub use self::lex::Lexer;
+pub use self::lex::Operator;
 pub use self::lex::Token;
+pub use self::lex::TokenId;
 
 impl Parser<'_> {
     /// Parses a redirection.
