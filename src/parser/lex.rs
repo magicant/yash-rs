@@ -271,15 +271,22 @@ mod core {
         where
             F: FnOnce(char) -> bool,
         {
-            let c = self.peek().await?;
-            if f(c.value) {
-                self.index += 1;
-                Ok(c)
-            } else {
-                Err(Error {
-                    cause: ErrorCause::Unknown,
-                    location: c.location,
-                })
+            match self.peek2().await? {
+                OptionChar::Char(c) => {
+                    if f(c.value) {
+                        self.index += 1;
+                        Ok(c)
+                    } else {
+                        Err(Error {
+                            cause: ErrorCause::Unknown,
+                            location: c.location,
+                        })
+                    }
+                }
+                OptionChar::EndOfInput(location) => Err(Error {
+                    cause: ErrorCause::EndOfInput,
+                    location,
+                }),
             }
         }
 
@@ -287,11 +294,7 @@ mod core {
         ///
         /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
         pub async fn next(&mut self) -> Result<SourceChar> {
-            let r = self.peek().await;
-            if r.is_ok() {
-                self.index += 1;
-            }
-            r
+            self.next_if(|_| true).await
         }
 
         /// Applies the given parser and updates the current position only if the parser succeeds.
@@ -418,7 +421,6 @@ use self::op::OPERATORS;
 use crate::parser::core::Error;
 use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
-use crate::source::SourceChar;
 use crate::syntax::*;
 
 impl Lexer {
@@ -504,7 +506,16 @@ impl Lexer {
     //  * Allow tilde expansion?
     /// Parses a word token.
     pub async fn word(&mut self) -> Result<Word> {
-        let SourceChar { location, .. } = self.peek().await?;
+        let location = match self.peek2().await {
+            Ok(OptionChar::Char(c)) => c.location,
+            Ok(OptionChar::EndOfInput(location)) => {
+                return Err(Error {
+                    cause: ErrorCause::EndOfInput,
+                    location,
+                });
+            }
+            Err(e) => return Err(e),
+        };
 
         let mut units = vec![];
         loop {
@@ -563,6 +574,7 @@ mod tests {
     use crate::source::Line;
     use crate::source::Location;
     use crate::source::Source;
+    use crate::source::SourceChar;
     use futures::executor::block_on;
     use std::fmt;
     use std::future::ready;
