@@ -272,6 +272,12 @@ mod core {
             self.index += 1;
         }
 
+        /// Returns the position of the next character, counted from zero.
+        #[must_use]
+        pub fn index(&self) -> usize {
+            self.index
+        }
+
         /// Peeks the next character and, if the given decider function returns true for it, advances
         /// the position.
         ///
@@ -735,6 +741,30 @@ mod tests {
     fn lexer_consume_char_without_peeking() {
         let mut lexer = Lexer::with_source(Source::Unknown, "abc");
         lexer.consume_char();
+    }
+
+    #[test]
+    fn lexer_index() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+
+        block_on(async {
+            assert_eq!(lexer.index(), 0);
+
+            let _ = lexer.peek_char().await;
+            assert_eq!(lexer.index(), 0);
+            lexer.consume_char();
+            assert_eq!(lexer.index(), 1);
+
+            let _ = lexer.peek_char().await;
+            assert_eq!(lexer.index(), 1);
+            lexer.consume_char();
+            assert_eq!(lexer.index(), 2);
+
+            let _ = lexer.peek_char().await;
+            assert_eq!(lexer.index(), 2);
+            lexer.consume_char();
+            assert_eq!(lexer.index(), 3);
+        });
     }
 
     #[test]
