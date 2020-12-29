@@ -42,6 +42,7 @@ mod core {
     use std::pin::Pin;
     use std::rc::Rc;
 
+    // TODO Remove this
     /// Enum of [`SourceChar`] and end-of-input.
     #[derive(Clone, Debug, PartialEq)]
     pub enum OptionChar {
@@ -152,6 +153,7 @@ mod core {
             Lexer::new(Box::new(Memory::new(source, code)))
         }
 
+        // TODO Remove this
         /// Peeks the next character.
         #[must_use]
         pub async fn peek(&mut self) -> Result<OptionChar> {
@@ -202,6 +204,72 @@ mod core {
                     }
                 }
             }
+        }
+
+        /// Peeks the next character.
+        ///
+        /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
+        #[must_use]
+        pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
+            loop {
+                if self.index < self.source.len() {
+                    return Ok(Some(&self.source[self.index]));
+                }
+
+                match self.state {
+                    InputState::Alive => (),
+                    InputState::EndOfInput(_) => return Ok(None),
+                    InputState::Error(ref error) => return Err(error.clone()),
+                }
+
+                // Read more input
+                match self.input.next_line(&Context).await {
+                    Ok(line) => {
+                        if line.value.is_empty() {
+                            // End of input
+                            let location = if let Some(c) = self.source.last() {
+                                // TODO correctly count line number after newline
+                                //if sc.value == '\n' {
+                                //} else {
+                                let mut location = c.location.clone();
+                                location.advance(1);
+                                location
+                            //}
+                            } else {
+                                // Completely empty source
+                                Location {
+                                    line,
+                                    column: NonZeroU64::new(1).unwrap(),
+                                }
+                            };
+                            self.state = InputState::EndOfInput(location);
+                        } else {
+                            // Successful read
+                            self.source.extend(line.enumerate())
+                        }
+                    }
+                    Err((location, io_error)) => {
+                        self.state = InputState::Error(Error {
+                            cause: ErrorCause::IoError(Rc::new(io_error)),
+                            location,
+                        });
+                    }
+                }
+            }
+        }
+
+        /// Consumes the next character.
+        ///
+        /// This function must be called after [`peek_char`](Lexer::peek_char) has successfully
+        /// returned the character. Consuming a character that has not yet been peeked would result
+        /// in a panic!
+        pub fn consume_char(&mut self) {
+            assert!(
+                self.index < self.source.len(),
+                "A character must have been peeked before being consumed: index={}",
+                self.index
+            );
+            self.index += 1;
         }
 
         /// Peeks the next character and, if the given decider function returns true for it, advances
@@ -528,28 +596,24 @@ mod tests {
     #[test]
     fn lexer_with_empty_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
-        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location.line.value, "");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
     fn lexer_with_multiline_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo\nbar\n");
 
-        let c = block_on(lexer.peek()).unwrap().unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap().clone();
         assert_eq!(c.value, 'f');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
-        let c2 = block_on(lexer.peek()).unwrap().unwrap();
-        assert_eq!(c, c2);
-        let c2 = block_on(lexer.peek()).unwrap().unwrap();
-        assert_eq!(c, c2);
+        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c, *c2);
+        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c, *c2);
         let c2 = block_on(lexer.next()).unwrap();
         assert_eq!(c, c2);
 
@@ -602,22 +666,12 @@ mod tests {
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
 
-        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location.line.value, "bar\n");
-        assert_eq!(location.line.number.get(), 2);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 5);
-
-        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location, location2);
-        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location, location2);
-        let location2 = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location, location2);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
-    fn lexer_peek_io_error() {
+    fn lexer_peek_char_io_error() {
         #[derive(Debug)]
         struct Failing;
         impl fmt::Display for Failing {
@@ -639,7 +693,7 @@ mod tests {
         }
         let mut lexer = Lexer::new(Box::new(Failing));
 
-        let e = block_on(lexer.peek()).unwrap_err();
+        let e = block_on(lexer.peek_char()).unwrap_err();
         if let ErrorCause::IoError(io_error) = e.cause {
             assert_eq!(io_error.kind(), std::io::ErrorKind::Other);
         } else {
@@ -649,6 +703,38 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_consume_char() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+
+        block_on(async {
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'b');
+            assert_eq!(c.location.line.value, "abc");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'c');
+            assert_eq!(c.location.line.value, "abc");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 3);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "A character must have been peeked before being consumed: index=0")]
+    fn lexer_consume_char_without_peeking() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        lexer.consume_char();
     }
 
     #[test]
@@ -809,11 +895,7 @@ mod tests {
 
         assert!(block_on(lexer.maybe_line_continuation()).is_ok());
 
-        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location.line.value, "\\\n");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 3);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -827,8 +909,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
 
-        let location = block_on(lexer.peek()).unwrap().unwrap_end_of_input();
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -842,7 +923,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
 
-        let c = block_on(lexer.peek()).unwrap().unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -858,7 +939,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
 
-        let c = block_on(lexer.peek()).unwrap().unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -874,7 +955,7 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
 
-        let c = block_on(lexer.peek()).unwrap().unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
         assert_eq!(c.location.column.get(), 1);
     }
@@ -885,7 +966,7 @@ mod tests {
 
         let c = block_on(async {
             lexer.skip_blanks().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -898,7 +979,7 @@ mod tests {
         // Test idempotence
         let c = block_on(async {
             lexer.skip_blanks().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -913,9 +994,9 @@ mod tests {
     fn lexer_skip_blanks_does_not_skip_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let (c1, c2) = block_on(async {
-            let c1 = lexer.peek().await;
+            let c1 = lexer.peek_char().await.unwrap().cloned();
             lexer.skip_blanks().await;
-            let c2 = lexer.peek().await;
+            let c2 = lexer.peek_char().await.unwrap().cloned();
             (c1, c2)
         });
         assert_eq!(c1, c2);
@@ -926,7 +1007,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n  \\\n\\\n\\\n \\\nX");
         let c = block_on(async {
             lexer.skip_blanks().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -939,7 +1020,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "  \\\n\\\n  \\\n Y");
         let c = block_on(async {
             lexer.skip_blanks().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -954,9 +1035,9 @@ mod tests {
     fn lexer_skip_comment_no_comment() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let (c1, c2) = block_on(async {
-            let c1 = lexer.peek().await;
+            let c1 = lexer.peek_char().await.unwrap().cloned();
             lexer.skip_comment().await;
-            let c2 = lexer.peek().await;
+            let c2 = lexer.peek_char().await.unwrap().cloned();
             (c1, c2)
         });
         assert_eq!(c1, c2);
@@ -968,7 +1049,7 @@ mod tests {
 
         let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -981,7 +1062,7 @@ mod tests {
         // Test idempotence
         let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -998,7 +1079,7 @@ mod tests {
 
         let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -1011,7 +1092,7 @@ mod tests {
         // Test idempotence
         let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
+            lexer.peek_char().await
         })
         .unwrap()
         .unwrap();
@@ -1026,28 +1107,18 @@ mod tests {
     fn lexer_skip_comment_not_ending_with_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "#comment");
 
-        let location = block_on(async {
+        let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
-        })
-        .unwrap()
-        .unwrap_end_of_input();
-        assert_eq!(location.line.value, "#comment");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 9);
+            lexer.peek_char().await
+        });
+        assert_eq!(c, Ok(None));
 
         // Test idempotence
-        let location = block_on(async {
+        let c = block_on(async {
             lexer.skip_comment().await;
-            lexer.peek().await
-        })
-        .unwrap()
-        .unwrap_end_of_input();
-        assert_eq!(location.line.value, "#comment");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 9);
+            lexer.peek_char().await
+        });
+        assert_eq!(c, Ok(None));
     }
 
     #[test]
