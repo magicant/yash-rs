@@ -254,6 +254,24 @@ mod core {
             }
         }
 
+        /// Returns the location of the next character.
+        ///
+        /// If there is no more character (that is, it is the end of input), an imaginary location
+        /// is returned that would be returned if a character existed.
+        ///
+        /// This function required a mutable reference to `self` since it may need to read a next
+        /// line if it is not yet read.
+        #[must_use]
+        pub async fn location(&mut self) -> Result<&Location> {
+            match self.peek_char().await? {
+                Some(_) => Ok(&self.source[self.index].location),
+                None => match self.state {
+                    InputState::EndOfInput(ref location) => Ok(location),
+                    _ => panic!("Unexpected input state: {:?}", self.state),
+                },
+            }
+        }
+
         /// Consumes the next character.
         ///
         /// This function must be called after [`peek_char`](Lexer::peek_char) has successfully
@@ -505,16 +523,7 @@ impl Lexer {
     //  * Allow tilde expansion?
     /// Parses a word token.
     pub async fn word(&mut self) -> Result<Word> {
-        let location = match self.peek().await {
-            Ok(OptionChar::Char(c)) => c.location,
-            Ok(OptionChar::EndOfInput(location)) => {
-                return Err(Error {
-                    cause: ErrorCause::EndOfInput,
-                    location,
-                });
-            }
-            Err(e) => return Err(e),
-        };
+        let location = self.location().await?.clone();
 
         let mut units = vec![];
         loop {
