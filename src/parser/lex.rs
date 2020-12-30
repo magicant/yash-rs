@@ -365,31 +365,6 @@ mod core {
             r
         }
 
-        // TODO Remove this
-        /// Applies the given parser repeatedly until it fails.
-        ///
-        /// This function implicitly applies [`Lexer::maybe`] so that the position is left just after the last
-        /// successful parse.
-        ///
-        /// Returns a vector of the successful results and the error that stopped the repetition.
-        pub async fn many<F, R>(&mut self, mut f: F) -> (Vec<R>, Error)
-        where
-            F: for<'a> AsyncFnMut<'a, Lexer, Result<R>>,
-        {
-            let mut results = vec![];
-            loop {
-                let old_index = self.index;
-                match f.call(self).await {
-                    Ok(r) => results.push(r),
-                    Err(e) => {
-                        self.index = old_index;
-                        break (results, e);
-                    }
-                }
-            }
-        }
-
-        // TODO Rename to `many`
         /// Applies the given parser repeatedly until it fails.
         ///
         /// Returns a vector of accumulated successful results from the parser.
@@ -401,7 +376,7 @@ mod core {
         /// When the parser fails, the current position is reset to the position just after the
         /// last successful parse. This cancels the effect of the failed parse that may have
         /// consumed some characters.
-        pub async fn many2<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
+        pub async fn many<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
         where
             F: for<'a> AsyncFnMut<'a, Lexer, Result<Option<R>>>,
         {
@@ -461,7 +436,7 @@ impl Lexer {
             }
             Ok(Some(()))
         }
-        self.many2(line_continuation).await.map(|_| ())
+        self.many(line_continuation).await.map(|_| ())
     }
 
     /// Skips blank characters until reaching a non-blank.
@@ -946,55 +921,43 @@ mod tests {
     fn lexer_many_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
 
-        async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next_if(|c| c == 'a').await?;
-            l.next_if(|c| c == 'b').await
+        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
+            l.consume_char_if(|c| c == 'a').await.map(|o| o.cloned())
         }
-        let (r, e) = block_on(lexer.many(f));
+        let r = block_on(lexer.many(f)).unwrap();
         assert!(r.is_empty());
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
     fn lexer_many_one() {
         let mut lexer = Lexer::with_source(Source::Unknown, "ab");
 
-        async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next_if(|c| c == 'a').await?;
-            l.next_if(|c| c == 'b').await
+        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
+            if let None = l.consume_char_if(|c| c == 'a').await? {
+                return Ok(None);
+            }
+            l.consume_char_if(|c| c == 'b').await.map(|o| o.cloned())
         }
-        let (r, e) = block_on(lexer.many(f));
+        let r = block_on(lexer.many(f)).unwrap();
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].value, 'b');
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "ab");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
     }
 
     #[test]
     fn lexer_many_three() {
         let mut lexer = Lexer::with_source(Source::Unknown, "xyxyxyxz");
 
-        async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next_if(|c| c == 'x').await?;
-            l.next_if(|c| c == 'y').await
+        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
+            if let None = l.consume_char_if(|c| c == 'x').await? {
+                return Ok(None);
+            }
+            l.consume_char_if(|c| c == 'y').await.map(|o| o.cloned())
         }
-        let (r, e) = block_on(lexer.many(f));
+        let r = block_on(lexer.many(f)).unwrap();
         assert_eq!(r.len(), 3);
         assert_eq!(r[0].value, 'y');
         assert_eq!(r[1].value, 'y');
         assert_eq!(r[2].value, 'y');
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "xyxyxyxz");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 8);
     }
 
     #[test]
