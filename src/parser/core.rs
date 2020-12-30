@@ -192,11 +192,11 @@ impl Parser<'_> {
     /// Reads a next token if the current token is `None`.
     async fn require_token(&mut self) {
         if self.token.is_none() {
-            if let Err(e) = self.lexer.skip_blanks_and_comment().await {
-                self.token = Some(Err(e));
+            self.token = Some(if let Err(e) = self.lexer.skip_blanks_and_comment().await {
+                Err(e)
             } else {
-                self.token = Some(self.lexer.token().await);
-            }
+                self.lexer.token().await
+            });
         }
     }
 
