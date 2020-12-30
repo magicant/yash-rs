@@ -38,34 +38,29 @@ mod core {
     use std::num::NonZeroU64;
     use std::rc::Rc;
 
-    // TODO Remove this
-    /// Enum of [`SourceChar`] and end-of-input.
-    #[derive(Clone, Debug, PartialEq)]
-    pub enum OptionChar {
-        Char(SourceChar),
-        EndOfInput(Location),
+    /// Result of [`Lexer::peek_char_or_end`].
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum PeekChar<'a> {
+        Char(&'a SourceChar),
+        EndOfInput(&'a Location),
     }
 
-    impl OptionChar {
-        /// Returns the `SourceChar` in this `OptionChar`.
-        ///
-        /// Panics if `self` is an `EndOfInput`.
-        pub fn unwrap(self) -> SourceChar {
+    impl<'a> PeekChar<'a> {
+        /// Converts `PeekChar` to `Option`.
+        #[must_use]
+        fn as_option<'b>(self: &'b PeekChar<'a>) -> Option<&'a SourceChar> {
             match self {
-                OptionChar::Char(c) => c,
-                OptionChar::EndOfInput(location) => {
-                    panic!("Unexpected OptionChar::EndOfInput({:?})", location)
-                }
+                PeekChar::Char(c) => Some(c),
+                PeekChar::EndOfInput(_) => None,
             }
         }
 
-        /// Returns the `Location` assuming `self` is an `EndOfInput`.
-        ///
-        /// Panics if `self` is a `Char`.
-        pub fn unwrap_end_of_input(self) -> Location {
+        /// Returns the location that was peeked.
+        #[must_use]
+        fn location<'b>(self: &'b PeekChar<'a>) -> &'a Location {
             match self {
-                OptionChar::Char(c) => panic!("Unexpected OptionChar::Char({:?})", c),
-                OptionChar::EndOfInput(location) => location,
+                PeekChar::Char(c) => &c.location,
+                PeekChar::EndOfInput(l) => l,
             }
         }
     }
@@ -120,8 +115,8 @@ mod core {
     /// internal buffer containing the characters that have been read and the position (or the
     /// index) of the character that is to be parsed next.
     ///
-    /// `Lexer` has primitive functions such as [`peek`](Lexer::peek) that provide access to the
-    /// character at the current position. Derived functions such as
+    /// `Lexer` has primitive functions such as [`peek_char`](Lexer::peek_char) that provide access
+    /// to the character at the current position. Derived functions such as
     /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
     /// parse more complex structures in the source code.
     pub struct Lexer {
@@ -149,19 +144,18 @@ mod core {
             Lexer::new(Box::new(Memory::new(source, code)))
         }
 
-        // TODO Remove this
         /// Peeks the next character.
         #[must_use]
-        pub async fn peek(&mut self) -> Result<OptionChar> {
+        async fn peek_char_or_end(&mut self) -> Result<PeekChar<'_>> {
             loop {
-                if let Some(c) = self.source.get(self.index) {
-                    return Ok(OptionChar::Char(c.clone()));
+                if self.index < self.source.len() {
+                    return Ok(PeekChar::Char(&self.source[self.index]));
                 }
 
                 match self.state {
                     InputState::Alive => (),
                     InputState::EndOfInput(ref location) => {
-                        return Ok(OptionChar::EndOfInput(location.clone()))
+                        return Ok(PeekChar::EndOfInput(location))
                     }
                     InputState::Error(ref error) => return Err(error.clone()),
                 }
@@ -207,51 +201,7 @@ mod core {
         /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
         #[must_use]
         pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
-            loop {
-                if self.index < self.source.len() {
-                    return Ok(Some(&self.source[self.index]));
-                }
-
-                match self.state {
-                    InputState::Alive => (),
-                    InputState::EndOfInput(_) => return Ok(None),
-                    InputState::Error(ref error) => return Err(error.clone()),
-                }
-
-                // Read more input
-                match self.input.next_line(&Context).await {
-                    Ok(line) => {
-                        if line.value.is_empty() {
-                            // End of input
-                            let location = if let Some(c) = self.source.last() {
-                                // TODO correctly count line number after newline
-                                //if sc.value == '\n' {
-                                //} else {
-                                let mut location = c.location.clone();
-                                location.advance(1);
-                                location
-                            //}
-                            } else {
-                                // Completely empty source
-                                Location {
-                                    line,
-                                    column: NonZeroU64::new(1).unwrap(),
-                                }
-                            };
-                            self.state = InputState::EndOfInput(location);
-                        } else {
-                            // Successful read
-                            self.source.extend(line.enumerate())
-                        }
-                    }
-                    Err((location, io_error)) => {
-                        self.state = InputState::Error(Error {
-                            cause: ErrorCause::IoError(Rc::new(io_error)),
-                            location,
-                        });
-                    }
-                }
-            }
+            self.peek_char_or_end().await.map(|p| p.as_option())
         }
 
         /// Returns the location of the next character.
@@ -263,13 +213,7 @@ mod core {
         /// line if it is not yet read.
         #[must_use]
         pub async fn location(&mut self) -> Result<&Location> {
-            match self.peek_char().await? {
-                Some(_) => Ok(&self.source[self.index].location),
-                None => match self.state {
-                    InputState::EndOfInput(ref location) => Ok(location),
-                    _ => panic!("Unexpected input state: {:?}", self.state),
-                },
-            }
+            self.peek_char_or_end().await.map(|p| p.location())
         }
 
         /// Consumes the next character.
