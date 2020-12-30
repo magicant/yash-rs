@@ -421,6 +421,7 @@ mod core {
             }
         }
 
+        // TODO Remove this
         /// Parses an operator that matches a key in the given trie, if any.
         ///
         /// If there is no match, this function returns an [`Unknown`](ErrorCause::Unknown) error
@@ -466,6 +467,7 @@ mod core {
             }
         }
 
+        // TODO Remove this
         /// Parses an operator that matches a key in the given trie, if any.
         ///
         /// If there is no match, this function returns an [`Unknown`](ErrorCause::Unknown) error
@@ -501,11 +503,15 @@ mod core {
 }
 
 pub use self::core::*;
+use self::op::Trie;
 use self::op::OPERATORS;
 use crate::parser::core::Error;
 use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
+use crate::source::Location;
 use crate::syntax::*;
+use std::future::Future;
+use std::pin::Pin;
 
 impl Lexer {
     /// Skips a character if the given function returns true for it.
@@ -568,11 +574,48 @@ impl Lexer {
         self.skip_comment().await;
     }
 
+    /// Parses an operator that matches a key in the given trie, if any.
+    ///
+    /// The char vector in the result is the reversed key that matched.
+    fn operator_tail(
+        &mut self,
+        trie: Trie,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<(Operator, Location, Vec<char>)>>> + '_>> {
+        Box::pin(async move {
+            self.many(Lexer::maybe_line_continuation).await;
+
+            let sc = match self.peek_char().await? {
+                None => return Ok(None),
+                Some(sc) => sc.clone(),
+            };
+            let edge = match trie.edge(sc.value) {
+                None => return Ok(None),
+                Some(edge) => edge,
+            };
+
+            let old_index = self.index();
+            self.consume_char();
+            if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
+                chars.push(sc.value);
+                return Ok(Some((op, sc.location, chars)));
+            }
+
+            match edge.value {
+                None => {
+                    self.rewind(old_index);
+                    Ok(None)
+                }
+                Some(op) => Ok(Some((op, sc.location, vec![sc.value]))),
+            }
+        })
+    }
+
     /// Parses an operator token.
     ///
     /// If the current character does not start an operator, this function returns an
     /// [`Unknown`](ErrorCause::Unknown) error.
     pub async fn operator(&mut self) -> Result<Token> {
+        // TODO Use operator_tail
         let (op, location, chars) = self.maybe_operator(OPERATORS).await?;
         let units = chars
             .into_iter()
