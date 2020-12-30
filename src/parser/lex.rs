@@ -293,6 +293,7 @@ mod core {
             self.index = index;
         }
 
+        // TODO Remove this
         /// Peeks the next character and, if the given decider function returns true for it, advances
         /// the position.
         ///
@@ -322,6 +323,7 @@ mod core {
             }
         }
 
+        // TODO Remove this
         /// Reads the next character, advancing the position.
         ///
         /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
@@ -329,6 +331,7 @@ mod core {
             self.next_if(|_| true).await
         }
 
+        // TODO Remove this
         /// Applies the given parser and updates the current position only if the parser succeeds.
         ///
         /// This function can be used to cancel the effect of failed parsing so that the consumed
@@ -346,6 +349,7 @@ mod core {
             r
         }
 
+        // TODO Remove this
         /// Applies the given parser repeatedly until it fails.
         ///
         /// This function implicitly applies [`Lexer::maybe`] so that the position is left just after the last
@@ -364,6 +368,35 @@ mod core {
                     Err(e) => {
                         self.index = old_index;
                         break (results, e);
+                    }
+                }
+            }
+        }
+
+        // TODO Rename to `many`
+        /// Applies the given parser repeatedly until it fails.
+        ///
+        /// Returns a vector of accumulated successful results from the parser.
+        ///
+        /// A parse result is considered successful if it is an `Ok(Some(_))`, failed if
+        /// `Ok(None)` or `Err(_)`. In case of `Err(_)`, all the accumulated results are abandoned
+        /// and only the error is returned.
+        ///
+        /// When the parser fails, the current position is reset to the position just after the
+        /// last successful parse. This cancels the effect of the failed parse that may have
+        /// consumed some characters.
+        pub async fn many2<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
+        where
+            F: for<'a> AsyncFnMut<'a, Lexer, Result<Option<R>>>,
+        {
+            let mut results = vec![];
+            loop {
+                let old_index = self.index;
+                match f.call(self).await? {
+                    Some(r) => results.push(r),
+                    None => {
+                        self.index = old_index;
+                        return Ok(results);
                     }
                 }
             }
