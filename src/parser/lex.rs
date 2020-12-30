@@ -450,24 +450,6 @@ impl Lexer {
         self.next_if(f).await.is_ok()
     }
 
-    // TODO Remove this
-    /// Skips a line continuation, if any.
-    ///
-    /// If there is a line continuation at the current position, this function skips it and returns
-    /// `Ok(())`. Otherwise, it returns an [`Unknown`](ErrorCause::Unknown) error without consuming
-    /// any characters.
-    pub async fn maybe_line_continuation(&mut self) -> Result<()> {
-        async fn line_continuation(this: &mut Lexer) -> Result<()> {
-            this.next_if(|c| c == '\\').await?;
-            this.next_if(|c| c == '\n').await?;
-            Ok(())
-        }
-        self.maybe(line_continuation).await
-    }
-    // TODO Change maybe_line_continuation to line_continuation or remove implicit `maybe` effect
-    // from `many`, as current `many(maybe_line_continuation)` doubles the `maybe` effect
-    // redundantly.
-
     /// Skips line continuations, if any.
     pub async fn line_continuations(&mut self) -> Result<()> {
         async fn line_continuation(this: &mut Lexer) -> Result<Option<()>> {
@@ -488,7 +470,7 @@ impl Lexer {
     pub async fn skip_blanks(&mut self) {
         // TODO Support locale-dependent decision
         loop {
-            let _ = self.many(Lexer::maybe_line_continuation).await;
+            let _ = self.line_continuations().await; // TODO Return error if any
             if !self.skip_if(|c| c != '\n' && c.is_whitespace()).await {
                 break;
             }
@@ -525,7 +507,7 @@ impl Lexer {
         trie: Trie,
     ) -> Pin<Box<dyn Future<Output = Result<Option<(Operator, Location, Vec<char>)>>> + '_>> {
         Box::pin(async move {
-            self.many(Lexer::maybe_line_continuation).await;
+            self.line_continuations().await?;
 
             let sc = match self.peek_char().await? {
                 None => return Ok(None),
