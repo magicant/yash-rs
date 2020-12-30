@@ -307,36 +307,6 @@ mod core {
             self.index = index;
         }
 
-        // TODO Remove this
-        /// Peeks the next character and, if the given decider function returns true for it, advances
-        /// the position.
-        ///
-        /// Returns the consumed character if the function returned true. Returns an
-        /// [`Unknown`](ErrorCause::Unknown) error if the function returned false. Returns the error
-        /// intact if the input function returned an error, including the end-of-input case.
-        pub async fn next_if<F>(&mut self, f: F) -> Result<SourceChar>
-        where
-            F: FnOnce(char) -> bool,
-        {
-            match self.peek().await? {
-                OptionChar::Char(c) => {
-                    if f(c.value) {
-                        self.index += 1;
-                        Ok(c)
-                    } else {
-                        Err(Error {
-                            cause: ErrorCause::Unknown,
-                            location: c.location,
-                        })
-                    }
-                }
-                OptionChar::EndOfInput(location) => Err(Error {
-                    cause: ErrorCause::EndOfInput,
-                    location,
-                }),
-            }
-        }
-
         /// Peeks the next character and, if the given decider function returns true for it,
         /// advances the position.
         ///
@@ -409,23 +379,23 @@ use std::pin::Pin;
 
 impl Lexer {
     /// Skips a character if the given function returns true for it.
-    pub async fn skip_if<F>(&mut self, f: F) -> bool
+    ///
+    /// Returns `Ok(true)` if the character was skipped, `Ok(false)` if the function returned
+    /// false, and `Err(_)` if an error occurred, respectively.
+    ///
+    /// `skip_if` is a simpler version of [`consume_char_if`](Lexer::consume_char_if).
+    pub async fn skip_if<F>(&mut self, f: F) -> Result<bool>
     where
         F: FnOnce(char) -> bool,
     {
-        self.next_if(f).await.is_ok()
+        Ok(self.consume_char_if(f).await?.is_some())
     }
 
     /// Skips line continuations, if any.
     pub async fn line_continuations(&mut self) -> Result<()> {
         async fn line_continuation(this: &mut Lexer) -> Result<Option<()>> {
-            if let None = this.consume_char_if(|c| c == '\\').await? {
-                return Ok(None);
-            }
-            if let None = this.consume_char_if(|c| c == '\n').await? {
-                return Ok(None);
-            }
-            Ok(Some(()))
+            let ok = this.skip_if(|c| c == '\\').await? && this.skip_if(|c| c == '\n').await?;
+            Ok(if ok { Some(()) } else { None })
         }
         self.many(line_continuation).await.map(|_| ())
     }
@@ -433,12 +403,12 @@ impl Lexer {
     /// Skips blank characters until reaching a non-blank.
     ///
     /// This function also skips line continuations.
-    pub async fn skip_blanks(&mut self) {
+    pub async fn skip_blanks(&mut self) -> Result<()> {
         // TODO Support locale-dependent decision
         loop {
-            let _ = self.line_continuations().await; // TODO Return error if any
-            if !self.skip_if(|c| c != '\n' && c.is_whitespace()).await {
-                break;
+            self.line_continuations().await?;
+            if !self.skip_if(|c| c != '\n' && c.is_whitespace()).await? {
+                break Ok(());
             }
         }
     }
@@ -448,21 +418,20 @@ impl Lexer {
     /// A comment ends just before a newline. The newline is *not* part of the comment.
     ///
     /// This function does not recognize any line continuations.
-    pub async fn skip_comment(&mut self) {
-        if !self.skip_if(|c| c == '#').await {
-            return;
+    pub async fn skip_comment(&mut self) -> Result<()> {
+        if self.skip_if(|c| c == '#').await? {
+            while self.skip_if(|c| c != '\n').await? {}
         }
-
-        while self.skip_if(|c| c != '\n').await {}
+        Ok(())
     }
 
     /// Skips blank characters and a comment, if any.
     ///
     /// This function also skips line continuations between blanks. It is the same as
     /// [`skip_blanks`](Lexer::skip_blanks) followed by [`skip_comment`](Lexer::skip_comment).
-    pub async fn skip_blanks_and_comment(&mut self) {
-        self.skip_blanks().await;
-        self.skip_comment().await;
+    pub async fn skip_blanks_and_comment(&mut self) -> Result<()> {
+        self.skip_blanks().await?;
+        self.skip_comment().await
     }
 
     /// Parses an operator that matches a key in the given trie, if any.
@@ -975,7 +944,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, " \t w");
 
         let c = block_on(async {
-            lexer.skip_blanks().await;
+            lexer.skip_blanks().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -988,7 +957,7 @@ mod tests {
 
         // Test idempotence
         let c = block_on(async {
-            lexer.skip_blanks().await;
+            lexer.skip_blanks().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1005,7 +974,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let (c1, c2) = block_on(async {
             let c1 = lexer.peek_char().await.unwrap().cloned();
-            lexer.skip_blanks().await;
+            lexer.skip_blanks().await.unwrap();
             let c2 = lexer.peek_char().await.unwrap().cloned();
             (c1, c2)
         });
@@ -1016,7 +985,7 @@ mod tests {
     fn lexer_skip_blanks_skips_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n  \\\n\\\n\\\n \\\nX");
         let c = block_on(async {
-            lexer.skip_blanks().await;
+            lexer.skip_blanks().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1029,7 +998,7 @@ mod tests {
 
         let mut lexer = Lexer::with_source(Source::Unknown, "  \\\n\\\n  \\\n Y");
         let c = block_on(async {
-            lexer.skip_blanks().await;
+            lexer.skip_blanks().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1046,7 +1015,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let (c1, c2) = block_on(async {
             let c1 = lexer.peek_char().await.unwrap().cloned();
-            lexer.skip_comment().await;
+            lexer.skip_comment().await.unwrap();
             let c2 = lexer.peek_char().await.unwrap().cloned();
             (c1, c2)
         });
@@ -1058,7 +1027,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "#\n");
 
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1071,7 +1040,7 @@ mod tests {
 
         // Test idempotence
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1088,7 +1057,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "### foo bar\\\n");
 
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1101,7 +1070,7 @@ mod tests {
 
         // Test idempotence
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         })
         .unwrap()
@@ -1118,14 +1087,14 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "#comment");
 
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         });
         assert_eq!(c, Ok(None));
 
         // Test idempotence
         let c = block_on(async {
-            lexer.skip_comment().await;
+            lexer.skip_comment().await?;
             lexer.peek_char().await
         });
         assert_eq!(c, Ok(None));
