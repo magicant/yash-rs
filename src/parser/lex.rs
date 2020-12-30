@@ -313,8 +313,6 @@ mod core {
 pub use self::core::*;
 use self::op::Trie;
 use self::op::OPERATORS;
-use crate::parser::core::Error;
-use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
 use crate::source::Location;
 use crate::syntax::*;
@@ -459,17 +457,7 @@ impl Lexer {
             return Ok(op);
         }
 
-        let word = match self.word().await {
-            Ok(word) => word,
-            Err(Error {
-                cause: ErrorCause::EndOfInput,
-                location,
-            }) => Word {
-                units: vec![],
-                location,
-            },
-            Err(e) => return Err(e),
-        };
+        let word = self.word().await?;
         let id = if word.units.is_empty() {
             TokenId::EndOfInput
         } else {
@@ -485,6 +473,7 @@ mod tests {
     use super::*;
     use crate::input::Context;
     use crate::input::Input;
+    use crate::parser::core::ErrorCause;
     use crate::source::Line;
     use crate::source::Location;
     use crate::source::Source;

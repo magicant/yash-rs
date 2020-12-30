@@ -34,8 +34,6 @@ pub enum ErrorCause {
     /// This error cause is used when the error type is so generic that no meaningful
     /// explanation can be provided.
     Unknown,
-    /// End of input is reached while more characters are expected to be read.
-    EndOfInput,
     /// Error in an underlying input function.
     IoError(Rc<std::io::Error>),
     /// A here-document operator is missing its delimiter token.
@@ -49,7 +47,6 @@ impl PartialEq for ErrorCause {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ErrorCause::Unknown, ErrorCause::Unknown)
-            | (ErrorCause::EndOfInput, ErrorCause::EndOfInput)
             | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
             | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
             _ => false,
@@ -61,7 +58,6 @@ impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ErrorCause::Unknown => f.write_str("Unknown error"),
-            ErrorCause::EndOfInput => f.write_str("Incomplete command"),
             ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
             ErrorCause::MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")
@@ -247,9 +243,9 @@ mod tests {
             column: number,
         };
         let error = Error {
-            cause: ErrorCause::EndOfInput,
+            cause: ErrorCause::Unknown,
             location,
         };
-        assert_eq!(format!("{}", error), "Incomplete command");
+        assert_eq!(format!("{}", error), "Unknown error");
     }
 }
