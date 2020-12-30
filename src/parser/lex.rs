@@ -278,6 +278,21 @@ mod core {
             self.index
         }
 
+        /// Moves the current position back to the given index so that characters that have been
+        /// consumed can be read again.
+        ///
+        /// The given index must not be larger than the [current index](Lexer::index), or this
+        /// function would panic.
+        pub fn rewind(&mut self, index: usize) {
+            assert!(
+                index <= self.index,
+                "The new index {} must not be larger than the current index {}",
+                index,
+                self.index
+            );
+            self.index = index;
+        }
+
         /// Peeks the next character and, if the given decider function returns true for it, advances
         /// the position.
         ///
@@ -765,6 +780,34 @@ mod tests {
             lexer.consume_char();
             assert_eq!(lexer.index(), 3);
         });
+    }
+
+    #[test]
+    fn lexer_rewind() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        lexer.rewind(0);
+
+        block_on(async {
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+            lexer.rewind(0);
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'a');
+            assert_eq!(c.location.line.value, "abc");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 1);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "The new index 1 must not be larger than the current index 0")]
+    fn lexer_rewind_invalid_index() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        lexer.rewind(1);
     }
 
     #[test]
