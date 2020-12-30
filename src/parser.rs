@@ -41,9 +41,10 @@ pub use self::lex::TokenId;
 impl Parser<'_> {
     /// Parses a redirection.
     ///
-    /// If the current token is not a redirection operator, an [unknown](ErrorCause::Unknown) error
-    /// is returned.
-    pub async fn redirection(&mut self) -> Result<Redir<MissingHereDoc>> {
+    /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
+    /// is missing after the operator, `Err(Error{...})` is returned with a cause of
+    /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
+    pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         // TODO IO_NUMBER
         let operator = match self.peek_token().await {
             Ok(token) => match token.id {
@@ -51,12 +52,7 @@ impl Parser<'_> {
                 Operator(op) if op == LessLess || op == LessLessDash => {
                     self.take_token().await.unwrap()
                 }
-                _ => {
-                    return Err(Error {
-                        cause: ErrorCause::Unknown,
-                        location: token.word.location.clone(),
-                    })
-                }
+                _ => return Ok(None),
             },
             Err(_) => return Err(self.take_token().await.unwrap_err()),
         };
@@ -72,10 +68,10 @@ impl Parser<'_> {
             } // TODO IoNumber => reject if posixly-correct,
         }
 
-        Ok(Redir {
+        Ok(Some(Redir {
             fd: None,
             body: RedirBody::HereDoc(MissingHereDoc),
-        })
+        }))
     }
 
     /// Parses a simple command.
@@ -107,7 +103,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<end ");
         let mut parser = Parser::new(&mut lexer);
 
-        let redir = block_on(parser.redirection()).unwrap();
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
         // TODO pending here-doc content
@@ -118,7 +114,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<-end ");
         let mut parser = Parser::new(&mut lexer);
 
-        let redir = block_on(parser.redirection()).unwrap();
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
         // TODO pending here-doc content
@@ -129,12 +125,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "x");
         let mut parser = Parser::new(&mut lexer);
 
-        let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "x");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert!(block_on(parser.redirection()).unwrap().is_none());
     }
 
     #[test]
