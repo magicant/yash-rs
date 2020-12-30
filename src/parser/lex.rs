@@ -524,20 +524,14 @@ impl Lexer {
     /// Parses a word token.
     pub async fn word(&mut self) -> Result<Word> {
         let location = self.location().await?.clone();
-
         let mut units = vec![];
-        loop {
-            // TODO Parse the word correctly
-            match self.next_if(|c| c != '\n' && !c.is_whitespace()).await {
-                Ok(sc) => units.push(Unquoted(Literal(sc.value))),
-                Err(Error { cause, .. }) if cause == ErrorCause::Unknown => break,
-                Err(Error { cause, .. })
-                    if cause == ErrorCause::EndOfInput && !units.is_empty() =>
-                {
-                    break
-                }
-                Err(e) => return Err(e),
-            }
+        // TODO Delimit the word correctly
+        // TODO Parse other types of word units
+        while let Some(sc) = self
+            .consume_char_if(|c| c != '\n' && !c.is_whitespace())
+            .await?
+        {
+            units.push(Unquoted(Literal(sc.value)))
         }
         Ok(Word { units, location })
     }
