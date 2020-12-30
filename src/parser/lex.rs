@@ -323,6 +323,25 @@ mod core {
             }
         }
 
+        /// Peeks the next character and, if the given decider function returns true for it,
+        /// advances the position.
+        ///
+        /// Returns the consumed character if the function returned true. Returns `Ok(None)` if it
+        /// returned false or there is no more character.
+        pub async fn consume_char_if<F>(&mut self, f: F) -> Result<Option<&SourceChar>>
+        where
+            F: FnOnce(char) -> bool,
+        {
+            match self.peek_char().await? {
+                Some(c) if f(c.value) => {
+                    let index = self.index;
+                    self.consume_char();
+                    Ok(Some(&self.source[index]))
+                }
+                _ => Ok(None),
+            }
+        }
+
         // TODO Remove this
         /// Reads the next character, advancing the position.
         ///
@@ -844,15 +863,16 @@ mod tests {
     }
 
     #[test]
-    fn lexer_next_if() {
+    fn lexer_consume_char_if() {
         let mut lexer = Lexer::with_source(Source::Unknown, "word\n");
 
         let mut called = 0;
-        let c = block_on(lexer.next_if(|c| {
+        let c = block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'w');
             called += 1;
             true
         }))
+        .unwrap()
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'w');
@@ -862,39 +882,30 @@ mod tests {
         assert_eq!(c.location.column.get(), 1);
 
         let mut called = 0;
-        let e = block_on(lexer.next_if(|c| {
+        let r = block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'o');
             called += 1;
             false
-        }))
-        .unwrap_err();
+        }));
         assert_eq!(called, 1);
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "word\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(r, Ok(None));
 
         let mut called = 0;
-        let e = block_on(lexer.next_if(|c| {
+        let r = block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'o');
             called += 1;
             false
-        }))
-        .unwrap_err();
+        }));
         assert_eq!(called, 1);
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "word\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(r, Ok(None));
 
         let mut called = 0;
-        let c = block_on(lexer.next_if(|c| {
+        let c = block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'o');
             called += 1;
             true
         }))
+        .unwrap()
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'o');
@@ -902,6 +913,31 @@ mod tests {
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
+
+        block_on(lexer.consume_char_if(|c| {
+            assert_eq!(c, 'r');
+            true
+        }))
+        .unwrap()
+        .unwrap();
+        block_on(lexer.consume_char_if(|c| {
+            assert_eq!(c, 'd');
+            true
+        }))
+        .unwrap()
+        .unwrap();
+        block_on(lexer.consume_char_if(|c| {
+            assert_eq!(c, '\n');
+            true
+        }))
+        .unwrap()
+        .unwrap();
+
+        // end of input
+        let r = block_on(lexer.consume_char_if(|c| {
+            panic!("Unexpected call to the decider function: argument={}", c)
+        }));
+        assert_eq!(r, Ok(None));
     }
 
     #[test]
