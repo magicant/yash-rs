@@ -29,11 +29,6 @@ use std::rc::Rc;
 /// Types of errors that may happen in parsing.
 #[derive(Clone, Debug)]
 pub enum ErrorCause {
-    /// Uncategorized type of error.
-    ///
-    /// This error cause is used when the error type is so generic that no meaningful
-    /// explanation can be provided.
-    Unknown,
     /// Error in an underlying input function.
     IoError(Rc<std::io::Error>),
     /// A here-document operator is missing its delimiter token.
@@ -46,8 +41,7 @@ pub enum ErrorCause {
 impl PartialEq for ErrorCause {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (ErrorCause::Unknown, ErrorCause::Unknown)
-            | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
+            (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
             | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
             _ => false,
         }
@@ -57,7 +51,6 @@ impl PartialEq for ErrorCause {
 impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorCause::Unknown => f.write_str("Unknown error"),
             ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
             ErrorCause::MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")
@@ -243,9 +236,12 @@ mod tests {
             column: number,
         };
         let error = Error {
-            cause: ErrorCause::Unknown,
+            cause: ErrorCause::MissingHereDocDelimiter,
             location,
         };
-        assert_eq!(format!("{}", error), "Unknown error");
+        assert_eq!(
+            format!("{}", error),
+            "The here-document operator is missing its delimiter"
+        );
     }
 }
