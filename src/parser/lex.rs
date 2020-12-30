@@ -23,7 +23,6 @@ mod op;
 mod core {
 
     pub use super::op::Operator;
-    use super::op::Trie;
     use crate::input::Context;
     use crate::input::Input;
     use crate::input::Memory;
@@ -37,9 +36,7 @@ mod core {
     use crate::source::SourceChar;
     use crate::syntax::Word;
     use std::fmt;
-    use std::future::Future;
     use std::num::NonZeroU64;
-    use std::pin::Pin;
     use std::rc::Rc;
 
     // TODO Remove this
@@ -420,75 +417,6 @@ mod core {
                 }
             }
         }
-
-        // TODO Remove this
-        /// Parses an operator that matches a key in the given trie, if any.
-        ///
-        /// If there is no match, this function returns an [`Unknown`](ErrorCause::Unknown) error
-        /// and the position is indeterminate.
-        ///
-        /// The char vector in the result is the reversed key that matched.
-        async fn try_operator(&mut self, trie: Trie) -> Result<(Operator, Location, Vec<char>)> {
-            self.many(Lexer::maybe_line_continuation).await;
-
-            let sc = self.next().await?;
-            let edge = match trie.edge(sc.value) {
-                None => {
-                    return Err(Error {
-                        cause: ErrorCause::Unknown,
-                        location: sc.location,
-                    })
-                }
-                Some(edge) => edge,
-            };
-
-            match self.maybe_operator(edge.next).await {
-                Ok((op, _location, mut s)) => {
-                    s.push(sc.value);
-                    return Ok((op, sc.location, s));
-                }
-                Err(Error {
-                    cause: ErrorCause::Unknown,
-                    ..
-                }) => (),
-                Err(Error {
-                    cause: ErrorCause::EndOfInput,
-                    ..
-                }) => (),
-                other_error => return other_error,
-            }
-
-            match edge.value {
-                None => Err(Error {
-                    cause: ErrorCause::Unknown,
-                    location: sc.location,
-                }),
-                Some(op) => Ok((op, sc.location, vec![edge.key])),
-            }
-        }
-
-        // TODO Remove this
-        /// Parses an operator that matches a key in the given trie, if any.
-        ///
-        /// If there is no match, this function returns an [`Unknown`](ErrorCause::Unknown) error
-        /// without advancing the position.
-        ///
-        /// The char vector in the result is the reversed key that matched.
-        pub fn maybe_operator(
-            &mut self,
-            trie: Trie,
-        ) -> Pin<Box<dyn Future<Output = Result<(Operator, Location, Vec<char>)>> + '_>> {
-            // The current rustc does not accept the `maybe` function called with a closure, hence
-            // this dedicated version of `maybe` for `try_operator`.
-            Box::pin(async move {
-                let old_index = self.index;
-                let result = self.try_operator(trie).await;
-                if result.is_err() {
-                    self.index = old_index;
-                }
-                result
-            })
-        }
     }
 
     impl fmt::Debug for Lexer {
@@ -611,20 +539,19 @@ impl Lexer {
     }
 
     /// Parses an operator token.
-    ///
-    /// If the current character does not start an operator, this function returns an
-    /// [`Unknown`](ErrorCause::Unknown) error.
-    pub async fn operator(&mut self) -> Result<Token> {
-        // TODO Use operator_tail
-        let (op, location, chars) = self.maybe_operator(OPERATORS).await?;
-        let units = chars
-            .into_iter()
-            .rev()
-            .map(|c| Unquoted(Literal(c)))
-            .collect::<Vec<_>>();
-        let word = Word { units, location };
-        let id = TokenId::Operator(op);
-        Ok(Token { word, id })
+    pub async fn operator(&mut self) -> Result<Option<Token>> {
+        self.operator_tail(OPERATORS).await.map(|o| {
+            o.map(|(op, location, chars)| {
+                let units = chars
+                    .into_iter()
+                    .rev()
+                    .map(|c| Unquoted(Literal(c)))
+                    .collect::<Vec<_>>();
+                let word = Word { units, location };
+                let id = TokenId::Operator(op);
+                Token { word, id }
+            })
+        })
     }
 
     // TODO Should return an empty word if the current position is the end of input.
@@ -667,9 +594,8 @@ impl Lexer {
     /// [`EndOfInput`](TokenId::EndOfInput) token identifier.
     pub async fn token(&mut self) -> Result<Token> {
         // TODO parse IO_NUMBER
-        let op = self.operator().await;
-        if op.is_ok() {
-            return op;
+        if let Some(op) = self.operator().await? {
+            return Ok(op);
         }
 
         let word = match self.word().await {
@@ -1310,7 +1236,7 @@ mod tests {
     fn lexer_operator_longest_match() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<-");
 
-        let t = block_on(lexer.operator()).unwrap();
+        let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
         assert_eq!(
             t.word.units[0],
@@ -1335,7 +1261,7 @@ mod tests {
     fn lexer_operator_delimited_by_another_operator() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<>");
 
-        let t = block_on(lexer.operator()).unwrap();
+        let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(
             t.word.units[0],
@@ -1356,7 +1282,7 @@ mod tests {
     fn lexer_operator_delimited_by_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<");
 
-        let t = block_on(lexer.operator()).unwrap();
+        let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(
             t.word.units[0],
@@ -1377,7 +1303,7 @@ mod tests {
     fn lexer_operator_containing_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n<\\\n<\\\n>");
 
-        let t = block_on(lexer.operator()).unwrap();
+        let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(
             t.word.units[0],
@@ -1398,12 +1324,8 @@ mod tests {
     fn lexer_operator_none() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n ");
 
-        let e = block_on(lexer.operator()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, " ");
-        assert_eq!(e.location.line.number.get(), 2);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        let r = block_on(lexer.operator()).unwrap();
+        assert!(r.is_none(), "Unexpected success: {:?}", r);
     }
 
     #[test]
