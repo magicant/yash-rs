@@ -27,7 +27,6 @@ use self::lex::TokenId::*;
 use super::syntax::*;
 
 pub use self::core::AsyncFnMut;
-pub use self::core::AsyncFnOnce;
 pub use self::core::Error;
 pub use self::core::ErrorCause;
 pub use self::core::Parser;

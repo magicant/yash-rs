@@ -163,26 +163,6 @@ impl<T> Rec<T> {
 /// Dummy trait for working around type error.
 ///
 /// cf. https://stackoverflow.com/a/64325742
-pub trait AsyncFnOnce<'a, T, R> {
-    type Output: Future<Output = R>;
-    fn call(self, t: &'a mut T) -> Self::Output;
-}
-
-impl<'a, T, F, R, Fut> AsyncFnOnce<'a, T, R> for F
-where
-    T: 'a,
-    F: FnOnce(&'a mut T) -> Fut,
-    Fut: Future<Output = R>,
-{
-    type Output = Fut;
-    fn call(self, t: &'a mut T) -> Fut {
-        self(t)
-    }
-}
-
-/// Dummy trait for working around type error.
-///
-/// cf. https://stackoverflow.com/a/64325742
 pub trait AsyncFnMut<'a, T, R> {
     type Output: Future<Output = R>;
     fn call(&mut self, t: &'a mut T) -> Self::Output;
@@ -223,8 +203,11 @@ impl Parser<'_> {
     /// Reads a next token if the current token is `None`.
     async fn require_token(&mut self) {
         if self.token.is_none() {
-            self.lexer.skip_blanks_and_comment().await;
-            self.token = Some(self.lexer.token().await);
+            if let Err(e) = self.lexer.skip_blanks_and_comment().await {
+                self.token = Some(Err(e));
+            } else {
+                self.token = Some(self.lexer.token().await);
+            }
         }
     }
 
