@@ -203,9 +203,9 @@ impl Parser<'_> {
     /// Returns a reference to the current token.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
-    pub async fn peek_token(&mut self) -> &Result<Token> {
+    pub async fn peek_token(&mut self) -> Result<&Token> {
         self.require_token().await;
-        self.token.as_ref().unwrap()
+        self.token.as_ref().unwrap().as_ref().map_err(|e| e.clone())
     }
 
     /// Consumes the current token.

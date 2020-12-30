@@ -46,15 +46,12 @@ impl Parser<'_> {
     /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         // TODO IO_NUMBER
-        let operator = match self.peek_token().await {
-            Ok(token) => match token.id {
-                // TODO <, <>, >, >>, >|, <&, >&, >>|, <<<
-                Operator(op) if op == LessLess || op == LessLessDash => {
-                    self.take_token().await.unwrap()
-                }
-                _ => return Ok(None),
-            },
-            Err(_) => return Err(self.take_token().await.unwrap_err()),
+        let operator = match self.peek_token().await?.id {
+            // TODO <, <>, >, >>, >|, <&, >&, >>|, <<<
+            Operator(op) if op == LessLess || op == LessLessDash => {
+                self.take_token().await.unwrap()
+            }
+            _ => return Ok(None),
         };
 
         let operand = self.take_token().await?;
