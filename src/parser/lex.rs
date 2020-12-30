@@ -27,7 +27,6 @@ mod core {
     use crate::input::Input;
     use crate::input::Memory;
     use crate::parser::core::AsyncFnMut;
-    use crate::parser::core::AsyncFnOnce;
     use crate::parser::core::Error;
     use crate::parser::core::ErrorCause;
     use crate::parser::core::Result;
@@ -121,8 +120,8 @@ mod core {
     /// internal buffer containing the characters that have been read and the position (or the
     /// index) of the character that is to be parsed next.
     ///
-    /// `Lexer` has primitive functions such as [`peek`](Lexer::peek) and [`next`](Lexer::next) that
-    /// provide access to the character at the current position. Derived functions such as
+    /// `Lexer` has primitive functions such as [`peek`](Lexer::peek) that provide access to the
+    /// character at the current position. Derived functions such as
     /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
     /// parse more complex structures in the source code.
     pub struct Lexer {
@@ -337,32 +336,6 @@ mod core {
                 }
                 _ => Ok(None),
             }
-        }
-
-        // TODO Remove this
-        /// Reads the next character, advancing the position.
-        ///
-        /// Returns [`EndOfInput`](ErrorCause::EndOfInput) if reached the end of input.
-        pub async fn next(&mut self) -> Result<SourceChar> {
-            self.next_if(|_| true).await
-        }
-
-        // TODO Remove this
-        /// Applies the given parser and updates the current position only if the parser succeeds.
-        ///
-        /// This function can be used to cancel the effect of failed parsing so that the consumed
-        /// characters can be parsed by another parser. Note that `maybe` only rewinds the position. It
-        /// does not undo the effect on the buffer containing the characters read while parsing.
-        pub async fn maybe<F, R>(&mut self, f: F) -> Result<R>
-        where
-            F: for<'a> AsyncFnOnce<'a, Lexer, Result<R>>,
-        {
-            let old_index = self.index;
-            let r = f.call(self).await;
-            if r.is_err() {
-                self.index = old_index;
-            }
-            r
         }
 
         /// Applies the given parser repeatedly until it fails.
@@ -628,57 +601,65 @@ mod tests {
         assert_eq!(c, *c2);
         let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c, *c2);
-        let c2 = block_on(lexer.next()).unwrap();
-        assert_eq!(c, c2);
+        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c, *c2);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 3);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "foo\n");
         assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, 'b');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, 'a');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, 'r');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 3);
+        lexer.consume_char();
 
-        let c = block_on(lexer.next()).unwrap();
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "bar\n");
         assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 4);
+        lexer.consume_char();
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -879,42 +860,6 @@ mod tests {
             panic!("Unexpected call to the decider function: argument={}", c)
         }));
         assert_eq!(r, Ok(None));
-    }
-
-    #[test]
-    fn lexer_maybe_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
-
-        async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next().await?;
-            l.next().await
-        }
-        let x = lexer.maybe(f);
-        let c = block_on(x).unwrap();
-        assert_eq!(c.value, 'b');
-
-        let c = block_on(lexer.next()).unwrap();
-        assert_eq!(c.value, 'c');
-    }
-
-    #[test]
-    fn lexer_maybe_failure() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
-
-        async fn f(l: &mut Lexer) -> Result<SourceChar> {
-            l.next().await?;
-            let SourceChar { location, .. } = l.next().await.unwrap();
-            let cause = ErrorCause::EndOfInput;
-            Err(Error { cause, location })
-        }
-        let x = lexer.maybe(f);
-        let Error { cause, location } = block_on(x).unwrap_err();
-        assert_eq!(cause, ErrorCause::EndOfInput);
-        assert_eq!(location.column.get(), 2);
-
-        let c = block_on(lexer.next()).unwrap();
-        assert_eq!(c.value, 'a');
-        assert_eq!(c.location.column.get(), 1);
     }
 
     #[test]
