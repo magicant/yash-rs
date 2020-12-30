@@ -450,6 +450,7 @@ impl Lexer {
         self.next_if(f).await.is_ok()
     }
 
+    // TODO Remove this
     /// Skips a line continuation, if any.
     ///
     /// If there is a line continuation at the current position, this function skips it and returns
@@ -466,6 +467,20 @@ impl Lexer {
     // TODO Change maybe_line_continuation to line_continuation or remove implicit `maybe` effect
     // from `many`, as current `many(maybe_line_continuation)` doubles the `maybe` effect
     // redundantly.
+
+    /// Skips line continuations, if any.
+    pub async fn line_continuations(&mut self) -> Result<()> {
+        async fn line_continuation(this: &mut Lexer) -> Result<Option<()>> {
+            if let None = this.consume_char_if(|c| c == '\\').await? {
+                return Ok(None);
+            }
+            if let None = this.consume_char_if(|c| c == '\n').await? {
+                return Ok(None);
+            }
+            Ok(Some(()))
+        }
+        self.many2(line_continuation).await.map(|_| ())
+    }
 
     /// Skips blank characters until reaching a non-blank.
     ///
@@ -1001,73 +1016,64 @@ mod tests {
     }
 
     #[test]
-    fn lexer_maybe_line_continuation_success() {
+    fn lexer_line_continuations_success() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n");
+        assert!(block_on(lexer.line_continuations()).is_ok());
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
 
-        assert!(block_on(lexer.maybe_line_continuation()).is_ok());
-
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n");
+        assert!(block_on(lexer.line_continuations()).is_ok());
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
-    fn lexer_maybe_line_continuation_empty() {
+    fn lexer_line_continuations_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
-
-        let e = block_on(lexer.maybe_line_continuation()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
-
+        assert!(block_on(lexer.line_continuations()).is_ok());
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
-    fn lexer_maybe_line_continuation_not_backslash() {
+    fn lexer_line_continuations_not_backslash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-
-        let e = block_on(lexer.maybe_line_continuation()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert!(block_on(lexer.line_continuations()).is_ok());
 
         let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\n');
+        assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.column.get(), 1);
     }
 
     #[test]
-    fn lexer_maybe_line_continuation_only_backslash() {
+    fn lexer_line_continuations_only_backslash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\");
-
-        let e = block_on(lexer.maybe_line_continuation()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EndOfInput);
-        assert_eq!(e.location.line.value, "\\");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert!(block_on(lexer.line_continuations()).is_ok());
 
         let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.number.get(), 1);
         assert_eq!(c.location.column.get(), 1);
     }
 
     #[test]
-    fn lexer_maybe_line_continuation_not_newline() {
+    fn lexer_line_continuations_not_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\\");
-
-        let e = block_on(lexer.maybe_line_continuation()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Unknown);
-        assert_eq!(e.location.line.value, "\\\\");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert!(block_on(lexer.line_continuations()).is_ok());
 
         let c = block_on(lexer.peek_char()).unwrap().unwrap();
         assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_line_continuations_partial_match_after_success() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\\");
+        assert!(block_on(lexer.line_continuations()).is_ok());
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.column.get(), 1);
     }
 
