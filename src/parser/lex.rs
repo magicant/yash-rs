@@ -231,6 +231,18 @@ mod core {
         }
 
         /// Returns the position of the next character, counted from zero.
+        ///
+        /// ```
+        /// futures::executor::block_on(async {
+        ///     let mut lexer = yash::parser::Lexer::with_source(
+        ///         yash::source::Source::Unknown, "abc");
+        ///     assert_eq!(lexer.index(), 0);
+        ///     let _ = lexer.peek_char().await;
+        ///     assert_eq!(lexer.index(), 0);
+        ///     lexer.consume_char();
+        ///     assert_eq!(lexer.index(), 1);
+        /// })
+        /// ```
         #[must_use]
         pub fn index(&self) -> usize {
             self.index
@@ -241,6 +253,21 @@ mod core {
         ///
         /// The given index must not be larger than the [current index](Lexer::index), or this
         /// function would panic.
+        ///
+        /// ```
+        /// futures::executor::block_on(async {
+        ///     let mut lexer = yash::parser::Lexer::with_source(
+        ///         yash::source::Source::Unknown, "abc");
+        ///     let saved_index = lexer.index();
+        ///     let a = lexer.peek_char().await.unwrap().cloned();
+        ///     lexer.consume_char();
+        ///     let b = lexer.peek_char().await.unwrap().cloned();
+        ///     lexer.rewind(saved_index);
+        ///     let a2 = lexer.peek_char().await.unwrap().cloned();
+        ///     assert_eq!(a, a2);
+        ///     assert_ne!(a, b);
+        /// })
+        /// ```
         pub fn rewind(&mut self, index: usize) {
             assert!(
                 index <= self.index,
