@@ -19,6 +19,8 @@
 /// Operator token identifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// Newline
+    Newline,
     /// `<<`
     LessLess,
     /// `<<-`
@@ -55,11 +57,18 @@ impl Trie {
 }
 
 /// Trie containing all the operators.
-pub const OPERATORS: Trie = Trie(&[Edge {
-    key: '<',
-    value: None,
-    next: LESS,
-}]);
+pub const OPERATORS: Trie = Trie(&[
+    Edge {
+        key: '\n',
+        value: Some(Operator::Newline),
+        next: NONE,
+    },
+    Edge {
+        key: '<',
+        value: None,
+        next: LESS,
+    },
+]);
 
 /// Trie of the operators that start with `<`.
 const LESS: Trie = Trie(&[Edge {
@@ -78,4 +87,24 @@ const LESS_LESS: Trie = Trie(&[Edge {
 /// Trie containing nothing.
 const NONE: Trie = Trie(&[]);
 
-// TODO test that all (sub-)trees are sorted.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ensure_sorted(trie: &Trie) {
+        assert!(
+            trie.0.windows(2).all(|pair| pair[0].key < pair[1].key),
+            "The trie should be sorted: {:?}",
+            trie
+        );
+
+        for edge in trie.0 {
+            ensure_sorted(&edge.next);
+        }
+    }
+
+    #[test]
+    fn tries_are_sorted() {
+        ensure_sorted(&OPERATORS);
+    }
+}
