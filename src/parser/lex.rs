@@ -424,9 +424,12 @@ impl Lexer {
 
             let old_index = self.index();
             self.consume_char();
-            if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
-                chars.push(sc.value);
-                return Ok(Some((op, sc.location, chars)));
+
+            if !edge.next.is_empty() {
+                if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
+                    chars.push(sc.value);
+                    return Ok(Some((op, sc.location, chars)));
+                }
             }
 
             match edge.value {
@@ -501,6 +504,7 @@ mod tests {
     use crate::input::Context;
     use crate::input::Input;
     use crate::parser::core::ErrorCause;
+    use crate::source::lines;
     use crate::source::Line;
     use crate::source::Location;
     use crate::source::Source;
@@ -1154,6 +1158,39 @@ mod tests {
 
         let r = block_on(lexer.operator()).unwrap();
         assert!(r.is_none(), "Unexpected success: {:?}", r);
+    }
+
+    #[test]
+    fn lexer_operator_should_not_peek_beyond_newline() {
+        struct OneLineInput(Option<Rc<Line>>);
+        impl Input for OneLineInput {
+            fn next_line(
+                &mut self,
+                _: &Context,
+            ) -> Pin<
+                Box<dyn Future<Output = std::result::Result<Rc<Line>, (Location, std::io::Error)>>>,
+            > {
+                if let Some(line) = self.0.take() {
+                    Box::pin(ready(Ok(line)))
+                } else {
+                    panic!("The second line should not be read")
+                }
+            }
+        }
+
+        let line = lines(Source::Unknown, "\n").next().unwrap();
+        let mut lexer = Lexer::new(Box::new(OneLineInput(Some(Rc::new(line)))));
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(
+            t.word.units,
+            [WordUnit::Unquoted(DoubleQuotable::Literal('\n'))]
+        );
+        assert_eq!(t.word.location.line.value, "\n");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::Newline));
     }
 
     #[test]

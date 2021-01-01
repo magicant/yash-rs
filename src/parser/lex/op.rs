@@ -47,6 +47,11 @@ pub struct Edge {
 }
 
 impl Trie {
+    /// Tests if this trie is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Finds an edge for the given key.
     pub fn edge(&self, key: char) -> Option<&Edge> {
         self.0
