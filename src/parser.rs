@@ -73,19 +73,22 @@ impl Parser<'_> {
 
     /// Parses a simple command.
     pub async fn simple_command(&mut self) -> Result<SimpleCommand<MissingHereDoc>> {
-        // TODO Support assignments and redirections. Stop on a delimiter token.
+        // TODO Return Option::None if the first token is not a normal word token.
+        // TODO Support assignments.
         let mut words = vec![];
+        let mut redirs = vec![];
         loop {
-            let token = self.take_token().await?;
+            if let Some(redir) = self.redirection().await? {
+                redirs.push(redir);
+                continue;
+            }
+            let token = self.peek_token().await?;
             if token.id != Token {
                 break;
             }
-            words.push(token.word);
+            words.push(self.take_token().await?.word);
         }
-        Ok(SimpleCommand {
-            words,
-            redirs: vec![],
-        })
+        Ok(SimpleCommand { words, redirs })
     }
 }
 
@@ -150,4 +153,6 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
+
+    // TODO test simple_command
 }
