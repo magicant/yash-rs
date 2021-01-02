@@ -411,6 +411,10 @@ impl Lexer {
         trie: Trie,
     ) -> Pin<Box<dyn Future<Output = Result<Option<(Operator, Location, Vec<char>)>>> + '_>> {
         Box::pin(async move {
+            if trie.is_empty() {
+                return Ok(None);
+            }
+
             self.line_continuations().await?;
 
             let sc = match self.peek_char().await? {
@@ -425,11 +429,9 @@ impl Lexer {
             let old_index = self.index();
             self.consume_char();
 
-            if !edge.next.is_empty() {
-                if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
-                    chars.push(sc.value);
-                    return Ok(Some((op, sc.location, chars)));
-                }
+            if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
+                chars.push(sc.value);
+                return Ok(Some((op, sc.location, chars)));
             }
 
             match edge.value {
