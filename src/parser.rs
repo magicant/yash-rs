@@ -22,6 +22,7 @@ mod core;
 mod fill;
 mod lex;
 
+use self::core::PartialHereDoc;
 use self::lex::Operator::*;
 use self::lex::TokenId::*;
 use super::syntax::*;
@@ -64,6 +65,16 @@ impl Parser<'_> {
                 })
             } // TODO IoNumber => reject if posixly-correct,
         }
+
+        let remove_tabs = match operator.id {
+            Operator(LessLess) => false,
+            Operator(LessLessDash) => true,
+            _ => unreachable!("unhandled redirection operator type"),
+        };
+        self.remember_unread_here_doc(PartialHereDoc {
+            delimiter: operator.word,
+            remove_tabs,
+        });
 
         Ok(Some(Redir {
             fd: None,

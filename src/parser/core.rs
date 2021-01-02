@@ -22,6 +22,8 @@
 use super::lex::Lexer;
 use super::lex::Token;
 use crate::source::Location;
+use crate::syntax::HereDoc;
+use crate::syntax::Word;
 use std::fmt;
 use std::future::Future;
 use std::rc::Rc;
@@ -169,6 +171,18 @@ where
     }
 }
 
+/// Here-document without a content.
+#[derive(Debug)]
+pub struct PartialHereDoc {
+    /// Token that marks the end of the content of the here-document.
+    pub delimiter: Word,
+
+    /// Whether leading tab characters should be removed from each line of the
+    /// here-document content. This value is `true` for the `<<-` operator and
+    /// `false` for `<<`.
+    pub remove_tabs: bool,
+}
+
 /// Set of data used in syntax parsing.
 #[derive(Debug)]
 pub struct Parser<'l> {
@@ -180,13 +194,29 @@ pub struct Parser<'l> {
     /// This value is an option of a result. It is `None` when the next token is not yet parsed by
     /// the lexer. It is `Some(Err(_))` if the lexer has failed.
     token: Option<Result<Token>>,
-    // TODO Alias definitions, pending here-document contents
+
+    /// Here-documents without contents.
+    ///
+    /// The contents must be read just after a next newline token is parsed.
+    unread_here_docs: Vec<PartialHereDoc>,
+
+    /// Here-documents with contents.
+    ///
+    /// After here-document contents have been read, the results are saved in this vector until
+    /// they are merged into the whose parse result.
+    read_here_docs: Vec<HereDoc>,
+    // TODO Alias definitions
 }
 
 impl Parser<'_> {
     /// Creates a new parser based on the given lexer.
     pub fn new(lexer: &mut Lexer) -> Parser {
-        Parser { lexer, token: None }
+        Parser {
+            lexer,
+            token: None,
+            unread_here_docs: vec![],
+            read_here_docs: vec![],
+        }
     }
 
     /// Reads a next token if the current token is `None`.
@@ -212,6 +242,11 @@ impl Parser<'_> {
     pub async fn take_token(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
+    }
+
+    /// Remembers the given partial here-document for later parsing of its content.
+    pub fn remember_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
+        self.unread_here_docs.push(here_doc)
     }
 }
 
