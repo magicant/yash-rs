@@ -92,6 +92,11 @@ const LESS_LESS: Trie = Trie(&[Edge {
 /// Trie containing nothing.
 const NONE: Trie = Trie(&[]);
 
+/// Tests whether the given character is the first character of an operator.
+pub fn is_operator_char(c: char) -> bool {
+    OPERATORS.edge(c).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -338,6 +338,8 @@ mod core {
 }
 
 pub use self::core::*;
+pub use self::op::is_operator_char;
+
 use self::op::Trie;
 use self::op::OPERATORS;
 use crate::parser::core::Result;
@@ -345,6 +347,13 @@ use crate::source::Location;
 use crate::syntax::*;
 use std::future::Future;
 use std::pin::Pin;
+
+/// Tests whether the given character is a token delimiter.
+///
+/// A character is a token delimiter if it is either a whitespace or [operator](is_operator_char).
+pub fn is_token_delimiter_char(c: char) -> bool {
+    is_operator_char(c) || c.is_whitespace()
+}
 
 impl Lexer {
     /// Skips a character if the given function returns true for it.
@@ -471,7 +480,7 @@ impl Lexer {
         // TODO Delimit the word correctly
         // TODO Parse other types of word units
         while let Some(sc) = self
-            .consume_char_if(|c| c != '\n' && !c.is_whitespace())
+            .consume_char_if(|c| !is_token_delimiter_char(c))
             .await?
         {
             units.push(Unquoted(Literal(sc.value)))
