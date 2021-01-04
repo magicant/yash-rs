@@ -54,7 +54,7 @@ async fn parse_and_print() {
     }
 
     loop {
-        let mut lexer = parser::Lexer::new(Box::new(Stdin));
+        let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
         let mut parser = parser::Parser::new(&mut lexer);
         match parser.simple_command().await {
             Ok(command) => {

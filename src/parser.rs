@@ -21,7 +21,6 @@
 mod core;
 mod fill;
 
-// TODO Move `lex` to crate::lex
 pub mod lex;
 
 use self::core::PartialHereDoc;
@@ -36,10 +35,6 @@ pub use self::core::Parser;
 pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
-pub use self::lex::Lexer;
-pub use self::lex::Operator;
-pub use self::lex::Token;
-pub use self::lex::TokenId;
 
 impl Parser<'_> {
     /// Parses a redirection.
@@ -107,6 +102,10 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
+    use super::lex::Lexer;
+    use super::lex::Operator;
+    use super::lex::Token;
+    use super::lex::TokenId;
     use super::*;
     use crate::source::Source;
     use futures::executor::block_on;
