@@ -471,18 +471,23 @@ impl Lexer {
 
     // TODO Should return an empty word if the current position is the end of input.
     // TODO Need more parameters to control how the word should be parsed. Especially:
-    //  * What delimiter ends the word?
     //  * Allow tilde expansion?
     /// Parses a word token.
-    pub async fn word(&mut self) -> Result<Word> {
+    ///
+    /// `is_delimiter` is a function that decides a character is a delimiter. The word ends when an
+    /// unquoted delimiter is found. To parse a normal word token, you should pass
+    /// [`is_token_delimiter_char`] as `is_delimiter`. Other functions can be passed to parse a
+    /// word that ends with different delimiters.
+    pub async fn word<F>(&mut self, mut is_delimiter: F) -> Result<Word>
+    where
+        F: FnMut(char) -> bool,
+    {
+        let mut is_not_delimiter = |c| !is_delimiter(c);
         let location = self.location().await?.clone();
         let mut units = vec![];
         // TODO Delimit the word correctly
         // TODO Parse other types of word units
-        while let Some(sc) = self
-            .consume_char_if(|c| !is_token_delimiter_char(c))
-            .await?
-        {
+        while let Some(sc) = self.consume_char_if(&mut is_not_delimiter).await? {
             units.push(Unquoted(Literal(sc.value)))
         }
         Ok(Word { units, location })
@@ -498,7 +503,7 @@ impl Lexer {
             return Ok(op);
         }
 
-        let word = self.word().await?;
+        let word = self.word(is_token_delimiter_char).await?;
         let id = if word.units.is_empty() {
             TokenId::EndOfInput
         } else {

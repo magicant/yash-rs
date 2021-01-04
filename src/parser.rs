@@ -20,7 +20,9 @@
 
 mod core;
 mod fill;
-mod lex;
+
+// TODO Move `lex` to crate::lex
+pub mod lex;
 
 use self::core::PartialHereDoc;
 use self::lex::Operator::*;
