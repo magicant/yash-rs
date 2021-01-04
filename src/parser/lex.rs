@@ -18,7 +18,7 @@
 //!
 //! TODO Elaborate
 
-mod heredoc;
+// mod heredoc; // See below
 mod op;
 
 mod core {
@@ -514,6 +514,9 @@ impl Lexer {
         Ok(Token { word, id })
     }
 }
+
+// This is here to get better order of Lexer members in the doc.
+mod heredoc;
 
 #[cfg(test)]
 mod tests {
