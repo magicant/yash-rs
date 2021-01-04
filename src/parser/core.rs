@@ -20,10 +20,10 @@
 //! parser.
 
 use super::lex::Lexer;
+use super::lex::PartialHereDoc;
 use super::lex::Token;
 use crate::source::Location;
 use crate::syntax::HereDoc;
-use crate::syntax::Word;
 use std::fmt;
 use std::future::Future;
 use std::rc::Rc;
@@ -169,18 +169,6 @@ where
     fn call(&mut self, t: &'a mut T) -> Fut {
         self(t)
     }
-}
-
-/// Here-document without a content.
-#[derive(Debug)]
-pub struct PartialHereDoc {
-    /// Token that marks the end of the content of the here-document.
-    pub delimiter: Word,
-
-    /// Whether leading tab characters should be removed from each line of the
-    /// here-document content. This value is `true` for the `<<-` operator and
-    /// `false` for `<<`.
-    pub remove_tabs: bool,
 }
 
 /// Set of data used in syntax parsing.

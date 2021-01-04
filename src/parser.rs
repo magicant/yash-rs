@@ -23,8 +23,8 @@ mod fill;
 
 pub mod lex;
 
-use self::core::PartialHereDoc;
 use self::lex::Operator::*;
+use self::lex::PartialHereDoc;
 use self::lex::TokenId::*;
 use super::syntax::*;
 

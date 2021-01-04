@@ -18,6 +18,7 @@
 //!
 //! TODO Elaborate
 
+mod heredoc;
 mod op;
 
 mod core {
@@ -338,6 +339,7 @@ mod core {
 }
 
 pub use self::core::*;
+pub use self::heredoc::PartialHereDoc;
 pub use self::op::is_operator_char;
 
 use self::op::Trie;
