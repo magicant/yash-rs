@@ -33,6 +33,9 @@ use std::rc::Rc;
 pub enum ErrorCause {
     /// Error in an underlying input function.
     IoError(Rc<std::io::Error>),
+    // TODO Define more fine-grained causes depending on the token type.
+    /// Unexpected token.
+    UnexpectedToken,
     /// A here-document operator is missing its delimiter token.
     MissingHereDocDelimiter,
     // TODO Include the corresponding here-doc operator.
@@ -43,7 +46,8 @@ pub enum ErrorCause {
 impl PartialEq for ErrorCause {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
+            (ErrorCause::UnexpectedToken, ErrorCause::UnexpectedToken)
+            | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
             | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
             _ => false,
         }
@@ -54,6 +58,7 @@ impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
+            ErrorCause::UnexpectedToken => f.write_str("Unexpected token"),
             ErrorCause::MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")
             }
