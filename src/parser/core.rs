@@ -236,6 +236,32 @@ impl Parser<'_> {
     pub fn memorize_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
         self.unread_here_docs.push(here_doc)
     }
+
+    /// Reads here-document contents that matches the remembered list of partial here-documents.
+    ///
+    /// The results are accumulated in the internal list of (non-partial) here-documents.
+    ///
+    /// This function must be called just after a newline token has been
+    /// [taken](Parser::take_token). If there is a pending token that has been peeked but not yet
+    /// taken, this function will panic!
+    pub async fn here_doc_contents(&mut self) -> Result<()> {
+        assert!(
+            self.token.is_none(),
+            "No token must be peeked before reading here-doc contents"
+        );
+
+        for here_doc in self.unread_here_docs.drain(..) {
+            self.read_here_docs
+                .push(self.lexer.here_doc_content(here_doc).await?);
+        }
+
+        Ok(())
+    }
+
+    /// Returns a list of here-documents with contents that have been read.
+    pub fn take_read_here_docs(&mut self) -> Vec<HereDoc> {
+        std::mem::take(&mut self.read_here_docs)
+    }
 }
 
 #[cfg(test)]
@@ -243,6 +269,7 @@ mod tests {
     use super::*;
     use crate::source::Line;
     use crate::source::Source;
+    use futures::executor::block_on;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 
@@ -266,5 +293,131 @@ mod tests {
             format!("{}", error),
             "The here-document operator is missing its delimiter"
         );
+    }
+
+    #[test]
+    fn parser_reading_no_here_doc_contents() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut parser = Parser::new(&mut lexer);
+            parser.here_doc_contents().await.unwrap();
+            assert!(parser.take_read_here_docs().is_empty());
+
+            let location = lexer.location().await.unwrap();
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.column.get(), 1);
+        })
+    }
+
+    #[test]
+    fn parser_reading_one_here_doc_content() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "END");
+            let delimiter = lexer.word(|_| false).await.unwrap();
+
+            let mut lexer = Lexer::with_source(Source::Unknown, "END\nX");
+            let mut parser = Parser::new(&mut lexer);
+            let remove_tabs = false;
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter,
+                remove_tabs,
+            });
+            parser.here_doc_contents().await.unwrap();
+            let here_docs = parser.take_read_here_docs();
+            assert_eq!(here_docs.len(), 1);
+            assert_eq!(here_docs[0].delimiter.to_string(), "END");
+            assert_eq!(here_docs[0].remove_tabs, remove_tabs);
+            assert!(here_docs[0].content.units.is_empty());
+
+            assert!(parser.take_read_here_docs().is_empty());
+
+            let location = lexer.location().await.unwrap();
+            assert_eq!(location.line.number.get(), 2);
+            assert_eq!(location.column.get(), 1);
+        })
+    }
+
+    #[test]
+    fn parser_reading_many_here_doc_contents() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "ONE");
+            let delimiter1 = lexer.word(|_| false).await.unwrap();
+            let mut lexer = Lexer::with_source(Source::Unknown, "TWO");
+            let delimiter2 = lexer.word(|_| false).await.unwrap();
+            let mut lexer = Lexer::with_source(Source::Unknown, "THREE");
+            let delimiter3 = lexer.word(|_| false).await.unwrap();
+
+            let mut lexer = Lexer::with_source(Source::Unknown, "1\nONE\nTWO\n3\nTHREE\nX");
+            let mut parser = Parser::new(&mut lexer);
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter: delimiter1,
+                remove_tabs: false,
+            });
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter: delimiter2,
+                remove_tabs: true,
+            });
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter: delimiter3,
+                remove_tabs: false,
+            });
+            parser.here_doc_contents().await.unwrap();
+            let here_docs = parser.take_read_here_docs();
+            assert_eq!(here_docs.len(), 3);
+            assert_eq!(here_docs[0].delimiter.to_string(), "ONE");
+            assert_eq!(here_docs[0].remove_tabs, false);
+            assert_eq!(here_docs[0].content.to_string(), "1\n");
+            assert_eq!(here_docs[1].delimiter.to_string(), "TWO");
+            assert_eq!(here_docs[1].remove_tabs, true);
+            assert_eq!(here_docs[1].content.to_string(), "");
+            assert_eq!(here_docs[2].delimiter.to_string(), "THREE");
+            assert_eq!(here_docs[2].remove_tabs, false);
+            assert_eq!(here_docs[2].content.to_string(), "3\n");
+        })
+    }
+
+    #[test]
+    fn parser_reading_here_doc_contents_twice() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "ONE");
+            let delimiter1 = lexer.word(|_| false).await.unwrap();
+            let mut lexer = Lexer::with_source(Source::Unknown, "TWO");
+            let delimiter2 = lexer.word(|_| false).await.unwrap();
+
+            let mut lexer = Lexer::with_source(Source::Unknown, "1\nONE\n2\nTWO\n");
+            let mut parser = Parser::new(&mut lexer);
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter: delimiter1,
+                remove_tabs: false,
+            });
+            parser.here_doc_contents().await.unwrap();
+            let here_docs = parser.take_read_here_docs();
+            assert_eq!(here_docs.len(), 1);
+            assert_eq!(here_docs[0].delimiter.to_string(), "ONE");
+            assert_eq!(here_docs[0].remove_tabs, false);
+            assert_eq!(here_docs[0].content.to_string(), "1\n");
+
+            parser.memorize_unread_here_doc(PartialHereDoc {
+                delimiter: delimiter2,
+                remove_tabs: true,
+            });
+            parser.here_doc_contents().await.unwrap();
+            let here_docs = parser.take_read_here_docs();
+            assert_eq!(here_docs.len(), 1);
+            assert_eq!(here_docs[0].delimiter.to_string(), "TWO");
+            assert_eq!(here_docs[0].remove_tabs, true);
+            assert_eq!(here_docs[0].content.to_string(), "2\n");
+        })
+    }
+
+    #[test]
+    #[should_panic(expected = "No token must be peeked before reading here-doc contents")]
+    fn parser_here_doc_contents_must_be_called_without_pending_token() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut parser = Parser::new(&mut lexer);
+            parser.peek_token().await.unwrap();
+            parser.here_doc_contents().await.unwrap();
+        })
     }
 }
