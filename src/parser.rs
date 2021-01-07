@@ -68,7 +68,7 @@ impl Parser<'_> {
             Operator(LessLessDash) => true,
             _ => unreachable!("unhandled redirection operator type"),
         };
-        self.remember_unread_here_doc(PartialHereDoc {
+        self.memorize_unread_here_doc(PartialHereDoc {
             delimiter: operator.word,
             remove_tabs,
         });

@@ -233,7 +233,7 @@ impl Parser<'_> {
     }
 
     /// Remembers the given partial here-document for later parsing of its content.
-    pub fn remember_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
+    pub fn memorize_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
         self.unread_here_docs.push(here_doc)
     }
 }
