@@ -36,7 +36,7 @@ pub struct MissingHereDoc;
 
 /// Partial abstract syntax tree (AST) that can be filled with missing parts to create the whole,
 /// final AST.
-pub trait Fill<T = Result<HereDoc>> {
+pub trait Fill<T = HereDoc> {
     /// Final AST created by filling `self`.
     type Full;
 
@@ -51,18 +51,18 @@ pub trait Fill<T = Result<HereDoc>> {
 
 impl Fill for RedirBody<MissingHereDoc> {
     type Full = RedirBody;
-    fn fill(self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<RedirBody> {
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
         match self {
-            RedirBody::HereDoc(MissingHereDoc) => Ok(RedirBody::HereDoc(
-                i.next().expect("missing value to fill")?,
-            )),
+            RedirBody::HereDoc(MissingHereDoc) => {
+                Ok(RedirBody::HereDoc(i.next().expect("missing value to fill")))
+            }
         }
     }
 }
 
 impl Fill for Redir<MissingHereDoc> {
     type Full = Redir;
-    fn fill(self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<Redir> {
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Redir> {
         Ok(Redir {
             fd: self.fd,
             body: self.body.fill(i)?,
@@ -72,14 +72,14 @@ impl Fill for Redir<MissingHereDoc> {
 
 impl Fill for SimpleCommand<MissingHereDoc> {
     type Full = SimpleCommand;
-    fn fill(mut self, i: &mut dyn Iterator<Item = Result<HereDoc>>) -> Result<SimpleCommand> {
-        let redirs = self.redirs.drain(..).try_fold(vec![], |mut vec, redir| {
-            vec.push(redir.fill(i)?);
-            Ok(vec)
-        })?;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
         Ok(SimpleCommand {
             words: self.words,
-            redirs,
+            redirs: self
+                .redirs
+                .into_iter()
+                .map(|redir| redir.fill(i))
+                .collect::<Result<Vec<_>>>()?,
         })
     }
 }
