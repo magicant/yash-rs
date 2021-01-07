@@ -98,6 +98,21 @@ impl Parser<'_> {
         }
         Ok(SimpleCommand { words, redirs })
     }
+
+    /// Parses an optional newline token and here-document contents.
+    ///
+    /// If the current token is a newline, it is consumed and any pending here-document contents
+    /// are read starting from the next line. Otherwise, this function returns `Ok(false)` without
+    /// any side effect.
+    pub async fn newline_and_here_doc_contents(&mut self) -> Result<bool> {
+        if self.peek_token().await?.id != Operator(Newline) {
+            return Ok(false);
+        }
+
+        self.take_token().await?;
+        self.here_doc_contents().await?;
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
