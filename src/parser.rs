@@ -118,9 +118,6 @@ impl Parser<'_> {
 #[cfg(test)]
 mod tests {
     use super::lex::Lexer;
-    use super::lex::Operator;
-    use super::lex::Token;
-    use super::lex::TokenId;
     use super::*;
     use crate::source::Source;
     use futures::executor::block_on;
