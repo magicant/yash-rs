@@ -69,7 +69,7 @@ impl Parser<'_> {
             _ => unreachable!("unhandled redirection operator type"),
         };
         self.memorize_unread_here_doc(PartialHereDoc {
-            delimiter: operator.word,
+            delimiter: operand.word,
             remove_tabs,
         });
 
@@ -112,6 +112,36 @@ impl Parser<'_> {
         self.take_token().await?;
         self.here_doc_contents().await?;
         Ok(true)
+    }
+
+    // TODO Should return a vector of and-or lists
+    /// Parses a complete command optionally delimited by a newline.
+    ///
+    /// A complete command is a minimal sequence of and-or lists that can be executed in the shell
+    /// environment. This function reads as many lines as needed to compose the complete command.
+    ///
+    /// If the current line is empty (or containing only whitespaces and comments), the result is
+    /// an empty vector. If the first token of the current line is the end of input, the result is
+    /// `Ok(None)`.
+    pub async fn command_line(&mut self) -> Result<Option<SimpleCommand>> {
+        if self.peek_token().await?.id == EndOfInput {
+            return Ok(None);
+        }
+
+        let cmd = self.simple_command().await?;
+
+        if !self.newline_and_here_doc_contents().await? {
+            let next = self.peek_token().await?;
+            if next.id != EndOfInput {
+                // TODO Return a better error depending on the token id of the peeked token
+                return Err(Error {
+                    cause: ErrorCause::UnexpectedToken,
+                    location: next.word.location.clone(),
+                });
+            }
+        }
+
+        Ok(Some(cmd.fill(&mut self.take_read_here_docs().into_iter())?))
     }
 }
 
@@ -179,4 +209,84 @@ mod tests {
     }
 
     // TODO test simple_command
+
+    #[test]
+    fn parser_command_line_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command_line()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn parser_command_line_command_and_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let cmd = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(cmd.words.len(), 0);
+        assert_eq!(cmd.redirs.len(), 1);
+        assert_eq!(cmd.redirs[0].fd, None);
+        let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body;
+        //if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
+        let HereDoc {
+            delimiter,
+            remove_tabs,
+            content,
+        } = here_doc;
+        assert_eq!(delimiter.to_string(), "END");
+        assert_eq!(*remove_tabs, false);
+        assert_eq!(content.to_string(), "foo\n");
+        //} else {
+        //panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
+        //}
+    }
+
+    #[test]
+    fn parser_command_line_command_without_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut parser = Parser::new(&mut lexer);
+
+        let cmd = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(cmd.to_string(), "foo");
+    }
+
+    #[test]
+    fn parser_command_line_newline_only() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let cmd = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(cmd.words.len(), 0);
+        assert_eq!(cmd.redirs.len(), 0);
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_command_line_here_doc_without_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.command_line()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingHereDocContent);
+        assert_eq!(e.location.line.value, "<<END");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_command_line_wrong_delimiter() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.command_line()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnexpectedToken);
+        assert_eq!(e.location.line.value, "foo)");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
+    }
 }
