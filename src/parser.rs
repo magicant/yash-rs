@@ -141,6 +141,7 @@ impl Parser<'_> {
             }
         }
 
+        self.ensure_no_unread_here_doc()?;
         Ok(Some(cmd.fill(&mut self.take_read_here_docs().into_iter())?))
     }
 }
@@ -263,7 +264,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_command_line_here_doc_without_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
         let mut parser = Parser::new(&mut lexer);
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(e.location.line.value, "<<END");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 3);
     }
 
     #[test]

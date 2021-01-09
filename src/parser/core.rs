@@ -263,6 +263,19 @@ impl Parser<'_> {
         Ok(())
     }
 
+    /// Ensures that there is no pending partial here-document.
+    ///
+    /// If there is any, this function returns a `MissingHereDocContent` error.
+    pub fn ensure_no_unread_here_doc(&self) -> Result<()> {
+        match self.unread_here_docs.first() {
+            None => Ok(()),
+            Some(here_doc) => Err(Error {
+                cause: ErrorCause::MissingHereDocContent,
+                location: here_doc.delimiter.location.clone(),
+            }),
+        }
+    }
+
     /// Returns a list of here-documents with contents that have been read.
     pub fn take_read_here_docs(&mut self) -> Vec<HereDoc> {
         std::mem::take(&mut self.read_here_docs)
