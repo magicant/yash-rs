@@ -277,7 +277,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_command_line_wrong_delimiter() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo)");
         let mut parser = Parser::new(&mut lexer);

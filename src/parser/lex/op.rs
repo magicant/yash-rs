@@ -21,6 +21,10 @@
 pub enum Operator {
     /// Newline
     Newline,
+    /// `(`
+    OpenParen,
+    /// `)`
+    CloseParen,
     /// `<<`
     LessLess,
     /// `<<-`
@@ -66,6 +70,16 @@ pub const OPERATORS: Trie = Trie(&[
     Edge {
         key: '\n',
         value: Some(Operator::Newline),
+        next: NONE,
+    },
+    Edge {
+        key: '(',
+        value: Some(Operator::OpenParen),
+        next: NONE,
+    },
+    Edge {
+        key: ')',
+        value: Some(Operator::CloseParen),
         next: NONE,
     },
     Edge {
