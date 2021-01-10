@@ -255,6 +255,9 @@ impl Parser<'_> {
             "No token must be peeked before reading here-doc contents"
         );
 
+        self.read_here_docs
+            .reserve_exact(self.unread_here_docs.len());
+
         for here_doc in self.unread_here_docs.drain(..) {
             self.read_here_docs
                 .push(self.lexer.here_doc_content(here_doc).await?);
