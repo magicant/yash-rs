@@ -155,24 +155,36 @@ mod tests {
 
     #[test]
     fn parser_redirection_lessless() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<end ");
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
-        // TODO pending here-doc content
+
+        block_on(parser.newline_and_here_doc_contents()).unwrap();
+        let here_docs = parser.take_read_here_docs();
+        assert_eq!(here_docs.len(), 1);
+        assert_eq!(here_docs[0].delimiter.to_string(), "end");
+        assert_eq!(here_docs[0].remove_tabs, false);
+        assert_eq!(here_docs[0].content.to_string(), "");
     }
 
     #[test]
     fn parser_redirection_lesslessdash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<-end ");
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<-end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
-        // TODO pending here-doc content
+
+        block_on(parser.newline_and_here_doc_contents()).unwrap();
+        let here_docs = parser.take_read_here_docs();
+        assert_eq!(here_docs.len(), 1);
+        assert_eq!(here_docs[0].delimiter.to_string(), "end");
+        assert_eq!(here_docs[0].remove_tabs, true);
+        assert_eq!(here_docs[0].content.to_string(), "");
     }
 
     #[test]
