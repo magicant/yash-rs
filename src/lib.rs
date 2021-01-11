@@ -25,6 +25,7 @@ pub mod syntax;
 // TODO Allow user to select input source
 // TODO Execute the command after parsing
 async fn parse_and_print() {
+    use crate::alias::AliasSet;
     use std::future::ready;
     use std::future::Future;
     use std::num::NonZeroU64;
@@ -54,9 +55,10 @@ async fn parse_and_print() {
         }
     }
 
+    let aliases = AliasSet::new();
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
-        let mut parser = parser::Parser::new(&mut lexer);
+        let mut parser = parser::Parser::with_aliases(&mut lexer, &aliases);
         match parser.command_line().await {
             Ok(None) => break,
             Ok(Some(command)) => println!("{}", command),
