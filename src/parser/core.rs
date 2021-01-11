@@ -204,12 +204,26 @@ pub struct Parser<'l, 'a> {
     read_here_docs: Vec<HereDoc>,
 }
 
-impl Parser<'_, '_> {
+impl<'l, 'a> Parser<'l, 'a> {
     /// Creates a new parser based on the given lexer.
-    pub fn new(lexer: &mut Lexer) -> Parser {
+    ///
+    /// The parser created by this function does not perform alias substitution. To do it, pass an
+    /// alias set to [`with_aliases`](Parser::with_aliases).
+    pub fn new(lexer: &'l mut Lexer) -> Parser<'l, 'a> {
         Parser {
             lexer,
             aliases: None,
+            token: None,
+            unread_here_docs: vec![],
+            read_here_docs: vec![],
+        }
+    }
+
+    /// Creates a new parser based on the given lexer and alias set.
+    pub fn with_aliases(lexer: &'l mut Lexer, aliases: &'a AliasSet) -> Parser<'l, 'a> {
+        Parser {
+            lexer,
+            aliases: Some(aliases),
             token: None,
             unread_here_docs: vec![],
             read_here_docs: vec![],
