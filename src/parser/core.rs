@@ -22,6 +22,7 @@
 use super::lex::Lexer;
 use super::lex::PartialHereDoc;
 use super::lex::Token;
+use crate::alias::AliasSet;
 use crate::source::Location;
 use crate::syntax::HereDoc;
 use std::fmt;
@@ -178,9 +179,12 @@ where
 
 /// Set of data used in syntax parsing.
 #[derive(Debug)]
-pub struct Parser<'l> {
+pub struct Parser<'l, 'a> {
     /// Lexer that provides tokens.
     lexer: &'l mut Lexer,
+
+    /// Aliases that are used while parsing.
+    aliases: Option<&'a AliasSet>,
 
     /// Token to parse next.
     ///
@@ -198,14 +202,14 @@ pub struct Parser<'l> {
     /// After here-document contents have been read, the results are saved in this vector until
     /// they are merged into the whose parse result.
     read_here_docs: Vec<HereDoc>,
-    // TODO Alias definitions
 }
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Creates a new parser based on the given lexer.
     pub fn new(lexer: &mut Lexer) -> Parser {
         Parser {
             lexer,
+            aliases: None,
             token: None,
             unread_here_docs: vec![],
             read_here_docs: vec![],
