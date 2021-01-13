@@ -177,14 +177,14 @@ mod core {
                             } else {
                                 // Completely empty source
                                 Location {
-                                    line,
+                                    line: Rc::new(line),
                                     column: NonZeroU64::new(1).unwrap(),
                                 }
                             };
                             self.state = InputState::EndOfInput(location);
                         } else {
                             // Successful read
-                            self.source.extend(line.enumerate())
+                            self.source.extend(Rc::new(line).enumerate())
                         }
                     }
                     Err((location, io_error)) => {
@@ -535,7 +535,6 @@ mod tests {
     use std::future::ready;
     use std::future::Future;
     use std::pin::Pin;
-    use std::rc::Rc;
 
     #[test]
     fn lexer_with_empty_source() {
@@ -636,7 +635,7 @@ mod tests {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<Box<dyn Future<Output = std::result::Result<Rc<Line>, crate::input::Error>>>>
+            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, crate::input::Error>>>>
             {
                 let location = Location::dummy("line".to_string());
                 let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
@@ -1183,14 +1182,13 @@ mod tests {
 
     #[test]
     fn lexer_operator_should_not_peek_beyond_newline() {
-        struct OneLineInput(Option<Rc<Line>>);
+        struct OneLineInput(Option<Line>);
         impl Input for OneLineInput {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<
-                Box<dyn Future<Output = std::result::Result<Rc<Line>, (Location, std::io::Error)>>>,
-            > {
+            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, (Location, std::io::Error)>>>>
+            {
                 if let Some(line) = self.0.take() {
                     Box::pin(ready(Ok(line)))
                 } else {
@@ -1200,7 +1198,7 @@ mod tests {
         }
 
         let line = lines(Source::Unknown, "\n").next().unwrap();
-        let mut lexer = Lexer::new(Box::new(OneLineInput(Some(Rc::new(line)))));
+        let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(

@@ -38,18 +38,17 @@ async fn parse_and_print() {
         fn next_line(
             &mut self,
             _: &input::Context,
-        ) -> Pin<Box<dyn Future<Output = Result<Rc<source::Line>, input::Error>>>> {
+        ) -> Pin<Box<dyn Future<Output = Result<source::Line, input::Error>>>> {
             Box::pin(ready({
                 let mut code = String::new();
                 std::io::stdin()
                     .read_line(&mut code)
-                    .map(|_|
-                    // TODO correct line number
-                    Rc::new(source::Line {
-                        value:code,
-                        number:NonZeroU64::new(1).unwrap(),
-                        source:source::Source::Unknown,
-                    }))
+                    .map(|_| source::Line {
+                        value: code,
+                        // TODO correct line number
+                        number: NonZeroU64::new(1).unwrap(),
+                        source: source::Source::Unknown,
+                    })
                     .map_err(|e| (source::Location::dummy("".to_string()), e))
             }))
         }

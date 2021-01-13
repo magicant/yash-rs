@@ -25,7 +25,6 @@ use std::future::ready;
 use std::future::Future;
 use std::num::NonZeroU64;
 use std::pin::Pin;
-use std::rc::Rc;
 
 /// Current state in which source code is read.
 ///
@@ -59,23 +58,21 @@ pub trait Input {
     fn next_line(
         &mut self,
         context: &Context,
-    ) -> Pin<Box<dyn Future<Output = Result<Rc<Line>, Error>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Line, Error>>>>;
 }
 
 /// Input function that reads from a string in memory.
 pub struct Memory {
-    lines: VecDeque<Rc<Line>>,
-    end: Rc<Line>,
+    lines: VecDeque<Line>,
+    end: Line,
 }
 
 impl Memory {
     /// Creates a new `Memory` that reads the given string.
     pub fn new(source: Source, code: &str) -> Memory {
-        let lines = lines(source.clone(), code)
-            .map(Rc::new)
-            .collect::<VecDeque<_>>();
+        let lines = lines(source.clone(), code).collect::<VecDeque<Line>>();
 
-        let end = Rc::new(Line {
+        let end = Line {
             value: "".to_string(),
             number: if let Some(last_line) = lines.back() {
                 // TODO Not correct if the last line does not end with a newline
@@ -84,16 +81,13 @@ impl Memory {
                 NonZeroU64::new(1).unwrap()
             },
             source,
-        });
+        };
 
         Memory { lines, end }
     }
 
-    fn next_line_sync(&mut self, _: &Context) -> Result<Rc<Line>, Error> {
-        Ok(self
-            .lines
-            .pop_front()
-            .unwrap_or_else(|| Rc::clone(&self.end)))
+    fn next_line_sync(&mut self, _: &Context) -> Result<Line, Error> {
+        Ok(self.lines.pop_front().unwrap_or_else(|| self.end.clone()))
     }
 }
 
@@ -101,7 +95,7 @@ impl Input for Memory {
     fn next_line(
         &mut self,
         context: &Context,
-    ) -> Pin<Box<dyn Future<Output = Result<Rc<Line>, Error>>>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Line, Error>>>> {
         Box::pin(ready(self.next_line_sync(context)))
     }
 }
