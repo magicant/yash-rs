@@ -18,6 +18,7 @@
 //!
 //! TODO Elaborate
 
+use crate::alias::Alias;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
@@ -28,6 +29,10 @@ pub enum Source {
     ///
     /// Normally you should not use this value, but it may be useful for quick debugging.
     Unknown,
+    /// Alias substitution.
+    ///
+    /// This applies to a code fragment that replaced another as a result of alias substitution.
+    Alias(Rc<Alias>),
     // TODO More Source types
 }
 
