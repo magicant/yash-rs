@@ -55,10 +55,10 @@ async fn parse_and_print() {
         }
     }
 
-    let aliases = AliasSet::new();
+    let aliases = Rc::new(AliasSet::new());
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
-        let mut parser = parser::Parser::with_aliases(&mut lexer, &aliases);
+        let mut parser = parser::Parser::with_aliases(&mut lexer, aliases.clone());
         match parser.command_line().await {
             Ok(None) => break,
             Ok(Some(command)) => println!("{}", command),

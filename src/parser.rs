@@ -36,7 +36,7 @@ pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
-impl Parser<'_, '_> {
+impl Parser<'_> {
     /// Parses a redirection.
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token

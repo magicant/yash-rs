@@ -179,12 +179,12 @@ where
 
 /// Set of data used in syntax parsing.
 #[derive(Debug)]
-pub struct Parser<'l, 'a> {
+pub struct Parser<'l> {
     /// Lexer that provides tokens.
     lexer: &'l mut Lexer,
 
     /// Aliases that are used while parsing.
-    aliases: Option<&'a AliasSet>,
+    aliases: Rc<AliasSet>,
 
     /// Token to parse next.
     ///
@@ -204,26 +204,20 @@ pub struct Parser<'l, 'a> {
     read_here_docs: Vec<HereDoc>,
 }
 
-impl<'l, 'a> Parser<'l, 'a> {
+impl Parser<'_> {
     /// Creates a new parser based on the given lexer.
     ///
     /// The parser created by this function does not perform alias substitution. To do it, pass an
     /// alias set to [`with_aliases`](Parser::with_aliases).
-    pub fn new(lexer: &'l mut Lexer) -> Parser<'l, 'a> {
-        Parser {
-            lexer,
-            aliases: None,
-            token: None,
-            unread_here_docs: vec![],
-            read_here_docs: vec![],
-        }
+    pub fn new(lexer: &mut Lexer) -> Parser {
+        Self::with_aliases(lexer, Rc::new(AliasSet::new()))
     }
 
     /// Creates a new parser based on the given lexer and alias set.
-    pub fn with_aliases(lexer: &'l mut Lexer, aliases: &'a AliasSet) -> Parser<'l, 'a> {
+    pub fn with_aliases(lexer: &mut Lexer, aliases: Rc<AliasSet>) -> Parser {
         Parser {
             lexer,
-            aliases: Some(aliases),
+            aliases,
             token: None,
             unread_here_docs: vec![],
             read_here_docs: vec![],
