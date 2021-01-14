@@ -353,8 +353,13 @@ mod core {
                 panic!("The alias name must not be empty");
             }
 
+            let original = self.source[begin].location.clone();
+            let source = Source::Alias {
+                original,
+                alias: alias.clone(),
+            };
             let mut repl = vec![];
-            for line in lines(Source::Alias(alias.clone()), &alias.replacement) {
+            for line in lines(source, &alias.replacement) {
                 repl.extend(Rc::new(line).enumerate());
             }
 
@@ -945,7 +950,19 @@ mod tests {
             assert_eq!(c.value, 'l');
             assert_eq!(c.location.line.value, "lex");
             assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
 
@@ -953,7 +970,19 @@ mod tests {
             assert_eq!(c.value, 'e');
             assert_eq!(c.location.line.value, "lex");
             assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
 
@@ -961,7 +990,19 @@ mod tests {
             assert_eq!(c.value, 'x');
             assert_eq!(c.location.line.value, "lex");
             assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Alias(alias));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 3);
             lexer.consume_char();
 
@@ -986,7 +1027,7 @@ mod tests {
         });
 
         block_on(async {
-            for _ in 0..4 {
+            for _ in 0usize..4 {
                 let _ = lexer.peek_char().await;
                 lexer.consume_char();
             }
@@ -997,7 +1038,19 @@ mod tests {
             assert_eq!(c.value, 'x');
             assert_eq!(c.location.line.value, "x\n");
             assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
 
@@ -1005,7 +1058,19 @@ mod tests {
             assert_eq!(c.value, '\n');
             assert_eq!(c.location.line.value, "x\n");
             assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
 
@@ -1013,7 +1078,19 @@ mod tests {
             assert_eq!(c.value, 'y');
             assert_eq!(c.location.line.value, "y");
             assert_eq!(c.location.line.number.get(), 2);
-            assert_eq!(c.location.line.source, Source::Alias(alias));
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
 
