@@ -24,6 +24,7 @@ mod op;
 mod core {
 
     pub use super::op::Operator;
+    use crate::alias::Alias;
     use crate::input::Context;
     use crate::input::Input;
     use crate::input::Memory;
@@ -31,6 +32,7 @@ mod core {
     use crate::parser::core::Error;
     use crate::parser::core::ErrorCause;
     use crate::parser::core::Result;
+    use crate::source::lines;
     use crate::source::Location;
     use crate::source::Source;
     use crate::source::SourceChar;
@@ -325,6 +327,40 @@ mod core {
                 }
             }
         }
+
+        /// Performs alias substitution right before the current position.
+        ///
+        /// This function must be called just after a [word](Lexer::word) has been parsed that
+        /// matches the name of the argument alias. No check is done in this function that there is
+        /// a matching word before the current position. As many bytes before the position as the
+        /// alias name is silently replaced with the alias value.
+        ///
+        /// The resulting part of code will be characters with a [`Source::Alias`] origin.
+        ///
+        /// After the substitution, the position will be set before the replaced string.
+        ///
+        /// # Panics
+        ///
+        /// If there is not enough bytes to replace, i.e., `self.index() < alias.name.len()`, or if
+        /// the alias name is empty.
+        pub fn substitute_alias(&mut self, alias: &Rc<Alias>) {
+            let end = self.index;
+            let begin = end.checked_sub(alias.name.chars().count()).expect(concat!(
+                "Sufficient characters must have been consumed ",
+                "before they can be alias-substituted"
+            ));
+            if begin == end {
+                panic!("The alias name must not be empty");
+            }
+
+            let mut repl = vec![];
+            for line in lines(Source::Alias(alias.clone()), &alias.replacement) {
+                repl.extend(Rc::new(line).enumerate());
+            }
+
+            self.source.splice(begin..end, repl);
+            self.index = begin;
+        }
     }
 
     impl fmt::Debug for Lexer {
@@ -522,6 +558,7 @@ mod heredoc;
 mod tests {
     use super::op::Operator;
     use super::*;
+    use crate::alias::Alias;
     use crate::input::Context;
     use crate::input::Input;
     use crate::parser::core::ErrorCause;
@@ -535,6 +572,7 @@ mod tests {
     use std::future::ready;
     use std::future::Future;
     use std::pin::Pin;
+    use std::rc::Rc;
 
     #[test]
     fn lexer_with_empty_source() {
@@ -859,6 +897,160 @@ mod tests {
         assert_eq!(r[0].value, 'y');
         assert_eq!(r[1].value, 'y');
         assert_eq!(r[2].value, 'y');
+    }
+
+    #[test]
+    #[should_panic(expected = "Sufficient characters must have been consumed ")]
+    fn lexer_substitute_alias_with_no_consumed_chars() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a b");
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: "".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+        lexer.substitute_alias(&alias);
+    }
+
+    #[test]
+    #[should_panic(expected = "The alias name must not be empty")]
+    fn lexer_substitute_alias_with_empty_name() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a");
+        let alias = Rc::new(Alias {
+            name: "".to_string(),
+            replacement: "".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+        lexer.substitute_alias(&alias);
+    }
+
+    #[test]
+    fn lexer_substitute_alias_single_line_replacement() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a b");
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: "lex".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+
+        block_on(async {
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+
+            lexer.substitute_alias(&alias);
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'l');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'e');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'x');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Alias(alias));
+            assert_eq!(c.location.column.get(), 3);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, "a b");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+        });
+    }
+
+    #[test]
+    fn lexer_substitute_alias_multi_line_replacement() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " foo b");
+        let alias = Rc::new(Alias {
+            name: "foo".to_string(),
+            replacement: "x\ny".to_string(),
+            global: true,
+            origin: Location::dummy("loc".to_string()),
+        });
+
+        block_on(async {
+            for _ in 0..4 {
+                let _ = lexer.peek_char().await;
+                lexer.consume_char();
+            }
+
+            lexer.substitute_alias(&alias);
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'x');
+            assert_eq!(c.location.line.value, "x\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, '\n');
+            assert_eq!(c.location.line.value, "x\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Alias(alias.clone()));
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, 'y');
+            assert_eq!(c.location.line.value, "y");
+            assert_eq!(c.location.line.number.get(), 2);
+            assert_eq!(c.location.line.source, Source::Alias(alias));
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, " foo b");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 5);
+            lexer.consume_char();
+        });
+    }
+
+    #[test]
+    fn lexer_substitute_alias_empty_replacement() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "x ");
+        let alias = Rc::new(Alias {
+            name: "x".to_string(),
+            replacement: "".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+
+        block_on(async {
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+
+            lexer.substitute_alias(&alias);
+
+            let c = lexer.peek_char().await.unwrap().unwrap();
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, "x ");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+        });
     }
 
     #[test]
