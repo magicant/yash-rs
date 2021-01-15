@@ -89,21 +89,30 @@ impl fmt::Display for Error {
 /// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Modifier that makes a result of parsing optional to trigger the parser to restart after alias
-/// substitution.
+/// Modifier that makes a result of parsing optional in order to trigger the parser to restart
+/// parsing after alias substitution.
 ///
-/// `Rec` stands for "recursion", as its method allows automatic recursion of parsers.
+/// `Rec` stands for "recursion", as it is used to make the parser work recursively.
+///
+/// This enum type has two variants: `AliasSubstituted` and `Parsed`. The former contains no
+/// meaningful value and is returned from a parsing function that has performed alias substitution
+/// without consuming any tokens. In this case, the caller of the parsing function must inspect the
+/// new source code produced by the substitution so that the syntax is correctly recognized in the
+/// new code.
+///
+/// Assume we have an alias definition `untrue='! true'`, for example. When the word `untrue` is
+/// recognized as an alias name during parse of a simple command, the simple command parser
+/// function must stop parsing and return `AliasSubstituted`. This allows the caller, the pipeline
+/// parser function, to recognize the `!` reserved word token as negation.
+///
+/// When a parser function successfully parses something, it returns the result in the `Parsed`
+/// variant. The caller then continues the remaining parse.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Rec<T> {
     /// Result of alias substitution.
-    ///
-    /// After alias substitution occurred, the substituted source code has to be parsed by the
-    /// parser that caused the alias substitution.
     AliasSubstituted,
-    /// Successful result that was produced without consuming any input characters.
-    Empty(T),
-    /// Successful result that was produced by consuming one or more input characters.
-    NonEmpty(T),
+    /// Successful parse result.
+    Parsed(T),
 }
 
 /// Repeatedly applies the parser that may involve alias substitution until the final result is
@@ -113,7 +122,7 @@ where
     F: FnMut() -> Result<Rec<T>>,
 {
     loop {
-        if let Rec::Empty(t) | Rec::NonEmpty(t) = f()? {
+        if let Rec::Parsed(t) = f()? {
             return Ok(t);
         }
     }
@@ -123,23 +132,18 @@ impl<T> Rec<T> {
     /// Combines `self` with another parser.
     ///
     /// If `self` is `AliasSubstituted`, `zip` returns `AliasSubstituted` without calling `f`.
-    /// Otherwise, `f` is called with the result contained in `self`. If `self` is `NonEmpty`, `f`
-    /// is called as many times until it returns a result that is not `AliasSubstituted`. Lastly,
-    /// the values of the two `Rec` objects are merged into one.
+    /// Otherwise, `f` is called with the result contained in `self`. If `self` is `Parsed(_)`, `f`
+    /// is called repeatedly until it returns a result that is `Parsed(_)`. Lastly, the values of
+    /// the two `Rec` objects are packed into a tuple.
     pub fn zip<U, F>(self, mut f: F) -> Result<Rec<(T, U)>>
     where
         F: FnMut(&T) -> Result<Rec<U>>,
     {
         match self {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Empty(t) => match f(&t)? {
-                Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-                Rec::Empty(u) => Ok(Rec::Empty((t, u))),
-                Rec::NonEmpty(u) => Ok(Rec::NonEmpty((t, u))),
-            },
-            Rec::NonEmpty(t) => {
+            Rec::Parsed(t) => {
                 let u = finish(|| f(&t))?;
-                Ok(Rec::NonEmpty((t, u)))
+                Ok(Rec::Parsed((t, u)))
             }
         }
     }
@@ -151,8 +155,7 @@ impl<T> Rec<T> {
     {
         match self {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Empty(t) => Ok(Rec::Empty(f(t)?)),
-            Rec::NonEmpty(t) => Ok(Rec::NonEmpty(f(t)?)),
+            Rec::Parsed(t) => Ok(Rec::Parsed(f(t)?)),
         }
     }
 }
