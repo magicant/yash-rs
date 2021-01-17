@@ -176,6 +176,27 @@ impl Parser<'_> {
         self.ensure_no_unread_here_doc()?;
         Ok(Some(cmd.fill(&mut self.take_read_here_docs().into_iter())?))
     }
+
+    // TODO Should return a vector of and-or lists
+    /// Parses an optional compound list.
+    ///
+    /// A compound list is a sequence of one or more and-or lists that are
+    /// separated by newlines and optionally preceded and/or followed by
+    /// newlines.
+    ///
+    /// This function stops parsing on encountering an unexpected token that
+    /// cannot be parsed as the beginning of an and-or list. The caller should
+    /// check that the next token is an expected one.
+    pub async fn maybe_compound_list(&mut self) -> Result<Vec<SimpleCommand<MissingHereDoc>>> {
+        // TODO Parse leading and trailing newlines
+        let cmd = loop {
+            if let Rec::Parsed(cmd) = self.simple_command().await? {
+                break cmd;
+            }
+        };
+        self.newline_and_here_doc_contents().await?;
+        Ok(vec![cmd])
+    }
 }
 
 #[cfg(test)]
