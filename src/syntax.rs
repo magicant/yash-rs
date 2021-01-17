@@ -35,8 +35,8 @@ use std::os::unix::io::RawFd;
 pub enum DoubleQuotable {
     /// Literal single character.
     Literal(char),
-    // /// Backslash-escaped single character.
-    // TODO Backslashed(char),
+    /// Backslash-escaped single character.
+    Backslashed(char),
     // Parameter(TODO),
     // CommandSubst(TODO),
     // Backquote(TODO),
@@ -49,6 +49,7 @@ impl fmt::Display for DoubleQuotable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal(c) => write!(f, "{}", c),
+            Backslashed(c) => write!(f, "\\{}", c),
         }
     }
 }
@@ -57,6 +58,7 @@ impl PartialEq for DoubleQuotable {
     fn eq(&self, other: &DoubleQuotable) -> bool {
         match self {
             Literal(c1) => matches!(other, Literal(c2) if c1 == c2),
+            Backslashed(c1) => matches!(other, Backslashed(c2) if c1 == c2),
         }
     }
 }
@@ -220,6 +222,14 @@ impl fmt::Display for SimpleCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn double_quotable_display() {
+        let literal = Literal('A');
+        assert_eq!(literal.to_string(), "A");
+        let backslashed = Backslashed('X');
+        assert_eq!(backslashed.to_string(), r"\X");
+    }
 
     #[test]
     fn here_doc_display() {
