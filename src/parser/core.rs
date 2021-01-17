@@ -117,12 +117,13 @@ pub enum Rec<T> {
 
 /// Repeatedly applies the parser that may involve alias substitution until the final result is
 /// obtained.
-pub fn finish<T, F>(mut f: F) -> Result<T>
+pub async fn finish<T, F, Fut>(mut f: F) -> Result<T>
 where
-    F: FnMut() -> Result<Rec<T>>,
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<Rec<T>>>,
 {
     loop {
-        if let Rec::Parsed(t) = f()? {
+        if let Rec::Parsed(t) = f().await? {
             return Ok(t);
         }
     }
@@ -152,17 +153,18 @@ impl<T> Rec<T> {
     /// Combines `self` with another parser.
     ///
     /// If `self` is `AliasSubstituted`, `zip` returns `AliasSubstituted` without calling `f`.
-    /// Otherwise, `f` is called with the result contained in `self`. If `self` is `Parsed(_)`, `f`
-    /// is called repeatedly until it returns a result that is `Parsed(_)`. Lastly, the values of
-    /// the two `Rec` objects are packed into a tuple.
-    pub fn zip<U, F>(self, mut f: F) -> Result<Rec<(T, U)>>
+    /// If `self` is `Parsed(_)`, `f` is called repeatedly until it returns a
+    /// result that is `Parsed(_)`. Lastly, the values of the two `Rec` objects
+    /// are packed into a tuple.
+    pub async fn zip<U, F, Fut>(self, mut f: F) -> Result<Rec<(T, U)>>
     where
-        F: FnMut(&T) -> Result<Rec<U>>,
+        F: FnMut(&T) -> Fut,
+        Fut: Future<Output = Result<Rec<U>>>,
     {
         match self {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
             Rec::Parsed(t) => {
-                let u = finish(|| f(&t))?;
+                let u = finish(|| f(&t)).await?;
                 Ok(Rec::Parsed((t, u)))
             }
         }
