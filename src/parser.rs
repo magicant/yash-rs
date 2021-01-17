@@ -70,7 +70,7 @@ impl Parser<'_> {
             _ => return Ok(None),
         };
 
-        let operand = self.take_token().await?;
+        let operand = self.take_token_aliased_fully().await?;
         match operand.id {
             Token => (),
             Operator(_) | EndOfInput => {
