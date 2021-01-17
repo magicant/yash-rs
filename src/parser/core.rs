@@ -129,6 +129,26 @@ where
 }
 
 impl<T> Rec<T> {
+    /// Tests if `self` is `AliasSubstituted`.
+    pub fn is_alias_substituted(&self) -> bool {
+        match self {
+            Rec::AliasSubstituted => true,
+            Rec::Parsed(_) => false,
+        }
+    }
+
+    /// Extracts the result of successful parsing.
+    ///
+    /// # Panics
+    ///
+    /// If `self` is `AliasSubstituted`.
+    pub fn unwrap(self) -> T {
+        match self {
+            Rec::AliasSubstituted => panic!("Rec::AliasSubstituted cannot be unwrapped"),
+            Rec::Parsed(v) => v,
+        }
+    }
+
     /// Combines `self` with another parser.
     ///
     /// If `self` is `AliasSubstituted`, `zip` returns `AliasSubstituted` without calling `f`.
@@ -247,9 +267,40 @@ impl Parser<'_> {
     }
 
     /// Consumes the current token.
+    ///
+    /// If the current token is not yet read from the underlying lexer, it is read.
+    ///
+    /// This function does not perform alias substitution. In most cases you should use
+    /// [`take_token_aliased`](Parser::take_token_aliased) instead.
     pub async fn take_token(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
+    }
+
+    // TODO global aliases
+    // TODO Alias substitution must occur after another with a blank-ending replacement
+    // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
+    /// Consumes the current token if it is not an alias.
+    ///
+    /// If `is_command_name` is true, this function checks if the token is the name of an alias. If
+    /// it is, alias substitution is performed on the token and the result is
+    /// `Ok(AliasSubstituted)`. Otherwise, the token is consumed and returned.
+    ///
+    /// This function ignores the token identifier of the consumed token. `is_command_name` must be
+    /// false if the token is a reserved word that is not subject to alias substitution.
+    pub async fn take_token_aliased(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
+        let token = self.take_token().await?;
+
+        if is_command_name {
+            if let Some(name) = token.word.to_string_if_literal() {
+                if let Some(alias) = self.aliases.get(&name as &str) {
+                    self.lexer.substitute_alias(&alias.0);
+                    return Ok(Rec::AliasSubstituted);
+                }
+            }
+        }
+
+        Ok(Rec::Parsed(token))
     }
 
     /// Remembers the given partial here-document for later parsing of its content.
@@ -303,6 +354,8 @@ impl Parser<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alias::AliasSet;
+    use crate::alias::HashEntry;
     use crate::source::Line;
     use crate::source::Source;
     use futures::executor::block_on;
@@ -329,6 +382,86 @@ mod tests {
             format!("{}", error),
             "The here-document operator is missing its delimiter"
         );
+    }
+
+    #[test]
+    fn parser_take_token_aliased_successful_substitution() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "x".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_aliased(true).await.unwrap();
+            assert!(
+                token.is_alias_substituted(),
+                "{:?} should be AliasSubstituted",
+                &token
+            );
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "x");
+        });
+    }
+
+    #[test]
+    fn parser_take_token_aliased_not_command_name() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "x".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_aliased(false).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "X");
+        });
+    }
+
+    #[test]
+    #[ignore] // TODO Enable when the parser supports backslash escapes
+    fn parser_take_token_aliased_not_literal() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, r"\X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "x".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            aliases.insert(HashEntry::new(
+                r"\X".to_string(),
+                "quoted".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), r"\X");
+        });
+    }
+
+    #[test]
+    fn parser_take_token_aliased_no_match() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let aliases = AliasSet::new();
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "X");
+        });
     }
 
     #[test]

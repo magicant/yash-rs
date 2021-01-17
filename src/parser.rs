@@ -32,6 +32,7 @@ pub use self::core::AsyncFnMut;
 pub use self::core::Error;
 pub use self::core::ErrorCause;
 pub use self::core::Parser;
+pub use self::core::Rec;
 pub use self::core::Result;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
