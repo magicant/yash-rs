@@ -25,6 +25,7 @@ pub mod lex;
 
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
+use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
 
@@ -38,6 +39,22 @@ pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
 impl Parser<'_> {
+    /// Consumes the current token with possible alias substitution fully applied.
+    ///
+    /// This function calls
+    /// [`self.take_token_aliased(false)`](Parser::take_token_aliased) repeatedly
+    /// until it returns `Ok(Rec::Parsed(_))` or `Err(_)` and then returns it.
+    ///
+    /// This function should be used only in contexts where no backtrack is
+    /// needed after alias substitution.
+    pub async fn take_token_aliased_fully(&mut self) -> Result<Token> {
+        loop {
+            if let Rec::Parsed(t) = self.take_token_aliased(false).await? {
+                return Ok(t);
+            }
+        }
+    }
+
     /// Parses a redirection.
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token

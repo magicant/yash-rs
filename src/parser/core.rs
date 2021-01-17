@@ -268,6 +268,7 @@ impl Parser<'_> {
         self.token.as_ref().unwrap().as_ref().map_err(|e| e.clone())
     }
 
+    // TODO Consider making this function private in favor of take_token_aliased(_fully)
     /// Consumes the current token.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
