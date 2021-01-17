@@ -98,7 +98,7 @@ impl Parser<'_> {
     }
 
     /// Parses a simple command.
-    pub async fn simple_command(&mut self) -> Result<SimpleCommand<MissingHereDoc>> {
+    pub async fn simple_command(&mut self) -> Result<Rec<SimpleCommand<MissingHereDoc>>> {
         // TODO Return Option::None if the first token is not a normal word token.
         // TODO Support assignments.
         let mut words = vec![];
@@ -108,13 +108,23 @@ impl Parser<'_> {
                 redirs.push(redir);
                 continue;
             }
+
             let token = self.peek_token().await?;
             if token.id != Token {
                 break;
             }
-            words.push(self.take_token().await?.word);
+
+            match self.take_token_aliased(words.is_empty()).await? {
+                // TODO Also consider assignments.is_empty
+                Rec::AliasSubstituted => {
+                    if words.is_empty() && redirs.is_empty() {
+                        return Ok(Rec::AliasSubstituted);
+                    }
+                }
+                Rec::Parsed(token) => words.push(token.word),
+            }
         }
-        Ok(SimpleCommand { words, redirs })
+        Ok(Rec::Parsed(SimpleCommand { words, redirs }))
     }
 
     /// Parses an optional newline token and here-document contents.
@@ -146,7 +156,11 @@ impl Parser<'_> {
             return Ok(None);
         }
 
-        let cmd = self.simple_command().await?;
+        let cmd = loop {
+            if let Rec::Parsed(cmd) = self.simple_command().await? {
+                break cmd;
+            }
+        };
 
         if !self.newline_and_here_doc_contents().await? {
             let next = self.peek_token().await?;
