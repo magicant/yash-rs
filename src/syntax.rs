@@ -111,6 +111,19 @@ impl Word {
             location: Location::dummy(s),
         }
     }
+
+    /// Converts the word to a string if the word is fully literal, that is, all composed of
+    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
+    pub fn to_string_if_literal(&self) -> Option<String> {
+        fn try_to_char(u: &WordUnit) -> Option<char> {
+            if let Unquoted(Literal(c)) = u {
+                Some(*c)
+            } else {
+                None
+            }
+        }
+        self.units.iter().map(try_to_char).collect()
+    }
 }
 
 impl fmt::Display for Word {
@@ -229,6 +242,28 @@ mod tests {
         assert_eq!(literal.to_string(), "A");
         let backslashed = Backslashed('X');
         assert_eq!(backslashed.to_string(), r"\X");
+    }
+
+    #[test]
+    fn word_to_string_if_literal_success() {
+        let empty = Word::with_str("".to_string());
+        let s = empty.to_string_if_literal().unwrap();
+        assert_eq!(s, "");
+
+        let nonempty = Word::with_str("foo".to_string());
+        let s = nonempty.to_string_if_literal().unwrap();
+        assert_eq!(s, "foo");
+    }
+
+    #[test]
+    fn word_to_string_if_literal_failure() {
+        let location = Location::dummy("foo".to_string());
+        let backslashed = Unquoted(Backslashed('?'));
+        let word = Word {
+            units: vec![backslashed],
+            location,
+        };
+        assert_eq!(word.to_string_if_literal(), None);
     }
 
     #[test]
