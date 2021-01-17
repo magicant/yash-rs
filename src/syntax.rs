@@ -38,7 +38,8 @@ pub enum DoubleQuotable {
     /// Backslash-escaped single character.
     Backslashed(char),
     // Parameter(TODO),
-    // CommandSubst(TODO),
+    /// Command substitution of the form `$(...)`.
+    CommandSubst { content: String, location: Location },
     // Backquote(TODO),
     // Arith(TODO),
 }
@@ -50,6 +51,7 @@ impl fmt::Display for DoubleQuotable {
         match self {
             Literal(c) => write!(f, "{}", c),
             Backslashed(c) => write!(f, "\\{}", c),
+            CommandSubst { content, .. } => write!(f, "$({})", content),
         }
     }
 }
@@ -59,6 +61,9 @@ impl PartialEq for DoubleQuotable {
         match self {
             Literal(c1) => matches!(other, Literal(c2) if c1 == c2),
             Backslashed(c1) => matches!(other, Backslashed(c2) if c1 == c2),
+            CommandSubst { content: c1, .. } => {
+                matches!(other, CommandSubst{content:c2,..} if c1 == c2)
+            }
         }
     }
 }
