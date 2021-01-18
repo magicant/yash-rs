@@ -96,6 +96,8 @@ mod core {
         pub word: Word,
         /// Token identifier.
         pub id: TokenId,
+        /// Position of the first character of the word.
+        pub index: usize,
     }
 
     impl fmt::Display for Token {
@@ -498,6 +500,7 @@ impl Lexer {
 
     /// Parses an operator token.
     pub async fn operator(&mut self) -> Result<Option<Token>> {
+        let index = self.index();
         self.operator_tail(OPERATORS).await.map(|o| {
             o.map(|(op, location, chars)| {
                 let units = chars
@@ -507,7 +510,7 @@ impl Lexer {
                     .collect::<Vec<_>>();
                 let word = Word { units, location };
                 let id = TokenId::Operator(op);
-                Token { word, id }
+                Token { word, id, index }
             })
         })
     }
@@ -546,13 +549,14 @@ impl Lexer {
             return Ok(op);
         }
 
+        let index = self.index();
         let word = self.word(is_token_delimiter_char).await?;
         let id = if word.units.is_empty() {
             TokenId::EndOfInput
         } else {
             TokenId::Token
         };
-        Ok(Token { word, id })
+        Ok(Token { word, id, index })
     }
 }
 
@@ -1492,6 +1496,7 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::EndOfInput);
+        assert_eq!(t.index, 0);
     }
 
     #[test]
@@ -1517,5 +1522,31 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Token);
+        assert_eq!(t.index, 0);
+    }
+
+    #[test]
+    fn lexer_token_after_blank() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, " a  ");
+
+            lexer.skip_blanks().await.unwrap();
+            let t = lexer.token().await.unwrap();
+            assert_eq!(t.word.location.line.value, " a  ");
+            assert_eq!(t.word.location.line.number.get(), 1);
+            assert_eq!(t.word.location.line.source, Source::Unknown);
+            assert_eq!(t.word.location.column.get(), 2);
+            assert_eq!(t.id, TokenId::Token);
+            assert_eq!(t.index, 1);
+
+            lexer.skip_blanks().await.unwrap();
+            let t = lexer.token().await.unwrap();
+            assert_eq!(t.word.location.line.value, " a  ");
+            assert_eq!(t.word.location.line.number.get(), 1);
+            assert_eq!(t.word.location.line.source, Source::Unknown);
+            assert_eq!(t.word.location.column.get(), 5);
+            assert_eq!(t.id, TokenId::EndOfInput);
+            assert_eq!(t.index, 4);
+        });
     }
 }
