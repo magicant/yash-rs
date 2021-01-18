@@ -334,8 +334,8 @@ mod core {
         ///
         /// This function must be called just after a [word](Lexer::word) has been parsed that
         /// matches the name of the argument alias. No check is done in this function that there is
-        /// a matching word before the current position. As many bytes before the position as the
-        /// alias name is silently replaced with the alias value.
+        /// a matching word before the current position. The characters starting from the `begin`
+        /// index up to the current position are silently replaced with the alias value.
         ///
         /// The resulting part of code will be characters with a [`Source::Alias`] origin.
         ///
@@ -343,16 +343,11 @@ mod core {
         ///
         /// # Panics
         ///
-        /// If there is not enough bytes to replace, i.e., `self.index() < alias.name.len()`, or if
-        /// the alias name is empty.
-        pub fn substitute_alias(&mut self, alias: &Rc<Alias>) {
+        /// If the replaced part is empty, i.e., `begin >= self.index()`.
+        pub fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
             let end = self.index;
-            let begin = end.checked_sub(alias.name.chars().count()).expect(concat!(
-                "Sufficient characters must have been consumed ",
-                "before they can be alias-substituted"
-            ));
-            if begin == end {
-                panic!("The alias name must not be empty");
+            if begin >= end {
+                panic!("Lexer::substitute_alias: begin={}, end={}", begin, end);
             }
 
             let original = self.source[begin].location.clone();
@@ -909,8 +904,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Sufficient characters must have been consumed ")]
-    fn lexer_substitute_alias_with_no_consumed_chars() {
+    #[should_panic(expected = "Lexer::substitute_alias: begin=0, end=0")]
+    fn lexer_substitute_alias_with_invalid_index() {
         let mut lexer = Lexer::with_source(Source::Unknown, "a b");
         let alias = Rc::new(Alias {
             name: "a".to_string(),
@@ -918,20 +913,7 @@ mod tests {
             global: false,
             origin: Location::dummy("dummy".to_string()),
         });
-        lexer.substitute_alias(&alias);
-    }
-
-    #[test]
-    #[should_panic(expected = "The alias name must not be empty")]
-    fn lexer_substitute_alias_with_empty_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a");
-        let alias = Rc::new(Alias {
-            name: "".to_string(),
-            replacement: "".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-        lexer.substitute_alias(&alias);
+        lexer.substitute_alias(0, &alias);
     }
 
     #[test]
@@ -948,7 +930,7 @@ mod tests {
             let _ = lexer.peek_char().await;
             lexer.consume_char();
 
-            lexer.substitute_alias(&alias);
+            lexer.substitute_alias(0, &alias);
 
             let c = lexer.peek_char().await.unwrap().unwrap();
             assert_eq!(c.value, 'l');
@@ -1036,7 +1018,7 @@ mod tests {
                 lexer.consume_char();
             }
 
-            lexer.substitute_alias(&alias);
+            lexer.substitute_alias(1, &alias);
 
             let c = lexer.peek_char().await.unwrap().unwrap();
             assert_eq!(c.value, 'x');
@@ -1122,7 +1104,7 @@ mod tests {
             let _ = lexer.peek_char().await;
             lexer.consume_char();
 
-            lexer.substitute_alias(&alias);
+            lexer.substitute_alias(0, &alias);
 
             let c = lexer.peek_char().await.unwrap().unwrap();
             assert_eq!(c.value, ' ');

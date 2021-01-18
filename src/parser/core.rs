@@ -297,7 +297,7 @@ impl Parser<'_> {
         if is_command_name {
             if let Some(name) = token.word.to_string_if_literal() {
                 if let Some(alias) = self.aliases.get(&name as &str) {
-                    self.lexer.substitute_alias(&alias.0);
+                    self.lexer.substitute_alias(token.index, &alias.0);
                     return Ok(Rec::AliasSubstituted);
                 }
             }
