@@ -363,6 +363,23 @@ mod core {
             self.source.splice(begin..end, repl);
             self.index = begin;
         }
+
+        /// Parses an optional compound list that is the content of a command
+        /// substitution.
+        ///
+        /// This function consumes characters until a token that cannot be the
+        /// beginning of an and-or list is found and returns the string that was
+        /// consumed.
+        pub async fn inner_program(&mut self) -> Result<String> {
+            let begin = self.index;
+
+            let mut parser = super::super::Parser::new(self);
+            parser.maybe_compound_list().await?;
+
+            let end = parser.peek_token().await?.index;
+            self.rewind(end);
+            Ok(self.source[begin..end].iter().map(|c| c.value).collect())
+        }
     }
 
     impl fmt::Debug for Lexer {
@@ -1114,6 +1131,24 @@ mod tests {
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
         });
+    }
+
+    #[test]
+    fn lexer_inner_program_success() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "x y )");
+        let source = block_on(lexer.inner_program()).unwrap();
+        assert_eq!(source, "x y ");
+    }
+
+    #[test]
+    fn lexer_inner_program_failure() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<< )");
+        let e = block_on(lexer.inner_program()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingHereDocDelimiter);
+        assert_eq!(e.location.line.value, "<< )");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
