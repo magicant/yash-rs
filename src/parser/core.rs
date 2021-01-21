@@ -42,6 +42,8 @@ pub enum ErrorCause {
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
+    /// A command substitution started with `$(` but lacks a cloding `)`.
+    UnclosedCommandSubstitution { opening_location: Location },
 }
 
 impl PartialEq for ErrorCause {
@@ -50,6 +52,14 @@ impl PartialEq for ErrorCause {
             (ErrorCause::UnexpectedToken, ErrorCause::UnexpectedToken)
             | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
             | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
+            (
+                ErrorCause::UnclosedCommandSubstitution {
+                    opening_location: l1,
+                },
+                ErrorCause::UnclosedCommandSubstitution {
+                    opening_location: l2,
+                },
+            ) if l1 == l2 => true,
             _ => false,
         }
     }
@@ -66,6 +76,9 @@ impl fmt::Display for ErrorCause {
             ErrorCause::MissingHereDocContent => {
                 f.write_str("Content of the here-document is missing")
             }
+            ErrorCause::UnclosedCommandSubstitution {
+                opening_location: _,
+            } => f.write_str("The command substitution is not cloned"),
         }
     }
 }
