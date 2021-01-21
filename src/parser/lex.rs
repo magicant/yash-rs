@@ -399,6 +399,8 @@ pub use self::op::is_operator_char;
 
 use self::op::Trie;
 use self::op::OPERATORS;
+use crate::parser::core::Error;
+use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
 use crate::source::Location;
 use crate::syntax::*;
@@ -525,6 +527,51 @@ impl Lexer {
                 Token { word, id, index }
             })
         })
+    }
+
+    /// Parses a command substitution of the form `$(...)`.
+    ///
+    /// The initial `$` must have been consumed before calling this function.
+    /// In this function, the next character is examined to see if it begins a
+    /// command substitution. If it is `(`, the following characters are parsed
+    /// as commands to find a matching `)`, which will be consumed before this
+    /// function returns. Otherwise, no characters are consumed and the return
+    /// value is `Ok(None)`.
+    ///
+    /// `opening_location` should be the location of the initial `$`. It is used
+    /// to construct the result, but this function does not check if it actually
+    /// is a location of `$`.
+    ///
+    /// This function does not consume line continuations between `$` and `(`.
+    /// Line continuations should have been consumed beforehand.
+    ///
+    /// # Errors
+    ///
+    /// - [ErrorCause::UnclosedCommandSubstitution]
+    ///
+    /// # Panics
+    ///
+    /// If the previously consumed character is not `$`.
+    pub async fn command_substitution(
+        &mut self,
+        opening_location: Location,
+    ) -> Result<Option<DoubleQuotable>> {
+        if !self.skip_if(|c| c == '(').await? {
+            return Ok(None);
+        }
+
+        let content = self.inner_program().await?;
+
+        if !self.skip_if(|c| c == ')').await? {
+            let location = self.location().await?.clone();
+            return Err(Error {
+                cause: ErrorCause::UnclosedCommandSubstitution { opening_location },
+                location,
+            });
+        }
+
+        let location = opening_location;
+        Ok(Some(DoubleQuotable::CommandSubst { content, location }))
     }
 
     // TODO Should return an empty word if the current position is the end of input.
@@ -1500,6 +1547,64 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::Newline));
+    }
+
+    #[test]
+    fn lexer_command_substitution_success() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.command_substitution(location)).unwrap().unwrap();
+        if let DoubleQuotable::CommandSubst{location,content} = result {
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+            assert_eq!(content, " foo bar ");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+
+        let next = block_on(lexer.location()).unwrap();
+        assert_eq!(next.line.value, "( foo bar )baz");
+        assert_eq!(next.line.number.get(), 1);
+        assert_eq!(next.line.source, Source::Unknown);
+        assert_eq!(next.column.get(), 12);
+    }
+
+    #[test]
+    fn lexer_command_substitution_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " foo bar )baz");
+        let location = Location::dummy("Y".to_string());
+
+        let result = block_on(lexer.command_substitution(location)).unwrap();
+        assert_eq!(result, None);
+
+        let next = block_on(lexer.location()).unwrap();
+        assert_eq!(next.line.value, " foo bar )baz");
+        assert_eq!(next.line.number.get(), 1);
+        assert_eq!(next.line.source, Source::Unknown);
+        assert_eq!(next.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_command_substitution_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar baz");
+        let location = Location::dummy("Z".to_string());
+
+        let e = block_on(lexer.command_substitution(location)).unwrap_err();
+        if let ErrorCause::UnclosedCommandSubstitution{opening_location} = e.cause {
+        assert_eq!(opening_location.line.value, "Z");
+        assert_eq!(opening_location.line.number.get(), 1);
+        assert_eq!(opening_location.line.source, Source::Unknown);
+        assert_eq!(opening_location.column.get(), 1);
+        }else{
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "( foo bar baz");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 14);
     }
 
     #[test]
