@@ -1554,8 +1554,10 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
         let location = Location::dummy("X".to_string());
 
-        let result = block_on(lexer.command_substitution(location)).unwrap().unwrap();
-        if let DoubleQuotable::CommandSubst{location,content} = result {
+        let result = block_on(lexer.command_substitution(location))
+            .unwrap()
+            .unwrap();
+        if let DoubleQuotable::CommandSubst { location, content } = result {
             assert_eq!(location.line.value, "X");
             assert_eq!(location.line.number.get(), 1);
             assert_eq!(location.line.source, Source::Unknown);
@@ -1593,12 +1595,12 @@ mod tests {
         let location = Location::dummy("Z".to_string());
 
         let e = block_on(lexer.command_substitution(location)).unwrap_err();
-        if let ErrorCause::UnclosedCommandSubstitution{opening_location} = e.cause {
-        assert_eq!(opening_location.line.value, "Z");
-        assert_eq!(opening_location.line.number.get(), 1);
-        assert_eq!(opening_location.line.source, Source::Unknown);
-        assert_eq!(opening_location.column.get(), 1);
-        }else{
+        if let ErrorCause::UnclosedCommandSubstitution { opening_location } = e.cause {
+            assert_eq!(opening_location.line.value, "Z");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.line.value, "( foo bar baz");
