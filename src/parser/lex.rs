@@ -574,6 +574,33 @@ impl Lexer {
         Ok(Some(DoubleQuotable::CommandSubst { content, location }))
     }
 
+    /// Parses a word unit that starts with `$`.
+    ///
+    /// If the next character is `$`, a parameter expansion, command
+    /// substitution, or arithmetic expansion is parsed. Otherwise, no
+    /// characters are consumed and the return value is `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// - Propagated from [`Lexer::command_substitution`]
+    pub async fn dollar_word_unit(&mut self) -> Result<Option<DoubleQuotable>> {
+        let index = self.index();
+        let location = match self.consume_char_if(|c| c == '$').await? {
+            None => return Ok(None),
+            Some(c) => c.location.clone(),
+        };
+
+        // TODO braced parameter expansion
+        // TODO non-braced parameter expansion
+        // TODO arithmetic expansion
+        if let Some(result) = self.command_substitution(location).await? {
+            return Ok(Some(result));
+        }
+
+        self.rewind(index);
+        Ok(None)
+    }
+
     // TODO Should return an empty word if the current position is the end of input.
     // TODO Need more parameters to control how the word should be parsed. Especially:
     //  * Allow tilde expansion?
@@ -1607,6 +1634,59 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 14);
+    }
+
+    #[test]
+    fn lexer_dollar_word_unit_no_dollar() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let result = block_on(lexer.dollar_word_unit()).unwrap();
+        assert_eq!(result, None);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "()");
+        let result = block_on(lexer.dollar_word_unit()).unwrap();
+        assert_eq!(result, None);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let result = block_on(lexer.dollar_word_unit()).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lexer_dollar_word_unit_dollar_followed_by_non_special() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$;");
+        let result = block_on(lexer.dollar_word_unit()).unwrap();
+        assert_eq!(result, None);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "$&");
+        let result = block_on(lexer.dollar_word_unit()).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lexer_dollar_word_unit_command_substitution() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
+        if let DoubleQuotable::CommandSubst { location, content } = result {
+            assert_eq!(location.line.value, "$()");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+            assert_eq!(content, "");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "$( foo bar )");
+        let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
+        if let DoubleQuotable::CommandSubst { location, content } = result {
+            assert_eq!(location.line.value, "$( foo bar )");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+            assert_eq!(content, " foo bar ");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
     }
 
     #[test]
