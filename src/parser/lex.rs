@@ -38,7 +38,9 @@ mod core {
     use crate::source::SourceChar;
     use crate::syntax::Word;
     use std::fmt;
+    use std::future::Future;
     use std::num::NonZeroU64;
+    use std::pin::Pin;
     use std::rc::Rc;
 
     /// Result of [`Lexer::peek_char_or_end`].
@@ -380,6 +382,13 @@ mod core {
             self.rewind(end);
             Ok(self.source[begin..end].iter().map(|c| c.value).collect())
         }
+
+        /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
+        pub fn inner_program_boxed(
+            &mut self,
+        ) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
+            Box::pin(self.inner_program())
+        }
     }
 
     impl fmt::Debug for Lexer {
@@ -560,7 +569,7 @@ impl Lexer {
             return Ok(None);
         }
 
-        let content = self.inner_program().await?;
+        let content = self.inner_program_boxed().await?;
 
         if !self.skip_if(|c| c == ')').await? {
             let location = self.location().await?.clone();
@@ -650,13 +659,12 @@ impl Lexer {
     where
         F: FnMut(char) -> bool,
     {
-        let mut is_not_delimiter = |c| !is_delimiter(c);
         let location = self.location().await?.clone();
         let mut units = vec![];
         // TODO Parse line continuations before each word unit
         // TODO Parse other types of word units
-        while let Some(sc) = self.consume_char_if(&mut is_not_delimiter).await? {
-            units.push(Unquoted(Literal(sc.value)))
+        while let Some(dq) = self.double_quotable(&mut is_delimiter).await? {
+            units.push(Unquoted(dq))
         }
         Ok(Word { units, location })
     }
@@ -1797,6 +1805,40 @@ mod tests {
             assert_eq!(content, "");
             assert_eq!(location.column.get(), 1);
         }
+    }
+
+    #[test]
+    fn lexer_word_nonempty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"0$(:)X\#");
+        let word = block_on(lexer.word(|_| false)).unwrap();
+        assert_eq!(word.units.len(), 4);
+        assert_eq!(
+            word.units[0],
+            WordUnit::Unquoted(DoubleQuotable::Literal('0'))
+        );
+        if let WordUnit::Unquoted(DoubleQuotable::CommandSubst { content, location }) =
+            &word.units[1]
+        {
+            assert_eq!(content, ":");
+            assert_eq!(location.line.value, r"0$(:)X\#");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 2);
+        } else {
+            panic!("unexpected word unit: {:?}", word.units[1]);
+        }
+        assert_eq!(
+            word.units[2],
+            WordUnit::Unquoted(DoubleQuotable::Literal('X'))
+        );
+        assert_eq!(
+            word.units[3],
+            WordUnit::Unquoted(DoubleQuotable::Backslashed('#'))
+        );
+        assert_eq!(word.location.line.value, r"0$(:)X\#");
+        assert_eq!(word.location.line.number.get(), 1);
+        assert_eq!(word.location.line.source, Source::Unknown);
+        assert_eq!(word.location.column.get(), 1);
     }
 
     #[test]
