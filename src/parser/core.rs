@@ -42,7 +42,7 @@ pub enum ErrorCause {
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
-    /// A command substitution started with `$(` but lacks a cloding `)`.
+    /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
 }
 
