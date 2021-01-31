@@ -161,13 +161,13 @@ impl Parser<'_> {
     /// If the current line is empty (or containing only whitespaces and comments), the result is
     /// an empty vector. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
-    pub async fn command_line(&mut self) -> Result<Option<SimpleCommand>> {
+    pub async fn command_line(&mut self) -> Result<Option<Command>> {
         if self.peek_token().await?.id == EndOfInput {
             return Ok(None);
         }
 
         let cmd = loop {
-            if let Rec::Parsed(cmd) = self.simple_command().await? {
+            if let Rec::Parsed(cmd) = self.command().await? {
                 break cmd;
             }
         };
@@ -301,6 +301,9 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let cmd = block_on(parser.command_line()).unwrap().unwrap();
+        let cmd = match cmd {
+            Command::SimpleCommand(c) => c,
+        };
         assert_eq!(cmd.words.len(), 0);
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
@@ -334,6 +337,9 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let cmd = block_on(parser.command_line()).unwrap().unwrap();
+        let cmd = match cmd {
+            Command::SimpleCommand(c) => c,
+        };
         assert_eq!(cmd.words.len(), 0);
         assert_eq!(cmd.redirs.len(), 0);
     }
