@@ -446,7 +446,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO Enable when the parser supports backslash escapes
     fn parser_take_token_aliased_not_literal() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, r"\X");
