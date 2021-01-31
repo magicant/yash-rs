@@ -127,6 +127,16 @@ impl Parser<'_> {
         Ok(Rec::Parsed(SimpleCommand { words, redirs }))
     }
 
+    /// Parses a command.
+    pub async fn command(&mut self) -> Result<Rec<Command<MissingHereDoc>>> {
+        // TODO compound command
+        // TODO Function definition
+        match self.simple_command().await? {
+            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
+            Rec::Parsed(c) => Ok(Rec::Parsed(Command::SimpleCommand(c))),
+        }
+    }
+
     /// Parses an optional newline token and here-document contents.
     ///
     /// If the current token is a newline, it is consumed and any pending here-document contents
