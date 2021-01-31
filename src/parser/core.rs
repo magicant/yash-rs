@@ -309,9 +309,11 @@ impl Parser<'_> {
 
         if is_command_name {
             if let Some(name) = token.word.to_string_if_literal() {
-                if let Some(alias) = self.aliases.get(&name as &str) {
-                    self.lexer.substitute_alias(token.index, &alias.0);
-                    return Ok(Rec::AliasSubstituted);
+                if !token.word.location.line.source.is_alias_for(&name) {
+                    if let Some(alias) = self.aliases.get(&name as &str) {
+                        self.lexer.substitute_alias(token.index, &alias.0);
+                        return Ok(Rec::AliasSubstituted);
+                    }
                 }
             }
         }
@@ -477,6 +479,50 @@ mod tests {
 
             let token = parser.take_token_aliased(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
+        });
+    }
+
+    #[test]
+    fn parser_take_token_aliased_recursive_substitution() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "Y x".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            aliases.insert(HashEntry::new(
+                "Y".to_string(),
+                "X y".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_aliased(true).await.unwrap();
+            assert!(
+                token.is_alias_substituted(),
+                "{:?} should be AliasSubstituted",
+                &token
+            );
+
+            let token = parser.take_token_aliased(true).await.unwrap();
+            assert!(
+                token.is_alias_substituted(),
+                "{:?} should be AliasSubstituted",
+                &token
+            );
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "X");
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "y");
+
+            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            assert_eq!(token.to_string(), "x");
         });
     }
 
