@@ -237,6 +237,23 @@ impl fmt::Display for SimpleCommand {
     }
 }
 
+/// Element of a pipe sequence.
+#[derive(Debug)]
+pub enum Command<H = HereDoc> {
+    /// Simple command.
+    SimpleCommand(SimpleCommand<H>),
+    // TODO Compound command
+    // TODO Function definition
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Command::SimpleCommand(c) => write!(f, "{}", c),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
