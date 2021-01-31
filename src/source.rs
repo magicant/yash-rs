@@ -41,6 +41,66 @@ pub enum Source {
     // TODO More Source types
 }
 
+impl Source {
+    /// Tests if this source is alias substitution for the given name.
+    ///
+    /// Returns true if `self` is `Source::Alias` with the `name` or such an
+    /// original, recursively.
+    ///
+    /// ```
+    /// // `is_alias_for` returns false for sources other than an Alias
+    /// use yash::source::Source;
+    /// assert_eq!(Source::Unknown.is_alias_for("foo"), false);
+    /// ```
+    ///
+    /// ```
+    /// // `is_alias_for` returns true if the names match
+    /// use yash::source::*;
+    /// let original = Location::dummy("".to_string());
+    /// let alias = std::rc::Rc::new(yash::alias::Alias{
+    ///     name:"foo".to_string(),
+    ///     replacement:"".to_string(),
+    ///     global: false,
+    ///     origin: original.clone()
+    /// });
+    /// let source = Source::Alias{original, alias};
+    /// assert_eq!(source.is_alias_for("foo"), true);
+    /// assert_eq!(source.is_alias_for("bar"), false);
+    /// ```
+    ///
+    /// ```
+    /// // `is_alias_for` checks aliases recursively.
+    /// use std::rc::Rc;
+    /// use yash::source::*;
+    /// let mut original = Location::dummy("".to_string());
+    /// let alias = Rc::new(yash::alias::Alias{
+    ///     name:"foo".to_string(),
+    ///     replacement:"".to_string(),
+    ///     global: false,
+    ///     origin: original.clone()
+    /// });
+    /// let source = Source::Alias{original: original.clone(), alias};
+    /// let alias = Rc::new(yash::alias::Alias{
+    ///     name:"bar".to_string(),
+    ///     replacement:"".to_string(),
+    ///     global: false,
+    ///     origin: original.clone()
+    /// });
+    /// Rc::make_mut(&mut original.line).source = source;
+    /// let source = Source::Alias{original, alias};
+    /// assert_eq!(source.is_alias_for("foo"), true);
+    /// assert_eq!(source.is_alias_for("bar"), true);
+    /// assert_eq!(source.is_alias_for("baz"), false);
+    /// ```
+    pub fn is_alias_for(&self, name: &str) -> bool {
+        if let Source::Alias { original, alias } = self {
+            alias.name == name || original.line.source.is_alias_for(name)
+        } else {
+            false
+        }
+    }
+}
+
 /// Line in source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Line {
