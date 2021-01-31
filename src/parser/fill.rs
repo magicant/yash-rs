@@ -83,3 +83,12 @@ impl Fill for SimpleCommand<MissingHereDoc> {
         })
     }
 }
+
+impl Fill for Command<MissingHereDoc> {
+    type Full = Command;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Command> {
+        Ok(match self {
+            Command::SimpleCommand(c) => Command::SimpleCommand(c.fill(i)?),
+        })
+    }
+}
