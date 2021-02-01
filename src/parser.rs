@@ -28,6 +28,7 @@ use self::lex::PartialHereDoc;
 use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
+use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
 pub use self::core::Error;
@@ -137,6 +138,20 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses a pipeline.
+    pub async fn pipeline(&mut self) -> Result<Rec<Pipeline<MissingHereDoc>>> {
+        // TODO Parse `!`
+        // TODO Parse `|` and more commands
+        let negation = false;
+        match self.command().await? {
+            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
+            Rec::Parsed(c) => Ok(Rec::Parsed(Pipeline {
+                commands: vec![Rc::new(c)],
+                negation,
+            })),
+        }
+    }
+
     /// Parses an optional newline token and here-document contents.
     ///
     /// If the current token is a newline, it is consumed and any pending here-document contents
@@ -161,13 +176,13 @@ impl Parser<'_> {
     /// If the current line is empty (or containing only whitespaces and comments), the result is
     /// an empty vector. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
-    pub async fn command_line(&mut self) -> Result<Option<Command>> {
+    pub async fn command_line(&mut self) -> Result<Option<Pipeline>> {
         if self.peek_token().await?.id == EndOfInput {
             return Ok(None);
         }
 
         let cmd = loop {
-            if let Rec::Parsed(cmd) = self.command().await? {
+            if let Rec::Parsed(cmd) = self.pipeline().await? {
                 break cmd;
             }
         };
@@ -300,9 +315,11 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let cmd = block_on(parser.command_line()).unwrap().unwrap();
-        let cmd = match cmd {
-            Command::SimpleCommand(c) => c,
+        let Pipeline { commands, negation } = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(negation, false);
+        assert_eq!(commands.len(), 1);
+        let cmd = match *commands[0] {
+            Command::SimpleCommand(ref c) => c,
         };
         assert_eq!(cmd.words.len(), 0);
         assert_eq!(cmd.redirs.len(), 1);
@@ -336,9 +353,11 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let cmd = block_on(parser.command_line()).unwrap().unwrap();
-        let cmd = match cmd {
-            Command::SimpleCommand(c) => c,
+        let Pipeline { commands, negation } = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(negation, false);
+        assert_eq!(commands.len(), 1);
+        let cmd = match *commands[0] {
+            Command::SimpleCommand(ref c) => c,
         };
         assert_eq!(cmd.words.len(), 0);
         assert_eq!(cmd.redirs.len(), 0);
