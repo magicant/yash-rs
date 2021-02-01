@@ -26,6 +26,7 @@
 
 use super::core::*;
 use crate::syntax::*;
+use std::rc::Rc;
 
 /// Placeholder for a here-document that is not yet fully parsed.
 ///
@@ -47,6 +48,29 @@ pub trait Fill<T = HereDoc> {
     ///
     /// May panic if a value has to be filled but the iterator returns `None`.
     fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
+}
+
+impl<T> Fill for Vec<T>
+where
+    T: Fill,
+{
+    type Full = Vec<<T as Fill>::Full>;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+        self.into_iter().map(|x| x.fill(i)).collect()
+    }
+}
+
+impl<T> Fill for Rc<T>
+where
+    T: Clone + Fill,
+{
+    type Full = Rc<<T as Fill>::Full>;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+        Rc::try_unwrap(self)
+            .unwrap_or_else(|rc| (*rc).clone())
+            .fill(i)
+            .map(Rc::new)
+    }
 }
 
 impl Fill for RedirBody<MissingHereDoc> {
@@ -90,5 +114,14 @@ impl Fill for Command<MissingHereDoc> {
         Ok(match self {
             Command::SimpleCommand(c) => Command::SimpleCommand(c.fill(i)?),
         })
+    }
+}
+
+impl Fill for Pipeline<MissingHereDoc> {
+    type Full = Pipeline;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Pipeline> {
+        let Pipeline { commands, negation } = self;
+        let commands = commands.fill(i)?;
+        Ok(Pipeline { commands, negation })
     }
 }

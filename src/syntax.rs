@@ -29,9 +29,10 @@ use crate::source::Location;
 use itertools::Itertools;
 use std::fmt;
 use std::os::unix::io::RawFd;
+use std::rc::Rc;
 
 /// Element of a [Word] that can be double-quoted.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum DoubleQuotable {
     /// Literal single character.
     Literal(char),
@@ -69,7 +70,7 @@ impl PartialEq for DoubleQuotable {
 }
 
 /// Element of a [Word].
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
@@ -91,7 +92,7 @@ impl fmt::Display for WordUnit {
 ///
 /// It depends on context whether an empty word is valid or not. It is your responsibility to
 /// ensure a word is non-empty in a context where it cannot.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Word {
     /// Word units that constitute the word.
     pub units: Vec<WordUnit>,
@@ -138,7 +139,7 @@ impl fmt::Display for Word {
 }
 
 /// Here-document.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct HereDoc {
     /// Token that marks the end of the content of the here-document.
     pub delimiter: Word,
@@ -185,7 +186,7 @@ impl From<HereDoc> for RedirBody {
 }
 
 /// Redirection.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Redir<H = HereDoc> {
     /// File descriptor that is modified by this redirection.
     pub fd: Option<RawFd>,
@@ -222,7 +223,7 @@ impl fmt::Display for Redir {
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SimpleCommand<H = HereDoc> {
     pub words: Vec<Word>,
     pub redirs: Vec<Redir<H>>,
@@ -238,7 +239,7 @@ impl fmt::Display for SimpleCommand {
 }
 
 /// Element of a pipe sequence.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Command<H = HereDoc> {
     /// Simple command.
     SimpleCommand(SimpleCommand<H>),
@@ -251,6 +252,26 @@ impl fmt::Display for Command {
         match self {
             Command::SimpleCommand(c) => write!(f, "{}", c),
         }
+    }
+}
+
+/// Commands separated by `|`
+#[derive(Clone, Debug)]
+pub struct Pipeline<H = HereDoc> {
+    /// Elements of the pipeline.
+    ///
+    /// A valid pipeline must have at least one command.
+    pub commands: Vec<Rc<Command<H>>>,
+    /// True if the pipeline begins with a `!`.
+    pub negation: bool,
+}
+
+impl fmt::Display for Pipeline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        if self.negation {
+            write!(f, "! ")?;
+        }
+        write!(f, "{}", self.commands.iter().format(" "))
     }
 }
 
