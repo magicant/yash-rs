@@ -271,7 +271,7 @@ impl fmt::Display for Pipeline {
         if self.negation {
             write!(f, "! ")?;
         }
-        write!(f, "{}", self.commands.iter().format(" "))
+        write!(f, "{}", self.commands.iter().format(" | "))
     }
 }
 
@@ -425,21 +425,45 @@ mod tests {
         // TODO Assignments
     }
 
+    fn dummy_command(s: String) -> Rc<Command> {
+        let w = Word::with_str(s);
+        let s = SimpleCommand {
+            words: vec![w],
+            redirs: vec![],
+        };
+        Rc::new(Command::SimpleCommand(s))
+    }
+
+    fn dummy_pipeline(s: String) -> Pipeline {
+        let c = dummy_command(s);
+        Pipeline {
+            commands: vec![c],
+            negation: false,
+        }
+    }
+
+    #[test]
+    fn pipeline_display() {
+        let mut p = Pipeline {
+            commands: vec![],
+            negation: false,
+        };
+        p.commands.push(dummy_command("first".to_string()));
+        assert_eq!(p.to_string(), "first");
+
+        p.negation = true;
+        assert_eq!(p.to_string(), "! first");
+
+        p.commands.push(dummy_command("second".to_string()));
+        assert_eq!(p.to_string(), "! first | second");
+
+        p.commands.push(dummy_command("third".to_string()));
+        p.negation = false;
+        assert_eq!(p.to_string(), "first | second | third");
+    }
+
     #[test]
     fn and_or_list_display() {
-        fn dummy_pipeline(s: String) -> Pipeline {
-            let w = Word::with_str(s);
-            let s = SimpleCommand {
-                words: vec![w],
-                redirs: vec![],
-            };
-            let c = Rc::new(Command::SimpleCommand(s));
-            Pipeline {
-                commands: vec![c],
-                negation: false,
-            }
-        }
-
         let p = dummy_pipeline("first".to_string());
         let mut aol = AndOrList {
             first: p,
