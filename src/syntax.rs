@@ -275,6 +275,40 @@ impl fmt::Display for Pipeline {
     }
 }
 
+/// Condition that decides if a [Pipeline] in an [and-or list](AndOrList) should be executed.
+#[derive(Clone, Copy, Debug)]
+pub enum AndOr {
+    /// `&&`
+    AndThen,
+    /// `||`
+    OrElse,
+}
+
+impl fmt::Display for AndOr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AndOr::AndThen => write!(f, "&&"),
+            AndOr::OrElse => write!(f, "||"),
+        }
+    }
+}
+
+/// Pipelines separated by `&&` and `||`.
+#[derive(Clone, Debug)]
+pub struct AndOrList<H = HereDoc> {
+    pub first: Pipeline<H>,
+    pub rest: Vec<(AndOr, Pipeline<H>)>,
+}
+
+impl fmt::Display for AndOrList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.first)?;
+        self.rest
+            .iter()
+            .try_for_each(|(c, p)| write!(f, " {} {}", c, p))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,5 +423,36 @@ mod tests {
         assert_eq!(format!("{}", command), "<<END 1<<-here");
 
         // TODO Assignments
+    }
+
+    #[test]
+    fn and_or_list_display() {
+        fn dummy_pipeline(s: String) -> Pipeline {
+            let w = Word::with_str(s);
+            let s = SimpleCommand {
+                words: vec![w],
+                redirs: vec![],
+            };
+            let c = Rc::new(Command::SimpleCommand(s));
+            Pipeline {
+                commands: vec![c],
+                negation: false,
+            }
+        }
+
+        let p = dummy_pipeline("first".to_string());
+        let mut aol = AndOrList {
+            first: p,
+            rest: vec![],
+        };
+        assert_eq!(aol.to_string(), "first");
+
+        let p = dummy_pipeline("second".to_string());
+        aol.rest.push((AndOr::AndThen, p));
+        assert_eq!(aol.to_string(), "first && second");
+
+        let p = dummy_pipeline("third".to_string());
+        aol.rest.push((AndOr::OrElse, p));
+        assert_eq!(aol.to_string(), "first && second || third");
     }
 }
