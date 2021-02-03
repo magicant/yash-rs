@@ -125,3 +125,37 @@ impl Fill for Pipeline<MissingHereDoc> {
         Ok(Pipeline { commands, negation })
     }
 }
+
+impl Fill for AndOrList<MissingHereDoc> {
+    type Full = AndOrList;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<AndOrList> {
+        let first = self.first.fill(i)?;
+        let rest = self
+            .rest
+            .into_iter()
+            .map(|(c, p)| Ok((c, p.fill(i)?)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(AndOrList { first, rest })
+    }
+}
+
+impl Fill for Item<MissingHereDoc> {
+    type Full = Item;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Item> {
+        let and_or = self.and_or.fill(i)?;
+        let is_async = self.is_async;
+        Ok(Item { and_or, is_async })
+    }
+}
+
+impl Fill for List<MissingHereDoc> {
+    type Full = List;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<List> {
+        let items = self
+            .items
+            .into_iter()
+            .map(|item| item.fill(i))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(List { items })
+    }
+}
