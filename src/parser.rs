@@ -152,6 +152,20 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses an and-or list.
+    pub async fn and_or_list(&mut self) -> Result<Rec<AndOrList<MissingHereDoc>>> {
+        let first = match self.pipeline().await? {
+            Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
+            Rec::Parsed(p) => p,
+        };
+
+        // TODO Parse `&&` and `||` and more pipelines
+        Ok(Rec::Parsed(AndOrList {
+            first,
+            rest: vec![],
+        }))
+    }
+
     /// Parses an optional newline token and here-document contents.
     ///
     /// If the current token is a newline, it is consumed and any pending here-document contents
@@ -176,13 +190,13 @@ impl Parser<'_> {
     /// If the current line is empty (or containing only whitespaces and comments), the result is
     /// an empty vector. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
-    pub async fn command_line(&mut self) -> Result<Option<Pipeline>> {
+    pub async fn command_line(&mut self) -> Result<Option<AndOrList>> {
         if self.peek_token().await?.id == EndOfInput {
             return Ok(None);
         }
 
         let cmd = loop {
-            if let Rec::Parsed(cmd) = self.pipeline().await? {
+            if let Rec::Parsed(cmd) = self.and_or_list().await? {
                 break cmd;
             }
         };
@@ -300,6 +314,9 @@ mod tests {
     }
 
     // TODO test simple_command
+    // TODO test command
+    // TODO test pipeline
+    // TODO test and_or_list
 
     #[test]
     fn parser_command_line_eof() {
@@ -315,7 +332,9 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let Pipeline { commands, negation } = block_on(parser.command_line()).unwrap().unwrap();
+        let AndOrList { first, rest } = block_on(parser.command_line()).unwrap().unwrap();
+        assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
+        let Pipeline { commands, negation } = first;
         assert_eq!(negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
@@ -353,7 +372,9 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let Pipeline { commands, negation } = block_on(parser.command_line()).unwrap().unwrap();
+        let AndOrList { first, rest } = block_on(parser.command_line()).unwrap().unwrap();
+        assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
+        let Pipeline { commands, negation } = first;
         assert_eq!(negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
