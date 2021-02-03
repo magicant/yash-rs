@@ -318,11 +318,18 @@ pub struct Item<H = HereDoc> {
     pub is_async: bool,
 }
 
+/// Allows conversion from Item to String.
+///
+/// By default, the `;` terminator is omitted from the formatted string.
+/// When the alternate flag is specified as in `{:#}`, the result is always
+/// terminated by either `;` or `&`.
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.and_or)?;
         if self.is_async {
             write!(f, "&")
+        } else if f.alternate() {
+            write!(f, ";")
         } else {
             Ok(())
         }
@@ -335,14 +342,22 @@ pub struct List<H = HereDoc> {
     pub items: Vec<Item<H>>,
 }
 
+/// Allows conversion from List to String.
+///
+/// By default, the last `;` terminator is omitted from the formatted string.
+/// When the alternate flag is specified as in `{:#}`, the result is always
+/// terminated by either `;` or `&`.
 impl fmt::Display for List {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((last, others)) = self.items.split_last() {
             for item in others {
-                let s = if item.is_async { "&" } else { ";" };
-                write!(f, "{}{} ", item.and_or, s)?;
+                write!(f, "{:#} ", item)?;
             }
-            write!(f, "{}", last)
+            if f.alternate() {
+                write!(f, "{:#}", last)
+            } else {
+                write!(f, "{}", last)
+            }
         } else {
             Ok(())
         }
@@ -553,5 +568,32 @@ mod tests {
         };
         list.items.push(item);
         assert_eq!(list.to_string(), "first; second& third");
+    }
+
+    #[test]
+    fn list_display_alternate() {
+        let and_or = dummy_and_or_list("first".to_string());
+        let item = Item {
+            and_or,
+            is_async: false,
+        };
+        let mut list = List { items: vec![item] };
+        assert_eq!(format!("{:#}", list), "first;");
+
+        let and_or = dummy_and_or_list("second".to_string());
+        let item = Item {
+            and_or,
+            is_async: true,
+        };
+        list.items.push(item);
+        assert_eq!(format!("{:#}", list), "first; second&");
+
+        let and_or = dummy_and_or_list("third".to_string());
+        let item = Item {
+            and_or,
+            is_async: false,
+        };
+        list.items.push(item);
+        assert_eq!(format!("{:#}", list), "first; second& third;");
     }
 }
