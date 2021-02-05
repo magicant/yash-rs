@@ -211,15 +211,14 @@ impl Parser<'_> {
     /// an empty list. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
     pub async fn command_line(&mut self) -> Result<Option<List>> {
-        if self.peek_token().await?.id == EndOfInput {
-            return Ok(None);
-        }
-        // TODO Return an empty list if the first token is a newline
-
-        let cmd = loop {
-            if let Rec::Parsed(cmd) = self.list().await? {
-                break cmd;
-            }
+        let list = match self.peek_token().await?.id {
+            EndOfInput => return Ok(None),
+            Operator(Newline) => List { items: vec![] },
+            _ => loop {
+                if let Rec::Parsed(list) = self.list().await? {
+                    break list;
+                }
+            },
         };
 
         if !self.newline_and_here_doc_contents().await? {
@@ -234,7 +233,9 @@ impl Parser<'_> {
         }
 
         self.ensure_no_unread_here_doc()?;
-        Ok(Some(cmd.fill(&mut self.take_read_here_docs().into_iter())?))
+        let mut here_docs = self.take_read_here_docs().into_iter();
+        let list = list.fill(&mut here_docs)?;
+        Ok(Some(list))
     }
 
     // TODO Should return a vector of and-or lists
@@ -398,20 +399,8 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let List { items } = block_on(parser.command_line()).unwrap().unwrap();
-        assert_eq!(items.len(), 1);
-        let item = items.first().unwrap();
-        assert_eq!(item.is_async, false);
-        let AndOrList { first, rest } = &item.and_or;
-        assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
-        let Pipeline { commands, negation } = first;
-        assert_eq!(*negation, false);
-        assert_eq!(commands.len(), 1);
-        let cmd = match *commands[0] {
-            Command::SimpleCommand(ref c) => c,
-        };
-        assert_eq!(cmd.words.len(), 0);
-        assert_eq!(cmd.redirs.len(), 0);
+        let list = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(list.items.len(), 0);
     }
 
     #[test]
