@@ -339,6 +339,9 @@ impl fmt::Display for Item {
 /// Sequence of [and-or lists](AndOrList) separated by `;` or `&`.
 #[derive(Clone, Debug)]
 pub struct List<H = HereDoc> {
+    /// Elements of the list.
+    ///
+    /// It depends on context whether an empty vector is a valid syntax.
     pub items: Vec<Item<H>>,
 }
 

@@ -166,6 +166,27 @@ impl Parser<'_> {
         }))
     }
 
+    // There is no function that parses a single item because it would not be
+    // very useful for parsing a list. An item requires a separator operator
+    // ('&' or ';') for it to be followed by another item. You cannot tell from
+    // the resultant item whether there was a separator operator.
+    // pub async fn item(&mut self) -> Result<Rec<Item<MissingHereDoc>>> { }
+
+    /// Parses a list.
+    pub async fn list(&mut self) -> Result<Rec<List<MissingHereDoc>>> {
+        let and_or = match self.and_or_list().await? {
+            Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
+            Rec::Parsed(and_or) => and_or,
+        };
+
+        // TODO Parse '&' and ';' and more items.
+        let item = Item {
+            and_or,
+            is_async: false,
+        };
+        Ok(Rec::Parsed(List { items: vec![item] }))
+    }
+
     /// Parses an optional newline token and here-document contents.
     ///
     /// If the current token is a newline, it is consumed and any pending here-document contents
@@ -181,22 +202,22 @@ impl Parser<'_> {
         Ok(true)
     }
 
-    // TODO Should return a vector of and-or lists
     /// Parses a complete command optionally delimited by a newline.
     ///
     /// A complete command is a minimal sequence of and-or lists that can be executed in the shell
     /// environment. This function reads as many lines as needed to compose the complete command.
     ///
     /// If the current line is empty (or containing only whitespaces and comments), the result is
-    /// an empty vector. If the first token of the current line is the end of input, the result is
+    /// an empty list. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
-    pub async fn command_line(&mut self) -> Result<Option<AndOrList>> {
+    pub async fn command_line(&mut self) -> Result<Option<List>> {
         if self.peek_token().await?.id == EndOfInput {
             return Ok(None);
         }
+        // TODO Return an empty list if the first token is a newline
 
         let cmd = loop {
-            if let Rec::Parsed(cmd) = self.and_or_list().await? {
+            if let Rec::Parsed(cmd) = self.list().await? {
                 break cmd;
             }
         };
@@ -317,6 +338,7 @@ mod tests {
     // TODO test command
     // TODO test pipeline
     // TODO test and_or_list
+    // TODO test list
 
     #[test]
     fn parser_command_line_eof() {
@@ -332,10 +354,14 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let AndOrList { first, rest } = block_on(parser.command_line()).unwrap().unwrap();
+        let List { items } = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(items.len(), 1);
+        let item = items.first().unwrap();
+        assert_eq!(item.is_async, false);
+        let AndOrList { first, rest } = &item.and_or;
         assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
         let Pipeline { commands, negation } = first;
-        assert_eq!(negation, false);
+        assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
             Command::SimpleCommand(ref c) => c,
@@ -372,10 +398,14 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let AndOrList { first, rest } = block_on(parser.command_line()).unwrap().unwrap();
+        let List { items } = block_on(parser.command_line()).unwrap().unwrap();
+        assert_eq!(items.len(), 1);
+        let item = items.first().unwrap();
+        assert_eq!(item.is_async, false);
+        let AndOrList { first, rest } = &item.and_or;
         assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
         let Pipeline { commands, negation } = first;
-        assert_eq!(negation, false);
+        assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
             Command::SimpleCommand(ref c) => c,

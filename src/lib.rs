@@ -63,6 +63,8 @@ async fn parse_and_print() {
             Ok(Some(command)) => println!("{}", command),
             Err(e) => println!("{}", e),
         }
+        // TODO If the lexer still has unconsumed input, it should be parsed
+        // before the lexer is dropped.
     }
 }
 
