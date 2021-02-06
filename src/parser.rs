@@ -197,6 +197,9 @@ impl Parser<'_> {
     ///
     /// This function parses a sequence of and-or lists that are separated by `;`
     /// or `&`. A newline token that delimits the list is not parsed.
+    ///
+    /// If there is no valid command at the current position, this function
+    /// returns a list with no items.
     pub async fn list(&mut self) -> Result<Rec<List<MissingHereDoc>>> {
         let mut items = vec![];
 
@@ -258,15 +261,10 @@ impl Parser<'_> {
     /// an empty list. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
     pub async fn command_line(&mut self) -> Result<Option<List>> {
-        // TODO Call self.list() before self.peek_token()
-        let list = match self.peek_token().await?.id {
-            EndOfInput => return Ok(None),
-            Operator(Newline) => List { items: vec![] },
-            _ => loop {
-                if let Rec::Parsed(list) = self.list().await? {
-                    break list;
-                }
-            },
+        let list = loop {
+            if let Rec::Parsed(list) = self.list().await? {
+                break list;
+            }
         };
 
         if !self.newline_and_here_doc_contents().await? {
@@ -277,6 +275,9 @@ impl Parser<'_> {
                     cause: ErrorCause::UnexpectedToken,
                     location: next.word.location.clone(),
                 });
+            }
+            if list.items.is_empty() {
+                return Ok(None);
             }
         }
 
