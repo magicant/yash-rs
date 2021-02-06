@@ -78,7 +78,7 @@ impl fmt::Display for ErrorCause {
             }
             ErrorCause::UnclosedCommandSubstitution {
                 opening_location: _,
-            } => f.write_str("The command substitution is not cloned"),
+            } => f.write_str("The command substitution is not closed"),
         }
     }
 }
