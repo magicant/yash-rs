@@ -572,6 +572,7 @@ impl Lexer {
         let content = self.inner_program_boxed().await?;
 
         if !self.skip_if(|c| c == ')').await? {
+            // TODO Return a better error depending on the token id of the next token
             let location = self.location().await?.clone();
             return Err(Error {
                 cause: ErrorCause::UnclosedCommandSubstitution { opening_location },
