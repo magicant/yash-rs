@@ -21,15 +21,48 @@
 pub enum Operator {
     /// Newline
     Newline,
+    /// `&`
+    And,
+    /// `&&`
+    AndAnd,
     /// `(`
     OpenParen,
     /// `)`
     CloseParen,
+    /// `;`
+    Semicolon,
+    /// `;;`
+    SemicolonSemicolon,
+    /// `<`
+    Less,
+    /// `<&`
+    LessAnd,
+    /// `<(`
+    LessOpenParen,
     /// `<<`
     LessLess,
     /// `<<-`
     LessLessDash,
-    // TODO Other operators
+    /// `<<<`
+    LessLessLess,
+    /// `<>`
+    LessGreater,
+    /// `>`
+    Greater,
+    /// `>&`
+    GreaterAnd,
+    /// `>(`
+    GreaterOpenParen,
+    /// `>>`
+    GreaterGreater,
+    /// `>>|`
+    GreaterGreaterBar,
+    /// `>|`
+    GreaterBar,
+    /// `|`
+    Bar,
+    /// `||`
+    BarBar,
 }
 
 /// Trie data structure that defines a set of operator tokens.
@@ -73,6 +106,11 @@ pub const OPERATORS: Trie = Trie(&[
         next: NONE,
     },
     Edge {
+        key: '&',
+        value: Some(Operator::And),
+        next: AND,
+    },
+    Edge {
         key: '(',
         value: Some(Operator::OpenParen),
         next: NONE,
@@ -83,23 +121,114 @@ pub const OPERATORS: Trie = Trie(&[
         next: NONE,
     },
     Edge {
+        key: ';',
+        value: Some(Operator::Semicolon),
+        next: SEMICOLON,
+    },
+    Edge {
         key: '<',
-        value: None,
+        value: Some(Operator::Less),
         next: LESS,
+    },
+    Edge {
+        key: '>',
+        value: Some(Operator::Greater),
+        next: GREATER,
+    },
+    Edge {
+        key: '|',
+        value: Some(Operator::Bar),
+        next: BAR,
     },
 ]);
 
-/// Trie of the operators that start with `<`.
-const LESS: Trie = Trie(&[Edge {
-    key: '<',
-    value: Some(Operator::LessLess),
-    next: LESS_LESS,
+/// Trie of the operators that start with `&`.
+const AND: Trie = Trie(&[Edge {
+    key: '&',
+    value: Some(Operator::AndAnd),
+    next: NONE,
 }]);
 
+/// Trie of the operators that start with `;`.
+const SEMICOLON: Trie = Trie(&[Edge {
+    key: ';',
+    value: Some(Operator::SemicolonSemicolon),
+    next: NONE,
+}]);
+
+/// Trie of the operators that start with `<`.
+const LESS: Trie = Trie(&[
+    Edge {
+        key: '&',
+        value: Some(Operator::LessAnd),
+        next: NONE,
+    },
+    Edge {
+        key: '(',
+        value: Some(Operator::LessOpenParen),
+        next: NONE,
+    },
+    Edge {
+        key: '<',
+        value: Some(Operator::LessLess),
+        next: LESS_LESS,
+    },
+    Edge {
+        key: '>',
+        value: Some(Operator::LessGreater),
+        next: NONE,
+    },
+]);
+
 /// Trie of the operators that start with `<<`.
-const LESS_LESS: Trie = Trie(&[Edge {
-    key: '-',
-    value: Some(Operator::LessLessDash),
+const LESS_LESS: Trie = Trie(&[
+    Edge {
+        key: '-',
+        value: Some(Operator::LessLessDash),
+        next: NONE,
+    },
+    Edge {
+        key: '<',
+        value: Some(Operator::LessLessLess),
+        next: NONE,
+    },
+]);
+
+/// Trie of the operators that start with `>`.
+const GREATER: Trie = Trie(&[
+    Edge {
+        key: '&',
+        value: Some(Operator::GreaterAnd),
+        next: NONE,
+    },
+    Edge {
+        key: '(',
+        value: Some(Operator::GreaterOpenParen),
+        next: NONE,
+    },
+    Edge {
+        key: '>',
+        value: Some(Operator::GreaterGreater),
+        next: GREATER_GREATER,
+    },
+    Edge {
+        key: '|',
+        value: Some(Operator::GreaterBar),
+        next: NONE,
+    },
+]);
+
+/// Trie of the operators that start with `>>`.
+const GREATER_GREATER: Trie = Trie(&[Edge {
+    key: '|',
+    value: Some(Operator::GreaterGreaterBar),
+    next: NONE,
+}]);
+
+/// Trie of the operators that start with `|`.
+const BAR: Trie = Trie(&[Edge {
+    key: '|',
+    value: Some(Operator::BarBar),
     next: NONE,
 }]);
 
