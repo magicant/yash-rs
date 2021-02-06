@@ -198,7 +198,7 @@ impl Parser<'_> {
             };
             let pipeline = match maybe_pipeline {
                 None => {
-                    let cause = ErrorCause::UnexpectedToken; // TODO Better error
+                    let cause = ErrorCause::MissingPipeline(condition);
                     let location = self.peek_token().await?.word.location.clone();
                     return Err(Error { cause, location });
                 }
@@ -480,7 +480,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.and_or_list()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnexpectedToken);
+        assert_eq!(e.cause, ErrorCause::MissingPipeline(AndOr::AndThen));
         assert_eq!(e.location.line.value, "foo &&");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
