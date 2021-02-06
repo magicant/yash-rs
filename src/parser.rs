@@ -287,7 +287,6 @@ impl Parser<'_> {
         Ok(Some(list))
     }
 
-    // TODO Should return a vector of and-or lists
     /// Parses an optional compound list.
     ///
     /// A compound list is a sequence of one or more and-or lists that are
@@ -297,15 +296,23 @@ impl Parser<'_> {
     /// This function stops parsing on encountering an unexpected token that
     /// cannot be parsed as the beginning of an and-or list. The caller should
     /// check that the next token is an expected one.
-    pub async fn maybe_compound_list(&mut self) -> Result<Vec<SimpleCommand<MissingHereDoc>>> {
-        // TODO Parse leading and trailing newlines
-        let cmd = loop {
-            if let Rec::Parsed(cmd) = self.simple_command().await? {
-                break cmd;
+    pub async fn maybe_compound_list(&mut self) -> Result<List<MissingHereDoc>> {
+        let mut items = vec![];
+
+        loop {
+            let list = loop {
+                if let Rec::Parsed(list) = self.list().await? {
+                    break list;
+                }
+            };
+            items.extend(list.items);
+
+            if !self.newline_and_here_doc_contents().await? {
+                break;
             }
-        };
-        self.newline_and_here_doc_contents().await?;
-        Ok(cmd.into_iter().collect())
+        }
+
+        Ok(List { items })
     }
 }
 
