@@ -99,7 +99,7 @@ impl Parser<'_> {
     }
 
     /// Parses a simple command.
-    pub async fn simple_command(&mut self) -> Result<Rec<SimpleCommand<MissingHereDoc>>> {
+    pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
         // TODO Return Option::None if the first token is not a normal word token.
         // TODO Support assignments.
         let mut words = vec![];
@@ -125,7 +125,7 @@ impl Parser<'_> {
                 Rec::Parsed(token) => words.push(token.word),
             }
         }
-        Ok(Rec::Parsed(SimpleCommand { words, redirs }))
+        Ok(Rec::Parsed(Some(SimpleCommand { words, redirs })))
     }
 
     /// Parses a command.
@@ -137,7 +137,8 @@ impl Parser<'_> {
         // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(c) => Ok(Rec::Parsed(Some(Command::SimpleCommand(c)))),
+            Rec::Parsed(None) => Ok(Rec::Parsed(None)),
+            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::SimpleCommand(c)))),
         }
     }
 
@@ -294,7 +295,7 @@ impl Parser<'_> {
             }
         };
         self.newline_and_here_doc_contents().await?;
-        Ok(vec![cmd])
+        Ok(cmd.into_iter().collect())
     }
 }
 
