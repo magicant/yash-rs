@@ -153,11 +153,17 @@ impl Parser<'_> {
     }
 
     /// Parses an and-or list.
+    ///
+    /// If there is no valid and-or list at the current position, this function
+    /// returns `Ok(Rec::Parsed(None))`.
     pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList<MissingHereDoc>>>> {
         let first = match self.pipeline().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
             Rec::Parsed(p) => p,
         };
+        if first.commands.is_empty() {
+            return Ok(Rec::Parsed(None));
+        }
 
         // TODO Parse `&&` and `||` and more pipelines
         Ok(Rec::Parsed(Some(AndOrList {
@@ -365,7 +371,18 @@ mod tests {
     // TODO test simple_command
     // TODO test command
     // TODO test pipeline
-    // TODO test and_or_list
+
+    #[test]
+    #[ignore] // TODO Parser::and_or_list should return None on EOF
+    fn parser_and_or_list_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.and_or_list()).unwrap().unwrap();
+        assert_eq!(option, None);
+    }
+
+    // TODO test and_or_list for other cases
 
     #[test]
     #[ignore] // TODO Parser::list should return an empty list on EOF
