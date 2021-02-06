@@ -129,23 +129,34 @@ impl Parser<'_> {
     }
 
     /// Parses a command.
-    pub async fn command(&mut self) -> Result<Rec<Command<MissingHereDoc>>> {
+    ///
+    /// If there is no valid command at the current position, this function
+    /// returns `Ok(Rec::Parsed(None))`.
+    pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
         // TODO compound command
         // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(c) => Ok(Rec::Parsed(Command::SimpleCommand(c))),
+            Rec::Parsed(c) => Ok(Rec::Parsed(Some(Command::SimpleCommand(c)))),
         }
     }
 
     /// Parses a pipeline.
+    ///
+    /// If there is no valid pipeline at the current position, this function
+    /// returns a `Pipeline` that contains no commands. The caller should examine
+    /// the result to see if it is a valid pipeline.
     pub async fn pipeline(&mut self) -> Result<Rec<Pipeline<MissingHereDoc>>> {
         // TODO Parse `!`
         // TODO Parse `|` and more commands
         let negation = false;
         match self.command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(c) => Ok(Rec::Parsed(Pipeline {
+            Rec::Parsed(None) => Ok(Rec::Parsed(Pipeline {
+                commands: vec![],
+                negation,
+            })),
+            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Pipeline {
                 commands: vec![Rc::new(c)],
                 negation,
             })),
@@ -369,8 +380,30 @@ mod tests {
     }
 
     // TODO test simple_command
-    // TODO test command
-    // TODO test pipeline
+
+    #[test]
+    #[ignore] // TODO Parser::command should return None on EOF
+    fn parser_command_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.command()).unwrap().unwrap();
+        assert_eq!(option, None);
+    }
+
+    // TODO test command for other cases
+
+    #[test]
+    #[ignore] // TODO Parser::pipeline should return an empty pipeline
+    fn parser_pipeline_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let p = block_on(parser.pipeline()).unwrap().unwrap();
+        assert_eq!(p.commands, vec![]);
+    }
+
+    // TODO test pipeline for other cases
 
     #[test]
     #[ignore] // TODO Parser::and_or_list should return None on EOF
