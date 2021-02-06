@@ -173,18 +173,39 @@ impl Parser<'_> {
     // pub async fn item(&mut self) -> Result<Rec<Item<MissingHereDoc>>> { }
 
     /// Parses a list.
+    ///
+    /// This function parses a sequence of and-or lists that are separated by `;`
+    /// or `&`. A newline token that delimits the list is not parsed.
     pub async fn list(&mut self) -> Result<Rec<List<MissingHereDoc>>> {
-        let and_or = match self.and_or_list().await? {
+        let mut items = vec![];
+
+        let mut and_or = match self.and_or_list().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
             Rec::Parsed(and_or) => and_or,
         };
 
-        // TODO Parse '&' and ';' and more items.
-        let item = Item {
-            and_or,
-            is_async: false,
-        };
-        Ok(Rec::Parsed(List { items: vec![item] }))
+        loop {
+            let (is_async, next) = match self.peek_token().await?.id {
+                Operator(Semicolon) => (false, true),
+                Operator(And) => (true, true),
+                _ => (false, false),
+            };
+
+            items.push(Item { and_or, is_async });
+
+            if !next {
+                break;
+            }
+            self.take_token().await?;
+
+            and_or = loop {
+                if let Rec::Parsed(and_or) = self.and_or_list().await? {
+                    break and_or;
+                }
+            };
+        }
+
+        Ok(Rec::Parsed(List { items }))
     }
 
     /// Parses an optional newline token and here-document contents.
@@ -211,6 +232,7 @@ impl Parser<'_> {
     /// an empty list. If the first token of the current line is the end of input, the result is
     /// `Ok(None)`.
     pub async fn command_line(&mut self) -> Result<Option<List>> {
+        // TODO Call self.list() before self.peek_token()
         let list = match self.peek_token().await?.id {
             EndOfInput => return Ok(None),
             Operator(Newline) => List { items: vec![] },
@@ -339,7 +361,58 @@ mod tests {
     // TODO test command
     // TODO test pipeline
     // TODO test and_or_list
-    // TODO test list
+
+    #[test]
+    #[ignore] // TODO Parser::list should return an empty list on EOF
+    fn parser_list_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let list = block_on(parser.list()).unwrap().unwrap();
+        assert_eq!(list.items, vec![]);
+    }
+
+    #[test]
+    fn parser_list_one_item_without_last_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut parser = Parser::new(&mut lexer);
+
+        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = list.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(list.items.len(), 1);
+        assert_eq!(list.items[0].is_async, false);
+        assert_eq!(list.items[0].and_or.to_string(), "foo");
+    }
+
+    #[test]
+    #[ignore] // TODO Parser::list should not return an empty item
+    fn parser_list_one_item_with_last_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = list.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(list.items.len(), 1);
+        assert_eq!(list.items[0].is_async, false);
+        assert_eq!(list.items[0].and_or.to_string(), "foo");
+    }
+
+    #[test]
+    #[ignore] // TODO Parser::list should not return an empty item
+    fn parser_list_many_items() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo & bar ; baz&");
+        let mut parser = Parser::new(&mut lexer);
+
+        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = list.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(list.items.len(), 3);
+        assert_eq!(list.items[0].is_async, true);
+        assert_eq!(list.items[0].and_or.to_string(), "foo");
+        assert_eq!(list.items[1].is_async, false);
+        assert_eq!(list.items[1].and_or.to_string(), "bar");
+        assert_eq!(list.items[2].is_async, true);
+        assert_eq!(list.items[2].and_or.to_string(), "baz");
+    }
 
     #[test]
     fn parser_command_line_eof() {
