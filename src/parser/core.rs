@@ -24,6 +24,7 @@ use super::lex::PartialHereDoc;
 use super::lex::Token;
 use crate::alias::AliasSet;
 use crate::source::Location;
+use crate::syntax::AndOr;
 use crate::syntax::HereDoc;
 use std::fmt;
 use std::future::Future;
@@ -44,6 +45,8 @@ pub enum ErrorCause {
     MissingHereDocContent,
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
+    /// A pipeline is missing after a `&&` or `||` token.
+    MissingPipeline(AndOr),
 }
 
 impl PartialEq for ErrorCause {
@@ -60,6 +63,9 @@ impl PartialEq for ErrorCause {
                     opening_location: l2,
                 },
             ) if l1 == l2 => true,
+            (ErrorCause::MissingPipeline(ao1), ErrorCause::MissingPipeline(ao2)) if ao1 == ao2 => {
+                true
+            }
             _ => false,
         }
     }
@@ -79,6 +85,9 @@ impl fmt::Display for ErrorCause {
             ErrorCause::UnclosedCommandSubstitution {
                 opening_location: _,
             } => f.write_str("The command substitution is not closed"),
+            ErrorCause::MissingPipeline(and_or) => {
+                write!(f, "A command is missing after `{}`", and_or)
+            }
         }
     }
 }
