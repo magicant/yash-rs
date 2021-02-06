@@ -47,6 +47,10 @@ pub enum ErrorCause {
     UnclosedCommandSubstitution { opening_location: Location },
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
+    /// Two successive `!` tokens.
+    DoubleNegation,
+    /// A command is missing after a `|` token.
+    MissingCommandInPipeline,
 }
 
 impl PartialEq for ErrorCause {
@@ -54,7 +58,9 @@ impl PartialEq for ErrorCause {
         match (self, other) {
             (ErrorCause::UnexpectedToken, ErrorCause::UnexpectedToken)
             | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
-            | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent) => true,
+            | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent)
+            | (ErrorCause::DoubleNegation, ErrorCause::DoubleNegation)
+            | (ErrorCause::MissingCommandInPipeline, ErrorCause::MissingCommandInPipeline) => true,
             (
                 ErrorCause::UnclosedCommandSubstitution {
                     opening_location: l1,
@@ -88,6 +94,8 @@ impl fmt::Display for ErrorCause {
             ErrorCause::MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
+            ErrorCause::DoubleNegation => f.write_str("`!` cannot be used twice in a row"),
+            ErrorCause::MissingCommandInPipeline => f.write_str("A command is missing after `|`"),
         }
     }
 }
