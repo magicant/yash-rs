@@ -144,22 +144,18 @@ impl Parser<'_> {
     /// Parses a pipeline.
     ///
     /// If there is no valid pipeline at the current position, this function
-    /// returns a `Pipeline` that contains no commands. The caller should examine
-    /// the result to see if it is a valid pipeline.
-    pub async fn pipeline(&mut self) -> Result<Rec<Pipeline<MissingHereDoc>>> {
+    /// returns `Ok(Rec::Parsed(None))`.
+    pub async fn pipeline(&mut self) -> Result<Rec<Option<Pipeline<MissingHereDoc>>>> {
         // TODO Parse `!`
         // TODO Parse `|` and more commands
         let negation = false;
         match self.command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => Ok(Rec::Parsed(Pipeline {
-                commands: vec![],
-                negation,
-            })),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Pipeline {
+            Rec::Parsed(None) => Ok(Rec::Parsed(None)),
+            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Pipeline {
                 commands: vec![Rc::new(c)],
                 negation,
-            })),
+            }))),
         }
     }
 
@@ -170,11 +166,9 @@ impl Parser<'_> {
     pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList<MissingHereDoc>>>> {
         let first = match self.pipeline().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
-            Rec::Parsed(p) => p,
+            Rec::Parsed(None) => return Ok(Rec::Parsed(None)),
+            Rec::Parsed(Some(p)) => p,
         };
-        if first.commands.is_empty() {
-            return Ok(Rec::Parsed(None));
-        }
 
         // TODO Parse `&&` and `||` and more pipelines
         Ok(Rec::Parsed(Some(AndOrList {
@@ -399,8 +393,8 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
 
-        let p = block_on(parser.pipeline()).unwrap().unwrap();
-        assert_eq!(p.commands, vec![]);
+        let option = block_on(parser.pipeline()).unwrap().unwrap();
+        assert_eq!(option, None);
     }
 
     // TODO test pipeline for other cases
