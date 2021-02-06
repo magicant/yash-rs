@@ -99,8 +99,11 @@ impl Parser<'_> {
     }
 
     /// Parses a simple command.
+    ///
+    /// If there is no valid command at the current position, this function
+    /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
-        // TODO Return Option::None if the first token is not a normal word token.
+        // TODO Return Option::None if the first token is a keyword.
         // TODO Support assignments.
         let mut words = vec![];
         let mut redirs = vec![];
@@ -125,7 +128,13 @@ impl Parser<'_> {
                 Rec::Parsed(token) => words.push(token.word),
             }
         }
-        Ok(Rec::Parsed(Some(SimpleCommand { words, redirs })))
+
+        // TODO Also consider assignments.is_empty
+        if words.is_empty() && redirs.is_empty() {
+            Ok(Rec::Parsed(None))
+        } else {
+            Ok(Rec::Parsed(Some(SimpleCommand { words, redirs })))
+        }
     }
 
     /// Parses a command.
@@ -377,7 +386,6 @@ mod tests {
     // TODO test simple_command
 
     #[test]
-    #[ignore] // TODO Parser::command should return None on EOF
     fn parser_command_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -389,7 +397,6 @@ mod tests {
     // TODO test command for other cases
 
     #[test]
-    #[ignore] // TODO Parser::pipeline should return an empty pipeline
     fn parser_pipeline_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -401,7 +408,6 @@ mod tests {
     // TODO test pipeline for other cases
 
     #[test]
-    #[ignore] // TODO Parser::and_or_list should return None on EOF
     fn parser_and_or_list_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -413,7 +419,6 @@ mod tests {
     // TODO test and_or_list for other cases
 
     #[test]
-    #[ignore] // TODO Parser::list should return an empty list on EOF
     fn parser_list_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -435,7 +440,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO Parser::list should not return an empty item
     fn parser_list_one_item_with_last_semicolon() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo;");
         let mut parser = Parser::new(&mut lexer);
@@ -448,7 +452,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO Parser::list should not return an empty item
     fn parser_list_many_items() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo & bar ; baz&");
         let mut parser = Parser::new(&mut lexer);
