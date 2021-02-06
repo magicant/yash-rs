@@ -72,7 +72,7 @@ pub enum Operator {
 pub struct Trie(&'static [Edge]);
 
 /// Edge of a [`Trie`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Edge {
     /// Character value of this edge.
     pub key: char,
