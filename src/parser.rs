@@ -153,17 +153,17 @@ impl Parser<'_> {
     }
 
     /// Parses an and-or list.
-    pub async fn and_or_list(&mut self) -> Result<Rec<AndOrList<MissingHereDoc>>> {
+    pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList<MissingHereDoc>>>> {
         let first = match self.pipeline().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
             Rec::Parsed(p) => p,
         };
 
         // TODO Parse `&&` and `||` and more pipelines
-        Ok(Rec::Parsed(AndOrList {
+        Ok(Rec::Parsed(Some(AndOrList {
             first,
             rest: vec![],
-        }))
+        })))
     }
 
     // There is no function that parses a single item because it would not be
@@ -181,7 +181,8 @@ impl Parser<'_> {
 
         let mut and_or = match self.and_or_list().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
-            Rec::Parsed(and_or) => and_or,
+            Rec::Parsed(None) => return Ok(Rec::Parsed(List { items: vec![] })),
+            Rec::Parsed(Some(and_or)) => and_or,
         };
 
         loop {
@@ -198,11 +199,15 @@ impl Parser<'_> {
             }
             self.take_token().await?;
 
-            and_or = loop {
-                if let Rec::Parsed(and_or) = self.and_or_list().await? {
-                    break and_or;
+            let result = loop {
+                if let Rec::Parsed(result) = self.and_or_list().await? {
+                    break result;
                 }
             };
+            and_or = match result {
+                None => break,
+                Some(and_or) => and_or,
+            }
         }
 
         Ok(Rec::Parsed(List { items }))
