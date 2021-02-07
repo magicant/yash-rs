@@ -90,7 +90,8 @@ mod core {
         Token(Option<Keyword>),
         /// Operator
         Operator(Operator),
-        // TODO IO_NUMBER
+        /// `IO_NUMBER`
+        IoNumber,
         /// Imaginary token identifier for the end of input.
         EndOfInput,
     }
@@ -677,28 +678,46 @@ impl Lexer {
         Ok(Word { units, location })
     }
 
+    /// Determines the token ID for the word.
+    ///
+    /// This is a helper function used by [`Lexer::token`] and does not support
+    /// operators.
+    async fn token_id(&mut self, word: &Word) -> Result<TokenId> {
+        if word.units.is_empty() {
+            return Ok(TokenId::EndOfInput);
+        }
+
+        if let Some(literal) = word.to_string_if_literal() {
+            use self::keyword::AsKeyword;
+            if let Some(keyword) = literal.as_str().as_keyword() {
+                return Ok(TokenId::Token(Some(keyword)));
+            }
+
+            if literal.chars().all(|c| c.is_ascii_digit()) {
+                // TODO Do we need to handle line continuations?
+                if let Some(next) = self.peek_char().await? {
+                    if next.value == '<' || next.value == '>' {
+                        return Ok(TokenId::IoNumber);
+                    }
+                }
+            }
+        }
+
+        Ok(TokenId::Token(None))
+    }
+
     /// Parses a token.
     ///
     /// If there is no more token that can be parsed, the result is a token with an empty word and
     /// [`EndOfInput`](TokenId::EndOfInput) token identifier.
     pub async fn token(&mut self) -> Result<Token> {
-        // TODO parse IO_NUMBER
         if let Some(op) = self.operator().await? {
             return Ok(op);
         }
 
         let index = self.index();
         let word = self.word(is_token_delimiter_char).await?;
-        let id = if word.units.is_empty() {
-            TokenId::EndOfInput
-        } else {
-            use self::keyword::AsKeyword;
-            TokenId::Token(
-                word.to_string_if_literal()
-                    .map(|s| s.as_str().as_keyword())
-                    .flatten(),
-            )
-        };
+        let id = self.token_id(&word).await?;
         Ok(Token { word, id, index })
     }
 }
@@ -1892,6 +1911,46 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Token(None));
+        assert_eq!(t.index, 0);
+    }
+
+    #[test]
+    fn lexer_token_io_number_delimited_by_less() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "12<");
+
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(t.word.units.len(), 2);
+        assert_eq!(
+            t.word.units[0],
+            WordUnit::Unquoted(DoubleQuotable::Literal('1'))
+        );
+        assert_eq!(
+            t.word.units[1],
+            WordUnit::Unquoted(DoubleQuotable::Literal('2'))
+        );
+        assert_eq!(t.word.location.line.value, "12<");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::IoNumber);
+        assert_eq!(t.index, 0);
+    }
+
+    #[test]
+    fn lexer_token_io_number_delimited_by_greater() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "0>>");
+
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(t.word.units.len(), 1);
+        assert_eq!(
+            t.word.units[0],
+            WordUnit::Unquoted(DoubleQuotable::Literal('0'))
+        );
+        assert_eq!(t.word.location.line.value, "0>>");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
     }
 

@@ -80,7 +80,9 @@ impl Parser<'_> {
                     cause: ErrorCause::MissingHereDocDelimiter,
                     location: operator.word.location,
                 })
-            } // TODO IoNumber => reject if posixly-correct,
+            }
+            IoNumber => (),
+            // TODO IoNumber => reject if posixly-correct
         }
 
         let remove_tabs = match operator.id {
