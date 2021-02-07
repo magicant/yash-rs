@@ -49,29 +49,31 @@ pub enum ErrorCause {
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
     DoubleNegation,
+    /// A command is missing after a `!` token.
+    MissingCommandAfterBang,
     /// A command is missing after a `|` token.
-    MissingCommandInPipeline,
+    MissingCommandAfterBar,
 }
 
 impl PartialEq for ErrorCause {
     fn eq(&self, other: &Self) -> bool {
+        use ErrorCause::*;
         match (self, other) {
-            (ErrorCause::UnexpectedToken, ErrorCause::UnexpectedToken)
-            | (ErrorCause::MissingHereDocDelimiter, ErrorCause::MissingHereDocDelimiter)
-            | (ErrorCause::MissingHereDocContent, ErrorCause::MissingHereDocContent)
-            | (ErrorCause::DoubleNegation, ErrorCause::DoubleNegation)
-            | (ErrorCause::MissingCommandInPipeline, ErrorCause::MissingCommandInPipeline) => true,
+            (UnexpectedToken, UnexpectedToken)
+            | (MissingHereDocDelimiter, MissingHereDocDelimiter)
+            | (MissingHereDocContent, MissingHereDocContent)
+            | (DoubleNegation, DoubleNegation)
+            | (MissingCommandAfterBang, MissingCommandAfterBang)
+            | (MissingCommandAfterBar, MissingCommandAfterBar) => true,
             (
-                ErrorCause::UnclosedCommandSubstitution {
+                UnclosedCommandSubstitution {
                     opening_location: l1,
                 },
-                ErrorCause::UnclosedCommandSubstitution {
+                UnclosedCommandSubstitution {
                     opening_location: l2,
                 },
             ) if l1 == l2 => true,
-            (ErrorCause::MissingPipeline(ao1), ErrorCause::MissingPipeline(ao2)) if ao1 == ao2 => {
-                true
-            }
+            (MissingPipeline(ao1), MissingPipeline(ao2)) if ao1 == ao2 => true,
             _ => false,
         }
     }
@@ -79,23 +81,23 @@ impl PartialEq for ErrorCause {
 
 impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ErrorCause::*;
         match self {
-            ErrorCause::IoError(e) => write!(f, "Error while reading commands: {}", e),
-            ErrorCause::UnexpectedToken => f.write_str("Unexpected token"),
-            ErrorCause::MissingHereDocDelimiter => {
+            IoError(e) => write!(f, "Error while reading commands: {}", e),
+            UnexpectedToken => f.write_str("Unexpected token"),
+            MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")
             }
-            ErrorCause::MissingHereDocContent => {
-                f.write_str("Content of the here-document is missing")
-            }
-            ErrorCause::UnclosedCommandSubstitution {
+            MissingHereDocContent => f.write_str("Content of the here-document is missing"),
+            UnclosedCommandSubstitution {
                 opening_location: _,
             } => f.write_str("The command substitution is not closed"),
-            ErrorCause::MissingPipeline(and_or) => {
+            MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
-            ErrorCause::DoubleNegation => f.write_str("`!` cannot be used twice in a row"),
-            ErrorCause::MissingCommandInPipeline => f.write_str("A command is missing after `|`"),
+            DoubleNegation => f.write_str("`!` cannot be used twice in a row"),
+            MissingCommandAfterBang => f.write_str("A command is missing after `!`"),
+            MissingCommandAfterBar => f.write_str("A command is missing after `|`"),
         }
     }
 }
