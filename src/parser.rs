@@ -189,11 +189,22 @@ impl Parser<'_> {
             }
         };
 
-        // TODO Parse `|` and more commands
-        Ok(Rec::Parsed(Some(Pipeline {
-            commands: vec![Rc::new(first)],
-            negation,
-        })))
+        // Parse `|` and remaining commands
+        let mut commands = vec![Rc::new(first)];
+        while self.peek_token().await?.id == Operator(Bar) {
+            let _location = self.take_token().await?.word.location;
+
+            while self.newline_and_here_doc_contents().await? {}
+
+            let next = loop {
+                if let Rec::Parsed(option) = self.command().await? {
+                    break option.unwrap(); // TODO What if None
+                }
+            };
+            commands.push(Rc::new(next));
+        }
+
+        Ok(Rec::Parsed(Some(Pipeline { commands, negation })))
     }
 
     /// Parses an and-or list.
@@ -495,9 +506,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_pipeline_many() {
-        unimplemented!();
+        let mut lexer = Lexer::with_source(Source::Unknown, "one | two | \n\t\n three");
+        let mut parser = Parser::new(&mut lexer);
+
+        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let p = p.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(p.negation, false);
+        assert_eq!(p.commands.len(), 3);
+        assert_eq!(p.commands[0].to_string(), "one");
+        assert_eq!(p.commands[1].to_string(), "two");
+        assert_eq!(p.commands[2].to_string(), "three");
     }
 
     #[test]
