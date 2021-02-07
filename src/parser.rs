@@ -114,6 +114,8 @@ impl Parser<'_> {
             }
 
             match self.peek_token().await?.id {
+                // TODO Also consider assignments.is_empty
+                Token(Some(_)) if words.is_empty() && redirs.is_empty() => break,
                 Token(_) => (),
                 _ => break,
             }
@@ -415,7 +417,25 @@ mod tests {
         assert_eq!(e.location.column.get(), 1);
     }
 
-    // TODO test simple_command
+    #[test]
+    fn parser_simple_command_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.simple_command()).unwrap().unwrap();
+        assert_eq!(option, None);
+    }
+
+    #[test]
+    fn parser_simple_command_keyword() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "then");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.simple_command()).unwrap().unwrap();
+        assert_eq!(option, None);
+    }
+
+    // TODO test simple_command for other cases
 
     #[test]
     fn parser_command_eof() {
