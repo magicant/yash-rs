@@ -189,19 +189,33 @@ impl Parser<'_> {
             }
         };
 
-        // Parse `|` and remaining commands
+        // Parse `|`
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
             let location = self.take_token().await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
+            // Parse the next command
             let next = loop {
                 if let Rec::Parsed(option) = self.command().await? {
-                    break option.ok_or_else(|| {
-                        let cause = ErrorCause::MissingCommandAfterBar;
-                        Error { cause, location }
-                    })?;
+                    if let Some(next) = option {
+                        break next;
+                    }
+
+                    // Error: the command is missing
+                    let next = self.peek_token().await?;
+                    return if next.id == Token(Some(Keyword::Bang)) {
+                        Err(Error {
+                            cause: ErrorCause::BangAfterBar,
+                            location: next.word.location.clone(),
+                        })
+                    } else {
+                        Err(Error {
+                            cause: ErrorCause::MissingCommandAfterBar,
+                            location,
+                        })
+                    };
                 }
             };
             commands.push(Rc::new(next));
@@ -571,6 +585,19 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn parser_pipeline_bang_after_bar() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo | !");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.pipeline()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::BangAfterBar);
+        assert_eq!(e.location.line.value, "foo | !");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 7);
     }
 
     #[test]

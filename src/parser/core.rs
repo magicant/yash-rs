@@ -49,6 +49,8 @@ pub enum ErrorCause {
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
     DoubleNegation,
+    /// A `|` token is followed by a `!`.
+    BangAfterBar,
     /// A command is missing after a `!` token.
     MissingCommandAfterBang,
     /// A command is missing after a `|` token.
@@ -63,6 +65,7 @@ impl PartialEq for ErrorCause {
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
             | (DoubleNegation, DoubleNegation)
+            | (BangAfterBar, BangAfterBar)
             | (MissingCommandAfterBang, MissingCommandAfterBang)
             | (MissingCommandAfterBar, MissingCommandAfterBar) => true,
             (
@@ -96,6 +99,7 @@ impl fmt::Display for ErrorCause {
                 write!(f, "A command is missing after `{}`", and_or)
             }
             DoubleNegation => f.write_str("`!` cannot be used twice in a row"),
+            BangAfterBar => f.write_str("`!` cannot be used in the middle of a pipeline"),
             MissingCommandAfterBang => f.write_str("A command is missing after `!`"),
             MissingCommandAfterBar => f.write_str("A command is missing after `|`"),
         }
