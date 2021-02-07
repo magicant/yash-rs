@@ -159,18 +159,30 @@ impl Parser<'_> {
     /// If there is no valid pipeline at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn pipeline(&mut self) -> Result<Rec<Option<Pipeline<MissingHereDoc>>>> {
+        // Parse the first command
         let (first, negation) = match self.command().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
             Rec::Parsed(Some(first)) => (first, false),
             Rec::Parsed(None) => {
+                // Parse the `!` reserved word
                 if let Token(Some(Keyword::Bang)) = self.peek_token().await?.id {
-                    let _bang = self.take_token().await?;
-                    let first = loop {
+                    let location = self.take_token().await?.word.location;
+                    loop {
+                        // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
-                            break option.unwrap(); // TODO what if None
+                            if let Some(first) = option {
+                                break (first, true);
+                            } else {
+                                let cause =
+                                    if self.peek_token().await?.id == Token(Some(Keyword::Bang)) {
+                                        ErrorCause::DoubleNegation
+                                    } else {
+                                        ErrorCause::MissingCommandAfterBang
+                                    };
+                                return Err(Error { cause, location });
+                            }
                         }
-                    };
-                    (first, true)
+                    }
                 } else {
                     return Ok(Rec::Parsed(None));
                 }
@@ -501,15 +513,29 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_pipeline_double_negation() {
-        unimplemented!();
+        let mut lexer = Lexer::with_source(Source::Unknown, " !  !");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.pipeline()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::DoubleNegation);
+        assert_eq!(e.location.line.value, " !  !");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_pipeline_missing_command_after_negation() {
-        unimplemented!("!\nfoo");
+        let mut lexer = Lexer::with_source(Source::Unknown, "!\nfoo");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.pipeline()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingCommandAfterBang);
+        assert_eq!(e.location.line.value, "!\n");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
