@@ -172,15 +172,16 @@ impl Parser<'_> {
                         if let Rec::Parsed(option) = self.command().await? {
                             if let Some(first) = option {
                                 break (first, true);
-                            } else {
-                                let cause =
-                                    if self.peek_token().await?.id == Token(Some(Keyword::Bang)) {
-                                        ErrorCause::DoubleNegation
-                                    } else {
-                                        ErrorCause::MissingCommandAfterBang
-                                    };
-                                return Err(Error { cause, location });
                             }
+
+                            // Error: the command is missing
+                            let next = self.peek_token().await?;
+                            let cause = if next.id == Token(Some(Keyword::Bang)) {
+                                ErrorCause::DoubleNegation
+                            } else {
+                                ErrorCause::MissingCommandAfterBang
+                            };
+                            return Err(Error { cause, location });
                         }
                     }
                 } else {
@@ -192,12 +193,12 @@ impl Parser<'_> {
         // Parse `|`
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
-            let location = self.take_token().await?.word.location;
+            let bar_location = self.take_token().await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
-            // Parse the next command
-            let next = loop {
+            commands.push(Rc::new(loop {
+                // Parse the next command
                 if let Rec::Parsed(option) = self.command().await? {
                     if let Some(next) = option {
                         break next;
@@ -213,12 +214,11 @@ impl Parser<'_> {
                     } else {
                         Err(Error {
                             cause: ErrorCause::MissingCommandAfterBar,
-                            location,
+                            location: bar_location,
                         })
                     };
                 }
-            };
-            commands.push(Rc::new(next));
+            }));
         }
 
         Ok(Rec::Parsed(Some(Pipeline { commands, negation })))
