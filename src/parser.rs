@@ -192,13 +192,16 @@ impl Parser<'_> {
         // Parse `|` and remaining commands
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
-            let _location = self.take_token().await?.word.location;
+            let location = self.take_token().await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
             let next = loop {
                 if let Rec::Parsed(option) = self.command().await? {
-                    break option.unwrap(); // TODO What if None
+                    break option.ok_or_else(|| {
+                        let cause = ErrorCause::MissingCommandAfterBar;
+                        Error { cause, location }
+                    })?;
                 }
             };
             commands.push(Rc::new(next));
@@ -558,9 +561,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn parser_pipeline_missing_command_after_bar() {
-        unimplemented!();
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo | ;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.pipeline()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingCommandAfterBar);
+        assert_eq!(e.location.line.value, "foo | ;");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
