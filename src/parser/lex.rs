@@ -693,6 +693,7 @@ impl Lexer {
 
 // This is here to get better order of Lexer members in the doc.
 mod heredoc;
+pub mod keyword;
 
 #[cfg(test)]
 mod tests {
