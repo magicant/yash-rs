@@ -73,7 +73,7 @@ impl Parser<'_> {
 
         let operand = self.take_token_aliased_fully().await?;
         match operand.id {
-            Token => (),
+            Token(_) => (),
             Operator(_) | EndOfInput => {
                 return Err(Error {
                     cause: ErrorCause::MissingHereDocDelimiter,
@@ -113,9 +113,9 @@ impl Parser<'_> {
                 continue;
             }
 
-            let token = self.peek_token().await?;
-            if token.id != Token {
-                break;
+            match self.peek_token().await?.id {
+                Token(_) => (),
+                _ => break,
             }
 
             match self.take_token_aliased(words.is_empty()).await? {

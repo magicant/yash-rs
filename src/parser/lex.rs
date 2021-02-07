@@ -23,6 +23,7 @@ mod op;
 
 mod core {
 
+    use super::keyword::Keyword;
     pub use super::op::Operator;
     use crate::alias::Alias;
     use crate::input::Context;
@@ -73,14 +74,20 @@ mod core {
     /// Token identifier, or classification of tokens.
     ///
     /// This enum classifies a token as defined in POSIX XCU 2.10.1 Shell Grammar Lexical
-    /// Conventions, but does not reflect further distinction defined in POSIX XCU 2.10.2 Shell
-    /// Grammar Rules.
+    /// Conventions, but does not exactly reflect further distinction defined in
+    /// POSIX XCU 2.10.2 Shell Grammar Rules.
     ///
     /// For convenience, the special token identifier `EndOfInput` is included.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub enum TokenId {
         /// `TOKEN`
-        Token,
+        ///
+        /// If this token _looks like_ a reserved word, this variant has some
+        /// associated `Keyword` that describes the word. However, it depends on
+        /// context whether a token is actually regarded as a reserved word or
+        /// just as an ordinary word. You must ensure that you're in an
+        /// applicable context when examining the `Keyword` value.
+        Token(Option<Keyword>),
         /// Operator
         Operator(Operator),
         // TODO IO_NUMBER
@@ -685,7 +692,12 @@ impl Lexer {
         let id = if word.units.is_empty() {
             TokenId::EndOfInput
         } else {
-            TokenId::Token
+            use self::keyword::AsKeyword;
+            TokenId::Token(
+                word.to_string_if_literal()
+                    .map(|s| s.as_str().as_keyword())
+                    .flatten(),
+            )
         };
         Ok(Token { word, id, index })
     }
@@ -1879,7 +1891,7 @@ mod tests {
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
-        assert_eq!(t.id, TokenId::Token);
+        assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
     }
 
@@ -1894,7 +1906,7 @@ mod tests {
             assert_eq!(t.word.location.line.number.get(), 1);
             assert_eq!(t.word.location.line.source, Source::Unknown);
             assert_eq!(t.word.location.column.get(), 2);
-            assert_eq!(t.id, TokenId::Token);
+            assert_eq!(t.id, TokenId::Token(None));
             assert_eq!(t.index, 1);
 
             lexer.skip_blanks().await.unwrap();
