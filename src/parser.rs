@@ -104,7 +104,6 @@ impl Parser<'_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
-        // TODO Return Option::None if the first token is a keyword.
         // TODO Support assignments.
         let mut words = vec![];
         let mut redirs = vec![];
