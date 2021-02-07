@@ -23,6 +23,7 @@ mod fill;
 
 pub mod lex;
 
+use self::lex::keyword::Keyword;
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
 use self::lex::Token;
@@ -158,17 +159,29 @@ impl Parser<'_> {
     /// If there is no valid pipeline at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn pipeline(&mut self) -> Result<Rec<Option<Pipeline<MissingHereDoc>>>> {
-        // TODO Parse `!`
+        let (first, negation) = match self.command().await? {
+            Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
+            Rec::Parsed(Some(first)) => (first, false),
+            Rec::Parsed(None) => {
+                if let Token(Some(Keyword::Bang)) = self.peek_token().await?.id {
+                    let _bang = self.take_token().await?;
+                    let first = loop {
+                        if let Rec::Parsed(option) = self.command().await? {
+                            break option.unwrap(); // TODO what if None
+                        }
+                    };
+                    (first, true)
+                } else {
+                    return Ok(Rec::Parsed(None));
+                }
+            }
+        };
+
         // TODO Parse `|` and more commands
-        let negation = false;
-        match self.command().await? {
-            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => Ok(Rec::Parsed(None)),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Pipeline {
-                commands: vec![Rc::new(c)],
-                negation,
-            }))),
-        }
+        Ok(Rec::Parsed(Some(Pipeline {
+            commands: vec![Rc::new(first)],
+            negation,
+        })))
     }
 
     /// Parses an and-or list.
@@ -457,7 +470,53 @@ mod tests {
         assert_eq!(option, None);
     }
 
-    // TODO test pipeline for other cases
+    #[test]
+    fn parser_pipeline_one() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut parser = Parser::new(&mut lexer);
+
+        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let p = p.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(p.negation, false);
+        assert_eq!(p.commands.len(), 1);
+        assert_eq!(p.commands[0].to_string(), "foo");
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_pipeline_many() {
+        unimplemented!();
+    }
+
+    #[test]
+    fn parser_pipeline_negated() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "! foo");
+        let mut parser = Parser::new(&mut lexer);
+
+        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let p = p.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(p.negation, true);
+        assert_eq!(p.commands.len(), 1);
+        assert_eq!(p.commands[0].to_string(), "foo");
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_pipeline_double_negation() {
+        unimplemented!();
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_pipeline_missing_command_after_negation() {
+        unimplemented!("!\nfoo");
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn parser_pipeline_missing_command_after_bar() {
+        unimplemented!();
+    }
 
     #[test]
     fn parser_and_or_list_eof() {
