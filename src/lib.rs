@@ -18,6 +18,7 @@
 
 pub mod alias;
 pub mod env;
+pub mod exec;
 pub mod input;
 pub mod parser;
 pub mod source;
