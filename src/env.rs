@@ -51,6 +51,19 @@ pub struct NativeEnv {
     pub aliases: Aliases,
 }
 
+impl NativeEnv {
+    /// Creates a new environment.
+    ///
+    /// Because `NativeEnv` is tied with the state of the current process, there
+    /// should be at most one instance of `NativeEnv` in a process. Using more
+    /// than one `NativeEnv` instance at the same time should be considered
+    /// unsafe.
+    pub fn new() -> NativeEnv {
+        let aliases = Aliases(Rc::new(AliasSet::new()));
+        NativeEnv { aliases }
+    }
+}
+
 impl AliasEnv for NativeEnv {
     fn aliases(&self) -> &Rc<AliasSet> {
         self.aliases.aliases()

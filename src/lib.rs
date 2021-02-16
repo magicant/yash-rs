@@ -27,12 +27,13 @@ pub mod syntax;
 // TODO Allow user to select input source
 // TODO Execute the command after parsing
 async fn parse_and_print() {
-    use crate::alias::AliasSet;
+    use crate::env::AliasEnv;
+    use crate::env::NativeEnv;
+    use crate::exec::Execute;
     use std::future::ready;
     use std::future::Future;
     use std::num::NonZeroU64;
     use std::pin::Pin;
-    use std::rc::Rc;
 
     struct Stdin;
 
@@ -56,13 +57,15 @@ async fn parse_and_print() {
         }
     }
 
-    let aliases = Rc::new(AliasSet::new());
+    let mut env = NativeEnv::new();
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
-        let mut parser = parser::Parser::with_aliases(&mut lexer, aliases.clone());
+        let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases().clone());
         match parser.command_line().await {
             Ok(None) => break,
-            Ok(Some(command)) => println!("{}", command),
+            Ok(Some(command)) => command
+                .execute(&mut env)
+                .unwrap_or_else(|a| eprintln!("{:?}", a)),
             Err(e) => println!("{}", e),
         }
         // TODO If the lexer still has unconsumed input, it should be parsed

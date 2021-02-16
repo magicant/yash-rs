@@ -20,6 +20,7 @@ use crate::env::Env;
 use crate::syntax::*;
 
 /// Result of command execution that requires stack unwinding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Abort {
     /// Break the current loop.
     Break {
@@ -43,6 +44,7 @@ pub trait Execute {
 
 impl Execute for SimpleCommand {
     fn execute(&self, _: &mut dyn Env) -> Result {
+        println!("{}", self);
         Ok(()) // TODO implement Execute::execute for SimpleCommand
     }
 }
