@@ -43,9 +43,18 @@ pub trait Execute {
 }
 
 impl Execute for SimpleCommand {
-    fn execute(&self, _: &mut dyn Env) -> Result {
-        println!("{}", self);
-        Ok(()) // TODO implement Execute::execute for SimpleCommand
+    fn execute(&self, env: &mut dyn Env) -> Result {
+        let fields: crate::expansion::Result<Vec<_>> =
+            self.words.iter().try_fold(vec![], |mut fs, w| {
+                fs.extend(w.expand_multiple(env)?);
+                Ok(fs)
+            });
+
+        // TODO open redirections
+        // TODO expand and perform assignments
+        use itertools::Itertools;
+        println!("{}", fields.iter().flatten().format(" "));
+        Ok(()) // TODO command search and execution
     }
 }
 
