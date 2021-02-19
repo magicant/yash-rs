@@ -52,9 +52,22 @@ impl Execute for SimpleCommand {
 
         // TODO open redirections
         // TODO expand and perform assignments
-        use itertools::Itertools;
-        println!("{}", fields.iter().flatten().format(" "));
-        Ok(()) // TODO command search and execution
+
+        let fields = match fields {
+            Ok(fields) => fields,
+            Err(_) => return Ok(()),
+        };
+        if let Some(name) = fields.get(0) {
+            let built_ins = crate::builtin::built_ins();
+            let built_in = built_ins.get(&name.value as &str);
+            if let Some(built_in) = built_in {
+                (built_in.execute)(env, fields)?;
+            } else {
+                use itertools::Itertools;
+                println!("{}", fields.iter().format(" "));
+            }
+        }
+        Ok(()) // TODO proper command search and execution
     }
 }
 
