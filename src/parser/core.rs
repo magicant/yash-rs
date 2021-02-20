@@ -321,12 +321,26 @@ impl Parser<'_> {
     // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
     /// Consumes the current token if it is not an alias.
     ///
-    /// If `is_command_name` is true, this function checks if the token is the name of an alias. If
-    /// it is, alias substitution is performed on the token and the result is
+    /// If the current token is not yet read from the underlying lexer, it is read.
+    ///
+    /// This function checks if the token is the name of an alias. If it is,
+    /// alias substitution is performed on the token and the result is
     /// `Ok(AliasSubstituted)`. Otherwise, the token is consumed and returned.
     ///
-    /// This function ignores the token identifier of the consumed token. `is_command_name` must be
-    /// false if the token is a reserved word that is not subject to alias substitution.
+    /// Alias substitution is performed only if at least one of the following is
+    /// true:
+    ///
+    /// - The token is the first command word in a simple command, that is, it is
+    ///   the word for the command name. (This condition should be specified by the
+    ///   `is_command_name` parameter.)
+    /// - The token comes just after the replacement string of another alias
+    ///   substitution that ends with a blank character.
+    /// - The token names a global alias.
+    ///
+    /// However, alias substitution should _not_ be performed on a reserved word
+    /// in any case. It is your responsibility to check the token type and not to
+    /// call this function on a reserved word. To consume a reserved word, you
+    /// should call [`take_token`](Self::take_token).
     pub async fn take_token_aliased(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
         let token = self.take_token().await?;
 
