@@ -55,4 +55,97 @@ pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result<ExitStatus>
     Ok(0)
 }
 
-// TODO test alias_built_in
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::env::AliasEnv;
+    use crate::env::SimEnv;
+    use crate::source::Location;
+    use crate::source::Source;
+
+    #[test]
+    fn alias_built_in_defines_alias() {
+        let mut env = SimEnv::new();
+        let arg0 = Field::dummy("".to_string());
+        let arg1 = Field::dummy("foo=bar baz".to_string());
+        let args = vec![arg0, arg1];
+
+        let exit_status = alias_built_in(&mut env, args);
+        assert_eq!(exit_status, Ok(0));
+
+        let aliases = env.aliases().as_ref();
+        assert_eq!(aliases.len(), 1);
+
+        let foo = aliases.get("foo").unwrap().0.as_ref();
+        assert_eq!(foo.name, "foo");
+        assert_eq!(foo.replacement, "bar baz");
+        assert_eq!(foo.global, false);
+        assert_eq!(foo.origin.line.value, "foo=bar baz");
+        assert_eq!(foo.origin.line.number.get(), 1);
+        assert_eq!(foo.origin.line.source, Source::Unknown);
+        assert_eq!(foo.origin.column.get(), 1);
+    }
+
+    #[test]
+    fn alias_built_in_defines_many_aliases() {
+        let mut env = SimEnv::new();
+        let arg0 = Field::dummy("alias".to_string());
+        let arg1 = Field::dummy("abc=xyz".to_string());
+        let arg2 = Field::dummy("yes=no".to_string());
+        let arg3 = Field::dummy("ls=ls --color".to_string());
+        let args = vec![arg0, arg1, arg2, arg3];
+
+        let exit_status = alias_built_in(&mut env, args);
+        assert_eq!(exit_status, Ok(0));
+
+        let aliases = env.aliases().as_ref();
+        assert_eq!(aliases.len(), 3);
+
+        let abc = aliases.get("abc").unwrap().0.as_ref();
+        assert_eq!(abc.name, "abc");
+        assert_eq!(abc.replacement, "xyz");
+        assert_eq!(abc.global, false);
+        assert_eq!(abc.origin.line.value, "abc=xyz");
+        assert_eq!(abc.origin.line.number.get(), 1);
+        assert_eq!(abc.origin.line.source, Source::Unknown);
+        assert_eq!(abc.origin.column.get(), 1);
+
+        let yes = aliases.get("yes").unwrap().0.as_ref();
+        assert_eq!(yes.name, "yes");
+        assert_eq!(yes.replacement, "no");
+        assert_eq!(yes.global, false);
+        assert_eq!(yes.origin.line.value, "yes=no");
+        assert_eq!(yes.origin.line.number.get(), 1);
+        assert_eq!(yes.origin.line.source, Source::Unknown);
+        assert_eq!(yes.origin.column.get(), 1);
+
+        let ls = aliases.get("ls").unwrap().0.as_ref();
+        assert_eq!(ls.name, "ls");
+        assert_eq!(ls.replacement, "ls --color");
+        assert_eq!(ls.global, false);
+        assert_eq!(ls.origin.line.value, "ls=ls --color");
+        assert_eq!(ls.origin.line.number.get(), 1);
+        assert_eq!(ls.origin.line.source, Source::Unknown);
+        assert_eq!(ls.origin.column.get(), 1);
+    }
+
+    #[test]
+    fn alias_built_in_prints_all_aliases() {
+        let mut env = SimEnv::new();
+        let aliases = Rc::make_mut(env.aliases_mut());
+        aliases.insert(HashEntry::new(
+            "foo".to_string(),
+            "bar".to_string(),
+            false,
+            Location::dummy("".to_string()),
+        ));
+        aliases.insert(HashEntry::new(
+            "hello".to_string(),
+            "world".to_string(),
+            false,
+            Location::dummy("".to_string()),
+        ));
+        // TODO alias_built_in should print to IoEnv rather than real standard output
+    }
+    // TODO test case with global aliases
+}

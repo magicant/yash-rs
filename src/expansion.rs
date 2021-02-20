@@ -42,6 +42,16 @@ pub struct Field {
     pub origin: Location,
 }
 
+impl Field {
+    /// Creates a new field with a dummy origin location.
+    ///
+    /// The return value's origin is created by `Location::dummy(value.clone())`.
+    pub fn dummy(value: String) -> Field {
+        let origin = Location::dummy(value.clone());
+        Field { value, origin }
+    }
+}
+
 impl std::fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.value.fmt(f)
