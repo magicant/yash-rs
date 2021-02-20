@@ -99,3 +99,31 @@ impl AliasEnv for NativeEnv {
 }
 
 impl Env for NativeEnv {}
+
+/// Simulated shell execution environment.
+///
+/// TODO Elaborate
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SimEnv {
+    /// Local part of the environment.
+    pub local: LocalEnv,
+}
+
+impl SimEnv {
+    /// Creates a new `SimEnv`.
+    pub fn new() -> SimEnv {
+        let local = LocalEnv::new();
+        SimEnv { local }
+    }
+}
+
+impl AliasEnv for SimEnv {
+    fn aliases(&self) -> &Rc<AliasSet> {
+        self.local.aliases()
+    }
+    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
+        self.local.aliases_mut()
+    }
+}
+
+impl Env for SimEnv {}
