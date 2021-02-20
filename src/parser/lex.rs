@@ -374,6 +374,42 @@ mod core {
             self.index = begin;
         }
 
+        /// Tests if the given index is after the replacement string of alias
+        /// substitution that ends with a blank.
+        ///
+        /// # Panics
+        ///
+        /// If `index` is larger than the currently read index.
+        pub fn is_after_blank_ending_alias(&self, index: usize) -> bool {
+            fn is_blank_ending(s: &str) -> bool {
+                s.chars().rev().next().map_or(false, char::is_whitespace)
+            }
+            fn is_same_alias(alias: &Alias, sc: Option<&SourceChar>) -> bool {
+                match sc {
+                    None => false,
+                    Some(sc) => sc.location.line.source.is_alias_for(&alias.name),
+                }
+            }
+
+            for index in (0..index).rev() {
+                let sc = &self.source[index];
+
+                if !sc.value.is_whitespace() {
+                    return false;
+                }
+
+                if let Source::Alias { ref alias, .. } = sc.location.line.source {
+                    if is_blank_ending(&alias.replacement) {
+                        if !is_same_alias(alias, self.source.get(index + 1)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+
         /// Parses an optional compound list that is the content of a command
         /// substitution.
         ///
@@ -1281,6 +1317,67 @@ mod tests {
             assert_eq!(c.location.line.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
+        });
+    }
+
+    #[test]
+    fn lexer_is_after_blank_ending_alias_index_0() {
+        let original = Location::dummy("original".to_string());
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: " ".to_string(),
+            global: false,
+            origin: Location::dummy("origin".to_string()),
+        });
+        let lexer = Lexer::with_source(Source::Alias { original, alias }, "a");
+        let result = lexer.is_after_blank_ending_alias(0);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn lexer_is_after_blank_ending_alias_not_blank_ending() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a x");
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: " b".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+
+        block_on(async {
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(3), false);
+        });
+    }
+
+    #[test]
+    fn lexer_is_after_blank_ending_alias_blank_ending() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a x");
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: " b ".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+
+        block_on(async {
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(3), true);
+            assert_eq!(lexer.is_after_blank_ending_alias(4), true);
         });
     }
 
