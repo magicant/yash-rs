@@ -74,6 +74,12 @@ pub struct BuiltIn {
 }
 
 /// Creates a new collection containing all the built-ins.
+///
+/// ```
+/// use yash::builtin::*;
+/// let map = built_ins();
+/// assert_eq!(map["alias"].r#type, Type::Intrinsic);
+/// ```
 pub fn built_ins() -> HashMap<&'static str, BuiltIn> {
     fn def(name: &str, r#type: Type, execute: Main) -> (&str, BuiltIn) {
         (name, BuiltIn { r#type, execute })
