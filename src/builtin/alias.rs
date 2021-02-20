@@ -18,10 +18,11 @@
 
 use super::*;
 use crate::alias::*;
+use std::future::ready;
 use std::rc::Rc;
 
 /// Implementation of the alias built-in.
-pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result<ExitStatus> {
+pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -33,7 +34,7 @@ pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result<ExitStatus>
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
-        return Ok(0);
+        return (0, None);
     }
 
     for Field { value, origin } in args {
@@ -52,7 +53,17 @@ pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result<ExitStatus>
         }
     }
 
-    Ok(0)
+    (0, None)
+}
+
+/// Implementation of the alias built-in.
+///
+/// This function calls [`alias_built_in`] and wraps the result in a `Future`.
+pub fn alias_built_in_async(
+    env: &mut dyn Env,
+    args: Vec<Field>,
+) -> Pin<Box<dyn Future<Output = Result>>> {
+    Box::pin(ready(alias_built_in(env, args)))
 }
 
 #[cfg(test)]
@@ -70,8 +81,8 @@ mod tests {
         let arg1 = Field::dummy("foo=bar baz".to_string());
         let args = vec![arg0, arg1];
 
-        let exit_status = alias_built_in(&mut env, args);
-        assert_eq!(exit_status, Ok(0));
+        let result = alias_built_in(&mut env, args);
+        assert_eq!(result, (0, None));
 
         let aliases = env.aliases().as_ref();
         assert_eq!(aliases.len(), 1);
@@ -95,8 +106,8 @@ mod tests {
         let arg3 = Field::dummy("ls=ls --color".to_string());
         let args = vec![arg0, arg1, arg2, arg3];
 
-        let exit_status = alias_built_in(&mut env, args);
-        assert_eq!(exit_status, Ok(0));
+        let result = alias_built_in(&mut env, args);
+        assert_eq!(result, (0, None));
 
         let aliases = env.aliases().as_ref();
         assert_eq!(aliases.len(), 3);

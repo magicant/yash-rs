@@ -21,11 +21,13 @@
 mod alias;
 
 pub use self::alias::alias_built_in;
-
+pub use self::alias::alias_built_in_async;
 use crate::env::Env;
-use crate::exec::Result;
+use crate::exec::Abort;
 use crate::expansion::Field;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 
 // TODO should be defined somewhere else.
 type ExitStatus = u32;
@@ -56,26 +58,28 @@ pub enum Type {
     NonIntrinsic,
 }
 
+/// Result of built-in utility.
+type Result = (ExitStatus, Option<Abort>);
+
+/// Type of functions that implement the behavior of a built-in.
+type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
+
 /// Built-in utility definition.
 #[derive(Clone, Copy)]
 pub struct BuiltIn {
     /// Type of the built-in.
     pub r#type: Type,
     /// Function that implements the behavior of the built-in.
-    pub execute: fn(&mut dyn Env, Vec<Field>) -> Result<ExitStatus>,
+    pub execute: Main,
 }
 
 /// Creates a new collection containing all the built-ins.
 pub fn built_ins() -> HashMap<&'static str, BuiltIn> {
-    fn def(
-        name: &str,
-        r#type: Type,
-        execute: fn(&mut dyn Env, Vec<Field>) -> Result<ExitStatus>,
-    ) -> (&str, BuiltIn) {
+    fn def(name: &str, r#type: Type, execute: Main) -> (&str, BuiltIn) {
         (name, BuiltIn { r#type, execute })
     }
 
-    [def("alias", Type::Intrinsic, alias_built_in)]
+    [def("alias", Type::Intrinsic, alias_built_in_async)]
         .iter()
         .cloned()
         .collect()

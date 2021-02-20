@@ -56,7 +56,11 @@ impl SimpleCommand {
             let built_ins = crate::builtin::built_ins();
             let built_in = built_ins.get(&name.value as &str);
             if let Some(built_in) = built_in {
-                (built_in.execute)(env, fields)?;
+                let (_exit_status, abort) = (built_in.execute)(env, fields).await;
+                if let Some(abort) = abort {
+                    return Err(abort);
+                }
+            // TOOD Set exit status to $?
             } else {
                 use itertools::Itertools;
                 println!("{}", fields.iter().format(" "));
