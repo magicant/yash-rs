@@ -18,6 +18,10 @@
 //!
 //! TODO Elaborate
 
+mod alias;
+
+pub use self::alias::alias_built_in;
+
 use crate::env::Env;
 use crate::exec::Result;
 use crate::expansion::Field;
@@ -59,10 +63,6 @@ pub struct BuiltIn {
     pub r#type: Type,
     /// Function that implements the behavior of the built-in.
     pub execute: fn(&mut dyn Env, Vec<Field>) -> Result<ExitStatus>,
-}
-
-fn alias_built_in(_env: &mut dyn Env, _args: Vec<Field>) -> Result<ExitStatus> {
-    Ok(0) // TODO implement the alias built-in
 }
 
 /// Creates a new collection containing all the built-ins.
