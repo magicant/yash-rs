@@ -31,7 +31,6 @@ pub mod syntax;
 async fn parse_and_print() {
     use crate::env::AliasEnv;
     use crate::env::NativeEnv;
-    use crate::exec::Execute;
     use std::future::ready;
     use std::future::Future;
     use std::num::NonZeroU64;
@@ -67,6 +66,7 @@ async fn parse_and_print() {
             Ok(None) => break,
             Ok(Some(command)) => command
                 .execute(&mut env)
+                .await
                 .unwrap_or_else(|a| eprintln!("{:?}", a)),
             Err(e) => println!("{}", e),
         }

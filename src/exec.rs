@@ -36,14 +36,9 @@ pub enum Abort {
 /// Result of command execution.
 pub type Result<T = ()> = std::result::Result<T, Abort>;
 
-/// Executable command.
-pub trait Execute {
-    /// Executes `self`.
-    fn execute(&self, env: &mut dyn Env) -> Result;
-}
-
-impl Execute for SimpleCommand {
-    fn execute(&self, env: &mut dyn Env) -> Result {
+impl SimpleCommand {
+    /// Executes this simple command.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
         let fields: crate::expansion::Result<Vec<_>> =
             self.words.iter().try_fold(vec![], |mut fs, w| {
                 fs.extend(w.expand_multiple(env)?);
@@ -65,46 +60,56 @@ impl Execute for SimpleCommand {
             } else {
                 use itertools::Itertools;
                 println!("{}", fields.iter().format(" "));
+                // TODO execute non-built-in utilities
             }
         }
         Ok(()) // TODO proper command search and execution
     }
 }
 
-impl Execute for Command {
-    fn execute(&self, env: &mut dyn Env) -> Result {
+impl Command {
+    /// Executes this command.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
         match self {
-            Command::SimpleCommand(command) => command.execute(env),
+            Command::SimpleCommand(command) => command.execute(env).await,
         }
     }
 }
 
-impl Execute for Pipeline {
-    fn execute(&self, env: &mut dyn Env) -> Result {
+impl Pipeline {
+    /// Executes this pipeline.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
         // TODO correctly execute pipeline
         self.commands
             .get(0)
             .expect("empty pipeline not yet handled")
             .execute(env)
+            .await
     }
 }
 
-impl Execute for AndOrList {
-    fn execute(&self, env: &mut dyn Env) -> Result {
-        self.first.execute(env)
+impl AndOrList {
+    /// Executes this and-or list.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+        self.first.execute(env).await
         // TODO rest
     }
 }
 
-impl Execute for Item {
-    fn execute(&self, env: &mut dyn Env) -> Result {
-        self.and_or.execute(env)
+impl Item {
+    /// Executes this item.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+        self.and_or.execute(env).await
         // TODO async
     }
 }
 
-impl Execute for List {
-    fn execute(&self, env: &mut dyn Env) -> Result {
-        self.items.iter().try_for_each(|i| i.execute(env))
+impl List {
+    /// Executes this list.
+    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+        for item in &self.items {
+            item.execute(env).await?
+        }
+        Ok(())
     }
 }
