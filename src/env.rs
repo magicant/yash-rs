@@ -30,7 +30,7 @@ pub trait AliasEnv {
 }
 
 /// Minimal implementor of [`AliasEnv`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Aliases(Rc<AliasSet>);
 
 impl AliasEnv for Aliases {
@@ -42,13 +42,38 @@ impl AliasEnv for Aliases {
     }
 }
 
+/// Subset of the shell execution environment that can be implemented
+/// independently of the underlying OS features.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocalEnv {
+    pub aliases: Aliases,
+}
+
+impl LocalEnv {
+    /// Creates a new local environment.
+    pub fn new() -> LocalEnv {
+        let aliases = Aliases(Rc::new(AliasSet::new()));
+        LocalEnv { aliases }
+    }
+}
+
+impl AliasEnv for LocalEnv {
+    fn aliases(&self) -> &Rc<AliasSet> {
+        self.aliases.aliases()
+    }
+    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
+        self.aliases.aliases_mut()
+    }
+}
+
 /// Whole shell execution environment.
 pub trait Env: AliasEnv {}
 
 /// Implementation of [`Env`] that is based on the state of the current process.
 #[derive(Debug)]
 pub struct NativeEnv {
-    pub aliases: Aliases,
+    /// Local part of the environment.
+    pub local: LocalEnv,
 }
 
 impl NativeEnv {
@@ -59,17 +84,17 @@ impl NativeEnv {
     /// than one `NativeEnv` instance at the same time should be considered
     /// unsafe.
     pub fn new() -> NativeEnv {
-        let aliases = Aliases(Rc::new(AliasSet::new()));
-        NativeEnv { aliases }
+        let local = LocalEnv::new();
+        NativeEnv { local }
     }
 }
 
 impl AliasEnv for NativeEnv {
     fn aliases(&self) -> &Rc<AliasSet> {
-        self.aliases.aliases()
+        self.local.aliases()
     }
     fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
-        self.aliases.aliases_mut()
+        self.local.aliases_mut()
     }
 }
 
