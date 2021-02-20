@@ -17,8 +17,42 @@
 //! Alias built-in.
 
 use super::*;
+use crate::alias::*;
+use std::rc::Rc;
 
 /// Implementation of the alias built-in.
-pub fn alias_built_in(_env: &mut dyn Env, _args: Vec<Field>) -> Result<ExitStatus> {
-    Ok(0) // TODO implement the alias built-in
+pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result<ExitStatus> {
+    // TODO support options
+    // TODO print alias definitions if there are no operands
+
+    let mut args = args.into_iter();
+    args.next(); // ignore the first argument, which is the command name
+
+    if args.as_ref().is_empty() {
+        for alias in env.aliases().as_ref() {
+            // TODO should print via IoEnv rather than directly to stdout
+            println!("{}={}", &alias.0.name, &alias.0.replacement);
+        }
+        return Ok(0);
+    }
+
+    for Field { value, origin } in args {
+        if let Some(eq_index) = value.find('=') {
+            let name = value[..eq_index].to_owned();
+            // TODO reject invalid name
+            let replacement = value[eq_index + 1..].to_owned();
+            Rc::make_mut(env.aliases_mut()).insert(HashEntry::new(
+                name,
+                replacement,
+                false,
+                origin,
+            ));
+        } else {
+            // TODO print alias definition
+        }
+    }
+
+    Ok(0)
 }
+
+// TODO test alias_built_in
