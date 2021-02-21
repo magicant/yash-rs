@@ -490,7 +490,78 @@ mod tests {
         assert_eq!(option, None);
     }
 
-    // TODO test simple_command for other cases
+    // TODO parser_simple_command_one_assignment
+    // TODO parser_simple_command_many_assignments
+
+    #[test]
+    fn parser_simple_command_one_word() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "word");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].to_string(), "word");
+    }
+
+    #[test]
+    fn parser_simple_command_many_words() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ": if then");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.words.len(), 3);
+        assert_eq!(sc.words[0].to_string(), ":");
+        assert_eq!(sc.words[1].to_string(), "if");
+        assert_eq!(sc.words[2].to_string(), "then");
+    }
+
+    #[test]
+    fn parser_simple_command_one_redirection() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs.len(), 1);
+        // TODO test redirection content
+    }
+
+    #[test]
+    fn parser_simple_command_many_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<1 <<2 <<3");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs.len(), 3);
+        // TODO test redirections content
+    }
+
+    // TODO parser_simple_command_assignment_word
+
+    #[test]
+    fn parser_simple_command_word_redirection() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "word <<REDIR");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.redirs.len(), 1);
+        assert_eq!(sc.words[0].to_string(), "word");
+        // TODO test redirection content
+    }
+
+    // // TODO parser_simple_command_redirection_word
+    // // TODO parser_simple_command_assignment_redirection
+    // TODO parser_simple_command_redirection_assignment
+    // TODO parser_simple_command_assignment_redirection_word
 
     #[test]
     fn parser_command_eof() {
