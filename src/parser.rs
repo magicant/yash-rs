@@ -137,7 +137,12 @@ impl Parser<'_> {
         if words.is_empty() && redirs.is_empty() {
             Ok(Rec::Parsed(None))
         } else {
-            Ok(Rec::Parsed(Some(SimpleCommand { words, redirs })))
+            let assigns = vec![];
+            Ok(Rec::Parsed(Some(SimpleCommand {
+                assigns,
+                words,
+                redirs,
+            })))
         }
     }
 

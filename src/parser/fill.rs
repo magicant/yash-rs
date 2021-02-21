@@ -98,6 +98,7 @@ impl Fill for SimpleCommand<MissingHereDoc> {
     type Full = SimpleCommand;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
         Ok(SimpleCommand {
+            assigns: self.assigns,
             words: self.words,
             redirs: self
                 .redirs

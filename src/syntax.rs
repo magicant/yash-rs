@@ -272,16 +272,18 @@ impl fmt::Display for Redir {
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand<H = HereDoc> {
+    pub assigns: Vec<Assign>,
     pub words: Vec<Word>,
     pub redirs: Vec<Redir<H>>,
-    // TODO Assignments
 }
 
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let i1 = self.words.iter().map(|x| x as &dyn fmt::Display);
-        let i2 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
-        write!(f, "{}", i1.chain(i2).format(" "))
+        let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
+        let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
+        let i3 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
+        write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
+        // TODO Avoid printing a keyword as the first word
     }
 }
 
@@ -530,16 +532,27 @@ mod tests {
     #[test]
     fn simple_command_display() {
         let mut command = SimpleCommand {
+            assigns: vec![],
             words: vec![],
             redirs: vec![],
         };
         assert_eq!(command.to_string(), "");
 
+        command
+            .assigns
+            .push(Assign::dummy("name".to_string(), "value".to_string()));
+        assert_eq!(command.to_string(), "name=value");
+
+        command
+            .assigns
+            .push(Assign::dummy("hello".to_string(), "world".to_string()));
+        assert_eq!(command.to_string(), "name=value hello=world");
+
         command.words.push(Word::with_str("echo".to_string()));
-        assert_eq!(command.to_string(), "echo");
+        assert_eq!(command.to_string(), "name=value hello=world echo");
 
         command.words.push(Word::with_str("foo".to_string()));
-        assert_eq!(command.to_string(), "echo foo");
+        assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         command.redirs.push(Redir {
             fd: None,
@@ -549,6 +562,9 @@ mod tests {
                 content: Word::with_str("".to_string()),
             }),
         });
+        assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
+
+        command.assigns.clear();
         assert_eq!(command.to_string(), "echo foo <<END");
 
         command.words.clear();
@@ -564,12 +580,16 @@ mod tests {
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
 
-        // TODO Assignments
+        command
+            .assigns
+            .push(Assign::dummy("foo".to_string(), "bar".to_string()));
+        assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 
     fn dummy_command(s: String) -> Rc<Command> {
         let w = Word::with_str(s);
         let s = SimpleCommand {
+            assigns: vec![],
             words: vec![w],
             redirs: vec![],
         };
