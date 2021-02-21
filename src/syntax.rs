@@ -31,6 +31,15 @@ use std::fmt;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
+/// Possibly literal syntax element.
+///
+/// When an instance of an implementor is literal, it can be converted directly
+/// to a string.
+pub trait MaybeLiteral {
+    /// Checks if `self` is literal and, if so, converts to a string.
+    fn to_string_if_literal(&self) -> Option<String>;
+}
+
 /// Element of a [Word] that can be double-quoted.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DoubleQuotable {
@@ -57,6 +66,18 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
+impl MaybeLiteral for DoubleQuotable {
+    /// If `self` is `Literal`, returns the character converted to a string.
+    /// Otherwise, returns `None`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        if let Literal(c) = self {
+            Some(c.to_string())
+        } else {
+            None
+        }
+    }
+}
+
 /// Element of a [Word].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
@@ -73,6 +94,35 @@ impl fmt::Display for WordUnit {
         match self {
             Unquoted(ref dq) => write!(f, "{}", dq),
         }
+    }
+}
+
+impl MaybeLiteral for WordUnit {
+    /// If `self` is `Unquoted(Literal(_))`, returns the character converted to a
+    /// string. Otherwise, returns `None`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        let Unquoted(dq) = self;
+        dq.to_string_if_literal()
+        // if let Unquoted(dq) = self {
+        //     dq.to_string_if_literal()
+        // } else {
+        //     None
+        // }
+    }
+}
+
+impl MaybeLiteral for [WordUnit] {
+    /// Converts the word units to a string if all the word units are literal,
+    /// that is, `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        fn try_to_char(u: &WordUnit) -> Option<char> {
+            if let Unquoted(Literal(c)) = u {
+                Some(*c)
+            } else {
+                None
+            }
+        }
+        self.iter().map(try_to_char).collect()
     }
 }
 
@@ -105,24 +155,19 @@ impl Word {
             location: Location::dummy(s),
         }
     }
-
-    /// Converts the word to a string if the word is fully literal, that is, all composed of
-    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    pub fn to_string_if_literal(&self) -> Option<String> {
-        fn try_to_char(u: &WordUnit) -> Option<char> {
-            if let Unquoted(Literal(c)) = u {
-                Some(*c)
-            } else {
-                None
-            }
-        }
-        self.units.iter().map(try_to_char).collect()
-    }
 }
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
+    }
+}
+
+impl MaybeLiteral for Word {
+    /// Converts the word to a string if the word is fully literal, that is, all composed of
+    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        self.units.to_string_if_literal()
     }
 }
 

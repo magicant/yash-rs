@@ -26,6 +26,7 @@ use crate::alias::AliasSet;
 use crate::source::Location;
 use crate::syntax::AndOr;
 use crate::syntax::HereDoc;
+use crate::syntax::MaybeLiteral;
 use std::fmt;
 use std::future::Future;
 use std::rc::Rc;
