@@ -107,43 +107,39 @@ impl Parser<'_> {
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
         // TODO Support assignments.
-        let mut words = vec![];
-        let mut redirs = vec![];
+        let mut result = SimpleCommand {
+            assigns: vec![],
+            words: vec![],
+            redirs: vec![],
+        };
+
         loop {
             if let Some(redir) = self.redirection().await? {
-                redirs.push(redir);
+                result.redirs.push(redir);
                 continue;
             }
 
             match self.peek_token().await?.id {
-                // TODO Also consider assignments.is_empty
-                Token(Some(_)) if words.is_empty() && redirs.is_empty() => break,
+                Token(Some(_keyword)) if result.is_empty() => break,
                 Token(_) => (),
                 _ => break,
             }
 
-            match self.take_token_aliased(words.is_empty()).await? {
-                // TODO Also consider assignments.is_empty
+            match self.take_token_aliased(result.words.is_empty()).await? {
                 Rec::AliasSubstituted => {
-                    if words.is_empty() && redirs.is_empty() {
+                    if result.is_empty() {
                         return Ok(Rec::AliasSubstituted);
                     }
                 }
-                Rec::Parsed(token) => words.push(token.word),
+                Rec::Parsed(token) => result.words.push(token.word),
             }
         }
 
-        // TODO Also consider assignments.is_empty
-        if words.is_empty() && redirs.is_empty() {
-            Ok(Rec::Parsed(None))
+        Ok(Rec::Parsed(if result.is_empty() {
+            None
         } else {
-            let assigns = vec![];
-            Ok(Rec::Parsed(Some(SimpleCommand {
-                assigns,
-                words,
-                redirs,
-            })))
-        }
+            Some(result)
+        }))
     }
 
     /// Parses a command.

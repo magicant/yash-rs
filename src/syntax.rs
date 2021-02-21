@@ -354,6 +354,14 @@ pub struct SimpleCommand<H = HereDoc> {
     pub redirs: Vec<Redir<H>>,
 }
 
+impl<H> SimpleCommand<H> {
+    /// Returns true if the simple command does not contain any assignments,
+    /// words, or redirections.
+    pub fn is_empty(&self) -> bool {
+        self.assigns.is_empty() && self.words.is_empty() && self.redirs.is_empty()
+    }
+}
+
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
