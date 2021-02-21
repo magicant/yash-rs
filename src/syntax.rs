@@ -126,6 +126,65 @@ impl fmt::Display for Word {
     }
 }
 
+/// Value of an [assignment](Assign).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Value {
+    /// Scalar value, a possibly empty word.
+    ///
+    /// Note: Because a scalar assignment value is created from a normal command
+    /// word, the location of the word in the scalar value points to the first
+    /// character of the entire assignment word rather than the assigned value.
+    Scalar(Word),
+    /// Array, possibly empty list of non-empty words.
+    Array(Vec<Word>),
+}
+
+pub use Value::*;
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Scalar(word) => word.fmt(f),
+            Array(words) => write!(f, "({})", words.iter().format(" ")),
+        }
+    }
+}
+
+/// Assignment word.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Assign {
+    /// Name of the variable to assign to.
+    ///
+    /// In the valid assignment syntax, the name must not be empty.
+    pub name: String,
+    /// Value assigned to the variable.
+    pub value: Value,
+    /// Location of the first character of the assignment word.
+    pub location: Location,
+}
+
+impl Assign {
+    /// Creates an assignment with unknown source.
+    ///
+    /// This is a convenience function to make a simple scalar assignment, mainly
+    /// for debugging purpose. The assigned value is created with
+    /// [`Word::with_str`].
+    pub fn dummy(name: String, value: String) -> Assign {
+        let line = format!("{}={}", &name, &value);
+        Assign {
+            name,
+            value: Scalar(Word::with_str(value)),
+            location: Location::dummy(line),
+        }
+    }
+}
+
+impl fmt::Display for Assign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", &self.name, &self.value)
+    }
+}
+
 /// Here-document.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HereDoc {
@@ -387,6 +446,43 @@ mod tests {
             location,
         };
         assert_eq!(word.to_string_if_literal(), None);
+    }
+
+    #[test]
+    fn scalar_display() {
+        let s = Scalar(Word::with_str("my scalar value".to_string()));
+        assert_eq!(s.to_string(), "my scalar value");
+    }
+
+    #[test]
+    fn array_display_empty() {
+        let a = Array(vec![]);
+        assert_eq!(a.to_string(), "()");
+    }
+
+    #[test]
+    fn array_display_one() {
+        let a = Array(vec![Word::with_str("one".to_string())]);
+        assert_eq!(a.to_string(), "(one)");
+    }
+
+    #[test]
+    fn array_display_many() {
+        let a = Array(vec![
+            Word::with_str("let".to_string()),
+            Word::with_str("me".to_string()),
+            Word::with_str("see".to_string()),
+        ]);
+        assert_eq!(a.to_string(), "(let me see)");
+    }
+
+    #[test]
+    fn assign_display() {
+        let mut a = Assign::dummy("foo".to_string(), "bar".to_string());
+        assert_eq!(a.to_string(), "foo=bar");
+
+        a.value = Array(vec![]);
+        assert_eq!(a.to_string(), "foo=()");
     }
 
     #[test]
