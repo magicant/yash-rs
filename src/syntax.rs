@@ -32,7 +32,7 @@ use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
 /// Element of a [Word] that can be double-quoted.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DoubleQuotable {
     /// Literal single character.
     Literal(char),
@@ -57,20 +57,8 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
-impl PartialEq for DoubleQuotable {
-    fn eq(&self, other: &DoubleQuotable) -> bool {
-        match self {
-            Literal(c1) => matches!(other, Literal(c2) if c1 == c2),
-            Backslashed(c1) => matches!(other, Backslashed(c2) if c1 == c2),
-            CommandSubst { content: c1, .. } => {
-                matches!(other, CommandSubst{content:c2,..} if c1 == c2)
-            }
-        }
-    }
-}
-
 /// Element of a [Word].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
@@ -92,7 +80,7 @@ impl fmt::Display for WordUnit {
 ///
 /// It depends on context whether an empty word is valid or not. It is your responsibility to
 /// ensure a word is non-empty in a context where it cannot.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Word {
     /// Word units that constitute the word.
     pub units: Vec<WordUnit>,
@@ -139,7 +127,7 @@ impl fmt::Display for Word {
 }
 
 /// Here-document.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HereDoc {
     /// Token that marks the end of the content of the here-document.
     pub delimiter: Word,
@@ -164,7 +152,7 @@ impl fmt::Display for HereDoc {
 }
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RedirBody<H = HereDoc> {
     // TODO filename-based redirections
     /// Here-document.
@@ -186,7 +174,7 @@ impl From<HereDoc> for RedirBody {
 }
 
 /// Redirection.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Redir<H = HereDoc> {
     /// File descriptor that is modified by this redirection.
     pub fd: Option<RawFd>,
@@ -223,7 +211,7 @@ impl fmt::Display for Redir {
 ///
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand<H = HereDoc> {
     pub words: Vec<Word>,
     pub redirs: Vec<Redir<H>>,
@@ -239,7 +227,7 @@ impl fmt::Display for SimpleCommand {
 }
 
 /// Element of a pipe sequence.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
     /// Simple command.
     SimpleCommand(SimpleCommand<H>),
@@ -256,7 +244,7 @@ impl fmt::Display for Command {
 }
 
 /// Commands separated by `|`
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Pipeline<H = HereDoc> {
     /// Elements of the pipeline.
     ///
@@ -294,7 +282,7 @@ impl fmt::Display for AndOr {
 }
 
 /// Pipelines separated by `&&` and `||`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AndOrList<H = HereDoc> {
     pub first: Pipeline<H>,
     pub rest: Vec<(AndOr, Pipeline<H>)>,
@@ -310,7 +298,7 @@ impl fmt::Display for AndOrList {
 }
 
 /// Element of a [List].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Item<H = HereDoc> {
     /// Main part of this item.
     pub and_or: AndOrList<H>,
@@ -337,7 +325,7 @@ impl fmt::Display for Item {
 }
 
 /// Sequence of [and-or lists](AndOrList) separated by `;` or `&`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct List<H = HereDoc> {
     /// Elements of the list.
     ///

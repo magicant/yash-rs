@@ -45,7 +45,7 @@ mod core {
     use std::rc::Rc;
 
     /// Result of [`Lexer::peek_char_or_end`].
-    #[derive(Clone, Copy, Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum PeekChar<'a> {
         Char(&'a SourceChar),
         EndOfInput(&'a Location),
