@@ -29,6 +29,7 @@ use self::lex::PartialHereDoc;
 use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
+use std::convert::TryFrom;
 use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
@@ -106,39 +107,49 @@ impl Parser<'_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
-        // TODO Support assignments.
-        let mut words = vec![];
-        let mut redirs = vec![];
+        let mut result = SimpleCommand {
+            assigns: vec![],
+            words: vec![],
+            redirs: vec![],
+        };
+
         loop {
             if let Some(redir) = self.redirection().await? {
-                redirs.push(redir);
+                result.redirs.push(redir);
                 continue;
             }
 
             match self.peek_token().await?.id {
-                // TODO Also consider assignments.is_empty
-                Token(Some(_)) if words.is_empty() && redirs.is_empty() => break,
+                Token(Some(_keyword)) if result.is_empty() => break,
                 Token(_) => (),
                 _ => break,
             }
 
-            match self.take_token_aliased(words.is_empty()).await? {
-                // TODO Also consider assignments.is_empty
+            match self.take_token_aliased(result.words.is_empty()).await? {
                 Rec::AliasSubstituted => {
-                    if words.is_empty() && redirs.is_empty() {
+                    if result.is_empty() {
                         return Ok(Rec::AliasSubstituted);
                     }
                 }
-                Rec::Parsed(token) => words.push(token.word),
+                Rec::Parsed(token) => {
+                    if result.words.is_empty() {
+                        match Assign::try_from(token.word) {
+                            // TODO parse array assignment
+                            Ok(assign) => result.assigns.push(assign),
+                            Err(word) => result.words.push(word),
+                        }
+                    } else {
+                        result.words.push(token.word);
+                    }
+                }
             }
         }
 
-        // TODO Also consider assignments.is_empty
-        if words.is_empty() && redirs.is_empty() {
-            Ok(Rec::Parsed(None))
+        Ok(Rec::Parsed(if result.is_empty() {
+            None
         } else {
-            Ok(Rec::Parsed(Some(SimpleCommand { words, redirs })))
-        }
+            Some(result)
+        }))
     }
 
     /// Parses a command.
@@ -489,7 +500,157 @@ mod tests {
         assert_eq!(option, None);
     }
 
-    // TODO test simple_command for other cases
+    #[test]
+    fn parser_simple_command_one_assignment() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "my=assignment");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.assigns[0].name, "my");
+        assert_eq!(sc.assigns[0].value.to_string(), "assignment");
+        assert_eq!(sc.assigns[0].location.line.value, "my=assignment");
+        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_simple_command_many_assignments() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a= b=! c=X");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.assigns.len(), 3);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_eq!(sc.assigns[0].value.to_string(), "");
+        assert_eq!(sc.assigns[0].location.line.value, "a= b=! c=X");
+        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(sc.assigns[1].name, "b");
+        assert_eq!(sc.assigns[1].value.to_string(), "!");
+        assert_eq!(sc.assigns[1].location.line.value, "a= b=! c=X");
+        assert_eq!(sc.assigns[1].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[1].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[1].location.column.get(), 4);
+        assert_eq!(sc.assigns[2].name, "c");
+        assert_eq!(sc.assigns[2].value.to_string(), "X");
+        assert_eq!(sc.assigns[2].location.line.value, "a= b=! c=X");
+        assert_eq!(sc.assigns[2].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[2].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[2].location.column.get(), 8);
+    }
+
+    #[test]
+    fn parser_simple_command_one_word() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "word");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.words[0].to_string(), "word");
+    }
+
+    #[test]
+    fn parser_simple_command_many_words() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ": if then");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.words.len(), 3);
+        assert_eq!(sc.words[0].to_string(), ":");
+        assert_eq!(sc.words[1].to_string(), "if");
+        assert_eq!(sc.words[2].to_string(), "then");
+    }
+
+    #[test]
+    fn parser_simple_command_one_redirection() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs.len(), 1);
+        // TODO test redirection content
+    }
+
+    #[test]
+    fn parser_simple_command_many_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<1 <<2 <<3");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs.len(), 3);
+        // TODO test redirections content
+    }
+
+    #[test]
+    fn parser_simple_command_assignment_word() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "if=then else");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.redirs, []);
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.assigns[0].name, "if");
+        assert_eq!(sc.assigns[0].value.to_string(), "then");
+        assert_eq!(sc.words[0].to_string(), "else");
+    }
+
+    #[test]
+    fn parser_simple_command_word_redirection() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "word <<REDIR");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns, []);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.redirs.len(), 1);
+        assert_eq!(sc.words[0].to_string(), "word");
+        // TODO test redirection content
+    }
+
+    #[test]
+    fn parser_simple_command_redirection_assignment() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<END a=b");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.redirs.len(), 1);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_eq!(sc.assigns[0].value.to_string(), "b");
+        // TODO test redirection content
+    }
+
+    #[test]
+    fn parser_simple_command_assignment_redirection_word() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "if=then <<FOO else");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 1);
+        assert_eq!(sc.redirs.len(), 1);
+        assert_eq!(sc.assigns[0].name, "if");
+        assert_eq!(sc.assigns[0].value.to_string(), "then");
+        assert_eq!(sc.words[0].to_string(), "else");
+        // TODO test redirection content
+    }
 
     #[test]
     fn parser_command_eof() {

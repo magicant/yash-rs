@@ -27,9 +27,19 @@
 
 use crate::source::Location;
 use itertools::Itertools;
+use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
+
+/// Possibly literal syntax element.
+///
+/// When an instance of an implementor is literal, it can be converted directly
+/// to a string.
+pub trait MaybeLiteral {
+    /// Checks if `self` is literal and, if so, converts to a string.
+    fn to_string_if_literal(&self) -> Option<String>;
+}
 
 /// Element of a [Word] that can be double-quoted.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,6 +67,18 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
+impl MaybeLiteral for DoubleQuotable {
+    /// If `self` is `Literal`, returns the character converted to a string.
+    /// Otherwise, returns `None`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        if let Literal(c) = self {
+            Some(c.to_string())
+        } else {
+            None
+        }
+    }
+}
+
 /// Element of a [Word].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
@@ -73,6 +95,35 @@ impl fmt::Display for WordUnit {
         match self {
             Unquoted(ref dq) => write!(f, "{}", dq),
         }
+    }
+}
+
+impl MaybeLiteral for WordUnit {
+    /// If `self` is `Unquoted(Literal(_))`, returns the character converted to a
+    /// string. Otherwise, returns `None`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        let Unquoted(dq) = self;
+        dq.to_string_if_literal()
+        // if let Unquoted(dq) = self {
+        //     dq.to_string_if_literal()
+        // } else {
+        //     None
+        // }
+    }
+}
+
+impl MaybeLiteral for [WordUnit] {
+    /// Converts the word units to a string if all the word units are literal,
+    /// that is, `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        fn try_to_char(u: &WordUnit) -> Option<char> {
+            if let Unquoted(Literal(c)) = u {
+                Some(*c)
+            } else {
+                None
+            }
+        }
+        self.iter().map(try_to_char).collect()
     }
 }
 
@@ -105,24 +156,109 @@ impl Word {
             location: Location::dummy(s),
         }
     }
-
-    /// Converts the word to a string if the word is fully literal, that is, all composed of
-    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    pub fn to_string_if_literal(&self) -> Option<String> {
-        fn try_to_char(u: &WordUnit) -> Option<char> {
-            if let Unquoted(Literal(c)) = u {
-                Some(*c)
-            } else {
-                None
-            }
-        }
-        self.units.iter().map(try_to_char).collect()
-    }
 }
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
+    }
+}
+
+impl MaybeLiteral for Word {
+    /// Converts the word to a string if the word is fully literal, that is, all composed of
+    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
+    fn to_string_if_literal(&self) -> Option<String> {
+        self.units.to_string_if_literal()
+    }
+}
+
+/// Value of an [assignment](Assign).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Value {
+    /// Scalar value, a possibly empty word.
+    ///
+    /// Note: Because a scalar assignment value is created from a normal command
+    /// word, the location of the word in the scalar value points to the first
+    /// character of the entire assignment word rather than the assigned value.
+    Scalar(Word),
+    /// Array, possibly empty list of non-empty words.
+    Array(Vec<Word>),
+}
+
+pub use Value::*;
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Scalar(word) => word.fmt(f),
+            Array(words) => write!(f, "({})", words.iter().format(" ")),
+        }
+    }
+}
+
+/// Assignment word.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Assign {
+    /// Name of the variable to assign to.
+    ///
+    /// In the valid assignment syntax, the name must not be empty.
+    pub name: String,
+    /// Value assigned to the variable.
+    pub value: Value,
+    /// Location of the first character of the assignment word.
+    pub location: Location,
+}
+
+impl Assign {
+    /// Creates an assignment with unknown source.
+    ///
+    /// This is a convenience function to make a simple scalar assignment, mainly
+    /// for debugging purpose. The assigned value is created with
+    /// [`Word::with_str`].
+    pub fn dummy(name: String, value: String) -> Assign {
+        let line = format!("{}={}", &name, &value);
+        Assign {
+            name,
+            value: Scalar(Word::with_str(value)),
+            location: Location::dummy(line),
+        }
+    }
+}
+
+impl fmt::Display for Assign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", &self.name, &self.value)
+    }
+}
+
+/// Fallible conversion from a word into an assignment.
+impl TryFrom<Word> for Assign {
+    type Error = Word;
+    /// Converts a word into an assignment.
+    ///
+    /// For a successful conversion, the word must be of the form `name=value`,
+    /// where `name` is a non-empty [literal](Word::to_string_if_literal) word,
+    /// `=` is an unquoted equal sign, and `value` is a word. If the input word
+    /// does not match this syntax, it is returned intact in `Err`.
+    fn try_from(mut word: Word) -> Result<Assign, Word> {
+        if let Some(eq) = word.units.iter().position(|u| u == &Unquoted(Literal('='))) {
+            if eq > 0 {
+                if let Some(name) = word.units[..eq].to_string_if_literal() {
+                    assert!(!name.is_empty());
+                    word.units.drain(..=eq);
+                    // TODO parse tilde expansions in the value
+                    let location = word.location.clone();
+                    let value = Scalar(word);
+                    return Ok(Assign {
+                        name,
+                        value,
+                        location,
+                    });
+                }
+            }
+        }
+
+        Err(word)
     }
 }
 
@@ -213,16 +349,26 @@ impl fmt::Display for Redir {
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand<H = HereDoc> {
+    pub assigns: Vec<Assign>,
     pub words: Vec<Word>,
     pub redirs: Vec<Redir<H>>,
-    // TODO Assignments
+}
+
+impl<H> SimpleCommand<H> {
+    /// Returns true if the simple command does not contain any assignments,
+    /// words, or redirections.
+    pub fn is_empty(&self) -> bool {
+        self.assigns.is_empty() && self.words.is_empty() && self.redirs.is_empty()
+    }
 }
 
 impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let i1 = self.words.iter().map(|x| x as &dyn fmt::Display);
-        let i2 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
-        write!(f, "{}", i1.chain(i2).format(" "))
+        let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
+        let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
+        let i3 = self.redirs.iter().map(|x| x as &dyn fmt::Display);
+        write!(f, "{}", i1.chain(i2).chain(i3).format(" "))
+        // TODO Avoid printing a keyword as the first word
     }
 }
 
@@ -390,6 +536,80 @@ mod tests {
     }
 
     #[test]
+    fn scalar_display() {
+        let s = Scalar(Word::with_str("my scalar value".to_string()));
+        assert_eq!(s.to_string(), "my scalar value");
+    }
+
+    #[test]
+    fn array_display_empty() {
+        let a = Array(vec![]);
+        assert_eq!(a.to_string(), "()");
+    }
+
+    #[test]
+    fn array_display_one() {
+        let a = Array(vec![Word::with_str("one".to_string())]);
+        assert_eq!(a.to_string(), "(one)");
+    }
+
+    #[test]
+    fn array_display_many() {
+        let a = Array(vec![
+            Word::with_str("let".to_string()),
+            Word::with_str("me".to_string()),
+            Word::with_str("see".to_string()),
+        ]);
+        assert_eq!(a.to_string(), "(let me see)");
+    }
+
+    #[test]
+    fn assign_display() {
+        let mut a = Assign::dummy("foo".to_string(), "bar".to_string());
+        assert_eq!(a.to_string(), "foo=bar");
+
+        a.value = Array(vec![]);
+        assert_eq!(a.to_string(), "foo=()");
+    }
+
+    #[test]
+    fn assign_try_from_word_without_equal() {
+        let word = Word::with_str("foo".to_string());
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_empty_name() {
+        let word = Word::with_str("=foo".to_string());
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_non_literal_name() {
+        let mut word = Word::with_str("night=foo".to_string());
+        word.units.insert(0, Unquoted(Backslashed('k')));
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_literal_name() {
+        let word = Word::with_str("night=foo".to_string());
+        let location = word.location.clone();
+        let assign = Assign::try_from(word).unwrap();
+        assert_eq!(assign.name, "night");
+        if let Scalar(value) = assign.value {
+            assert_eq!(value.to_string(), "foo");
+            assert_eq!(value.location, location);
+        } else {
+            panic!("wrong value: {:?}", assign.value);
+        }
+        assert_eq!(assign.location, location);
+    }
+
+    #[test]
     fn here_doc_display() {
         let heredoc = HereDoc {
             delimiter: Word::with_str("END".to_string()),
@@ -434,16 +654,27 @@ mod tests {
     #[test]
     fn simple_command_display() {
         let mut command = SimpleCommand {
+            assigns: vec![],
             words: vec![],
             redirs: vec![],
         };
         assert_eq!(command.to_string(), "");
 
+        command
+            .assigns
+            .push(Assign::dummy("name".to_string(), "value".to_string()));
+        assert_eq!(command.to_string(), "name=value");
+
+        command
+            .assigns
+            .push(Assign::dummy("hello".to_string(), "world".to_string()));
+        assert_eq!(command.to_string(), "name=value hello=world");
+
         command.words.push(Word::with_str("echo".to_string()));
-        assert_eq!(command.to_string(), "echo");
+        assert_eq!(command.to_string(), "name=value hello=world echo");
 
         command.words.push(Word::with_str("foo".to_string()));
-        assert_eq!(command.to_string(), "echo foo");
+        assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         command.redirs.push(Redir {
             fd: None,
@@ -453,6 +684,9 @@ mod tests {
                 content: Word::with_str("".to_string()),
             }),
         });
+        assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
+
+        command.assigns.clear();
         assert_eq!(command.to_string(), "echo foo <<END");
 
         command.words.clear();
@@ -468,12 +702,16 @@ mod tests {
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
 
-        // TODO Assignments
+        command
+            .assigns
+            .push(Assign::dummy("foo".to_string(), "bar".to_string()));
+        assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 
     fn dummy_command(s: String) -> Rc<Command> {
         let w = Word::with_str(s);
         let s = SimpleCommand {
+            assigns: vec![],
             words: vec![w],
             redirs: vec![],
         };
