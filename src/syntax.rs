@@ -396,14 +396,14 @@ mod tests {
             remove_tabs: true,
             content: Word::with_str("here".to_string()),
         };
-        assert_eq!(format!("{}", heredoc), "<<-END");
+        assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
             delimiter: Word::with_str("XXX".to_string()),
             remove_tabs: false,
             content: Word::with_str("there".to_string()),
         };
-        assert_eq!(format!("{}", heredoc), "<<XXX");
+        assert_eq!(heredoc.to_string(), "<<XXX");
     }
 
     #[test]
@@ -418,17 +418,17 @@ mod tests {
             fd: None,
             body: heredoc.into(),
         };
-        assert_eq!(format!("{}", redir), "<<END");
+        assert_eq!(redir.to_string(), "<<END");
         let redir = Redir {
             fd: Some(0),
             ..redir
         };
-        assert_eq!(format!("{}", redir), "0<<END");
+        assert_eq!(redir.to_string(), "0<<END");
         let redir = Redir {
             fd: Some(9),
             ..redir
         };
-        assert_eq!(format!("{}", redir), "9<<END");
+        assert_eq!(redir.to_string(), "9<<END");
     }
 
     #[test]
@@ -437,13 +437,13 @@ mod tests {
             words: vec![],
             redirs: vec![],
         };
-        assert_eq!(format!("{}", command), "");
+        assert_eq!(command.to_string(), "");
 
         command.words.push(Word::with_str("echo".to_string()));
-        assert_eq!(format!("{}", command), "echo");
+        assert_eq!(command.to_string(), "echo");
 
         command.words.push(Word::with_str("foo".to_string()));
-        assert_eq!(format!("{}", command), "echo foo");
+        assert_eq!(command.to_string(), "echo foo");
 
         command.redirs.push(Redir {
             fd: None,
@@ -453,10 +453,10 @@ mod tests {
                 content: Word::with_str("".to_string()),
             }),
         });
-        assert_eq!(format!("{}", command), "echo foo <<END");
+        assert_eq!(command.to_string(), "echo foo <<END");
 
         command.words.clear();
-        assert_eq!(format!("{}", command), "<<END");
+        assert_eq!(command.to_string(), "<<END");
 
         command.redirs.push(Redir {
             fd: Some(1),
@@ -466,7 +466,7 @@ mod tests {
                 content: Word::with_str("ignored".to_string()),
             }),
         });
-        assert_eq!(format!("{}", command), "<<END 1<<-here");
+        assert_eq!(command.to_string(), "<<END 1<<-here");
 
         // TODO Assignments
     }

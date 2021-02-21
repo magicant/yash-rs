@@ -437,7 +437,7 @@ mod tests {
             location,
         };
         assert_eq!(
-            format!("{}", error),
+            error.to_string(),
             "The here-document operator is missing its delimiter"
         );
     }
