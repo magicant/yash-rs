@@ -27,6 +27,7 @@
 
 use crate::source::Location;
 use itertools::Itertools;
+use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
@@ -227,6 +228,37 @@ impl Assign {
 impl fmt::Display for Assign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}={}", &self.name, &self.value)
+    }
+}
+
+/// Fallible conversion from a word into an assignment.
+impl TryFrom<Word> for Assign {
+    type Error = Word;
+    /// Converts a word into an assignment.
+    ///
+    /// For a successful conversion, the word must be of the form `name=value`,
+    /// where `name` is a non-empty [literal](Word::to_string_if_literal) word,
+    /// `=` is an unquoted equal sign, and `value` is a word. If the input word
+    /// does not match this syntax, it is returned intact in `Err`.
+    fn try_from(mut word: Word) -> Result<Assign, Word> {
+        if let Some(eq) = word.units.iter().position(|u| u == &Unquoted(Literal('='))) {
+            if eq > 0 {
+                if let Some(name) = word.units[..eq].to_string_if_literal() {
+                    assert!(!name.is_empty());
+                    word.units.drain(..=eq);
+                    // TODO parse tilde expansions in the value
+                    let location = word.location.clone();
+                    let value = Scalar(word);
+                    return Ok(Assign {
+                        name,
+                        value,
+                        location,
+                    });
+                }
+            }
+        }
+
+        Err(word)
     }
 }
 
@@ -530,6 +562,43 @@ mod tests {
 
         a.value = Array(vec![]);
         assert_eq!(a.to_string(), "foo=()");
+    }
+
+    #[test]
+    fn assign_try_from_word_without_equal() {
+        let word = Word::with_str("foo".to_string());
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_empty_name() {
+        let word = Word::with_str("=foo".to_string());
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_non_literal_name() {
+        let mut word = Word::with_str("night=foo".to_string());
+        word.units.insert(0, Unquoted(Backslashed('k')));
+        let result = Assign::try_from(word.clone());
+        assert_eq!(result.unwrap_err(), word);
+    }
+
+    #[test]
+    fn assign_try_from_word_with_literal_name() {
+        let word = Word::with_str("night=foo".to_string());
+        let location = word.location.clone();
+        let assign = Assign::try_from(word).unwrap();
+        assert_eq!(assign.name, "night");
+        if let Scalar(value) = assign.value {
+            assert_eq!(value.to_string(), "foo");
+            assert_eq!(value.location, location);
+        } else {
+            panic!("wrong value: {:?}", assign.value);
+        }
+        assert_eq!(assign.location, location);
     }
 
     #[test]
