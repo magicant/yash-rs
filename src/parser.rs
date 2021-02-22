@@ -114,34 +114,40 @@ impl Parser<'_> {
         };
 
         loop {
+            // Parse redirection
             if let Some(redir) = self.redirection().await? {
                 result.redirs.push(redir);
                 continue;
             }
 
+            // Filter token type
             match self.peek_token().await?.id {
                 Token(Some(_keyword)) if result.is_empty() => break,
                 Token(_) => (),
                 _ => break,
             }
 
-            match self.take_token_aliased(result.words.is_empty()).await? {
+            // Apply alias substitution
+            let token = match self.take_token_aliased(result.words.is_empty()).await? {
                 Rec::AliasSubstituted => {
                     if result.is_empty() {
                         return Ok(Rec::AliasSubstituted);
-                    }
-                }
-                Rec::Parsed(token) => {
-                    if result.words.is_empty() {
-                        match Assign::try_from(token.word) {
-                            // TODO parse array assignment
-                            Ok(assign) => result.assigns.push(assign),
-                            Err(word) => result.words.push(word),
-                        }
                     } else {
-                        result.words.push(token.word);
+                        continue;
                     }
                 }
+                Rec::Parsed(token) => token,
+            };
+
+            // Tell assignment from word
+            if result.words.is_empty() {
+                match Assign::try_from(token.word) {
+                    // TODO parse array assignment
+                    Ok(assign) => result.assigns.push(assign),
+                    Err(word) => result.words.push(word),
+                }
+            } else {
+                result.words.push(token.word);
             }
         }
 
