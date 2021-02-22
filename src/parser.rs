@@ -140,15 +140,32 @@ impl Parser<'_> {
             };
 
             // Tell assignment from word
-            if result.words.is_empty() {
-                match Assign::try_from(token.word) {
-                    // TODO parse array assignment
-                    Ok(assign) => result.assigns.push(assign),
-                    Err(word) => result.words.push(word),
-                }
-            } else {
+            if !result.words.is_empty() {
                 result.words.push(token.word);
+                continue;
             }
+            let assign = match Assign::try_from(token.word) {
+                Ok(assign) => assign,
+                Err(word) => {
+                    result.words.push(word);
+                    continue;
+                }
+            };
+
+            // Tell array assignment from scalar assignment
+            let units = match &assign.value {
+                Scalar(Word { units, .. }) => units,
+                _ => panic!(
+                    "Assign::try_from produced a non-scalar value {:?}",
+                    assign.value
+                ),
+            };
+            if !units.is_empty() {
+                result.assigns.push(assign);
+                continue;
+            }
+            result.assigns.push(assign);
+            // TODO array assignment
         }
 
         Ok(Rec::Parsed(if result.is_empty() {
