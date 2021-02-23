@@ -47,6 +47,8 @@ pub enum ErrorCause {
     MissingHereDocContent,
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
+    /// An array assignment started with `=(` but lacks a closing `)`.
+    UnclosedArrayValue { opening_location: Location },
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -77,8 +79,16 @@ impl PartialEq for ErrorCause {
                 UnclosedCommandSubstitution {
                     opening_location: l2,
                 },
-            ) if l1 == l2 => true,
-            (MissingPipeline(ao1), MissingPipeline(ao2)) if ao1 == ao2 => true,
+            ) => l1 == l2,
+            (
+                UnclosedArrayValue {
+                    opening_location: l1,
+                },
+                UnclosedArrayValue {
+                    opening_location: l2,
+                },
+            ) => l1 == l2,
+            (MissingPipeline(ao1), MissingPipeline(ao2)) => ao1 == ao2,
             _ => false,
         }
     }
@@ -97,6 +107,9 @@ impl fmt::Display for ErrorCause {
             UnclosedCommandSubstitution {
                 opening_location: _,
             } => f.write_str("The command substitution is not closed"),
+            UnclosedArrayValue {
+                opening_location: _,
+            } => f.write_str("The array assignment value is not closed"),
             MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
