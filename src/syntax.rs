@@ -359,16 +359,19 @@ impl fmt::Display for HereDoc {
 }
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RedirBody<H = HereDoc> {
-    // TODO filename-based redirections
+    /// Normal redirection.
+    Normal { operator: RedirOp, operand: Word },
     /// Here-document.
     HereDoc(H),
+    // TODO process redirection
 }
 
 impl fmt::Display for RedirBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            RedirBody::Normal { operator, operand } => write!(f, "{}{}", operator, operand),
             RedirBody::HereDoc(h) => write!(f, "{}", h),
         }
     }
@@ -391,7 +394,7 @@ pub struct Redir<H = HereDoc> {
 
 // TODO Should be somewhere else.
 const STDIN_FD: RawFd = 0;
-// const STDOUT_FD: RawFd = 1;
+const STDOUT_FD: RawFd = 1;
 
 impl<H> Redir<H> {
     /// Computes the file descriptor that is modified by this redirection.
@@ -399,7 +402,12 @@ impl<H> Redir<H> {
     /// If `self.fd` is `Some(_)`, the `RawFd` value is returned intact. Otherwise,
     /// the default file descriptor is selected depending on the type of `self.body`.
     pub fn fd_or_default(&self) -> RawFd {
+        use RedirOp::*;
         self.fd.unwrap_or_else(|| match self.body {
+            RedirBody::Normal { operator, .. } => match operator {
+                FileIn | FileInOut | FdIn | String => STDIN_FD,
+                FileOut | FileAppend | FileClobber | FdOut | Pipe => STDOUT_FD,
+            },
             RedirBody::HereDoc { .. } => STDIN_FD,
         })
     }

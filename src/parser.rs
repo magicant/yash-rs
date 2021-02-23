@@ -1092,19 +1092,18 @@ mod tests {
         assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
-        let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body;
-        //if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
-        let HereDoc {
-            delimiter,
-            remove_tabs,
-            content,
-        } = here_doc;
-        assert_eq!(delimiter.to_string(), "END");
-        assert_eq!(*remove_tabs, false);
-        assert_eq!(content.to_string(), "foo\n");
-        //} else {
-        //panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
-        //}
+        if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
+            let HereDoc {
+                delimiter,
+                remove_tabs,
+                content,
+            } = here_doc;
+            assert_eq!(delimiter.to_string(), "END");
+            assert_eq!(*remove_tabs, false);
+            assert_eq!(content.to_string(), "foo\n");
+        } else {
+            panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
+        }
     }
 
     #[test]
