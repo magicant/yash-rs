@@ -802,8 +802,8 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
-        assert_eq!(sc.words.len(), 0);
-        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         if let Array(words) = &sc.assigns[0].value {
             assert_eq!(words, &[]);
@@ -822,8 +822,8 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
-        assert_eq!(sc.words.len(), 0);
-        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(sc.assigns[0].location.line.value, "a= ()");
@@ -842,8 +842,8 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
-        assert_eq!(sc.words.len(), 0);
-        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.words, []);
+        assert_eq!(sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
         assert_eq!(sc.assigns[0].location.line.value, "a=b()");
@@ -1088,7 +1088,7 @@ mod tests {
         let cmd = match *commands[0] {
             Command::SimpleCommand(ref c) => c,
         };
-        assert_eq!(cmd.words.len(), 0);
+        assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
         let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body;
@@ -1121,7 +1121,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.command_line()).unwrap().unwrap();
-        assert_eq!(list.items.len(), 0);
+        assert_eq!(list.items, []);
     }
 
     #[test]
