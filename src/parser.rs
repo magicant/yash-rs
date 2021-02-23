@@ -58,6 +58,39 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses the value of an array assignment.
+    ///
+    /// This function first consumes a `(` token, then any number of words
+    /// separated by blanks and/or newlines, and finally a `)`.
+    /// If the first token is not `(`, the result is `Ok(None)`.
+    /// If the last `)` is missing, the result is
+    /// `Err(ErrorCause::UnclosedArrayValue(_))`.
+    pub async fn array_values(&mut self) -> Result<Option<Vec<Word>>> {
+        if self.peek_token().await?.id != Operator(OpenParen) {
+            return Ok(None);
+        }
+
+        let opening_location = self.take_token().await?.word.location;
+        let mut words = vec![];
+
+        loop {
+            let next = self.take_token().await?;
+            match next.id {
+                Operator(Newline) => continue,
+                Operator(CloseParen) => break,
+                Token(_keyword) => words.push(next.word),
+                _ => {
+                    return Err(Error {
+                        cause: ErrorCause::UnclosedArrayValue { opening_location },
+                        location: next.word.location,
+                    })
+                }
+            }
+        }
+
+        Ok(Some(words))
+    }
+
     /// Parses a redirection.
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
@@ -436,6 +469,91 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use futures::executor::block_on;
+
+    #[test]
+    fn parser_array_values_no_open_parenthesis() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ")");
+        let mut parser = Parser::new(&mut lexer);
+        let result = block_on(parser.array_values()).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn parser_array_values_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "()");
+        let mut parser = Parser::new(&mut lexer);
+        let words = block_on(parser.array_values()).unwrap().unwrap();
+        assert_eq!(words, []);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_array_values_many() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(a b c)");
+        let mut parser = Parser::new(&mut lexer);
+        let words = block_on(parser.array_values()).unwrap().unwrap();
+        assert_eq!(words.len(), 3);
+        assert_eq!(words[0].to_string(), "a");
+        assert_eq!(words[1].to_string(), "b");
+        assert_eq!(words[2].to_string(), "c");
+    }
+
+    #[test]
+    fn parser_array_values_newlines_and_comments() {
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            "(
+            a # b
+            c d
+        )",
+        );
+        let mut parser = Parser::new(&mut lexer);
+        let words = block_on(parser.array_values()).unwrap().unwrap();
+        assert_eq!(words.len(), 3);
+        assert_eq!(words[0].to_string(), "a");
+        assert_eq!(words[1].to_string(), "c");
+        assert_eq!(words[2].to_string(), "d");
+    }
+
+    #[test]
+    fn parser_array_values_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(a b");
+        let mut parser = Parser::new(&mut lexer);
+        let e = block_on(parser.array_values()).unwrap_err();
+        if let ErrorCause::UnclosedArrayValue { opening_location } = e.cause {
+            assert_eq!(opening_location.line.value, "(a b");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Unexpected cause {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "(a b");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn parser_array_values_invalid_word() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(a;b)");
+        let mut parser = Parser::new(&mut lexer);
+        let e = block_on(parser.array_values()).unwrap_err();
+        if let ErrorCause::UnclosedArrayValue { opening_location } = e.cause {
+            assert_eq!(opening_location.line.value, "(a;b)");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Unexpected cause {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "(a;b)");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
+    }
 
     #[test]
     fn parser_redirection_lessless() {
