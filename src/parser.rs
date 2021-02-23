@@ -74,7 +74,7 @@ impl Parser<'_> {
         let mut words = vec![];
 
         loop {
-            let next = self.take_token().await?;
+            let next = self.take_token_aliased_fully().await?;
             match next.id {
                 Operator(Newline) => continue,
                 Operator(CloseParen) => break,
