@@ -23,6 +23,7 @@ use super::lex::Lexer;
 use super::lex::PartialHereDoc;
 use super::lex::Token;
 use crate::alias::AliasSet;
+use crate::parser::lex::is_blank;
 use crate::source::Location;
 use crate::syntax::AndOr;
 use crate::syntax::HereDoc;
@@ -362,6 +363,29 @@ impl Parser<'_> {
         Ok(Rec::Parsed(token))
     }
 
+    /// Tests if there is a blank before the next token.
+    ///
+    /// This function can be called to tell whether the previous and next tokens
+    /// are separated by a blank or they are adjacent.
+    ///
+    /// This function must be called after the previous token has been
+    /// [taken](Self::take_token) and before the next token is
+    /// [peeked](Self::peek_token). Otherwise, this function would panic.
+    ///
+    /// This function consumes and ignores line continuations that may lie
+    /// between the tokens.
+    ///
+    /// # Panics
+    ///
+    /// If the previous token has not been taken or the next token has been
+    /// peeked.
+    pub async fn has_blank(&mut self) -> Result<bool> {
+        assert!(self.token.is_none(), "There should be no pending token");
+        self.lexer.line_continuations().await?;
+        let c = self.lexer.peek_char().await?;
+        Ok(c.map_or(false, |c| is_blank(c.value)))
+    }
+
     /// Remembers the given partial here-document for later parsing of its content.
     pub fn memorize_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
         self.unread_here_docs.push(here_doc)
@@ -663,6 +687,67 @@ mod tests {
 
             let token = parser.take_token_aliased(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "x");
+        });
+    }
+
+    #[test]
+    fn parser_has_blank_true() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, " ");
+            let mut parser = Parser::new(&mut lexer);
+            let result = parser.has_blank().await;
+            assert_eq!(result, Ok(true));
+        });
+    }
+
+    #[test]
+    fn parser_has_blank_false() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "(");
+            let mut parser = Parser::new(&mut lexer);
+            let result = parser.has_blank().await;
+            assert_eq!(result, Ok(false));
+        });
+    }
+
+    #[test]
+    fn parser_has_blank_eof() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "");
+            let mut parser = Parser::new(&mut lexer);
+            let result = parser.has_blank().await;
+            assert_eq!(result, Ok(false));
+        });
+    }
+
+    #[test]
+    fn parser_has_blank_true_with_line_continuations() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n ");
+            let mut parser = Parser::new(&mut lexer);
+            let result = parser.has_blank().await;
+            assert_eq!(result, Ok(true));
+        });
+    }
+
+    #[test]
+    fn parser_has_blank_false_with_line_continuations() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n(");
+            let mut parser = Parser::new(&mut lexer);
+            let result = parser.has_blank().await;
+            assert_eq!(result, Ok(false));
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "There should be no pending token")]
+    fn parser_has_blank_with_pending_token() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+            let mut parser = Parser::new(&mut lexer);
+            parser.peek_token().await.unwrap();
+            let _ = parser.has_blank().await;
         });
     }
 
