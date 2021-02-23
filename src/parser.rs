@@ -194,6 +194,7 @@ impl Parser<'_> {
             };
 
             // Tell array assignment from scalar assignment
+            // TODO no array assignment in POSIXly-correct mode
             if units.is_empty() && !self.has_blank().await? {
                 if let Some(words) = self.array_values().await? {
                     assign.value = Array(words);
