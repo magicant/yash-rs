@@ -44,6 +44,12 @@ mod core {
     use std::pin::Pin;
     use std::rc::Rc;
 
+    /// Returns true if the character is a blank character.
+    pub fn is_blank(c: char) -> bool {
+        // TODO locale
+        c != '\n' && c.is_whitespace()
+    }
+
     /// Result of [`Lexer::peek_char_or_end`].
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum PeekChar<'a> {
@@ -381,8 +387,8 @@ mod core {
         ///
         /// If `index` is larger than the currently read index.
         pub fn is_after_blank_ending_alias(&self, index: usize) -> bool {
-            fn is_blank_ending(s: &str) -> bool {
-                s.chars().rev().next().map_or(false, char::is_whitespace)
+            fn ends_with_blank(s: &str) -> bool {
+                s.chars().rev().next().map_or(false, is_blank)
             }
             fn is_same_alias(alias: &Alias, sc: Option<&SourceChar>) -> bool {
                 match sc {
@@ -394,12 +400,12 @@ mod core {
             for index in (0..index).rev() {
                 let sc = &self.source[index];
 
-                if !sc.value.is_whitespace() {
+                if !is_blank(sc.value) {
                     return false;
                 }
 
                 if let Source::Alias { ref alias, .. } = sc.location.line.source {
-                    if is_blank_ending(&alias.replacement) {
+                    if ends_with_blank(&alias.replacement) {
                         if !is_same_alias(alias, self.source.get(index + 1)) {
                             return true;
                         }
@@ -464,7 +470,7 @@ use std::pin::Pin;
 ///
 /// A character is a token delimiter if it is either a whitespace or [operator](is_operator_char).
 pub fn is_token_delimiter_char(c: char) -> bool {
-    is_operator_char(c) || c.is_whitespace()
+    is_operator_char(c) || is_blank(c)
 }
 
 impl Lexer {
@@ -494,10 +500,9 @@ impl Lexer {
     ///
     /// This function also skips line continuations.
     pub async fn skip_blanks(&mut self) -> Result<()> {
-        // TODO Support locale-dependent decision
         loop {
             self.line_continuations().await?;
-            if !self.skip_if(|c| c != '\n' && c.is_whitespace()).await? {
+            if !self.skip_if(is_blank).await? {
                 break Ok(());
             }
         }
