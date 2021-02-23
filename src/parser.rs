@@ -177,7 +177,7 @@ impl Parser<'_> {
                 result.words.push(token.word);
                 continue;
             }
-            let assign = match Assign::try_from(token.word) {
+            let mut assign = match Assign::try_from(token.word) {
                 Ok(assign) => assign,
                 Err(word) => {
                     result.words.push(word);
@@ -185,7 +185,6 @@ impl Parser<'_> {
                 }
             };
 
-            // Tell array assignment from scalar assignment
             let units = match &assign.value {
                 Scalar(Word { units, .. }) => units,
                 _ => panic!(
@@ -193,12 +192,15 @@ impl Parser<'_> {
                     assign.value
                 ),
             };
-            if !units.is_empty() {
-                result.assigns.push(assign);
-                continue;
+
+            // Tell array assignment from scalar assignment
+            if units.is_empty() && !self.has_blank().await? {
+                if let Some(words) = self.array_values().await? {
+                    assign.value = Array(words);
+                }
             }
+
             result.assigns.push(assign);
-            // TODO array assignment
         }
 
         Ok(Rec::Parsed(if result.is_empty() {
@@ -791,6 +793,66 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "then");
         assert_eq!(sc.words[0].to_string(), "else");
         // TODO test redirection content
+    }
+
+    #[test]
+    fn parser_simple_command_array_assignment() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a=()");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 0);
+        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.assigns[0].name, "a");
+        if let Array(words) = &sc.assigns[0].value {
+            assert_eq!(words, &[]);
+        } else {
+            panic!("Non-array assignment value {:?}", sc.assigns[0].value);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_simple_command_empty_assignment_followed_by_blank_and_parenthesis() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a= ()");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 0);
+        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_eq!(sc.assigns[0].value.to_string(), "");
+        assert_eq!(sc.assigns[0].location.line.value, "a= ()");
+        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column.get(), 1);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(OpenParen));
+    }
+
+    #[test]
+    fn parser_simple_command_non_empty_assignment_followed_by_parenthesis() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a=b()");
+        let mut parser = Parser::new(&mut lexer);
+
+        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        assert_eq!(sc.assigns.len(), 1);
+        assert_eq!(sc.words.len(), 0);
+        assert_eq!(sc.redirs.len(), 0);
+        assert_eq!(sc.assigns[0].name, "a");
+        assert_eq!(sc.assigns[0].value.to_string(), "b");
+        assert_eq!(sc.assigns[0].location.line.value, "a=b()");
+        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column.get(), 1);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(OpenParen));
     }
 
     #[test]
