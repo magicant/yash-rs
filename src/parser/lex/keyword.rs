@@ -16,6 +16,7 @@
 
 //! Types and functions for parsing reserved words.
 
+use std::convert::TryFrom;
 use std::fmt;
 
 /// Token identifier for reserved words.
@@ -70,35 +71,32 @@ impl fmt::Display for Keyword {
     }
 }
 
-/// Provides a function for finding keywords.
-pub trait AsKeyword {
-    /// Determines if `self` is a reserved word.
-    fn as_keyword(&self) -> Option<Keyword>;
-}
-
-impl AsKeyword for str {
-    fn as_keyword(&self) -> Option<Keyword> {
+impl TryFrom<&str> for Keyword {
+    type Error = ();
+    /// Returns the `Keyword` that matches the input string, or `()` if the
+    /// string is not a keyword.
+    fn try_from(s: &str) -> Result<Keyword, ()> {
         use Keyword::*;
-        match self {
-            "!" => Some(Bang),
-            "[[" => Some(OpenBracketBracket),
-            "case" => Some(Case),
-            "do" => Some(Do),
-            "done" => Some(Done),
-            "elif" => Some(Elif),
-            "else" => Some(Else),
-            "esac" => Some(Esac),
-            "fi" => Some(Fi),
-            "for" => Some(For),
-            "function" => Some(Function),
-            "if" => Some(If),
-            "in" => Some(In),
-            "then" => Some(Then),
-            "until" => Some(Until),
-            "while" => Some(While),
-            "{" => Some(OpenBrace),
-            "}" => Some(CloseBrace),
-            _ => None,
+        match s {
+            "!" => Ok(Bang),
+            "[[" => Ok(OpenBracketBracket),
+            "case" => Ok(Case),
+            "do" => Ok(Do),
+            "done" => Ok(Done),
+            "elif" => Ok(Elif),
+            "else" => Ok(Else),
+            "esac" => Ok(Esac),
+            "fi" => Ok(Fi),
+            "for" => Ok(For),
+            "function" => Ok(Function),
+            "if" => Ok(If),
+            "in" => Ok(In),
+            "then" => Ok(Then),
+            "until" => Ok(Until),
+            "while" => Ok(While),
+            "{" => Ok(OpenBrace),
+            "}" => Ok(CloseBrace),
+            _ => Err(()),
         }
     }
 }

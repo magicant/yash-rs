@@ -461,8 +461,10 @@ use self::op::OPERATORS;
 use crate::parser::core::Error;
 use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
+use crate::parser::Keyword;
 use crate::source::Location;
 use crate::syntax::*;
+use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -729,8 +731,7 @@ impl Lexer {
         }
 
         if let Some(literal) = word.to_string_if_literal() {
-            use self::keyword::AsKeyword;
-            if let Some(keyword) = literal.as_str().as_keyword() {
+            if let Ok(keyword) = Keyword::try_from(literal.as_str()) {
                 return Ok(TokenId::Token(Some(keyword)));
             }
 
