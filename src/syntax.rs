@@ -25,6 +25,7 @@
 //!
 //! TODO Elaborate
 
+use crate::parser::lex::Operator;
 use crate::source::Location;
 use itertools::Itertools;
 use std::convert::TryFrom;
@@ -259,6 +260,76 @@ impl TryFrom<Word> for Assign {
         }
 
         Err(word)
+    }
+}
+
+/// Redirection operators.
+///
+/// This enum defines the redirection operator types except here-document and
+/// process redirection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RedirOp {
+    // `<` (open a file for input)
+    FileIn,
+    // `<>` (open a file for input and output)
+    FileInOut,
+    // `>` (open a file for output; truncate or fail if existing)
+    FileOut,
+    // `>>` (open a file for output; append if existing)
+    FileAppend,
+    // `>|` (open a file for output; always truncate if existing)
+    FileClobber,
+    // `<&` (copy or close a file descriptor for input)
+    FdIn,
+    // `>&` (copy or close a file descriptor for output)
+    FdOut,
+    // `>>|` (open a pipe, one end for input and the other output)
+    Pipe,
+    // `<<<` (here-string)
+    String,
+}
+
+impl TryFrom<Operator> for RedirOp {
+    type Error = ();
+    fn try_from(op: Operator) -> Result<RedirOp, ()> {
+        use Operator::*;
+        use RedirOp::*;
+        match op {
+            Less => Ok(FileIn),
+            LessGreater => Ok(FileInOut),
+            Greater => Ok(FileOut),
+            GreaterGreater => Ok(FileAppend),
+            GreaterBar => Ok(FileClobber),
+            LessAnd => Ok(FdIn),
+            GreaterAnd => Ok(FdOut),
+            GreaterGreaterBar => Ok(Pipe),
+            LessLessLess => Ok(String),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<RedirOp> for Operator {
+    fn from(op: RedirOp) -> Operator {
+        use Operator::*;
+        use RedirOp::*;
+        match op {
+            FileIn => Less,
+            FileInOut => LessGreater,
+            FileOut => Greater,
+            FileAppend => GreaterGreater,
+            FileClobber => GreaterBar,
+            FdIn => LessAnd,
+            FdOut => GreaterAnd,
+            Pipe => GreaterGreaterBar,
+            String => LessLessLess,
+        }
+    }
+}
+
+impl fmt::Display for RedirOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Operator::from(*self).fmt(f)
     }
 }
 
@@ -607,6 +678,25 @@ mod tests {
             panic!("wrong value: {:?}", assign.value);
         }
         assert_eq!(assign.location, location);
+    }
+
+    #[test]
+    fn redir_op_conversions() {
+        use RedirOp::*;
+        for op in &[
+            FileIn,
+            FileInOut,
+            FileOut,
+            FileAppend,
+            FileClobber,
+            FdIn,
+            FdOut,
+            Pipe,
+            String,
+        ] {
+            let op2 = RedirOp::try_from(Operator::from(*op));
+            assert_eq!(op2, Ok(*op));
+        }
     }
 
     #[test]
