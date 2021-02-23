@@ -121,6 +121,18 @@ impl fmt::Display for ErrorCause {
     }
 }
 
+impl From<Rc<std::io::Error>> for ErrorCause {
+    fn from(e: Rc<std::io::Error>) -> ErrorCause {
+        ErrorCause::IoError(e)
+    }
+}
+
+impl From<std::io::Error> for ErrorCause {
+    fn from(e: std::io::Error) -> ErrorCause {
+        ErrorCause::from(Rc::new(e))
+    }
+}
+
 /// Explanation of a failure in parsing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error {

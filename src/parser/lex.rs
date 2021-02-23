@@ -31,7 +31,6 @@ mod core {
     use crate::input::Memory;
     use crate::parser::core::AsyncFnMut;
     use crate::parser::core::Error;
-    use crate::parser::core::ErrorCause;
     use crate::parser::core::Result;
     use crate::source::lines;
     use crate::source::Location;
@@ -209,7 +208,7 @@ mod core {
                     }
                     Err((location, io_error)) => {
                         self.state = InputState::Error(Error {
-                            cause: ErrorCause::IoError(Rc::new(io_error)),
+                            cause: io_error.into(),
                             location,
                         });
                     }
