@@ -559,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_redirection_lessless() {
+    fn parser_redirection_less_less() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
@@ -576,7 +576,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_redirection_lesslessdash() {
+    fn parser_redirection_less_less_dash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<-end \nend\n");
         let mut parser = Parser::new(&mut lexer);
 
