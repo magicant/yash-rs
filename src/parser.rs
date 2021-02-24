@@ -110,38 +110,37 @@ impl Parser<'_> {
     /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         // TODO IO_NUMBER
-        let operator_token = self.peek_token().await?;
-        if let Operator(op) = operator_token.id {
-            if let Ok(operator) = RedirOp::try_from(op) {
-                // TODO reject >>| and <<< if POSIXly-correct
-                let operator_location = self.take_token().await?.word.location;
-                let operand = self.redirection_operand().await?.ok_or(Error {
-                    cause: ErrorCause::MissingRedirOperand,
-                    location: operator_location,
-                })?;
-                return Ok(Some(Redir {
-                    fd: None,
-                    body: RedirBody::Normal { operator, operand },
-                }));
-            }
+        let operator = if let Operator(operator) = self.peek_token().await?.id {
+            operator
+        } else {
+            return Ok(None);
+        };
+
+        if let Ok(operator) = RedirOp::try_from(operator) {
+            // TODO reject >>| and <<< if POSIXly-correct
+            let operator_location = self.take_token().await?.word.location;
+            let operand = self.redirection_operand().await?.ok_or(Error {
+                cause: ErrorCause::MissingRedirOperand,
+                location: operator_location,
+            })?;
+            return Ok(Some(Redir {
+                fd: None,
+                body: RedirBody::Normal { operator, operand },
+            }));
         }
 
-        let operator = match self.peek_token().await?.id {
+        let remove_tabs = match operator {
             // TODO <() >()
-            Operator(LessLess) | Operator(LessLessDash) => self.take_token().await.unwrap(),
+            LessLess => false,
+            LessLessDash => true,
             _ => return Ok(None),
         };
-
+        let operator_location = self.take_token().await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingHereDocDelimiter,
-            location: operator.word.location,
+            location: operator_location,
         })?;
 
-        let remove_tabs = match operator.id {
-            Operator(LessLess) => false,
-            Operator(LessLessDash) => true,
-            _ => unreachable!("unhandled redirection operator type"),
-        };
         self.memorize_unread_here_doc(PartialHereDoc {
             delimiter,
             remove_tabs,
