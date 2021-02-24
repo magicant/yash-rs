@@ -91,6 +91,17 @@ impl Parser<'_> {
         Ok(Some(words))
     }
 
+    /// Parses the operand of a redirection operator.
+    async fn redirection_operand(&mut self) -> Result<Option<Word>> {
+        let operand = self.take_token_aliased_fully().await?;
+        match operand.id {
+            Token(_) => (),
+            Operator(_) | EndOfInput => return Ok(None),
+            IoNumber => (), // TODO reject if POSIXly-correct
+        }
+        Ok(Some(operand.word))
+    }
+
     /// Parses a redirection.
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
@@ -104,19 +115,10 @@ impl Parser<'_> {
             if let Ok(operator) = RedirOp::try_from(op) {
                 // TODO reject >>| and <<< if POSIXly-correct
                 let operator_location = self.take_token().await?.word.location;
-                let operand = self.take_token_aliased_fully().await?;
-                match operand.id {
-                    Token(_) => (),
-                    Operator(_) | EndOfInput => {
-                        return Err(Error {
-                            cause: ErrorCause::MissingRedirOperand,
-                            location: operator_location,
-                        })
-                    }
-                    IoNumber => (),
-                    // TODO IoNumber => reject if posixly-correct
-                }
-                let operand = operand.word;
+                let operand = self.redirection_operand().await?.ok_or(Error {
+                    cause: ErrorCause::MissingRedirOperand,
+                    location: operator_location,
+                })?;
                 return Ok(Some(Redir {
                     fd: None,
                     body: RedirBody::Normal { operator, operand },
@@ -130,18 +132,10 @@ impl Parser<'_> {
             _ => return Ok(None),
         };
 
-        let operand = self.take_token_aliased_fully().await?;
-        match operand.id {
-            Token(_) => (),
-            Operator(_) | EndOfInput => {
-                return Err(Error {
-                    cause: ErrorCause::MissingHereDocDelimiter,
-                    location: operator.word.location,
-                })
-            }
-            IoNumber => (),
-            // TODO IoNumber => reject if posixly-correct
-        }
+        let delimiter = self.redirection_operand().await?.ok_or(Error {
+            cause: ErrorCause::MissingHereDocDelimiter,
+            location: operator.word.location,
+        })?;
 
         let remove_tabs = match operator.id {
             Operator(LessLess) => false,
@@ -149,7 +143,7 @@ impl Parser<'_> {
             _ => unreachable!("unhandled redirection operator type"),
         };
         self.memorize_unread_here_doc(PartialHereDoc {
-            delimiter: operand.word,
+            delimiter,
             remove_tabs,
         });
 
