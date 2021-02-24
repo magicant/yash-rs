@@ -102,14 +102,8 @@ impl Parser<'_> {
         Ok(Some(operand.word))
     }
 
-    /// Parses a redirection.
-    ///
-    /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
-    /// is missing after the operator, `Err(Error{...})` is returned with a cause of
-    /// [`MissingRedirOperand`](ErrorCause::MissingRedirOperand) or
-    /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
-    pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
-        // TODO IO_NUMBER
+    /// Parses the redirection body.
+    async fn redirection_body(&mut self) -> Result<Option<RedirBody<MissingHereDoc>>> {
         let operator = if let Operator(operator) = self.peek_token().await?.id {
             operator
         } else {
@@ -123,10 +117,7 @@ impl Parser<'_> {
                 cause: ErrorCause::MissingRedirOperand,
                 location: operator_location,
             })?;
-            return Ok(Some(Redir {
-                fd: None,
-                body: RedirBody::Normal { operator, operand },
-            }));
+            return Ok(Some(RedirBody::Normal { operator, operand }));
         }
 
         let remove_tabs = match operator {
@@ -146,10 +137,22 @@ impl Parser<'_> {
             remove_tabs,
         });
 
-        Ok(Some(Redir {
-            fd: None,
-            body: RedirBody::HereDoc(MissingHereDoc),
-        }))
+        Ok(Some(RedirBody::HereDoc(MissingHereDoc)))
+    }
+
+    /// Parses a redirection.
+    ///
+    /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
+    /// is missing after the operator, `Err(Error{...})` is returned with a cause of
+    /// [`MissingRedirOperand`](ErrorCause::MissingRedirOperand) or
+    /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
+    pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
+        // TODO IO_NUMBER
+        let fd = None;
+        Ok(self
+            .redirection_body()
+            .await?
+            .map(|body| Redir { fd, body }))
     }
 
     /// Parses a simple command.
