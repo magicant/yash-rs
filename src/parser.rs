@@ -105,17 +105,17 @@ impl Parser<'_> {
                 // TODO reject >>| and <<< if POSIXly-correct
                 let operator_location = self.take_token().await?.word.location;
                 let operand = self.take_token_aliased_fully().await?;
-                // match operand.id {
-                //     Token(_) => (),
-                //     Operator(_) | EndOfInput => {
-                //         return Err(Error {
-                //             cause: ErrorCause::MissingRedirOperand,
-                //             location: operator_location,
-                //         })
-                //     }
-                //     IoNumber => (),
-                //     // TODO IoNumber => reject if posixly-correct
-                // }
+                match operand.id {
+                    Token(_) => (),
+                    Operator(_) | EndOfInput => {
+                        return Err(Error {
+                            cause: ErrorCause::MissingRedirOperand,
+                            location: operator_location,
+                        })
+                    }
+                    IoNumber => (),
+                    // TODO IoNumber => reject if posixly-correct
+                }
                 let operand = operand.word;
                 return Ok(Some(Redir {
                     fd: None,
@@ -760,6 +760,32 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         assert!(block_on(parser.redirection()).unwrap().is_none());
+    }
+
+    #[test]
+    fn parser_redirection_non_word_operand() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " < >");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(e.location.line.value, " < >");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn parser_redirection_eof_operand() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "  < ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(e.location.line.value, "  < ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
     }
 
     #[test]
