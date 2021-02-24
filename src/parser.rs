@@ -100,9 +100,7 @@ impl Parser<'_> {
         // TODO IO_NUMBER
         let operator = match self.peek_token().await?.id {
             // TODO <, <>, >, >>, >|, <&, >&, >>|, <<<
-            Operator(op) if op == LessLess || op == LessLessDash => {
-                self.take_token().await.unwrap()
-            }
+            Operator(LessLess) | Operator(LessLessDash) => self.take_token().await.unwrap(),
             _ => return Ok(None),
         };
 
