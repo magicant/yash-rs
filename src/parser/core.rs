@@ -51,6 +51,8 @@ pub enum ErrorCause {
     UnclosedCommandSubstitution { opening_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
+    /// A subshell is not closed.
+    UnclosedSubshell { opening_location: Location },
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -91,6 +93,14 @@ impl PartialEq for ErrorCause {
                     opening_location: l2,
                 },
             ) => l1 == l2,
+            (
+                UnclosedSubshell {
+                    opening_location: l1,
+                },
+                UnclosedSubshell {
+                    opening_location: l2,
+                },
+            ) => l1 == l2,
             (MissingPipeline(ao1), MissingPipeline(ao2)) => ao1 == ao2,
             _ => false,
         }
@@ -114,6 +124,9 @@ impl fmt::Display for ErrorCause {
             UnclosedArrayValue {
                 opening_location: _,
             } => f.write_str("The array assignment value is not closed"),
+            UnclosedSubshell {
+                opening_location: _,
+            } => f.write_str("The subshell is not closed"),
             MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
