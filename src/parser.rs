@@ -102,30 +102,25 @@ impl Parser<'_> {
         Ok(Some(operand.word))
     }
 
-    /// Parses the redirection body.
-    async fn redirection_body(&mut self) -> Result<Option<RedirBody<MissingHereDoc>>> {
-        let operator = if let Operator(operator) = self.peek_token().await?.id {
-            operator
-        } else {
-            return Ok(None);
-        };
+    /// Parses a normal redirection body.
+    async fn normal_redirection_body(
+        &mut self,
+        operator: RedirOp,
+    ) -> Result<RedirBody<MissingHereDoc>> {
+        // TODO reject >>| and <<< if POSIXly-correct
+        let operator_location = self.take_token().await?.word.location;
+        let operand = self.redirection_operand().await?.ok_or(Error {
+            cause: ErrorCause::MissingRedirOperand,
+            location: operator_location,
+        })?;
+        return Ok(RedirBody::Normal { operator, operand });
+    }
 
-        if let Ok(operator) = RedirOp::try_from(operator) {
-            // TODO reject >>| and <<< if POSIXly-correct
-            let operator_location = self.take_token().await?.word.location;
-            let operand = self.redirection_operand().await?.ok_or(Error {
-                cause: ErrorCause::MissingRedirOperand,
-                location: operator_location,
-            })?;
-            return Ok(Some(RedirBody::Normal { operator, operand }));
-        }
-
-        let remove_tabs = match operator {
-            // TODO <() >()
-            LessLess => false,
-            LessLessDash => true,
-            _ => return Ok(None),
-        };
+    /// Parses the redirection body for a here-document.
+    async fn here_doc_redirection_body(
+        &mut self,
+        remove_tabs: bool,
+    ) -> Result<RedirBody<MissingHereDoc>> {
         let operator_location = self.take_token().await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingHereDocDelimiter,
@@ -137,7 +132,25 @@ impl Parser<'_> {
             remove_tabs,
         });
 
-        Ok(Some(RedirBody::HereDoc(MissingHereDoc)))
+        Ok(RedirBody::HereDoc(MissingHereDoc))
+    }
+
+    /// Parses the redirection body.
+    async fn redirection_body(&mut self) -> Result<Option<RedirBody<MissingHereDoc>>> {
+        let operator = match self.peek_token().await?.id {
+            Operator(operator) => operator,
+            _ => return Ok(None),
+        };
+
+        if let Ok(operator) = RedirOp::try_from(operator) {
+            return Ok(Some(self.normal_redirection_body(operator).await?));
+        }
+        match operator {
+            LessLess => Ok(Some(self.here_doc_redirection_body(false).await?)),
+            LessLessDash => Ok(Some(self.here_doc_redirection_body(true).await?)),
+            // TODO <() >()
+            _ => Ok(None),
+        }
     }
 
     /// Parses a redirection.
