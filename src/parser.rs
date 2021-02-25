@@ -1285,6 +1285,7 @@ mod tests {
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
             Command::SimpleCommand(ref c) => c,
+            _ => panic!("Expected a simple command but got {:?}", commands[0]),
         };
         assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);

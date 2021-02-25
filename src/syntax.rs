@@ -484,7 +484,11 @@ impl fmt::Display for CompoundCommand {
 pub enum Command<H = HereDoc> {
     /// Simple command.
     SimpleCommand(SimpleCommand<H>),
-    // TODO Compound command
+    /// Compound command.
+    Compound {
+        command: CompoundCommand<H>,
+        redirs: Vec<Redir<H>>,
+    },
     // TODO Function definition
 }
 
@@ -492,6 +496,10 @@ impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::SimpleCommand(c) => write!(f, "{}", c),
+            Command::Compound { command, redirs } => {
+                write!(f, "{}", command)?;
+                redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
+            }
         }
     }
 }
