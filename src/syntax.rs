@@ -457,6 +457,28 @@ impl fmt::Display for SimpleCommand {
     }
 }
 
+/// Command that contains other commands.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CompoundCommand<H = HereDoc> {
+    // TODO Grouping
+    /// Command for executing commands in a subshell.
+    Subshell(List<H>),
+    // TODO for
+    // TODO while/until
+    // TODO if
+    // TODO case
+    // TODO [[ ]]
+}
+
+impl fmt::Display for CompoundCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use CompoundCommand::*;
+        match self {
+            Subshell(list) => write!(f, "({})", list),
+        }
+    }
+}
+
 /// Element of a pipe sequence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
