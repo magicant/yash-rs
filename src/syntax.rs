@@ -354,6 +354,12 @@ pub struct HereDoc {
 impl fmt::Display for HereDoc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(if self.remove_tabs { "<<-" } else { "<<" })?;
+
+        // This space is to disambiguate `<< --` and `<<- -`
+        if let Some(Unquoted(Literal('-'))) = self.delimiter.units.get(0) {
+            f.write_str(" ")?;
+        }
+
         write!(f, "{}", self.delimiter)
     }
 }
@@ -722,6 +728,23 @@ mod tests {
             content: Word::with_str("there".to_string()),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
+    }
+
+    #[test]
+    fn here_doc_display_disambiguation() {
+        let heredoc = HereDoc {
+            delimiter: Word::with_str("--".to_string()),
+            remove_tabs: false,
+            content: Word::with_str("here".to_string()),
+        };
+        assert_eq!(heredoc.to_string(), "<< --");
+
+        let heredoc = HereDoc {
+            delimiter: Word::with_str("-".to_string()),
+            remove_tabs: true,
+            content: Word::with_str("here".to_string()),
+        };
+        assert_eq!(heredoc.to_string(), "<<- -");
     }
 
     #[test]
