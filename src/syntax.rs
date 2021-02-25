@@ -483,7 +483,7 @@ impl fmt::Display for CompoundCommand {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
     /// Simple command.
-    SimpleCommand(SimpleCommand<H>),
+    Simple(SimpleCommand<H>),
     /// Compound command.
     Compound {
         command: CompoundCommand<H>,
@@ -495,7 +495,7 @@ pub enum Command<H = HereDoc> {
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::SimpleCommand(c) => write!(f, "{}", c),
+            Command::Simple(c) => write!(f, "{}", c),
             Command::Compound { command, redirs } => {
                 write!(f, "{}", command)?;
                 redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
@@ -866,7 +866,7 @@ mod tests {
             words: vec![w],
             redirs: vec![],
         };
-        Rc::new(Command::SimpleCommand(s))
+        Rc::new(Command::Simple(s))
     }
 
     fn dummy_pipeline(s: String) -> Pipeline {

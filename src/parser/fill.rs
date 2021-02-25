@@ -125,7 +125,7 @@ impl Fill for Command<MissingHereDoc> {
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Command> {
         use Command::*;
         Ok(match self {
-            SimpleCommand(c) => SimpleCommand(c.fill(i)?),
+            Simple(c) => Simple(c.fill(i)?),
             Compound { command, redirs } => Compound {
                 command: command.fill(i)?,
                 redirs: redirs.fill(i)?,

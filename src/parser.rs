@@ -254,7 +254,7 @@ impl Parser<'_> {
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
             Rec::Parsed(None) => Ok(Rec::Parsed(None)),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::SimpleCommand(c)))),
+            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::Simple(c)))),
         }
     }
 
@@ -1284,7 +1284,7 @@ mod tests {
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
-            Command::SimpleCommand(ref c) => c,
+            Command::Simple(ref c) => c,
             _ => panic!("Expected a simple command but got {:?}", commands[0]),
         };
         assert_eq!(cmd.words, []);

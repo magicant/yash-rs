@@ -75,7 +75,7 @@ impl Command {
     /// Executes this command.
     pub async fn execute(&self, env: &mut dyn Env) -> Result {
         match self {
-            Command::SimpleCommand(command) => command.execute(env).await,
+            Command::Simple(command) => command.execute(env).await,
             Command::Compound { .. } => Ok(println!("{}", self)), // TODO execute compound command
         }
     }
