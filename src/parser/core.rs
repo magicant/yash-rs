@@ -40,6 +40,8 @@ pub enum ErrorCause {
     // TODO Define more fine-grained causes depending on the token type.
     /// Unexpected token.
     UnexpectedToken,
+    /// A redirection operator is missing its operand.
+    MissingRedirOperand,
     /// A here-document operator is missing its delimiter token.
     MissingHereDocDelimiter,
     // TODO Include the corresponding here-doc operator.
@@ -66,6 +68,7 @@ impl PartialEq for ErrorCause {
         use ErrorCause::*;
         match (self, other) {
             (UnexpectedToken, UnexpectedToken)
+            | (MissingRedirOperand, MissingRedirOperand)
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
             | (DoubleNegation, DoubleNegation)
@@ -100,6 +103,7 @@ impl fmt::Display for ErrorCause {
         match self {
             IoError(e) => write!(f, "Error while reading commands: {}", e),
             UnexpectedToken => f.write_str("Unexpected token"),
+            MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
             MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")
             }

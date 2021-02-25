@@ -77,6 +77,7 @@ impl Fill for RedirBody<MissingHereDoc> {
     type Full = RedirBody;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
         match self {
+            RedirBody::Normal { operator, operand } => Ok(RedirBody::Normal { operator, operand }),
             RedirBody::HereDoc(MissingHereDoc) => {
                 Ok(RedirBody::HereDoc(i.next().expect("missing value to fill")))
             }

@@ -91,48 +91,81 @@ impl Parser<'_> {
         Ok(Some(words))
     }
 
+    /// Parses the operand of a redirection operator.
+    async fn redirection_operand(&mut self) -> Result<Option<Word>> {
+        let operand = self.take_token_aliased_fully().await?;
+        match operand.id {
+            Token(_) => (),
+            Operator(_) | EndOfInput => return Ok(None),
+            IoNumber => (), // TODO reject if POSIXly-correct
+        }
+        Ok(Some(operand.word))
+    }
+
+    /// Parses a normal redirection body.
+    async fn normal_redirection_body(
+        &mut self,
+        operator: RedirOp,
+    ) -> Result<RedirBody<MissingHereDoc>> {
+        // TODO reject >>| and <<< if POSIXly-correct
+        let operator_location = self.take_token().await?.word.location;
+        let operand = self.redirection_operand().await?.ok_or(Error {
+            cause: ErrorCause::MissingRedirOperand,
+            location: operator_location,
+        })?;
+        return Ok(RedirBody::Normal { operator, operand });
+    }
+
+    /// Parses the redirection body for a here-document.
+    async fn here_doc_redirection_body(
+        &mut self,
+        remove_tabs: bool,
+    ) -> Result<RedirBody<MissingHereDoc>> {
+        let operator_location = self.take_token().await?.word.location;
+        let delimiter = self.redirection_operand().await?.ok_or(Error {
+            cause: ErrorCause::MissingHereDocDelimiter,
+            location: operator_location,
+        })?;
+
+        self.memorize_unread_here_doc(PartialHereDoc {
+            delimiter,
+            remove_tabs,
+        });
+
+        Ok(RedirBody::HereDoc(MissingHereDoc))
+    }
+
+    /// Parses the redirection body.
+    async fn redirection_body(&mut self) -> Result<Option<RedirBody<MissingHereDoc>>> {
+        let operator = match self.peek_token().await?.id {
+            Operator(operator) => operator,
+            _ => return Ok(None),
+        };
+
+        if let Ok(operator) = RedirOp::try_from(operator) {
+            return Ok(Some(self.normal_redirection_body(operator).await?));
+        }
+        match operator {
+            LessLess => Ok(Some(self.here_doc_redirection_body(false).await?)),
+            LessLessDash => Ok(Some(self.here_doc_redirection_body(true).await?)),
+            // TODO <() >()
+            _ => Ok(None),
+        }
+    }
+
     /// Parses a redirection.
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
     /// is missing after the operator, `Err(Error{...})` is returned with a cause of
+    /// [`MissingRedirOperand`](ErrorCause::MissingRedirOperand) or
     /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         // TODO IO_NUMBER
-        let operator = match self.peek_token().await?.id {
-            // TODO <, <>, >, >>, >|, <&, >&, >>|, <<<
-            Operator(op) if op == LessLess || op == LessLessDash => {
-                self.take_token().await.unwrap()
-            }
-            _ => return Ok(None),
-        };
-
-        let operand = self.take_token_aliased_fully().await?;
-        match operand.id {
-            Token(_) => (),
-            Operator(_) | EndOfInput => {
-                return Err(Error {
-                    cause: ErrorCause::MissingHereDocDelimiter,
-                    location: operator.word.location,
-                })
-            }
-            IoNumber => (),
-            // TODO IoNumber => reject if posixly-correct
-        }
-
-        let remove_tabs = match operator.id {
-            Operator(LessLess) => false,
-            Operator(LessLessDash) => true,
-            _ => unreachable!("unhandled redirection operator type"),
-        };
-        self.memorize_unread_here_doc(PartialHereDoc {
-            delimiter: operand.word,
-            remove_tabs,
-        });
-
-        Ok(Some(Redir {
-            fd: None,
-            body: RedirBody::HereDoc(MissingHereDoc),
-        }))
+        let fd = None;
+        Ok(self
+            .redirection_body()
+            .await?
+            .map(|body| Redir { fd, body }))
     }
 
     /// Parses a simple command.
@@ -559,6 +592,144 @@ mod tests {
     }
 
     #[test]
+    fn parser_redirection_less() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "</dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(Newline));
+    }
+
+    #[test]
+    fn parser_redirection_less_greater() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<> /dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileInOut);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_greater() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ">/dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileOut);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_greater_greater() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " >> /dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileAppend);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_greater_bar() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ">| /dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileClobber);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_less_and() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<& -\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FdIn);
+            assert_eq!(operand.to_string(), "-")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_greater_and() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ">& 3\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FdOut);
+            assert_eq!(operand.to_string(), "3")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_greater_greater_bar() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ">>| 3\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::Pipe);
+            assert_eq!(operand.to_string(), "3")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
+    fn parser_redirection_less_less_less() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<< foo\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, None);
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::String);
+            assert_eq!(operand.to_string(), "foo")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+    }
+
+    #[test]
     fn parser_redirection_less_less() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<end \nend\n");
         let mut parser = Parser::new(&mut lexer);
@@ -598,6 +769,32 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         assert!(block_on(parser.redirection()).unwrap().is_none());
+    }
+
+    #[test]
+    fn parser_redirection_non_word_operand() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " < >");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(e.location.line.value, " < >");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn parser_redirection_eof_operand() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "  < ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(e.location.line.value, "  < ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
     }
 
     #[test]
@@ -1092,19 +1289,18 @@ mod tests {
         assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
-        let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body;
-        //if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
-        let HereDoc {
-            delimiter,
-            remove_tabs,
-            content,
-        } = here_doc;
-        assert_eq!(delimiter.to_string(), "END");
-        assert_eq!(*remove_tabs, false);
-        assert_eq!(content.to_string(), "foo\n");
-        //} else {
-        //panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
-        //}
+        if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
+            let HereDoc {
+                delimiter,
+                remove_tabs,
+                content,
+            } = here_doc;
+            assert_eq!(delimiter.to_string(), "END");
+            assert_eq!(*remove_tabs, false);
+            assert_eq!(content.to_string(), "foo\n");
+        } else {
+            panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
+        }
     }
 
     #[test]

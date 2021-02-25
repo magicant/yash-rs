@@ -16,6 +16,8 @@
 
 //! Helper for parsing operator tokens.
 
+use std::fmt;
+
 /// Operator token identifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operator {
@@ -63,6 +65,36 @@ pub enum Operator {
     Bar,
     /// `||`
     BarBar,
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Operator::*;
+        match self {
+            Newline => f.write_str("\n"),
+            And => f.write_str("&"),
+            AndAnd => f.write_str("&&"),
+            OpenParen => f.write_str("("),
+            CloseParen => f.write_str(")"),
+            Semicolon => f.write_str(";"),
+            SemicolonSemicolon => f.write_str(";;"),
+            Less => f.write_str("<"),
+            LessAnd => f.write_str("<&"),
+            LessOpenParen => f.write_str("<("),
+            LessLess => f.write_str("<<"),
+            LessLessDash => f.write_str("<<-"),
+            LessLessLess => f.write_str("<<<"),
+            LessGreater => f.write_str("<>"),
+            Greater => f.write_str(">"),
+            GreaterAnd => f.write_str(">&"),
+            GreaterOpenParen => f.write_str(">("),
+            GreaterGreater => f.write_str(">>"),
+            GreaterGreaterBar => f.write_str(">>|"),
+            GreaterBar => f.write_str(">|"),
+            Bar => f.write_str("|"),
+            BarBar => f.write_str("||"),
+        }
+    }
 }
 
 /// Trie data structure that defines a set of operator tokens.
