@@ -479,16 +479,30 @@ impl fmt::Display for CompoundCommand {
     }
 }
 
+/// Compound command with redirections.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullCompoundCommand<H = HereDoc> {
+    /// The main part.
+    pub command: CompoundCommand<H>,
+    /// Redirections.
+    pub redirs: Vec<Redir<H>>,
+}
+
+impl fmt::Display for FullCompoundCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let FullCompoundCommand { command, redirs } = self;
+        write!(f, "{}", command)?;
+        redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
+    }
+}
+
 /// Element of a pipe sequence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
     /// Simple command.
     Simple(SimpleCommand<H>),
     /// Compound command.
-    Compound {
-        command: CompoundCommand<H>,
-        redirs: Vec<Redir<H>>,
-    },
+    Compound(FullCompoundCommand<H>),
     // TODO Function definition
 }
 
@@ -496,10 +510,7 @@ impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::Simple(c) => write!(f, "{}", c),
-            Command::Compound { command, redirs } => {
-                write!(f, "{}", command)?;
-                redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
-            }
+            Command::Compound(c) => write!(f, "{}", c),
         }
     }
 }
