@@ -244,6 +244,58 @@ impl Parser<'_> {
         }))
     }
 
+    /// Parses a subshell.
+    ///
+    /// The next token must be a `(`.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not a `(`.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorCause::UnclosedSubshell`]
+    /// - [`ErrorCause::EmptySubshell`]
+    async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token().await?;
+        assert_eq!(open.id, Operator(OpenParen));
+
+        let list = self.maybe_compound_list().await?;
+
+        let close = self.take_token().await?;
+        if close.id != Operator(CloseParen) {
+            return Err(Error {
+                cause: ErrorCause::UnclosedSubshell {
+                    opening_location: open.word.location,
+                },
+                location: close.word.location,
+            });
+        }
+
+        // TODO allow empty subshell if not POSIXly-correct
+        if list.items.is_empty() {
+            return Err(Error {
+                cause: ErrorCause::EmptySubshell,
+                location: open.word.location,
+            });
+        }
+
+        Ok(CompoundCommand::Subshell(list))
+    }
+
+    /// Parses a compound command.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorCause::UnclosedSubshell`]
+    /// - [`ErrorCause::EmptySubshell`]
+    pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
+        match self.peek_token().await?.id {
+            Operator(OpenParen) => self.subshell().await.map(Some),
+            _ => Ok(None),
+        }
+    }
+
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function
@@ -1051,6 +1103,78 @@ mod tests {
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));
+    }
+
+    #[test]
+    fn parser_subshell_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        let CompoundCommand::Subshell(list) = result;
+        // if let CompoundCommand::Subshell(list) = result {
+        assert_eq!(list.to_string(), ":");
+        // } else {
+        //     panic!("Not a subshell: {:?}", result);
+        // }
+    }
+
+    #[test]
+    fn parser_subshell_long() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo& bar; )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        let CompoundCommand::Subshell(list) = result;
+        // if let CompoundCommand::Subshell(list) = result {
+        assert_eq!(list.to_string(), "foo& bar");
+        // } else {
+        //     panic!("Not a subshell: {:?}", result);
+        // }
+    }
+
+    #[test]
+    fn parser_subshell_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " ( oh no");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::UnclosedSubshell { opening_location } = e.cause {
+            assert_eq!(opening_location.line.value, " ( oh no");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("Wrong error cause: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, " ( oh no");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 9);
+    }
+
+    #[test]
+    fn parser_subshell_empty_posix() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::EmptySubshell);
+        assert_eq!(e.location.line.value, "( )");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_compound_command_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.compound_command()).unwrap();
+        assert_eq!(option, None);
     }
 
     #[test]
