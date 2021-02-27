@@ -168,6 +168,15 @@ impl Parser<'_> {
             .map(|body| Redir { fd, body }))
     }
 
+    /// Parses a (possibly empty) sequence of redirections.
+    pub async fn redirections(&mut self) -> Result<Vec<Redir<MissingHereDoc>>> {
+        let mut redirs = vec![];
+        while let Some(redir) = self.redirection().await? {
+            redirs.push(redir);
+        }
+        Ok(redirs)
+    }
+
     /// Parses a simple command.
     ///
     /// If there is no valid command at the current position, this function
