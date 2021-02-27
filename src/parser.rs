@@ -324,11 +324,13 @@ impl Parser<'_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
-        // TODO compound command
         // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => Ok(Rec::Parsed(None)),
+            Rec::Parsed(None) => self
+                .full_compound_command()
+                .await
+                .map(|c| Rec::Parsed(c.map(Command::Compound))),
             Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::Simple(c)))),
         }
     }
@@ -1244,6 +1246,42 @@ mod tests {
     }
 
     #[test]
+    fn parser_command_simple() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo < bar");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Simple(c) = result {
+            assert_eq!(c.to_string(), "foo <bar");
+        } else {
+            panic!("Not a simple command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_command_compound() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(foo) < bar");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Compound(c) = result {
+            assert_eq!(c.to_string(), "(foo) <bar");
+        } else {
+            panic!("Not a compound command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    // TODO parser_command_function_definition
+
+    #[test]
     fn parser_command_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -1251,8 +1289,6 @@ mod tests {
         let option = block_on(parser.command()).unwrap().unwrap();
         assert_eq!(option, None);
     }
-
-    // TODO test command for other cases
 
     #[test]
     fn parser_pipeline_eof() {
