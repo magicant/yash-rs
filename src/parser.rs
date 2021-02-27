@@ -30,6 +30,8 @@ use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
 use std::convert::TryFrom;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
@@ -269,7 +271,7 @@ impl Parser<'_> {
         let open = self.take_token().await?;
         assert_eq!(open.id, Operator(OpenParen));
 
-        let list = self.maybe_compound_list().await?;
+        let list = self.maybe_compound_list_boxed().await?;
 
         let close = self.take_token().await?;
         if close.id != Operator(CloseParen) {
@@ -569,6 +571,13 @@ impl Parser<'_> {
         }
 
         Ok(List { items })
+    }
+
+    /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
+    pub fn maybe_compound_list_boxed(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<List<MissingHereDoc>>> + '_>> {
+        Box::pin(self.maybe_compound_list())
     }
 }
 
