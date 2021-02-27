@@ -305,6 +305,18 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses a compound command with optional redirections.
+    pub async fn full_compound_command(
+        &mut self,
+    ) -> Result<Option<FullCompoundCommand<MissingHereDoc>>> {
+        let command = match self.compound_command().await? {
+            Some(command) => command,
+            None => return Ok(None),
+        };
+        let redirs = self.redirections().await?;
+        Ok(Some(FullCompoundCommand { command, redirs }))
+    }
+
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function
@@ -1183,6 +1195,42 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.compound_command()).unwrap();
+        assert_eq!(option, None);
+    }
+
+    #[test]
+    fn parser_full_compound_command_without_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
+        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(command.to_string(), "(:)");
+        assert_eq!(redirs, []);
+    }
+
+    #[test]
+    fn parser_full_compound_command_with_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(command) <foo >bar ;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
+        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(command.to_string(), "(command)");
+        assert_eq!(redirs.len(), 2);
+        assert_eq!(redirs[0].to_string(), "<foo");
+        assert_eq!(redirs[1].to_string(), ">bar");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(Semicolon));
+    }
+
+    #[test]
+    fn parser_full_compound_command_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.full_compound_command()).unwrap();
         assert_eq!(option, None);
     }
 
