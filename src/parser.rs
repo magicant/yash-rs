@@ -30,6 +30,8 @@ use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
 use std::convert::TryFrom;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
@@ -168,6 +170,15 @@ impl Parser<'_> {
             .map(|body| Redir { fd, body }))
     }
 
+    /// Parses a (possibly empty) sequence of redirections.
+    pub async fn redirections(&mut self) -> Result<Vec<Redir<MissingHereDoc>>> {
+        let mut redirs = vec![];
+        while let Some(redir) = self.redirection().await? {
+            redirs.push(redir);
+        }
+        Ok(redirs)
+    }
+
     /// Parses a simple command.
     ///
     /// If there is no valid command at the current position, this function
@@ -244,17 +255,85 @@ impl Parser<'_> {
         }))
     }
 
+    /// Parses a subshell.
+    ///
+    /// The next token must be a `(`.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not a `(`.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorCause::UnclosedSubshell`]
+    /// - [`ErrorCause::EmptySubshell`]
+    async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token().await?;
+        assert_eq!(open.id, Operator(OpenParen));
+
+        let list = self.maybe_compound_list_boxed().await?;
+
+        let close = self.take_token().await?;
+        if close.id != Operator(CloseParen) {
+            return Err(Error {
+                cause: ErrorCause::UnclosedSubshell {
+                    opening_location: open.word.location,
+                },
+                location: close.word.location,
+            });
+        }
+
+        // TODO allow empty subshell if not POSIXly-correct
+        if list.items.is_empty() {
+            return Err(Error {
+                cause: ErrorCause::EmptySubshell,
+                location: open.word.location,
+            });
+        }
+
+        Ok(CompoundCommand::Subshell(list))
+    }
+
+    /// Parses a compound command.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorCause::UnclosedSubshell`]
+    /// - [`ErrorCause::EmptySubshell`]
+    pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
+        match self.peek_token().await?.id {
+            Operator(OpenParen) => self.subshell().await.map(Some),
+            _ => Ok(None),
+        }
+    }
+
+    /// Parses a compound command with optional redirections.
+    pub async fn full_compound_command(
+        &mut self,
+    ) -> Result<Option<FullCompoundCommand<MissingHereDoc>>> {
+        let command = match self.compound_command().await? {
+            Some(command) => command,
+            None => return Ok(None),
+        };
+        let redirs = self.redirections().await?;
+        // TODO Reject `{ { :; } >foo }` and `{ ( : ) }` if POSIXly-correct
+        // (The last `}` is not regarded as a keyword in these cases.)
+        Ok(Some(FullCompoundCommand { command, redirs }))
+    }
+
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
-        // TODO compound command
         // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => Ok(Rec::Parsed(None)),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::SimpleCommand(c)))),
+            Rec::Parsed(None) => self
+                .full_compound_command()
+                .await
+                .map(|c| Rec::Parsed(c.map(Command::Compound))),
+            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::Simple(c)))),
         }
     }
 
@@ -496,6 +575,13 @@ impl Parser<'_> {
         }
 
         Ok(List { items })
+    }
+
+    /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
+    pub fn maybe_compound_list_boxed(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<List<MissingHereDoc>>> + '_>> {
+        Box::pin(self.maybe_compound_list())
     }
 }
 
@@ -1054,6 +1140,150 @@ mod tests {
     }
 
     #[test]
+    fn parser_subshell_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        let CompoundCommand::Subshell(list) = result;
+        // if let CompoundCommand::Subshell(list) = result {
+        assert_eq!(list.to_string(), ":");
+        // } else {
+        //     panic!("Not a subshell: {:?}", result);
+        // }
+    }
+
+    #[test]
+    fn parser_subshell_long() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo& bar; )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        let CompoundCommand::Subshell(list) = result;
+        // if let CompoundCommand::Subshell(list) = result {
+        assert_eq!(list.to_string(), "foo& bar");
+        // } else {
+        //     panic!("Not a subshell: {:?}", result);
+        // }
+    }
+
+    #[test]
+    fn parser_subshell_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " ( oh no");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::UnclosedSubshell { opening_location } = e.cause {
+            assert_eq!(opening_location.line.value, " ( oh no");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("Wrong error cause: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, " ( oh no");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 9);
+    }
+
+    #[test]
+    fn parser_subshell_empty_posix() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::EmptySubshell);
+        assert_eq!(e.location.line.value, "( )");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_compound_command_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.compound_command()).unwrap();
+        assert_eq!(option, None);
+    }
+
+    #[test]
+    fn parser_full_compound_command_without_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
+        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(command.to_string(), "(:)");
+        assert_eq!(redirs, []);
+    }
+
+    #[test]
+    fn parser_full_compound_command_with_redirections() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(command) <foo >bar ;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
+        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(command.to_string(), "(command)");
+        assert_eq!(redirs.len(), 2);
+        assert_eq!(redirs[0].to_string(), "<foo");
+        assert_eq!(redirs[1].to_string(), ">bar");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(Semicolon));
+    }
+
+    #[test]
+    fn parser_full_compound_command_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut parser = Parser::new(&mut lexer);
+
+        let option = block_on(parser.full_compound_command()).unwrap();
+        assert_eq!(option, None);
+    }
+
+    #[test]
+    fn parser_command_simple() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo < bar");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Simple(c) = result {
+            assert_eq!(c.to_string(), "foo <bar");
+        } else {
+            panic!("Not a simple command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_command_compound() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(foo) < bar");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Compound(c) = result {
+            assert_eq!(c.to_string(), "(foo) <bar");
+        } else {
+            panic!("Not a compound command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    // TODO parser_command_function_definition
+
+    #[test]
     fn parser_command_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
@@ -1061,8 +1291,6 @@ mod tests {
         let option = block_on(parser.command()).unwrap().unwrap();
         assert_eq!(option, None);
     }
-
-    // TODO test command for other cases
 
     #[test]
     fn parser_pipeline_eof() {
@@ -1284,7 +1512,8 @@ mod tests {
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
         let cmd = match *commands[0] {
-            Command::SimpleCommand(ref c) => c,
+            Command::Simple(ref c) => c,
+            _ => panic!("Expected a simple command but got {:?}", commands[0]),
         };
         assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);

@@ -110,11 +110,34 @@ impl Fill for SimpleCommand<MissingHereDoc> {
     }
 }
 
+impl Fill for CompoundCommand<MissingHereDoc> {
+    type Full = CompoundCommand;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CompoundCommand> {
+        use CompoundCommand::*;
+        Ok(match self {
+            Subshell(list) => Subshell(list.fill(i)?),
+        })
+    }
+}
+
+impl Fill for FullCompoundCommand<MissingHereDoc> {
+    type Full = FullCompoundCommand;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<FullCompoundCommand> {
+        let FullCompoundCommand { command, redirs } = self;
+        Ok(FullCompoundCommand {
+            command: command.fill(i)?,
+            redirs: redirs.fill(i)?,
+        })
+    }
+}
+
 impl Fill for Command<MissingHereDoc> {
     type Full = Command;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Command> {
+        use Command::*;
         Ok(match self {
-            Command::SimpleCommand(c) => Command::SimpleCommand(c.fill(i)?),
+            Simple(c) => Simple(c.fill(i)?),
+            Compound(c) => Compound(c.fill(i)?),
         })
     }
 }

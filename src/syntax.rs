@@ -457,19 +457,60 @@ impl fmt::Display for SimpleCommand {
     }
 }
 
+/// Command that contains other commands.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CompoundCommand<H = HereDoc> {
+    // TODO Grouping
+    /// Command for executing commands in a subshell.
+    Subshell(List<H>),
+    // TODO for
+    // TODO while/until
+    // TODO if
+    // TODO case
+    // TODO [[ ]]
+}
+
+impl fmt::Display for CompoundCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use CompoundCommand::*;
+        match self {
+            Subshell(list) => write!(f, "({})", list),
+        }
+    }
+}
+
+/// Compound command with redirections.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FullCompoundCommand<H = HereDoc> {
+    /// The main part.
+    pub command: CompoundCommand<H>,
+    /// Redirections.
+    pub redirs: Vec<Redir<H>>,
+}
+
+impl fmt::Display for FullCompoundCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let FullCompoundCommand { command, redirs } = self;
+        write!(f, "{}", command)?;
+        redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
+    }
+}
+
 /// Element of a pipe sequence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
     /// Simple command.
-    SimpleCommand(SimpleCommand<H>),
-    // TODO Compound command
+    Simple(SimpleCommand<H>),
+    /// Compound command.
+    Compound(FullCompoundCommand<H>),
     // TODO Function definition
 }
 
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::SimpleCommand(c) => write!(f, "{}", c),
+            Command::Simple(c) => write!(f, "{}", c),
+            Command::Compound(c) => write!(f, "{}", c),
         }
     }
 }
@@ -836,7 +877,7 @@ mod tests {
             words: vec![w],
             redirs: vec![],
         };
-        Rc::new(Command::SimpleCommand(s))
+        Rc::new(Command::Simple(s))
     }
 
     fn dummy_pipeline(s: String) -> Pipeline {

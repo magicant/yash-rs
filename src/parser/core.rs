@@ -51,6 +51,10 @@ pub enum ErrorCause {
     UnclosedCommandSubstitution { opening_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
+    /// A subshell is not closed.
+    UnclosedSubshell { opening_location: Location },
+    /// A subshell contains no commands.
+    EmptySubshell,
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -71,6 +75,7 @@ impl PartialEq for ErrorCause {
             | (MissingRedirOperand, MissingRedirOperand)
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
+            | (EmptySubshell, EmptySubshell)
             | (DoubleNegation, DoubleNegation)
             | (BangAfterBar, BangAfterBar)
             | (MissingCommandAfterBang, MissingCommandAfterBang)
@@ -88,6 +93,14 @@ impl PartialEq for ErrorCause {
                     opening_location: l1,
                 },
                 UnclosedArrayValue {
+                    opening_location: l2,
+                },
+            ) => l1 == l2,
+            (
+                UnclosedSubshell {
+                    opening_location: l1,
+                },
+                UnclosedSubshell {
                     opening_location: l2,
                 },
             ) => l1 == l2,
@@ -114,6 +127,10 @@ impl fmt::Display for ErrorCause {
             UnclosedArrayValue {
                 opening_location: _,
             } => f.write_str("The array assignment value is not closed"),
+            UnclosedSubshell {
+                opening_location: _,
+            } => f.write_str("The subshell is not closed"),
+            EmptySubshell => f.write_str("The subshell is missing its content"),
             MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
