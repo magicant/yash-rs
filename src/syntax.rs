@@ -496,6 +496,26 @@ impl fmt::Display for FullCompoundCommand {
     }
 }
 
+/// Function definition command.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FunctionDefinition<H = HereDoc> {
+    /// Whether the function definition command starts with the `function` reserved word.
+    pub has_keyword: bool,
+    /// Function name.
+    pub name: Word,
+    /// Function body.
+    pub body: FullCompoundCommand<H>,
+}
+
+impl fmt::Display for FunctionDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.has_keyword {
+            f.write_str("function ")?;
+        }
+        write!(f, "{}() {}", self.name, self.body)
+    }
+}
+
 /// Element of a pipe sequence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command<H = HereDoc> {
@@ -894,6 +914,32 @@ mod tests {
             first,
             rest: vec![],
         }
+    }
+
+    fn dummy_list(s: String) -> List {
+        let and_or = dummy_and_or_list(s);
+        let is_async = false;
+        let item = Item { and_or, is_async };
+        List { items: vec![item] }
+    }
+
+    fn dummy_compound_command(s: String) -> CompoundCommand {
+        let list = dummy_list(s);
+        CompoundCommand::Subshell(list)
+    }
+
+    #[test]
+    fn function_definition_display() {
+        let body = FullCompoundCommand {
+            command: dummy_compound_command("bar".to_string()),
+            redirs: vec![],
+        };
+        let fd = FunctionDefinition {
+            has_keyword: false,
+            name: Word::with_str("foo".to_string()),
+            body,
+        };
+        assert_eq!(fd.to_string(), "foo() (bar)");
     }
 
     #[test]
