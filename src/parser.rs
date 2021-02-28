@@ -1001,26 +1001,74 @@ mod tests {
 
     #[test]
     fn parser_simple_command_one_redirection() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
+        let mut lexer = Lexer::with_source(Source::Unknown, "<foo");
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 1);
-        // TODO test redirection content
+        assert_eq!(sc.redirs[0].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[0].body
+        {
+            assert_eq!(operator, &RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "foo")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
     }
 
     #[test]
     fn parser_simple_command_many_redirections() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<1 <<2 <<3");
+        let mut lexer = Lexer::with_source(Source::Unknown, "<one >two >>three");
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 3);
-        // TODO test redirections content
+        assert_eq!(sc.redirs[0].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[0].body
+        {
+            assert_eq!(operator, &RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "one")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
+        }
+        assert_eq!(sc.redirs[1].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[1].body
+        {
+            assert_eq!(operator, &RedirOp::FileOut);
+            assert_eq!(operand.to_string(), "two")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[1].body);
+        }
+        assert_eq!(sc.redirs[2].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[2].body
+        {
+            assert_eq!(operator, &RedirOp::FileAppend);
+            assert_eq!(operand.to_string(), "three")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[2].body);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
     }
 
     #[test]
@@ -1039,7 +1087,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_word_redirection() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "word <<REDIR");
+        let mut lexer = Lexer::with_source(Source::Unknown, "word <redirection");
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -1047,12 +1095,22 @@ mod tests {
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.words[0].to_string(), "word");
-        // TODO test redirection content
+        assert_eq!(sc.redirs[0].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[0].body
+        {
+            assert_eq!(operator, &RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "redirection")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
+        }
     }
 
     #[test]
     fn parser_simple_command_redirection_assignment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<END a=b");
+        let mut lexer = Lexer::with_source(Source::Unknown, "<foo a=b");
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -1061,12 +1119,22 @@ mod tests {
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
-        // TODO test redirection content
+        assert_eq!(sc.redirs[0].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[0].body
+        {
+            assert_eq!(operator, &RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "foo")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
+        }
     }
 
     #[test]
     fn parser_simple_command_assignment_redirection_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "if=then <<FOO else");
+        let mut lexer = Lexer::with_source(Source::Unknown, "if=then <foo else");
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -1076,7 +1144,17 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "if");
         assert_eq!(sc.assigns[0].value.to_string(), "then");
         assert_eq!(sc.words[0].to_string(), "else");
-        // TODO test redirection content
+        assert_eq!(sc.redirs[0].fd, None);
+        if let RedirBody::Normal {
+            ref operator,
+            ref operand,
+        } = sc.redirs[0].body
+        {
+            assert_eq!(operator, &RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "foo")
+        } else {
+            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
+        }
     }
 
     #[test]
