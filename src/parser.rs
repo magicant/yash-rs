@@ -316,6 +316,8 @@ impl Parser<'_> {
             None => return Ok(None),
         };
         let redirs = self.redirections().await?;
+        // TODO Reject `{ { :; } >foo }` and `{ ( : ) }` if POSIXly-correct
+        // (The last `}` is not regarded as a keyword in these cases.)
         Ok(Some(FullCompoundCommand { command, redirs }))
     }
 
