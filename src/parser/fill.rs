@@ -155,6 +155,7 @@ impl Fill for Command<MissingHereDoc> {
         Ok(match self {
             Simple(c) => Simple(c.fill(i)?),
             Compound(c) => Compound(c.fill(i)?),
+            Function(c) => Function(c.fill(i)?),
         })
     }
 }

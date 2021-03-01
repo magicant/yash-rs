@@ -523,14 +523,16 @@ pub enum Command<H = HereDoc> {
     Simple(SimpleCommand<H>),
     /// Compound command.
     Compound(FullCompoundCommand<H>),
-    // TODO Function definition
+    /// Function definition command.
+    Function(FunctionDefinition<H>),
 }
 
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::Simple(c) => write!(f, "{}", c),
-            Command::Compound(c) => write!(f, "{}", c),
+            Command::Simple(c) => c.fmt(f),
+            Command::Compound(c) => c.fmt(f),
+            Command::Function(c) => c.fmt(f),
         }
     }
 }
