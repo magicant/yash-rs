@@ -55,6 +55,12 @@ pub enum ErrorCause {
     UnclosedSubshell { opening_location: Location },
     /// A subshell contains no commands.
     EmptySubshell,
+    /// The `(` is not followed by `)` in a function definition.
+    UnmatchedParenthesis,
+    /// The function body is missing in a function definition command.
+    MissingFunctionBody,
+    /// A function body is not a compound command.
+    InvalidFunctionBody,
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -76,6 +82,9 @@ impl PartialEq for ErrorCause {
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
             | (EmptySubshell, EmptySubshell)
+            | (UnmatchedParenthesis, UnmatchedParenthesis)
+            | (MissingFunctionBody, MissingFunctionBody)
+            | (InvalidFunctionBody, InvalidFunctionBody)
             | (DoubleNegation, DoubleNegation)
             | (BangAfterBar, BangAfterBar)
             | (MissingCommandAfterBang, MissingCommandAfterBang)
@@ -131,6 +140,9 @@ impl fmt::Display for ErrorCause {
                 opening_location: _,
             } => f.write_str("The subshell is not closed"),
             EmptySubshell => f.write_str("The subshell is missing its content"),
+            UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
+            MissingFunctionBody => f.write_str("The function body is missing"),
+            InvalidFunctionBody => f.write_str("The function body must be a compound command"),
             MissingPipeline(and_or) => {
                 write!(f, "A command is missing after `{}`", and_or)
             }
