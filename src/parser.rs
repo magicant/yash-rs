@@ -383,14 +383,16 @@ impl Parser<'_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
-        // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
             Rec::Parsed(None) => self
                 .full_compound_command()
                 .await
                 .map(|c| Rec::Parsed(c.map(Command::Compound))),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::Simple(c)))),
+            Rec::Parsed(Some(c)) => self
+                .short_function_definition(c)
+                .await
+                .map(|c| Rec::Parsed(Some(c))),
         }
     }
 
@@ -1535,7 +1537,22 @@ mod tests {
         assert_eq!(next.id, EndOfInput);
     }
 
-    // TODO parser_command_function_definition
+    #[test]
+    fn parser_command_function() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "fun () ( echo )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.to_string(), "fun() (echo)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
 
     #[test]
     fn parser_command_eof() {
