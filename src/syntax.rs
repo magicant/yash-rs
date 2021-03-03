@@ -445,6 +445,11 @@ impl<H> SimpleCommand<H> {
     pub fn is_empty(&self) -> bool {
         self.assigns.is_empty() && self.words.is_empty() && self.redirs.is_empty()
     }
+
+    /// Returns true if the simple command contains only one word.
+    pub fn is_one_word(&self) -> bool {
+        self.assigns.is_empty() && self.words.len() == 1 && self.redirs.is_empty()
+    }
 }
 
 impl fmt::Display for SimpleCommand {
