@@ -172,6 +172,7 @@ impl Parser<'_> {
 
     /// Parses a (possibly empty) sequence of redirections.
     pub async fn redirections(&mut self) -> Result<Vec<Redir<MissingHereDoc>>> {
+        // TODO substitute global aliases
         let mut redirs = vec![];
         while let Some(redir) = self.redirection().await? {
             redirs.push(redir);
@@ -359,22 +360,27 @@ impl Parser<'_> {
         debug_assert!(intro.is_empty());
         // TODO reject invalid name if POSIXly-correct
 
-        match self.full_compound_command().await? {
-            Some(body) => Ok(Command::Function(FunctionDefinition {
-                has_keyword: false,
-                name,
-                body,
-            })),
-            None => {
-                let next = self.peek_token().await?;
-                let cause = if let Token(_) = next.id {
-                    ErrorCause::InvalidFunctionBody
-                } else {
-                    ErrorCause::MissingFunctionBody
-                };
-                let location = next.word.location.clone();
-                Err(Error { cause, location })
-            }
+        loop {
+            return match self.full_compound_command().await? {
+                Some(body) => Ok(Command::Function(FunctionDefinition {
+                    has_keyword: false,
+                    name,
+                    body,
+                })),
+                None => {
+                    let next = match self.take_token_aliased(false).await? {
+                        Rec::AliasSubstituted => continue,
+                        Rec::Parsed(next) => next,
+                    };
+                    let cause = if let Token(_) = next.id {
+                        ErrorCause::InvalidFunctionBody
+                    } else {
+                        ErrorCause::MissingFunctionBody
+                    };
+                    let location = next.word.location;
+                    Err(Error { cause, location })
+                }
+            };
         }
     }
 
@@ -648,7 +654,8 @@ impl Parser<'_> {
 mod tests {
     use super::lex::Lexer;
     use super::*;
-    use crate::source::Source;
+    use crate::alias::{AliasSet, HashEntry};
+    use crate::source::{Location, Source};
     use futures::executor::block_on;
 
     #[test]
@@ -1501,6 +1508,81 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
+    }
+
+    #[test]
+    fn parser_short_function_definition_alias() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "a".to_string(),
+            "f() ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            "(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(async {
+            parser.simple_command().await.unwrap(); // alias
+            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
+            parser.short_function_definition(c).await.unwrap()
+        });
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.has_keyword, false);
+            assert_eq!(f.name.to_string(), "f");
+            assert_eq!(f.body.to_string(), "(:)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_short_function_definition_alias_inapplicable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "()b");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            "(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("f".to_string())],
+            redirs: vec![],
+        };
+
+        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::InvalidFunctionBody);
+        assert_eq!(e.location.line.value, "()b");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
     }
 
     #[test]
