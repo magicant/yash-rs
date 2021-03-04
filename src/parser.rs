@@ -361,6 +361,8 @@ impl Parser<'_> {
         // TODO reject invalid name if POSIXly-correct
 
         loop {
+            while self.newline_and_here_doc_contents().await? {}
+
             return match self.full_compound_command().await? {
                 Some(body) => Ok(Command::Function(FunctionDefinition {
                     has_keyword: false,
@@ -1511,7 +1513,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_short_function_definition_alias() {
+    fn parser_short_function_definition_alias_and_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("".to_string());
@@ -1529,7 +1531,7 @@ mod tests {
         ));
         aliases.insert(HashEntry::new(
             "c".to_string(),
-            "(:)".to_string(),
+            "\n\n(:)".to_string(),
             false,
             origin.clone(),
         ));
