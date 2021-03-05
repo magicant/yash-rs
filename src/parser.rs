@@ -348,7 +348,7 @@ impl Parser<'_> {
         let open = self.take_token().await?;
         debug_assert_eq!(open.id, Operator(OpenParen));
 
-        let close = self.take_token().await?;
+        let close = self.take_token_aliased_fully().await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: ErrorCause::UnmatchedParenthesis,
@@ -1513,7 +1513,50 @@ mod tests {
     }
 
     #[test]
-    fn parser_short_function_definition_alias_and_newline() {
+    fn parser_short_function_definition_close_parenthesis_alias() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "a".to_string(),
+            "f( ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            " )\n\n(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(async {
+            parser.simple_command().await.unwrap(); // alias
+            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
+            parser.short_function_definition(c).await.unwrap()
+        });
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.has_keyword, false);
+            assert_eq!(f.name.to_string(), "f");
+            assert_eq!(f.body.to_string(), "(:)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_short_function_definition_body_alias_and_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("".to_string());
