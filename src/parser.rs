@@ -172,6 +172,7 @@ impl Parser<'_> {
 
     /// Parses a (possibly empty) sequence of redirections.
     pub async fn redirections(&mut self) -> Result<Vec<Redir<MissingHereDoc>>> {
+        // TODO substitute global aliases
         let mut redirs = vec![];
         while let Some(redir) = self.redirection().await? {
             redirs.push(redir);
@@ -321,19 +322,85 @@ impl Parser<'_> {
         Ok(Some(FullCompoundCommand { command, redirs }))
     }
 
+    /// Parses a function definition command that does not start with the
+    /// `function` reserved word.
+    ///
+    /// This function must be called just after a [simple
+    /// command](Self::simple_command) has been parsed.
+    /// The simple command must be passed as an argument.
+    /// If the simple command has only one word and the next token is `(`, it is
+    /// parsed as a function definition command.
+    /// Otherwise, the simple command is returned intact.
+    ///
+    /// # Errors
+    ///
+    /// - [`ErrorCause::UnmatchedParenthesis`]
+    /// - [`ErrorCause::MissingFunctionBody`]
+    /// - [`ErrorCause::InvalidFunctionBody`]
+    pub async fn short_function_definition(
+        &mut self,
+        mut intro: SimpleCommand<MissingHereDoc>,
+    ) -> Result<Command<MissingHereDoc>> {
+        if !intro.is_one_word() || self.peek_token().await?.id != Operator(OpenParen) {
+            return Ok(Command::Simple(intro));
+        }
+
+        let open = self.take_token().await?;
+        debug_assert_eq!(open.id, Operator(OpenParen));
+
+        let close = self.take_token_aliased_fully().await?;
+        if close.id != Operator(CloseParen) {
+            return Err(Error {
+                cause: ErrorCause::UnmatchedParenthesis,
+                location: close.word.location,
+            });
+        }
+
+        let name = intro.words.pop().unwrap();
+        debug_assert!(intro.is_empty());
+        // TODO reject invalid name if POSIXly-correct
+
+        loop {
+            while self.newline_and_here_doc_contents().await? {}
+
+            return match self.full_compound_command().await? {
+                Some(body) => Ok(Command::Function(FunctionDefinition {
+                    has_keyword: false,
+                    name,
+                    body,
+                })),
+                None => {
+                    let next = match self.take_token_aliased(false).await? {
+                        Rec::AliasSubstituted => continue,
+                        Rec::Parsed(next) => next,
+                    };
+                    let cause = if let Token(_) = next.id {
+                        ErrorCause::InvalidFunctionBody
+                    } else {
+                        ErrorCause::MissingFunctionBody
+                    };
+                    let location = next.word.location;
+                    Err(Error { cause, location })
+                }
+            };
+        }
+    }
+
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
-        // TODO Function definition
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
             Rec::Parsed(None) => self
                 .full_compound_command()
                 .await
                 .map(|c| Rec::Parsed(c.map(Command::Compound))),
-            Rec::Parsed(Some(c)) => Ok(Rec::Parsed(Some(Command::Simple(c)))),
+            Rec::Parsed(Some(c)) => self
+                .short_function_definition(c)
+                .await
+                .map(|c| Rec::Parsed(Some(c))),
         }
     }
 
@@ -589,7 +656,8 @@ impl Parser<'_> {
 mod tests {
     use super::lex::Lexer;
     use super::*;
-    use crate::source::Source;
+    use crate::alias::{AliasSet, HashEntry};
+    use crate::source::{Location, Source};
     use futures::executor::block_on;
 
     #[test]
@@ -1326,6 +1394,243 @@ mod tests {
     }
 
     #[test]
+    fn parser_short_function_definition_ok() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " ( ) ( : ) > /dev/null ");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("foo".to_string())],
+            redirs: vec![],
+        };
+
+        let result = block_on(parser.short_function_definition(c)).unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.has_keyword, false);
+            assert_eq!(f.name.to_string(), "foo");
+            assert_eq!(f.body.to_string(), "(:) >/dev/null");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_short_function_definition_not_one_word_name() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![],
+            redirs: vec![],
+        };
+
+        let result = block_on(parser.short_function_definition(c)).unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Simple(c) = result {
+            assert_eq!(c.to_string(), "");
+        } else {
+            panic!("Not a simple command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(OpenParen));
+    }
+
+    #[test]
+    fn parser_short_function_definition_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("foo".to_string())],
+            redirs: vec![],
+        };
+
+        let result = block_on(parser.short_function_definition(c)).unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Simple(c) = result {
+            assert_eq!(c.to_string(), "foo");
+        } else {
+            panic!("Not a simple command: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn parser_short_function_definition_unmatched_parenthesis() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( ");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("foo".to_string())],
+            redirs: vec![],
+        };
+
+        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnmatchedParenthesis);
+        assert_eq!(e.location.line.value, "( ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
+    }
+
+    #[test]
+    fn parser_short_function_definition_missing_function_body() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( ) ");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("foo".to_string())],
+            redirs: vec![],
+        };
+
+        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::MissingFunctionBody);
+        assert_eq!(e.location.line.value, "( ) ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn parser_short_function_definition_invalid_function_body() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "() foo ; ");
+        let mut parser = Parser::new(&mut lexer);
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("foo".to_string())],
+            redirs: vec![],
+        };
+
+        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::InvalidFunctionBody);
+        assert_eq!(e.location.line.value, "() foo ; ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
+    }
+
+    #[test]
+    fn parser_short_function_definition_close_parenthesis_alias() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "a".to_string(),
+            "f( ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            " )\n\n(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(async {
+            parser.simple_command().await.unwrap(); // alias
+            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
+            parser.short_function_definition(c).await.unwrap()
+        });
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.has_keyword, false);
+            assert_eq!(f.name.to_string(), "f");
+            assert_eq!(f.body.to_string(), "(:)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_short_function_definition_body_alias_and_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "a".to_string(),
+            "f() ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            "\n\n(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(async {
+            parser.simple_command().await.unwrap(); // alias
+            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
+            parser.short_function_definition(c).await.unwrap()
+        });
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.has_keyword, false);
+            assert_eq!(f.name.to_string(), "f");
+            assert_eq!(f.body.to_string(), "(:)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_short_function_definition_alias_inapplicable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "()b");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "b".to_string(),
+            " c".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "c".to_string(),
+            "(:)".to_string(),
+            false,
+            origin.clone(),
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let c = SimpleCommand {
+            assigns: vec![],
+            words: vec![Word::with_str("f".to_string())],
+            redirs: vec![],
+        };
+
+        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::InvalidFunctionBody);
+        assert_eq!(e.location.line.value, "()b");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
+    }
+
+    #[test]
     fn parser_command_simple() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo < bar");
         let mut parser = Parser::new(&mut lexer);
@@ -1359,7 +1664,22 @@ mod tests {
         assert_eq!(next.id, EndOfInput);
     }
 
-    // TODO parser_command_function_definition
+    #[test]
+    fn parser_command_function() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "fun () ( echo )");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let Command::Function(f) = result {
+            assert_eq!(f.to_string(), "fun() (echo)");
+        } else {
+            panic!("Not a function definition: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
 
     #[test]
     fn parser_command_eof() {

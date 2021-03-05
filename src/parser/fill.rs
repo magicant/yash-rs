@@ -131,6 +131,23 @@ impl Fill for FullCompoundCommand<MissingHereDoc> {
     }
 }
 
+impl Fill for FunctionDefinition<MissingHereDoc> {
+    type Full = FunctionDefinition;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<FunctionDefinition> {
+        let FunctionDefinition {
+            has_keyword,
+            name,
+            body,
+        } = self;
+        let body = body.fill(i)?;
+        Ok(FunctionDefinition {
+            has_keyword,
+            name,
+            body,
+        })
+    }
+}
+
 impl Fill for Command<MissingHereDoc> {
     type Full = Command;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Command> {
@@ -138,6 +155,7 @@ impl Fill for Command<MissingHereDoc> {
         Ok(match self {
             Simple(c) => Simple(c.fill(i)?),
             Compound(c) => Compound(c.fill(i)?),
+            Function(c) => Function(c.fill(i)?),
         })
     }
 }
