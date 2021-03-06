@@ -371,7 +371,7 @@ impl Parser<'_> {
     ///
     /// This function does not perform alias substitution. In most cases you should use
     /// [`take_token_aliased`](Parser::take_token_aliased) instead.
-    pub async fn take_token(&mut self) -> Result<Token> {
+    pub async fn take_token_raw(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
     }
@@ -400,7 +400,7 @@ impl Parser<'_> {
     /// call this function on a reserved word. To consume a reserved word, you
     /// should call [`take_token`](Self::take_token).
     pub async fn take_token_aliased(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
-        let token = self.take_token().await?;
+        let token = self.take_token_raw().await?;
 
         if !self.aliases.is_empty() {
             if let Some(name) = token.word.to_string_if_literal() {
