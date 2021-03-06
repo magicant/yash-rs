@@ -72,7 +72,7 @@ impl Parser<'_> {
             return Ok(None);
         }
 
-        let opening_location = self.take_token_raw().await?.word.location;
+        let opening_location = self.take_token_auto(&[]).await?.word.location;
         let mut words = vec![];
 
         loop {
@@ -110,7 +110,7 @@ impl Parser<'_> {
         operator: RedirOp,
     ) -> Result<RedirBody<MissingHereDoc>> {
         // TODO reject >>| and <<< if POSIXly-correct
-        let operator_location = self.take_token_raw().await?.word.location;
+        let operator_location = self.take_token_auto(&[]).await?.word.location;
         let operand = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingRedirOperand,
             location: operator_location,
@@ -123,7 +123,7 @@ impl Parser<'_> {
         &mut self,
         remove_tabs: bool,
     ) -> Result<RedirBody<MissingHereDoc>> {
-        let operator_location = self.take_token_raw().await?.word.location;
+        let operator_location = self.take_token_auto(&[]).await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingHereDocDelimiter,
             location: operator_location,
@@ -269,12 +269,12 @@ impl Parser<'_> {
     /// - [`ErrorCause::UnclosedSubshell`]
     /// - [`ErrorCause::EmptySubshell`]
     async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
-        let open = self.take_token_raw().await?;
+        let open = self.take_token_auto(&[]).await?;
         assert_eq!(open.id, Operator(OpenParen));
 
         let list = self.maybe_compound_list_boxed().await?;
 
-        let close = self.take_token_raw().await?;
+        let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: ErrorCause::UnclosedSubshell {
@@ -345,7 +345,7 @@ impl Parser<'_> {
             return Ok(Command::Simple(intro));
         }
 
-        let open = self.take_token_raw().await?;
+        let open = self.take_token_auto(&[]).await?;
         debug_assert_eq!(open.id, Operator(OpenParen));
 
         let close = self.take_token_aliased_fully().await?;
@@ -416,7 +416,7 @@ impl Parser<'_> {
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
                 if let Token(Some(Keyword::Bang)) = self.peek_token().await?.id {
-                    let location = self.take_token_raw().await?.word.location;
+                    let location = self.take_token_auto(&[Keyword::Bang]).await?.word.location;
                     loop {
                         // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
@@ -443,7 +443,7 @@ impl Parser<'_> {
         // Parse `|`
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
-            let bar_location = self.take_token_raw().await?.word.location;
+            let bar_location = self.take_token_auto(&[]).await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -492,7 +492,7 @@ impl Parser<'_> {
                 Operator(BarBar) => AndOr::OrElse,
                 _ => break,
             };
-            self.take_token_raw().await?;
+            self.take_token_auto(&[]).await?;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -550,7 +550,7 @@ impl Parser<'_> {
             if !next {
                 break;
             }
-            self.take_token_raw().await?;
+            self.take_token_auto(&[]).await?;
 
             let result = loop {
                 if let Rec::Parsed(result) = self.and_or_list().await? {
@@ -576,7 +576,7 @@ impl Parser<'_> {
             return Ok(false);
         }
 
-        self.take_token_raw().await?;
+        self.take_token_auto(&[]).await?;
         self.here_doc_contents().await?;
         Ok(true)
     }

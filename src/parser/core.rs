@@ -366,14 +366,14 @@ impl Parser<'_> {
         self.token.as_ref().unwrap().as_ref().map_err(|e| e.clone())
     }
 
-    // TODO Consider making this function private in favor of take_token_aliased(_fully)
     /// Consumes the current token.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
     ///
     /// This function does not perform alias substitution. In most cases you should use
-    /// [`take_token_aliased`](Parser::take_token_aliased) instead.
-    pub async fn take_token_raw(&mut self) -> Result<Token> {
+    /// [`take_token_manual`](Self::take_token_manual) or
+    /// [`take_token_auto`](Self::take_token_auto) instead.
+    async fn take_token_raw(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
     }
