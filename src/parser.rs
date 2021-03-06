@@ -54,7 +54,7 @@ impl Parser<'_> {
     /// needed after alias substitution.
     pub async fn take_token_aliased_fully(&mut self) -> Result<Token> {
         loop {
-            if let Rec::Parsed(t) = self.take_token_aliased(false).await? {
+            if let Rec::Parsed(t) = self.take_token_manual(false).await? {
                 return Ok(t);
             }
         }
@@ -206,7 +206,7 @@ impl Parser<'_> {
             }
 
             // Apply alias substitution
-            let token = match self.take_token_aliased(result.words.is_empty()).await? {
+            let token = match self.take_token_manual(result.words.is_empty()).await? {
                 Rec::AliasSubstituted => {
                     if result.is_empty() {
                         return Ok(Rec::AliasSubstituted);
@@ -370,7 +370,7 @@ impl Parser<'_> {
                     body,
                 })),
                 None => {
-                    let next = match self.take_token_aliased(false).await? {
+                    let next = match self.take_token_manual(false).await? {
                         Rec::AliasSubstituted => continue,
                         Rec::Parsed(next) => next,
                     };

@@ -397,9 +397,10 @@ impl Parser<'_> {
     ///
     /// However, alias substitution should _not_ be performed on a reserved word
     /// in any case. It is your responsibility to check the token type and not to
-    /// call this function on a reserved word. To consume a reserved word, you
-    /// should call [`take_token`](Self::take_token).
-    pub async fn take_token_aliased(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
+    /// call this function on a reserved word. That is why this function is named
+    /// `manual`. To consume a reserved word, you should call
+    /// [`take_token`](Self::take_token).
+    pub async fn take_token_manual(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
         let token = self.take_token_raw().await?;
 
         if !self.aliases.is_empty() {
@@ -526,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_take_token_aliased_successful_substitution() {
+    fn parser_take_token_manual_successful_substitution() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X");
             let mut aliases = AliasSet::new();
@@ -538,20 +539,20 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap();
+            let token = parser.take_token_manual(true).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "x");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_not_command_name() {
+    fn parser_take_token_manual_not_command_name() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X");
             let mut aliases = AliasSet::new();
@@ -563,13 +564,13 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(false).await.unwrap().unwrap();
+            let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_not_literal() {
+    fn parser_take_token_manual_not_literal() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, r"\X");
             let mut aliases = AliasSet::new();
@@ -587,25 +588,25 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), r"\X");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_no_match() {
+    fn parser_take_token_manual_no_match() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X");
             let aliases = AliasSet::new();
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_recursive_substitution() {
+    fn parser_take_token_manual_recursive_substitution() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X");
             let mut aliases = AliasSet::new();
@@ -623,33 +624,33 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap();
+            let token = parser.take_token_manual(true).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(true).await.unwrap();
+            let token = parser.take_token_manual(true).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "y");
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "x");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_after_blank_ending_substitution() {
+    fn parser_take_token_manual_after_blank_ending_substitution() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X\tY");
             let mut aliases = AliasSet::new();
@@ -667,30 +668,30 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap();
+            let token = parser.take_token_manual(true).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
 
-            let token = parser.take_token_aliased(false).await.unwrap();
+            let token = parser.take_token_manual(false).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(false).await.unwrap().unwrap();
+            let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "y");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_not_after_blank_ending_substitution() {
+    fn parser_take_token_manual_not_after_blank_ending_substitution() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X\tY");
             let mut aliases = AliasSet::new();
@@ -708,23 +709,23 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(true).await.unwrap();
+            let token = parser.take_token_manual(true).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(true).await.unwrap().unwrap();
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
 
-            let token = parser.take_token_aliased(false).await.unwrap().unwrap();
+            let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "Y");
         });
     }
 
     #[test]
-    fn parser_take_token_aliased_global() {
+    fn parser_take_token_manual_global() {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "X");
             let mut aliases = AliasSet::new();
@@ -736,14 +737,14 @@ mod tests {
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
-            let token = parser.take_token_aliased(false).await.unwrap();
+            let token = parser.take_token_manual(false).await.unwrap();
             assert!(
                 token.is_alias_substituted(),
                 "{:?} should be AliasSubstituted",
                 &token
             );
 
-            let token = parser.take_token_aliased(false).await.unwrap().unwrap();
+            let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "x");
         });
     }
