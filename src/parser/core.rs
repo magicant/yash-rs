@@ -377,7 +377,7 @@ impl Parser<'_> {
     }
 
     // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
-    /// Consumes the current token if it is not an alias.
+    /// Consumes the current token after performing applicable alias substitution.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
     ///
