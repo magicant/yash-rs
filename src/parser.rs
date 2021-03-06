@@ -26,7 +26,6 @@ pub mod lex;
 use self::lex::keyword::Keyword;
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
-use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
 use std::convert::TryFrom;
@@ -44,22 +43,6 @@ pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
 impl Parser<'_> {
-    /// Consumes the current token with possible alias substitution fully applied.
-    ///
-    /// This function calls
-    /// [`self.take_token_aliased(false)`](Parser::take_token_aliased) repeatedly
-    /// until it returns `Ok(Rec::Parsed(_))` or `Err(_)` and then returns it.
-    ///
-    /// This function should be used only in contexts where no backtrack is
-    /// needed after alias substitution.
-    pub async fn take_token_aliased_fully(&mut self) -> Result<Token> {
-        loop {
-            if let Rec::Parsed(t) = self.take_token_manual(false).await? {
-                return Ok(t);
-            }
-        }
-    }
-
     /// Parses the value of an array assignment.
     ///
     /// This function first consumes a `(` token, then any number of words
@@ -76,7 +59,7 @@ impl Parser<'_> {
         let mut words = vec![];
 
         loop {
-            let next = self.take_token_aliased_fully().await?;
+            let next = self.take_token_auto(&[]).await?;
             match next.id {
                 Operator(Newline) => continue,
                 Operator(CloseParen) => break,
@@ -95,7 +78,7 @@ impl Parser<'_> {
 
     /// Parses the operand of a redirection operator.
     async fn redirection_operand(&mut self) -> Result<Option<Word>> {
-        let operand = self.take_token_aliased_fully().await?;
+        let operand = self.take_token_auto(&[]).await?;
         match operand.id {
             Token(_) => (),
             Operator(_) | EndOfInput => return Ok(None),
@@ -348,7 +331,7 @@ impl Parser<'_> {
         let open = self.take_token_auto(&[]).await?;
         debug_assert_eq!(open.id, Operator(OpenParen));
 
-        let close = self.take_token_aliased_fully().await?;
+        let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: ErrorCause::UnmatchedParenthesis,
