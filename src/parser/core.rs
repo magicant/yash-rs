@@ -19,9 +19,11 @@
 //! This module includes common types that are used as building blocks for constructing the syntax
 //! parser.
 
+use super::lex::keyword::Keyword;
 use super::lex::Lexer;
 use super::lex::PartialHereDoc;
 use super::lex::Token;
+use super::lex::TokenId::*;
 use crate::alias::AliasSet;
 use crate::parser::lex::is_blank;
 use crate::source::Location;
@@ -422,6 +424,31 @@ impl Parser<'_> {
         Ok(Rec::Parsed(token))
     }
 
+    /// Consumes the current token after performing applicable alias substitution.
+    ///
+    /// This function performs alias substitution unless the result is one of the
+    /// reserved words specified in the argument.
+    ///
+    /// Alias substitution is performed repeatedly until a non-alias token is
+    /// found. That is why this function is named `auto`. This function should be
+    /// used only in contexts where no backtrack is needed after alias
+    /// substitution. If you need to backtrack or want to know whether alias
+    /// substitution was performed or not, you should use
+    /// [`Self::take_token_manual`](Self::take_token_manual), which performs
+    /// alias substitution at most once and returns `Rec`.
+    pub async fn take_token_auto(&mut self, keywords: &[Keyword]) -> Result<Token> {
+        loop {
+            if let Token(Some(keyword)) = self.peek_token().await?.id {
+                if keywords.contains(&keyword) {
+                    return self.take_token_raw().await;
+                }
+            }
+            if let Rec::Parsed(token) = self.take_token_manual(false).await? {
+                return Ok(token);
+            }
+        }
+    }
+
     /// Tests if there is a blank before the next token.
     ///
     /// This function can be called to tell whether the previous and next tokens
@@ -747,6 +774,84 @@ mod tests {
             let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "x");
         });
+    }
+
+    #[test]
+    fn parser_take_token_auto_non_keyword() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "x".to_string(),
+                true,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_auto(&[]).await.unwrap();
+            assert_eq!(token.to_string(), "x");
+        })
+    }
+
+    #[test]
+    fn parser_take_token_auto_keyword_matched() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "if");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "if".to_string(),
+                "x".to_string(),
+                true,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_auto(&[Keyword::If]).await.unwrap();
+            assert_eq!(token.to_string(), "if");
+        })
+    }
+
+    #[test]
+    fn parser_take_token_auto_keyword_unmatched() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "if");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "if".to_string(),
+                "x".to_string(),
+                true,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_auto(&[]).await.unwrap();
+            assert_eq!(token.to_string(), "x");
+        })
+    }
+
+    #[test]
+    fn parser_take_token_auto_alias_substitution_to_keyword_matched() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, "X");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                "X".to_string(),
+                "if".to_string(),
+                true,
+                Location::dummy("?".to_string()),
+            ));
+            aliases.insert(HashEntry::new(
+                "if".to_string(),
+                "x".to_string(),
+                true,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_auto(&[Keyword::If]).await.unwrap();
+            assert_eq!(token.to_string(), "if");
+        })
     }
 
     #[test]
