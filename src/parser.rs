@@ -26,7 +26,6 @@ pub mod lex;
 use self::lex::keyword::Keyword;
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
-use self::lex::Token;
 use self::lex::TokenId::*;
 use super::syntax::*;
 use std::convert::TryFrom;
@@ -44,22 +43,6 @@ pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
 impl Parser<'_> {
-    /// Consumes the current token with possible alias substitution fully applied.
-    ///
-    /// This function calls
-    /// [`self.take_token_aliased(false)`](Parser::take_token_aliased) repeatedly
-    /// until it returns `Ok(Rec::Parsed(_))` or `Err(_)` and then returns it.
-    ///
-    /// This function should be used only in contexts where no backtrack is
-    /// needed after alias substitution.
-    pub async fn take_token_aliased_fully(&mut self) -> Result<Token> {
-        loop {
-            if let Rec::Parsed(t) = self.take_token_aliased(false).await? {
-                return Ok(t);
-            }
-        }
-    }
-
     /// Parses the value of an array assignment.
     ///
     /// This function first consumes a `(` token, then any number of words
@@ -72,11 +55,11 @@ impl Parser<'_> {
             return Ok(None);
         }
 
-        let opening_location = self.take_token().await?.word.location;
+        let opening_location = self.take_token_auto(&[]).await?.word.location;
         let mut words = vec![];
 
         loop {
-            let next = self.take_token_aliased_fully().await?;
+            let next = self.take_token_auto(&[]).await?;
             match next.id {
                 Operator(Newline) => continue,
                 Operator(CloseParen) => break,
@@ -95,7 +78,7 @@ impl Parser<'_> {
 
     /// Parses the operand of a redirection operator.
     async fn redirection_operand(&mut self) -> Result<Option<Word>> {
-        let operand = self.take_token_aliased_fully().await?;
+        let operand = self.take_token_auto(&[]).await?;
         match operand.id {
             Token(_) => (),
             Operator(_) | EndOfInput => return Ok(None),
@@ -110,7 +93,7 @@ impl Parser<'_> {
         operator: RedirOp,
     ) -> Result<RedirBody<MissingHereDoc>> {
         // TODO reject >>| and <<< if POSIXly-correct
-        let operator_location = self.take_token().await?.word.location;
+        let operator_location = self.take_token_auto(&[]).await?.word.location;
         let operand = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingRedirOperand,
             location: operator_location,
@@ -123,7 +106,7 @@ impl Parser<'_> {
         &mut self,
         remove_tabs: bool,
     ) -> Result<RedirBody<MissingHereDoc>> {
-        let operator_location = self.take_token().await?.word.location;
+        let operator_location = self.take_token_auto(&[]).await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
             cause: ErrorCause::MissingHereDocDelimiter,
             location: operator_location,
@@ -206,7 +189,7 @@ impl Parser<'_> {
             }
 
             // Apply alias substitution
-            let token = match self.take_token_aliased(result.words.is_empty()).await? {
+            let token = match self.take_token_manual(result.words.is_empty()).await? {
                 Rec::AliasSubstituted => {
                     if result.is_empty() {
                         return Ok(Rec::AliasSubstituted);
@@ -269,12 +252,12 @@ impl Parser<'_> {
     /// - [`ErrorCause::UnclosedSubshell`]
     /// - [`ErrorCause::EmptySubshell`]
     async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
-        let open = self.take_token().await?;
+        let open = self.take_token_auto(&[]).await?;
         assert_eq!(open.id, Operator(OpenParen));
 
         let list = self.maybe_compound_list_boxed().await?;
 
-        let close = self.take_token().await?;
+        let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: ErrorCause::UnclosedSubshell {
@@ -345,10 +328,10 @@ impl Parser<'_> {
             return Ok(Command::Simple(intro));
         }
 
-        let open = self.take_token().await?;
+        let open = self.take_token_auto(&[]).await?;
         debug_assert_eq!(open.id, Operator(OpenParen));
 
-        let close = self.take_token_aliased_fully().await?;
+        let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: ErrorCause::UnmatchedParenthesis,
@@ -370,7 +353,7 @@ impl Parser<'_> {
                     body,
                 })),
                 None => {
-                    let next = match self.take_token_aliased(false).await? {
+                    let next = match self.take_token_manual(false).await? {
                         Rec::AliasSubstituted => continue,
                         Rec::Parsed(next) => next,
                     };
@@ -416,7 +399,7 @@ impl Parser<'_> {
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
                 if let Token(Some(Keyword::Bang)) = self.peek_token().await?.id {
-                    let location = self.take_token().await?.word.location;
+                    let location = self.take_token_auto(&[Keyword::Bang]).await?.word.location;
                     loop {
                         // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
@@ -443,7 +426,7 @@ impl Parser<'_> {
         // Parse `|`
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
-            let bar_location = self.take_token().await?.word.location;
+            let bar_location = self.take_token_auto(&[]).await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -492,7 +475,7 @@ impl Parser<'_> {
                 Operator(BarBar) => AndOr::OrElse,
                 _ => break,
             };
-            self.take_token().await?;
+            self.take_token_auto(&[]).await?;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -550,7 +533,7 @@ impl Parser<'_> {
             if !next {
                 break;
             }
-            self.take_token().await?;
+            self.take_token_auto(&[]).await?;
 
             let result = loop {
                 if let Rec::Parsed(result) = self.and_or_list().await? {
@@ -576,7 +559,7 @@ impl Parser<'_> {
             return Ok(false);
         }
 
-        self.take_token().await?;
+        self.take_token_auto(&[]).await?;
         self.here_doc_contents().await?;
         Ok(true)
     }
