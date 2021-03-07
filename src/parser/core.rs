@@ -378,6 +378,28 @@ impl Parser<'_> {
         self.token.take().unwrap()
     }
 
+    /// Performs alias substitution on a token that has just been
+    /// [taken](Self::take_token_raw).
+    fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
+        if !self.aliases.is_empty() {
+            if let Some(name) = token.word.to_string_if_literal() {
+                if !token.word.location.line.source.is_alias_for(&name) {
+                    if let Some(alias) = self.aliases.get(&name as &str) {
+                        if is_command_name
+                            || alias.0.global
+                            || self.lexer.is_after_blank_ending_alias(token.index)
+                        {
+                            self.lexer.substitute_alias(token.index, &alias.0);
+                            return Rec::AliasSubstituted;
+                        }
+                    }
+                }
+            }
+        }
+
+        Rec::Parsed(token)
+    }
+
     // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
     /// Consumes the current token after performing applicable alias substitution.
     ///
@@ -404,24 +426,7 @@ impl Parser<'_> {
     /// [`take_token`](Self::take_token).
     pub async fn take_token_manual(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
         let token = self.take_token_raw().await?;
-
-        if !self.aliases.is_empty() {
-            if let Some(name) = token.word.to_string_if_literal() {
-                if !token.word.location.line.source.is_alias_for(&name) {
-                    if let Some(alias) = self.aliases.get(&name as &str) {
-                        if is_command_name
-                            || alias.0.global
-                            || self.lexer.is_after_blank_ending_alias(token.index)
-                        {
-                            self.lexer.substitute_alias(token.index, &alias.0);
-                            return Ok(Rec::AliasSubstituted);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(Rec::Parsed(token))
+        Ok(self.substitute_alias(token, is_command_name))
     }
 
     /// Consumes the current token after performing applicable alias substitution.
@@ -438,12 +443,13 @@ impl Parser<'_> {
     /// alias substitution at most once and returns `Rec`.
     pub async fn take_token_auto(&mut self, keywords: &[Keyword]) -> Result<Token> {
         loop {
-            if let Token(Some(keyword)) = self.peek_token().await?.id {
+            let token = self.take_token_raw().await?;
+            if let Token(Some(keyword)) = token.id {
                 if keywords.contains(&keyword) {
-                    return self.take_token_raw().await;
+                    return Ok(token)
                 }
             }
-            if let Rec::Parsed(token) = self.take_token_manual(false).await? {
+            if let Rec::Parsed(token) = self.substitute_alias(token, false) {
                 return Ok(token);
             }
         }
