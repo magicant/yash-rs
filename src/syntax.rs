@@ -31,7 +31,6 @@ use itertools::Itertools;
 use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
-use std::rc::Rc;
 
 /// Possibly literal syntax element.
 ///
@@ -548,7 +547,7 @@ pub struct Pipeline<H = HereDoc> {
     /// Elements of the pipeline.
     ///
     /// A valid pipeline must have at least one command.
-    pub commands: Vec<Rc<Command<H>>>,
+    pub commands: Vec<Command<H>>,
     /// True if the pipeline begins with a `!`.
     pub negation: bool,
 }
@@ -897,14 +896,14 @@ mod tests {
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 
-    fn dummy_command(s: String) -> Rc<Command> {
+    fn dummy_command(s: String) -> Command {
         let w = Word::with_str(s);
         let s = SimpleCommand {
             assigns: vec![],
             words: vec![w],
             redirs: vec![],
         };
-        Rc::new(Command::Simple(s))
+        Command::Simple(s)
     }
 
     fn dummy_pipeline(s: String) -> Pipeline {

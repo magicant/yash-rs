@@ -31,7 +31,6 @@ use super::syntax::*;
 use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
 
 pub use self::core::AsyncFnMut;
 pub use self::core::Error;
@@ -424,13 +423,13 @@ impl Parser<'_> {
         };
 
         // Parse `|`
-        let mut commands = vec![Rc::new(first)];
+        let mut commands = vec![first];
         while self.peek_token().await?.id == Operator(Bar) {
             let bar_location = self.take_token_auto(&[]).await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
-            commands.push(Rc::new(loop {
+            commands.push(loop {
                 // Parse the next command
                 if let Rec::Parsed(option) = self.command().await? {
                     if let Some(next) = option {
@@ -451,7 +450,7 @@ impl Parser<'_> {
                         })
                     };
                 }
-            }));
+            });
         }
 
         Ok(Rec::Parsed(Some(Pipeline { commands, negation })))
@@ -1892,7 +1891,7 @@ mod tests {
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
-        let cmd = match *commands[0] {
+        let cmd = match commands[0] {
             Command::Simple(ref c) => c,
             _ => panic!("Expected a simple command but got {:?}", commands[0]),
         };
