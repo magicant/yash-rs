@@ -381,16 +381,19 @@ impl Parser<'_> {
     /// Performs alias substitution on a token that has just been
     /// [taken](Self::take_token_raw).
     fn substitute_alias(&mut self, token: Token, is_command_name: bool) -> Rec<Token> {
+        // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
         if !self.aliases.is_empty() {
-            if let Some(name) = token.word.to_string_if_literal() {
-                if !token.word.location.line.source.is_alias_for(&name) {
-                    if let Some(alias) = self.aliases.get(&name as &str) {
-                        if is_command_name
-                            || alias.0.global
-                            || self.lexer.is_after_blank_ending_alias(token.index)
-                        {
-                            self.lexer.substitute_alias(token.index, &alias.0);
-                            return Rec::AliasSubstituted;
+            if let Token(_) = token.id {
+                if let Some(name) = token.word.to_string_if_literal() {
+                    if !token.word.location.line.source.is_alias_for(&name) {
+                        if let Some(alias) = self.aliases.get(&name as &str) {
+                            if is_command_name
+                                || alias.0.global
+                                || self.lexer.is_after_blank_ending_alias(token.index)
+                            {
+                                self.lexer.substitute_alias(token.index, &alias.0);
+                                return Rec::AliasSubstituted;
+                            }
                         }
                     }
                 }
@@ -400,7 +403,6 @@ impl Parser<'_> {
         Rec::Parsed(token)
     }
 
-    // TODO Only POSIXly-valid alias name should be recognized in POSIXly-correct mode.
     /// Consumes the current token after performing applicable alias substitution.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
@@ -626,6 +628,25 @@ mod tests {
             let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), r"\X");
         });
+    }
+
+    #[test]
+    fn parser_take_token_manual_operator() {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, ";");
+            let mut aliases = AliasSet::new();
+            aliases.insert(HashEntry::new(
+                ";".to_string(),
+                "x".to_string(),
+                false,
+                Location::dummy("?".to_string()),
+            ));
+            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+
+            let token = parser.take_token_manual(true).await.unwrap().unwrap();
+            assert_eq!(token.id, Operator(super::super::lex::Operator::Semicolon));
+            assert_eq!(token.word.to_string_if_literal().unwrap(), ";");
+        })
     }
 
     #[test]
