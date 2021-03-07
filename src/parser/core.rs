@@ -422,8 +422,8 @@ impl Parser<'_> {
     /// However, alias substitution should _not_ be performed on a reserved word
     /// in any case. It is your responsibility to check the token type and not to
     /// call this function on a reserved word. That is why this function is named
-    /// `manual`. To consume a reserved word, you should call
-    /// [`take_token`](Self::take_token).
+    /// `manual`. To consume a reserved word without performing alias
+    /// substitution, you should call [`take_token_auto`](Self::take_token_auto).
     pub async fn take_token_manual(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
         let token = self.take_token_raw().await?;
         Ok(self.substitute_alias(token, is_command_name))
@@ -446,7 +446,7 @@ impl Parser<'_> {
             let token = self.take_token_raw().await?;
             if let Token(Some(keyword)) = token.id {
                 if keywords.contains(&keyword) {
-                    return Ok(token)
+                    return Ok(token);
                 }
             }
             if let Rec::Parsed(token) = self.substitute_alias(token, false) {
@@ -460,8 +460,9 @@ impl Parser<'_> {
     /// This function can be called to tell whether the previous and next tokens
     /// are separated by a blank or they are adjacent.
     ///
-    /// This function must be called after the previous token has been
-    /// [taken](Self::take_token) and before the next token is
+    /// This function must be called after the previous token has been taken
+    /// (either [manual](Self::take_token_manual) or
+    /// [auto](Self::take_token_auto)) and before the next token is
     /// [peeked](Self::peek_token). Otherwise, this function would panic.
     ///
     /// This function consumes and ignores line continuations that may lie
@@ -487,9 +488,10 @@ impl Parser<'_> {
     ///
     /// The results are accumulated in the internal list of (non-partial) here-documents.
     ///
-    /// This function must be called just after a newline token has been
-    /// [taken](Parser::take_token). If there is a pending token that has been peeked but not yet
-    /// taken, this function will panic!
+    /// This function must be called just after a newline token has been taken
+    /// (either [manual](Self::take_token_manual) or
+    /// [auto](Self::take_token_auto)). If there is a pending token that has been
+    /// peeked but not yet taken, this function will panic!
     pub async fn here_doc_contents(&mut self) -> Result<()> {
         assert!(
             self.token.is_none(),
