@@ -165,7 +165,6 @@ mod core {
         }
 
         /// Peeks the next character.
-        #[must_use]
         async fn peek_char_or_end(&mut self) -> Result<PeekChar<'_>> {
             loop {
                 if self.index < self.source.len() {
@@ -219,7 +218,6 @@ mod core {
         /// Peeks the next character.
         ///
         /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
-        #[must_use]
         pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
             self.peek_char_or_end().await.map(|p| p.as_option())
         }
@@ -231,7 +229,6 @@ mod core {
         ///
         /// This function required a mutable reference to `self` since it may need to read a next
         /// line if it is not yet read.
-        #[must_use]
         pub async fn location(&mut self) -> Result<&Location> {
             self.peek_char_or_end().await.map(|p| p.location())
         }
