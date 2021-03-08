@@ -475,6 +475,13 @@ pub fn is_token_delimiter_char(c: char) -> bool {
     is_operator_char(c) || is_blank(c)
 }
 
+/// Return type for [`Lexer::operator_tail`]
+struct OperatorTail {
+    pub operator: Operator,
+    pub location: Location,
+    pub reversed_key: Vec<char>,
+}
+
 impl Lexer {
     /// Skips a character if the given function returns true for it.
     ///
@@ -532,12 +539,10 @@ impl Lexer {
     }
 
     /// Parses an operator that matches a key in the given trie, if any.
-    ///
-    /// The char vector in the result is the reversed key that matched.
     fn operator_tail(
         &mut self,
         trie: Trie,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<(Operator, Location, Vec<char>)>>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<OperatorTail>>> + '_>> {
         Box::pin(async move {
             if trie.is_empty() {
                 return Ok(None);
@@ -557,9 +562,18 @@ impl Lexer {
             let old_index = self.index();
             self.consume_char();
 
-            if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
-                chars.push(sc.value);
-                return Ok(Some((op, sc.location, chars)));
+            if let Some(OperatorTail {
+                operator,
+                location: _,
+                mut reversed_key,
+            }) = self.operator_tail(edge.next).await?
+            {
+                reversed_key.push(sc.value);
+                return Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key,
+                }));
             }
 
             match edge.value {
@@ -567,7 +581,11 @@ impl Lexer {
                     self.rewind(old_index);
                     Ok(None)
                 }
-                Some(op) => Ok(Some((op, sc.location, vec![sc.value]))),
+                Some(operator) => Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key: vec![sc.value],
+                })),
             }
         })
     }
@@ -576,14 +594,19 @@ impl Lexer {
     pub async fn operator(&mut self) -> Result<Option<Token>> {
         let index = self.index();
         self.operator_tail(OPERATORS).await.map(|o| {
-            o.map(|(op, location, chars)| {
-                let units = chars
+            o.map(|ot| {
+                let OperatorTail {
+                    operator,
+                    location,
+                    reversed_key,
+                } = ot;
+                let units = reversed_key
                     .into_iter()
                     .rev()
                     .map(|c| Unquoted(Literal(c)))
                     .collect::<Vec<_>>();
                 let word = Word { units, location };
-                let id = TokenId::Operator(op);
+                let id = TokenId::Operator(operator);
                 Token { word, id, index }
             })
         })
