@@ -86,8 +86,8 @@ impl Memory {
         Memory { lines, end }
     }
 
-    fn next_line_sync(&mut self, _: &Context) -> Result<Line, Error> {
-        Ok(self.lines.pop_front().unwrap_or_else(|| self.end.clone()))
+    fn next_line_sync(&mut self, _: &Context) -> Line {
+        self.lines.pop_front().unwrap_or_else(|| self.end.clone())
     }
 }
 
@@ -96,7 +96,7 @@ impl Input for Memory {
         &mut self,
         context: &Context,
     ) -> Pin<Box<dyn Future<Output = Result<Line, Error>>>> {
-        Box::pin(ready(self.next_line_sync(context)))
+        Box::pin(ready(Ok(self.next_line_sync(context))))
     }
 }
 
