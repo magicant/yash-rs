@@ -51,6 +51,7 @@ pub struct LocalEnv {
 
 impl LocalEnv {
     /// Creates a new local environment.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> LocalEnv {
         let aliases = Aliases(Rc::new(AliasSet::new()));
         LocalEnv { aliases }
@@ -83,6 +84,7 @@ impl NativeEnv {
     /// should be at most one instance of `NativeEnv` in a process. Using more
     /// than one `NativeEnv` instance at the same time should be considered
     /// unsafe.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> NativeEnv {
         let local = LocalEnv::new();
         NativeEnv { local }
@@ -111,6 +113,7 @@ pub struct SimEnv {
 
 impl SimEnv {
     /// Creates a new `SimEnv`.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> SimEnv {
         let local = LocalEnv::new();
         SimEnv { local }

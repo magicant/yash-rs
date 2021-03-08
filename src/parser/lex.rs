@@ -404,6 +404,7 @@ mod core {
                 }
 
                 if let Source::Alias { ref alias, .. } = sc.location.line.source {
+                    #[allow(clippy::collapsible_if)]
                     if ends_with_blank(&alias.replacement) {
                         if !is_same_alias(alias, self.source.get(index + 1)) {
                             return true;
