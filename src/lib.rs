@@ -42,7 +42,7 @@ async fn parse_and_print() {
         fn next_line(
             &mut self,
             _: &input::Context,
-        ) -> Pin<Box<dyn Future<Output = Result<source::Line, input::Error>>>> {
+        ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
             Box::pin(ready({
                 let mut code = String::new();
                 std::io::stdin()

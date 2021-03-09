@@ -907,8 +907,7 @@ mod tests {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, crate::input::Error>>>>
-            {
+            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
                 let location = Location::dummy("line".to_string());
                 let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
                 Box::pin(ready(Err((location, error))))
@@ -1751,8 +1750,7 @@ mod tests {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, (Location, std::io::Error)>>>>
-            {
+            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
                 if let Some(line) = self.0.take() {
                     Box::pin(ready(Ok(line)))
                 } else {
