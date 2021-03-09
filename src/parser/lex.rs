@@ -165,7 +165,6 @@ mod core {
         }
 
         /// Peeks the next character.
-        #[must_use]
         async fn peek_char_or_end(&mut self) -> Result<PeekChar<'_>> {
             loop {
                 if self.index < self.source.len() {
@@ -219,7 +218,6 @@ mod core {
         /// Peeks the next character.
         ///
         /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
-        #[must_use]
         pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
             self.peek_char_or_end().await.map(|p| p.as_option())
         }
@@ -231,7 +229,6 @@ mod core {
         ///
         /// This function required a mutable reference to `self` since it may need to read a next
         /// line if it is not yet read.
-        #[must_use]
         pub async fn location(&mut self) -> Result<&Location> {
             self.peek_char_or_end().await.map(|p| p.location())
         }
@@ -404,6 +401,7 @@ mod core {
                 }
 
                 if let Source::Alias { ref alias, .. } = sc.location.line.source {
+                    #[allow(clippy::collapsible_if)]
                     if ends_with_blank(&alias.replacement) {
                         if !is_same_alias(alias, self.source.get(index + 1)) {
                             return true;
@@ -474,6 +472,13 @@ pub fn is_token_delimiter_char(c: char) -> bool {
     is_operator_char(c) || is_blank(c)
 }
 
+/// Return type for [`Lexer::operator_tail`]
+struct OperatorTail {
+    pub operator: Operator,
+    pub location: Location,
+    pub reversed_key: Vec<char>,
+}
+
 impl Lexer {
     /// Skips a character if the given function returns true for it.
     ///
@@ -531,12 +536,10 @@ impl Lexer {
     }
 
     /// Parses an operator that matches a key in the given trie, if any.
-    ///
-    /// The char vector in the result is the reversed key that matched.
     fn operator_tail(
         &mut self,
         trie: Trie,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<(Operator, Location, Vec<char>)>>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<OperatorTail>>> + '_>> {
         Box::pin(async move {
             if trie.is_empty() {
                 return Ok(None);
@@ -556,9 +559,18 @@ impl Lexer {
             let old_index = self.index();
             self.consume_char();
 
-            if let Some((op, _location, mut chars)) = self.operator_tail(edge.next).await? {
-                chars.push(sc.value);
-                return Ok(Some((op, sc.location, chars)));
+            if let Some(OperatorTail {
+                operator,
+                location: _,
+                mut reversed_key,
+            }) = self.operator_tail(edge.next).await?
+            {
+                reversed_key.push(sc.value);
+                return Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key,
+                }));
             }
 
             match edge.value {
@@ -566,7 +578,11 @@ impl Lexer {
                     self.rewind(old_index);
                     Ok(None)
                 }
-                Some(op) => Ok(Some((op, sc.location, vec![sc.value]))),
+                Some(operator) => Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key: vec![sc.value],
+                })),
             }
         })
     }
@@ -575,14 +591,19 @@ impl Lexer {
     pub async fn operator(&mut self) -> Result<Option<Token>> {
         let index = self.index();
         self.operator_tail(OPERATORS).await.map(|o| {
-            o.map(|(op, location, chars)| {
-                let units = chars
+            o.map(|ot| {
+                let OperatorTail {
+                    operator,
+                    location,
+                    reversed_key,
+                } = ot;
+                let units = reversed_key
                     .into_iter()
                     .rev()
                     .map(|c| Unquoted(Literal(c)))
                     .collect::<Vec<_>>();
                 let word = Word { units, location };
-                let id = TokenId::Operator(op);
+                let id = TokenId::Operator(operator);
                 Token { word, id, index }
             })
         })
@@ -886,8 +907,7 @@ mod tests {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, crate::input::Error>>>>
-            {
+            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
                 let location = Location::dummy("line".to_string());
                 let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
                 Box::pin(ready(Err((location, error))))
@@ -1085,7 +1105,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "ab");
 
         async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if let None = l.consume_char_if(|c| c == 'a').await? {
+            if l.consume_char_if(|c| c == 'a').await?.is_none() {
                 return Ok(None);
             }
             l.consume_char_if(|c| c == 'b').await.map(|o| o.cloned())
@@ -1100,7 +1120,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "xyxyxyxz");
 
         async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if let None = l.consume_char_if(|c| c == 'x').await? {
+            if l.consume_char_if(|c| c == 'x').await?.is_none() {
                 return Ok(None);
             }
             l.consume_char_if(|c| c == 'y').await.map(|o| o.cloned())
@@ -1730,8 +1750,7 @@ mod tests {
             fn next_line(
                 &mut self,
                 _: &Context,
-            ) -> Pin<Box<dyn Future<Output = std::result::Result<Line, (Location, std::io::Error)>>>>
-            {
+            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
                 if let Some(line) = self.0.take() {
                     Box::pin(ready(Ok(line)))
                 } else {

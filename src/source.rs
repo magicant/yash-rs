@@ -218,6 +218,7 @@ impl Line {
     /// Creates an iterator of `SourceChar`.
     ///
     /// The character columns are counted from 1.
+    #[allow(clippy::needless_lifetimes)] // This lifetime is actually needed.
     pub fn enumerate<'a>(self: &'a Rc<Self>) -> impl Iterator<Item = SourceChar> + 'a {
         self.value.chars().zip(1u64..).map(move |(value, i)| {
             let column = NonZeroU64::new(i).unwrap();

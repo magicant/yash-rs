@@ -1515,7 +1515,7 @@ mod tests {
             "c".to_string(),
             " )\n\n(:)".to_string(),
             false,
-            origin.clone(),
+            origin,
         ));
         let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
 
@@ -1558,7 +1558,7 @@ mod tests {
             "c".to_string(),
             "\n\n(:)".to_string(),
             false,
-            origin.clone(),
+            origin,
         ));
         let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
 
@@ -1595,7 +1595,7 @@ mod tests {
             "c".to_string(),
             "(:)".to_string(),
             false,
-            origin.clone(),
+            origin,
         ));
         let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
         let c = SimpleCommand {

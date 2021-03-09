@@ -39,6 +39,9 @@ pub struct Context;
 /// Error returned by the [Input] function.
 pub type Error = (Location, std::io::Error);
 
+/// Result of the [Input] function.
+pub type Result = std::result::Result<Line, Error>;
+
 /// Line-oriented source code reader.
 ///
 /// An `Input` object provides the parser with source code by reading from underlying source.
@@ -55,10 +58,7 @@ pub trait Input {
     ///
     /// Because the current Rust compiler does not support `async` functions in a trait, this
     /// function is explicitly declared to return a `Future` in a pinned box.
-    fn next_line(
-        &mut self,
-        context: &Context,
-    ) -> Pin<Box<dyn Future<Output = Result<Line, Error>>>>;
+    fn next_line(&mut self, context: &Context) -> Pin<Box<dyn Future<Output = Result>>>;
 }
 
 /// Input function that reads from a string in memory.
@@ -86,17 +86,14 @@ impl Memory {
         Memory { lines, end }
     }
 
-    fn next_line_sync(&mut self, _: &Context) -> Result<Line, Error> {
-        Ok(self.lines.pop_front().unwrap_or_else(|| self.end.clone()))
+    fn next_line_sync(&mut self, _: &Context) -> Line {
+        self.lines.pop_front().unwrap_or_else(|| self.end.clone())
     }
 }
 
 impl Input for Memory {
-    fn next_line(
-        &mut self,
-        context: &Context,
-    ) -> Pin<Box<dyn Future<Output = Result<Line, Error>>>> {
-        Box::pin(ready(self.next_line_sync(context)))
+    fn next_line(&mut self, context: &Context) -> Pin<Box<dyn Future<Output = Result>>> {
+        Box::pin(ready(Ok(self.next_line_sync(context))))
     }
 }
 

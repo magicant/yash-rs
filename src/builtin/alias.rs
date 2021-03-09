@@ -87,14 +87,14 @@ mod tests {
         let aliases = env.aliases().as_ref();
         assert_eq!(aliases.len(), 1);
 
-        let foo = aliases.get("foo").unwrap().0.as_ref();
-        assert_eq!(foo.name, "foo");
-        assert_eq!(foo.replacement, "bar baz");
-        assert_eq!(foo.global, false);
-        assert_eq!(foo.origin.line.value, "foo=bar baz");
-        assert_eq!(foo.origin.line.number.get(), 1);
-        assert_eq!(foo.origin.line.source, Source::Unknown);
-        assert_eq!(foo.origin.column.get(), 1);
+        let alias = aliases.get("foo").unwrap().0.as_ref();
+        assert_eq!(alias.name, "foo");
+        assert_eq!(alias.replacement, "bar baz");
+        assert_eq!(alias.global, false);
+        assert_eq!(alias.origin.line.value, "foo=bar baz");
+        assert_eq!(alias.origin.line.number.get(), 1);
+        assert_eq!(alias.origin.line.source, Source::Unknown);
+        assert_eq!(alias.origin.column.get(), 1);
     }
 
     #[test]
