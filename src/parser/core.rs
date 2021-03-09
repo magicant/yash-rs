@@ -53,6 +53,10 @@ pub enum ErrorCause {
     UnclosedCommandSubstitution { opening_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
+    /// A grouping is not closed.
+    UnclosedGrouping { opening_location: Location },
+    /// A grouping contains no commands.
+    EmptyGrouping,
     /// A subshell is not closed.
     UnclosedSubshell { opening_location: Location },
     /// A subshell contains no commands.
@@ -83,6 +87,7 @@ impl PartialEq for ErrorCause {
             | (MissingRedirOperand, MissingRedirOperand)
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
+            | (EmptyGrouping, EmptyGrouping)
             | (EmptySubshell, EmptySubshell)
             | (UnmatchedParenthesis, UnmatchedParenthesis)
             | (MissingFunctionBody, MissingFunctionBody)
@@ -104,6 +109,14 @@ impl PartialEq for ErrorCause {
                     opening_location: l1,
                 },
                 UnclosedArrayValue {
+                    opening_location: l2,
+                },
+            ) => l1 == l2,
+            (
+                UnclosedGrouping {
+                    opening_location: l1,
+                },
+                UnclosedGrouping {
                     opening_location: l2,
                 },
             ) => l1 == l2,
@@ -138,6 +151,10 @@ impl fmt::Display for ErrorCause {
             UnclosedArrayValue {
                 opening_location: _,
             } => f.write_str("The array assignment value is not closed"),
+            UnclosedGrouping {
+                opening_location: _,
+            } => f.write_str("The grouping is not closed"),
+            EmptyGrouping => f.write_str("The grouping is missing its content"),
             UnclosedSubshell {
                 opening_location: _,
             } => f.write_str("The subshell is not closed"),
