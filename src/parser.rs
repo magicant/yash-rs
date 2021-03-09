@@ -1274,12 +1274,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        let CompoundCommand::Subshell(list) = result;
-        // if let CompoundCommand::Subshell(list) = result {
-        assert_eq!(list.to_string(), ":");
-        // } else {
-        //     panic!("Not a subshell: {:?}", result);
-        // }
+        if let CompoundCommand::Subshell(list) = result {
+            assert_eq!(list.to_string(), ":");
+        } else {
+            panic!("Not a subshell: {:?}", result);
+        }
     }
 
     #[test]
@@ -1289,12 +1288,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        let CompoundCommand::Subshell(list) = result;
-        // if let CompoundCommand::Subshell(list) = result {
-        assert_eq!(list.to_string(), "foo& bar");
-        // } else {
-        //     panic!("Not a subshell: {:?}", result);
-        // }
+        if let CompoundCommand::Subshell(list) = result {
+            assert_eq!(list.to_string(), "foo& bar");
+        } else {
+            panic!("Not a subshell: {:?}", result);
+        }
     }
 
     #[test]

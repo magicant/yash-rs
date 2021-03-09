@@ -115,6 +115,7 @@ impl Fill for CompoundCommand<MissingHereDoc> {
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CompoundCommand> {
         use CompoundCommand::*;
         Ok(match self {
+            Grouping(list) => Grouping(list.fill(i)?),
             Subshell(list) => Subshell(list.fill(i)?),
         })
     }
