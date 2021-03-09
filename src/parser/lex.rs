@@ -1106,7 +1106,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "ab");
 
         async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if let None = l.consume_char_if(|c| c == 'a').await? {
+            if l.consume_char_if(|c| c == 'a').await?.is_none() {
                 return Ok(None);
             }
             l.consume_char_if(|c| c == 'b').await.map(|o| o.cloned())
@@ -1121,7 +1121,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "xyxyxyxz");
 
         async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if let None = l.consume_char_if(|c| c == 'x').await? {
+            if l.consume_char_if(|c| c == 'x').await?.is_none() {
                 return Ok(None);
             }
             l.consume_char_if(|c| c == 'y').await.map(|o| o.cloned())
