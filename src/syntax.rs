@@ -464,7 +464,8 @@ impl fmt::Display for SimpleCommand {
 /// Command that contains other commands.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompoundCommand<H = HereDoc> {
-    // TODO Grouping
+    /// List as a command.
+    Grouping(List<H>),
     /// Command for executing commands in a subshell.
     Subshell(List<H>),
     // TODO for
@@ -478,6 +479,7 @@ impl fmt::Display for CompoundCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompoundCommand::*;
         match self {
+            Grouping(list) => write!(f, "{{ {:#} }}", list),
             Subshell(list) => write!(f, "({})", list),
         }
     }
@@ -932,6 +934,13 @@ mod tests {
     fn dummy_compound_command(s: String) -> CompoundCommand {
         let list = dummy_list(s);
         CompoundCommand::Subshell(list)
+    }
+
+    #[test]
+    fn grouping_display() {
+        let list = dummy_list("foo".to_string());
+        let grouping = CompoundCommand::Grouping(list);
+        assert_eq!(grouping.to_string(), "{ foo; }");
     }
 
     #[test]
