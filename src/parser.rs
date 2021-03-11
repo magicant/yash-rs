@@ -145,15 +145,15 @@ impl Parser<'_> {
     /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         let fd = if self.peek_token().await?.id == IoNumber {
-            Some(
-                self.take_token_manual(false)
-                    .await?
-                    .unwrap()
-                    .word
-                    .to_string()
-                    .parse()
-                    .unwrap(),
-            )
+            let token = self.take_token_manual(false).await?.unwrap();
+            if let Ok(fd) = token.word.to_string().parse() {
+                Some(fd)
+            } else {
+                return Err(Error {
+                    cause: ErrorCause::FdOutOfRange,
+                    location: token.word.location,
+                });
+            }
         } else {
             None
         };
@@ -969,6 +969,25 @@ mod tests {
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(Newline));
+    }
+
+    #[test]
+    fn parser_redirection_fd_out_of_range() {
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            "9999999999999999999999999999999999999999< x",
+        );
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::FdOutOfRange);
+        assert_eq!(
+            e.location.line.value,
+            "9999999999999999999999999999999999999999< x"
+        );
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
