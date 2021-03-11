@@ -453,12 +453,12 @@ pub use self::core::*;
 pub use self::heredoc::PartialHereDoc;
 pub use self::op::is_operator_char;
 
+use self::keyword::Keyword;
 use self::op::Trie;
 use self::op::OPERATORS;
 use crate::parser::core::Error;
 use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
-use crate::parser::Keyword;
 use crate::source::Location;
 use crate::syntax::*;
 use std::convert::TryFrom;

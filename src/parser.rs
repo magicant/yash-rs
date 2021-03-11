@@ -23,7 +23,6 @@ mod fill;
 
 pub mod lex;
 
-use self::lex::keyword::Keyword;
 use self::lex::keyword::Keyword::*;
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
@@ -440,8 +439,8 @@ impl Parser<'_> {
             Rec::Parsed(Some(first)) => (first, false),
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
-                if let Token(Some(Keyword::Bang)) = self.peek_token().await?.id {
-                    let location = self.take_token_auto(&[Keyword::Bang]).await?.word.location;
+                if let Token(Some(Bang)) = self.peek_token().await?.id {
+                    let location = self.take_token_auto(&[Bang]).await?.word.location;
                     loop {
                         // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
@@ -451,7 +450,7 @@ impl Parser<'_> {
 
                             // Error: the command is missing
                             let next = self.peek_token().await?;
-                            let cause = if next.id == Token(Some(Keyword::Bang)) {
+                            let cause = if next.id == Token(Some(Bang)) {
                                 ErrorCause::DoubleNegation
                             } else {
                                 ErrorCause::MissingCommandAfterBang
@@ -481,7 +480,7 @@ impl Parser<'_> {
 
                     // Error: the command is missing
                     let next = self.peek_token().await?;
-                    return if next.id == Token(Some(Keyword::Bang)) {
+                    return if next.id == Token(Some(Bang)) {
                         Err(Error {
                             cause: ErrorCause::BangAfterBar,
                             location: next.word.location.clone(),
