@@ -42,6 +42,8 @@ pub enum ErrorCause {
     // TODO Define more fine-grained causes depending on the token type.
     /// Unexpected token.
     UnexpectedToken,
+    /// The file descriptor specified for a redirection cannot be used.
+    FdOutOfRange,
     /// A redirection operator is missing its operand.
     MissingRedirOperand,
     /// A here-document operator is missing its delimiter token.
@@ -84,6 +86,7 @@ impl PartialEq for ErrorCause {
         use ErrorCause::*;
         match (self, other) {
             (UnexpectedToken, UnexpectedToken)
+            | (FdOutOfRange, FdOutOfRange)
             | (MissingRedirOperand, MissingRedirOperand)
             | (MissingHereDocDelimiter, MissingHereDocDelimiter)
             | (MissingHereDocContent, MissingHereDocContent)
@@ -140,6 +143,7 @@ impl fmt::Display for ErrorCause {
         match self {
             IoError(e) => write!(f, "Error while reading commands: {}", e),
             UnexpectedToken => f.write_str("Unexpected token"),
+            FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
             MissingHereDocDelimiter => {
                 f.write_str("The here-document operator is missing its delimiter")

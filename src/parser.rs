@@ -144,8 +144,20 @@ impl Parser<'_> {
     /// [`MissingRedirOperand`](ErrorCause::MissingRedirOperand) or
     /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
-        // TODO IO_NUMBER
-        let fd = None;
+        let fd = if self.peek_token().await?.id == IoNumber {
+            let token = self.take_token_manual(false).await?.unwrap();
+            if let Ok(fd) = token.word.to_string().parse() {
+                Some(fd)
+            } else {
+                return Err(Error {
+                    cause: ErrorCause::FdOutOfRange,
+                    location: token.word.location,
+                });
+            }
+        } else {
+            None
+        };
+
         Ok(self
             .redirection_body()
             .await?
@@ -939,6 +951,43 @@ mod tests {
         assert_eq!(here_docs[0].delimiter.to_string(), "end");
         assert_eq!(here_docs[0].remove_tabs, true);
         assert_eq!(here_docs[0].content.to_string(), "");
+    }
+
+    #[test]
+    fn parser_redirection_with_io_number() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "12< /dev/null\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        assert_eq!(redir.fd, Some(12));
+        if let RedirBody::Normal { operator, operand } = redir.body {
+            assert_eq!(operator, RedirOp::FileIn);
+            assert_eq!(operand.to_string(), "/dev/null")
+        } else {
+            panic!("Unexpected redirection body {:?}", redir.body);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Operator(Newline));
+    }
+
+    #[test]
+    fn parser_redirection_fd_out_of_range() {
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            "9999999999999999999999999999999999999999< x",
+        );
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.redirection()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::FdOutOfRange);
+        assert_eq!(
+            e.location.line.value,
+            "9999999999999999999999999999999999999999< x"
+        );
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
