@@ -20,6 +20,7 @@
 
 mod core;
 mod fill;
+mod fromstr;
 
 pub mod lex;
 

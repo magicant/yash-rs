@@ -572,6 +572,26 @@ pub enum AndOr {
     OrElse,
 }
 
+impl TryFrom<Operator> for AndOr {
+    type Error = ();
+    fn try_from(op: Operator) -> Result<AndOr, ()> {
+        match op {
+            Operator::AndAnd => Ok(AndOr::AndThen),
+            Operator::BarBar => Ok(AndOr::OrElse),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<AndOr> for Operator {
+    fn from(op: AndOr) -> Operator {
+        match op {
+            AndOr::AndThen => Operator::AndAnd,
+            AndOr::OrElse => Operator::BarBar,
+        }
+    }
+}
+
 impl fmt::Display for AndOr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -972,6 +992,14 @@ mod tests {
         p.commands.push(dummy_command("third".to_string()));
         p.negation = false;
         assert_eq!(p.to_string(), "first | second | third");
+    }
+
+    #[test]
+    fn and_or_conversions() {
+        for op in &[AndOr::AndThen, AndOr::OrElse] {
+            let op2 = AndOr::try_from(Operator::from(*op));
+            assert_eq!(op2, Ok(*op));
+        }
     }
 
     #[test]
