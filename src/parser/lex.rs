@@ -457,8 +457,8 @@ use self::keyword::Keyword;
 use self::op::Trie;
 use self::op::OPERATORS;
 use crate::parser::core::Error;
-use crate::parser::core::ErrorCause;
 use crate::parser::core::Result;
+use crate::parser::core::SyntaxError;
 use crate::source::Location;
 use crate::syntax::*;
 use std::convert::TryFrom;
@@ -627,7 +627,7 @@ impl Lexer {
     ///
     /// # Errors
     ///
-    /// - [ErrorCause::UnclosedCommandSubstitution]
+    /// - [SyntaxError::UnclosedCommandSubstitution]
     ///
     /// # Panics
     ///
@@ -646,7 +646,7 @@ impl Lexer {
             // TODO Return a better error depending on the token id of the next token
             let location = self.location().await?.clone();
             return Err(Error {
-                cause: ErrorCause::UnclosedCommandSubstitution { opening_location },
+                cause: SyntaxError::UnclosedCommandSubstitution { opening_location }.into(),
                 location,
             });
         }
@@ -916,7 +916,7 @@ mod tests {
         let mut lexer = Lexer::new(Box::new(Failing));
 
         let e = block_on(lexer.peek_char()).unwrap_err();
-        if let ErrorCause::IoError(io_error) = e.cause {
+        if let ErrorCause::Io(io_error) = e.cause {
             assert_eq!(io_error.kind(), std::io::ErrorKind::Other);
         } else {
             panic!("expected IoError, but actually {}", e.cause)
@@ -1417,7 +1417,10 @@ mod tests {
     fn lexer_inner_program_failure() {
         let mut lexer = Lexer::with_source(Source::Unknown, "<< )");
         let e = block_on(lexer.inner_program()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingHereDocDelimiter);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
+        );
         assert_eq!(e.location.line.value, "<< )");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1820,7 +1823,9 @@ mod tests {
         let location = Location::dummy("Z".to_string());
 
         let e = block_on(lexer.command_substitution(location)).unwrap_err();
-        if let ErrorCause::UnclosedCommandSubstitution { opening_location } = e.cause {
+        if let ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) =
+            e.cause
+        {
             assert_eq!(opening_location.line.value, "Z");
             assert_eq!(opening_location.line.number.get(), 1);
             assert_eq!(opening_location.line.source, Source::Unknown);

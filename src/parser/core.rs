@@ -34,12 +34,10 @@ use std::fmt;
 use std::future::Future;
 use std::rc::Rc;
 
-/// Types of errors that may happen in parsing.
-#[derive(Clone, Debug)]
-pub enum ErrorCause {
-    /// Error in an underlying input function.
-    IoError(Rc<std::io::Error>),
-    // TODO Define more fine-grained causes depending on the token type.
+/// Types of syntax errors.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SyntaxError {
+    // TODO Should we remove `UnexpectedToken` in favor of other error types?
     /// Unexpected token.
     UnexpectedToken,
     /// The file descriptor specified for a redirection cannot be used.
@@ -81,67 +79,10 @@ pub enum ErrorCause {
     MissingCommandAfterBar,
 }
 
-impl PartialEq for ErrorCause {
-    fn eq(&self, other: &Self) -> bool {
-        use ErrorCause::*;
-        match (self, other) {
-            (UnexpectedToken, UnexpectedToken)
-            | (FdOutOfRange, FdOutOfRange)
-            | (MissingRedirOperand, MissingRedirOperand)
-            | (MissingHereDocDelimiter, MissingHereDocDelimiter)
-            | (MissingHereDocContent, MissingHereDocContent)
-            | (EmptyGrouping, EmptyGrouping)
-            | (EmptySubshell, EmptySubshell)
-            | (UnmatchedParenthesis, UnmatchedParenthesis)
-            | (MissingFunctionBody, MissingFunctionBody)
-            | (InvalidFunctionBody, InvalidFunctionBody)
-            | (DoubleNegation, DoubleNegation)
-            | (BangAfterBar, BangAfterBar)
-            | (MissingCommandAfterBang, MissingCommandAfterBang)
-            | (MissingCommandAfterBar, MissingCommandAfterBar) => true,
-            (
-                UnclosedCommandSubstitution {
-                    opening_location: l1,
-                },
-                UnclosedCommandSubstitution {
-                    opening_location: l2,
-                },
-            ) => l1 == l2,
-            (
-                UnclosedArrayValue {
-                    opening_location: l1,
-                },
-                UnclosedArrayValue {
-                    opening_location: l2,
-                },
-            ) => l1 == l2,
-            (
-                UnclosedGrouping {
-                    opening_location: l1,
-                },
-                UnclosedGrouping {
-                    opening_location: l2,
-                },
-            ) => l1 == l2,
-            (
-                UnclosedSubshell {
-                    opening_location: l1,
-                },
-                UnclosedSubshell {
-                    opening_location: l2,
-                },
-            ) => l1 == l2,
-            (MissingPipeline(ao1), MissingPipeline(ao2)) => ao1 == ao2,
-            _ => false,
-        }
-    }
-}
-
-impl fmt::Display for ErrorCause {
+impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ErrorCause::*;
+        use SyntaxError::*;
         match self {
-            IoError(e) => write!(f, "Error while reading commands: {}", e),
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
@@ -177,15 +118,48 @@ impl fmt::Display for ErrorCause {
     }
 }
 
+/// Types of errors that may happen in parsing.
+#[derive(Clone, Debug)]
+pub enum ErrorCause {
+    /// Error in an underlying input function.
+    Io(Rc<std::io::Error>),
+    /// Syntax error.
+    Syntax(SyntaxError),
+}
+
+impl PartialEq for ErrorCause {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ErrorCause::Syntax(e1), ErrorCause::Syntax(e2)) => e1 == e2,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for ErrorCause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorCause::Io(e) => write!(f, "Error while reading commands: {}", e),
+            ErrorCause::Syntax(e) => e.fmt(f),
+        }
+    }
+}
+
 impl From<Rc<std::io::Error>> for ErrorCause {
     fn from(e: Rc<std::io::Error>) -> ErrorCause {
-        ErrorCause::IoError(e)
+        ErrorCause::Io(e)
     }
 }
 
 impl From<std::io::Error> for ErrorCause {
     fn from(e: std::io::Error) -> ErrorCause {
         ErrorCause::from(Rc::new(e))
+    }
+}
+
+impl From<SyntaxError> for ErrorCause {
+    fn from(e: SyntaxError) -> ErrorCause {
+        ErrorCause::Syntax(e)
     }
 }
 
@@ -539,7 +513,7 @@ impl Parser<'_> {
         match self.unread_here_docs.first() {
             None => Ok(()),
             Some(here_doc) => Err(Error {
-                cause: ErrorCause::MissingHereDocContent,
+                cause: SyntaxError::MissingHereDocContent.into(),
                 location: here_doc.delimiter.location.clone(),
             }),
         }
@@ -575,7 +549,7 @@ mod tests {
             column: number,
         };
         let error = Error {
-            cause: ErrorCause::MissingHereDocDelimiter,
+            cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,
         };
         assert_eq!(

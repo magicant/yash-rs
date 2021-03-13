@@ -34,10 +34,10 @@ use std::pin::Pin;
 
 pub use self::core::AsyncFnMut;
 pub use self::core::Error;
-pub use self::core::ErrorCause;
 pub use self::core::Parser;
 pub use self::core::Rec;
 pub use self::core::Result;
+pub use self::core::SyntaxError;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
@@ -48,7 +48,7 @@ impl Parser<'_> {
     /// separated by blanks and/or newlines, and finally a `)`.
     /// If the first token is not `(`, the result is `Ok(None)`.
     /// If the last `)` is missing, the result is
-    /// `Err(ErrorCause::UnclosedArrayValue(_))`.
+    /// `Err(ErrorCause::Syntax(SyntaxError::UnclosedArrayValue(_)))`.
     pub async fn array_values(&mut self) -> Result<Option<Vec<Word>>> {
         if self.peek_token().await?.id != Operator(OpenParen) {
             return Ok(None);
@@ -65,7 +65,7 @@ impl Parser<'_> {
                 Token(_keyword) => words.push(next.word),
                 _ => {
                     return Err(Error {
-                        cause: ErrorCause::UnclosedArrayValue { opening_location },
+                        cause: SyntaxError::UnclosedArrayValue { opening_location }.into(),
                         location: next.word.location,
                     })
                 }
@@ -94,7 +94,7 @@ impl Parser<'_> {
         // TODO reject >>| and <<< if POSIXly-correct
         let operator_location = self.take_token_auto(&[]).await?.word.location;
         let operand = self.redirection_operand().await?.ok_or(Error {
-            cause: ErrorCause::MissingRedirOperand,
+            cause: SyntaxError::MissingRedirOperand.into(),
             location: operator_location,
         })?;
         return Ok(RedirBody::Normal { operator, operand });
@@ -107,7 +107,7 @@ impl Parser<'_> {
     ) -> Result<RedirBody<MissingHereDoc>> {
         let operator_location = self.take_token_auto(&[]).await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
-            cause: ErrorCause::MissingHereDocDelimiter,
+            cause: SyntaxError::MissingHereDocDelimiter.into(),
             location: operator_location,
         })?;
 
@@ -141,8 +141,8 @@ impl Parser<'_> {
     ///
     /// If the current token is not a redirection operator, `Ok(None)` is returned. If a word token
     /// is missing after the operator, `Err(Error{...})` is returned with a cause of
-    /// [`MissingRedirOperand`](ErrorCause::MissingRedirOperand) or
-    /// [`MissingHereDocDelimiter`](ErrorCause::MissingHereDocDelimiter).
+    /// [`MissingRedirOperand`](SyntaxError::MissingRedirOperand) or
+    /// [`MissingHereDocDelimiter`](SyntaxError::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         let fd = if self.peek_token().await?.id == IoNumber {
             let token = self.take_token_manual(false).await?.unwrap();
@@ -150,7 +150,7 @@ impl Parser<'_> {
                 Some(fd)
             } else {
                 return Err(Error {
-                    cause: ErrorCause::FdOutOfRange,
+                    cause: SyntaxError::FdOutOfRange.into(),
                     location: token.word.location,
                 });
             }
@@ -260,8 +260,8 @@ impl Parser<'_> {
     ///
     /// # Errors
     ///
-    /// - [`ErrorCause::UnclosedGrouping`]
-    /// - [`ErrorCause::EmptyGrouping`]
+    /// - [`SyntaxError::UnclosedGrouping`]
+    /// - [`SyntaxError::EmptyGrouping`]
     async fn grouping(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_auto(&[]).await?;
         assert_eq!(open.id, Token(Some(OpenBrace)));
@@ -271,9 +271,10 @@ impl Parser<'_> {
         let close = self.take_token_auto(&[]).await?;
         if close.id != Token(Some(CloseBrace)) {
             return Err(Error {
-                cause: ErrorCause::UnclosedGrouping {
+                cause: SyntaxError::UnclosedGrouping {
                     opening_location: open.word.location,
-                },
+                }
+                .into(),
                 location: close.word.location,
             });
         }
@@ -281,7 +282,7 @@ impl Parser<'_> {
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
             return Err(Error {
-                cause: ErrorCause::EmptyGrouping,
+                cause: SyntaxError::EmptyGrouping.into(),
                 location: open.word.location,
             });
         }
@@ -299,8 +300,8 @@ impl Parser<'_> {
     ///
     /// # Errors
     ///
-    /// - [`ErrorCause::UnclosedSubshell`]
-    /// - [`ErrorCause::EmptySubshell`]
+    /// - [`SyntaxError::UnclosedSubshell`]
+    /// - [`SyntaxError::EmptySubshell`]
     async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_auto(&[]).await?;
         assert_eq!(open.id, Operator(OpenParen));
@@ -310,9 +311,10 @@ impl Parser<'_> {
         let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
-                cause: ErrorCause::UnclosedSubshell {
+                cause: SyntaxError::UnclosedSubshell {
                     opening_location: open.word.location,
-                },
+                }
+                .into(),
                 location: close.word.location,
             });
         }
@@ -320,7 +322,7 @@ impl Parser<'_> {
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
             return Err(Error {
-                cause: ErrorCause::EmptySubshell,
+                cause: SyntaxError::EmptySubshell.into(),
                 location: open.word.location,
             });
         }
@@ -332,10 +334,10 @@ impl Parser<'_> {
     ///
     /// # Errors
     ///
-    /// - [`ErrorCause::UnclosedGrouping`]
-    /// - [`ErrorCause::EmptyGrouping`]
-    /// - [`ErrorCause::UnclosedSubshell`]
-    /// - [`ErrorCause::EmptySubshell`]
+    /// - [`SyntaxError::UnclosedGrouping`]
+    /// - [`SyntaxError::EmptyGrouping`]
+    /// - [`SyntaxError::UnclosedSubshell`]
+    /// - [`SyntaxError::EmptySubshell`]
     pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
@@ -370,9 +372,9 @@ impl Parser<'_> {
     ///
     /// # Errors
     ///
-    /// - [`ErrorCause::UnmatchedParenthesis`]
-    /// - [`ErrorCause::MissingFunctionBody`]
-    /// - [`ErrorCause::InvalidFunctionBody`]
+    /// - [`SyntaxError::UnmatchedParenthesis`]
+    /// - [`SyntaxError::MissingFunctionBody`]
+    /// - [`SyntaxError::InvalidFunctionBody`]
     pub async fn short_function_definition(
         &mut self,
         mut intro: SimpleCommand<MissingHereDoc>,
@@ -387,7 +389,7 @@ impl Parser<'_> {
         let close = self.take_token_auto(&[]).await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
-                cause: ErrorCause::UnmatchedParenthesis,
+                cause: SyntaxError::UnmatchedParenthesis.into(),
                 location: close.word.location,
             });
         }
@@ -411,9 +413,9 @@ impl Parser<'_> {
                         Rec::Parsed(next) => next,
                     };
                     let cause = if let Token(_) = next.id {
-                        ErrorCause::InvalidFunctionBody
+                        SyntaxError::InvalidFunctionBody.into()
                     } else {
-                        ErrorCause::MissingFunctionBody
+                        SyntaxError::MissingFunctionBody.into()
                     };
                     let location = next.word.location;
                     Err(Error { cause, location })
@@ -463,9 +465,9 @@ impl Parser<'_> {
                             // Error: the command is missing
                             let next = self.peek_token().await?;
                             let cause = if next.id == Token(Some(Bang)) {
-                                ErrorCause::DoubleNegation
+                                SyntaxError::DoubleNegation.into()
                             } else {
-                                ErrorCause::MissingCommandAfterBang
+                                SyntaxError::MissingCommandAfterBang.into()
                             };
                             return Err(Error { cause, location });
                         }
@@ -494,12 +496,12 @@ impl Parser<'_> {
                     let next = self.peek_token().await?;
                     return if next.id == Token(Some(Bang)) {
                         Err(Error {
-                            cause: ErrorCause::BangAfterBar,
+                            cause: SyntaxError::BangAfterBar.into(),
                             location: next.word.location.clone(),
                         })
                     } else {
                         Err(Error {
-                            cause: ErrorCause::MissingCommandAfterBar,
+                            cause: SyntaxError::MissingCommandAfterBar.into(),
                             location: bar_location,
                         })
                     };
@@ -539,7 +541,7 @@ impl Parser<'_> {
             };
             let pipeline = match maybe_pipeline {
                 None => {
-                    let cause = ErrorCause::MissingPipeline(condition);
+                    let cause = SyntaxError::MissingPipeline(condition).into();
                     let location = self.peek_token().await?.word.location.clone();
                     return Err(Error { cause, location });
                 }
@@ -632,7 +634,7 @@ impl Parser<'_> {
             if next.id != EndOfInput {
                 // TODO Return a better error depending on the token id of the peeked token
                 return Err(Error {
-                    cause: ErrorCause::UnexpectedToken,
+                    cause: SyntaxError::UnexpectedToken.into(),
                     location: next.word.location.clone(),
                 });
             }
@@ -685,6 +687,7 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
+    use super::core::ErrorCause;
     use super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
@@ -743,7 +746,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "(a b");
         let mut parser = Parser::new(&mut lexer);
         let e = block_on(parser.array_values()).unwrap_err();
-        if let ErrorCause::UnclosedArrayValue { opening_location } = e.cause {
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "(a b");
             assert_eq!(opening_location.line.number.get(), 1);
             assert_eq!(opening_location.line.source, Source::Unknown);
@@ -762,7 +765,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "(a;b)");
         let mut parser = Parser::new(&mut lexer);
         let e = block_on(parser.array_values()).unwrap_err();
-        if let ErrorCause::UnclosedArrayValue { opening_location } = e.cause {
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "(a;b)");
             assert_eq!(opening_location.line.number.get(), 1);
             assert_eq!(opening_location.line.source, Source::Unknown);
@@ -975,7 +978,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::FdOutOfRange);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::FdOutOfRange));
         assert_eq!(
             e.location.line.value,
             "9999999999999999999999999999999999999999< x"
@@ -999,7 +1002,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
+        );
         assert_eq!(e.location.line.value, " < >");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1012,7 +1018,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingRedirOperand);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
+        );
         assert_eq!(e.location.line.value, "  < ");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1025,7 +1034,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingHereDocDelimiter);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
+        );
         assert_eq!(e.location.line.value, "<< <<");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1038,7 +1050,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingHereDocDelimiter);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
+        );
         assert_eq!(e.location.line.value, "<<");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1387,7 +1402,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::UnclosedGrouping { opening_location } = e.cause {
+        if let ErrorCause::Syntax(SyntaxError::UnclosedGrouping { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, " { oh no ");
             assert_eq!(opening_location.line.number.get(), 1);
             assert_eq!(opening_location.line.source, Source::Unknown);
@@ -1407,7 +1422,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EmptyGrouping);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyGrouping));
         assert_eq!(e.location.line.value, "{ }");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1448,7 +1463,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::UnclosedSubshell { opening_location } = e.cause {
+        if let ErrorCause::Syntax(SyntaxError::UnclosedSubshell { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, " ( oh no");
             assert_eq!(opening_location.line.number.get(), 1);
             assert_eq!(opening_location.line.source, Source::Unknown);
@@ -1468,7 +1483,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::EmptySubshell);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptySubshell));
         assert_eq!(e.location.line.value, "( )");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1596,7 +1611,10 @@ mod tests {
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnmatchedParenthesis);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnmatchedParenthesis)
+        );
         assert_eq!(e.location.line.value, "( ");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1614,7 +1632,10 @@ mod tests {
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingFunctionBody);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingFunctionBody)
+        );
         assert_eq!(e.location.line.value, "( ) ");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1632,7 +1653,10 @@ mod tests {
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::InvalidFunctionBody);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
+        );
         assert_eq!(e.location.line.value, "() foo ; ");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1750,7 +1774,10 @@ mod tests {
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::InvalidFunctionBody);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
+        );
         assert_eq!(e.location.line.value, "()b");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1870,7 +1897,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::DoubleNegation);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
         assert_eq!(e.location.line.value, " !  !");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1883,7 +1910,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingCommandAfterBang);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingCommandAfterBang)
+        );
         assert_eq!(e.location.line.value, "!\n");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1896,7 +1926,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingCommandAfterBar);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingCommandAfterBar)
+        );
         assert_eq!(e.location.line.value, "foo | ;");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1909,7 +1942,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::BangAfterBar);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
         assert_eq!(e.location.line.value, "foo | !");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -1957,7 +1990,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.and_or_list()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingPipeline(AndOr::AndThen));
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingPipeline(AndOr::AndThen))
+        );
         assert_eq!(e.location.line.value, "foo &&");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -2081,7 +2117,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.command_line()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::MissingHereDocContent);
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+        );
         assert_eq!(e.location.line.value, "<<END");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
@@ -2094,7 +2133,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.command_line()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::UnexpectedToken);
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnexpectedToken));
         assert_eq!(e.location.line.value, "foo)");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
