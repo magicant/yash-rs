@@ -625,13 +625,10 @@ impl fmt::Display for Item {
 }
 
 /// Sequence of [and-or lists](AndOrList) separated by `;` or `&`.
+///
+/// It depends on context whether an empty list is a valid syntax.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct List<H = HereDoc> {
-    /// Elements of the list.
-    ///
-    /// It depends on context whether an empty vector is a valid syntax.
-    pub items: Vec<Item<H>>,
-}
+pub struct List<H = HereDoc>(pub Vec<Item<H>>);
 
 /// Allows conversion from List to String.
 ///
@@ -640,7 +637,7 @@ pub struct List<H = HereDoc> {
 /// terminated by either `;` or `&`.
 impl fmt::Display for List {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some((last, others)) = self.items.split_last() {
+        if let Some((last, others)) = self.0.split_last() {
             for item in others {
                 write!(f, "{:#} ", item)?;
             }
@@ -928,7 +925,7 @@ mod tests {
         let and_or = dummy_and_or_list(s);
         let is_async = false;
         let item = Item { and_or, is_async };
-        List { items: vec![item] }
+        List(vec![item])
     }
 
     fn dummy_compound_command(s: String) -> CompoundCommand {
@@ -1002,7 +999,7 @@ mod tests {
             and_or,
             is_async: false,
         };
-        let mut list = List { items: vec![item] };
+        let mut list = List(vec![item]);
         assert_eq!(list.to_string(), "first");
 
         let and_or = dummy_and_or_list("second".to_string());
@@ -1010,7 +1007,7 @@ mod tests {
             and_or,
             is_async: true,
         };
-        list.items.push(item);
+        list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
 
         let and_or = dummy_and_or_list("third".to_string());
@@ -1018,7 +1015,7 @@ mod tests {
             and_or,
             is_async: false,
         };
-        list.items.push(item);
+        list.0.push(item);
         assert_eq!(list.to_string(), "first; second& third");
     }
 
@@ -1029,7 +1026,7 @@ mod tests {
             and_or,
             is_async: false,
         };
-        let mut list = List { items: vec![item] };
+        let mut list = List(vec![item]);
         assert_eq!(format!("{:#}", list), "first;");
 
         let and_or = dummy_and_or_list("second".to_string());
@@ -1037,7 +1034,7 @@ mod tests {
             and_or,
             is_async: true,
         };
-        list.items.push(item);
+        list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");
 
         let and_or = dummy_and_or_list("third".to_string());
@@ -1045,7 +1042,7 @@ mod tests {
             and_or,
             is_async: false,
         };
-        list.items.push(item);
+        list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second& third;");
     }
 }

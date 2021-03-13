@@ -279,7 +279,7 @@ impl Parser<'_> {
         }
 
         // TODO allow empty subshell if not POSIXly-correct
-        if list.items.is_empty() {
+        if list.0.is_empty() {
             return Err(Error {
                 cause: ErrorCause::EmptyGrouping,
                 location: open.word.location,
@@ -318,7 +318,7 @@ impl Parser<'_> {
         }
 
         // TODO allow empty subshell if not POSIXly-correct
-        if list.items.is_empty() {
+        if list.0.is_empty() {
             return Err(Error {
                 cause: ErrorCause::EmptySubshell,
                 location: open.word.location,
@@ -570,7 +570,7 @@ impl Parser<'_> {
 
         let mut and_or = match self.and_or_list().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => return Ok(Rec::Parsed(List { items: vec![] })),
+            Rec::Parsed(None) => return Ok(Rec::Parsed(List(items))),
             Rec::Parsed(Some(and_or)) => and_or,
         };
 
@@ -599,7 +599,7 @@ impl Parser<'_> {
             }
         }
 
-        Ok(Rec::Parsed(List { items }))
+        Ok(Rec::Parsed(List(items)))
     }
 
     /// Parses an optional newline token and here-document contents.
@@ -641,7 +641,7 @@ impl Parser<'_> {
                     location: next.word.location.clone(),
                 });
             }
-            if list.items.is_empty() {
+            if list.0.is_empty() {
                 return Ok(None);
             }
         }
@@ -670,14 +670,14 @@ impl Parser<'_> {
                     break list;
                 }
             };
-            items.extend(list.items);
+            items.extend(list.0);
 
             if !self.newline_and_here_doc_contents().await? {
                 break;
             }
         }
 
-        Ok(List { items })
+        Ok(List(items))
     }
 
     /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
@@ -1975,7 +1975,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.list()).unwrap().unwrap();
-        assert_eq!(list.items, vec![]);
+        assert_eq!(list.0, vec![]);
     }
 
     #[test]
@@ -1985,9 +1985,9 @@ mod tests {
 
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
-        assert_eq!(list.items.len(), 1);
-        assert_eq!(list.items[0].is_async, false);
-        assert_eq!(list.items[0].and_or.to_string(), "foo");
+        assert_eq!(list.0.len(), 1);
+        assert_eq!(list.0[0].is_async, false);
+        assert_eq!(list.0[0].and_or.to_string(), "foo");
     }
 
     #[test]
@@ -1997,9 +1997,9 @@ mod tests {
 
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
-        assert_eq!(list.items.len(), 1);
-        assert_eq!(list.items[0].is_async, false);
-        assert_eq!(list.items[0].and_or.to_string(), "foo");
+        assert_eq!(list.0.len(), 1);
+        assert_eq!(list.0[0].is_async, false);
+        assert_eq!(list.0[0].and_or.to_string(), "foo");
     }
 
     #[test]
@@ -2009,13 +2009,13 @@ mod tests {
 
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
-        assert_eq!(list.items.len(), 3);
-        assert_eq!(list.items[0].is_async, true);
-        assert_eq!(list.items[0].and_or.to_string(), "foo");
-        assert_eq!(list.items[1].is_async, false);
-        assert_eq!(list.items[1].and_or.to_string(), "bar");
-        assert_eq!(list.items[2].is_async, true);
-        assert_eq!(list.items[2].and_or.to_string(), "baz");
+        assert_eq!(list.0.len(), 3);
+        assert_eq!(list.0[0].is_async, true);
+        assert_eq!(list.0[0].and_or.to_string(), "foo");
+        assert_eq!(list.0[1].is_async, false);
+        assert_eq!(list.0[1].and_or.to_string(), "bar");
+        assert_eq!(list.0[2].is_async, true);
+        assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
 
     #[test]
@@ -2032,7 +2032,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
         let mut parser = Parser::new(&mut lexer);
 
-        let List { items } = block_on(parser.command_line()).unwrap().unwrap();
+        let List(items) = block_on(parser.command_line()).unwrap().unwrap();
         assert_eq!(items.len(), 1);
         let item = items.first().unwrap();
         assert_eq!(item.is_async, false);
@@ -2077,7 +2077,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.command_line()).unwrap().unwrap();
-        assert_eq!(list.items, []);
+        assert_eq!(list.0, []);
     }
 
     #[test]

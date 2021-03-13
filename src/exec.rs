@@ -114,7 +114,7 @@ impl Item {
 impl List {
     /// Executes this list.
     pub async fn execute(&self, env: &mut dyn Env) -> Result {
-        for item in &self.items {
+        for item in &self.0 {
             item.execute(env).await?
         }
         Ok(())

@@ -196,10 +196,10 @@ impl Fill for List<MissingHereDoc> {
     type Full = List;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<List> {
         let items = self
-            .items
+            .0
             .into_iter()
             .map(|item| item.fill(i))
             .collect::<Result<Vec<_>>>()?;
-        Ok(List { items })
+        Ok(List(items))
     }
 }
