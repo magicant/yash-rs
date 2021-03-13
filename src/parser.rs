@@ -568,13 +568,12 @@ impl Parser<'_> {
     pub async fn list(&mut self) -> Result<Rec<List<MissingHereDoc>>> {
         let mut items = vec![];
 
-        let mut and_or = match self.and_or_list().await? {
+        let mut result = match self.and_or_list().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => return Ok(Rec::Parsed(List(items))),
-            Rec::Parsed(Some(and_or)) => and_or,
+            Rec::Parsed(result) => result,
         };
 
-        loop {
+        while let Some(and_or) = result {
             let (is_async, next) = match self.peek_token().await?.id {
                 Operator(Semicolon) => (false, true),
                 Operator(And) => (true, true),
@@ -588,15 +587,11 @@ impl Parser<'_> {
             }
             self.take_token_auto(&[]).await?;
 
-            let result = loop {
+            result = loop {
                 if let Rec::Parsed(result) = self.and_or_list().await? {
                     break result;
                 }
             };
-            and_or = match result {
-                None => break,
-                Some(and_or) => and_or,
-            }
         }
 
         Ok(Rec::Parsed(List(items)))
