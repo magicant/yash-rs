@@ -200,7 +200,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// When a parser function successfully parses something, it returns the result in the `Parsed`
 /// variant. The caller then continues the remaining parse.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Rec<T> {
     /// Result of alias substitution.
     AliasSubstituted,
