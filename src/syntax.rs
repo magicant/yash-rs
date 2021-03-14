@@ -209,22 +209,6 @@ pub struct Assign {
     pub location: Location,
 }
 
-impl Assign {
-    /// Creates an assignment with unknown source.
-    ///
-    /// This is a convenience function to make a simple scalar assignment, mainly
-    /// for debugging purpose. The assigned value is created with
-    /// [`Word::with_str`].
-    pub fn dummy(name: String, value: String) -> Assign {
-        let line = format!("{}={}", &name, &value);
-        Assign {
-            name,
-            value: Scalar(Word::with_str(value)),
-            location: Location::dummy(line),
-        }
-    }
-}
-
 impl fmt::Display for Assign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}={}", &self.name, &self.value)
@@ -737,7 +721,7 @@ mod tests {
 
     #[test]
     fn assign_display() {
-        let mut a = Assign::dummy("foo".to_string(), "bar".to_string());
+        let mut a = Assign::from_str("foo=bar").unwrap();
         assert_eq!(a.to_string(), "foo=bar");
 
         a.value = Array(vec![]);
@@ -870,12 +854,12 @@ mod tests {
 
         command
             .assigns
-            .push(Assign::dummy("name".to_string(), "value".to_string()));
+            .push(Assign::from_str("name=value").unwrap());
         assert_eq!(command.to_string(), "name=value");
 
         command
             .assigns
-            .push(Assign::dummy("hello".to_string(), "world".to_string()));
+            .push(Assign::from_str("hello=world").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world");
 
         command.words.push(Word::from_str("echo").unwrap());
@@ -910,9 +894,7 @@ mod tests {
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
 
-        command
-            .assigns
-            .push(Assign::dummy("foo".to_string(), "bar".to_string()));
+        command.assigns.push(Assign::from_str("foo=bar").unwrap());
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 
