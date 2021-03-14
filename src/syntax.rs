@@ -139,25 +139,6 @@ pub struct Word {
     pub location: Location,
 }
 
-impl Word {
-    /// Creates a constant word with unknown source.
-    ///
-    /// This is a convenience function to make a simple word, mainly for debugging
-    /// purpose.
-    ///
-    /// The resulting word elements are not quoted even if they would be usually special.
-    pub fn with_str(s: String) -> Word {
-        let mut units = vec![];
-        for c in s.chars() {
-            units.push(WordUnit::Unquoted(DoubleQuotable::Literal(c)));
-        }
-        Word {
-            units,
-            location: Location::dummy(s),
-        }
-    }
-}
-
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
