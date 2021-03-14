@@ -84,7 +84,9 @@ impl MaybeLiteral for DoubleQuotable {
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
-    // TODO DoubleQuote(Vec<DoubleQuotable>),
+    /// Any number of [`DoubleQuotable`]s surrounded with a pair of double
+    /// quotations.
+    DoubleQuote(Vec<DoubleQuotable>),
     // TODO SingleQuote(String),
 }
 
@@ -93,7 +95,14 @@ pub use WordUnit::*;
 impl fmt::Display for WordUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Unquoted(ref dq) => write!(f, "{}", dq),
+            Unquoted(dq) => dq.fmt(f),
+            DoubleQuote(dqs) => {
+                f.write_str("\"")?;
+                for dq in dqs {
+                    dq.fmt(f)?;
+                }
+                f.write_str("\"")
+            }
         }
     }
 }
@@ -102,13 +111,11 @@ impl MaybeLiteral for WordUnit {
     /// If `self` is `Unquoted(Literal(_))`, returns the character converted to a
     /// string. Otherwise, returns `None`.
     fn to_string_if_literal(&self) -> Option<String> {
-        let Unquoted(dq) = self;
-        dq.to_string_if_literal()
-        // if let Unquoted(dq) = self {
-        //     dq.to_string_if_literal()
-        // } else {
-        //     None
-        // }
+        if let Unquoted(dq) = self {
+            dq.to_string_if_literal()
+        } else {
+            None
+        }
     }
 }
 
@@ -648,6 +655,19 @@ mod tests {
         assert_eq!(literal.to_string(), "A");
         let backslashed = Backslashed('X');
         assert_eq!(backslashed.to_string(), r"\X");
+    }
+
+    #[test]
+    fn word_unit_display() {
+        let unquoted = Unquoted(Literal('A'));
+        assert_eq!(unquoted.to_string(), "A");
+        let unquoted = Unquoted(Backslashed('B'));
+        assert_eq!(unquoted.to_string(), "\\B");
+
+        let double_quote = DoubleQuote(vec![]);
+        assert_eq!(double_quote.to_string(), "\"\"");
+        let double_quote = DoubleQuote(vec![Literal('A'), Backslashed('B')]);
+        assert_eq!(double_quote.to_string(), "\"A\\B\"");
     }
 
     #[test]
