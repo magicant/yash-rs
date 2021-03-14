@@ -37,6 +37,8 @@ use std::rc::Rc;
 /// Types of syntax errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SyntaxError {
+    /// A command substitution started with `$(` but lacks a closing `)`.
+    UnclosedCommandSubstitution { opening_location: Location },
     // TODO Should we remove `UnexpectedToken` in favor of other error types?
     /// Unexpected token.
     UnexpectedToken,
@@ -49,8 +51,6 @@ pub enum SyntaxError {
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
-    /// A command substitution started with `$(` but lacks a closing `)`.
-    UnclosedCommandSubstitution { opening_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
     /// A grouping is not closed.
@@ -83,6 +83,9 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
+            UnclosedCommandSubstitution {
+                opening_location: _,
+            } => f.write_str("The command substitution is not closed"),
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
@@ -90,9 +93,6 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The here-document operator is missing its delimiter")
             }
             MissingHereDocContent => f.write_str("Content of the here-document is missing"),
-            UnclosedCommandSubstitution {
-                opening_location: _,
-            } => f.write_str("The command substitution is not closed"),
             UnclosedArrayValue {
                 opening_location: _,
             } => f.write_str("The array assignment value is not closed"),
