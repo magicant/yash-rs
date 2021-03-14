@@ -675,6 +675,7 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn double_quotable_display() {
@@ -686,11 +687,11 @@ mod tests {
 
     #[test]
     fn word_to_string_if_literal_success() {
-        let empty = Word::with_str("".to_string());
+        let empty = Word::from_str("").unwrap();
         let s = empty.to_string_if_literal().unwrap();
         assert_eq!(s, "");
 
-        let nonempty = Word::with_str("foo".to_string());
+        let nonempty = Word::from_str("foo").unwrap();
         let s = nonempty.to_string_if_literal().unwrap();
         assert_eq!(s, "foo");
     }
@@ -708,7 +709,7 @@ mod tests {
 
     #[test]
     fn scalar_display() {
-        let s = Scalar(Word::with_str("my scalar value".to_string()));
+        let s = Scalar(Word::from_str("my scalar value").unwrap());
         assert_eq!(s.to_string(), "my scalar value");
     }
 
@@ -720,16 +721,16 @@ mod tests {
 
     #[test]
     fn array_display_one() {
-        let a = Array(vec![Word::with_str("one".to_string())]);
+        let a = Array(vec![Word::from_str("one").unwrap()]);
         assert_eq!(a.to_string(), "(one)");
     }
 
     #[test]
     fn array_display_many() {
         let a = Array(vec![
-            Word::with_str("let".to_string()),
-            Word::with_str("me".to_string()),
-            Word::with_str("see".to_string()),
+            Word::from_str("let").unwrap(),
+            Word::from_str("me").unwrap(),
+            Word::from_str("see").unwrap(),
         ]);
         assert_eq!(a.to_string(), "(let me see)");
     }
@@ -745,21 +746,21 @@ mod tests {
 
     #[test]
     fn assign_try_from_word_without_equal() {
-        let word = Word::with_str("foo".to_string());
+        let word = Word::from_str("foo").unwrap();
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
     }
 
     #[test]
     fn assign_try_from_word_with_empty_name() {
-        let word = Word::with_str("=foo".to_string());
+        let word = Word::from_str("=foo").unwrap();
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
     }
 
     #[test]
     fn assign_try_from_word_with_non_literal_name() {
-        let mut word = Word::with_str("night=foo".to_string());
+        let mut word = Word::from_str("night=foo").unwrap();
         word.units.insert(0, Unquoted(Backslashed('k')));
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
@@ -767,7 +768,7 @@ mod tests {
 
     #[test]
     fn assign_try_from_word_with_literal_name() {
-        let word = Word::with_str("night=foo".to_string());
+        let word = Word::from_str("night=foo").unwrap();
         let location = word.location.clone();
         let assign = Assign::try_from(word).unwrap();
         assert_eq!(assign.name, "night");
@@ -802,16 +803,16 @@ mod tests {
     #[test]
     fn here_doc_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END".to_string()),
+            delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
-            delimiter: Word::with_str("XXX".to_string()),
+            delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("there".to_string()),
+            content: Word::from_str("there").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -819,16 +820,16 @@ mod tests {
     #[test]
     fn here_doc_display_disambiguation() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("--".to_string()),
+            delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
-            delimiter: Word::with_str("-".to_string()),
+            delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -836,9 +837,9 @@ mod tests {
     #[test]
     fn redir_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END".to_string()),
+            delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
 
         let redir = Redir {
@@ -877,18 +878,18 @@ mod tests {
             .push(Assign::dummy("hello".to_string(), "world".to_string()));
         assert_eq!(command.to_string(), "name=value hello=world");
 
-        command.words.push(Word::with_str("echo".to_string()));
+        command.words.push(Word::from_str("echo").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world echo");
 
-        command.words.push(Word::with_str("foo".to_string()));
+        command.words.push(Word::from_str("foo").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         command.redirs.push(Redir {
             fd: None,
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("END".to_string()),
+                delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Word::with_str("".to_string()),
+                content: Word::from_str("").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -902,9 +903,9 @@ mod tests {
         command.redirs.push(Redir {
             fd: Some(1),
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("here".to_string()),
+                delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Word::with_str("ignored".to_string()),
+                content: Word::from_str("ignored").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
@@ -930,7 +931,7 @@ mod tests {
         };
         let fd = FunctionDefinition {
             has_keyword: false,
-            name: Word::with_str("foo".to_string()),
+            name: Word::from_str("foo").unwrap(),
             body,
         };
         assert_eq!(fd.to_string(), "foo() (bar)");
