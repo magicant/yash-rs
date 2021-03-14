@@ -915,47 +915,9 @@ mod tests {
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 
-    fn dummy_command(s: String) -> Command {
-        let w = Word::with_str(s);
-        let s = SimpleCommand {
-            assigns: vec![],
-            words: vec![w],
-            redirs: vec![],
-        };
-        Command::Simple(s)
-    }
-
-    fn dummy_pipeline(s: String) -> Pipeline {
-        let c = dummy_command(s);
-        Pipeline {
-            commands: vec![c],
-            negation: false,
-        }
-    }
-
-    fn dummy_and_or_list(s: String) -> AndOrList {
-        let first = dummy_pipeline(s);
-        AndOrList {
-            first,
-            rest: vec![],
-        }
-    }
-
-    fn dummy_list(s: String) -> List {
-        let and_or = dummy_and_or_list(s);
-        let is_async = false;
-        let item = Item { and_or, is_async };
-        List(vec![item])
-    }
-
-    fn dummy_compound_command(s: String) -> CompoundCommand {
-        let list = dummy_list(s);
-        CompoundCommand::Subshell(list)
-    }
-
     #[test]
     fn grouping_display() {
-        let list = dummy_list("foo".to_string());
+        let list = "foo".parse::<List>().unwrap();
         let grouping = CompoundCommand::Grouping(list);
         assert_eq!(grouping.to_string(), "{ foo; }");
     }
@@ -963,7 +925,7 @@ mod tests {
     #[test]
     fn function_definition_display() {
         let body = FullCompoundCommand {
-            command: dummy_compound_command("bar".to_string()),
+            command: "( bar )".parse().unwrap(),
             redirs: vec![],
         };
         let fd = FunctionDefinition {
@@ -980,16 +942,16 @@ mod tests {
             commands: vec![],
             negation: false,
         };
-        p.commands.push(dummy_command("first".to_string()));
+        p.commands.push("first".parse().unwrap());
         assert_eq!(p.to_string(), "first");
 
         p.negation = true;
         assert_eq!(p.to_string(), "! first");
 
-        p.commands.push(dummy_command("second".to_string()));
+        p.commands.push("second".parse().unwrap());
         assert_eq!(p.to_string(), "! first | second");
 
-        p.commands.push(dummy_command("third".to_string()));
+        p.commands.push("third".parse().unwrap());
         p.negation = false;
         assert_eq!(p.to_string(), "first | second | third");
     }
@@ -1004,25 +966,25 @@ mod tests {
 
     #[test]
     fn and_or_list_display() {
-        let p = dummy_pipeline("first".to_string());
+        let p = "first".parse().unwrap();
         let mut aol = AndOrList {
             first: p,
             rest: vec![],
         };
         assert_eq!(aol.to_string(), "first");
 
-        let p = dummy_pipeline("second".to_string());
+        let p = "second".parse().unwrap();
         aol.rest.push((AndOr::AndThen, p));
         assert_eq!(aol.to_string(), "first && second");
 
-        let p = dummy_pipeline("third".to_string());
+        let p = "third".parse().unwrap();
         aol.rest.push((AndOr::OrElse, p));
         assert_eq!(aol.to_string(), "first && second || third");
     }
 
     #[test]
     fn list_display() {
-        let and_or = dummy_and_or_list("first".to_string());
+        let and_or = "first".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1030,7 +992,7 @@ mod tests {
         let mut list = List(vec![item]);
         assert_eq!(list.to_string(), "first");
 
-        let and_or = dummy_and_or_list("second".to_string());
+        let and_or = "second".parse().unwrap();
         let item = Item {
             and_or,
             is_async: true,
@@ -1038,7 +1000,7 @@ mod tests {
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
 
-        let and_or = dummy_and_or_list("third".to_string());
+        let and_or = "third".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1049,7 +1011,7 @@ mod tests {
 
     #[test]
     fn list_display_alternate() {
-        let and_or = dummy_and_or_list("first".to_string());
+        let and_or = "first".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1057,7 +1019,7 @@ mod tests {
         let mut list = List(vec![item]);
         assert_eq!(format!("{:#}", list), "first;");
 
-        let and_or = dummy_and_or_list("second".to_string());
+        let and_or = "second".parse().unwrap();
         let item = Item {
             and_or,
             is_async: true,
@@ -1065,7 +1027,7 @@ mod tests {
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");
 
-        let and_or = dummy_and_or_list("third".to_string());
+        let and_or = "third".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
