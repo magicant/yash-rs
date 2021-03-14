@@ -32,7 +32,7 @@ use std::rc::Rc;
 ///
 /// This object is included in the abstract syntax tree in place of a
 /// [`HereDoc`](crate::syntax::HereDoc) that is yet to be parsed.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct MissingHereDoc;
 
 /// Partial abstract syntax tree (AST) that can be filled with missing parts to create the whole,
