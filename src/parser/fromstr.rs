@@ -66,7 +66,25 @@ impl FromStr for Word {
     }
 }
 
-// TODO FromStr for Value
+impl FromStr for Value {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Value, Error> {
+        let s = format!("x={}", s);
+        let a = Assign::from_str(&s).map_err(Option::unwrap)?;
+        Ok(a.value)
+    }
+}
+
+impl FromStr for Assign {
+    type Err = Option<Error>;
+    /// Converts a string to an assignment.
+    ///
+    /// Returns `Err(None)` if the string is not an assignment word.
+    fn from_str(s: &str) -> Result<Assign, Option<Error>> {
+        let c = SimpleCommand::from_str(s)?;
+        Ok(c.assigns.into_iter().next()).shift()
+    }
+}
 
 impl FromStr for Operator {
     type Err = ();
@@ -223,6 +241,24 @@ mod tests {
     fn word_from_str() {
         let parse: Word = "a".parse().unwrap();
         assert_eq!(parse.to_string(), "a");
+    }
+
+    #[test]
+    fn value_from_str() {
+        let parse: Value = "v".parse().unwrap();
+        assert_eq!(parse.to_string(), "v");
+
+        let parse: Value = "(1 2 3)".parse().unwrap();
+        assert_eq!(parse.to_string(), "(1 2 3)");
+    }
+
+    #[test]
+    fn assign_from_str() {
+        let parse: Assign = "a=b".parse().unwrap();
+        assert_eq!(parse.to_string(), "a=b");
+
+        let parse: Assign = "x=(1 2 3)".parse().unwrap();
+        assert_eq!(parse.to_string(), "x=(1 2 3)");
     }
 
     #[test]
