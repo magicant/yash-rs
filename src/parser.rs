@@ -20,6 +20,7 @@
 
 mod core;
 mod fill;
+mod fromstr;
 
 pub mod lex;
 
@@ -1541,7 +1542,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("foo".to_string())],
+            words: vec!["foo".parse().unwrap()],
             redirs: vec![],
         };
 
@@ -1587,7 +1588,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("foo".to_string())],
+            words: vec!["foo".parse().unwrap()],
             redirs: vec![],
         };
 
@@ -1606,7 +1607,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("foo".to_string())],
+            words: vec!["foo".parse().unwrap()],
             redirs: vec![],
         };
 
@@ -1627,7 +1628,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("foo".to_string())],
+            words: vec!["foo".parse().unwrap()],
             redirs: vec![],
         };
 
@@ -1648,7 +1649,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("foo".to_string())],
+            words: vec!["foo".parse().unwrap()],
             redirs: vec![],
         };
 
@@ -1769,7 +1770,7 @@ mod tests {
         let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
         let c = SimpleCommand {
             assigns: vec![],
-            words: vec![Word::with_str("f".to_string())],
+            words: vec!["f".parse().unwrap()],
             redirs: vec![],
         };
 

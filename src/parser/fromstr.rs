@@ -1,0 +1,342 @@
+// This file is part of yash, an extended POSIX shell.
+// Copyright (C) 2021 WATANABE Yuki
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use super::fill::Fill;
+use super::fill::MissingHereDoc;
+use super::lex::Lexer;
+use super::lex::Operator;
+use super::lex::TokenId;
+use super::Error;
+use super::Parser;
+use super::Rec;
+use crate::source::Source;
+use crate::syntax::*;
+use futures::executor::block_on;
+use std::convert::TryInto;
+use std::str::FromStr;
+
+// TODO Most FromStr implementations in this file ignore trailing redundant
+// tokens, which should be rejected.
+
+/// Helper for implementing FromStr.
+trait Shift {
+    type Output;
+    fn shift(self) -> Self::Output;
+}
+
+impl<T, E> Shift for Result<Option<T>, E> {
+    type Output = Result<T, Option<E>>;
+    fn shift(self) -> Result<T, Option<E>> {
+        match self {
+            Ok(Some(t)) => Ok(t),
+            Ok(None) => Err(None),
+            Err(e) => Err(Some(e)),
+        }
+    }
+}
+
+impl FromStr for DoubleQuotable {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<DoubleQuotable, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        block_on(async { lexer.double_quotable(|_| false).await.map(Option::unwrap) })
+    }
+}
+
+// TODO FromStr for WordUnit
+
+impl FromStr for Word {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Word, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        block_on(lexer.word(|_| false))
+    }
+}
+
+impl FromStr for Value {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Value, Error> {
+        let s = format!("x={}", s);
+        let a = Assign::from_str(&s).map_err(Option::unwrap)?;
+        Ok(a.value)
+    }
+}
+
+impl FromStr for Assign {
+    type Err = Option<Error>;
+    /// Converts a string to an assignment.
+    ///
+    /// Returns `Err(None)` if the string is not an assignment word.
+    fn from_str(s: &str) -> Result<Assign, Option<Error>> {
+        let c = SimpleCommand::from_str(s)?;
+        Ok(c.assigns.into_iter().next()).shift()
+    }
+}
+
+impl FromStr for Operator {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Operator, ()> {
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, s);
+            let token = lexer.operator().await.map_err(|_| ())?.ok_or(())?;
+            if let TokenId::Operator(op) = token.id {
+                Ok(op)
+            } else {
+                Err(())
+            }
+        })
+    }
+}
+
+impl FromStr for RedirOp {
+    type Err = ();
+    fn from_str(s: &str) -> Result<RedirOp, ()> {
+        Operator::from_str(s)?.try_into()
+    }
+}
+
+impl FromStr for Redir<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a redirection.
+    ///
+    /// Returns `Err(None)` if the first token is not a redirection operator.
+    fn from_str(s: &str) -> Result<Redir<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.redirection()).shift()
+    }
+}
+
+impl FromStr for SimpleCommand<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a simple command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a simple command.
+    fn from_str(s: &str) -> Result<SimpleCommand<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.simple_command()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for CompoundCommand<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a compound command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a compound command.
+    fn from_str(s: &str) -> Result<CompoundCommand<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.compound_command()).shift()
+    }
+}
+
+impl FromStr for FullCompoundCommand<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a compound command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a compound command.
+    fn from_str(s: &str) -> Result<FullCompoundCommand<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.full_compound_command()).shift()
+    }
+}
+
+impl FromStr for Command<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a command.
+    fn from_str(s: &str) -> Result<Command<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.command()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for Pipeline<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a pipeline.
+    ///
+    /// Returns `Err(None)` if the first token does not start a pipeline.
+    fn from_str(s: &str) -> Result<Pipeline<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.pipeline()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for AndOr {
+    type Err = ();
+    fn from_str(s: &str) -> Result<AndOr, ()> {
+        Operator::from_str(s)?.try_into()
+    }
+}
+
+impl FromStr for AndOrList<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to an and-or list.
+    ///
+    /// Returns `Err(None)` if the first token does not start an and-or list.
+    fn from_str(s: &str) -> Result<AndOrList<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.and_or_list()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for List<MissingHereDoc> {
+    type Err = Error;
+    /// Converts a string to a list.
+    ///
+    /// Returns `Err(None)` if the first token does not start a list.
+    fn from_str(s: &str) -> Result<List<MissingHereDoc>, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.list()).map(Rec::unwrap)
+    }
+}
+
+impl FromStr for List {
+    type Err = Error;
+    /// Converts a string to a list.
+    ///
+    /// Returns `Err(None)` if the first token does not start a list.
+    fn from_str(s: &str) -> Result<List, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let list = block_on(parser.maybe_compound_list())?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        list.fill(&mut here_docs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::iter::empty;
+
+    #[test]
+    fn double_quotable_from_str() {
+        let parse: DoubleQuotable = "a".parse().unwrap();
+        assert_eq!(parse.to_string(), "a");
+    }
+
+    #[test]
+    fn word_from_str() {
+        let parse: Word = "a".parse().unwrap();
+        assert_eq!(parse.to_string(), "a");
+    }
+
+    #[test]
+    fn value_from_str() {
+        let parse: Value = "v".parse().unwrap();
+        assert_eq!(parse.to_string(), "v");
+
+        let parse: Value = "(1 2 3)".parse().unwrap();
+        assert_eq!(parse.to_string(), "(1 2 3)");
+    }
+
+    #[test]
+    fn assign_from_str() {
+        let parse: Assign = "a=b".parse().unwrap();
+        assert_eq!(parse.to_string(), "a=b");
+
+        let parse: Assign = "x=(1 2 3)".parse().unwrap();
+        assert_eq!(parse.to_string(), "x=(1 2 3)");
+    }
+
+    #[test]
+    fn operator_from_str() {
+        let parse: Operator = "<<".parse().unwrap();
+        assert_eq!(parse, Operator::LessLess);
+    }
+
+    #[test]
+    fn redir_op_from_str() {
+        let parse: RedirOp = ">|".parse().unwrap();
+        assert_eq!(parse, RedirOp::FileClobber);
+    }
+
+    #[test]
+    fn redir_from_str() {
+        let parse: Redir<MissingHereDoc> = "2> /dev/null".parse().unwrap();
+        assert_eq!(parse.fd, Some(2));
+        if let RedirBody::Normal { operator, operand } = parse.body {
+            assert_eq!(operator, RedirOp::FileOut);
+            assert_eq!(operand.to_string(), "/dev/null");
+        } else {
+            panic!("Not normal redirection: {:?}", parse.body);
+        }
+    }
+
+    #[test]
+    fn simple_command_from_str() {
+        let parse: SimpleCommand<MissingHereDoc> = " a=b</dev/null foo ".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "a=b foo </dev/null");
+    }
+
+    #[test]
+    fn compound_command_from_str() {
+        let parse: CompoundCommand<MissingHereDoc> = " { :; } ".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "{ :; }");
+    }
+
+    #[test]
+    fn full_compound_command_from_str() {
+        let parse: FullCompoundCommand<MissingHereDoc> = " { :; } <&- ".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "{ :; } <&-");
+    }
+
+    #[test]
+    fn command_from_str() {
+        let parse: Command<MissingHereDoc> = "f(){ :; }>&2".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "f() { :; } >&2");
+    }
+
+    #[test]
+    fn pipeline_from_str() {
+        let parse: Pipeline<MissingHereDoc> = " ! a|b|c".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "! a | b | c");
+    }
+
+    #[test]
+    fn and_or_from_str() {
+        assert_eq!(AndOr::from_str("&&"), Ok(AndOr::AndThen));
+        assert_eq!(AndOr::from_str("||"), Ok(AndOr::OrElse));
+    }
+
+    #[test]
+    fn and_or_list_from_str() {
+        let parse: AndOrList<MissingHereDoc> = " a|b&&! c||d|e ".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "a | b && ! c || d | e");
+    }
+
+    #[test]
+    fn list_from_str() {
+        let parse: List<MissingHereDoc> = " a;b&&c&d ".parse().unwrap();
+        let parse = parse.fill(&mut empty()).unwrap();
+        assert_eq!(parse.to_string(), "a; b && c& d");
+    }
+}

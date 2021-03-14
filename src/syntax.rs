@@ -139,25 +139,6 @@ pub struct Word {
     pub location: Location,
 }
 
-impl Word {
-    /// Creates a constant word with unknown source.
-    ///
-    /// This is a convenience function to make a simple word, mainly for debugging
-    /// purpose.
-    ///
-    /// The resulting word elements are not quoted even if they would be usually special.
-    pub fn with_str(s: String) -> Word {
-        let mut units = vec![];
-        for c in s.chars() {
-            units.push(WordUnit::Unquoted(DoubleQuotable::Literal(c)));
-        }
-        Word {
-            units,
-            location: Location::dummy(s),
-        }
-    }
-}
-
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
@@ -207,22 +188,6 @@ pub struct Assign {
     pub value: Value,
     /// Location of the first character of the assignment word.
     pub location: Location,
-}
-
-impl Assign {
-    /// Creates an assignment with unknown source.
-    ///
-    /// This is a convenience function to make a simple scalar assignment, mainly
-    /// for debugging purpose. The assigned value is created with
-    /// [`Word::with_str`].
-    pub fn dummy(name: String, value: String) -> Assign {
-        let line = format!("{}={}", &name, &value);
-        Assign {
-            name,
-            value: Scalar(Word::with_str(value)),
-            location: Location::dummy(line),
-        }
-    }
 }
 
 impl fmt::Display for Assign {
@@ -373,7 +338,7 @@ pub enum RedirBody<H = HereDoc> {
     // TODO process redirection
 }
 
-impl fmt::Display for RedirBody {
+impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RedirBody::Normal { operator, operand } => write!(f, "{}{}", operator, operand),
@@ -418,7 +383,7 @@ impl<H> Redir<H> {
     }
 }
 
-impl fmt::Display for Redir {
+impl<H: fmt::Display> fmt::Display for Redir<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(fd) = self.fd {
             write!(f, "{}", fd)?;
@@ -451,7 +416,7 @@ impl<H> SimpleCommand<H> {
     }
 }
 
-impl fmt::Display for SimpleCommand {
+impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
         let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
@@ -475,7 +440,7 @@ pub enum CompoundCommand<H = HereDoc> {
     // TODO [[ ]]
 }
 
-impl fmt::Display for CompoundCommand {
+impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompoundCommand::*;
         match self {
@@ -494,7 +459,7 @@ pub struct FullCompoundCommand<H = HereDoc> {
     pub redirs: Vec<Redir<H>>,
 }
 
-impl fmt::Display for FullCompoundCommand {
+impl<H: fmt::Display> fmt::Display for FullCompoundCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let FullCompoundCommand { command, redirs } = self;
         write!(f, "{}", command)?;
@@ -513,7 +478,7 @@ pub struct FunctionDefinition<H = HereDoc> {
     pub body: FullCompoundCommand<H>,
 }
 
-impl fmt::Display for FunctionDefinition {
+impl<H: fmt::Display> fmt::Display for FunctionDefinition<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.has_keyword {
             f.write_str("function ")?;
@@ -533,7 +498,7 @@ pub enum Command<H = HereDoc> {
     Function(FunctionDefinition<H>),
 }
 
-impl fmt::Display for Command {
+impl<H: fmt::Display> fmt::Display for Command<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::Simple(c) => c.fmt(f),
@@ -554,7 +519,7 @@ pub struct Pipeline<H = HereDoc> {
     pub negation: bool,
 }
 
-impl fmt::Display for Pipeline {
+impl<H: fmt::Display> fmt::Display for Pipeline<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         if self.negation {
             write!(f, "! ")?;
@@ -570,6 +535,26 @@ pub enum AndOr {
     AndThen,
     /// `||`
     OrElse,
+}
+
+impl TryFrom<Operator> for AndOr {
+    type Error = ();
+    fn try_from(op: Operator) -> Result<AndOr, ()> {
+        match op {
+            Operator::AndAnd => Ok(AndOr::AndThen),
+            Operator::BarBar => Ok(AndOr::OrElse),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<AndOr> for Operator {
+    fn from(op: AndOr) -> Operator {
+        match op {
+            AndOr::AndThen => Operator::AndAnd,
+            AndOr::OrElse => Operator::BarBar,
+        }
+    }
 }
 
 impl fmt::Display for AndOr {
@@ -588,7 +573,7 @@ pub struct AndOrList<H = HereDoc> {
     pub rest: Vec<(AndOr, Pipeline<H>)>,
 }
 
-impl fmt::Display for AndOrList {
+impl<H: fmt::Display> fmt::Display for AndOrList<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.first)?;
         self.rest
@@ -611,7 +596,7 @@ pub struct Item<H = HereDoc> {
 /// By default, the `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl fmt::Display for Item {
+impl<H: fmt::Display> fmt::Display for Item<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.and_or)?;
         if self.is_async {
@@ -635,7 +620,7 @@ pub struct List<H = HereDoc>(pub Vec<Item<H>>);
 /// By default, the last `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl fmt::Display for List {
+impl<H: fmt::Display> fmt::Display for List<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((last, others)) = self.0.split_last() {
             for item in others {
@@ -655,6 +640,7 @@ impl fmt::Display for List {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn double_quotable_display() {
@@ -666,11 +652,11 @@ mod tests {
 
     #[test]
     fn word_to_string_if_literal_success() {
-        let empty = Word::with_str("".to_string());
+        let empty = Word::from_str("").unwrap();
         let s = empty.to_string_if_literal().unwrap();
         assert_eq!(s, "");
 
-        let nonempty = Word::with_str("foo".to_string());
+        let nonempty = Word::from_str("foo").unwrap();
         let s = nonempty.to_string_if_literal().unwrap();
         assert_eq!(s, "foo");
     }
@@ -688,7 +674,7 @@ mod tests {
 
     #[test]
     fn scalar_display() {
-        let s = Scalar(Word::with_str("my scalar value".to_string()));
+        let s = Scalar(Word::from_str("my scalar value").unwrap());
         assert_eq!(s.to_string(), "my scalar value");
     }
 
@@ -700,23 +686,23 @@ mod tests {
 
     #[test]
     fn array_display_one() {
-        let a = Array(vec![Word::with_str("one".to_string())]);
+        let a = Array(vec![Word::from_str("one").unwrap()]);
         assert_eq!(a.to_string(), "(one)");
     }
 
     #[test]
     fn array_display_many() {
         let a = Array(vec![
-            Word::with_str("let".to_string()),
-            Word::with_str("me".to_string()),
-            Word::with_str("see".to_string()),
+            Word::from_str("let").unwrap(),
+            Word::from_str("me").unwrap(),
+            Word::from_str("see").unwrap(),
         ]);
         assert_eq!(a.to_string(), "(let me see)");
     }
 
     #[test]
     fn assign_display() {
-        let mut a = Assign::dummy("foo".to_string(), "bar".to_string());
+        let mut a = Assign::from_str("foo=bar").unwrap();
         assert_eq!(a.to_string(), "foo=bar");
 
         a.value = Array(vec![]);
@@ -725,21 +711,21 @@ mod tests {
 
     #[test]
     fn assign_try_from_word_without_equal() {
-        let word = Word::with_str("foo".to_string());
+        let word = Word::from_str("foo").unwrap();
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
     }
 
     #[test]
     fn assign_try_from_word_with_empty_name() {
-        let word = Word::with_str("=foo".to_string());
+        let word = Word::from_str("=foo").unwrap();
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
     }
 
     #[test]
     fn assign_try_from_word_with_non_literal_name() {
-        let mut word = Word::with_str("night=foo".to_string());
+        let mut word = Word::from_str("night=foo").unwrap();
         word.units.insert(0, Unquoted(Backslashed('k')));
         let result = Assign::try_from(word.clone());
         assert_eq!(result.unwrap_err(), word);
@@ -747,7 +733,7 @@ mod tests {
 
     #[test]
     fn assign_try_from_word_with_literal_name() {
-        let word = Word::with_str("night=foo".to_string());
+        let word = Word::from_str("night=foo").unwrap();
         let location = word.location.clone();
         let assign = Assign::try_from(word).unwrap();
         assert_eq!(assign.name, "night");
@@ -782,16 +768,16 @@ mod tests {
     #[test]
     fn here_doc_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END".to_string()),
+            delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
-            delimiter: Word::with_str("XXX".to_string()),
+            delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("there".to_string()),
+            content: Word::from_str("there").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -799,16 +785,16 @@ mod tests {
     #[test]
     fn here_doc_display_disambiguation() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("--".to_string()),
+            delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
-            delimiter: Word::with_str("-".to_string()),
+            delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -816,9 +802,9 @@ mod tests {
     #[test]
     fn redir_display() {
         let heredoc = HereDoc {
-            delimiter: Word::with_str("END".to_string()),
+            delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Word::with_str("here".to_string()),
+            content: Word::from_str("here").unwrap(),
         };
 
         let redir = Redir {
@@ -849,26 +835,26 @@ mod tests {
 
         command
             .assigns
-            .push(Assign::dummy("name".to_string(), "value".to_string()));
+            .push(Assign::from_str("name=value").unwrap());
         assert_eq!(command.to_string(), "name=value");
 
         command
             .assigns
-            .push(Assign::dummy("hello".to_string(), "world".to_string()));
+            .push(Assign::from_str("hello=world").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world");
 
-        command.words.push(Word::with_str("echo".to_string()));
+        command.words.push(Word::from_str("echo").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world echo");
 
-        command.words.push(Word::with_str("foo".to_string()));
+        command.words.push(Word::from_str("foo").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
         command.redirs.push(Redir {
             fd: None,
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("END".to_string()),
+                delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Word::with_str("".to_string()),
+                content: Word::from_str("").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -882,60 +868,20 @@ mod tests {
         command.redirs.push(Redir {
             fd: Some(1),
             body: RedirBody::from(HereDoc {
-                delimiter: Word::with_str("here".to_string()),
+                delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Word::with_str("ignored".to_string()),
+                content: Word::from_str("ignored").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
 
-        command
-            .assigns
-            .push(Assign::dummy("foo".to_string(), "bar".to_string()));
+        command.assigns.push(Assign::from_str("foo=bar").unwrap());
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
-    }
-
-    fn dummy_command(s: String) -> Command {
-        let w = Word::with_str(s);
-        let s = SimpleCommand {
-            assigns: vec![],
-            words: vec![w],
-            redirs: vec![],
-        };
-        Command::Simple(s)
-    }
-
-    fn dummy_pipeline(s: String) -> Pipeline {
-        let c = dummy_command(s);
-        Pipeline {
-            commands: vec![c],
-            negation: false,
-        }
-    }
-
-    fn dummy_and_or_list(s: String) -> AndOrList {
-        let first = dummy_pipeline(s);
-        AndOrList {
-            first,
-            rest: vec![],
-        }
-    }
-
-    fn dummy_list(s: String) -> List {
-        let and_or = dummy_and_or_list(s);
-        let is_async = false;
-        let item = Item { and_or, is_async };
-        List(vec![item])
-    }
-
-    fn dummy_compound_command(s: String) -> CompoundCommand {
-        let list = dummy_list(s);
-        CompoundCommand::Subshell(list)
     }
 
     #[test]
     fn grouping_display() {
-        let list = dummy_list("foo".to_string());
+        let list = "foo".parse::<List>().unwrap();
         let grouping = CompoundCommand::Grouping(list);
         assert_eq!(grouping.to_string(), "{ foo; }");
     }
@@ -943,12 +889,12 @@ mod tests {
     #[test]
     fn function_definition_display() {
         let body = FullCompoundCommand {
-            command: dummy_compound_command("bar".to_string()),
+            command: "( bar )".parse().unwrap(),
             redirs: vec![],
         };
         let fd = FunctionDefinition {
             has_keyword: false,
-            name: Word::with_str("foo".to_string()),
+            name: Word::from_str("foo").unwrap(),
             body,
         };
         assert_eq!(fd.to_string(), "foo() (bar)");
@@ -960,41 +906,49 @@ mod tests {
             commands: vec![],
             negation: false,
         };
-        p.commands.push(dummy_command("first".to_string()));
+        p.commands.push("first".parse().unwrap());
         assert_eq!(p.to_string(), "first");
 
         p.negation = true;
         assert_eq!(p.to_string(), "! first");
 
-        p.commands.push(dummy_command("second".to_string()));
+        p.commands.push("second".parse().unwrap());
         assert_eq!(p.to_string(), "! first | second");
 
-        p.commands.push(dummy_command("third".to_string()));
+        p.commands.push("third".parse().unwrap());
         p.negation = false;
         assert_eq!(p.to_string(), "first | second | third");
     }
 
     #[test]
+    fn and_or_conversions() {
+        for op in &[AndOr::AndThen, AndOr::OrElse] {
+            let op2 = AndOr::try_from(Operator::from(*op));
+            assert_eq!(op2, Ok(*op));
+        }
+    }
+
+    #[test]
     fn and_or_list_display() {
-        let p = dummy_pipeline("first".to_string());
+        let p = "first".parse().unwrap();
         let mut aol = AndOrList {
             first: p,
             rest: vec![],
         };
         assert_eq!(aol.to_string(), "first");
 
-        let p = dummy_pipeline("second".to_string());
+        let p = "second".parse().unwrap();
         aol.rest.push((AndOr::AndThen, p));
         assert_eq!(aol.to_string(), "first && second");
 
-        let p = dummy_pipeline("third".to_string());
+        let p = "third".parse().unwrap();
         aol.rest.push((AndOr::OrElse, p));
         assert_eq!(aol.to_string(), "first && second || third");
     }
 
     #[test]
     fn list_display() {
-        let and_or = dummy_and_or_list("first".to_string());
+        let and_or = "first".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1002,7 +956,7 @@ mod tests {
         let mut list = List(vec![item]);
         assert_eq!(list.to_string(), "first");
 
-        let and_or = dummy_and_or_list("second".to_string());
+        let and_or = "second".parse().unwrap();
         let item = Item {
             and_or,
             is_async: true,
@@ -1010,7 +964,7 @@ mod tests {
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
 
-        let and_or = dummy_and_or_list("third".to_string());
+        let and_or = "third".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1021,7 +975,7 @@ mod tests {
 
     #[test]
     fn list_display_alternate() {
-        let and_or = dummy_and_or_list("first".to_string());
+        let and_or = "first".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -1029,7 +983,7 @@ mod tests {
         let mut list = List(vec![item]);
         assert_eq!(format!("{:#}", list), "first;");
 
-        let and_or = dummy_and_or_list("second".to_string());
+        let and_or = "second".parse().unwrap();
         let item = Item {
             and_or,
             is_async: true,
@@ -1037,7 +991,7 @@ mod tests {
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");
 
-        let and_or = dummy_and_or_list("third".to_string());
+        let and_or = "third".parse().unwrap();
         let item = Item {
             and_or,
             is_async: false,
