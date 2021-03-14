@@ -373,7 +373,7 @@ pub enum RedirBody<H = HereDoc> {
     // TODO process redirection
 }
 
-impl fmt::Display for RedirBody {
+impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RedirBody::Normal { operator, operand } => write!(f, "{}{}", operator, operand),
@@ -418,7 +418,7 @@ impl<H> Redir<H> {
     }
 }
 
-impl fmt::Display for Redir {
+impl<H: fmt::Display> fmt::Display for Redir<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(fd) = self.fd {
             write!(f, "{}", fd)?;
@@ -451,7 +451,7 @@ impl<H> SimpleCommand<H> {
     }
 }
 
-impl fmt::Display for SimpleCommand {
+impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
         let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
@@ -475,7 +475,7 @@ pub enum CompoundCommand<H = HereDoc> {
     // TODO [[ ]]
 }
 
-impl fmt::Display for CompoundCommand {
+impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompoundCommand::*;
         match self {
@@ -494,7 +494,7 @@ pub struct FullCompoundCommand<H = HereDoc> {
     pub redirs: Vec<Redir<H>>,
 }
 
-impl fmt::Display for FullCompoundCommand {
+impl<H: fmt::Display> fmt::Display for FullCompoundCommand<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let FullCompoundCommand { command, redirs } = self;
         write!(f, "{}", command)?;
@@ -513,7 +513,7 @@ pub struct FunctionDefinition<H = HereDoc> {
     pub body: FullCompoundCommand<H>,
 }
 
-impl fmt::Display for FunctionDefinition {
+impl<H: fmt::Display> fmt::Display for FunctionDefinition<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.has_keyword {
             f.write_str("function ")?;
@@ -533,7 +533,7 @@ pub enum Command<H = HereDoc> {
     Function(FunctionDefinition<H>),
 }
 
-impl fmt::Display for Command {
+impl<H: fmt::Display> fmt::Display for Command<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::Simple(c) => c.fmt(f),
@@ -554,7 +554,7 @@ pub struct Pipeline<H = HereDoc> {
     pub negation: bool,
 }
 
-impl fmt::Display for Pipeline {
+impl<H: fmt::Display> fmt::Display for Pipeline<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         if self.negation {
             write!(f, "! ")?;
@@ -608,7 +608,7 @@ pub struct AndOrList<H = HereDoc> {
     pub rest: Vec<(AndOr, Pipeline<H>)>,
 }
 
-impl fmt::Display for AndOrList {
+impl<H: fmt::Display> fmt::Display for AndOrList<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.first)?;
         self.rest
@@ -631,7 +631,7 @@ pub struct Item<H = HereDoc> {
 /// By default, the `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl fmt::Display for Item {
+impl<H: fmt::Display> fmt::Display for Item<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.and_or)?;
         if self.is_async {
@@ -655,7 +655,7 @@ pub struct List<H = HereDoc>(pub Vec<Item<H>>);
 /// By default, the last `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl fmt::Display for List {
+impl<H: fmt::Display> fmt::Display for List<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((last, others)) = self.0.split_last() {
             for item in others {
