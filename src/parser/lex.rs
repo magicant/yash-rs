@@ -731,7 +731,6 @@ impl Lexer {
         Ok(self.double_quotable(is_delimiter).await?.map(Unquoted))
     }
 
-    // TODO Should return an empty word if the current position is the end of input.
     // TODO Need more parameters to control how the word should be parsed. Especially:
     //  * Allow tilde expansion?
     /// Parses a word token.
@@ -2023,6 +2022,17 @@ mod tests {
             WordUnit::Unquoted(DoubleQuotable::Backslashed('#'))
         );
         assert_eq!(word.location.line.value, r"0$(:)X\#");
+        assert_eq!(word.location.line.number.get(), 1);
+        assert_eq!(word.location.line.source, Source::Unknown);
+        assert_eq!(word.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_word_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let word = block_on(lexer.word(|_| panic!("unexpected call to is_delimiter"))).unwrap();
+        assert_eq!(word.units, []);
+        assert_eq!(word.location.line.value, "");
         assert_eq!(word.location.line.number.get(), 1);
         assert_eq!(word.location.line.source, Source::Unknown);
         assert_eq!(word.location.column.get(), 1);
