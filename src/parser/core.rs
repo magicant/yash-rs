@@ -37,6 +37,8 @@ use std::rc::Rc;
 /// Types of syntax errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SyntaxError {
+    /// A double quotation lacks a closing `"`.
+    UnclosedDoubleQuote { opening_location: Location },
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
     // TODO Should we remove `UnexpectedToken` in favor of other error types?
@@ -83,6 +85,9 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
+            UnclosedDoubleQuote {
+                opening_location: _,
+            } => f.write_str("The double quote is not closed."),
             UnclosedCommandSubstitution {
                 opening_location: _,
             } => f.write_str("The command substitution is not closed"),
