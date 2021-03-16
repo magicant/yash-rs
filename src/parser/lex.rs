@@ -718,6 +718,24 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a double-quoted string.
+    ///
+    /// The opening `"` must have been consumed before calling this function.
+    /// The closing `"` is consumed in this function.
+    async fn double_quote(&mut self) -> Result<WordUnit> {
+        let mut content = vec![];
+        // TODO all characters should not be escapable
+        while let Some(dq) = self.double_quotable(|c| c == '"').await? {
+            content.push(dq);
+        }
+
+        if self.skip_if(|c| c == '"').await? {
+            Ok(DoubleQuote(content))
+        } else {
+            todo!()
+        }
+    }
+
     /// Parses a word unit.
     ///
     /// `is_delimiter` is a function that decides a character is a delimiter. An
@@ -728,7 +746,13 @@ impl Lexer {
     {
         // TODO Parse line continuations before the word unit
         // TODO Parse other types of word units
-        Ok(self.double_quotable(is_delimiter).await?.map(Unquoted))
+        match self.consume_char_if(|c| c == '"').await? {
+            None => Ok(self.double_quotable(is_delimiter).await?.map(Unquoted)),
+            Some(sc) => match sc.value {
+                '"' => self.double_quote().await.map(Some),
+                _ => unreachable!(),
+            },
+        }
     }
 
     // TODO Need more parameters to control how the word should be parsed. Especially:
@@ -1988,6 +2012,34 @@ mod tests {
         if let Unquoted(CommandSubst { content, location }) = result {
             assert_eq!(content, "");
             assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+    }
+
+    #[test]
+    fn lexer_word_unit_double_quote_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\"\"");
+        let result =
+            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap()
+                .unwrap();
+        if let DoubleQuote(content) = result {
+            assert_eq!(content, []);
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+    }
+
+    #[test]
+    fn lexer_word_unit_double_quote_non_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\"abc\"");
+        let result =
+            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap()
+                .unwrap();
+        if let DoubleQuote(content) = result {
+            assert_eq!(content, [Literal('a'), Literal('b'), Literal('c')]);
         } else {
             panic!("unexpected result {:?}", result);
         }
