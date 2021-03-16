@@ -718,6 +718,19 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a word unit.
+    ///
+    /// `is_delimiter` is a function that decides a character is a delimiter. An
+    /// unquoted character is parsed only if `is_delimiter` returns false for it.
+    pub async fn word_unit<F>(&mut self, is_delimiter: F) -> Result<Option<WordUnit>>
+    where
+        F: FnOnce(char) -> bool,
+    {
+        // TODO Parse line continuations before the word unit
+        // TODO Parse other types of word units
+        Ok(self.double_quotable(is_delimiter).await?.map(Unquoted))
+    }
+
     // TODO Should return an empty word if the current position is the end of input.
     // TODO Need more parameters to control how the word should be parsed. Especially:
     //  * Allow tilde expansion?
@@ -733,10 +746,8 @@ impl Lexer {
     {
         let location = self.location().await?.clone();
         let mut units = vec![];
-        // TODO Parse line continuations before each word unit
-        // TODO Parse other types of word units
-        while let Some(dq) = self.double_quotable(&mut is_delimiter).await? {
-            units.push(Unquoted(dq))
+        while let Some(unit) = self.word_unit(&mut is_delimiter).await? {
+            units.push(unit)
         }
         Ok(Word { units, location })
     }
@@ -1963,6 +1974,23 @@ mod tests {
         if let CommandSubst { content, location } = result {
             assert_eq!(content, "");
             assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+    }
+
+    #[test]
+    fn lexer_word_unit_unquoted() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let result =
+            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap()
+                .unwrap();
+        if let Unquoted(CommandSubst { content, location }) = result {
+            assert_eq!(content, "");
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("unexpected result {:?}", result);
         }
     }
 
