@@ -57,7 +57,13 @@ impl FromStr for DoubleQuotable {
     }
 }
 
-// TODO FromStr for WordUnit
+impl FromStr for WordUnit {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<WordUnit, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        block_on(lexer.word_unit(|_| false)).map(Option::unwrap)
+    }
+}
 
 impl FromStr for Word {
     type Err = Error;
