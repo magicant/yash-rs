@@ -37,6 +37,8 @@ use std::rc::Rc;
 /// Types of syntax errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SyntaxError {
+    /// A single quotation lacks a closing `'`.
+    UnclosedSingleQuote { opening_location: Location },
     /// A double quotation lacks a closing `"`.
     UnclosedDoubleQuote { opening_location: Location },
     /// A command substitution started with `$(` but lacks a closing `)`.
@@ -85,6 +87,9 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
+            UnclosedSingleQuote {
+                opening_location: _,
+            } => f.write_str("The single quote is not closed."),
             UnclosedDoubleQuote {
                 opening_location: _,
             } => f.write_str("The double quote is not closed."),
