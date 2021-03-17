@@ -725,7 +725,11 @@ impl Lexer {
     ///
     /// The opening `"` must have been consumed before calling this function.
     /// The closing `"` is consumed in this function.
-    async fn double_quote(&mut self) -> Result<WordUnit> {
+    ///
+    /// `opening_location` should be the location of the opening `"`. It is used
+    /// to construct an error value, but this function does not check if it
+    /// actually is a location of `"`.
+    async fn double_quote(&mut self, opening_location: Location) -> Result<WordUnit> {
         fn is_delimiter(c: char) -> bool {
             c == '"'
         }
@@ -741,7 +745,9 @@ impl Lexer {
         if self.skip_if(|c| c == '"').await? {
             Ok(DoubleQuote(content))
         } else {
-            todo!()
+            let cause = SyntaxError::UnclosedDoubleQuote { opening_location }.into();
+            let location = self.location().await?.clone();
+            Err(Error { cause, location })
         }
     }
 
@@ -761,7 +767,10 @@ impl Lexer {
                 .await?
                 .map(Unquoted)),
             Some(sc) => match sc.value {
-                '"' => self.double_quote().await.map(Some),
+                '"' => {
+                    let location = sc.location.clone();
+                    self.double_quote(location).await.map(Some)
+                }
                 _ => unreachable!(),
             },
         }
@@ -2136,6 +2145,26 @@ mod tests {
                 panic!("Not a double quote: {:?}", result);
             }
         })
+    }
+
+    #[test]
+    fn lexer_word_unit_double_quote_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\"abc\ndef");
+
+        let e = block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            .unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedDoubleQuote { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "\"abc\n");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "def");
+        assert_eq!(e.location.line.number.get(), 2);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
     }
 
     #[test]
