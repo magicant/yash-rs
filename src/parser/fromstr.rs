@@ -50,9 +50,10 @@ impl<T, E> Shift for Result<Option<T>, E> {
 
 impl FromStr for DoubleQuotable {
     type Err = Error;
+    /// Parses a [`DoubleQuotable`] by `lexer.double_quotable(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<DoubleQuotable, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
-        block_on(async { lexer.double_quotable(|_| false).await.map(Option::unwrap) })
+        block_on(lexer.double_quotable(|_| false, |_| true)).map(Option::unwrap)
     }
 }
 
