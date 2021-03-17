@@ -84,10 +84,12 @@ impl MaybeLiteral for DoubleQuotable {
 pub enum WordUnit {
     /// Unquoted [`DoubleQuotable`] as a word unit.
     Unquoted(DoubleQuotable),
+    /// String surrounded with a pair of single quotations.
+    SingleQuote(String),
     /// Any number of [`DoubleQuotable`]s surrounded with a pair of double
     /// quotations.
     DoubleQuote(Vec<DoubleQuotable>),
-    // TODO SingleQuote(String),
+    // TODO tilde expansion
 }
 
 pub use WordUnit::*;
@@ -96,6 +98,7 @@ impl fmt::Display for WordUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Unquoted(dq) => dq.fmt(f),
+            SingleQuote(s) => write!(f, "'{}'", s),
             DoubleQuote(dqs) => {
                 f.write_str("\"")?;
                 for dq in dqs {
@@ -663,6 +666,11 @@ mod tests {
         assert_eq!(unquoted.to_string(), "A");
         let unquoted = Unquoted(Backslashed('B'));
         assert_eq!(unquoted.to_string(), "\\B");
+
+        let single_quote = SingleQuote("".to_string());
+        assert_eq!(single_quote.to_string(), "''");
+        let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
+        assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
 
         let double_quote = DoubleQuote(vec![]);
         assert_eq!(double_quote.to_string(), "\"\"");
