@@ -1753,6 +1753,8 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -1774,6 +1776,8 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.location()).unwrap().column.get(), 3);
     }
 
     #[test]
@@ -1795,6 +1799,8 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -1816,6 +1822,8 @@ mod tests {
         assert_eq!(t.word.location.line.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '>');
     }
 
     #[test]
@@ -1928,6 +1936,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "()");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
         assert_eq!(result, None);
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
 
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
@@ -1939,6 +1948,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "$;");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
         assert_eq!(result, None);
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '$');
 
         let mut lexer = Lexer::with_source(Source::Unknown, "$&");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
@@ -1958,6 +1968,7 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
 
         let mut lexer = Lexer::with_source(Source::Unknown, "$( foo bar )");
         let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
@@ -1970,6 +1981,7 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -1992,6 +2004,8 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2009,6 +2023,8 @@ mod tests {
         .unwrap();
         assert!(called);
         assert_eq!(result, None);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
     }
 
     #[test]
@@ -2027,6 +2043,8 @@ mod tests {
         .unwrap();
         assert!(called);
         assert_eq!(result, Backslashed('#'));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2039,6 +2057,8 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(result, Literal('\\'));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2056,6 +2076,8 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2071,6 +2093,8 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2106,6 +2130,8 @@ mod tests {
                 .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('#')))));
+
+            assert_eq!(lexer.peek_char().await, Ok(None));
         })
     }
 
@@ -2122,8 +2148,7 @@ mod tests {
             panic!("unexpected result {:?}", result);
         }
 
-        let next = block_on(lexer.peek_char()).unwrap();
-        assert_eq!(next, None);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2139,8 +2164,7 @@ mod tests {
             panic!("unexpected result {:?}", result);
         }
 
-        let next = block_on(lexer.peek_char()).unwrap();
-        assert_eq!(next, None);
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2175,6 +2199,8 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2189,6 +2215,8 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2223,6 +2251,8 @@ mod tests {
             } else {
                 panic!("Not a double quote: {:?}", result);
             }
+
+            assert_eq!(lexer.peek_char().await, Ok(None));
         })
     }
 
@@ -2278,6 +2308,8 @@ mod tests {
         assert_eq!(word.location.line.number.get(), 1);
         assert_eq!(word.location.line.source, Source::Unknown);
         assert_eq!(word.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
@@ -2329,6 +2361,8 @@ mod tests {
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ' ');
     }
 
     #[test]
@@ -2351,6 +2385,8 @@ mod tests {
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
 
     #[test]
@@ -2369,6 +2405,8 @@ mod tests {
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
+
+        assert_eq!(block_on(lexer.location()).unwrap().column.get(), 2);
     }
 
     #[test]
