@@ -700,6 +700,8 @@ impl Lexer {
         F: FnOnce(char) -> bool,
         G: FnOnce(char) -> bool,
     {
+        // TODO line continuations
+
         if self.skip_if(|c| c == '\\').await? {
             if let Some(c) = self.consume_char_if(is_escapable).await? {
                 return Ok(Some(Backslashed(c.value)));
