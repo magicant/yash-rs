@@ -460,6 +460,7 @@ use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
 use crate::source::Location;
+use crate::source::SourceChar;
 use crate::syntax::*;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -723,6 +724,29 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a single-quoted string.
+    ///
+    /// The opening `'` must have been consumed before calling this function.
+    /// The closing `'` is consumed in this function.
+    ///
+    /// `opening_location` should be the location of the opening `'`. It is used
+    /// to construct an error value, but this function does not check if it
+    /// actually is a location of `'`.
+    async fn single_quote(&mut self, opening_location: Location) -> Result<WordUnit> {
+        let mut content = String::new();
+        loop {
+            match self.consume_char_if(|_| true).await? {
+                Some(&SourceChar { value: '\'', .. }) => return Ok(SingleQuote(content)),
+                Some(&SourceChar { value, .. }) => content.push(value),
+                None => {
+                    let cause = SyntaxError::UnclosedSingleQuote { opening_location }.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
+                }
+            }
+        }
+    }
+
     /// Parses a double-quoted string.
     ///
     /// The opening `"` must have been consumed before calling this function.
@@ -763,18 +787,19 @@ impl Lexer {
     {
         // TODO Parse line continuations before the word unit
         // TODO Parse other types of word units
-        match self.consume_char_if(|c| c == '"').await? {
+        match self.consume_char_if(|c| c == '\'' || c == '"').await? {
             None => Ok(self
                 .double_quotable(is_delimiter, |_| true)
                 .await?
                 .map(Unquoted)),
-            Some(sc) => match sc.value {
-                '"' => {
-                    let location = sc.location.clone();
-                    self.double_quote(location).await.map(Some)
+            Some(sc) => {
+                let location = sc.location.clone();
+                match sc.value {
+                    '\'' => self.single_quote(location).await.map(Some),
+                    '"' => self.double_quote(location).await.map(Some),
+                    _ => unreachable!(),
                 }
-                _ => unreachable!(),
-            },
+            }
         }
     }
 
@@ -855,9 +880,7 @@ mod tests {
     use crate::parser::core::ErrorCause;
     use crate::source::lines;
     use crate::source::Line;
-    use crate::source::Location;
     use crate::source::Source;
-    use crate::source::SourceChar;
     use futures::executor::block_on;
     use std::fmt;
     use std::future::ready;
@@ -2084,6 +2107,60 @@ mod tests {
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('#')))));
         })
+    }
+
+    #[test]
+    fn lexer_word_unit_single_quote_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "''");
+        let result =
+            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap()
+                .unwrap();
+        if let SingleQuote(content) = result {
+            assert_eq!(content, "");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+
+        let next = block_on(lexer.peek_char()).unwrap();
+        assert_eq!(next, None);
+    }
+
+    #[test]
+    fn lexer_word_unit_single_quote_nonempty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\n$def\\'");
+        let result =
+            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap()
+                .unwrap();
+        if let SingleQuote(content) = result {
+            assert_eq!(content, "abc\n$def\\");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+
+        let next = block_on(lexer.peek_char()).unwrap();
+        assert_eq!(next, None);
+    }
+
+    #[test]
+    fn lexer_word_unit_single_quote_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\ndef\\");
+
+        let e = block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            .unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedSingleQuote { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "'abc\n");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "def\\");
+        assert_eq!(e.location.line.number.get(), 2);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
