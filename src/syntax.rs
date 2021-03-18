@@ -97,6 +97,16 @@ impl MaybeLiteral for DoubleQuotable {
     }
 }
 
+/// String that may contain some expansions.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Text(pub Vec<DoubleQuotable>);
+
+impl fmt::Display for Text {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|unit| unit.fmt(f))
+    }
+}
+
 /// Element of a [Word].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
