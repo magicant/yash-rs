@@ -50,6 +50,13 @@ pub trait MaybeLiteral {
     }
 }
 
+impl<T: MaybeLiteral> MaybeLiteral for [T] {
+    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Option<R> {
+        self.iter()
+            .try_fold(result, |result, unit| unit.extend_if_literal(result))
+    }
+}
+
 /// Element of a [Word] that can be double-quoted.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DoubleQuotable {
@@ -130,13 +137,6 @@ impl MaybeLiteral for WordUnit {
         } else {
             None
         }
-    }
-}
-
-// TODO generalize
-impl MaybeLiteral for [WordUnit] {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
-        self.iter().try_fold(result, |result, unit| unit.extend_if_literal(result))
     }
 }
 
