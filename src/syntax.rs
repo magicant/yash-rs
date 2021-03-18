@@ -34,11 +34,20 @@ use std::os::unix::io::RawFd;
 
 /// Possibly literal syntax element.
 ///
-/// When an instance of an implementor is literal, it can be converted directly
-/// to a string.
+/// A syntax element is _literal_ if it is not quoted and does not contain any
+/// expansions. Such an element can be converted to a string independently of the
+/// shell execution environment.
 pub trait MaybeLiteral {
+    /// Checks if `self` is literal and, if so, converts to a string and appends
+    /// it to `result`.
+    ///
+    /// Returns `Some(result)` if `self` is literal. Otherwise, returns `None`.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T>;
+
     /// Checks if `self` is literal and, if so, converts to a string.
-    fn to_string_if_literal(&self) -> Option<String>;
+    fn to_string_if_literal(&self) -> Option<String> {
+        self.extend_if_literal(String::new())
+    }
 }
 
 /// Element of a [Word] that can be double-quoted.
@@ -68,11 +77,13 @@ impl fmt::Display for DoubleQuotable {
 }
 
 impl MaybeLiteral for DoubleQuotable {
-    /// If `self` is `Literal`, returns the character converted to a string.
+    /// If `self` is `Literal`, appends the character to `result` and returns it.
     /// Otherwise, returns `None`.
-    fn to_string_if_literal(&self) -> Option<String> {
+    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Option<T> {
         if let Literal(c) = self {
-            Some(c.to_string())
+            // TODO Use Extend::extend_one
+            result.extend(std::iter::once(*c));
+            Some(result)
         } else {
             None
         }
@@ -111,29 +122,21 @@ impl fmt::Display for WordUnit {
 }
 
 impl MaybeLiteral for WordUnit {
-    /// If `self` is `Unquoted(Literal(_))`, returns the character converted to a
-    /// string. Otherwise, returns `None`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        if let Unquoted(dq) = self {
-            dq.to_string_if_literal()
+    /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`
+    /// and returns it. Otherwise, returns `None`.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+        if let Unquoted(inner) = self {
+            inner.extend_if_literal(result)
         } else {
             None
         }
     }
 }
 
+// TODO generalize
 impl MaybeLiteral for [WordUnit] {
-    /// Converts the word units to a string if all the word units are literal,
-    /// that is, `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        fn try_to_char(u: &WordUnit) -> Option<char> {
-            if let Unquoted(Literal(c)) = u {
-                Some(*c)
-            } else {
-                None
-            }
-        }
-        self.iter().map(try_to_char).collect()
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+        self.iter().try_fold(result, |result, unit| unit.extend_if_literal(result))
     }
 }
 
@@ -156,10 +159,8 @@ impl fmt::Display for Word {
 }
 
 impl MaybeLiteral for Word {
-    /// Converts the word to a string if the word is fully literal, that is, all composed of
-    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        self.units.to_string_if_literal()
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+        self.units.extend_if_literal(result)
     }
 }
 
