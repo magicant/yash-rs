@@ -107,6 +107,12 @@ impl fmt::Display for Text {
     }
 }
 
+impl MaybeLiteral for Text {
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+        self.0.extend_if_literal(result)
+    }
+}
+
 /// Element of a [Word].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
@@ -687,6 +693,23 @@ mod tests {
         assert_eq!(double_quote.to_string(), "\"\"");
         let double_quote = DoubleQuote(vec![Literal('A'), Backslashed('B')]);
         assert_eq!(double_quote.to_string(), "\"A\\B\"");
+    }
+
+    #[test]
+    fn text_to_string_if_literal_success() {
+        let empty = Text(vec![]);
+        let s = empty.to_string_if_literal().unwrap();
+        assert_eq!(s, "");
+
+        let nonempty = Text(vec![Literal('f'), Literal('o'), Literal('o')]);
+        let s = nonempty.to_string_if_literal().unwrap();
+        assert_eq!(s, "foo");
+    }
+
+    #[test]
+    fn text_to_string_if_literal_failure() {
+        let backslashed = Text(vec![Backslashed('a')]);
+        assert_eq!(backslashed.to_string_if_literal(), None);
     }
 
     #[test]
