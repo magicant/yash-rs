@@ -724,6 +724,34 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a text, i.e., a (possibly empty) sequence of [`DoubleQuotable`]s.
+    ///
+    /// `is_delimiter` tests if an unquoted character is a delimiter. When
+    /// `is_delimiter` returns true, the parser ends parsing and returns the text
+    /// up to the character as a result.
+    ///
+    /// `is_escapable` tests if a backslash can escape a character. When the
+    /// parser founds an unquoted backslash, the next character is passed to
+    /// `is_escapable`. If `is_escapable` returns true, the backslash is treated
+    /// as a valid escape (`DoubleQuotable::Backslashed`). Otherwise, it ia a
+    /// literal (`DoubleQuotable::Literal`).
+    pub async fn text<F, G>(&mut self, mut is_delimiter: F, mut is_escapable: G) -> Result<Text>
+    where
+        F: FnMut(char) -> bool,
+        G: FnMut(char) -> bool,
+    {
+        let mut units = vec![];
+
+        while let Some(unit) = self
+            .double_quotable(&mut is_delimiter, &mut is_escapable)
+            .await?
+        {
+            units.push(unit);
+        }
+
+        Ok(Text(units))
+    }
+
     /// Parses a single-quoted string.
     ///
     /// The opening `'` must have been consumed before calling this function.
@@ -2076,6 +2104,92 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let Text(units) = block_on(lexer.text(
+            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| panic!("unexpected call to is_escapable({:?})", c),
+        ))
+        .unwrap();
+        assert_eq!(units, &[]);
+    }
+
+    #[test]
+    fn lexer_text_nonempty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let mut called = 0;
+        let Text(units) = block_on(lexer.text(
+            |c| {
+                assert!(
+                    matches!(c, 'a' | 'b' | 'c'),
+                    "unexpected call to is_delimiter({:?}), called={}",
+                    c,
+                    called
+                );
+                called += 1;
+                false
+            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
+        ))
+        .unwrap();
+        assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
+        assert_eq!(called, 3);
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_delimiter() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let mut called = 0;
+        let Text(units) = block_on(lexer.text(
+            |c| {
+                assert!(
+                    matches!(c, 'a' | 'b' | 'c'),
+                    "unexpected call to is_delimiter({:?}), called={}",
+                    c,
+                    called
+                );
+                called += 1;
+                c == 'c'
+            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
+        ))
+        .unwrap();
+        assert_eq!(units, &[Literal('a'), Literal('b')]);
+        assert_eq!(called, 3);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'c');
+    }
+
+    #[test]
+    fn lexer_text_escaping() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"a\b\c");
+        let mut called = 0;
+        let Text(units) = block_on(lexer.text(
+            |_| false,
+            |c| {
+                assert!(
+                    matches!(c, 'b' | 'c'),
+                    "unexpected call to is_escapable({:?}), called={}",
+                    c,
+                    called
+                );
+                called += 1;
+                c == 'b'
+            },
+        ))
+        .unwrap();
+        assert_eq!(
+            units,
+            &[Literal('a'), Backslashed('b'), Literal('\\'), Literal('c')]
+        );
+        assert_eq!(called, 2);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
