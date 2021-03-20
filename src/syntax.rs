@@ -332,8 +332,8 @@ pub struct HereDoc {
     /// Content of the here-document.
     ///
     /// The content ends with a newline unless it is empty. If the delimiter
-    /// is quoted, the content must not contain any expansion.
-    pub content: Word,
+    /// is quoted, the content must be all literal.
+    pub content: Text,
 }
 
 impl fmt::Display for HereDoc {
@@ -826,14 +826,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("there").unwrap(),
+            content: Text::from_str("there").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -843,14 +843,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -860,7 +860,7 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
 
         let redir = Redir {
@@ -910,7 +910,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Word::from_str("").unwrap(),
+                content: Text::from_str("").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -926,7 +926,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Word::from_str("ignored").unwrap(),
+                content: Text::from_str("ignored").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");

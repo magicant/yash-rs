@@ -981,7 +981,7 @@ mod tests {
             assert_eq!(here_docs.len(), 1);
             assert_eq!(here_docs[0].delimiter.to_string(), "END");
             assert_eq!(here_docs[0].remove_tabs, remove_tabs);
-            assert!(here_docs[0].content.units.is_empty());
+            assert_eq!(here_docs[0].content.0, []);
 
             assert!(parser.take_read_here_docs().is_empty());
 
