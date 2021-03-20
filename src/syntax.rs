@@ -66,7 +66,13 @@ pub enum TextUnit {
     Backslashed(char),
     // Parameter(TODO),
     /// Command substitution of the form `$(...)`.
-    CommandSubst { content: String, location: Location },
+    CommandSubst {
+        /// Command string that will be parsed and executed when the command
+        /// substitution is expanded.
+        content: String,
+        /// Location of the initial `$` character of this command substitution.
+        location: Location,
+    },
     // Backquote(TODO),
     // Arith(TODO),
 }
@@ -98,6 +104,9 @@ impl MaybeLiteral for TextUnit {
 }
 
 /// String that may contain some expansions.
+///
+/// A text is a sequence of [text unit](TextUnit)s, which may contain some kinds
+/// of expansions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
@@ -113,15 +122,14 @@ impl MaybeLiteral for Text {
     }
 }
 
-/// Element of a [Word].
+/// Element of a [Word], i.e., text with quotes and tilde expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
     /// Unquoted [`TextUnit`] as a word unit.
     Unquoted(TextUnit),
     /// String surrounded with a pair of single quotations.
     SingleQuote(String),
-    /// Any number of [`TextUnit`]s surrounded with a pair of double
-    /// quotations.
+    /// Text surrounded with a pair of double quotations.
     DoubleQuote(Text),
     // TODO tilde expansion
 }
@@ -150,10 +158,14 @@ impl MaybeLiteral for WordUnit {
     }
 }
 
-/// Token that may involve expansion.
+/// Token that may involve expansions and quotes.
 ///
-/// It depends on context whether an empty word is valid or not. It is your responsibility to
-/// ensure a word is non-empty in a context where it cannot.
+/// A word is a sequence of [word unit](WordUnit)s. It depends on context whether
+/// an empty word is valid or not. It is your responsibility to ensure a word is
+/// non-empty in a context where it cannot.
+///
+/// The difference between words and [text](Text)s is that only words can contain
+/// single- and double-quotes and tilde expansions. Compare [`WordUnit`] and [`TextUnit`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Word {
     /// Word units that constitute the word.

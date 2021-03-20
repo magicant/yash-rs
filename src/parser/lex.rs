@@ -629,10 +629,6 @@ impl Lexer {
     /// # Errors
     ///
     /// - [SyntaxError::UnclosedCommandSubstitution]
-    ///
-    /// # Panics
-    ///
-    /// If the previously consumed character is not `$`.
     pub async fn command_substitution(
         &mut self,
         opening_location: Location,
