@@ -791,10 +791,7 @@ impl Lexer {
             matches!(c, '$' | '`' | '"' | '\\')
         }
 
-        let mut content = vec![];
-        while let Some(dq) = self.double_quotable(is_delimiter, is_escapable).await? {
-            content.push(dq);
-        }
+        let content = self.text(is_delimiter, is_escapable).await?.0;
 
         if self.skip_if(|c| c == '"').await? {
             Ok(DoubleQuote(content))
