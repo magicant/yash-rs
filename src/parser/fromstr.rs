@@ -57,6 +57,15 @@ impl FromStr for DoubleQuotable {
     }
 }
 
+impl FromStr for Text {
+    type Err = Error;
+    // Parses a text by `lexer.text(|_| false, |_| true)`.
+    fn from_str(s: &str) -> Result<Text, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        block_on(lexer.text(|_| false, |_| true))
+    }
+}
+
 impl FromStr for WordUnit {
     type Err = Error;
     fn from_str(s: &str) -> Result<WordUnit, Error> {
@@ -242,6 +251,19 @@ mod tests {
     fn double_quotable_from_str() {
         let parse: DoubleQuotable = "a".parse().unwrap();
         assert_eq!(parse.to_string(), "a");
+    }
+
+    #[test]
+    fn text_from_str() {
+        let parse: Text = r"a\b$(c)".parse().unwrap();
+        assert_eq!(parse.0.len(), 3);
+        assert_eq!(parse.0[0], Literal('a'));
+        assert_eq!(parse.0[1], Backslashed('b'));
+        if let CommandSubst { content, .. } = &parse.0[2] {
+            assert_eq!(content, "c");
+        } else {
+            panic!("not a command substitution: {:?}", parse.0[2]);
+        }
     }
 
     #[test]
