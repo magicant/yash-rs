@@ -686,8 +686,13 @@ impl Lexer {
     /// This function parses a literal character, backslash-escaped character, or
     /// [dollar word unit](Lexer::dollar_word_unit).
     ///
-    /// `is_delimiter` is a function that decides a character is a delimiter. An
-    /// unquoted character is parsed only if `is_delimiter` returns false for it.
+    /// `is_delimiter` is a function that decides if a character is a delimiter.
+    /// An unquoted character is parsed only if `is_delimiter` returns false for
+    /// it.
+    ///
+    /// `is_escapable` decides if a character can be escaped by a backslash. When
+    /// `is_escapable` returns false, the preceding backslash is considered
+    /// literal.
     pub async fn text_unit<F, G>(
         &mut self,
         is_delimiter: F,
