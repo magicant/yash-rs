@@ -41,17 +41,19 @@ pub trait MaybeLiteral {
     /// Checks if `self` is literal and, if so, converts to a string and appends
     /// it to `result`.
     ///
-    /// Returns `Some(result)` if `self` is literal. Otherwise, returns `None`.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T>;
+    /// If `self` is literal, `self` converted to a string is appended to
+    /// `result` and `Ok(result)` is returned. Otherwise, `result` is not
+    /// modified and `Err(result)` is returned.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T>;
 
     /// Checks if `self` is literal and, if so, converts to a string.
     fn to_string_if_literal(&self) -> Option<String> {
-        self.extend_if_literal(String::new())
+        self.extend_if_literal(String::new()).ok()
     }
 }
 
 impl<T: MaybeLiteral> MaybeLiteral for [T] {
-    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Option<R> {
+    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Result<R, R> {
         self.iter()
             .try_fold(result, |result, unit| unit.extend_if_literal(result))
     }
@@ -90,15 +92,15 @@ impl fmt::Display for TextUnit {
 }
 
 impl MaybeLiteral for TextUnit {
-    /// If `self` is `Literal`, appends the character to `result` and returns it.
-    /// Otherwise, returns `None`.
-    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Option<T> {
+    /// If `self` is `Literal`, appends the character to `result` and returns
+    /// `Ok(result)`. Otherwise, returns `Err(result)`.
+    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Result<T, T> {
         if let Literal(c) = self {
             // TODO Use Extend::extend_one
             result.extend(std::iter::once(*c));
-            Some(result)
+            Ok(result)
         } else {
-            None
+            Err(result)
         }
     }
 }
@@ -117,7 +119,7 @@ impl fmt::Display for Text {
 }
 
 impl MaybeLiteral for Text {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
         self.0.extend_if_literal(result)
     }
 }
@@ -148,12 +150,12 @@ impl fmt::Display for WordUnit {
 
 impl MaybeLiteral for WordUnit {
     /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`
-    /// and returns it. Otherwise, returns `None`.
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+    /// and returns `Ok(result)`. Otherwise, returns `Err(result)`.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
         if let Unquoted(inner) = self {
             inner.extend_if_literal(result)
         } else {
-            None
+            Err(result)
         }
     }
 }
@@ -181,7 +183,7 @@ impl fmt::Display for Word {
 }
 
 impl MaybeLiteral for Word {
-    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Option<T> {
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
         self.units.extend_if_literal(result)
     }
 }
