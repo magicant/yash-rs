@@ -791,7 +791,7 @@ impl Lexer {
             matches!(c, '$' | '`' | '"' | '\\')
         }
 
-        let content = self.text(is_delimiter, is_escapable).await?.0;
+        let content = self.text(is_delimiter, is_escapable).await?;
 
         if self.skip_if(|c| c == '"').await? {
             Ok(DoubleQuote(content))
@@ -2305,7 +2305,7 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let DoubleQuote(content) = result {
+        if let DoubleQuote(Text(content)) = result {
             assert_eq!(content, []);
         } else {
             panic!("unexpected result {:?}", result);
@@ -2321,7 +2321,7 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let DoubleQuote(content) = result {
+        if let DoubleQuote(Text(content)) = result {
             assert_eq!(content, [Literal('a'), Literal('b'), Literal('c')]);
         } else {
             panic!("unexpected result {:?}", result);
@@ -2343,7 +2343,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            if let DoubleQuote(ref units) = result {
+            if let DoubleQuote(Text(ref units)) = result {
                 assert_eq!(
                     units,
                     &[

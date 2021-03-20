@@ -122,7 +122,7 @@ pub enum WordUnit {
     SingleQuote(String),
     /// Any number of [`DoubleQuotable`]s surrounded with a pair of double
     /// quotations.
-    DoubleQuote(Vec<DoubleQuotable>),
+    DoubleQuote(Text),
     // TODO tilde expansion
 }
 
@@ -133,13 +133,7 @@ impl fmt::Display for WordUnit {
         match self {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{}'", s),
-            DoubleQuote(dqs) => {
-                f.write_str("\"")?;
-                for dq in dqs {
-                    dq.fmt(f)?;
-                }
-                f.write_str("\"")
-            }
+            DoubleQuote(content) => write!(f, "\"{}\"", content),
         }
     }
 }
@@ -689,9 +683,9 @@ mod tests {
         let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
         assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
 
-        let double_quote = DoubleQuote(vec![]);
+        let double_quote = DoubleQuote(Text(vec![]));
         assert_eq!(double_quote.to_string(), "\"\"");
-        let double_quote = DoubleQuote(vec![Literal('A'), Backslashed('B')]);
+        let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
         assert_eq!(double_quote.to_string(), "\"A\\B\"");
     }
 
