@@ -636,7 +636,7 @@ impl Lexer {
     pub async fn command_substitution(
         &mut self,
         opening_location: Location,
-    ) -> Result<Option<DoubleQuotable>> {
+    ) -> Result<Option<TextUnit>> {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(None);
         }
@@ -653,7 +653,7 @@ impl Lexer {
         }
 
         let location = opening_location;
-        Ok(Some(DoubleQuotable::CommandSubst { content, location }))
+        Ok(Some(TextUnit::CommandSubst { content, location }))
     }
 
     /// Parses a word unit that starts with `$`.
@@ -665,7 +665,7 @@ impl Lexer {
     /// # Errors
     ///
     /// - Propagated from [`Lexer::command_substitution`]
-    pub async fn dollar_word_unit(&mut self) -> Result<Option<DoubleQuotable>> {
+    pub async fn dollar_word_unit(&mut self) -> Result<Option<TextUnit>> {
         let index = self.index();
         let location = match self.consume_char_if(|c| c == '$').await? {
             None => return Ok(None),
@@ -685,18 +685,18 @@ impl Lexer {
     }
 
     // TODO Backquote command substitution.
-    /// Parses a [`DoubleQuotable`].
+    /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character, or
     /// [dollar word unit](Lexer::dollar_word_unit).
     ///
     /// `is_delimiter` is a function that decides a character is a delimiter. An
     /// unquoted character is parsed only if `is_delimiter` returns false for it.
-    pub async fn double_quotable<F, G>(
+    pub async fn text_unit<F, G>(
         &mut self,
         is_delimiter: F,
         is_escapable: G,
-    ) -> Result<Option<DoubleQuotable>>
+    ) -> Result<Option<TextUnit>>
     where
         F: FnOnce(char) -> bool,
         G: FnOnce(char) -> bool,
@@ -724,7 +724,7 @@ impl Lexer {
         Ok(None)
     }
 
-    /// Parses a text, i.e., a (possibly empty) sequence of [`DoubleQuotable`]s.
+    /// Parses a text, i.e., a (possibly empty) sequence of [`TextUnit`]s.
     ///
     /// `is_delimiter` tests if an unquoted character is a delimiter. When
     /// `is_delimiter` returns true, the parser ends parsing and returns the text
@@ -733,8 +733,8 @@ impl Lexer {
     /// `is_escapable` tests if a backslash can escape a character. When the
     /// parser founds an unquoted backslash, the next character is passed to
     /// `is_escapable`. If `is_escapable` returns true, the backslash is treated
-    /// as a valid escape (`DoubleQuotable::Backslashed`). Otherwise, it ia a
-    /// literal (`DoubleQuotable::Literal`).
+    /// as a valid escape (`TextUnit::Backslashed`). Otherwise, it ia a
+    /// literal (`TextUnit::Literal`).
     pub async fn text<F, G>(&mut self, mut is_delimiter: F, mut is_escapable: G) -> Result<Text>
     where
         F: FnMut(char) -> bool,
@@ -742,10 +742,7 @@ impl Lexer {
     {
         let mut units = vec![];
 
-        while let Some(unit) = self
-            .double_quotable(&mut is_delimiter, &mut is_escapable)
-            .await?
-        {
+        while let Some(unit) = self.text_unit(&mut is_delimiter, &mut is_escapable).await? {
             units.push(unit);
         }
 
@@ -813,10 +810,7 @@ impl Lexer {
         // TODO Parse line continuations before the word unit
         // TODO Parse other types of word units
         match self.consume_char_if(|c| c == '\'' || c == '"').await? {
-            None => Ok(self
-                .double_quotable(is_delimiter, |_| true)
-                .await?
-                .map(Unquoted)),
+            None => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
             Some(sc) => {
                 let location = sc.location.clone();
                 match sc.value {
@@ -1761,18 +1755,9 @@ mod tests {
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
-        assert_eq!(
-            t.word.units[2],
-            WordUnit::Unquoted(DoubleQuotable::Literal('-'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('-')));
         assert_eq!(t.word.location.line.value, "<<-");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -1788,14 +1773,8 @@ mod tests {
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.line.value, "<<>");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -1811,14 +1790,8 @@ mod tests {
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.line.value, "<<");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -1834,14 +1807,8 @@ mod tests {
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('<'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.line.value, "<\\\n");
         assert_eq!(t.word.location.line.number.get(), 3);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -1879,10 +1846,7 @@ mod tests {
         let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
-        assert_eq!(
-            t.word.units,
-            [WordUnit::Unquoted(DoubleQuotable::Literal('\n'))]
-        );
+        assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
         assert_eq!(t.word.location.line.value, "\n");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -1898,7 +1862,7 @@ mod tests {
         let result = block_on(lexer.command_substitution(location))
             .unwrap()
             .unwrap();
-        if let DoubleQuotable::CommandSubst { location, content } = result {
+        if let TextUnit::CommandSubst { location, content } = result {
             assert_eq!(location.line.value, "X");
             assert_eq!(location.line.number.get(), 1);
             assert_eq!(location.line.source, Source::Unknown);
@@ -1984,7 +1948,7 @@ mod tests {
     fn lexer_dollar_word_unit_command_substitution() {
         let mut lexer = Lexer::with_source(Source::Unknown, "$()");
         let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
-        if let DoubleQuotable::CommandSubst { location, content } = result {
+        if let TextUnit::CommandSubst { location, content } = result {
             assert_eq!(location.line.value, "$()");
             assert_eq!(location.line.number.get(), 1);
             assert_eq!(location.line.source, Source::Unknown);
@@ -1997,7 +1961,7 @@ mod tests {
 
         let mut lexer = Lexer::with_source(Source::Unknown, "$( foo bar )");
         let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
-        if let DoubleQuotable::CommandSubst { location, content } = result {
+        if let TextUnit::CommandSubst { location, content } = result {
             assert_eq!(location.line.value, "$( foo bar )");
             assert_eq!(location.line.number.get(), 1);
             assert_eq!(location.line.source, Source::Unknown);
@@ -2010,10 +1974,10 @@ mod tests {
     }
 
     #[test]
-    fn lexer_double_quotable_literal_accepted() {
+    fn lexer_text_unit_literal_accepted() {
         let mut lexer = Lexer::with_source(Source::Unknown, "X");
         let mut called = false;
-        let result = block_on(lexer.double_quotable(
+        let result = block_on(lexer.text_unit(
             |c| {
                 called = true;
                 assert_eq!(c, 'X');
@@ -2034,10 +1998,10 @@ mod tests {
     }
 
     #[test]
-    fn lexer_double_quotable_literal_rejected() {
+    fn lexer_text_unit_literal_rejected() {
         let mut lexer = Lexer::with_source(Source::Unknown, ";");
         let mut called = false;
-        let result = block_on(lexer.double_quotable(
+        let result = block_on(lexer.text_unit(
             |c| {
                 called = true;
                 assert_eq!(c, ';');
@@ -2053,10 +2017,10 @@ mod tests {
     }
 
     #[test]
-    fn lexer_double_quotable_backslash_accepted() {
+    fn lexer_text_unit_backslash_accepted() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"\#");
         let mut called = false;
-        let result = block_on(lexer.double_quotable(
+        let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| {
                 called = true;
@@ -2073,9 +2037,9 @@ mod tests {
     }
 
     #[test]
-    fn lexer_double_quotable_backslash_eof() {
+    fn lexer_text_unit_backslash_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"\");
-        let result = block_on(lexer.double_quotable(
+        let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
@@ -2087,9 +2051,9 @@ mod tests {
     }
 
     #[test]
-    fn lexer_double_quotable_dollar() {
+    fn lexer_text_unit_dollar() {
         let mut lexer = Lexer::with_source(Source::Unknown, "$()");
-        let result = block_on(lexer.double_quotable(
+        let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
@@ -2392,13 +2356,8 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, r"0$(:)X\#");
         let word = block_on(lexer.word(|_| false)).unwrap();
         assert_eq!(word.units.len(), 4);
-        assert_eq!(
-            word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('0'))
-        );
-        if let WordUnit::Unquoted(DoubleQuotable::CommandSubst { content, location }) =
-            &word.units[1]
-        {
+        assert_eq!(word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
+        if let WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) = &word.units[1] {
             assert_eq!(content, ":");
             assert_eq!(location.line.value, r"0$(:)X\#");
             assert_eq!(location.line.number.get(), 1);
@@ -2407,13 +2366,10 @@ mod tests {
         } else {
             panic!("unexpected word unit: {:?}", word.units[1]);
         }
-        assert_eq!(
-            word.units[2],
-            WordUnit::Unquoted(DoubleQuotable::Literal('X'))
-        );
+        assert_eq!(word.units[2], WordUnit::Unquoted(TextUnit::Literal('X')));
         assert_eq!(
             word.units[3],
-            WordUnit::Unquoted(DoubleQuotable::Backslashed('#'))
+            WordUnit::Unquoted(TextUnit::Backslashed('#'))
         );
         assert_eq!(word.location.line.value, r"0$(:)X\#");
         assert_eq!(word.location.line.number.get(), 1);
@@ -2454,18 +2410,9 @@ mod tests {
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 3);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('a'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('b'))
-        );
-        assert_eq!(
-            t.word.units[2],
-            WordUnit::Unquoted(DoubleQuotable::Literal('c'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('a')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('b')));
+        assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('c')));
         assert_eq!(t.word.location.line.value, "abc ");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -2482,14 +2429,8 @@ mod tests {
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 2);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('1'))
-        );
-        assert_eq!(
-            t.word.units[1],
-            WordUnit::Unquoted(DoubleQuotable::Literal('2'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
         assert_eq!(t.word.location.line.value, "12<");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);
@@ -2506,10 +2447,7 @@ mod tests {
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 1);
-        assert_eq!(
-            t.word.units[0],
-            WordUnit::Unquoted(DoubleQuotable::Literal('0'))
-        );
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
         assert_eq!(t.word.location.line.value, "0>>");
         assert_eq!(t.word.location.line.number.get(), 1);
         assert_eq!(t.word.location.line.source, Source::Unknown);

@@ -57,9 +57,9 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
-/// Element of a [Word] that can be double-quoted.
+/// Element of a [Text], i.e., something that can be expanded.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DoubleQuotable {
+pub enum TextUnit {
     /// Literal single character.
     Literal(char),
     /// Backslash-escaped single character.
@@ -71,9 +71,9 @@ pub enum DoubleQuotable {
     // Arith(TODO),
 }
 
-pub use DoubleQuotable::*;
+pub use TextUnit::*;
 
-impl fmt::Display for DoubleQuotable {
+impl fmt::Display for TextUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal(c) => write!(f, "{}", c),
@@ -83,7 +83,7 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
-impl MaybeLiteral for DoubleQuotable {
+impl MaybeLiteral for TextUnit {
     /// If `self` is `Literal`, appends the character to `result` and returns it.
     /// Otherwise, returns `None`.
     fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Option<T> {
@@ -99,7 +99,7 @@ impl MaybeLiteral for DoubleQuotable {
 
 /// String that may contain some expansions.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Text(pub Vec<DoubleQuotable>);
+pub struct Text(pub Vec<TextUnit>);
 
 impl fmt::Display for Text {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -116,11 +116,11 @@ impl MaybeLiteral for Text {
 /// Element of a [Word].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
-    /// Unquoted [`DoubleQuotable`] as a word unit.
-    Unquoted(DoubleQuotable),
+    /// Unquoted [`TextUnit`] as a word unit.
+    Unquoted(TextUnit),
     /// String surrounded with a pair of single quotations.
     SingleQuote(String),
-    /// Any number of [`DoubleQuotable`]s surrounded with a pair of double
+    /// Any number of [`TextUnit`]s surrounded with a pair of double
     /// quotations.
     DoubleQuote(Text),
     // TODO tilde expansion
@@ -664,7 +664,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn double_quotable_display() {
+    fn text_unit_display() {
         let literal = Literal('A');
         assert_eq!(literal.to_string(), "A");
         let backslashed = Backslashed('X');

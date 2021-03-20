@@ -18,9 +18,9 @@
 
 use super::Lexer;
 use crate::parser::core::Result;
-use crate::syntax::DoubleQuotable::Literal;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
+use crate::syntax::TextUnit::Literal;
 use crate::syntax::Word;
 
 /// Here-document without a content.
