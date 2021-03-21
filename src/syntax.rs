@@ -32,11 +32,16 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
+/// Result of [`Unquote::unquote`].
+///
+/// If there is some quotes to be removed, the result will be `Ok(true)`. If no
+/// quotes, `Ok(false)`. On error, `Err(Error)`.
+type UnquoteResult = Result<bool, fmt::Error>;
+
 /// Removing quotes from syntax without performing expansion.
 pub trait Unquote {
-    /// Converts `self` to a string with all quotes removed and writes to
-    /// `result`.
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result;
+    /// Converts `self` to a string with all quotes removed and writes to `w`.
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
 
     /// Converts `self` to a string with all quotes removed.
     fn to_unquoted_string(&self) -> String {
@@ -68,8 +73,9 @@ pub trait MaybeLiteral {
 }
 
 impl<T: Unquote> Unquote for [T] {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.iter().try_for_each(|item| item.unquote(w))
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.iter()
+            .try_fold(false, |quoted, item| Ok(quoted | item.unquote(w)?))
     }
 }
 
@@ -113,10 +119,20 @@ impl fmt::Display for TextUnit {
 }
 
 impl Unquote for TextUnit {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         match self {
-            Literal(c) | Backslashed(c) => w.write_char(*c),
-            CommandSubst { content, .. } => write!(w, "$({})", content),
+            Literal(c) => {
+                w.write_char(*c)?;
+                Ok(false)
+            }
+            Backslashed(c) => {
+                w.write_char(*c)?;
+                Ok(true)
+            }
+            CommandSubst { content, .. } => {
+                write!(w, "$({})", content)?;
+                Ok(false)
+            }
         }
     }
 }
@@ -149,7 +165,7 @@ impl fmt::Display for Text {
 }
 
 impl Unquote for Text {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         self.0.unquote(w)
     }
 }
@@ -185,10 +201,13 @@ impl fmt::Display for WordUnit {
 }
 
 impl Unquote for WordUnit {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         match self {
             Unquoted(inner) => inner.unquote(w),
-            SingleQuote(inner) => w.write_str(inner),
+            SingleQuote(inner) => {
+                w.write_str(inner)?;
+                Ok(true)
+            }
             DoubleQuote(inner) => inner.unquote(w),
         }
     }
@@ -229,7 +248,7 @@ impl fmt::Display for Word {
 }
 
 impl Unquote for Word {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         self.units.unquote(w)
     }
 }
