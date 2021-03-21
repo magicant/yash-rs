@@ -684,7 +684,8 @@ impl Lexer {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character, or
-    /// [dollar word unit](Lexer::dollar_word_unit).
+    /// [dollar word unit](Lexer::dollar_word_unit), optionally preceded by line
+    /// continuations.
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for
@@ -702,7 +703,7 @@ impl Lexer {
         F: FnOnce(char) -> bool,
         G: FnOnce(char) -> bool,
     {
-        // TODO line continuations
+        self.line_continuations().await?;
 
         if self.skip_if(|c| c == '\\').await? {
             if let Some(c) = self.consume_char_if(is_escapable).await? {
@@ -2063,6 +2064,24 @@ mod tests {
         if let CommandSubst { content, location } = result {
             assert_eq!(content, "");
             assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_unit_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\nX");
+        let result = block_on(lexer.text_unit(
+            |_| false,
+            |c| panic!("unexpected call to is_escapable({:?})", c),
+        ))
+        .unwrap()
+        .unwrap();
+        if let Literal(c) = result {
+            assert_eq!(c, 'X');
         } else {
             panic!("unexpected result {:?}", result);
         }
