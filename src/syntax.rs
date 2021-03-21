@@ -32,6 +32,21 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
+/// Removing quotes from syntax without performing expansion.
+pub trait Unquote {
+    /// Converts `self` to a string with all quotes removed and writes to
+    /// `result`.
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result;
+
+    /// Converts `self` to a string with all quotes removed.
+    fn to_unquoted_string(&self) -> String {
+        let mut result = String::new();
+        self.unquote(&mut result)
+            .expect("`unquote` should not fail");
+        result
+    }
+}
+
 /// Possibly literal syntax element.
 ///
 /// A syntax element is _literal_ if it is not quoted and does not contain any
@@ -49,6 +64,12 @@ pub trait MaybeLiteral {
     /// Checks if `self` is literal and, if so, converts to a string.
     fn to_string_if_literal(&self) -> Option<String> {
         self.extend_if_literal(String::new()).ok()
+    }
+}
+
+impl<T: Unquote> Unquote for [T] {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        self.iter().try_for_each(|item| item.unquote(w))
     }
 }
 
@@ -91,6 +112,15 @@ impl fmt::Display for TextUnit {
     }
 }
 
+impl Unquote for TextUnit {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        match self {
+            Literal(c) | Backslashed(c) => w.write_char(*c),
+            CommandSubst { content, .. } => write!(w, "$({})", content),
+        }
+    }
+}
+
 impl MaybeLiteral for TextUnit {
     /// If `self` is `Literal`, appends the character to `result` and returns
     /// `Ok(result)`. Otherwise, returns `Err(result)`.
@@ -115,6 +145,12 @@ pub struct Text(pub Vec<TextUnit>);
 impl fmt::Display for Text {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|unit| unit.fmt(f))
+    }
+}
+
+impl Unquote for Text {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        self.0.unquote(w)
     }
 }
 
@@ -144,6 +180,16 @@ impl fmt::Display for WordUnit {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{}'", s),
             DoubleQuote(content) => write!(f, "\"{}\"", content),
+        }
+    }
+}
+
+impl Unquote for WordUnit {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        match self {
+            Unquoted(inner) => inner.unquote(w),
+            SingleQuote(inner) => w.write_str(inner),
+            DoubleQuote(inner) => inner.unquote(w),
         }
     }
 }
@@ -179,6 +225,12 @@ pub struct Word {
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
+    }
+}
+
+impl Unquote for Word {
+    fn unquote<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        self.units.unquote(w)
     }
 }
 
@@ -704,6 +756,29 @@ mod tests {
     }
 
     #[test]
+    fn text_unquote_without_quotes() {
+        let empty = Text(vec![]);
+        assert_eq!(empty.to_unquoted_string(), "");
+
+        let content = "Y".to_string();
+        let location = Location::dummy(content.clone());
+        let nonempty = Text(vec![Literal('X'), CommandSubst { content, location }]);
+        assert_eq!(nonempty.to_unquoted_string(), "X$(Y)");
+    }
+
+    #[test]
+    fn text_unquote_with_quotes() {
+        let quoted = Text(vec![
+            Literal('a'),
+            Backslashed('b'),
+            Literal('c'),
+            Backslashed('d'), // TODO Arithmetic expansion
+            Literal('e'),
+        ]);
+        assert_eq!(quoted.to_unquoted_string(), "abcde");
+    }
+
+    #[test]
     fn text_to_string_if_literal_success() {
         let empty = Text(vec![]);
         let s = empty.to_string_if_literal().unwrap();
@@ -718,6 +793,12 @@ mod tests {
     fn text_to_string_if_literal_failure() {
         let backslashed = Text(vec![Backslashed('a')]);
         assert_eq!(backslashed.to_string_if_literal(), None);
+    }
+
+    #[test]
+    fn word_unquote() {
+        let word = Word::from_str(r#"a\b'c'"d""#).unwrap();
+        assert_eq!(word.to_unquoted_string(), "abcd");
     }
 
     #[test]
