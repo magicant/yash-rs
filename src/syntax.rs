@@ -32,7 +32,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
-/// Result of [`Unquote::unquote`].
+/// Result of [`Unquote::write_unquoted`].
 ///
 /// If there is some quotes to be removed, the result will be `Ok(true)`. If no
 /// quotes, `Ok(false)`. On error, `Err(Error)`.
@@ -41,18 +41,18 @@ type UnquoteResult = Result<bool, fmt::Error>;
 /// Removing quotes from syntax without performing expansion.
 pub trait Unquote {
     /// Converts `self` to a string with all quotes removed and writes to `w`.
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
 
     /// Converts `self` to a string with all quotes removed.
     ///
     /// Returns a tuple of a string and a bool. The string is an unquoted version
     /// of `self`. The bool tells whether there is any quotes contained in
     /// `self`.
-    fn to_unquoted_string(&self) -> (String, bool) {
+    fn unquote(&self) -> (String, bool) {
         let mut unquoted = String::new();
         let is_quoted = self
-            .unquote(&mut unquoted)
-            .expect("`unquote` should not fail");
+            .write_unquoted(&mut unquoted)
+            .expect("`write_unquoted` should not fail");
         (unquoted, is_quoted)
     }
 }
@@ -78,9 +78,9 @@ pub trait MaybeLiteral {
 }
 
 impl<T: Unquote> Unquote for [T] {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         self.iter()
-            .try_fold(false, |quoted, item| Ok(quoted | item.unquote(w)?))
+            .try_fold(false, |quoted, item| Ok(quoted | item.write_unquoted(w)?))
     }
 }
 
@@ -124,7 +124,7 @@ impl fmt::Display for TextUnit {
 }
 
 impl Unquote for TextUnit {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         match self {
             Literal(c) => {
                 w.write_char(*c)?;
@@ -170,8 +170,8 @@ impl fmt::Display for Text {
 }
 
 impl Unquote for Text {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        self.0.unquote(w)
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.0.write_unquoted(w)
     }
 }
 
@@ -206,14 +206,14 @@ impl fmt::Display for WordUnit {
 }
 
 impl Unquote for WordUnit {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
         match self {
-            Unquoted(inner) => inner.unquote(w),
+            Unquoted(inner) => inner.write_unquoted(w),
             SingleQuote(inner) => {
                 w.write_str(inner)?;
                 Ok(true)
             }
-            DoubleQuote(inner) => inner.unquote(w),
+            DoubleQuote(inner) => inner.write_unquoted(w),
         }
     }
 }
@@ -253,8 +253,8 @@ impl fmt::Display for Word {
 }
 
 impl Unquote for Word {
-    fn unquote<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        self.units.unquote(w)
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.units.write_unquoted(w)
     }
 }
 
@@ -782,14 +782,14 @@ mod tests {
     #[test]
     fn text_unquote_without_quotes() {
         let empty = Text(vec![]);
-        let (unquoted, is_quoted) = empty.to_unquoted_string();
+        let (unquoted, is_quoted) = empty.unquote();
         assert_eq!(unquoted, "");
         assert_eq!(is_quoted, false);
 
         let content = "Y".to_string();
         let location = Location::dummy(content.clone());
         let nonempty = Text(vec![Literal('X'), CommandSubst { content, location }]);
-        let (unquoted, is_quoted) = nonempty.to_unquoted_string();
+        let (unquoted, is_quoted) = nonempty.unquote();
         assert_eq!(unquoted, "X$(Y)");
         assert_eq!(is_quoted, false);
     }
@@ -803,7 +803,7 @@ mod tests {
             Backslashed('d'), // TODO Arithmetic expansion
             Literal('e'),
         ]);
-        let (unquoted, is_quoted) = quoted.to_unquoted_string();
+        let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "abcde");
         assert_eq!(is_quoted, true);
     }
@@ -828,7 +828,7 @@ mod tests {
     #[test]
     fn word_unquote() {
         let word = Word::from_str(r#"a\b'c'"d""#).unwrap();
-        let (unquoted, is_quoted) = word.to_unquoted_string();
+        let (unquoted, is_quoted) = word.unquote();
         assert_eq!(unquoted, "abcd");
         assert_eq!(is_quoted, true);
     }
