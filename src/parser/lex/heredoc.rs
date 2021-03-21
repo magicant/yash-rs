@@ -84,10 +84,8 @@ mod tests {
     use futures::executor::block_on;
 
     fn partial_here_doc(delimiter: &str, remove_tabs: bool) -> PartialHereDoc {
-        let mut lexer = Lexer::with_source(Source::Unknown, delimiter);
-        let delimiter = block_on(lexer.token()).unwrap().word;
         PartialHereDoc {
-            delimiter,
+            delimiter: delimiter.parse().unwrap(),
             remove_tabs,
         }
     }
