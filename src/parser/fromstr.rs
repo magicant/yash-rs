@@ -48,12 +48,21 @@ impl<T, E> Shift for Result<Option<T>, E> {
     }
 }
 
-impl FromStr for DoubleQuotable {
+impl FromStr for TextUnit {
     type Err = Error;
-    /// Parses a [`DoubleQuotable`] by `lexer.double_quotable(|_| false, |_| true)`.
-    fn from_str(s: &str) -> Result<DoubleQuotable, Error> {
+    /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
+    fn from_str(s: &str) -> Result<TextUnit, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
-        block_on(lexer.double_quotable(|_| false, |_| true)).map(Option::unwrap)
+        block_on(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
+    }
+}
+
+impl FromStr for Text {
+    type Err = Error;
+    // Parses a text by `lexer.text(|_| false, |_| true)`.
+    fn from_str(s: &str) -> Result<Text, Error> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        block_on(lexer.text(|_| false, |_| true))
     }
 }
 
@@ -239,9 +248,22 @@ mod tests {
     use std::iter::empty;
 
     #[test]
-    fn double_quotable_from_str() {
-        let parse: DoubleQuotable = "a".parse().unwrap();
+    fn text_unit_from_str() {
+        let parse: TextUnit = "a".parse().unwrap();
         assert_eq!(parse.to_string(), "a");
+    }
+
+    #[test]
+    fn text_from_str() {
+        let parse: Text = r"a\b$(c)".parse().unwrap();
+        assert_eq!(parse.0.len(), 3);
+        assert_eq!(parse.0[0], Literal('a'));
+        assert_eq!(parse.0[1], Backslashed('b'));
+        if let CommandSubst { content, .. } = &parse.0[2] {
+            assert_eq!(content, "c");
+        } else {
+            panic!("not a command substitution: {:?}", parse.0[2]);
+        }
     }
 
     #[test]

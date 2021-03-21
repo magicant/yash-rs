@@ -34,30 +34,54 @@ use std::os::unix::io::RawFd;
 
 /// Possibly literal syntax element.
 ///
-/// When an instance of an implementor is literal, it can be converted directly
-/// to a string.
+/// A syntax element is _literal_ if it is not quoted and does not contain any
+/// expansions. Such an element can be converted to a string independently of the
+/// shell execution environment.
 pub trait MaybeLiteral {
+    /// Checks if `self` is literal and, if so, converts to a string and appends
+    /// it to `result`.
+    ///
+    /// If `self` is literal, `self` converted to a string is appended to
+    /// `result` and `Ok(result)` is returned. Otherwise, `result` is not
+    /// modified and `Err(result)` is returned.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T>;
+
     /// Checks if `self` is literal and, if so, converts to a string.
-    fn to_string_if_literal(&self) -> Option<String>;
+    fn to_string_if_literal(&self) -> Option<String> {
+        self.extend_if_literal(String::new()).ok()
+    }
 }
 
-/// Element of a [Word] that can be double-quoted.
+impl<T: MaybeLiteral> MaybeLiteral for [T] {
+    fn extend_if_literal<R: Extend<char>>(&self, result: R) -> Result<R, R> {
+        self.iter()
+            .try_fold(result, |result, unit| unit.extend_if_literal(result))
+    }
+}
+
+/// Element of a [Text], i.e., something that can be expanded.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DoubleQuotable {
+pub enum TextUnit {
     /// Literal single character.
     Literal(char),
     /// Backslash-escaped single character.
     Backslashed(char),
     // Parameter(TODO),
     /// Command substitution of the form `$(...)`.
-    CommandSubst { content: String, location: Location },
+    CommandSubst {
+        /// Command string that will be parsed and executed when the command
+        /// substitution is expanded.
+        content: String,
+        /// Location of the initial `$` character of this command substitution.
+        location: Location,
+    },
     // Backquote(TODO),
     // Arith(TODO),
 }
 
-pub use DoubleQuotable::*;
+pub use TextUnit::*;
 
-impl fmt::Display for DoubleQuotable {
+impl fmt::Display for TextUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal(c) => write!(f, "{}", c),
@@ -67,28 +91,48 @@ impl fmt::Display for DoubleQuotable {
     }
 }
 
-impl MaybeLiteral for DoubleQuotable {
-    /// If `self` is `Literal`, returns the character converted to a string.
-    /// Otherwise, returns `None`.
-    fn to_string_if_literal(&self) -> Option<String> {
+impl MaybeLiteral for TextUnit {
+    /// If `self` is `Literal`, appends the character to `result` and returns
+    /// `Ok(result)`. Otherwise, returns `Err(result)`.
+    fn extend_if_literal<T: Extend<char>>(&self, mut result: T) -> Result<T, T> {
         if let Literal(c) = self {
-            Some(c.to_string())
+            // TODO Use Extend::extend_one
+            result.extend(std::iter::once(*c));
+            Ok(result)
         } else {
-            None
+            Err(result)
         }
     }
 }
 
-/// Element of a [Word].
+/// String that may contain some expansions.
+///
+/// A text is a sequence of [text unit](TextUnit)s, which may contain some kinds
+/// of expansions.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Text(pub Vec<TextUnit>);
+
+impl fmt::Display for Text {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|unit| unit.fmt(f))
+    }
+}
+
+impl MaybeLiteral for Text {
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
+        self.0.extend_if_literal(result)
+    }
+}
+
+/// Element of a [Word], i.e., text with quotes and tilde expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WordUnit {
-    /// Unquoted [`DoubleQuotable`] as a word unit.
-    Unquoted(DoubleQuotable),
+    /// Unquoted [`TextUnit`] as a word unit.
+    Unquoted(TextUnit),
     /// String surrounded with a pair of single quotations.
     SingleQuote(String),
-    /// Any number of [`DoubleQuotable`]s surrounded with a pair of double
-    /// quotations.
-    DoubleQuote(Vec<DoubleQuotable>),
+    /// Text surrounded with a pair of double quotations.
+    DoubleQuote(Text),
     // TODO tilde expansion
 }
 
@@ -99,48 +143,31 @@ impl fmt::Display for WordUnit {
         match self {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{}'", s),
-            DoubleQuote(dqs) => {
-                f.write_str("\"")?;
-                for dq in dqs {
-                    dq.fmt(f)?;
-                }
-                f.write_str("\"")
-            }
+            DoubleQuote(content) => write!(f, "\"{}\"", content),
         }
     }
 }
 
 impl MaybeLiteral for WordUnit {
-    /// If `self` is `Unquoted(Literal(_))`, returns the character converted to a
-    /// string. Otherwise, returns `None`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        if let Unquoted(dq) = self {
-            dq.to_string_if_literal()
+    /// If `self` is `Unquoted(Literal(_))`, appends the character to `result`
+    /// and returns `Ok(result)`. Otherwise, returns `Err(result)`.
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
+        if let Unquoted(inner) = self {
+            inner.extend_if_literal(result)
         } else {
-            None
+            Err(result)
         }
     }
 }
 
-impl MaybeLiteral for [WordUnit] {
-    /// Converts the word units to a string if all the word units are literal,
-    /// that is, `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        fn try_to_char(u: &WordUnit) -> Option<char> {
-            if let Unquoted(Literal(c)) = u {
-                Some(*c)
-            } else {
-                None
-            }
-        }
-        self.iter().map(try_to_char).collect()
-    }
-}
-
-/// Token that may involve expansion.
+/// Token that may involve expansions and quotes.
 ///
-/// It depends on context whether an empty word is valid or not. It is your responsibility to
-/// ensure a word is non-empty in a context where it cannot.
+/// A word is a sequence of [word unit](WordUnit)s. It depends on context whether
+/// an empty word is valid or not. It is your responsibility to ensure a word is
+/// non-empty in a context where it cannot.
+///
+/// The difference between words and [text](Text)s is that only words can contain
+/// single- and double-quotes and tilde expansions. Compare [`WordUnit`] and [`TextUnit`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Word {
     /// Word units that constitute the word.
@@ -156,10 +183,8 @@ impl fmt::Display for Word {
 }
 
 impl MaybeLiteral for Word {
-    /// Converts the word to a string if the word is fully literal, that is, all composed of
-    /// `WordUnit::Unquoted(DoubleQuotable::Literal(_))`.
-    fn to_string_if_literal(&self) -> Option<String> {
-        self.units.to_string_if_literal()
+    fn extend_if_literal<T: Extend<char>>(&self, result: T) -> Result<T, T> {
+        self.units.extend_if_literal(result)
     }
 }
 
@@ -321,8 +346,8 @@ pub struct HereDoc {
     /// Content of the here-document.
     ///
     /// The content ends with a newline unless it is empty. If the delimiter
-    /// is quoted, the content must not contain any expansion.
-    pub content: Word,
+    /// is quoted, the content must be all literal.
+    pub content: Text,
 }
 
 impl fmt::Display for HereDoc {
@@ -653,7 +678,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn double_quotable_display() {
+    fn text_unit_display() {
         let literal = Literal('A');
         assert_eq!(literal.to_string(), "A");
         let backslashed = Backslashed('X');
@@ -672,10 +697,27 @@ mod tests {
         let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
         assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
 
-        let double_quote = DoubleQuote(vec![]);
+        let double_quote = DoubleQuote(Text(vec![]));
         assert_eq!(double_quote.to_string(), "\"\"");
-        let double_quote = DoubleQuote(vec![Literal('A'), Backslashed('B')]);
+        let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
         assert_eq!(double_quote.to_string(), "\"A\\B\"");
+    }
+
+    #[test]
+    fn text_to_string_if_literal_success() {
+        let empty = Text(vec![]);
+        let s = empty.to_string_if_literal().unwrap();
+        assert_eq!(s, "");
+
+        let nonempty = Text(vec![Literal('f'), Literal('o'), Literal('o')]);
+        let s = nonempty.to_string_if_literal().unwrap();
+        assert_eq!(s, "foo");
+    }
+
+    #[test]
+    fn text_to_string_if_literal_failure() {
+        let backslashed = Text(vec![Backslashed('a')]);
+        assert_eq!(backslashed.to_string_if_literal(), None);
     }
 
     #[test]
@@ -798,14 +840,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("there").unwrap(),
+            content: Text::from_str("there").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -815,14 +857,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -832,7 +874,7 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Word::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap(),
         };
 
         let redir = Redir {
@@ -882,7 +924,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Word::from_str("").unwrap(),
+                content: Text::from_str("").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -898,7 +940,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Word::from_str("ignored").unwrap(),
+                content: Text::from_str("ignored").unwrap(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");

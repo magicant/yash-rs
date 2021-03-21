@@ -18,10 +18,10 @@
 
 use super::Lexer;
 use crate::parser::core::Result;
-use crate::syntax::DoubleQuotable::Literal;
 use crate::syntax::HereDoc;
+use crate::syntax::Text;
+use crate::syntax::TextUnit::Literal;
 use crate::syntax::Word;
-use crate::syntax::WordUnit::Unquoted;
 
 /// Here-document without a content.
 ///
@@ -50,16 +50,12 @@ impl Lexer {
         // TODO Unquote the delimiter string
         let delimiter_string = delimiter.to_string();
         // TODO Reject if the delimiter contains a newline
-        let location = self.location().await?.clone();
-        let mut content = Word {
-            units: vec![],
-            location,
-        };
+        let mut content = Text(vec![]);
         loop {
             // TODO If the delimiter is not quoted, backslashes should be effective only before
             // expansions and newlines
             // TODO If the delimiter is quoted, the here-doc content should be literal.
-            let line = self.word(|c| c == NEWLINE).await?;
+            let line = self.text(|c| c == NEWLINE, |_| false).await?;
             // TODO Strip leading tabs depending on the here-doc operator type
             let line_string = line.to_string();
 
@@ -75,8 +71,8 @@ impl Lexer {
                 });
             }
 
-            content.units.extend(line.units);
-            content.units.push(Unquoted(Literal(NEWLINE)));
+            content.0.extend(line.0);
+            content.0.push(Literal(NEWLINE));
         }
     }
 }
@@ -104,9 +100,7 @@ mod tests {
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.units.len(), 0);
-        assert_eq!(heredoc.content.location.line.number.get(), 1);
-        assert_eq!(heredoc.content.location.column.get(), 1);
+        assert_eq!(heredoc.content.0, []);
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.line.number.get(), 2);
@@ -122,8 +116,6 @@ mod tests {
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
         assert_eq!(heredoc.content.to_string(), "content\n");
-        assert_eq!(heredoc.content.location.line.number.get(), 1);
-        assert_eq!(heredoc.content.location.column.get(), 1);
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.line.number.get(), 3);
@@ -139,8 +131,6 @@ mod tests {
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
         assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
-        assert_eq!(heredoc.content.location.line.number.get(), 1);
-        assert_eq!(heredoc.content.location.column.get(), 1);
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.line.number.get(), 6);
