@@ -44,6 +44,10 @@ const NEWLINE: char = '\n';
 impl Lexer {
     /// Parses the content of a here-document.
     pub async fn here_doc_content(&mut self, heredoc: PartialHereDoc) -> Result<HereDoc> {
+        fn is_escapable(c: char) -> bool {
+            matches!(c, '$' | '`' | '\\')
+        }
+
         let delimiter = heredoc.delimiter;
         let remove_tabs = heredoc.remove_tabs;
 
@@ -52,10 +56,8 @@ impl Lexer {
         // TODO Reject if the delimiter contains a newline
         let mut content = Text(vec![]);
         loop {
-            // TODO If the delimiter is not quoted, backslashes should be effective only before
-            // expansions and newlines
             // TODO If the delimiter is quoted, the here-doc content should be literal.
-            let line = self.text(|c| c == NEWLINE, |_| false).await?;
+            let line = self.text(|c| c == NEWLINE, is_escapable).await?;
             // TODO Strip leading tabs depending on the here-doc operator type
             let line_string = line.to_string();
 
@@ -81,6 +83,7 @@ impl Lexer {
 mod tests {
     use super::*;
     use crate::source::Source;
+    use crate::syntax::TextUnit::*;
     use futures::executor::block_on;
 
     fn partial_here_doc(delimiter: &str, remove_tabs: bool) -> PartialHereDoc {
@@ -133,5 +136,35 @@ mod tests {
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.line.number.get(), 6);
         assert_eq!(location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_here_doc_content_escapes_with_unquoted_delimiter() {
+        let heredoc = partial_here_doc("END", false);
+
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            r#"\a\$\"\'\`\\\
+X
+END
+"#,
+        );
+        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        assert_eq!(
+            heredoc.content.0,
+            [
+                Literal('\\'),
+                Literal('a'),
+                Backslashed('$'),
+                Literal('\\'),
+                Literal('"'),
+                Literal('\\'),
+                Literal('\''),
+                Backslashed('`'),
+                Backslashed('\\'),
+                Literal('X'),
+                Literal('\n'),
+            ]
+        );
     }
 }
