@@ -42,6 +42,19 @@ pub struct PartialHereDoc {
 const NEWLINE: char = '\n';
 
 impl Lexer {
+    /// Reads a line literally.
+    ///
+    /// This function recognizes no quotes or expansions. Starting from the
+    /// current position, the line is read up to (but not including) the
+    /// terminating newline.
+    pub async fn line(&mut self) -> Result<String> {
+        let mut line = String::new();
+        while let Some(c) = self.consume_char_if(|c| c != NEWLINE).await? {
+            line.push(c.value);
+        }
+        Ok(line)
+    }
+
     /// Parses the content of a here-document.
     pub async fn here_doc_content(&mut self, heredoc: PartialHereDoc) -> Result<HereDoc> {
         fn is_escapable(c: char) -> bool {
@@ -85,6 +98,19 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use futures::executor::block_on;
+
+    #[test]
+    fn lexer_line() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let line = block_on(lexer.line()).unwrap();
+        assert_eq!(line, "");
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo\n");
+        let line = block_on(lexer.line()).unwrap();
+        assert_eq!(line, "foo");
+        let next = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(next.value, '\n');
+    }
 
     fn partial_here_doc(delimiter: &str, remove_tabs: bool) -> PartialHereDoc {
         PartialHereDoc {
