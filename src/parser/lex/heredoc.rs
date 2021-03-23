@@ -20,7 +20,7 @@ use super::Lexer;
 use crate::parser::core::Result;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
-use crate::syntax::TextUnit::Literal;
+use crate::syntax::TextUnit::{self, Literal};
 use crate::syntax::Unquote;
 use crate::syntax::Word;
 
@@ -41,6 +41,13 @@ pub struct PartialHereDoc {
 }
 
 const NEWLINE: char = '\n';
+
+/// Counts the number of leading literal tab characters in `i`.
+fn leading_tabs<'a, I: IntoIterator<Item = &'a TextUnit>>(i: I) -> usize {
+    i.into_iter()
+        .take_while(|&unit| unit == &Literal('\t'))
+        .count()
+}
 
 impl Lexer {
     /// Reads a line literally.
@@ -78,13 +85,17 @@ impl Lexer {
                 let line_string = line_text.to_string();
                 (line_text, line_string)
             };
-            // TODO Strip leading tabs depending on the here-doc operator type
 
             if !self.skip_if(|c| c == NEWLINE).await? {
                 todo!("Return an error: unexpected EOF, the delimiter missing");
             }
 
-            if line_string == delimiter_string {
+            let skip_count = if remove_tabs {
+                leading_tabs(&line_text.0)
+            } else {
+                0
+            };
+            if line_string[skip_count..] == delimiter_string {
                 return Ok(HereDoc {
                     delimiter,
                     remove_tabs,
@@ -92,7 +103,7 @@ impl Lexer {
                 });
             }
 
-            content.0.extend(line_text.0);
+            content.0.extend({ line_text }.0.drain(skip_count..));
             content.0.push(Literal(NEWLINE));
         }
     }
@@ -104,6 +115,16 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use futures::executor::block_on;
+
+    #[test]
+    fn leading_tabs_test() {
+        let c = leading_tabs(std::iter::empty());
+        assert_eq!(c, 0);
+        let c = leading_tabs(&[Literal('\t'), Literal('a')]);
+        assert_eq!(c, 1);
+        let c = leading_tabs(&[Literal('\t'), Literal('\t'), Literal('\t')]);
+        assert_eq!(c, 3);
+    }
 
     #[test]
     fn lexer_line() {
@@ -233,5 +254,20 @@ END
                 Literal('\n'),
             ]
         );
+    }
+
+    #[test]
+    fn lexer_here_doc_content_with_tabs_removed() {
+        let heredoc = partial_here_doc("BAR", true);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX");
+        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        assert_eq!(heredoc.delimiter.to_string(), "BAR");
+        assert_eq!(heredoc.remove_tabs, true);
+        assert_eq!(heredoc.content.to_string(), "foo\n");
+
+        let location = block_on(lexer.location()).unwrap();
+        assert_eq!(location.line.number.get(), 3);
+        assert_eq!(location.column.get(), 1);
     }
 }
