@@ -32,6 +32,31 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
+/// Result of [`Unquote::write_unquoted`].
+///
+/// If there is some quotes to be removed, the result will be `Ok(true)`. If no
+/// quotes, `Ok(false)`. On error, `Err(Error)`.
+type UnquoteResult = Result<bool, fmt::Error>;
+
+/// Removing quotes from syntax without performing expansion.
+pub trait Unquote {
+    /// Converts `self` to a string with all quotes removed and writes to `w`.
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
+
+    /// Converts `self` to a string with all quotes removed.
+    ///
+    /// Returns a tuple of a string and a bool. The string is an unquoted version
+    /// of `self`. The bool tells whether there is any quotes contained in
+    /// `self`.
+    fn unquote(&self) -> (String, bool) {
+        let mut unquoted = String::new();
+        let is_quoted = self
+            .write_unquoted(&mut unquoted)
+            .expect("`write_unquoted` should not fail");
+        (unquoted, is_quoted)
+    }
+}
+
 /// Possibly literal syntax element.
 ///
 /// A syntax element is _literal_ if it is not quoted and does not contain any
@@ -49,6 +74,13 @@ pub trait MaybeLiteral {
     /// Checks if `self` is literal and, if so, converts to a string.
     fn to_string_if_literal(&self) -> Option<String> {
         self.extend_if_literal(String::new()).ok()
+    }
+}
+
+impl<T: Unquote> Unquote for [T] {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.iter()
+            .try_fold(false, |quoted, item| Ok(quoted | item.write_unquoted(w)?))
     }
 }
 
@@ -91,6 +123,25 @@ impl fmt::Display for TextUnit {
     }
 }
 
+impl Unquote for TextUnit {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        match self {
+            Literal(c) => {
+                w.write_char(*c)?;
+                Ok(false)
+            }
+            Backslashed(c) => {
+                w.write_char(*c)?;
+                Ok(true)
+            }
+            CommandSubst { content, .. } => {
+                write!(w, "$({})", content)?;
+                Ok(false)
+            }
+        }
+    }
+}
+
 impl MaybeLiteral for TextUnit {
     /// If `self` is `Literal`, appends the character to `result` and returns
     /// `Ok(result)`. Otherwise, returns `Err(result)`.
@@ -112,9 +163,22 @@ impl MaybeLiteral for TextUnit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
+impl Text {
+    /// Creates a text from an iterator of literal chars.
+    pub fn from_literal_chars<I: IntoIterator<Item = char>>(i: I) -> Text {
+        Text(i.into_iter().map(Literal).collect())
+    }
+}
+
 impl fmt::Display for Text {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|unit| unit.fmt(f))
+    }
+}
+
+impl Unquote for Text {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.0.write_unquoted(w)
     }
 }
 
@@ -144,6 +208,19 @@ impl fmt::Display for WordUnit {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{}'", s),
             DoubleQuote(content) => write!(f, "\"{}\"", content),
+        }
+    }
+}
+
+impl Unquote for WordUnit {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        match self {
+            Unquoted(inner) => inner.write_unquoted(w),
+            SingleQuote(inner) => {
+                w.write_str(inner)?;
+                Ok(true)
+            }
+            DoubleQuote(inner) => inner.write_unquoted(w),
         }
     }
 }
@@ -179,6 +256,12 @@ pub struct Word {
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
+    }
+}
+
+impl Unquote for Word {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        self.units.write_unquoted(w)
     }
 }
 
@@ -704,6 +787,41 @@ mod tests {
     }
 
     #[test]
+    fn text_from_literal_chars() {
+        let text = Text::from_literal_chars(['a', '1'].iter().copied());
+        assert_eq!(text.0, [Literal('a'), Literal('1')]);
+    }
+
+    #[test]
+    fn text_unquote_without_quotes() {
+        let empty = Text(vec![]);
+        let (unquoted, is_quoted) = empty.unquote();
+        assert_eq!(unquoted, "");
+        assert_eq!(is_quoted, false);
+
+        let content = "Y".to_string();
+        let location = Location::dummy(content.clone());
+        let nonempty = Text(vec![Literal('X'), CommandSubst { content, location }]);
+        let (unquoted, is_quoted) = nonempty.unquote();
+        assert_eq!(unquoted, "X$(Y)");
+        assert_eq!(is_quoted, false);
+    }
+
+    #[test]
+    fn text_unquote_with_quotes() {
+        let quoted = Text(vec![
+            Literal('a'),
+            Backslashed('b'),
+            Literal('c'),
+            Backslashed('d'), // TODO Arithmetic expansion
+            Literal('e'),
+        ]);
+        let (unquoted, is_quoted) = quoted.unquote();
+        assert_eq!(unquoted, "abcde");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
     fn text_to_string_if_literal_success() {
         let empty = Text(vec![]);
         let s = empty.to_string_if_literal().unwrap();
@@ -718,6 +836,14 @@ mod tests {
     fn text_to_string_if_literal_failure() {
         let backslashed = Text(vec![Backslashed('a')]);
         assert_eq!(backslashed.to_string_if_literal(), None);
+    }
+
+    #[test]
+    fn word_unquote() {
+        let word = Word::from_str(r#"a\b'c'"d""#).unwrap();
+        let (unquoted, is_quoted) = word.unquote();
+        assert_eq!(unquoted, "abcd");
+        assert_eq!(is_quoted, true);
     }
 
     #[test]
