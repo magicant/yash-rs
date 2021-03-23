@@ -163,6 +163,13 @@ impl MaybeLiteral for TextUnit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
+impl Text {
+    /// Creates a text from an iterator of literal chars.
+    pub fn from_literal_chars<I: IntoIterator<Item = char>>(i: I) -> Text {
+        Text(i.into_iter().map(Literal).collect())
+    }
+}
+
 impl fmt::Display for Text {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|unit| unit.fmt(f))
@@ -777,6 +784,12 @@ mod tests {
         assert_eq!(double_quote.to_string(), "\"\"");
         let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
         assert_eq!(double_quote.to_string(), "\"A\\B\"");
+    }
+
+    #[test]
+    fn text_from_literal_chars() {
+        let text = Text::from_literal_chars(['a', '1'].iter().copied());
+        assert_eq!(text.0, [Literal('a'), Literal('1')]);
     }
 
     #[test]
