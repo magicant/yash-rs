@@ -21,6 +21,7 @@ use crate::parser::core::Result;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::Literal;
+use crate::syntax::Unquote;
 use crate::syntax::Word;
 
 /// Here-document without a content.
@@ -64,15 +65,20 @@ impl Lexer {
         let delimiter = heredoc.delimiter;
         let remove_tabs = heredoc.remove_tabs;
 
-        // TODO Unquote the delimiter string
-        let delimiter_string = delimiter.to_string();
+        let (delimiter_string, literal) = delimiter.unquote();
         // TODO Reject if the delimiter contains a newline
         let mut content = Text(vec![]);
         loop {
-            // TODO If the delimiter is quoted, the here-doc content should be literal.
-            let line = self.text(|c| c == NEWLINE, is_escapable).await?;
+            let (line_text, line_string) = if literal {
+                let line_string = self.line().await?;
+                let line_text = Text::from_literal_chars(line_string.chars());
+                (line_text, line_string)
+            } else {
+                let line_text = self.text(|c| c == NEWLINE, is_escapable).await?;
+                let line_string = line_text.to_string();
+                (line_text, line_string)
+            };
             // TODO Strip leading tabs depending on the here-doc operator type
-            let line_string = line.to_string();
 
             if !self.skip_if(|c| c == NEWLINE).await? {
                 todo!("Return an error: unexpected EOF, the delimiter missing");
@@ -86,7 +92,7 @@ impl Lexer {
                 });
             }
 
-            content.0.extend(line.0);
+            content.0.extend(line_text.0);
             content.0.push(Literal(NEWLINE));
         }
     }
@@ -188,6 +194,41 @@ END
                 Literal('\''),
                 Backslashed('`'),
                 Backslashed('\\'),
+                Literal('X'),
+                Literal('\n'),
+            ]
+        );
+    }
+
+    #[test]
+    fn lexer_here_doc_content_escapes_with_quoted_delimiter() {
+        let heredoc = partial_here_doc(r"\END", false);
+
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            r#"\a\$\"\'\`\\\
+X
+END
+"#,
+        );
+        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        assert_eq!(
+            heredoc.content.0,
+            [
+                Literal('\\'),
+                Literal('a'),
+                Literal('\\'),
+                Literal('$'),
+                Literal('\\'),
+                Literal('"'),
+                Literal('\\'),
+                Literal('\''),
+                Literal('\\'),
+                Literal('`'),
+                Literal('\\'),
+                Literal('\\'),
+                Literal('\\'),
+                Literal('\n'),
                 Literal('X'),
                 Literal('\n'),
             ]
