@@ -17,7 +17,9 @@
 //! Here-document content parser
 
 use super::Lexer;
+use crate::parser::core::Error;
 use crate::parser::core::Result;
+use crate::parser::core::SyntaxError;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
@@ -87,7 +89,10 @@ impl Lexer {
             };
 
             if !self.skip_if(|c| c == NEWLINE).await? {
-                todo!("Return an error: unexpected EOF, the delimiter missing");
+                let redir_op_location = delimiter.location;
+                let cause = SyntaxError::UnclosedHereDocContent { redir_op_location }.into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
             }
 
             let skip_count = if remove_tabs {
@@ -112,6 +117,7 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::core::ErrorCause;
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use futures::executor::block_on;
@@ -269,5 +275,27 @@ END
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.line.number.get(), 3);
         assert_eq!(location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_here_doc_content_unclosed() {
+        let heredoc = partial_here_doc("END", false);
+
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let e = block_on(lexer.here_doc_content(heredoc)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) =
+            e.cause
+        {
+            assert_eq!(redir_op_location.line.value, "END");
+            assert_eq!(redir_op_location.line.number.get(), 1);
+            assert_eq!(redir_op_location.line.source, Source::Unknown);
+            assert_eq!(redir_op_location.column.get(), 1);
+        } else {
+            panic!("Not UnclosedHereDocContent: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 }
