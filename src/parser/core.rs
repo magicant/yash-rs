@@ -55,6 +55,8 @@ pub enum SyntaxError {
     // TODO Include the corresponding here-doc operator.
     /// A here-document operator is missing its corresponding content.
     MissingHereDocContent,
+    /// A here-document content is missing its delimiter.
+    UnclosedHereDocContent { redir_op_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
     /// A grouping is not closed.
@@ -103,6 +105,9 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The here-document operator is missing its delimiter")
             }
             MissingHereDocContent => f.write_str("Content of the here-document is missing"),
+            UnclosedHereDocContent {
+                redir_op_location: _,
+            } => f.write_str("The delimiter to close the here-document content is missing"),
             UnclosedArrayValue {
                 opening_location: _,
             } => f.write_str("The array assignment value is not closed"),
