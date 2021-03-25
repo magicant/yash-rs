@@ -67,6 +67,14 @@ pub enum SyntaxError {
     UnclosedSubshell { opening_location: Location },
     /// A subshell contains no commands.
     EmptySubshell,
+    /// A do clause is not closed.
+    UnclosedDoClause { opening_location: Location },
+    /// A do clause contains no commands.
+    EmptyDoClause,
+    /// A while loop is missing a do clause.
+    UnclosedWhileClause { opening_location: Location },
+    /// A while loop's condition is empty.
+    EmptyWhileCondition,
     /// The `(` is not followed by `)` in a function definition.
     UnmatchedParenthesis,
     /// The function body is missing in a function definition command.
@@ -119,6 +127,14 @@ impl fmt::Display for SyntaxError {
                 opening_location: _,
             } => f.write_str("The subshell is not closed"),
             EmptySubshell => f.write_str("The subshell is missing its content"),
+            UnclosedDoClause {
+                opening_location: _,
+            } => f.write_str("The `do` clause is missing its closing `done`"),
+            EmptyDoClause => f.write_str("The `do` clause is missing its content"),
+            UnclosedWhileClause {
+                opening_location: _,
+            } => f.write_str("The `while` loop is missing its `do` clause"),
+            EmptyWhileCondition => f.write_str("The `while` loop is missing its condition"),
             UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
             MissingFunctionBody => f.write_str("The function body is missing"),
             InvalidFunctionBody => f.write_str("The function body must be a compound command"),
