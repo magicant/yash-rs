@@ -376,14 +376,15 @@ impl Parser<'_> {
         self.token.as_ref().unwrap().as_ref().map_err(|e| e.clone())
     }
 
-    /// Consumes the current token.
+    /// Consumes the current token without performing alias substitution.
     ///
     /// If the current token is not yet read from the underlying lexer, it is read.
     ///
-    /// This function does not perform alias substitution. In most cases you should use
-    /// [`take_token_manual`](Self::take_token_manual) or
+    /// This function does not perform alias substitution and therefore should be
+    /// used only in context where no alias substitution is expected. Otherwise,
+    /// you should use [`take_token_manual`](Self::take_token_manual) or
     /// [`take_token_auto`](Self::take_token_auto) instead.
-    async fn take_token_raw(&mut self) -> Result<Token> {
+    pub async fn take_token_raw(&mut self) -> Result<Token> {
         self.require_token().await;
         self.token.take().unwrap()
     }
@@ -435,7 +436,8 @@ impl Parser<'_> {
     /// in any case. It is your responsibility to check the token type and not to
     /// call this function on a reserved word. That is why this function is named
     /// `manual`. To consume a reserved word without performing alias
-    /// substitution, you should call [`take_token_auto`](Self::take_token_auto).
+    /// substitution, you should call [`take_token_raw`](Self::take_token_raw) or
+    /// [`take_token_auto`](Self::take_token_auto).
     pub async fn take_token_manual(&mut self, is_command_name: bool) -> Result<Rec<Token>> {
         let token = self.take_token_raw().await?;
         Ok(self.substitute_alias(token, is_command_name))
@@ -472,9 +474,10 @@ impl Parser<'_> {
     /// This function can be called to tell whether the previous and next tokens
     /// are separated by a blank or they are adjacent.
     ///
-    /// This function must be called after the previous token has been taken
-    /// (either [manual](Self::take_token_manual) or
-    /// [auto](Self::take_token_auto)) and before the next token is
+    /// This function must be called after the previous token has been taken (by
+    /// one of [`take_token_raw`](Self::take_token_raw),
+    /// [`take_token_manual`](Self::take_token_manual) and
+    /// [`take_token_auto`](Self::take_token_auto)) and before the next token is
     /// [peeked](Self::peek_token). Otherwise, this function would panic.
     ///
     /// This function consumes and ignores line continuations that may lie

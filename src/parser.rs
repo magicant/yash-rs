@@ -55,7 +55,7 @@ impl Parser<'_> {
             return Ok(None);
         }
 
-        let opening_location = self.take_token_auto(&[]).await?.word.location;
+        let opening_location = self.take_token_raw().await?.word.location;
         let mut words = vec![];
 
         loop {
@@ -93,7 +93,7 @@ impl Parser<'_> {
         operator: RedirOp,
     ) -> Result<RedirBody<MissingHereDoc>> {
         // TODO reject >>| and <<< if POSIXly-correct
-        let operator_location = self.take_token_auto(&[]).await?.word.location;
+        let operator_location = self.take_token_raw().await?.word.location;
         let operand = self.redirection_operand().await?.ok_or(Error {
             cause: SyntaxError::MissingRedirOperand.into(),
             location: operator_location,
@@ -106,7 +106,7 @@ impl Parser<'_> {
         &mut self,
         remove_tabs: bool,
     ) -> Result<RedirBody<MissingHereDoc>> {
-        let operator_location = self.take_token_auto(&[]).await?.word.location;
+        let operator_location = self.take_token_raw().await?.word.location;
         let delimiter = self.redirection_operand().await?.ok_or(Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location: operator_location,
@@ -146,7 +146,7 @@ impl Parser<'_> {
     /// [`MissingHereDocDelimiter`](SyntaxError::MissingHereDocDelimiter).
     pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
         let fd = if self.peek_token().await?.id == IoNumber {
-            let token = self.take_token_manual(false).await?.unwrap();
+            let token = self.take_token_raw().await?;
             if let Ok(fd) = token.word.to_string().parse() {
                 Some(fd)
             } else {
@@ -264,12 +264,12 @@ impl Parser<'_> {
     /// - [`SyntaxError::UnclosedGrouping`]
     /// - [`SyntaxError::EmptyGrouping`]
     async fn grouping(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
-        let open = self.take_token_auto(&[]).await?;
+        let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(OpenBrace)));
 
         let list = self.maybe_compound_list_boxed().await?;
 
-        let close = self.take_token_auto(&[]).await?;
+        let close = self.take_token_raw().await?;
         if close.id != Token(Some(CloseBrace)) {
             return Err(Error {
                 cause: SyntaxError::UnclosedGrouping {
@@ -304,12 +304,12 @@ impl Parser<'_> {
     /// - [`SyntaxError::UnclosedSubshell`]
     /// - [`SyntaxError::EmptySubshell`]
     async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
-        let open = self.take_token_auto(&[]).await?;
+        let open = self.take_token_raw().await?;
         assert_eq!(open.id, Operator(OpenParen));
 
         let list = self.maybe_compound_list_boxed().await?;
 
-        let close = self.take_token_auto(&[]).await?;
+        let close = self.take_token_raw().await?;
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: SyntaxError::UnclosedSubshell {
@@ -384,7 +384,7 @@ impl Parser<'_> {
             return Ok(Command::Simple(intro));
         }
 
-        let open = self.take_token_auto(&[]).await?;
+        let open = self.take_token_raw().await?;
         debug_assert_eq!(open.id, Operator(OpenParen));
 
         let close = self.take_token_auto(&[]).await?;
@@ -455,7 +455,7 @@ impl Parser<'_> {
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
                 if let Token(Some(Bang)) = self.peek_token().await?.id {
-                    let location = self.take_token_auto(&[Bang]).await?.word.location;
+                    let location = self.take_token_raw().await?.word.location;
                     loop {
                         // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
@@ -482,7 +482,7 @@ impl Parser<'_> {
         // Parse `|`
         let mut commands = vec![first];
         while self.peek_token().await?.id == Operator(Bar) {
-            let bar_location = self.take_token_auto(&[]).await?.word.location;
+            let bar_location = self.take_token_raw().await?.word.location;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -531,7 +531,7 @@ impl Parser<'_> {
                 Operator(BarBar) => AndOr::OrElse,
                 _ => break,
             };
-            self.take_token_auto(&[]).await?;
+            self.take_token_raw().await?;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -588,7 +588,7 @@ impl Parser<'_> {
             if !next {
                 break;
             }
-            self.take_token_auto(&[]).await?;
+            self.take_token_raw().await?;
 
             result = loop {
                 if let Rec::Parsed(result) = self.and_or_list().await? {
@@ -610,7 +610,7 @@ impl Parser<'_> {
             return Ok(false);
         }
 
-        self.take_token_auto(&[]).await?;
+        self.take_token_raw().await?;
         self.here_doc_contents().await?;
         Ok(true)
     }
@@ -1431,6 +1431,40 @@ mod tests {
     }
 
     #[test]
+    fn parser_grouping_aliasing() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " { :; end ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "{".to_string(),
+            "".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "}".to_string(),
+            "".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "end".to_string(),
+            "}".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Grouping(list) = result {
+            assert_eq!(list.to_string(), ":");
+        } else {
+            panic!("Not a grouping: {:?}", result);
+        }
+    }
+
+    #[test]
     fn parser_subshell_short() {
         let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
         let mut parser = Parser::new(&mut lexer);
@@ -1948,6 +1982,26 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
+    }
+
+    #[test]
+    fn parser_pipeline_no_aliasing_of_bang() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "! ok");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "!".to_string(),
+            "; ; ;".to_string(),
+            true,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let p = p.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(p.negation, true);
+        assert_eq!(p.commands.len(), 1);
+        assert_eq!(p.commands[0].to_string(), "ok");
     }
 
     #[test]
