@@ -75,6 +75,10 @@ pub enum SyntaxError {
     UnclosedWhileClause { opening_location: Location },
     /// A while loop's condition is empty.
     EmptyWhileCondition,
+    /// An until loop is missing a do clause.
+    UnclosedUntilClause { opening_location: Location },
+    /// An until loop's condition is empty.
+    EmptyUntilCondition,
     /// The `(` is not followed by `)` in a function definition.
     UnmatchedParenthesis,
     /// The function body is missing in a function definition command.
@@ -135,6 +139,10 @@ impl fmt::Display for SyntaxError {
                 opening_location: _,
             } => f.write_str("The `while` loop is missing its `do` clause"),
             EmptyWhileCondition => f.write_str("The `while` loop is missing its condition"),
+            UnclosedUntilClause {
+                opening_location: _,
+            } => f.write_str("The `until` loop is missing its `do` clause"),
+            EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
             UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
             MissingFunctionBody => f.write_str("The function body is missing"),
             InvalidFunctionBody => f.write_str("The function body must be a compound command"),
