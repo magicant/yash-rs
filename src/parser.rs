@@ -392,12 +392,50 @@ impl Parser<'_> {
         Ok(CompoundCommand::While { condition, body })
     }
 
+    /// Parses an until loop.
+    ///
+    /// The next token must be the `until` reserved word.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not `until`.
+    async fn until_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token_raw().await?;
+        assert_eq!(open.id, Token(Some(Until)));
+
+        let condition = self.maybe_compound_list_boxed().await?;
+
+        let body = match self.do_clause().await? {
+            Some(body) => body,
+            None => {
+                return Err(Error {
+                    cause: SyntaxError::UnclosedUntilClause {
+                        opening_location: open.word.location,
+                    }
+                    .into(),
+                    location: self.take_token_raw().await?.word.location,
+                })
+            }
+        };
+
+        // TODO allow empty condition if not POSIXly-correct
+        if condition.0.is_empty() {
+            return Err(Error {
+                cause: SyntaxError::EmptyUntilCondition.into(),
+                location: open.word.location,
+            });
+        }
+
+        Ok(CompoundCommand::Until { condition, body })
+    }
+
     /// Parses a compound command.
     pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
             Operator(OpenParen) => self.subshell().await.map(Some),
             Token(Some(While)) => self.while_loop().await.map(Some),
+            Token(Some(Until)) => self.until_loop().await.map(Some),
             _ => Ok(None),
         }
     }
@@ -1769,6 +1807,105 @@ mod tests {
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "while :; do :; done");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_until_loop_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "until true; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Until { condition, body } = result {
+            assert_eq!(condition.to_string(), "true");
+            assert_eq!(body.to_string(), ":");
+        } else {
+            panic!("Not an until loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_until_loop_long() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "until false; true& do foo; bar& done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Until { condition, body } = result {
+            assert_eq!(condition.to_string(), "false; true&");
+            assert_eq!(body.to_string(), "foo; bar&");
+        } else {
+            panic!("Not an until loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_until_loop_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "until :");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedUntilClause { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "until :");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Wrong error cause: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "until :");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 8);
+    }
+
+    #[test]
+    fn parser_until_loop_empty_posix() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "  until do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::EmptyUntilCondition)
+        );
+        assert_eq!(e.location.line.value, "  until do :; done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 3);
+    }
+
+    #[test]
+    fn parser_until_loop_aliasing() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " until :; DO :; done");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "DO".to_string(),
+            "do".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "until".to_string(),
+            ";;".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), "until :; do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
