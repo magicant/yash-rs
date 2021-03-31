@@ -128,6 +128,10 @@ impl Fill for CompoundCommand<MissingHereDoc> {
                 condition: condition.fill(i)?,
                 body: body.fill(i)?,
             },
+            Until { condition, body } => Until {
+                condition: condition.fill(i)?,
+                body: body.fill(i)?,
+            },
         })
     }
 }

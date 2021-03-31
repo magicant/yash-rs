@@ -554,7 +554,8 @@ pub enum CompoundCommand<H = HereDoc> {
     // TODO for
     /// While loop.
     While { condition: List<H>, body: List<H> },
-    // TODO until
+    /// Until loop.
+    Until { condition: List<H>, body: List<H> },
     // TODO if
     // TODO case
     // TODO [[ ]]
@@ -567,6 +568,7 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
             Grouping(list) => write!(f, "{{ {:#} }}", list),
             Subshell(list) => write!(f, "({})", list),
             While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
+            Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
         }
     }
 }
@@ -1091,6 +1093,14 @@ mod tests {
         let body = "echo ok".parse::<List>().unwrap();
         let r#while = CompoundCommand::While { condition, body };
         assert_eq!(r#while.to_string(), "while true& false; do echo ok; done");
+    }
+
+    #[test]
+    fn until_display() {
+        let condition = "true& false".parse::<List>().unwrap();
+        let body = "echo ok".parse::<List>().unwrap();
+        let until = CompoundCommand::Until { condition, body };
+        assert_eq!(until.to_string(), "until true& false; do echo ok; done");
     }
 
     #[test]
