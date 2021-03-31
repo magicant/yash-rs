@@ -258,11 +258,6 @@ impl Parser<'_> {
     /// # Panics
     ///
     /// If the first token is not a `{`.
-    ///
-    /// # Errors
-    ///
-    /// - [`SyntaxError::UnclosedGrouping`]
-    /// - [`SyntaxError::EmptyGrouping`]
     async fn grouping(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(OpenBrace)));
@@ -298,11 +293,6 @@ impl Parser<'_> {
     /// # Panics
     ///
     /// If the first token is not a `(`.
-    ///
-    /// # Errors
-    ///
-    /// - [`SyntaxError::UnclosedSubshell`]
-    /// - [`SyntaxError::EmptySubshell`]
     async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Operator(OpenParen));
@@ -372,8 +362,6 @@ impl Parser<'_> {
     /// # Panics
     ///
     /// If the first token is not `while`.
-    ///
-    /// # Errors
     async fn while_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(While)));
@@ -405,17 +393,6 @@ impl Parser<'_> {
     }
 
     /// Parses a compound command.
-    ///
-    /// # Errors
-    ///
-    /// - [`SyntaxError::UnclosedGrouping`]
-    /// - [`SyntaxError::EmptyGrouping`]
-    /// - [`SyntaxError::UnclosedSubshell`]
-    /// - [`SyntaxError::EmptySubshell`]
-    /// - [`SyntaxError::UnclosedDoClause`]
-    /// - [`SyntaxError::EmptyDoClause`]
-    /// - [`SyntaxError::UnclosedWhileClause`]
-    /// - [`SyntaxError::EmptyWhileCondition`]
     pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
@@ -448,12 +425,6 @@ impl Parser<'_> {
     /// If the simple command has only one word and the next token is `(`, it is
     /// parsed as a function definition command.
     /// Otherwise, the simple command is returned intact.
-    ///
-    /// # Errors
-    ///
-    /// - [`SyntaxError::UnmatchedParenthesis`]
-    /// - [`SyntaxError::MissingFunctionBody`]
-    /// - [`SyntaxError::InvalidFunctionBody`]
     pub async fn short_function_definition(
         &mut self,
         mut intro: SimpleCommand<MissingHereDoc>,

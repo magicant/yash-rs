@@ -625,10 +625,6 @@ impl Lexer {
     ///
     /// This function does not consume line continuations between `$` and `(`.
     /// Line continuations should have been consumed beforehand.
-    ///
-    /// # Errors
-    ///
-    /// - [SyntaxError::UnclosedCommandSubstitution]
     pub async fn command_substitution(
         &mut self,
         opening_location: Location,
@@ -657,10 +653,6 @@ impl Lexer {
     /// If the next character is `$`, a parameter expansion, command
     /// substitution, or arithmetic expansion is parsed. Otherwise, no
     /// characters are consumed and the return value is `Ok(None)`.
-    ///
-    /// # Errors
-    ///
-    /// - Propagated from [`Lexer::command_substitution`]
     pub async fn dollar_word_unit(&mut self) -> Result<Option<TextUnit>> {
         let index = self.index();
         let location = match self.consume_char_if(|c| c == '$').await? {
