@@ -331,6 +331,79 @@ impl Parser<'_> {
         Ok(CompoundCommand::Subshell(list))
     }
 
+    /// Parses a `do` clause, i.e., a compound list surrounded in `do ... done`.
+    ///
+    /// Returns `Ok(None)` if the first token is not `do`.
+    async fn do_clause(&mut self) -> Result<Option<List<MissingHereDoc>>> {
+        if self.peek_token().await?.id != Token(Some(Do)) {
+            return Ok(None);
+        }
+
+        let open = self.take_token_raw().await?;
+
+        let list = self.maybe_compound_list_boxed().await?;
+
+        let close = self.take_token_raw().await?;
+        if close.id != Token(Some(Done)) {
+            return Err(Error {
+                cause: SyntaxError::UnclosedDoClause {
+                    opening_location: open.word.location,
+                }
+                .into(),
+                location: close.word.location,
+            });
+        }
+
+        // TODO allow empty do clause if not POSIXly-correct
+        if list.0.is_empty() {
+            return Err(Error {
+                cause: SyntaxError::EmptyDoClause.into(),
+                location: open.word.location,
+            });
+        }
+
+        Ok(Some(list))
+    }
+
+    /// Parses a while loop.
+    ///
+    /// The next token must be the `while` reserved word.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not `while`.
+    ///
+    /// # Errors
+    async fn while_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token_raw().await?;
+        assert_eq!(open.id, Token(Some(While)));
+
+        let condition = self.maybe_compound_list_boxed().await?;
+
+        let body = match self.do_clause().await? {
+            Some(body) => body,
+            None => {
+                return Err(Error {
+                    cause: SyntaxError::UnclosedWhileClause {
+                        opening_location: open.word.location,
+                    }
+                    .into(),
+                    location: self.take_token_raw().await?.word.location,
+                })
+            }
+        };
+
+        // TODO allow empty condition if not POSIXly-correct
+        if condition.0.is_empty() {
+            return Err(Error {
+                cause: SyntaxError::EmptyWhileCondition.into(),
+                location: open.word.location,
+            });
+        }
+
+        Ok(CompoundCommand::While { condition, body })
+    }
+
     /// Parses a compound command.
     ///
     /// # Errors
@@ -339,10 +412,15 @@ impl Parser<'_> {
     /// - [`SyntaxError::EmptyGrouping`]
     /// - [`SyntaxError::UnclosedSubshell`]
     /// - [`SyntaxError::EmptySubshell`]
+    /// - [`SyntaxError::UnclosedDoClause`]
+    /// - [`SyntaxError::EmptyDoClause`]
+    /// - [`SyntaxError::UnclosedWhileClause`]
+    /// - [`SyntaxError::EmptyWhileCondition`]
     pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
             Operator(OpenParen) => self.subshell().await.map(Some),
+            Token(Some(While)) => self.while_loop().await.map(Some),
             _ => Ok(None),
         }
     }
@@ -1523,6 +1601,206 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_do_clause_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.do_clause()).unwrap();
+        assert!(result.is_none(), "result should be none: {:?}", result);
+    }
+
+    #[test]
+    fn parser_do_clause_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), ":");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_do_clause_long() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "do foo; bar& done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), "foo; bar&");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_do_clause_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " do not close ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.do_clause()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, " do not close ");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("Wrong error cause: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, " do not close ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 15);
+    }
+
+    #[test]
+    fn parser_do_clause_empty_posix() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "do done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.do_clause()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
+        assert_eq!(e.location.line.value, "do done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_do_clause_aliasing() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " do :; end ");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "do".to_string(),
+            "".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "done".to_string(),
+            "".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "end".to_string(),
+            "done".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), ":");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_while_loop_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "while true; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::While { condition, body } = result {
+            assert_eq!(condition.to_string(), "true");
+            assert_eq!(body.to_string(), ":");
+        } else {
+            panic!("Not a while loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_while_loop_long() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "while false; true& do foo; bar& done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::While { condition, body } = result {
+            assert_eq!(condition.to_string(), "false; true&");
+            assert_eq!(body.to_string(), "foo; bar&");
+        } else {
+            panic!("Not a while loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_while_loop_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "while :");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedWhileClause { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "while :");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Wrong error cause: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "while :");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 8);
+    }
+
+    #[test]
+    fn parser_while_loop_empty_posix() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " while do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::EmptyWhileCondition)
+        );
+        assert_eq!(e.location.line.value, " while do :; done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn parser_while_loop_aliasing() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " while :; DO :; done");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "DO".to_string(),
+            "do".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "while".to_string(),
+            ";;".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), "while :; do :; done");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
     }
 
     #[test]

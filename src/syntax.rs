@@ -552,7 +552,9 @@ pub enum CompoundCommand<H = HereDoc> {
     /// Command for executing commands in a subshell.
     Subshell(List<H>),
     // TODO for
-    // TODO while/until
+    /// While loop.
+    While { condition: List<H>, body: List<H> },
+    // TODO until
     // TODO if
     // TODO case
     // TODO [[ ]]
@@ -564,6 +566,7 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
         match self {
             Grouping(list) => write!(f, "{{ {:#} }}", list),
             Subshell(list) => write!(f, "({})", list),
+            While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
         }
     }
 }
@@ -1080,6 +1083,14 @@ mod tests {
         let list = "foo".parse::<List>().unwrap();
         let grouping = CompoundCommand::Grouping(list);
         assert_eq!(grouping.to_string(), "{ foo; }");
+    }
+
+    #[test]
+    fn while_display() {
+        let condition = "true& false".parse::<List>().unwrap();
+        let body = "echo ok".parse::<List>().unwrap();
+        let r#while = CompoundCommand::While { condition, body };
+        assert_eq!(r#while.to_string(), "while true& false; do echo ok; done");
     }
 
     #[test]

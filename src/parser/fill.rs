@@ -124,6 +124,10 @@ impl Fill for CompoundCommand<MissingHereDoc> {
         Ok(match self {
             Grouping(list) => Grouping(list.fill(i)?),
             Subshell(list) => Subshell(list.fill(i)?),
+            While { condition, body } => While {
+                condition: condition.fill(i)?,
+                body: body.fill(i)?,
+            },
         })
     }
 }
