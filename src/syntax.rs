@@ -197,7 +197,10 @@ pub enum WordUnit {
     SingleQuote(String),
     /// Text surrounded with a pair of double quotations.
     DoubleQuote(Text),
-    // TODO tilde expansion
+    /// Tilde expansion.
+    ///
+    /// The `String` value does not contain the initial tilde.
+    Tilde(String),
 }
 
 pub use WordUnit::*;
@@ -208,6 +211,7 @@ impl fmt::Display for WordUnit {
             Unquoted(dq) => dq.fmt(f),
             SingleQuote(s) => write!(f, "'{}'", s),
             DoubleQuote(content) => write!(f, "\"{}\"", content),
+            Tilde(s) => write!(f, "~{}", s),
         }
     }
 }
@@ -221,6 +225,10 @@ impl Unquote for WordUnit {
                 Ok(true)
             }
             DoubleQuote(inner) => inner.write_unquoted(w),
+            Tilde(s) => {
+                write!(w, "~{}", s)?;
+                Ok(false)
+            }
         }
     }
 }
@@ -774,24 +782,6 @@ mod tests {
     }
 
     #[test]
-    fn word_unit_display() {
-        let unquoted = Unquoted(Literal('A'));
-        assert_eq!(unquoted.to_string(), "A");
-        let unquoted = Unquoted(Backslashed('B'));
-        assert_eq!(unquoted.to_string(), "\\B");
-
-        let single_quote = SingleQuote("".to_string());
-        assert_eq!(single_quote.to_string(), "''");
-        let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
-        assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
-
-        let double_quote = DoubleQuote(Text(vec![]));
-        assert_eq!(double_quote.to_string(), "\"\"");
-        let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
-        assert_eq!(double_quote.to_string(), "\"A\\B\"");
-    }
-
-    #[test]
     fn text_from_literal_chars() {
         let text = Text::from_literal_chars(['a', '1'].iter().copied());
         assert_eq!(text.0, [Literal('a'), Literal('1')]);
@@ -844,10 +834,33 @@ mod tests {
     }
 
     #[test]
+    fn word_unit_display() {
+        let unquoted = Unquoted(Literal('A'));
+        assert_eq!(unquoted.to_string(), "A");
+        let unquoted = Unquoted(Backslashed('B'));
+        assert_eq!(unquoted.to_string(), "\\B");
+
+        let single_quote = SingleQuote("".to_string());
+        assert_eq!(single_quote.to_string(), "''");
+        let single_quote = SingleQuote(r#"a"b"c\"#.to_string());
+        assert_eq!(single_quote.to_string(), r#"'a"b"c\'"#);
+
+        let double_quote = DoubleQuote(Text(vec![]));
+        assert_eq!(double_quote.to_string(), "\"\"");
+        let double_quote = DoubleQuote(Text(vec![Literal('A'), Backslashed('B')]));
+        assert_eq!(double_quote.to_string(), "\"A\\B\"");
+
+        let tilde = Tilde("".to_string());
+        assert_eq!(tilde.to_string(), "~");
+        let tilde = Tilde("foo".to_string());
+        assert_eq!(tilde.to_string(), "~foo");
+    }
+
+    #[test]
     fn word_unquote() {
-        let word = Word::from_str(r#"a\b'c'"d""#).unwrap();
+        let word = Word::from_str(r#"~a/b\c'd'"e""#).unwrap();
         let (unquoted, is_quoted) = word.unquote();
-        assert_eq!(unquoted, "abcd");
+        assert_eq!(unquoted, "~a/bcde");
         assert_eq!(is_quoted, true);
     }
 
@@ -857,9 +870,9 @@ mod tests {
         let s = empty.to_string_if_literal().unwrap();
         assert_eq!(s, "");
 
-        let nonempty = Word::from_str("foo").unwrap();
+        let nonempty = Word::from_str("~foo").unwrap();
         let s = nonempty.to_string_if_literal().unwrap();
-        assert_eq!(s, "foo");
+        assert_eq!(s, "~foo");
     }
 
     #[test]
@@ -869,6 +882,12 @@ mod tests {
         let word = Word {
             units: vec![backslashed],
             location,
+        };
+        assert_eq!(word.to_string_if_literal(), None);
+
+        let word = Word {
+            units: vec![Tilde("foo".to_string())],
+            ..word
         };
         assert_eq!(word.to_string_if_literal(), None);
     }
