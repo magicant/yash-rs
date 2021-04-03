@@ -20,6 +20,7 @@
 
 // mod heredoc; // See below
 mod op;
+mod tilde;
 
 mod core {
 
