@@ -23,8 +23,7 @@ use crate::syntax::Word;
 use crate::syntax::WordUnit::{Tilde, Unquoted};
 
 impl Word {
-    /// TODO
-    pub fn parse_tilde(self) -> Self {
+    fn parse_tilde(self) -> Self {
         if self.units.first() != Some(&Unquoted(Literal('~'))) {
             return self;
         }
@@ -55,6 +54,14 @@ impl Word {
         units.extend(i);
         Word { units, ..self }
     }
+
+    /// TODO Describe
+    ///
+    /// TODO Describe about difference from strictly POSIX-conforming behavior
+    #[inline]
+    pub fn parse_tilde_front(self) -> Self {
+        self.parse_tilde()
+    }
 }
 
 #[cfg(test)]
@@ -66,40 +73,40 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn word_parse_tilde_not_starting_with_tilde() {
+    fn word_parse_tilde_front_not_starting_with_tilde() {
         let input = Word::from_str("").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result, input);
 
         let input = Word::from_str("a").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result, input);
 
         let input = Word::from_str("''").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result, input);
     }
 
     #[test]
-    fn word_parse_tilde_only_tilde() {
+    fn word_parse_tilde_front_only_tilde() {
         let input = Word::from_str("~").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(result.units, [Tilde("".to_string())]);
     }
 
     #[test]
-    fn word_parse_tilde_with_name() {
+    fn word_parse_tilde_front_with_name() {
         let input = Word::from_str("~foo").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(result.units, [Tilde("foo".to_string())]);
     }
 
     #[test]
-    fn word_parse_tilde_ending_with_slash() {
+    fn word_parse_tilde_front_ending_with_slash() {
         let input = Word::from_str("~bar/''").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
@@ -112,9 +119,9 @@ mod tests {
     }
 
     #[test]
-    fn word_parse_tilde_ending_with_colon() {
+    fn word_parse_tilde_front_ending_with_colon() {
         let input = Word::from_str("~bar:\"\"").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
@@ -127,9 +134,9 @@ mod tests {
     }
 
     #[test]
-    fn word_parse_tilde_interrupted_by_non_literal() {
+    fn word_parse_tilde_front_interrupted_by_non_literal() {
         let input = Word::from_str(r"~foo\/").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
@@ -143,7 +150,7 @@ mod tests {
         );
 
         let input = Word::from_str("~bar''").unwrap();
-        let result = input.clone().parse_tilde();
+        let result = input.clone().parse_tilde_front();
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
