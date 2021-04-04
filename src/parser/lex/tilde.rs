@@ -20,7 +20,23 @@
 
 use crate::syntax::TextUnit::Literal;
 use crate::syntax::Word;
-use crate::syntax::WordUnit::{Tilde, Unquoted};
+use crate::syntax::WordUnit::{self, Tilde, Unquoted};
+use std::iter::Peekable;
+
+/// Parses a tilde expansion except the initial tilde.
+///
+/// Returns the literal string up to the next non-applicable word unit.
+fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>) -> String {
+    let mut name = String::new();
+
+    while let Some(Unquoted(Literal(c))) =
+        i.next_if(|unit| matches!(unit, Unquoted(Literal(c)) if !matches!(*c, '/' | ':')))
+    {
+        name.push(c)
+    }
+
+    name
+}
 
 impl Word {
     fn parse_tilde(&mut self) {
@@ -66,7 +82,42 @@ impl Word {
     /// TODO Describe
     #[inline]
     pub fn parse_tilde_everywhere(&mut self) {
-        self.parse_tilde()
+        let mut i = self.units.drain(..).peekable();
+        let mut is_after_colon = true;
+        let mut units = vec![];
+
+        loop {
+            is_after_colon = match i.next() {
+                Some(Unquoted(Literal('~'))) if is_after_colon => {
+                    let name = parse_name(&mut i);
+
+                    // Check the delimiter and push the result.
+                    match i.peek() {
+                        None | Some(Unquoted(Literal(_))) => units.push(Tilde(name)),
+                        Some(_) => {
+                            // The next word unit is not applicable for tilde expansion.
+                            // Revert to the original literals.
+                            units.push(Unquoted(Literal('~')));
+                            units.extend(name.chars().map(|c| Unquoted(Literal(c))));
+                        }
+                    }
+
+                    false
+                }
+                Some(unit @ Unquoted(Literal(':'))) => {
+                    units.push(unit);
+                    true
+                }
+                Some(unit) => {
+                    units.push(unit);
+                    false
+                }
+                None => break,
+            }
+        }
+
+        drop(i);
+        self.units = units;
     }
 }
 
@@ -270,6 +321,63 @@ mod tests {
                 Unquoted(Literal('a')),
                 Unquoted(Literal('r')),
                 SingleQuote("".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_not_after_colon() {
+        let input = Word::from_str("a~").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("/~a").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("''~/").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_after_colon() {
+        let input = Word::from_str(":~").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [Unquoted(Literal(':')), Tilde("".to_string())]
+        );
+
+        let input = Word::from_str(":~foo/a:~bar").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Unquoted(Literal(':')),
+                Tilde("foo".to_string()),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('a')),
+                Unquoted(Literal(':')),
+                Tilde("bar".to_string()),
+            ]
+        );
+
+        let input = Word::from_str("~a/b:~c/d").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Tilde("a".to_string()),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('b')),
+                Unquoted(Literal(':')),
+                Tilde("c".to_string()),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('d')),
             ]
         );
     }
