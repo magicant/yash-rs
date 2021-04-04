@@ -62,6 +62,12 @@ impl Word {
     pub fn parse_tilde_front(&mut self) {
         self.parse_tilde()
     }
+
+    /// TODO Describe
+    #[inline]
+    pub fn parse_tilde_everywhere(&mut self) {
+        self.parse_tilde()
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +81,12 @@ mod tests {
     fn parse_tilde_front(word: &Word) -> Word {
         let mut word = word.clone();
         word.parse_tilde_front();
+        word
+    }
+
+    fn parse_tilde_everywhere(word: &Word) -> Word {
+        let mut word = word.clone();
+        word.parse_tilde_everywhere();
         word
     }
 
@@ -157,6 +169,98 @@ mod tests {
 
         let input = Word::from_str("~bar''").unwrap();
         let result = parse_tilde_front(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Unquoted(Literal('~')),
+                Unquoted(Literal('b')),
+                Unquoted(Literal('a')),
+                Unquoted(Literal('r')),
+                SingleQuote("".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_not_starting_with_tilde() {
+        let input = Word::from_str("").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("a").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("''").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_only_tilde() {
+        let input = Word::from_str("~").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(result.units, [Tilde("".to_string())]);
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_with_name() {
+        let input = Word::from_str("~foo").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(result.units, [Tilde("foo".to_string())]);
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_ending_with_slash() {
+        let input = Word::from_str("~bar/''").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Tilde("bar".to_string()),
+                Unquoted(Literal('/')),
+                SingleQuote("".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_ending_with_colon() {
+        let input = Word::from_str("~bar:\"\"").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Tilde("bar".to_string()),
+                Unquoted(Literal(':')),
+                DoubleQuote(Text(vec![])),
+            ]
+        );
+    }
+
+    #[test]
+    fn word_parse_tilde_everywhere_interrupted_by_non_literal() {
+        let input = Word::from_str(r"~foo\/").unwrap();
+        let result = parse_tilde_everywhere(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Unquoted(Literal('~')),
+                Unquoted(Literal('f')),
+                Unquoted(Literal('o')),
+                Unquoted(Literal('o')),
+                Unquoted(Backslashed('/')),
+            ]
+        );
+
+        let input = Word::from_str("~bar''").unwrap();
+        let result = parse_tilde_everywhere(&input);
         assert_eq!(result.location, input.location);
         assert_eq!(
             result.units,
