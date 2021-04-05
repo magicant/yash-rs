@@ -40,48 +40,6 @@ fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>) -> String {
 
 impl Word {
     fn parse_tilde(&mut self) {
-        if self.units.first() != Some(&Unquoted(Literal('~'))) {
-            return;
-        }
-
-        let mut i = self.units.drain(..).peekable();
-        let tilde = i.next().unwrap();
-        debug_assert_eq!(tilde, Unquoted(Literal('~')));
-
-        // Parse the body of the tilde expansion into `name`, consuming characters from `i`.
-        let mut name = String::new();
-        while let Some(Unquoted(Literal(c))) =
-            i.next_if(|unit| matches!(unit, Unquoted(Literal(c)) if !matches!(*c, '/' | ':')))
-        {
-            name.push(c)
-        }
-
-        // Check the delimiter and create the result.
-        let mut units = match i.peek() {
-            None | Some(Unquoted(Literal(_))) => vec![Tilde(name)],
-            Some(_) => {
-                // The next word unit is not applicable for tilde expansion.
-                // Revert to the original literals.
-                let mut units = vec![Unquoted(Literal('~'))];
-                units.extend(name.chars().map(|c| Unquoted(Literal(c))));
-                units
-            }
-        };
-        units.extend(i);
-        self.units = units;
-    }
-
-    /// TODO Describe
-    ///
-    /// TODO Describe about difference from strictly POSIX-conforming behavior
-    #[inline]
-    pub fn parse_tilde_front(&mut self) {
-        self.parse_tilde()
-    }
-
-    /// TODO Describe
-    #[inline]
-    pub fn parse_tilde_everywhere(&mut self) {
         let mut i = self.units.drain(..).peekable();
         let mut is_after_colon = true;
         let mut units = vec![];
@@ -118,6 +76,20 @@ impl Word {
 
         drop(i);
         self.units = units;
+    }
+
+    /// TODO Describe
+    ///
+    /// TODO Describe about difference from strictly POSIX-conforming behavior
+    #[inline]
+    pub fn parse_tilde_front(&mut self) {
+        self.parse_tilde()
+    }
+
+    /// TODO Describe
+    #[inline]
+    pub fn parse_tilde_everywhere(&mut self) {
+        self.parse_tilde()
     }
 }
 
