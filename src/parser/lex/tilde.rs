@@ -39,7 +39,7 @@ fn parse_name<I: Iterator<Item = WordUnit>>(i: &mut Peekable<I>) -> String {
 }
 
 impl Word {
-    fn parse_tilde(&mut self) {
+    fn parse_tilde(&mut self, everywhere: bool) {
         let mut i = self.units.drain(..).peekable();
         let mut is_after_colon = true;
         let mut units = vec![];
@@ -62,7 +62,7 @@ impl Word {
 
                     false
                 }
-                Some(unit @ Unquoted(Literal(':'))) => {
+                Some(unit @ Unquoted(Literal(':'))) if everywhere => {
                     units.push(unit);
                     true
                 }
@@ -83,13 +83,13 @@ impl Word {
     /// TODO Describe about difference from strictly POSIX-conforming behavior
     #[inline]
     pub fn parse_tilde_front(&mut self) {
-        self.parse_tilde()
+        self.parse_tilde(false)
     }
 
     /// TODO Describe
     #[inline]
     pub fn parse_tilde_everywhere(&mut self) {
-        self.parse_tilde()
+        self.parse_tilde(true)
     }
 }
 
@@ -201,6 +201,70 @@ mod tests {
                 Unquoted(Literal('a')),
                 Unquoted(Literal('r')),
                 SingleQuote("".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn word_parse_tilde_front_not_after_colon() {
+        let input = Word::from_str("a~").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("/~a").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result, input);
+
+        let input = Word::from_str("''~/").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn word_parse_tilde_front_after_colon() {
+        let input = Word::from_str(":~").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [Unquoted(Literal(':')), Unquoted(Literal('~'))]
+        );
+
+        let input = Word::from_str(":~foo/a:~bar").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Unquoted(Literal(':')),
+                Unquoted(Literal('~')),
+                Unquoted(Literal('f')),
+                Unquoted(Literal('o')),
+                Unquoted(Literal('o')),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('a')),
+                Unquoted(Literal(':')),
+                Unquoted(Literal('~')),
+                Unquoted(Literal('b')),
+                Unquoted(Literal('a')),
+                Unquoted(Literal('r')),
+            ]
+        );
+
+        let input = Word::from_str("~a/b:~c/d").unwrap();
+        let result = parse_tilde_front(&input);
+        assert_eq!(result.location, input.location);
+        assert_eq!(
+            result.units,
+            [
+                Tilde("a".to_string()),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('b')),
+                Unquoted(Literal(':')),
+                Unquoted(Literal('~')),
+                Unquoted(Literal('c')),
+                Unquoted(Literal('/')),
+                Unquoted(Literal('d')),
             ]
         );
     }
