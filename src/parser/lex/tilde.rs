@@ -78,15 +78,84 @@ impl Word {
         self.units = units;
     }
 
-    /// TODO Describe
+    /// Parses a tilde expansion at the beginning of the word.
     ///
-    /// TODO Describe about difference from strictly POSIX-conforming behavior
+    /// This function checks if `self.units` begins with a unquoted tilde
+    /// character, i.e., `WordUnit::Unquoted(TextUnit::Literal('~'))`. If so, the
+    /// word unit is replaced with a `WordUnit::Tilde` value. Other unquoted
+    /// characters that follow the tilde are together replaced to produce the
+    /// value of the `WordUnit::Tilde`.
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use yash::syntax::{Word, WordUnit::Tilde};
+    /// let mut word = Word::from_str("~").unwrap();
+    /// word.parse_tilde_front();
+    /// assert_eq!(word.units, [Tilde("".to_string())]);
+    /// ```
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use yash::syntax::{Word, WordUnit::Tilde};
+    /// let mut word = Word::from_str("~foo").unwrap();
+    /// word.parse_tilde_front();
+    /// assert_eq!(word.units, [Tilde("foo".to_string())]);
+    /// ```
+    ///
+    /// If there is no leading tilde, `self.units` will have the same content
+    /// when this function returns.
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use yash::syntax::{TextUnit::Literal, Word, WordUnit::Unquoted};
+    /// let mut word = Word::from_str("X").unwrap();
+    /// assert_eq!(word.units, [Unquoted(Literal('X'))]);
+    /// word.parse_tilde_front();
+    /// assert_eq!(word.units, [Unquoted(Literal('X'))]);
+    /// ```
+    ///
+    /// This function parses a literal word units only, which differs from the
+    /// strictly POSIX-conforming behavior. For example, POSIX requires the word
+    /// `~$()` to be regarded as a tilde expansion, but this function does not
+    /// convert it to `WordUnit::Tilde("$()".to_string())`.
+    ///
+    /// The tilde expansion are delimited by an unquoted slash or colon. This is
+    /// also not strictly POSIX-conforming since POSIX allows colons to be
+    /// included in the tilde expansion.
+    ///
+    /// This function only parses a tilde expansion at the beginning of the word.
+    /// If the word is a colon-separated list of paths, you might want to use
+    /// [`parse_tilde_everywhere`](Self::parse_tilde_everywhere) instead.
     #[inline]
     pub fn parse_tilde_front(&mut self) {
         self.parse_tilde(false)
     }
 
-    /// TODO Describe
+    /// Parses tilde expansions in the word.
+    ///
+    /// This function works the same as
+    /// [`parse_tilde_front`](Self::parse_tilde_front) except that it parses
+    /// tilde expansions not only at the beginning of the word but also after
+    /// each unquoted colon.
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use yash::syntax::{TextUnit::Literal, Word, WordUnit::{Tilde, Unquoted}};
+    /// let mut word = Word::from_str("~:~a/b:~c").unwrap();
+    /// word.parse_tilde_everywhere();
+    /// assert_eq!(
+    ///     word.units,
+    ///     [
+    ///         Tilde("".to_string()),
+    ///         Unquoted(Literal(':')),
+    ///         Tilde("a".to_string()),
+    ///         Unquoted(Literal('/')),
+    ///         Unquoted(Literal('b')),
+    ///         Unquoted(Literal(':')),
+    ///         Tilde("c".to_string()),
+    ///     ]
+    /// );
+    /// ```
     #[inline]
     pub fn parse_tilde_everywhere(&mut self) {
         self.parse_tilde(true)
