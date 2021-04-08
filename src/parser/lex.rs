@@ -877,7 +877,8 @@ impl Lexer {
         }
 
         let index = self.index();
-        let word = self.word(is_token_delimiter_char).await?;
+        let mut word = self.word(is_token_delimiter_char).await?;
+        word.parse_tilde_front();
         let id = self.token_id(&word).await?;
         Ok(Token { word, id, index })
     }
@@ -2437,6 +2438,21 @@ mod tests {
         assert_eq!(t.index, 0);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ' ');
+    }
+
+    #[test]
+    fn lexer_token_tilde() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "~a:~");
+
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(
+            t.word.units,
+            [
+                WordUnit::Tilde("a".to_string()),
+                WordUnit::Unquoted(TextUnit::Literal(':')),
+                WordUnit::Unquoted(TextUnit::Literal('~'))
+            ]
+        );
     }
 
     #[test]
