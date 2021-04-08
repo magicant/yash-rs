@@ -337,7 +337,7 @@ impl TryFrom<Word> for Assign {
                 if let Some(name) = word.units[..eq].to_string_if_literal() {
                     assert!(!name.is_empty());
                     word.units.drain(..=eq);
-                    // TODO parse tilde expansions in the value
+                    word.parse_tilde_everywhere();
                     let location = word.location.clone();
                     let value = Scalar(word);
                     return Ok(Assign {
@@ -964,6 +964,24 @@ mod tests {
             panic!("wrong value: {:?}", assign.value);
         }
         assert_eq!(assign.location, location);
+    }
+
+    #[test]
+    fn assign_try_from_word_tilde() {
+        let word = Word::from_str("a=~:~b").unwrap();
+        let assign = Assign::try_from(word).unwrap();
+        if let Scalar(value) = assign.value {
+            assert_eq!(
+                value.units,
+                [
+                    WordUnit::Tilde("".to_string()),
+                    WordUnit::Unquoted(TextUnit::Literal(':')),
+                    WordUnit::Tilde("b".to_string()),
+                ]
+            );
+        } else {
+            panic!("wrong value: {:?}", assign.value);
+        }
     }
 
     #[test]
