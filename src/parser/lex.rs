@@ -20,6 +20,7 @@
 
 // mod heredoc; // See below
 mod op;
+mod tilde;
 
 mod core {
 
@@ -816,14 +817,17 @@ impl Lexer {
         }
     }
 
-    // TODO Need more parameters to control how the word should be parsed. Especially:
-    //  * Allow tilde expansion?
     /// Parses a word token.
     ///
-    /// `is_delimiter` is a function that decides a character is a delimiter. The word ends when an
-    /// unquoted delimiter is found. To parse a normal word token, you should pass
-    /// [`is_token_delimiter_char`] as `is_delimiter`. Other functions can be passed to parse a
-    /// word that ends with different delimiters.
+    /// `is_delimiter` is a function that decides which character is a delimiter.
+    /// The word ends when an unquoted delimiter is found. To parse a normal word
+    /// token, you should pass [`is_token_delimiter_char`] as `is_delimiter`.
+    /// Other functions can be passed to parse a word that ends with different
+    /// delimiters.
+    ///
+    /// This function does not parse any tilde expansions in the word.
+    /// To parse them, you need to call [`Word::parse_tilde_front`] or
+    /// [`Word::parse_tilde_everywhere`] on the resultant word.
     pub async fn word<F>(&mut self, mut is_delimiter: F) -> Result<Word>
     where
         F: FnMut(char) -> bool,
@@ -873,7 +877,8 @@ impl Lexer {
         }
 
         let index = self.index();
-        let word = self.word(is_token_delimiter_char).await?;
+        let mut word = self.word(is_token_delimiter_char).await?;
+        word.parse_tilde_front();
         let id = self.token_id(&word).await?;
         Ok(Token { word, id, index })
     }
@@ -2433,6 +2438,21 @@ mod tests {
         assert_eq!(t.index, 0);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ' ');
+    }
+
+    #[test]
+    fn lexer_token_tilde() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "~a:~");
+
+        let t = block_on(lexer.token()).unwrap();
+        assert_eq!(
+            t.word.units,
+            [
+                WordUnit::Tilde("a".to_string()),
+                WordUnit::Unquoted(TextUnit::Literal(':')),
+                WordUnit::Unquoted(TextUnit::Literal('~'))
+            ]
+        );
     }
 
     #[test]

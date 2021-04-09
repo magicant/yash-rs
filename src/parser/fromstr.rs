@@ -76,6 +76,12 @@ impl FromStr for WordUnit {
 
 impl FromStr for Word {
     type Err = Error;
+
+    /// Converts a string to a word.
+    ///
+    /// This function does not parse any tilde expansions in the word.
+    /// To parse them, you need to call [`Word::parse_tilde_front`] or
+    /// [`Word::parse_tilde_everywhere`] on the resultant word.
     fn from_str(s: &str) -> Result<Word, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         block_on(lexer.word(|_| false))
