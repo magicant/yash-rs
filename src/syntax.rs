@@ -858,7 +858,12 @@ mod tests {
 
     #[test]
     fn word_unquote() {
-        let word = Word::from_str(r#"~a/b\c'd'"e""#).unwrap();
+        let mut word = Word::from_str(r#"~a/b\c'd'"e""#).unwrap();
+        let (unquoted, is_quoted) = word.unquote();
+        assert_eq!(unquoted, "~a/bcde");
+        assert_eq!(is_quoted, true);
+
+        word.parse_tilde_front();
         let (unquoted, is_quoted) = word.unquote();
         assert_eq!(unquoted, "~a/bcde");
         assert_eq!(is_quoted, true);
