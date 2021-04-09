@@ -559,7 +559,12 @@ pub enum CompoundCommand<H = HereDoc> {
     Grouping(List<H>),
     /// Command for executing commands in a subshell.
     Subshell(List<H>),
-    // TODO for
+    /// For loop.
+    For {
+        name: Word,
+        values: Option<Vec<Word>>,
+        body: List<H>,
+    },
     /// While loop.
     While { condition: List<H>, body: List<H> },
     /// Until loop.
@@ -575,6 +580,17 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
         match self {
             Grouping(list) => write!(f, "{{ {:#} }}", list),
             Subshell(list) => write!(f, "({})", list),
+            For { name, values, body } => {
+                write!(f, "for {}", name)?;
+                if let Some(values) = values {
+                    f.write_str(" in")?;
+                    for value in values {
+                        write!(f, " {}", value)?;
+                    }
+                    f.write_str(";")?;
+                }
+                write!(f, " do {:#} done", body)
+            }
             While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
             Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
         }
@@ -1127,6 +1143,36 @@ mod tests {
         let list = "foo".parse::<List>().unwrap();
         let grouping = CompoundCommand::Grouping(list);
         assert_eq!(grouping.to_string(), "{ foo; }");
+    }
+
+    #[test]
+    fn for_display_without_values() {
+        let name = Word::from_str("foo").unwrap();
+        let values = None;
+        let body = "echo ok".parse::<List>().unwrap();
+        let r#for = CompoundCommand::For { name, values, body };
+        assert_eq!(r#for.to_string(), "for foo do echo ok; done");
+    }
+
+    #[test]
+    fn for_display_with_empty_values() {
+        let name = Word::from_str("foo").unwrap();
+        let values = Some(vec![]);
+        let body = "echo ok".parse::<List>().unwrap();
+        let r#for = CompoundCommand::For { name, values, body };
+        assert_eq!(r#for.to_string(), "for foo in; do echo ok; done");
+    }
+
+    #[test]
+    fn for_display_with_some_values() {
+        let name = Word::from_str("V").unwrap();
+        let values = Some(vec![
+            Word::from_str("a").unwrap(),
+            Word::from_str("b").unwrap(),
+        ]);
+        let body = "one; two&".parse::<List>().unwrap();
+        let r#for = CompoundCommand::For { name, values, body };
+        assert_eq!(r#for.to_string(), "for V in a b; do one; two& done");
     }
 
     #[test]
