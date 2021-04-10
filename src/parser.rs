@@ -355,6 +355,42 @@ impl Parser<'_> {
         Ok(Some(list))
     }
 
+    /// Parses a for loop.
+    ///
+    /// The next token must be the `for` reserved word.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not `for`.
+    async fn for_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token_raw().await?;
+        assert_eq!(open.id, Token(Some(For)));
+
+        let name = self.take_token_auto(&[]).await?;
+        match name.id {
+            EndOfInput | Operator(Newline) | Operator(Semicolon) => {
+                let cause = SyntaxError::MissingForName.into();
+                let location = name.word.location;
+                return Err(Error { cause, location });
+            }
+            Operator(_) => {
+                let cause = SyntaxError::InvalidForName.into();
+                let location = name.word.location;
+                return Err(Error { cause, location });
+            }
+            Token(_) | IoNumber => (),
+        }
+        let name = name.word;
+        // TODO reject non-portable names in POSIXly-correct mode
+
+        let values = None;
+
+        let body = self.do_clause().await?;
+        let body = body.unwrap(); // TODO return a proper error
+
+        Ok(CompoundCommand::For { name, values, body })
+    }
+
     /// Parses a while loop.
     ///
     /// The next token must be the `while` reserved word.
@@ -434,6 +470,7 @@ impl Parser<'_> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
             Operator(OpenParen) => self.subshell().await.map(Some),
+            Token(Some(For)) => self.for_loop().await.map(Some),
             Token(Some(While)) => self.while_loop().await.map(Some),
             Token(Some(Until)) => self.until_loop().await.map(Some),
             _ => Ok(None),
@@ -1711,6 +1748,77 @@ mod tests {
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_short() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for A do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "A");
+            assert_eq!(values, None);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_missing_name_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " for ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
+        assert_eq!(e.location.line.value, " for ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 6);
+    }
+
+    #[test]
+    fn parser_for_loop_missing_name_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " for\ndo :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
+        assert_eq!(e.location.line.value, " for\n");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn parser_for_loop_missing_name_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
+        assert_eq!(e.location.line.value, "for; do :; done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
+    }
+
+    #[test]
+    fn parser_for_loop_invalid_name() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for & do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
+        assert_eq!(e.location.line.value, "for & do :; done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
