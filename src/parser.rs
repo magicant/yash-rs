@@ -385,9 +385,20 @@ impl Parser<'_> {
 
         let values = None;
 
-        // TODO handle aliases
-        if self.peek_token().await?.id == Operator(Semicolon) {
-            self.take_token_auto(&[]).await?;
+        loop {
+            match self.peek_token().await?.id {
+                Operator(Semicolon) => {
+                    self.take_token_raw().await?;
+                    break;
+                }
+                Operator(Newline) | Token(Some(Do)) => {
+                    break;
+                }
+                _ => match self.take_token_manual(false).await? {
+                    Rec::AliasSubstituted => (),
+                    Rec::Parsed(_) => todo!("Return a proper error"),
+                },
+            }
         }
 
         let body = loop {
@@ -1836,6 +1847,36 @@ mod tests {
         } else {
             panic!("Not a for loop: {:?}", result);
         }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_aliasing_on_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " FOR_A if :; done");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "if".to_string(),
+            " ;\n\ndo".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "FOR_A".to_string(),
+            "for A ".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        assert_eq!(result.to_string(), "for A do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
