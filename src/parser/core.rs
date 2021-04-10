@@ -109,15 +109,11 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
-            UnclosedSingleQuote {
-                opening_location: _,
-            } => f.write_str("The single quote is not closed."),
-            UnclosedDoubleQuote {
-                opening_location: _,
-            } => f.write_str("The double quote is not closed."),
-            UnclosedCommandSubstitution {
-                opening_location: _,
-            } => f.write_str("The command substitution is not closed"),
+            UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed."),
+            UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed."),
+            UnclosedCommandSubstitution { .. } => {
+                f.write_str("The command substitution is not closed")
+            }
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
@@ -125,23 +121,15 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The here-document operator is missing its delimiter")
             }
             MissingHereDocContent => f.write_str("Content of the here-document is missing"),
-            UnclosedHereDocContent {
-                redir_op_location: _,
-            } => f.write_str("The delimiter to close the here-document content is missing"),
-            UnclosedArrayValue {
-                opening_location: _,
-            } => f.write_str("The array assignment value is not closed"),
-            UnclosedGrouping {
-                opening_location: _,
-            } => f.write_str("The grouping is not closed"),
+            UnclosedHereDocContent { .. } => {
+                f.write_str("The delimiter to close the here-document content is missing")
+            }
+            UnclosedArrayValue { .. } => f.write_str("The array assignment value is not closed"),
+            UnclosedGrouping { .. } => f.write_str("The grouping is not closed"),
             EmptyGrouping => f.write_str("The grouping is missing its content"),
-            UnclosedSubshell {
-                opening_location: _,
-            } => f.write_str("The subshell is not closed"),
+            UnclosedSubshell { .. } => f.write_str("The subshell is not closed"),
             EmptySubshell => f.write_str("The subshell is missing its content"),
-            UnclosedDoClause {
-                opening_location: _,
-            } => f.write_str("The `do` clause is missing its closing `done`"),
+            UnclosedDoClause { .. } => f.write_str("The `do` clause is missing its closing `done`"),
             EmptyDoClause => f.write_str("The `do` clause is missing its content"),
             MissingForName => f.write_str("The variable name is missing in the `for` loop"),
             InvalidForName => f.write_str("The variable name is invalid"),
@@ -151,13 +139,13 @@ impl fmt::Display for SyntaxError {
             MissingForBody {
                 opening_location: _,
             } => f.write_str("The `for` loop is missing its `do` clause"),
-            UnclosedWhileClause {
-                opening_location: _,
-            } => f.write_str("The `while` loop is missing its `do` clause"),
+            UnclosedWhileClause { .. } => {
+                f.write_str("The `while` loop is missing its `do` clause")
+            }
             EmptyWhileCondition => f.write_str("The `while` loop is missing its condition"),
-            UnclosedUntilClause {
-                opening_location: _,
-            } => f.write_str("The `until` loop is missing its `do` clause"),
+            UnclosedUntilClause { .. } => {
+                f.write_str("The `until` loop is missing its `do` clause")
+            }
             EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
             UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
             MissingFunctionBody => f.write_str("The function body is missing"),
