@@ -385,6 +385,13 @@ impl Parser<'_> {
 
         let values = None;
 
+        // TODO handle aliases
+        if self.peek_token().await?.id == Operator(Semicolon) {
+            self.take_token_auto(&[]).await?;
+        }
+
+        while self.newline_and_here_doc_contents().await? {}
+
         let body = self.do_clause().await?;
         let body = body.unwrap(); // TODO return a proper error
 
@@ -1759,6 +1766,63 @@ mod tests {
         let result = result.fill(&mut std::iter::empty()).unwrap();
         if let CompoundCommand::For { name, values, body } = result {
             assert_eq!(name.to_string(), "A");
+            assert_eq!(values, None);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_with_semicolon_before_do() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for B ; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "B");
+            assert_eq!(values, None);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_with_semicolon_and_newlines_before_do() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for B ; \n\t\n do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "B");
+            assert_eq!(values, None);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_with_newlines_before_do() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for B \n \\\n \n do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
             assert_eq!(body.to_string(), ":")
         } else {
