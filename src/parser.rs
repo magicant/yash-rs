@@ -413,16 +413,19 @@ impl Parser<'_> {
         // Parse values until a delimiter is found
         let mut values = Vec::new();
         loop {
-            match self.peek_token().await?.id {
-                Token(_) => {
-                    let value = self.take_token_auto(&[]).await?;
-                    values.push(value.word);
+            let next = self.take_token_auto(&[]).await?;
+            match next.id {
+                Token(_) | IoNumber => {
+                    values.push(next.word);
                 }
                 Operator(Semicolon) | Operator(Newline) => {
-                    self.take_token_raw().await?;
                     return Ok(Some(values));
                 }
-                _ => todo!("Return a proper error"), // TODO alias
+                _ => {
+                    let cause = SyntaxError::InvalidForValue.into();
+                    let location = next.word.location;
+                    return Err(Error { cause, location });
+                }
             }
         }
     }
@@ -2091,6 +2094,45 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn parser_for_loop_invalid_values_delimiter() {
+        // Alias substitution results in "for A in a b & c; do :; done"
+        let mut lexer = Lexer::with_source(Source::Unknown, "for_A_in_a_b if c; do :; done");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "for_A_in_a_b".to_string(),
+            "for A in a b ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "if".to_string(),
+            "&".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForValue));
+        assert_eq!(e.location.line.value, "&");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.column.get(), 1);
+        if let Source::Alias { original, alias } = &e.location.line.source {
+            assert_eq!(original.line.value, "for_A_in_a_b if c; do :; done");
+            assert_eq!(original.line.number.get(), 1);
+            assert_eq!(original.line.source, Source::Unknown);
+            assert_eq!(original.column.get(), 14);
+            assert_eq!(alias.name, "if");
+        } else {
+            panic!("Not an alias: {:?}", e.location.line.source);
+        }
     }
 
     #[test]
