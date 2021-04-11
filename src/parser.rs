@@ -29,6 +29,7 @@ use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
 use self::lex::TokenId::*;
 use super::syntax::*;
+use crate::source::Location;
 use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
@@ -383,13 +384,12 @@ impl Parser<'_> {
     ///
     /// For the values to be parsed, the first token should be `in`. Otherwise,
     /// the result will be `None`.
-    async fn for_loop_values(&mut self) -> Result<Option<Vec<Word>>> {
-        // TODO Test for a semicolon at the beginning only
-
+    async fn for_loop_values(&mut self, opening_location: Location) -> Result<Option<Vec<Word>>> {
         // Parse the `in`
+        let mut first_line = true;
         loop {
             match self.peek_token().await?.id {
-                Operator(Semicolon) => {
+                Operator(Semicolon) if first_line => {
                     self.take_token_raw().await?;
                     return Ok(None);
                 }
@@ -398,6 +398,7 @@ impl Parser<'_> {
                 }
                 Operator(Newline) => {
                     assert!(self.newline_and_here_doc_contents().await?);
+                    first_line = false;
                 }
                 Token(Some(In)) => {
                     self.take_token_raw().await?;
@@ -405,7 +406,12 @@ impl Parser<'_> {
                 }
                 _ => match self.take_token_manual(false).await? {
                     Rec::AliasSubstituted => (),
-                    Rec::Parsed(_) => todo!("Return a proper error"),
+                    Rec::Parsed(token) => {
+                        // TODO let this error happen in for_loop_body
+                        let cause = SyntaxError::MissingForBody { opening_location }.into();
+                        let location = token.word.location;
+                        return Err(Error { cause, location });
+                    }
                 },
             }
         }
@@ -458,7 +464,7 @@ impl Parser<'_> {
         assert_eq!(open.id, Token(Some(For)));
 
         let name = self.for_loop_name().await?;
-        let values = self.for_loop_values().await?;
+        let values = self.for_loop_values(open.word.location).await?;
         let body = self.for_loop_body().await?;
         Ok(CompoundCommand::For { name, values, body })
     }
@@ -2139,6 +2145,26 @@ mod tests {
         } else {
             panic!("Not an alias: {:?}", e.location.line.source);
         }
+    }
+
+    #[test]
+    fn parser_for_loop_semicolon_after_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for X\n; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
+            assert_eq!(opening_location.line.value, "for X\n");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Not MissingForBody: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "; do :; done");
+        assert_eq!(e.location.line.number.get(), 2);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
     }
 
     #[test]
