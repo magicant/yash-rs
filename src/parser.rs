@@ -2085,15 +2085,41 @@ mod tests {
 
     #[test]
     fn parser_for_loop_invalid_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "for & do :; done");
-        let mut parser = Parser::new(&mut lexer);
+        // Alias substitution results in "for & do :; done"
+        let mut lexer = Lexer::with_source(Source::Unknown, "FOR if do :; done");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "FOR".to_string(),
+            "for ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "if".to_string(),
+            "&".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
-        assert_eq!(e.location.line.value, "for & do :; done");
+        assert_eq!(e.location.line.value, "&");
         assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(e.location.column.get(), 1);
+        if let Source::Alias { original, alias } = &e.location.line.source {
+            assert_eq!(original.line.value, "FOR if do :; done");
+            assert_eq!(original.line.number.get(), 1);
+            assert_eq!(original.line.source, Source::Unknown);
+            assert_eq!(original.column.get(), 5);
+            assert_eq!(alias.name, "if");
+        } else {
+            panic!("Not an alias: {:?}", e.location.line.source);
+        }
     }
 
     #[test]
