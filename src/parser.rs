@@ -1985,6 +1985,25 @@ mod tests {
     }
 
     #[test]
+    fn parser_for_loop_newlines_before_in() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for foo\n \n\nin\ndo :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "foo");
+            assert_eq!(values, Some(vec![]));
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
     fn parser_for_loop_aliasing_on_semicolon() {
         let mut lexer = Lexer::with_source(Source::Unknown, " FOR_A if :; done");
         let mut aliases = AliasSet::new();
