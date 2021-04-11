@@ -410,22 +410,19 @@ impl Parser<'_> {
             }
         }
 
+        // Parse values until a delimiter is found
         let mut values = Vec::new();
-        // TODO parse more values
-        if let Token(_) = self.peek_token().await?.id {
-            let value = self.take_token_auto(&[]).await?;
-            values.push(value.word);
-        }
-
-        // Parse the delimiter, that is, a semicolon or newline
         loop {
             match self.peek_token().await?.id {
-                Operator(Semicolon) => {
+                Token(_) => {
+                    let value = self.take_token_auto(&[]).await?;
+                    values.push(value.word);
+                }
+                Operator(Semicolon) | Operator(Newline) => {
                     self.take_token_raw().await?;
                     return Ok(Some(values));
                 }
-                _ => todo!(), // TODO newline
-                              // TODO alias
+                _ => todo!("Return a proper error"), // TODO alias
             }
         }
     }
@@ -1941,8 +1938,48 @@ mod tests {
         assert_eq!(next.id, EndOfInput);
     }
 
-    // TODO parser_for_loop_with_many_values_delimited_by_one_newline
-    // TODO parser_for_loop_with_zero_values_delimited_by_many_newlines
+    #[test]
+    fn parser_for_loop_with_many_values_delimited_by_one_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for in in in a b c\ndo :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "in");
+            let values = values
+                .unwrap()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>();
+            assert_eq!(values, vec!["in", "a", "b", "c"]);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_with_zero_values_delimited_by_many_newlines() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for foo in \n \n \n do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "foo");
+            assert_eq!(values, Some(vec![]));
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
 
     #[test]
     fn parser_for_loop_aliasing_on_semicolon() {
