@@ -355,6 +355,22 @@ impl Parser<'_> {
         Ok(Some(list))
     }
 
+    /// Parses the body of a for loop, possibly preceded by newlines.
+    async fn for_loop_body(&mut self) -> Result<List<MissingHereDoc>> {
+        loop {
+            while self.newline_and_here_doc_contents().await? {}
+
+            if let Some(body) = self.do_clause().await? {
+                return Ok(body);
+            }
+
+            match self.take_token_manual(false).await? {
+                Rec::AliasSubstituted => (),
+                Rec::Parsed(_) => todo!("Return a proper error"),
+            }
+        }
+    }
+
     /// Parses a for loop.
     ///
     /// The next token must be the `for` reserved word.
@@ -401,18 +417,7 @@ impl Parser<'_> {
             }
         }
 
-        let body = loop {
-            while self.newline_and_here_doc_contents().await? {}
-
-            if let Some(body) = self.do_clause().await? {
-                break body;
-            }
-
-            match self.take_token_manual(false).await? {
-                Rec::AliasSubstituted => (),
-                Rec::Parsed(_) => todo!("Return a proper error"),
-            }
-        };
+        let body = self.for_loop_body().await?;
 
         Ok(CompoundCommand::For { name, values, body })
     }
