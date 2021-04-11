@@ -355,6 +355,30 @@ impl Parser<'_> {
         Ok(Some(list))
     }
 
+    /// Parses the name of a for loop.
+    async fn for_loop_name(&mut self) -> Result<Word> {
+        let name = self.take_token_auto(&[]).await?;
+
+        // Validate the token type
+        match name.id {
+            EndOfInput | Operator(Newline) | Operator(Semicolon) => {
+                let cause = SyntaxError::MissingForName.into();
+                let location = name.word.location;
+                return Err(Error { cause, location });
+            }
+            Operator(_) => {
+                let cause = SyntaxError::InvalidForName.into();
+                let location = name.word.location;
+                return Err(Error { cause, location });
+            }
+            Token(_) | IoNumber => (),
+        }
+
+        // TODO reject non-portable names in POSIXly-correct mode
+
+        Ok(name.word)
+    }
+
     /// Parses the values of a for loop.
     ///
     /// For the values to be parsed, the first token should be `in`. Otherwise,
@@ -428,23 +452,7 @@ impl Parser<'_> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(For)));
 
-        let name = self.take_token_auto(&[]).await?;
-        match name.id {
-            EndOfInput | Operator(Newline) | Operator(Semicolon) => {
-                let cause = SyntaxError::MissingForName.into();
-                let location = name.word.location;
-                return Err(Error { cause, location });
-            }
-            Operator(_) => {
-                let cause = SyntaxError::InvalidForName.into();
-                let location = name.word.location;
-                return Err(Error { cause, location });
-            }
-            Token(_) | IoNumber => (),
-        }
-        let name = name.word;
-        // TODO reject non-portable names in POSIXly-correct mode
-
+        let name = self.for_loop_name().await?;
         let values = self.for_loop_values().await?;
         let body = self.for_loop_body().await?;
         Ok(CompoundCommand::For { name, values, body })
