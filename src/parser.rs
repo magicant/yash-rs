@@ -355,6 +355,52 @@ impl Parser<'_> {
         Ok(Some(list))
     }
 
+    /// Parses the values of a for loop.
+    ///
+    /// For the values to be parsed, the first token should be `in`. Otherwise,
+    /// the result will be `None`.
+    async fn for_loop_values(&mut self) -> Result<Option<Vec<Word>>> {
+        // TODO Test for a semicolon at the beginning only
+
+        // Parse the `in`
+        loop {
+            match self.peek_token().await?.id {
+                Operator(Semicolon) => {
+                    self.take_token_raw().await?;
+                    return Ok(None);
+                }
+                Token(Some(Do)) => {
+                    return Ok(None);
+                }
+                Operator(Newline) => {
+                    assert!(self.newline_and_here_doc_contents().await?);
+                }
+                Token(Some(In)) => {
+                    self.take_token_raw().await?;
+                    break;
+                }
+                _ => match self.take_token_manual(false).await? {
+                    Rec::AliasSubstituted => (),
+                    Rec::Parsed(_) => todo!("Return a proper error"),
+                },
+            }
+        }
+
+        // TODO parse values
+
+        // Parse the delimiter, that is, a semicolon or newline
+        loop {
+            match self.peek_token().await?.id {
+                Operator(Semicolon) => {
+                    self.take_token_raw().await?;
+                    return Ok(Some(vec![]));
+                }
+                _ => todo!(), // TODO newline
+                              // TODO alias
+            }
+        }
+    }
+
     /// Parses the body of a for loop, possibly preceded by newlines.
     async fn for_loop_body(&mut self) -> Result<List<MissingHereDoc>> {
         loop {
@@ -399,26 +445,8 @@ impl Parser<'_> {
         let name = name.word;
         // TODO reject non-portable names in POSIXly-correct mode
 
-        let values = None;
-
-        loop {
-            match self.peek_token().await?.id {
-                Operator(Semicolon) => {
-                    self.take_token_raw().await?;
-                    break;
-                }
-                Operator(Newline) | Token(Some(Do)) => {
-                    break;
-                }
-                _ => match self.take_token_manual(false).await? {
-                    Rec::AliasSubstituted => (),
-                    Rec::Parsed(_) => todo!("Return a proper error"),
-                },
-            }
-        }
-
+        let values = self.for_loop_values().await?;
         let body = self.for_loop_body().await?;
-
         Ok(CompoundCommand::For { name, values, body })
     }
 
@@ -1848,6 +1876,25 @@ mod tests {
         if let CompoundCommand::For { name, values, body } = result {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_for_loop_with_zero_values_delimited_by_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for foo in; do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "foo");
+            assert_eq!(values, Some(vec![]));
             assert_eq!(body.to_string(), ":")
         } else {
             panic!("Not a for loop: {:?}", result);
