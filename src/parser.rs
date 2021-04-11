@@ -382,19 +382,25 @@ impl Parser<'_> {
 
     /// Parses the values of a for loop.
     ///
-    /// For the values to be parsed, the first token should be `in`. Otherwise,
+    /// For the values to be parsed, the first token needs to be `in`. Otherwise,
     /// the result will be `None`.
-    async fn for_loop_values(&mut self, opening_location: Location) -> Result<Option<Vec<Word>>> {
+    ///
+    /// If successful, `opening_location` is returned intact as the second value
+    /// of the tuple.
+    async fn for_loop_values(
+        &mut self,
+        opening_location: Location,
+    ) -> Result<(Option<Vec<Word>>, Location)> {
         // Parse the `in`
         let mut first_line = true;
         loop {
             match self.peek_token().await?.id {
                 Operator(Semicolon) if first_line => {
                     self.take_token_raw().await?;
-                    return Ok(None);
+                    return Ok((None, opening_location));
                 }
                 Token(Some(Do)) => {
-                    return Ok(None);
+                    return Ok((None, opening_location));
                 }
                 Operator(Newline) => {
                     assert!(self.newline_and_here_doc_contents().await?);
@@ -407,7 +413,6 @@ impl Parser<'_> {
                 _ => match self.take_token_manual(false).await? {
                     Rec::AliasSubstituted => (),
                     Rec::Parsed(token) => {
-                        // TODO let this error happen in for_loop_body
                         let cause = SyntaxError::MissingForBody { opening_location }.into();
                         let location = token.word.location;
                         return Err(Error { cause, location });
@@ -425,7 +430,7 @@ impl Parser<'_> {
                     values.push(next.word);
                 }
                 Operator(Semicolon) | Operator(Newline) => {
-                    return Ok(Some(values));
+                    return Ok((Some(values), opening_location));
                 }
                 _ => {
                     let cause = SyntaxError::InvalidForValue.into();
@@ -437,7 +442,7 @@ impl Parser<'_> {
     }
 
     /// Parses the body of a for loop, possibly preceded by newlines.
-    async fn for_loop_body(&mut self) -> Result<List<MissingHereDoc>> {
+    async fn for_loop_body(&mut self, opening_location: Location) -> Result<List<MissingHereDoc>> {
         loop {
             while self.newline_and_here_doc_contents().await? {}
 
@@ -447,7 +452,11 @@ impl Parser<'_> {
 
             match self.take_token_manual(false).await? {
                 Rec::AliasSubstituted => (),
-                Rec::Parsed(_) => todo!("Return a proper error"),
+                Rec::Parsed(token) => {
+                    let cause = SyntaxError::MissingForBody { opening_location }.into();
+                    let location = token.word.location;
+                    return Err(Error { cause, location });
+                }
             }
         }
     }
@@ -462,10 +471,11 @@ impl Parser<'_> {
     async fn for_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(For)));
+        let opening_location = open.word.location;
 
         let name = self.for_loop_name().await?;
-        let values = self.for_loop_values(open.word.location).await?;
-        let body = self.for_loop_body().await?;
+        let (values, opening_location) = self.for_loop_values(opening_location).await?;
+        let body = self.for_loop_body(opening_location).await?;
         Ok(CompoundCommand::For { name, values, body })
     }
 
@@ -2204,6 +2214,26 @@ mod tests {
         } else {
             panic!("Not an alias: {:?}", e.location.line.source);
         }
+    }
+
+    #[test]
+    fn parser_for_loop_invalid_token_after_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " for X; ! do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
+            assert_eq!(opening_location.line.value, " for X; ! do :; done");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("Not MissingForBody: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, " for X; ! do :; done");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 9);
     }
 
     #[test]
