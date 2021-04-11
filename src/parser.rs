@@ -410,14 +410,19 @@ impl Parser<'_> {
             }
         }
 
-        // TODO parse values
+        let mut values = Vec::new();
+        // TODO parse more values
+        if let Token(_) = self.peek_token().await?.id {
+            let value = self.take_token_auto(&[]).await?;
+            values.push(value.word);
+        }
 
         // Parse the delimiter, that is, a semicolon or newline
         loop {
             match self.peek_token().await?.id {
                 Operator(Semicolon) => {
                     self.take_token_raw().await?;
-                    return Ok(Some(vec![]));
+                    return Ok(Some(values));
                 }
                 _ => todo!(), // TODO newline
                               // TODO alias
@@ -1911,6 +1916,33 @@ mod tests {
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
     }
+
+    #[test]
+    fn parser_for_loop_with_one_value_delimited_by_semicolon_and_newlines() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "for foo in bar; \n \n do :; done");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::For { name, values, body } = result {
+            assert_eq!(name.to_string(), "foo");
+            let values = values
+                .unwrap()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>();
+            assert_eq!(values, vec!["bar"]);
+            assert_eq!(body.to_string(), ":")
+        } else {
+            panic!("Not a for loop: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    // TODO parser_for_loop_with_many_values_delimited_by_one_newline
+    // TODO parser_for_loop_with_zero_values_delimited_by_many_newlines
 
     #[test]
     fn parser_for_loop_aliasing_on_semicolon() {
