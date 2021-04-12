@@ -71,6 +71,14 @@ pub enum SyntaxError {
     UnclosedDoClause { opening_location: Location },
     /// A do clause contains no commands.
     EmptyDoClause,
+    /// The variable name is missing in a for loop.
+    MissingForName,
+    /// The variable name is not a valid word in a for loop.
+    InvalidForName,
+    /// A value is not a valid word in a for loop.
+    InvalidForValue,
+    /// A for loop is missing a do clause.
+    MissingForBody { opening_location: Location },
     /// A while loop is missing a do clause.
     UnclosedWhileClause { opening_location: Location },
     /// A while loop's condition is empty.
@@ -123,6 +131,14 @@ impl fmt::Display for SyntaxError {
             EmptySubshell => f.write_str("The subshell is missing its content"),
             UnclosedDoClause { .. } => f.write_str("The `do` clause is missing its closing `done`"),
             EmptyDoClause => f.write_str("The `do` clause is missing its content"),
+            MissingForName => f.write_str("The variable name is missing in the `for` loop"),
+            InvalidForName => f.write_str("The variable name is invalid"),
+            InvalidForValue => {
+                f.write_str("The operator token is invalid in the word list of the `for` loop")
+            }
+            MissingForBody {
+                opening_location: _,
+            } => f.write_str("The `for` loop is missing its `do` clause"),
             UnclosedWhileClause { .. } => {
                 f.write_str("The `while` loop is missing its `do` clause")
             }
