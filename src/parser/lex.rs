@@ -690,12 +690,17 @@ impl Lexer {
             Some(c) => c.location.clone(),
         };
 
-        // TODO check for the closing backquote
-        self.peek_char().await?;
-        self.consume_char();
-
         let content = Vec::new();
-        Ok(Some(TextUnit::Backquote { content, location }))
+        if self.consume_char_if(|c| c == '`').await?.is_some() {
+            Ok(Some(TextUnit::Backquote { content, location }))
+        } else {
+            let cause = SyntaxError::UnclosedBackquote {
+                opening_location: location,
+            }
+            .into();
+            let location = self.location().await?.clone();
+            Err(Error { cause, location })
+        }
     }
 
     // TODO Backquote command substitution.
@@ -2016,6 +2021,24 @@ mod tests {
         }
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_backquote_unclosed_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "`");
+        let e = block_on(lexer.backquote(false)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "`");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "`");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
     }
 
     #[test]
