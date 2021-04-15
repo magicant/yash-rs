@@ -673,6 +673,31 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a command substitution of the form `` `...` ``.
+    ///
+    /// If the next character is a backquote, the command substitution is parsed
+    /// up to the closing backquote (inclusive). It is a syntax error if there is
+    /// no closing backquote.
+    ///
+    /// Between the backquotes, only backslashes can have special meanings. A
+    /// backslash followed by a newline is parsed as line continuation. A
+    /// backslash is an escape character if it precedes a dollar, backquote, or
+    /// another backslash. If `double_quote_escapable` is true, double quotes can
+    /// also be backslash-escaped.
+    pub async fn backquote(&mut self, _double_quote_escapable: bool) -> Result<Option<TextUnit>> {
+        let location = match self.consume_char_if(|c| c == '`').await? {
+            None => return Ok(None),
+            Some(c) => c.location.clone(),
+        };
+
+        // TODO check for the closing backquote
+        self.peek_char().await?;
+        self.consume_char();
+
+        let content = Vec::new();
+        Ok(Some(TextUnit::Backquote { content, location }))
+    }
+
     // TODO Backquote command substitution.
     /// Parses a [`TextUnit`].
     ///
@@ -1969,6 +1994,27 @@ mod tests {
         } else {
             panic!("unexpected result {:?}", result);
         }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_backquote_not_backquote() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "X");
+        let result = block_on(lexer.backquote(false)).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lexer_backquote_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "``");
+        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        if let TextUnit::Backquote { content, location } = result {
+            assert_eq!(content, []);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
