@@ -690,16 +690,22 @@ impl Lexer {
             Some(c) => c.location.clone(),
         };
 
-        let content = Vec::new();
-        if self.consume_char_if(|c| c == '`').await?.is_some() {
-            Ok(Some(TextUnit::Backquote { content, location }))
-        } else {
-            let cause = SyntaxError::UnclosedBackquote {
-                opening_location: location,
+        let mut content = Vec::new();
+        loop {
+            if let Some(&SourceChar { value, .. }) = self.peek_char().await? {
+                self.consume_char();
+                match value {
+                    '`' => return Ok(Some(TextUnit::Backquote { content, location })),
+                    _ => content.push(BackquoteUnit::Literal(value)),
+                }
+            } else {
+                let cause = SyntaxError::UnclosedBackquote {
+                    opening_location: location,
+                }
+                .into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
             }
-            .into();
-            let location = self.location().await?.clone();
-            Err(Error { cause, location })
         }
     }
 
@@ -2024,6 +2030,31 @@ mod tests {
     }
 
     #[test]
+    fn lexer_backquote_literals() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "`echo`");
+        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        if let TextUnit::Backquote { content, location } = result {
+            assert_eq!(
+                content,
+                [
+                    BackquoteUnit::Literal('e'),
+                    BackquoteUnit::Literal('c'),
+                    BackquoteUnit::Literal('h'),
+                    BackquoteUnit::Literal('o')
+                ]
+            );
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    // TODO lexer_backquote_with_escapes_double_quote_escapable
+    // TODO lexer_backquote_with_escapes_double_quote_not_escapable
+
+    #[test]
     fn lexer_backquote_unclosed_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "`");
         let e = block_on(lexer.backquote(false)).unwrap_err();
@@ -2039,6 +2070,24 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn lexer_backquote_unclosed_nonempty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "`foo");
+        let e = block_on(lexer.backquote(false)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "`foo");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "`foo");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
