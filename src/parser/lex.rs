@@ -684,19 +684,40 @@ impl Lexer {
     /// backslash is an escape character if it precedes a dollar, backquote, or
     /// another backslash. If `double_quote_escapable` is true, double quotes can
     /// also be backslash-escaped.
-    pub async fn backquote(&mut self, _double_quote_escapable: bool) -> Result<Option<TextUnit>> {
+    pub async fn backquote(&mut self, double_quote_escapable: bool) -> Result<Option<TextUnit>> {
         let location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
         };
 
         let mut content = Vec::new();
+        let mut after_backslash = false;
         loop {
             if let Some(&SourceChar { value, .. }) = self.peek_char().await? {
                 self.consume_char();
-                match value {
-                    '`' => return Ok(Some(TextUnit::Backquote { content, location })),
-                    _ => content.push(BackquoteUnit::Literal(value)),
+                if after_backslash {
+                    match value {
+                        '$' | '`' | '\\' => {
+                            content.push(BackquoteUnit::Backslashed(value));
+                        }
+                        '"' if double_quote_escapable => {
+                            content.push(BackquoteUnit::Backslashed(value));
+                        }
+                        _ => {
+                            content.push(BackquoteUnit::Literal('\\'));
+                            content.push(BackquoteUnit::Literal(value));
+                        }
+                    }
+                    after_backslash = false;
+                } else {
+                    match value {
+                        '`' => return Ok(Some(TextUnit::Backquote { content, location })),
+                        '\\' => after_backslash = true,
+                        _ => {
+                            after_backslash = false;
+                            content.push(BackquoteUnit::Literal(value));
+                        }
+                    }
                 }
             } else {
                 let cause = SyntaxError::UnclosedBackquote {
@@ -2051,8 +2072,61 @@ mod tests {
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
-    // TODO lexer_backquote_with_escapes_double_quote_escapable
-    // TODO lexer_backquote_with_escapes_double_quote_not_escapable
+    #[test]
+    fn lexer_backquote_with_escapes_double_quote_escapable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let result = block_on(lexer.backquote(true)).unwrap().unwrap();
+        if let TextUnit::Backquote { content, location } = result {
+            assert_eq!(
+                content,
+                [
+                    BackquoteUnit::Literal('a'),
+                    BackquoteUnit::Literal('\\'),
+                    BackquoteUnit::Literal('a'),
+                    BackquoteUnit::Backslashed('$'),
+                    BackquoteUnit::Backslashed('`'),
+                    BackquoteUnit::Backslashed('\\'),
+                    BackquoteUnit::Backslashed('"'),
+                    BackquoteUnit::Literal('\\'),
+                    BackquoteUnit::Literal('\'')
+                ]
+            );
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_backquote_with_escapes_double_quote_not_escapable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        if let TextUnit::Backquote { content, location } = result {
+            assert_eq!(
+                content,
+                [
+                    BackquoteUnit::Literal('a'),
+                    BackquoteUnit::Literal('\\'),
+                    BackquoteUnit::Literal('a'),
+                    BackquoteUnit::Backslashed('$'),
+                    BackquoteUnit::Backslashed('`'),
+                    BackquoteUnit::Backslashed('\\'),
+                    BackquoteUnit::Literal('\\'),
+                    BackquoteUnit::Literal('"'),
+                    BackquoteUnit::Literal('\\'),
+                    BackquoteUnit::Literal('\'')
+                ]
+            );
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+    // TODO lexer_backquote_line_continuation
 
     #[test]
     fn lexer_backquote_unclosed_empty() {
