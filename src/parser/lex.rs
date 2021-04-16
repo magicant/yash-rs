@@ -702,8 +702,6 @@ impl Lexer {
             if let Some(c) = self.consume_char_if(is_escapable).await? {
                 return Ok(Some(Backslashed(c.value)));
             } else {
-                // The backslash is trying to escape the end of input!
-                // We treat the backslash literally. (Should we return an error?)
                 return Ok(Some(Literal('\\')));
             }
         }
