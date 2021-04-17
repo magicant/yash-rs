@@ -731,12 +731,12 @@ impl Lexer {
         }
     }
 
-    // TODO Backquote command substitution.
+    // TODO arithmetic expansion
     /// Parses a [`TextUnit`].
     ///
-    /// This function parses a literal character, backslash-escaped character, or
-    /// [dollar word unit](Lexer::dollar_word_unit), optionally preceded by line
-    /// continuations.
+    /// This function parses a literal character, backslash-escaped character,
+    /// [dollar word unit](Self::dollar_word_unit), or
+    /// [backquote](Self::backquote), optionally preceded by line continuations.
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for
@@ -745,6 +745,11 @@ impl Lexer {
     /// `is_escapable` decides if a character can be escaped by a backslash. When
     /// `is_escapable` returns false, the preceding backslash is considered
     /// literal.
+    ///
+    /// If the text unit is a backquote, treatment of `\"` inside the backquote
+    /// depends on `is_escapable('_')`. If it is false, the text unit is in a
+    /// double-quoted context and `\"` is an escaped double-quote. Otherwise, the
+    /// text unit is in an unquoted context and `\"` is treated literally.
     pub async fn text_unit<F, G>(
         &mut self,
         is_delimiter: F,
@@ -770,6 +775,10 @@ impl Lexer {
             return Ok(Some(u));
         }
 
+        if let Some(u) = self.backquote(!is_escapable('_')).await? {
+            return Ok(Some(u));
+        }
+
         if let Some(sc) = self.consume_char_if(|c| !is_delimiter(c)).await? {
             return Ok(Some(Literal(sc.value)));
         }
@@ -788,6 +797,9 @@ impl Lexer {
     /// `is_escapable`. If `is_escapable` returns true, the backslash is treated
     /// as a valid escape (`TextUnit::Backslashed`). Otherwise, it ia a
     /// literal (`TextUnit::Literal`).
+    ///
+    /// `is_escapable` also affects escaping of double-quotes inside backquotes.
+    /// See [`text_unit`](Self::text_unit) for details.
     pub async fn text<F, G>(&mut self, mut is_delimiter: F, mut is_escapable: G) -> Result<Text>
     where
         F: FnMut(char) -> bool,
@@ -2191,7 +2203,10 @@ mod tests {
                 assert_eq!(c, 'X');
                 false
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap()
         .unwrap();
@@ -2215,7 +2230,10 @@ mod tests {
                 assert_eq!(c, ';');
                 true
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap();
         assert!(called);
@@ -2278,11 +2296,61 @@ mod tests {
     }
 
     #[test]
+    fn lexer_text_unit_backquote_double_quote_escapable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let result = block_on(lexer.text_unit(
+            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                false
+            },
+        ))
+        .unwrap()
+        .unwrap();
+        if let Backquote { content, location } = result {
+            assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_unit_backquote_double_quote_not_escapable() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let result = block_on(lexer.text_unit(
+            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
+        ))
+        .unwrap()
+        .unwrap();
+        if let Backquote { content, location } = result {
+            assert_eq!(
+                content,
+                [BackquoteUnit::Literal('\\'), BackquoteUnit::Literal('"')]
+            );
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
     fn lexer_text_unit_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\nX");
         let result = block_on(lexer.text_unit(
             |_| false,
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap()
         .unwrap();
@@ -2300,7 +2368,10 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let Text(units) = block_on(lexer.text(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap();
         assert_eq!(units, &[]);
@@ -2321,7 +2392,10 @@ mod tests {
                 called += 1;
                 false
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
@@ -2345,7 +2419,10 @@ mod tests {
                 called += 1;
                 c == 'c'
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| {
+                assert_eq!(c, '_');
+                true
+            },
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b')]);
@@ -2357,17 +2434,11 @@ mod tests {
     #[test]
     fn lexer_text_escaping() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"a\b\c");
-        let mut called = 0;
+        let mut tested_chars = String::new();
         let Text(units) = block_on(lexer.text(
             |_| false,
             |c| {
-                assert!(
-                    matches!(c, 'b' | 'c'),
-                    "unexpected call to is_escapable({:?}), called={}",
-                    c,
-                    called
-                );
-                called += 1;
+                tested_chars.push(c);
                 c == 'b'
             },
         ))
@@ -2376,7 +2447,7 @@ mod tests {
             units,
             &[Literal('a'), Backslashed('b'), Literal('\\'), Literal('c')]
         );
-        assert_eq!(called, 2);
+        assert_eq!(tested_chars, "_bc__");
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
