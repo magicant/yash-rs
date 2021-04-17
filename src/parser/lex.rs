@@ -697,6 +697,7 @@ impl Lexer {
                 self.consume_char();
                 if after_backslash {
                     match value {
+                        '\n' => (),
                         '$' | '`' | '\\' => {
                             content.push(BackquoteUnit::Backslashed(value));
                         }
@@ -2126,7 +2127,23 @@ mod tests {
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
-    // TODO lexer_backquote_line_continuation
+
+    #[test]
+    fn lexer_backquote_line_continuation() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "`\\\na\\\n\\\nb\\\n`");
+        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        if let TextUnit::Backquote { content, location } = result {
+            assert_eq!(
+                content,
+                [BackquoteUnit::Literal('a'), BackquoteUnit::Literal('b')]
+            );
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a backquote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
 
     #[test]
     fn lexer_backquote_unclosed_empty() {
