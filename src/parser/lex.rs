@@ -673,6 +673,30 @@ impl Lexer {
         Ok(None)
     }
 
+    /// Parses a backquote unit, possibly preceded by line continuations.
+    async fn backquote_unit(
+        &mut self,
+        double_quote_escapable: bool,
+    ) -> Result<Option<BackquoteUnit>> {
+        self.line_continuations().await?;
+
+        if self.skip_if(|c| c == '\\').await? {
+            let is_escapable =
+                |c| matches!(c, '$' | '`' | '\\') || c == '"' && double_quote_escapable;
+            if let Some(c) = self.consume_char_if(is_escapable).await? {
+                return Ok(Some(BackquoteUnit::Backslashed(c.value)));
+            } else {
+                return Ok(Some(BackquoteUnit::Literal('\\')));
+            }
+        }
+
+        if let Some(c) = self.consume_char_if(|c| c != '`').await? {
+            return Ok(Some(BackquoteUnit::Literal(c.value)));
+        }
+
+        Ok(None)
+    }
+
     /// Parses a command substitution of the form `` `...` ``.
     ///
     /// If the next character is a backquote, the command substitution is parsed
@@ -691,43 +715,19 @@ impl Lexer {
         };
 
         let mut content = Vec::new();
-        let mut after_backslash = false;
-        loop {
-            if let Some(&SourceChar { value, .. }) = self.peek_char().await? {
-                self.consume_char();
-                if after_backslash {
-                    match value {
-                        '\n' => (),
-                        '$' | '`' | '\\' => {
-                            content.push(BackquoteUnit::Backslashed(value));
-                        }
-                        '"' if double_quote_escapable => {
-                            content.push(BackquoteUnit::Backslashed(value));
-                        }
-                        _ => {
-                            content.push(BackquoteUnit::Literal('\\'));
-                            content.push(BackquoteUnit::Literal(value));
-                        }
-                    }
-                    after_backslash = false;
-                } else {
-                    match value {
-                        '`' => return Ok(Some(TextUnit::Backquote { content, location })),
-                        '\\' => after_backslash = true,
-                        _ => {
-                            after_backslash = false;
-                            content.push(BackquoteUnit::Literal(value));
-                        }
-                    }
-                }
-            } else {
-                let cause = SyntaxError::UnclosedBackquote {
-                    opening_location: location,
-                }
-                .into();
-                let location = self.location().await?.clone();
-                return Err(Error { cause, location });
+        while let Some(unit) = self.backquote_unit(double_quote_escapable).await? {
+            content.push(unit);
+        }
+
+        if self.skip_if(|c| c == '`').await? {
+            Ok(Some(TextUnit::Backquote { content, location }))
+        } else {
+            let cause = SyntaxError::UnclosedBackquote {
+                opening_location: location,
             }
+            .into();
+            let location = self.location().await?.clone();
+            Err(Error { cause, location })
         }
     }
 
