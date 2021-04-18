@@ -43,6 +43,8 @@ pub enum SyntaxError {
     UnclosedDoubleQuote { opening_location: Location },
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
+    /// A command substitution started with `` ` `` but lacks a closing `` ` ``.
+    UnclosedBackquote { opening_location: Location },
     // TODO Should we remove `UnexpectedToken` in favor of other error types?
     /// Unexpected token.
     UnexpectedToken,
@@ -114,6 +116,7 @@ impl fmt::Display for SyntaxError {
             UnclosedCommandSubstitution { .. } => {
                 f.write_str("The command substitution is not closed")
             }
+            UnclosedBackquote { .. } => f.write_str("The backquote is not closed."),
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),

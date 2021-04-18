@@ -91,6 +91,39 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
+/// Element of [`TextUnit::Backquote`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackquoteUnit {
+    /// Literal single character.
+    Literal(char),
+    /// Backslash-escaped single character.
+    Backslashed(char),
+}
+
+impl fmt::Display for BackquoteUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BackquoteUnit::Literal(c) => write!(f, "{}", c),
+            BackquoteUnit::Backslashed(c) => write!(f, "\\{}", c),
+        }
+    }
+}
+
+impl Unquote for BackquoteUnit {
+    fn write_unquoted<W: std::fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        match self {
+            BackquoteUnit::Literal(c) => {
+                w.write_char(*c)?;
+                Ok(false)
+            }
+            BackquoteUnit::Backslashed(c) => {
+                w.write_char(*c)?;
+                Ok(true)
+            }
+        }
+    }
+}
+
 /// Element of a [Text], i.e., something that can be expanded.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TextUnit {
@@ -107,7 +140,14 @@ pub enum TextUnit {
         /// Location of the initial `$` character of this command substitution.
         location: Location,
     },
-    // Backquote(TODO),
+    /// Command substitution of the form `` `...` ``.
+    Backquote {
+        /// Command string that will be parsed and executed when the command
+        /// substitution is expanded.
+        content: Vec<BackquoteUnit>,
+        /// Location of the initial backquote character of this command substitution.
+        location: Location,
+    },
     // Arith(TODO),
 }
 
@@ -119,6 +159,11 @@ impl fmt::Display for TextUnit {
             Literal(c) => write!(f, "{}", c),
             Backslashed(c) => write!(f, "\\{}", c),
             CommandSubst { content, .. } => write!(f, "$({})", content),
+            Backquote { content, .. } => {
+                f.write_str("`")?;
+                content.iter().try_for_each(|unit| unit.fmt(f))?;
+                f.write_str("`")
+            }
         }
     }
 }
@@ -137,6 +182,12 @@ impl Unquote for TextUnit {
             CommandSubst { content, .. } => {
                 write!(w, "$({})", content)?;
                 Ok(false)
+            }
+            Backquote { content, .. } => {
+                w.write_char('`')?;
+                let quoted = content.write_unquoted(w)?;
+                w.write_char('`')?;
+                Ok(quoted)
             }
         }
     }
@@ -790,11 +841,49 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
+    fn backquote_unit_display() {
+        let literal = BackquoteUnit::Literal('A');
+        assert_eq!(literal.to_string(), "A");
+        let backslashed = BackquoteUnit::Backslashed('X');
+        assert_eq!(backslashed.to_string(), r"\X");
+    }
+
+    #[test]
+    fn backquote_unit_unquote() {
+        let literal = BackquoteUnit::Literal('A');
+        let (unquoted, is_quoted) = literal.unquote();
+        assert_eq!(unquoted, "A");
+        assert_eq!(is_quoted, false);
+
+        let backslashed = BackquoteUnit::Backslashed('X');
+        let (unquoted, is_quoted) = backslashed.unquote();
+        assert_eq!(unquoted, "X");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
     fn text_unit_display() {
         let literal = Literal('A');
         assert_eq!(literal.to_string(), "A");
         let backslashed = Backslashed('X');
         assert_eq!(backslashed.to_string(), r"\X");
+
+        let command_subst = CommandSubst {
+            content: r"foo\bar".to_string(),
+            location: Location::dummy("".to_string()),
+        };
+        assert_eq!(command_subst.to_string(), r"$(foo\bar)");
+
+        let backquote = Backquote {
+            content: vec![
+                BackquoteUnit::Literal('a'),
+                BackquoteUnit::Backslashed('b'),
+                BackquoteUnit::Backslashed('c'),
+                BackquoteUnit::Literal('d'),
+            ],
+            location: Location::dummy("".to_string()),
+        };
+        assert_eq!(backquote.to_string(), r"`a\b\cd`");
     }
 
     #[test]
@@ -810,11 +899,23 @@ mod tests {
         assert_eq!(unquoted, "");
         assert_eq!(is_quoted, false);
 
-        let content = "Y".to_string();
-        let location = Location::dummy(content.clone());
-        let nonempty = Text(vec![Literal('X'), CommandSubst { content, location }]);
+        let content1 = "Y".to_string();
+        let location1 = Location::dummy(content1.clone());
+        let content2 = vec![BackquoteUnit::Literal('Z')];
+        let location2 = Location::dummy(content1.clone());
+        let nonempty = Text(vec![
+            Literal('X'),
+            CommandSubst {
+                content: content1,
+                location: location1,
+            },
+            Backquote {
+                content: content2,
+                location: location2,
+            },
+        ]);
         let (unquoted, is_quoted) = nonempty.unquote();
-        assert_eq!(unquoted, "X$(Y)");
+        assert_eq!(unquoted, "X$(Y)`Z`");
         assert_eq!(is_quoted, false);
     }
 
@@ -829,6 +930,13 @@ mod tests {
         ]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "abcde");
+        assert_eq!(is_quoted, true);
+
+        let content = vec![BackquoteUnit::Backslashed('X')];
+        let location = Location::dummy("".to_string());
+        let quoted = Text(vec![Backquote { content, location }]);
+        let (unquoted, is_quoted) = quoted.unquote();
+        assert_eq!(unquoted, "`X`");
         assert_eq!(is_quoted, true);
     }
 
