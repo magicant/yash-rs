@@ -207,4 +207,9 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "itertools",
+ "yash-core",
 ]
+
+[[package]]
+name = "yash-core"
+version = "0.1.0"

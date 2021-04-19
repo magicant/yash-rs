@@ -16,15 +16,16 @@
 
 //! TODO Elaborate
 
-pub mod alias;
 pub mod builtin;
-pub mod env;
 pub mod exec;
 pub mod expansion;
 pub mod input;
 pub mod parser;
-pub mod source;
 pub mod syntax;
+
+pub use yash_core::alias;
+pub use yash_core::env;
+pub use yash_core::source;
 
 // TODO Allow user to select input source
 // TODO Execute the command after parsing
