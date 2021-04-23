@@ -16,13 +16,12 @@
 
 //! TODO Elaborate
 
-pub mod builtin;
-pub mod exec;
-pub mod expansion;
-
 pub use yash_core::alias;
 pub use yash_core::env;
 pub use yash_core::source;
+pub use yash_syntax::builtin;
+pub use yash_syntax::exec;
+pub use yash_syntax::expansion;
 pub use yash_syntax::input;
 pub use yash_syntax::parser;
 pub use yash_syntax::syntax;
