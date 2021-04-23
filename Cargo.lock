@@ -208,8 +208,18 @@ dependencies = [
  "futures",
  "itertools",
  "yash-core",
+ "yash-syntax",
 ]
 
 [[package]]
 name = "yash-core"
 version = "0.1.0"
+
+[[package]]
+name = "yash-syntax"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "itertools",
+ "yash-core",
+]

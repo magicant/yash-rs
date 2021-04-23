@@ -19,13 +19,13 @@
 pub mod builtin;
 pub mod exec;
 pub mod expansion;
-pub mod input;
-pub mod parser;
-pub mod syntax;
 
 pub use yash_core::alias;
 pub use yash_core::env;
 pub use yash_core::source;
+pub use yash_syntax::input;
+pub use yash_syntax::parser;
+pub use yash_syntax::syntax;
 
 // TODO Allow user to select input source
 // TODO Execute the command after parsing

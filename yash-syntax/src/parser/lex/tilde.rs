@@ -88,7 +88,7 @@ impl Word {
     ///
     /// ```
     /// use std::str::FromStr;
-    /// use yash::syntax::{Word, WordUnit::Tilde};
+    /// use yash_syntax::syntax::{Word, WordUnit::Tilde};
     /// let mut word = Word::from_str("~").unwrap();
     /// word.parse_tilde_front();
     /// assert_eq!(word.units, [Tilde("".to_string())]);
@@ -96,7 +96,7 @@ impl Word {
     ///
     /// ```
     /// use std::str::FromStr;
-    /// use yash::syntax::{Word, WordUnit::Tilde};
+    /// use yash_syntax::syntax::{Word, WordUnit::Tilde};
     /// let mut word = Word::from_str("~foo").unwrap();
     /// word.parse_tilde_front();
     /// assert_eq!(word.units, [Tilde("foo".to_string())]);
@@ -107,7 +107,7 @@ impl Word {
     ///
     /// ```
     /// use std::str::FromStr;
-    /// use yash::syntax::{TextUnit::Literal, Word, WordUnit::Unquoted};
+    /// use yash_syntax::syntax::{TextUnit::Literal, Word, WordUnit::Unquoted};
     /// let mut word = Word::from_str("X").unwrap();
     /// assert_eq!(word.units, [Unquoted(Literal('X'))]);
     /// word.parse_tilde_front();
@@ -140,7 +140,7 @@ impl Word {
     ///
     /// ```
     /// use std::str::FromStr;
-    /// use yash::syntax::{TextUnit::Literal, Word, WordUnit::{Tilde, Unquoted}};
+    /// use yash_syntax::syntax::{TextUnit::Literal, Word, WordUnit::{Tilde, Unquoted}};
     /// let mut word = Word::from_str("~:~a/b:~c").unwrap();
     /// word.parse_tilde_everywhere();
     /// assert_eq!(

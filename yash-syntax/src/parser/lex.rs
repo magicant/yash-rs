@@ -252,8 +252,8 @@ mod core {
         ///
         /// ```
         /// futures::executor::block_on(async {
-        ///     let mut lexer = yash::parser::lex::Lexer::with_source(
-        ///         yash::source::Source::Unknown, "abc");
+        ///     let mut lexer = yash_syntax::parser::lex::Lexer::with_source(
+        ///         yash_syntax::source::Source::Unknown, "abc");
         ///     assert_eq!(lexer.index(), 0);
         ///     let _ = lexer.peek_char().await;
         ///     assert_eq!(lexer.index(), 0);
@@ -274,8 +274,8 @@ mod core {
         ///
         /// ```
         /// futures::executor::block_on(async {
-        ///     let mut lexer = yash::parser::lex::Lexer::with_source(
-        ///         yash::source::Source::Unknown, "abc");
+        ///     let mut lexer = yash_syntax::parser::lex::Lexer::with_source(
+        ///         yash_syntax::source::Source::Unknown, "abc");
         ///     let saved_index = lexer.index();
         ///     let a = lexer.peek_char().await.unwrap().cloned();
         ///     lexer.consume_char();
