@@ -1,5 +1,5 @@
 // This file is part of yash, an extended POSIX shell.
-// Copyright (C) 2020 WATANABE Yuki
+// Copyright (C) 2021 WATANABE Yuki
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,8 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use yash::bin_main;
+//! TODO Elaborate
 
-fn main() {
-    bin_main()
-}
+pub mod input;
+pub mod parser;
+pub mod syntax;
+
+// TODO Move to some other package
+pub mod builtin;
+pub mod exec;
+pub mod expansion;
+
+pub use yash_core::alias;
+pub use yash_core::env;
+pub use yash_core::source;

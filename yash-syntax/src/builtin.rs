@@ -76,7 +76,7 @@ pub struct BuiltIn {
 /// Creates a new collection containing all the built-ins.
 ///
 /// ```
-/// use yash::builtin::*;
+/// use yash_syntax::builtin::*;
 /// let map = built_ins();
 /// assert_eq!(map["alias"].r#type, Type::Intrinsic);
 /// ```

@@ -16,18 +16,17 @@
 
 //! TODO Elaborate
 
-pub mod alias;
-pub mod builtin;
-pub mod env;
-pub mod exec;
-pub mod expansion;
-pub mod input;
-pub mod parser;
-pub mod source;
-pub mod syntax;
+pub use yash_core::alias;
+pub use yash_core::env;
+pub use yash_core::source;
+pub use yash_syntax::builtin;
+pub use yash_syntax::exec;
+pub use yash_syntax::expansion;
+pub use yash_syntax::input;
+pub use yash_syntax::parser;
+pub use yash_syntax::syntax;
 
 // TODO Allow user to select input source
-// TODO Execute the command after parsing
 async fn parse_and_print() {
     use crate::env::AliasEnv;
     use crate::env::NativeEnv;
@@ -75,7 +74,7 @@ async fn parse_and_print() {
     }
 }
 
-pub fn bin_main() {
+fn main() {
     let mut pool = futures::executor::LocalPool::new();
     use futures::task::LocalSpawnExt;
     pool.spawner()
