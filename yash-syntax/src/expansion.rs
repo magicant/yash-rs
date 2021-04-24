@@ -19,44 +19,9 @@
 //! TODO Elaborate
 
 use crate::env::Env;
-use crate::source::Location;
 use crate::syntax::Word;
 
-/// Errors that may happen in word expansions.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Error {
-    // TODO define error variants
-}
-
-/// Result type for word expansion.
-pub type Result<T = ()> = std::result::Result<T, Error>;
-
-/// Resultant string of word expansion.
-///
-/// A field is a string accompanied with the original word location.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Field {
-    /// String value of the field.
-    pub value: String,
-    /// Location of the word this field resulted from.
-    pub origin: Location,
-}
-
-impl Field {
-    /// Creates a new field with a dummy origin location.
-    ///
-    /// The return value's origin is created by `Location::dummy(value.clone())`.
-    pub fn dummy(value: String) -> Field {
-        let origin = Location::dummy(value.clone());
-        Field { value, origin }
-    }
-}
-
-impl std::fmt::Display for Field {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.value.fmt(f)
-    }
-}
+pub use yash_core::expansion::*;
 
 impl Word {
     /// Expands `self` to fields.

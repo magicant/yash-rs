@@ -18,4 +18,5 @@
 
 pub mod alias;
 pub mod env;
+pub mod expansion;
 pub mod source;
