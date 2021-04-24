@@ -19,6 +19,8 @@
 //! TODO Elaborate
 
 use crate::alias::AliasSet;
+use crate::builtin::Builtin;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Alias-related part of the shell execution environment.
@@ -39,6 +41,23 @@ impl AliasEnv for Aliases {
     }
     fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
         &mut self.0
+    }
+}
+
+/// Part of the shell execution environment that is related with built-in
+/// utilities.
+pub trait BuiltinEnv {
+    /// Returns a reference to the built-in for the specified name.
+    fn builtin(&self, name: &str) -> Option<&Builtin>;
+}
+
+/// Minimal implementor of [`BuiltinEnv`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Builtins(HashMap<&'static str, Builtin>);
+
+impl BuiltinEnv for Builtins {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.0.get(name)
     }
 }
 

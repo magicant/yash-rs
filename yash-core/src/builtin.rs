@@ -21,6 +21,7 @@
 use crate::env::Env;
 use crate::exec::Abort;
 use crate::expansion::Field;
+use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -67,3 +68,20 @@ pub struct Builtin {
     /// Function that implements the behavior of the built-in.
     pub execute: Main,
 }
+
+impl Debug for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO use finish_non_exhaustive
+        f.debug_struct("Builtin")
+            .field("type", &self.r#type)
+            .finish()
+    }
+}
+
+impl PartialEq for Builtin {
+    fn eq(&self, other: &Builtin) -> bool {
+        self.r#type == other.r#type
+    }
+}
+
+impl Eq for Builtin {}
