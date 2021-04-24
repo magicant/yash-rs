@@ -1,21 +1,2 @@
-[package]
-name = "yash"
-version = "0.1.0"
-authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
-edition = "2018"
-description = "Extended POSIX shell"
-# documentation = "https://yash.osdn.jp/doc/"
-readme = "README.md"
-# homepage = "https://yash.osdn.jp/"
-repository = "https://github.com/magicant/yash3"
-license = "GPL-3.0-or-later"
-# license-file = "LICENSE"
-keywords = ["posix", "shell"]
-categories = ["command-line-utilities", "parser-implementations"]
-publish = false
-
-[dependencies]
-futures = "0.3.8"
-itertools = "0.9.0"
-yash-core = { path = "yash-core", version = "0.1.0" }
-yash-syntax = { path = "yash-syntax", version = "0.1.0" }
+[workspace]
+members = ["yash"]

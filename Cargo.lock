@@ -206,7 +206,6 @@ name = "yash"
 version = "0.1.0"
 dependencies = [
  "futures",
- "itertools",
  "yash-core",
  "yash-syntax",
 ]
