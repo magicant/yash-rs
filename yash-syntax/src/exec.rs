@@ -19,22 +19,7 @@
 use crate::env::Env;
 use crate::syntax::*;
 
-/// Result of command execution that requires stack unwinding.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Abort {
-    /// Break the current loop.
-    Break {
-        /// Number of loops to break.
-        ///
-        /// `0` for breaking the innermost loop, `1` for one-level outer, and so on.
-        count: usize,
-    },
-    /// Continue the current loop.
-    Continue,
-}
-
-/// Result of command execution.
-pub type Result<T = ()> = std::result::Result<T, Abort>;
+pub use yash_core::exec::*;
 
 impl SimpleCommand {
     /// Executes this simple command.
