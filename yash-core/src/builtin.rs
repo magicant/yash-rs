@@ -61,7 +61,7 @@ pub type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Resu
 
 /// Built-in utility definition.
 #[derive(Clone, Copy)]
-pub struct BuiltIn {
+pub struct Builtin {
     /// Type of the built-in.
     pub r#type: Type,
     /// Function that implements the behavior of the built-in.
