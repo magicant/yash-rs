@@ -33,7 +33,7 @@ pub trait AliasEnv {
 
 /// Minimal implementor of [`AliasEnv`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Aliases(Rc<AliasSet>);
+pub struct Aliases(pub Rc<AliasSet>);
 
 impl AliasEnv for Aliases {
     fn aliases(&self) -> &Rc<AliasSet> {
@@ -53,7 +53,7 @@ pub trait BuiltinEnv {
 
 /// Minimal implementor of [`BuiltinEnv`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Builtins(HashMap<&'static str, Builtin>);
+pub struct Builtins(pub HashMap<&'static str, Builtin>);
 
 impl BuiltinEnv for Builtins {
     fn builtin(&self, name: &str) -> Option<&Builtin> {
