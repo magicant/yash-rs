@@ -14,18 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Built-in utilities.
+//! Type definitions for Built-in utilities.
 //!
 //! TODO Elaborate
 
-mod alias;
-
-pub use self::alias::alias_built_in;
-pub use self::alias::alias_built_in_async;
 use crate::env::Env;
 use crate::exec::Abort;
 use crate::expansion::Field;
-use std::collections::HashMap;
+use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -58,35 +54,34 @@ pub enum Type {
     NonIntrinsic,
 }
 
-/// Result of built-in utility.
-type Result = (ExitStatus, Option<Abort>);
+/// Result of built-in utility execution.
+pub type Result = (ExitStatus, Option<Abort>);
 
 /// Type of functions that implement the behavior of a built-in.
-type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
+pub type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
 
 /// Built-in utility definition.
 #[derive(Clone, Copy)]
-pub struct BuiltIn {
+pub struct Builtin {
     /// Type of the built-in.
     pub r#type: Type,
     /// Function that implements the behavior of the built-in.
     pub execute: Main,
 }
 
-/// Creates a new collection containing all the built-ins.
-///
-/// ```
-/// use yash_syntax::builtin::*;
-/// let map = built_ins();
-/// assert_eq!(map["alias"].r#type, Type::Intrinsic);
-/// ```
-pub fn built_ins() -> HashMap<&'static str, BuiltIn> {
-    fn def(name: &str, r#type: Type, execute: Main) -> (&str, BuiltIn) {
-        (name, BuiltIn { r#type, execute })
+impl Debug for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO use finish_non_exhaustive
+        f.debug_struct("Builtin")
+            .field("type", &self.r#type)
+            .finish()
     }
-
-    [def("alias", Type::Intrinsic, alias_built_in_async)]
-        .iter()
-        .cloned()
-        .collect()
 }
+
+impl PartialEq for Builtin {
+    fn eq(&self, other: &Builtin) -> bool {
+        self.r#type == other.r#type
+    }
+}
+
+impl Eq for Builtin {}

@@ -14,24 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Word expansions.
-//!
-//! TODO Elaborate
+//! Type definitions for command execution.
 
-use crate::env::Env;
-use crate::syntax::Word;
-
-pub use yash_core::expansion::*;
-
-impl Word {
-    /// Expands `self` to fields.
-    ///
-    /// The result can be any number of fields.
-    pub fn expand_multiple(&self, _: &mut dyn Env) -> Result<Vec<Field>> {
-        // TODO Expand each word units
-        Ok(vec![Field {
-            value: self.to_string(),
-            origin: self.location.clone(),
-        }])
-    }
+/// Result of command execution that requires stack unwinding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Abort {
+    /// Break the current loop.
+    Break {
+        /// Number of loops to break.
+        ///
+        /// `0` for breaking the innermost loop, `1` for one-level outer, and so on.
+        count: usize,
+    },
+    /// Continue the current loop.
+    Continue,
 }
+
+/// Result of command execution.
+pub type Result<T = ()> = std::result::Result<T, Abort>;

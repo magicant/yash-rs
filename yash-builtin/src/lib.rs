@@ -14,24 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Word expansions.
-//!
 //! TODO Elaborate
 
-use crate::env::Env;
-use crate::syntax::Word;
+mod alias;
 
-pub use yash_core::expansion::*;
+pub use self::alias::alias_built_in;
+pub use self::alias::alias_built_in_async;
+pub use yash_core::builtin::*;
 
-impl Word {
-    /// Expands `self` to fields.
-    ///
-    /// The result can be any number of fields.
-    pub fn expand_multiple(&self, _: &mut dyn Env) -> Result<Vec<Field>> {
-        // TODO Expand each word units
-        Ok(vec![Field {
-            value: self.to_string(),
-            origin: self.location.clone(),
-        }])
-    }
-}
+use Type::Intrinsic;
+
+/// Array of all the implemented built-in utilities.
+pub const BUILTINS: &[(&str, Builtin)] = &[(
+    "alias",
+    Builtin {
+        r#type: Intrinsic,
+        execute: alias_built_in_async,
+    },
+)];

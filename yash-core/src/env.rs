@@ -19,6 +19,8 @@
 //! TODO Elaborate
 
 use crate::alias::AliasSet;
+use crate::builtin::Builtin;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Alias-related part of the shell execution environment.
@@ -31,7 +33,7 @@ pub trait AliasEnv {
 
 /// Minimal implementor of [`AliasEnv`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Aliases(Rc<AliasSet>);
+pub struct Aliases(pub Rc<AliasSet>);
 
 impl AliasEnv for Aliases {
     fn aliases(&self) -> &Rc<AliasSet> {
@@ -42,11 +44,29 @@ impl AliasEnv for Aliases {
     }
 }
 
+/// Part of the shell execution environment that is related with built-in
+/// utilities.
+pub trait BuiltinEnv {
+    /// Returns a reference to the built-in for the specified name.
+    fn builtin(&self, name: &str) -> Option<&Builtin>;
+}
+
+/// Minimal implementor of [`BuiltinEnv`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Builtins(pub HashMap<&'static str, Builtin>);
+
+impl BuiltinEnv for Builtins {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.0.get(name)
+    }
+}
+
 /// Subset of the shell execution environment that can be implemented
 /// independently of the underlying OS features.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LocalEnv {
     pub aliases: Aliases,
+    pub builtins: Builtins,
 }
 
 impl LocalEnv {
@@ -54,7 +74,8 @@ impl LocalEnv {
     #[allow(clippy::new_without_default)]
     pub fn new() -> LocalEnv {
         let aliases = Aliases(Rc::new(AliasSet::new()));
-        LocalEnv { aliases }
+        let builtins = Builtins(HashMap::new());
+        LocalEnv { aliases, builtins }
     }
 }
 
@@ -67,8 +88,14 @@ impl AliasEnv for LocalEnv {
     }
 }
 
+impl BuiltinEnv for LocalEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.builtins.builtin(name)
+    }
+}
+
 /// Whole shell execution environment.
-pub trait Env: AliasEnv {}
+pub trait Env: AliasEnv + BuiltinEnv {}
 
 /// Implementation of [`Env`] that is based on the state of the current process.
 #[derive(Debug)]
@@ -100,6 +127,12 @@ impl AliasEnv for NativeEnv {
     }
 }
 
+impl BuiltinEnv for NativeEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.local.builtin(name)
+    }
+}
+
 impl Env for NativeEnv {}
 
 /// Simulated shell execution environment.
@@ -126,6 +159,12 @@ impl AliasEnv for SimEnv {
     }
     fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
         self.local.aliases_mut()
+    }
+}
+
+impl BuiltinEnv for SimEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.local.builtin(name)
     }
 }
 
