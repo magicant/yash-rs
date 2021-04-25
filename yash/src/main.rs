@@ -16,10 +16,10 @@
 
 //! TODO Elaborate
 
+pub use yash_builtin as builtin;
 pub use yash_core::alias;
 pub use yash_core::env;
 pub use yash_core::source;
-pub use yash_syntax::builtin;
 pub use yash_syntax::exec;
 pub use yash_syntax::expansion;
 pub use yash_syntax::input;
@@ -58,7 +58,8 @@ async fn parse_and_print() {
     }
 
     let mut env = NativeEnv::new();
-    env.local.builtins.0 = crate::builtin::built_ins();
+    let builtins = &mut env.local.builtins.0;
+    builtins.extend(builtin::BUILTINS.iter().copied());
 
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));

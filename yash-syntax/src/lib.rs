@@ -21,7 +21,6 @@ pub mod parser;
 pub mod syntax;
 
 // TODO Move to some other package
-pub mod builtin;
 pub mod exec;
 pub mod expansion;
 

@@ -15,3 +15,20 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! TODO Elaborate
+
+mod alias;
+
+pub use self::alias::alias_built_in;
+pub use self::alias::alias_built_in_async;
+pub use yash_core::builtin::*;
+
+use Type::Intrinsic;
+
+/// Array of all the implemented built-in utilities.
+pub const BUILTINS: &[(&str, Builtin)] = &[(
+    "alias",
+    Builtin {
+        r#type: Intrinsic,
+        execute: alias_built_in_async,
+    },
+)];

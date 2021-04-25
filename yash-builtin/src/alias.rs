@@ -16,10 +16,14 @@
 
 //! Alias built-in.
 
-use super::*;
-use crate::alias::*;
 use std::future::ready;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
+use yash_core::alias::*;
+use yash_core::builtin::Result;
+use yash_core::env::Env;
+use yash_core::expansion::Field;
 
 /// Implementation of the alias built-in.
 pub fn alias_built_in(env: &mut dyn Env, args: Vec<Field>) -> Result {
@@ -69,10 +73,10 @@ pub fn alias_built_in_async(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::AliasEnv;
-    use crate::env::SimEnv;
-    use crate::source::Location;
-    use crate::source::Source;
+    use yash_core::env::AliasEnv;
+    use yash_core::env::SimEnv;
+    use yash_core::source::Location;
+    use yash_core::source::Source;
 
     #[test]
     fn alias_built_in_defines_alias() {
