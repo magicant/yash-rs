@@ -206,8 +206,16 @@ name = "yash"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "yash-builtin",
  "yash-core",
  "yash-syntax",
+]
+
+[[package]]
+name = "yash-builtin"
+version = "0.1.0"
+dependencies = [
+ "yash-core",
 ]
 
 [[package]]
