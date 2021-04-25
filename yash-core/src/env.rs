@@ -66,6 +66,7 @@ impl BuiltinEnv for Builtins {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LocalEnv {
     pub aliases: Aliases,
+    pub builtins: Builtins,
 }
 
 impl LocalEnv {
@@ -73,7 +74,8 @@ impl LocalEnv {
     #[allow(clippy::new_without_default)]
     pub fn new() -> LocalEnv {
         let aliases = Aliases(Rc::new(AliasSet::new()));
-        LocalEnv { aliases }
+        let builtins = Builtins(HashMap::new());
+        LocalEnv { aliases, builtins }
     }
 }
 
@@ -83,6 +85,12 @@ impl AliasEnv for LocalEnv {
     }
     fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
         self.aliases.aliases_mut()
+    }
+}
+
+impl BuiltinEnv for LocalEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.builtins.builtin(name)
     }
 }
 
