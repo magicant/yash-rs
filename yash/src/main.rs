@@ -58,6 +58,8 @@ async fn parse_and_print() {
     }
 
     let mut env = NativeEnv::new();
+    env.local.builtins.0 = crate::builtin::built_ins();
+
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
         let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases().clone());

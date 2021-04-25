@@ -38,9 +38,7 @@ impl SimpleCommand {
             Err(_) => return Ok(()),
         };
         if let Some(name) = fields.get(0) {
-            let built_ins = crate::builtin::built_ins();
-            let built_in = built_ins.get(&name.value as &str);
-            if let Some(built_in) = built_in {
+            if let Some(built_in) = env.builtin(&name.value) {
                 let (_exit_status, abort) = (built_in.execute)(env, fields).await;
                 if let Some(abort) = abort {
                     return Err(abort);
