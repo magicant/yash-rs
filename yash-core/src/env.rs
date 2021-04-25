@@ -95,7 +95,7 @@ impl BuiltinEnv for LocalEnv {
 }
 
 /// Whole shell execution environment.
-pub trait Env: AliasEnv {}
+pub trait Env: AliasEnv + BuiltinEnv {}
 
 /// Implementation of [`Env`] that is based on the state of the current process.
 #[derive(Debug)]
@@ -127,6 +127,12 @@ impl AliasEnv for NativeEnv {
     }
 }
 
+impl BuiltinEnv for NativeEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.local.builtin(name)
+    }
+}
+
 impl Env for NativeEnv {}
 
 /// Simulated shell execution environment.
@@ -153,6 +159,12 @@ impl AliasEnv for SimEnv {
     }
     fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
         self.local.aliases_mut()
+    }
+}
+
+impl BuiltinEnv for SimEnv {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.local.builtin(name)
     }
 }
 
