@@ -603,6 +603,29 @@ impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
     }
 }
 
+/// Branch item of a `case` compound command.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CaseItem<H = HereDoc> {
+    /// Array of patterns that are matched against the main word of the case
+    /// compound command to decide if the body of this item should be executed.
+    ///
+    /// A syntactically valid case item must have at least one pattern.
+    pub patterns: Vec<Word>,
+    /// Commands that are executed if any of the patterns matched.
+    pub body: List<H>,
+}
+
+impl<H: fmt::Display> fmt::Display for CaseItem<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({}) {};;",
+            self.patterns.iter().format(" | "),
+            self.body
+        )
+    }
+}
+
 /// Command that contains other commands.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompoundCommand<H = HereDoc> {
@@ -1244,6 +1267,24 @@ mod tests {
 
         command.assigns.push(Assign::from_str("foo=bar").unwrap());
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
+    }
+
+    #[test]
+    fn case_item_display() {
+        let patterns = vec!["foo".parse().unwrap()];
+        let body = "".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(foo) ;;");
+
+        let patterns = vec!["bar".parse().unwrap()];
+        let body = "echo ok".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(bar) echo ok;;");
+
+        let patterns = ["a", "b", "c"].iter().map(|s| s.parse().unwrap()).collect();
+        let body = "foo; bar&".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(a | b | c) foo; bar&;;");
     }
 
     #[test]
