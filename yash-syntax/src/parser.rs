@@ -27,7 +27,7 @@ pub mod lex;
 use self::lex::keyword::Keyword::*;
 use self::lex::Operator::*;
 use self::lex::PartialHereDoc;
-use self::lex::TokenId::*;
+use self::lex::TokenId::{self, EndOfInput, IoNumber, Operator, Token};
 use super::syntax::*;
 use crate::source::Location;
 use std::convert::TryFrom;
@@ -551,6 +551,88 @@ impl Parser<'_> {
         }
 
         Ok(CompoundCommand::Until { condition, body })
+    }
+
+    /// Parses a case item.
+    ///
+    /// Returns `None` if the next token is `esac`.
+    pub async fn case_item(&mut self) -> Result<Option<CaseItem<MissingHereDoc>>> {
+        fn pattern_error_cause(token_id: TokenId) -> SyntaxError {
+            match token_id {
+                Token(Some(Esac)) => SyntaxError::EsacAsPattern,
+                Token(_) => unreachable!(),
+                Operator(CloseParen) | Operator(Bar) | Operator(Newline) | EndOfInput => {
+                    SyntaxError::MissingPattern
+                }
+                _ => SyntaxError::InvalidPattern,
+            }
+        }
+
+        let first_token = loop {
+            while self.newline_and_here_doc_contents().await? {}
+
+            if self.peek_token().await?.id == Token(Some(Esac)) {
+                return Ok(None);
+            }
+
+            match self.take_token_manual(false).await? {
+                Rec::AliasSubstituted => (),
+                Rec::Parsed(token) => break token,
+            }
+        };
+
+        let first_pattern = match first_token.id {
+            Token(_) => first_token.word,
+            Operator(OpenParen) => {
+                let next_token = self.take_token_auto(&[Esac]).await?;
+                match next_token.id {
+                    // TODO Allow `esac` if not in POSIXly-correct mode
+                    Token(keyword) if keyword != Some(Esac) => next_token.word,
+                    _ => {
+                        let cause = pattern_error_cause(next_token.id).into();
+                        let location = next_token.word.location;
+                        return Err(Error { cause, location });
+                    }
+                }
+            }
+            _ => {
+                let cause = pattern_error_cause(first_token.id).into();
+                let location = first_token.word.location;
+                return Err(Error { cause, location });
+            }
+        };
+
+        let mut patterns = vec![first_pattern];
+        loop {
+            let separator = self.take_token_auto(&[]).await?;
+            match separator.id {
+                Operator(CloseParen) => break,
+                Operator(Bar) => {
+                    let pattern = self.take_token_auto(&[]).await?;
+                    match pattern.id {
+                        Token(_) => patterns.push(pattern.word),
+                        _ => {
+                            let cause = pattern_error_cause(pattern.id).into();
+                            let location = pattern.word.location;
+                            return Err(Error { cause, location });
+                        }
+                    }
+                }
+                _ => {
+                    let cause = SyntaxError::UnclosedPatternList.into();
+                    let location = separator.word.location;
+                    return Err(Error { cause, location });
+                }
+            }
+        }
+
+        let body = self.maybe_compound_list_boxed().await?;
+
+        if self.peek_token().await?.id == Operator(SemicolonSemicolon) {
+            self.take_token_raw().await?;
+        }
+
+        Ok(Some(CaseItem { patterns, body }))
     }
 
     /// Parses a compound command.
@@ -2432,6 +2514,189 @@ mod tests {
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_esac() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\nESAC");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "ESAC".to_string(),
+            "\n\nesac".to_string(),
+            true,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "esac".to_string(),
+            "&&".to_string(),
+            true,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let option = block_on(parser.case_item()).unwrap();
+        assert_eq!(option, None);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, Token(Some(Esac)));
+    }
+
+    #[test]
+    fn parser_case_item_minimum() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0, []);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_with_open_paren() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(foo)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0, []);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_many_patterns() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "1 | esac | $three)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 3);
+        assert_eq!(item.patterns[0].to_string(), "1");
+        assert_eq!(item.patterns[1].to_string(), "esac");
+        assert_eq!(item.patterns[2].to_string(), "$three");
+        assert_eq!(item.body.0, []);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_non_empty_body() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo)\necho ok\n:&\n");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0.len(), 2);
+        assert_eq!(item.body.0[0].to_string(), "echo ok");
+        assert_eq!(item.body.0[1].to_string(), ":&");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_with_double_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo);;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0, []);
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_with_non_empty_body_and_double_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "foo):;\n;;");
+        let mut parser = Parser::new(&mut lexer);
+
+        let item = block_on(parser.case_item()).unwrap().unwrap();
+        assert_eq!(item.patterns.len(), 1);
+        assert_eq!(item.patterns[0].to_string(), "foo");
+        assert_eq!(item.body.0.len(), 1);
+        assert_eq!(item.body.0[0].to_string(), ":");
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_item_missing_pattern_without_open_paren() {
+        let mut lexer = Lexer::with_source(Source::Unknown, ")");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.case_item()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
+        assert_eq!(e.location.line.value, ")");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 1);
+    }
+
+    #[test]
+    fn parser_case_item_esac_after_paren() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(esac)");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.case_item()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
+        assert_eq!(e.location.line.value, "(esac)");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn parser_case_item_first_pattern_not_word_after_open_paren() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(&");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.case_item()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidPattern));
+        assert_eq!(e.location.line.value, "(&");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 2);
+    }
+
+    #[test]
+    fn parser_case_item_missing_pattern_after_bar() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(foo| |");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.case_item()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
+        assert_eq!(e.location.line.value, "(foo| |");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 7);
+    }
+
+    #[test]
+    fn parser_case_item_missing_close_paren() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(foo bar");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.case_item()).unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedPatternList)
+        );
+        assert_eq!(e.location.line.value, "(foo bar");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 6);
     }
 
     #[test]
