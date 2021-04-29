@@ -89,6 +89,14 @@ pub enum SyntaxError {
     UnclosedUntilClause { opening_location: Location },
     /// An until loop's condition is empty.
     EmptyUntilCondition,
+    /// The `)` is missing in a case item.
+    UnclosedPatternList,
+    /// The pattern is missing in a case item.
+    MissingPattern,
+    /// The pattern is not a valid word token.
+    InvalidPattern,
+    /// The first pattern of a case item is `esac`.
+    EsacAsPattern,
     /// The `(` is not followed by `)` in a function definition.
     UnmatchedParenthesis,
     /// The function body is missing in a function definition command.
@@ -150,6 +158,10 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The `until` loop is missing its `do` clause")
             }
             EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
+            UnclosedPatternList => f.write_str("The pattern list is not properly closed by a `)`"),
+            MissingPattern => f.write_str("A pattern is missing in the `case` command"),
+            InvalidPattern => f.write_str("The pattern is not a valid word token"),
+            EsacAsPattern => f.write_str("`esac` cannot be the first of a pattern list"),
             UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
             MissingFunctionBody => f.write_str("The function body is missing"),
             InvalidFunctionBody => f.write_str("The function body must be a compound command"),
