@@ -267,21 +267,17 @@ impl Parser<'_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Token(Some(CloseBrace)) {
-            return Err(Error {
-                cause: SyntaxError::UnclosedGrouping {
-                    opening_location: open.word.location,
-                }
-                .into(),
-                location: close.word.location,
-            });
+            let opening_location = open.word.location;
+            let cause = SyntaxError::UnclosedGrouping { opening_location }.into();
+            let location = close.word.location;
+            return Err(Error { cause, location });
         }
 
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
-            return Err(Error {
-                cause: SyntaxError::EmptyGrouping.into(),
-                location: open.word.location,
-            });
+            let cause = SyntaxError::EmptyGrouping.into();
+            let location = open.word.location;
+            return Err(Error { cause, location });
         }
 
         Ok(CompoundCommand::Grouping(list))
@@ -302,21 +298,17 @@ impl Parser<'_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Operator(CloseParen) {
-            return Err(Error {
-                cause: SyntaxError::UnclosedSubshell {
-                    opening_location: open.word.location,
-                }
-                .into(),
-                location: close.word.location,
-            });
+            let opening_location = open.word.location;
+            let cause = SyntaxError::UnclosedSubshell { opening_location }.into();
+            let location = close.word.location;
+            return Err(Error { cause, location });
         }
 
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
-            return Err(Error {
-                cause: SyntaxError::EmptySubshell.into(),
-                location: open.word.location,
-            });
+            let cause = SyntaxError::EmptySubshell.into();
+            let location = open.word.location;
+            return Err(Error { cause, location });
         }
 
         Ok(CompoundCommand::Subshell(list))
@@ -336,21 +328,17 @@ impl Parser<'_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Token(Some(Done)) {
-            return Err(Error {
-                cause: SyntaxError::UnclosedDoClause {
-                    opening_location: open.word.location,
-                }
-                .into(),
-                location: close.word.location,
-            });
+            let opening_location = open.word.location;
+            let cause = SyntaxError::UnclosedDoClause { opening_location }.into();
+            let location = close.word.location;
+            return Err(Error { cause, location });
         }
 
         // TODO allow empty do clause if not POSIXly-correct
         if list.0.is_empty() {
-            return Err(Error {
-                cause: SyntaxError::EmptyDoClause.into(),
-                location: open.word.location,
-            });
+            let cause = SyntaxError::EmptyDoClause.into();
+            let location = open.word.location;
+            return Err(Error { cause, location });
         }
 
         Ok(Some(list))
@@ -495,22 +483,18 @@ impl Parser<'_> {
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                return Err(Error {
-                    cause: SyntaxError::UnclosedWhileClause {
-                        opening_location: open.word.location,
-                    }
-                    .into(),
-                    location: self.take_token_raw().await?.word.location,
-                })
+                let opening_location = open.word.location;
+                let cause = SyntaxError::UnclosedWhileClause { opening_location }.into();
+                let location = self.take_token_raw().await?.word.location;
+                return Err(Error { cause, location });
             }
         };
 
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
-            return Err(Error {
-                cause: SyntaxError::EmptyWhileCondition.into(),
-                location: open.word.location,
-            });
+            let cause = SyntaxError::EmptyWhileCondition.into();
+            let location = open.word.location;
+            return Err(Error { cause, location });
         }
 
         Ok(CompoundCommand::While { condition, body })
@@ -532,22 +516,18 @@ impl Parser<'_> {
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                return Err(Error {
-                    cause: SyntaxError::UnclosedUntilClause {
-                        opening_location: open.word.location,
-                    }
-                    .into(),
-                    location: self.take_token_raw().await?.word.location,
-                })
+                let opening_location = open.word.location;
+                let cause = SyntaxError::UnclosedUntilClause { opening_location }.into();
+                let location = self.take_token_raw().await?.word.location;
+                return Err(Error { cause, location });
             }
         };
 
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
-            return Err(Error {
-                cause: SyntaxError::EmptyUntilCondition.into(),
-                location: open.word.location,
-            });
+            let cause = SyntaxError::EmptyUntilCondition.into();
+            let location = open.word.location;
+            return Err(Error { cause, location });
         }
 
         Ok(CompoundCommand::Until { condition, body })

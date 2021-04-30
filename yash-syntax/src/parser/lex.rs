@@ -638,11 +638,9 @@ impl Lexer {
 
         if !self.skip_if(|c| c == ')').await? {
             // TODO Return a better error depending on the token id of the next token
+            let cause = SyntaxError::UnclosedCommandSubstitution { opening_location }.into();
             let location = self.location().await?.clone();
-            return Err(Error {
-                cause: SyntaxError::UnclosedCommandSubstitution { opening_location }.into(),
-                location,
-            });
+            return Err(Error { cause, location });
         }
 
         let location = opening_location;
@@ -722,10 +720,8 @@ impl Lexer {
         if self.skip_if(|c| c == '`').await? {
             Ok(Some(TextUnit::Backquote { content, location }))
         } else {
-            let cause = SyntaxError::UnclosedBackquote {
-                opening_location: location,
-            }
-            .into();
+            let opening_location = location;
+            let cause = SyntaxError::UnclosedBackquote { opening_location }.into();
             let location = self.location().await?.clone();
             Err(Error { cause, location })
         }
