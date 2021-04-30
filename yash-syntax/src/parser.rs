@@ -555,6 +555,8 @@ impl Parser<'_> {
 
     /// Parses a case item.
     ///
+    /// Does not parse the optional trailing double semicolon.
+    ///
     /// Returns `None` if the next token is `esac`.
     pub async fn case_item(&mut self) -> Result<Option<CaseItem<MissingHereDoc>>> {
         fn pattern_error_cause(token_id: TokenId) -> SyntaxError {
@@ -628,10 +630,6 @@ impl Parser<'_> {
 
         let body = self.maybe_compound_list_boxed().await?;
 
-        if self.peek_token().await?.id == Operator(SemicolonSemicolon) {
-            self.take_token_raw().await?;
-        }
-
         Ok(Some(CaseItem { patterns, body }))
     }
 
@@ -680,7 +678,12 @@ impl Parser<'_> {
 
         let mut items = Vec::new();
         while let Some(item) = self.case_item().await? {
-            items.push(item)
+            items.push(item);
+
+            if self.peek_token().await?.id != Operator(SemicolonSemicolon) {
+                break;
+            }
+            self.take_token_raw().await?;
         }
 
         self.take_token_raw().await?;
@@ -2666,7 +2669,7 @@ mod tests {
         assert_eq!(item.body.0, []);
 
         let next = block_on(parser.peek_token()).unwrap();
-        assert_eq!(next.id, EndOfInput);
+        assert_eq!(next.id, Operator(SemicolonSemicolon));
     }
 
     #[test]
@@ -2681,7 +2684,7 @@ mod tests {
         assert_eq!(item.body.0[0].to_string(), ":");
 
         let next = block_on(parser.peek_token()).unwrap();
-        assert_eq!(next.id, EndOfInput);
+        assert_eq!(next.id, Operator(SemicolonSemicolon));
     }
 
     #[test]
