@@ -635,6 +635,58 @@ impl Parser<'_> {
         Ok(Some(CaseItem { patterns, body }))
     }
 
+    /// Parses a case conditional construct.
+    ///
+    /// The next token must be the `case` reserved word.
+    ///
+    /// # Panics
+    ///
+    /// If the first token is not `case`.
+    async fn case_command(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+        let open = self.take_token_raw().await?;
+        assert_eq!(open.id, Token(Some(Case)));
+
+        let subject = self.take_token_auto(&[]).await?;
+        match subject.id {
+            Token(_) => (),
+            Operator(Newline) | EndOfInput => {
+                let cause = SyntaxError::MissingCaseSubject.into();
+                let location = subject.word.location;
+                return Err(Error { cause, location });
+            }
+            _ => {
+                let cause = SyntaxError::InvalidCaseSubject.into();
+                let location = subject.word.location;
+                return Err(Error { cause, location });
+            }
+        }
+        let subject = subject.word;
+
+        loop {
+            while self.newline_and_here_doc_contents().await? {}
+
+            let next_token = self.take_token_auto(&[In]).await?;
+            match next_token.id {
+                Token(Some(In)) => break,
+                Operator(Newline) => (),
+                _ => {
+                    let opening_location = open.word.location;
+                    let cause = SyntaxError::MissingIn { opening_location }.into();
+                    let location = next_token.word.location;
+                    return Err(Error { cause, location });
+                }
+            }
+        }
+
+        let mut items = Vec::new();
+        while let Some(item) = self.case_item().await? {
+            items.push(item)
+        }
+
+        self.take_token_raw().await?;
+        Ok(CompoundCommand::Case { subject, items })
+    }
+
     /// Parses a compound command.
     pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
         match self.peek_token().await?.id {
@@ -643,6 +695,7 @@ impl Parser<'_> {
             Token(Some(For)) => self.for_loop().await.map(Some),
             Token(Some(While)) => self.while_loop().await.map(Some),
             Token(Some(Until)) => self.until_loop().await.map(Some),
+            Token(Some(Case)) => self.case_command().await.map(Some),
             _ => Ok(None),
         }
     }
@@ -2698,6 +2751,244 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 6);
     }
+
+    #[test]
+    fn parser_case_command_minimum() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "case foo in esac");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "foo");
+            assert_eq!(items, []);
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_newline_before_in() {
+        // Alias substitution results in "case x \n\n \nin esac"
+        let mut lexer = Lexer::with_source(Source::Unknown, "CASE_X IN_ESAC");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "CASE_X".to_string(),
+            " case x \n\n ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "IN_ESAC".to_string(),
+            "\nin esac".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "x");
+            assert_eq!(items, []);
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_alias_on_subject() {
+        // Alias substitution results in " case   in in  a|b) esac"
+        let mut lexer = Lexer::with_source(Source::Unknown, "CASE in a|b) esac");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "CASE".to_string(),
+            " case ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "in".to_string(),
+            " in in ".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "in");
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0].to_string(), "(a | b) ;;");
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_alias_on_in() {
+        // Alias substitution results in "case x  in esac"
+        let mut lexer = Lexer::with_source(Source::Unknown, "CASE_X in esac");
+        let mut aliases = AliasSet::new();
+        let origin = Location::dummy("".to_string());
+        aliases.insert(HashEntry::new(
+            "CASE_X".to_string(),
+            "case x ".to_string(),
+            false,
+            origin.clone(),
+        ));
+        aliases.insert(HashEntry::new(
+            "in".to_string(),
+            "in a)".to_string(),
+            false,
+            origin,
+        ));
+        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+
+        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
+        assert!(first_pass.is_alias_substituted());
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "x");
+            assert_eq!(items, []);
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_one_item() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "case foo in bar) esac");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "foo");
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0].to_string(), "(bar) ;;");
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_many_items_without_final_double_semicolon() {
+        let mut lexer = Lexer::with_source(
+            Source::Unknown,
+            "case x in\n\na) ;; (b|c):&:; ;;\n d)echo\nesac",
+        );
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "x");
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].to_string(), "(a) ;;");
+            assert_eq!(items[1].to_string(), "(b | c) :& :;;");
+            assert_eq!(items[2].to_string(), "(d) echo;;");
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_many_items_with_final_double_semicolon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "case x in(1);; 2)echo\n\n;;\n\nesac");
+        let mut parser = Parser::new(&mut lexer);
+
+        let result = block_on(parser.compound_command()).unwrap().unwrap();
+        let result = result.fill(&mut std::iter::empty()).unwrap();
+        if let CompoundCommand::Case { subject, items } = result {
+            assert_eq!(subject.to_string(), "x");
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].to_string(), "(1) ;;");
+            assert_eq!(items[1].to_string(), "(2) echo;;");
+        } else {
+            panic!("Not a case command: {:?}", result);
+        }
+
+        let next = block_on(parser.peek_token()).unwrap();
+        assert_eq!(next.id, EndOfInput);
+    }
+
+    #[test]
+    fn parser_case_command_missing_subject() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " case  ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingCaseSubject));
+        assert_eq!(e.location.line.value, " case  ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 8);
+    }
+
+    #[test]
+    fn parser_case_command_invalid_subject() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " case ; ");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidCaseSubject));
+        assert_eq!(e.location.line.value, " case ; ");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 7);
+    }
+
+    #[test]
+    fn parser_case_command_missing_in() {
+        let mut lexer = Lexer::with_source(Source::Unknown, " case x esac");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::MissingIn { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, " case x esac");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("Not a MissingIn: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, " case x esac");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 9);
+    }
+
+    // TODO case: missing esac
 
     #[test]
     fn parser_compound_command_none() {
