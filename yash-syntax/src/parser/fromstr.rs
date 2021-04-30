@@ -154,6 +154,18 @@ impl FromStr for SimpleCommand<MissingHereDoc> {
     }
 }
 
+impl FromStr for CaseItem<MissingHereDoc> {
+    type Err = Option<Error>;
+    /// Converts a string to a case item.
+    ///
+    /// Returns `Err(None)` if the first token is `esac`.
+    fn from_str(s: &str) -> Result<CaseItem<MissingHereDoc>, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        block_on(parser.case_item()).shift()
+    }
+}
+
 impl FromStr for CompoundCommand<MissingHereDoc> {
     type Err = Option<Error>;
     /// Converts a string to a compound command.

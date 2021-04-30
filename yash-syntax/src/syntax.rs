@@ -603,6 +603,29 @@ impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
     }
 }
 
+/// Branch item of a `case` compound command.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CaseItem<H = HereDoc> {
+    /// Array of patterns that are matched against the main word of the case
+    /// compound command to decide if the body of this item should be executed.
+    ///
+    /// A syntactically valid case item must have at least one pattern.
+    pub patterns: Vec<Word>,
+    /// Commands that are executed if any of the patterns matched.
+    pub body: List<H>,
+}
+
+impl<H: fmt::Display> fmt::Display for CaseItem<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({}) {};;",
+            self.patterns.iter().format(" | "),
+            self.body
+        )
+    }
+}
+
 /// Command that contains other commands.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompoundCommand<H = HereDoc> {
@@ -621,7 +644,11 @@ pub enum CompoundCommand<H = HereDoc> {
     /// Until loop.
     Until { condition: List<H>, body: List<H> },
     // TODO if
-    // TODO case
+    /// Case conditional construct.
+    Case {
+        subject: Word,
+        items: Vec<CaseItem<H>>,
+    },
     // TODO [[ ]]
 }
 
@@ -644,6 +671,13 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
             }
             While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
             Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
+            Case { subject, items } => {
+                write!(f, "case {} in ", subject)?;
+                for item in items {
+                    write!(f, "{} ", item)?;
+                }
+                f.write_str("esac")
+            }
         }
     }
 }
@@ -1247,6 +1281,24 @@ mod tests {
     }
 
     #[test]
+    fn case_item_display() {
+        let patterns = vec!["foo".parse().unwrap()];
+        let body = "".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(foo) ;;");
+
+        let patterns = vec!["bar".parse().unwrap()];
+        let body = "echo ok".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(bar) echo ok;;");
+
+        let patterns = ["a", "b", "c"].iter().map(|s| s.parse().unwrap()).collect();
+        let body = "foo; bar&".parse::<List>().unwrap();
+        let item = CaseItem { patterns, body };
+        assert_eq!(item.to_string(), "(a | b | c) foo; bar&;;");
+    }
+
+    #[test]
     fn grouping_display() {
         let list = "foo".parse::<List>().unwrap();
         let grouping = CompoundCommand::Grouping(list);
@@ -1297,6 +1349,24 @@ mod tests {
         let body = "echo ok".parse::<List>().unwrap();
         let until = CompoundCommand::Until { condition, body };
         assert_eq!(until.to_string(), "until true& false; do echo ok; done");
+    }
+
+    #[test]
+    fn case_display() {
+        let subject = "foo".parse().unwrap();
+        let items = Vec::<CaseItem>::new();
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case foo in esac");
+
+        let subject = "bar".parse().unwrap();
+        let items = vec!["foo)".parse().unwrap()];
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
+
+        let subject = "baz".parse().unwrap();
+        let items = vec!["1)".parse().unwrap(), "(a|b|c) :&".parse().unwrap()];
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case baz in (1) ;; (a | b | c) :&;; esac");
     }
 
     #[test]

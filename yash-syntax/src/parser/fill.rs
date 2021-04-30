@@ -117,6 +117,17 @@ impl Fill for SimpleCommand<MissingHereDoc> {
     }
 }
 
+impl Fill for CaseItem<MissingHereDoc> {
+    type Full = CaseItem;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CaseItem> {
+        let CaseItem { patterns, body } = self;
+        Ok(CaseItem {
+            patterns,
+            body: body.fill(i)?,
+        })
+    }
+}
+
 impl Fill for CompoundCommand<MissingHereDoc> {
     type Full = CompoundCommand;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CompoundCommand> {
@@ -136,6 +147,10 @@ impl Fill for CompoundCommand<MissingHereDoc> {
             Until { condition, body } => Until {
                 condition: condition.fill(i)?,
                 body: body.fill(i)?,
+            },
+            Case { subject, items } => Case {
+                subject,
+                items: items.fill(i)?,
             },
         })
     }
