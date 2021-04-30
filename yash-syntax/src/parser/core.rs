@@ -89,6 +89,12 @@ pub enum SyntaxError {
     UnclosedUntilClause { opening_location: Location },
     /// An until loop's condition is empty.
     EmptyUntilCondition,
+    /// The case command is missing its subject.
+    MissingCaseSubject,
+    /// The subject of the case command is not a valid word.
+    InvalidCaseSubject,
+    /// The case command is missing `in` after the subject.
+    MissingIn { opening_location: Location },
     /// The `)` is missing in a case item.
     UnclosedPatternList,
     /// The pattern is missing in a case item.
@@ -97,6 +103,8 @@ pub enum SyntaxError {
     InvalidPattern,
     /// The first pattern of a case item is `esac`.
     EsacAsPattern,
+    /// A case command is not closed.
+    UnclosedCase { opening_location: Location },
     /// The `(` is not followed by `)` in a function definition.
     UnmatchedParenthesis,
     /// The function body is missing in a function definition command.
@@ -158,10 +166,14 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The `until` loop is missing its `do` clause")
             }
             EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
+            MissingCaseSubject => f.write_str("The subject is missing after `case`"),
+            InvalidCaseSubject => f.write_str("The `case` command subject is not a valid word"),
+            MissingIn { .. } => f.write_str("`in` is missing in the `case` command"),
             UnclosedPatternList => f.write_str("The pattern list is not properly closed by a `)`"),
             MissingPattern => f.write_str("A pattern is missing in the `case` command"),
             InvalidPattern => f.write_str("The pattern is not a valid word token"),
             EsacAsPattern => f.write_str("`esac` cannot be the first of a pattern list"),
+            UnclosedCase { .. } => f.write_str("The `case` command is missing its closing `esac`"),
             UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
             MissingFunctionBody => f.write_str("The function body is missing"),
             InvalidFunctionBody => f.write_str("The function body must be a compound command"),
