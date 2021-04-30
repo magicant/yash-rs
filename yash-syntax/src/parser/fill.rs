@@ -148,6 +148,10 @@ impl Fill for CompoundCommand<MissingHereDoc> {
                 condition: condition.fill(i)?,
                 body: body.fill(i)?,
             },
+            Case { subject, items } => Case {
+                subject,
+                items: items.fill(i)?,
+            },
         })
     }
 }

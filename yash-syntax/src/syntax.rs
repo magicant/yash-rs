@@ -644,7 +644,11 @@ pub enum CompoundCommand<H = HereDoc> {
     /// Until loop.
     Until { condition: List<H>, body: List<H> },
     // TODO if
-    // TODO case
+    /// Case conditional construct.
+    Case {
+        subject: Word,
+        items: Vec<CaseItem<H>>,
+    },
     // TODO [[ ]]
 }
 
@@ -667,6 +671,13 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
             }
             While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
             Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
+            Case { subject, items } => {
+                write!(f, "case {} in ", subject)?;
+                for item in items {
+                    write!(f, "{} ", item)?;
+                }
+                f.write_str("esac")
+            }
         }
     }
 }
@@ -1338,6 +1349,24 @@ mod tests {
         let body = "echo ok".parse::<List>().unwrap();
         let until = CompoundCommand::Until { condition, body };
         assert_eq!(until.to_string(), "until true& false; do echo ok; done");
+    }
+
+    #[test]
+    fn case_display() {
+        let subject = "foo".parse().unwrap();
+        let items = Vec::<CaseItem>::new();
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case foo in esac");
+
+        let subject = "bar".parse().unwrap();
+        let items = vec!["foo)".parse().unwrap()];
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
+
+        let subject = "baz".parse().unwrap();
+        let items = vec!["1)".parse().unwrap(), "(a|b|c) :&".parse().unwrap()];
+        let case = CompoundCommand::Case { subject, items };
+        assert_eq!(case.to_string(), "case baz in (1) ;; (a | b | c) :&;; esac");
     }
 
     #[test]
