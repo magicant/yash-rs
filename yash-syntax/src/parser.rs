@@ -686,7 +686,14 @@ impl Parser<'_> {
             self.take_token_raw().await?;
         }
 
-        self.take_token_raw().await?;
+        let close = self.take_token_raw().await?;
+        if close.id != Token(Some(Esac)) {
+            let opening_location = open.word.location;
+            let cause = SyntaxError::UnclosedCase { opening_location }.into();
+            let location = close.word.location;
+            return Err(Error { cause, location });
+        }
+
         Ok(CompoundCommand::Case { subject, items })
     }
 
@@ -2991,7 +2998,25 @@ mod tests {
         assert_eq!(e.location.column.get(), 9);
     }
 
-    // TODO case: missing esac
+    #[test]
+    fn parser_case_command_missing_esac() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "case x in a) }");
+        let mut parser = Parser::new(&mut lexer);
+
+        let e = block_on(parser.compound_command()).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedCase { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "case x in a) }");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("Not a MissingIn: {:?}", e.cause);
+        }
+        assert_eq!(e.location.line.value, "case x in a) }");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 14);
+    }
 
     #[test]
     fn parser_compound_command_none() {
