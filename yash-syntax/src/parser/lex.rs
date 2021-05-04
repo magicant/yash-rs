@@ -802,7 +802,6 @@ impl Lexer {
         }
     }
 
-    // TODO arithmetic expansion
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
