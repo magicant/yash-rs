@@ -669,6 +669,8 @@ impl Lexer {
         location: Location,
     ) -> Result<std::result::Result<TextUnit, Location>> {
         let index = self.index();
+
+        // Part 1: Parse `((`
         if !self.skip_if(|c| c == '(').await? {
             return Ok(Err(location));
         }
@@ -678,6 +680,7 @@ impl Lexer {
             return Ok(Err(location));
         }
 
+        // Part 2: Parse the content
         let is_delimiter = |c| c == ')';
         let is_escapable = |c| matches!(c, '$' | '`' | '\\');
         // Boxing needed for recursion
@@ -685,12 +688,30 @@ impl Lexer {
             Box::pin(self.text_with_parentheses(is_delimiter, is_escapable));
         let content = content.await?;
 
-        if !self.skip_if(|c| c == ')').await? {
-            todo!("unclosed arithmetic expansion");
+        // Part 3: Parse `))`
+        match self.peek_char().await? {
+            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(_) => unreachable!(),
+            None => {
+                let opening_location = location;
+                let cause = SyntaxError::UnclosedArith { opening_location }.into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
+            }
         }
         self.line_continuations().await?;
-        if !self.skip_if(|c| c == ')').await? {
-            todo!("unclosed arithmetic expansion");
+        match self.peek_char().await? {
+            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(_) => {
+                self.rewind(index);
+                return Ok(Err(location));
+            }
+            None => {
+                let opening_location = location;
+                let cause = SyntaxError::UnclosedArith { opening_location }.into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
+            }
         }
 
         Ok(Ok(TextUnit::Arith { content, location }))
@@ -2173,6 +2194,62 @@ mod tests {
         }
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_first() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1");
+        let location = Location::dummy("Z".to_string());
+
+        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "Z");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "((1");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_second() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1)");
+        let location = Location::dummy("Z".to_string());
+
+        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "Z");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "((1)");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1) ");
+        let location = Location::dummy("Z".to_string());
+
+        let location = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(location.line.value, "Z");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
+
+        assert_eq!(lexer.index(), 0);
     }
 
     #[test]
