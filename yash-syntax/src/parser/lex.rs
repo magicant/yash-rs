@@ -810,6 +810,60 @@ impl Lexer {
         Ok(Text(units))
     }
 
+    /// Parses a text that may contain nested parentheses.
+    ///
+    /// This function works similarly to [`text`](Self::text). However, if an
+    /// unquoted `(` is found in the text, all text units are parsed up to the
+    /// next matching unquoted `)`. Inside the parentheses, the `is_delimiter`
+    /// function is ignored and all non-special characters are parsed as literal
+    /// word units. After finding the `)`, this function continues parsing to
+    /// find a delimiter (as per `is_delimiter`) or another parentheses.
+    ///
+    /// Nested parentheses are supported: the number of `(`s and `)`s must
+    /// match. In other words, the final delimiter is recognized only outside
+    /// outermost parentheses.
+    pub async fn text_with_parentheses<F, G>(
+        &mut self,
+        mut is_delimiter: F,
+        mut is_escapable: G,
+    ) -> Result<Text>
+    where
+        F: FnMut(char) -> bool,
+        G: FnMut(char) -> bool,
+    {
+        let mut units = Vec::new();
+        let mut open_paren_locations = Vec::new();
+        loop {
+            let is_delimiter_or_paren = |c| {
+                if c == '(' {
+                    return true;
+                }
+                if open_paren_locations.is_empty() {
+                    is_delimiter(c)
+                } else {
+                    c == ')'
+                }
+            };
+            let next_units = self.text(is_delimiter_or_paren, &mut is_escapable).await?.0;
+            units.extend(next_units);
+            if let Some(sc) = self.consume_char_if(|c| c == '(').await? {
+                units.push(Literal('('));
+                open_paren_locations.push(sc.location.clone());
+            } else if let Some(opening_location) = open_paren_locations.pop() {
+                if self.skip_if(|c| c == ')').await? {
+                    units.push(Literal(')'));
+                } else {
+                    let cause = SyntaxError::UnclosedParen { opening_location }.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(Text(units))
+    }
+
     /// Parses a single-quoted string.
     ///
     /// The opening `'` must have been consumed before calling this function.
@@ -2446,6 +2500,109 @@ mod tests {
         assert_eq!(tested_chars, "_bc__");
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_no_parentheses() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let Text(units) = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap();
+        assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_1() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a(b)c)");
+        let Text(units) =
+            block_on(lexer.text_with_parentheses(|c| c == 'b' || c == ')', |_| false)).unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('('),
+                Literal('b'),
+                Literal(')'),
+                Literal('c'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_1_1() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "ab(CD)ef(GH)ij;");
+        let Text(units) = block_on(
+            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
+        )
+        .unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('b'),
+                Literal('('),
+                Literal('C'),
+                Literal('D'),
+                Literal(')'),
+                Literal('e'),
+                Literal('f'),
+                Literal('('),
+                Literal('G'),
+                Literal('H'),
+                Literal(')'),
+                Literal('i'),
+                Literal('j'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_3() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a(B((C)D))e;");
+        let Text(units) = block_on(
+            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
+        )
+        .unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('('),
+                Literal('B'),
+                Literal('('),
+                Literal('('),
+                Literal('C'),
+                Literal(')'),
+                Literal('D'),
+                Literal(')'),
+                Literal(')'),
+                Literal('e'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "x(()");
+        let e = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "x(()");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "x(()");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
