@@ -649,6 +649,50 @@ impl Lexer {
         Ok(Some(TextUnit::CommandSubst { content, location }))
     }
 
+    /// Parses an arithmetic expansion.
+    ///
+    /// The initial `$` must have been consumed before calling this function.
+    /// In this function, the next two characters are examined to see if they
+    /// begin an arithmetic expansion. If the characters are `((`, then the
+    /// arithmetic expansion is parsed, in which case this function consumes up
+    /// to the closing `))` (inclusive). Otherwise, no characters are consumed
+    /// and the return value is `Ok(Err(opening_location))`.
+    ///
+    /// The `location` parameter should be the location of the initial `$`. It
+    /// is used to construct the result, but this function does not check if it
+    /// actually is a location of `$`.
+    ///
+    /// This function does not consume line continuations between `$` and `(`.
+    /// Line continuations should have been consumed beforehand.
+    pub async fn arithmetic_expansion(
+        &mut self,
+        location: Location,
+    ) -> Result<std::result::Result<TextUnit, Location>> {
+        let index = self.index();
+        if !self.skip_if(|c| c == '(').await? {
+            return Ok(Err(location));
+        }
+        // TODO line continuation
+        if !self.skip_if(|c| c == '(').await? {
+            self.rewind(index);
+            return Ok(Err(location));
+        }
+
+        // TODO allow escaping some characters
+        // Boxing needed for recursion
+        let content: Pin<Box<dyn Future<Output = Result<Text>>>> =
+            Box::pin(self.text_with_parentheses(|c| c == ')', |_| false));
+        let content = content.await?;
+        if !self.skip_if(|c| c == ')').await? {
+            todo!("unclosed arithmetic expansion");
+        }
+        // TODO line continuation
+        if !self.skip_if(|c| c == ')').await? {
+            todo!("unclosed arithmetic expansion");
+        }
+        Ok(Ok(TextUnit::Arith { content, location }))
+    }
+
     /// Parses a word unit that starts with `$`.
     ///
     /// If the next character is `$`, a parameter expansion, command
@@ -664,7 +708,12 @@ impl Lexer {
         // TODO line continuations following $
         // TODO braced parameter expansion
         // TODO non-braced parameter expansion
-        // TODO arithmetic expansion
+
+        let location = match self.arithmetic_expansion(location).await? {
+            Ok(result) => return Ok(Some(result)),
+            Err(location) => location,
+        };
+
         if let Some(result) = self.command_substitution(location).await? {
             return Ok(Some(result));
         }
@@ -2036,6 +2085,43 @@ mod tests {
     }
 
     #[test]
+    fn lexer_arithmetic_expansion_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(());");
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content.0, []);
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
+        let location = Location::dummy("Y".to_string());
+
+        let location = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(location.line.value, "Y");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
+    }
+
+    #[test]
     fn lexer_dollar_word_unit_no_dollar() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
@@ -2086,6 +2172,22 @@ mod tests {
             assert_eq!(location.line.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, " foo bar ");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_dollar_word_unit_arithmetic_expansion() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$((1))");
+        let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content, Text(vec![Literal('1')]));
+            assert_eq!(location.line.value, "$((1))");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
         }
