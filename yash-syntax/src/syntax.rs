@@ -148,7 +148,13 @@ pub enum TextUnit {
         /// Location of the initial backquote character of this command substitution.
         location: Location,
     },
-    // Arith(TODO),
+    /// Arithmetic expansion.
+    Arith {
+        /// Expression that is to be evaluated.
+        content: Text,
+        /// Location of the initial `$` character of this command substitution.
+        location: Location,
+    },
 }
 
 pub use TextUnit::*;
@@ -164,6 +170,7 @@ impl fmt::Display for TextUnit {
                 content.iter().try_for_each(|unit| unit.fmt(f))?;
                 f.write_str("`")
             }
+            Arith { content, .. } => write!(f, "$(({}))", content),
         }
     }
 }
@@ -187,6 +194,12 @@ impl Unquote for TextUnit {
                 w.write_char('`')?;
                 let quoted = content.write_unquoted(w)?;
                 w.write_char('`')?;
+                Ok(quoted)
+            }
+            Arith { content, .. } => {
+                w.write_str("$((")?;
+                let quoted = content.write_unquoted(w)?;
+                w.write_str("))")?;
                 Ok(quoted)
             }
         }
@@ -918,6 +931,12 @@ mod tests {
             location: Location::dummy("".to_string()),
         };
         assert_eq!(backquote.to_string(), r"`a\b\cd`");
+
+        let arith = Arith {
+            content: Text(vec![literal, backslashed, command_subst, backquote]),
+            location: Location::dummy("".to_string()),
+        };
+        assert_eq!(arith.to_string(), r"$((A\X$(foo\bar)`a\b\cd`))");
     }
 
     #[test]
@@ -933,23 +952,23 @@ mod tests {
         assert_eq!(unquoted, "");
         assert_eq!(is_quoted, false);
 
-        let content1 = "Y".to_string();
-        let location1 = Location::dummy(content1.clone());
-        let content2 = vec![BackquoteUnit::Literal('Z')];
-        let location2 = Location::dummy(content1.clone());
         let nonempty = Text(vec![
             Literal('X'),
             CommandSubst {
-                content: content1,
-                location: location1,
+                content: "Y".to_string(),
+                location: Location::dummy("".to_string()),
             },
             Backquote {
-                content: content2,
-                location: location2,
+                content: vec![BackquoteUnit::Literal('Z')],
+                location: Location::dummy("".to_string()),
+            },
+            Arith {
+                content: Text(vec![Literal('0')]),
+                location: Location::dummy("".to_string()),
             },
         ]);
         let (unquoted, is_quoted) = nonempty.unquote();
-        assert_eq!(unquoted, "X$(Y)`Z`");
+        assert_eq!(unquoted, "X$(Y)`Z`$((0))");
         assert_eq!(is_quoted, false);
     }
 
@@ -959,11 +978,14 @@ mod tests {
             Literal('a'),
             Backslashed('b'),
             Literal('c'),
-            Backslashed('d'), // TODO Arithmetic expansion
+            Arith {
+                content: Text(vec![Literal('d')]),
+                location: Location::dummy("".to_string()),
+            },
             Literal('e'),
         ]);
         let (unquoted, is_quoted) = quoted.unquote();
-        assert_eq!(unquoted, "abcde");
+        assert_eq!(unquoted, "abc$((d))e");
         assert_eq!(is_quoted, true);
 
         let content = vec![BackquoteUnit::Backslashed('X')];
@@ -971,6 +993,13 @@ mod tests {
         let quoted = Text(vec![Backquote { content, location }]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "`X`");
+        assert_eq!(is_quoted, true);
+
+        let content = Text(vec![Backslashed('X')]);
+        let location = Location::dummy("".to_string());
+        let quoted = Text(vec![Arith { content, location }]);
+        let (unquoted, is_quoted) = quoted.unquote();
+        assert_eq!(unquoted, "$((X))");
         assert_eq!(is_quoted, true);
     }
 

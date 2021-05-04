@@ -37,6 +37,8 @@ use std::rc::Rc;
 /// Types of syntax errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SyntaxError {
+    /// A `(` lacks a closing `)`.
+    UnclosedParen { opening_location: Location },
     /// A single quotation lacks a closing `'`.
     UnclosedSingleQuote { opening_location: Location },
     /// A double quotation lacks a closing `"`.
@@ -45,6 +47,8 @@ pub enum SyntaxError {
     UnclosedCommandSubstitution { opening_location: Location },
     /// A command substitution started with `` ` `` but lacks a closing `` ` ``.
     UnclosedBackquote { opening_location: Location },
+    /// An arithmetic expansion lacks a closing `))`.
+    UnclosedArith { opening_location: Location },
     // TODO Should we remove `UnexpectedToken` in favor of other error types?
     /// Unexpected token.
     UnexpectedToken,
@@ -127,12 +131,14 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
+            UnclosedParen { .. } => f.write_str("The parenthesis is not closed."),
             UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed."),
             UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed."),
             UnclosedCommandSubstitution { .. } => {
                 f.write_str("The command substitution is not closed")
             }
             UnclosedBackquote { .. } => f.write_str("The backquote is not closed."),
+            UnclosedArith { .. } => f.write_str("The arithmetic expansion is not closed."),
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),

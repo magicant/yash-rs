@@ -649,6 +649,74 @@ impl Lexer {
         Ok(Some(TextUnit::CommandSubst { content, location }))
     }
 
+    /// Parses an arithmetic expansion.
+    ///
+    /// The initial `$` must have been consumed before calling this function.
+    /// In this function, the next two characters are examined to see if they
+    /// begin an arithmetic expansion. If the characters are `((`, then the
+    /// arithmetic expansion is parsed, in which case this function consumes up
+    /// to the closing `))` (inclusive). Otherwise, no characters are consumed
+    /// and the return value is `Ok(Err(opening_location))`.
+    ///
+    /// The `location` parameter should be the location of the initial `$`. It
+    /// is used to construct the result, but this function does not check if it
+    /// actually is a location of `$`.
+    ///
+    /// This function does not consume line continuations between `$` and `(`.
+    /// Line continuations should have been consumed beforehand.
+    pub async fn arithmetic_expansion(
+        &mut self,
+        location: Location,
+    ) -> Result<std::result::Result<TextUnit, Location>> {
+        let index = self.index();
+
+        // Part 1: Parse `((`
+        if !self.skip_if(|c| c == '(').await? {
+            return Ok(Err(location));
+        }
+        self.line_continuations().await?;
+        if !self.skip_if(|c| c == '(').await? {
+            self.rewind(index);
+            return Ok(Err(location));
+        }
+
+        // Part 2: Parse the content
+        let is_delimiter = |c| c == ')';
+        let is_escapable = |c| matches!(c, '$' | '`' | '\\');
+        // Boxing needed for recursion
+        let content: Pin<Box<dyn Future<Output = Result<Text>>>> =
+            Box::pin(self.text_with_parentheses(is_delimiter, is_escapable));
+        let content = content.await?;
+
+        // Part 3: Parse `))`
+        match self.peek_char().await? {
+            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(_) => unreachable!(),
+            None => {
+                let opening_location = location;
+                let cause = SyntaxError::UnclosedArith { opening_location }.into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
+            }
+        }
+        self.line_continuations().await?;
+        match self.peek_char().await? {
+            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(_) => {
+                self.rewind(index);
+                return Ok(Err(location));
+            }
+            None => {
+                let opening_location = location;
+                let cause = SyntaxError::UnclosedArith { opening_location }.into();
+                let location = self.location().await?.clone();
+                return Err(Error { cause, location });
+            }
+        }
+
+        Ok(Ok(TextUnit::Arith { content, location }))
+    }
+
     /// Parses a word unit that starts with `$`.
     ///
     /// If the next character is `$`, a parameter expansion, command
@@ -664,7 +732,12 @@ impl Lexer {
         // TODO line continuations following $
         // TODO braced parameter expansion
         // TODO non-braced parameter expansion
-        // TODO arithmetic expansion
+
+        let location = match self.arithmetic_expansion(location).await? {
+            Ok(result) => return Ok(Some(result)),
+            Err(location) => location,
+        };
+
         if let Some(result) = self.command_substitution(location).await? {
             return Ok(Some(result));
         }
@@ -807,6 +880,60 @@ impl Lexer {
             units.push(unit);
         }
 
+        Ok(Text(units))
+    }
+
+    /// Parses a text that may contain nested parentheses.
+    ///
+    /// This function works similarly to [`text`](Self::text). However, if an
+    /// unquoted `(` is found in the text, all text units are parsed up to the
+    /// next matching unquoted `)`. Inside the parentheses, the `is_delimiter`
+    /// function is ignored and all non-special characters are parsed as literal
+    /// word units. After finding the `)`, this function continues parsing to
+    /// find a delimiter (as per `is_delimiter`) or another parentheses.
+    ///
+    /// Nested parentheses are supported: the number of `(`s and `)`s must
+    /// match. In other words, the final delimiter is recognized only outside
+    /// outermost parentheses.
+    pub async fn text_with_parentheses<F, G>(
+        &mut self,
+        mut is_delimiter: F,
+        mut is_escapable: G,
+    ) -> Result<Text>
+    where
+        F: FnMut(char) -> bool,
+        G: FnMut(char) -> bool,
+    {
+        let mut units = Vec::new();
+        let mut open_paren_locations = Vec::new();
+        loop {
+            let is_delimiter_or_paren = |c| {
+                if c == '(' {
+                    return true;
+                }
+                if open_paren_locations.is_empty() {
+                    is_delimiter(c)
+                } else {
+                    c == ')'
+                }
+            };
+            let next_units = self.text(is_delimiter_or_paren, &mut is_escapable).await?.0;
+            units.extend(next_units);
+            if let Some(sc) = self.consume_char_if(|c| c == '(').await? {
+                units.push(Literal('('));
+                open_paren_locations.push(sc.location.clone());
+            } else if let Some(opening_location) = open_paren_locations.pop() {
+                if self.skip_if(|c| c == ')').await? {
+                    units.push(Literal(')'));
+                } else {
+                    let cause = SyntaxError::UnclosedParen { opening_location }.into();
+                    let location = self.location().await?.clone();
+                    return Err(Error { cause, location });
+                }
+            } else {
+                break;
+            }
+        }
         Ok(Text(units))
     }
 
@@ -1982,6 +2109,150 @@ mod tests {
     }
 
     #[test]
+    fn lexer_arithmetic_expansion_empty() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(());");
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content.0, []);
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
+        let location = Location::dummy("Y".to_string());
+
+        let location = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(location.line.value, "Y");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(\\\n\\\n(\\\n)\\\n\\\n);");
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content.0, []);
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_escapes() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"((\\\"\`\$));"#);
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(
+                content.0,
+                [
+                    Backslashed('\\'),
+                    Literal('\\'),
+                    Literal('"'),
+                    Backslashed('`'),
+                    Backslashed('$')
+                ]
+            );
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_first() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1");
+        let location = Location::dummy("Z".to_string());
+
+        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "Z");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "((1");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 4);
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_second() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1)");
+        let location = Location::dummy("Z".to_string());
+
+        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "Z");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 1);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "((1)");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "((1) ");
+        let location = Location::dummy("Z".to_string());
+
+        let location = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(location.line.value, "Z");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
+
+        assert_eq!(lexer.index(), 0);
+    }
+
+    #[test]
     fn lexer_dollar_word_unit_no_dollar() {
         let mut lexer = Lexer::with_source(Source::Unknown, "foo");
         let result = block_on(lexer.dollar_word_unit()).unwrap();
@@ -2032,6 +2303,22 @@ mod tests {
             assert_eq!(location.line.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, " foo bar ");
+        } else {
+            panic!("unexpected result {:?}", result);
+        }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_dollar_word_unit_arithmetic_expansion() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$((1))");
+        let result = block_on(lexer.dollar_word_unit()).unwrap().unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content, Text(vec![Literal('1')]));
+            assert_eq!(location.line.value, "$((1))");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
         }
@@ -2446,6 +2733,109 @@ mod tests {
         assert_eq!(tested_chars, "_bc__");
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_no_parentheses() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let Text(units) = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap();
+        assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_1() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a(b)c)");
+        let Text(units) =
+            block_on(lexer.text_with_parentheses(|c| c == 'b' || c == ')', |_| false)).unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('('),
+                Literal('b'),
+                Literal(')'),
+                Literal('c'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_1_1() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "ab(CD)ef(GH)ij;");
+        let Text(units) = block_on(
+            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
+        )
+        .unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('b'),
+                Literal('('),
+                Literal('C'),
+                Literal('D'),
+                Literal(')'),
+                Literal('e'),
+                Literal('f'),
+                Literal('('),
+                Literal('G'),
+                Literal('H'),
+                Literal(')'),
+                Literal('i'),
+                Literal('j'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_nest_3() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "a(B((C)D))e;");
+        let Text(units) = block_on(
+            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
+        )
+        .unwrap();
+        assert_eq!(
+            units,
+            &[
+                Literal('a'),
+                Literal('('),
+                Literal('B'),
+                Literal('('),
+                Literal('('),
+                Literal('C'),
+                Literal(')'),
+                Literal('D'),
+                Literal(')'),
+                Literal(')'),
+                Literal('e'),
+            ]
+        );
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_text_with_parentheses_unclosed() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "x(()");
+        let e = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap_err();
+        if let ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) = e.cause {
+            assert_eq!(opening_location.line.value, "x(()");
+            assert_eq!(opening_location.line.number.get(), 1);
+            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.column.get(), 2);
+        } else {
+            panic!("unexpected error cause {:?}", e);
+        }
+        assert_eq!(e.location.line.value, "x(()");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
