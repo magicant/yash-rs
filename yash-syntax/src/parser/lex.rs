@@ -678,11 +678,13 @@ impl Lexer {
             return Ok(Err(location));
         }
 
-        // TODO allow escaping some characters
+        let is_delimiter = |c| c == ')';
+        let is_escapable = |c| matches!(c, '$' | '`' | '\\');
         // Boxing needed for recursion
         let content: Pin<Box<dyn Future<Output = Result<Text>>>> =
-            Box::pin(self.text_with_parentheses(|c| c == ')', |_| false));
+            Box::pin(self.text_with_parentheses(is_delimiter, is_escapable));
         let content = content.await?;
+
         if !self.skip_if(|c| c == ')').await? {
             todo!("unclosed arithmetic expansion");
         }
@@ -690,6 +692,7 @@ impl Lexer {
         if !self.skip_if(|c| c == ')').await? {
             todo!("unclosed arithmetic expansion");
         }
+
         Ok(Ok(TextUnit::Arith { content, location }))
     }
 
@@ -2131,6 +2134,36 @@ mod tests {
             .unwrap();
         if let TextUnit::Arith { content, location } = result {
             assert_eq!(content.0, []);
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_escapes() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#"((\\\"\`\$));"#);
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(
+                content.0,
+                [
+                    Backslashed('\\'),
+                    Literal('\\'),
+                    Literal('"'),
+                    Backslashed('`'),
+                    Backslashed('$')
+                ]
+            );
             assert_eq!(location.line.value, "X");
             assert_eq!(location.line.number.get(), 1);
             assert_eq!(location.line.source, Source::Unknown);
