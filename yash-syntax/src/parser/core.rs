@@ -161,9 +161,7 @@ impl fmt::Display for SyntaxError {
             InvalidForValue => {
                 f.write_str("The operator token is invalid in the word list of the `for` loop")
             }
-            MissingForBody {
-                opening_location: _,
-            } => f.write_str("The `for` loop is missing its `do` clause"),
+            MissingForBody { .. } => f.write_str("The `for` loop is missing its `do` clause"),
             UnclosedWhileClause { .. } => {
                 f.write_str("The `while` loop is missing its `do` clause")
             }
