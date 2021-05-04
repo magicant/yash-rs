@@ -672,7 +672,7 @@ impl Lexer {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(Err(location));
         }
-        // TODO line continuation
+        self.line_continuations().await?;
         if !self.skip_if(|c| c == '(').await? {
             self.rewind(index);
             return Ok(Err(location));
@@ -686,7 +686,7 @@ impl Lexer {
         if !self.skip_if(|c| c == ')').await? {
             todo!("unclosed arithmetic expansion");
         }
-        // TODO line continuation
+        self.line_continuations().await?;
         if !self.skip_if(|c| c == ')').await? {
             todo!("unclosed arithmetic expansion");
         }
@@ -2119,6 +2119,27 @@ mod tests {
         assert_eq!(location.column.get(), 1);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
+    }
+
+    #[test]
+    fn lexer_arithmetic_expansion_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "(\\\n\\\n(\\\n)\\\n\\\n);");
+        let location = Location::dummy("X".to_string());
+
+        let result = block_on(lexer.arithmetic_expansion(location))
+            .unwrap()
+            .unwrap();
+        if let TextUnit::Arith { content, location } = result {
+            assert_eq!(content.0, []);
+            assert_eq!(location.line.value, "X");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not an arithmetic expansion: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
     }
 
     #[test]
