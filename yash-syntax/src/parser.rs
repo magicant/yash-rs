@@ -22,6 +22,7 @@ mod core;
 mod fill;
 mod fromstr;
 
+mod and_or;
 mod case;
 mod command;
 mod compound_command;
@@ -51,48 +52,6 @@ pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
 impl Parser<'_> {
-    /// Parses an and-or list.
-    ///
-    /// If there is no valid and-or list at the current position, this function
-    /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList<MissingHereDoc>>>> {
-        let first = match self.pipeline().await? {
-            Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => return Ok(Rec::Parsed(None)),
-            Rec::Parsed(Some(p)) => p,
-        };
-
-        let mut rest = vec![];
-        loop {
-            let condition = match self.peek_token().await?.id {
-                Operator(AndAnd) => AndOr::AndThen,
-                Operator(BarBar) => AndOr::OrElse,
-                _ => break,
-            };
-            self.take_token_raw().await?;
-
-            while self.newline_and_here_doc_contents().await? {}
-
-            let maybe_pipeline = loop {
-                if let Rec::Parsed(maybe_pipeline) = self.pipeline().await? {
-                    break maybe_pipeline;
-                }
-            };
-            let pipeline = match maybe_pipeline {
-                None => {
-                    let cause = SyntaxError::MissingPipeline(condition).into();
-                    let location = self.peek_token().await?.word.location.clone();
-                    return Err(Error { cause, location });
-                }
-                Some(pipeline) => pipeline,
-            };
-
-            rest.push((condition, pipeline));
-        }
-
-        Ok(Rec::Parsed(Some(AndOrList { first, rest })))
-    }
-
     // There is no function that parses a single item because it would not be
     // very useful for parsing a list. An item requires a separator operator
     // ('&' or ';') for it to be followed by another item. You cannot tell from
@@ -231,57 +190,6 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use futures::executor::block_on;
-
-    #[test]
-    fn parser_and_or_list_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-        let mut parser = Parser::new(&mut lexer);
-
-        let option = block_on(parser.and_or_list()).unwrap().unwrap();
-        assert_eq!(option, None);
-    }
-
-    #[test]
-    fn parser_and_or_list_one() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
-        let mut parser = Parser::new(&mut lexer);
-
-        let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
-        let aol = aol.fill(&mut std::iter::empty()).unwrap();
-        assert_eq!(aol.first.to_string(), "foo");
-        assert_eq!(aol.rest, vec![]);
-    }
-
-    #[test]
-    fn parser_and_or_list_many() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "first && second || \n\n third;");
-        let mut parser = Parser::new(&mut lexer);
-
-        let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
-        let aol = aol.fill(&mut std::iter::empty()).unwrap();
-        assert_eq!(aol.first.to_string(), "first");
-        assert_eq!(aol.rest.len(), 2);
-        assert_eq!(aol.rest[0].0, AndOr::AndThen);
-        assert_eq!(aol.rest[0].1.to_string(), "second");
-        assert_eq!(aol.rest[1].0, AndOr::OrElse);
-        assert_eq!(aol.rest[1].1.to_string(), "third");
-    }
-
-    #[test]
-    fn parser_and_or_list_missing_command_after_and_and() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo &&");
-        let mut parser = Parser::new(&mut lexer);
-
-        let e = block_on(parser.and_or_list()).unwrap_err();
-        assert_eq!(
-            e.cause,
-            ErrorCause::Syntax(SyntaxError::MissingPipeline(AndOr::AndThen))
-        );
-        assert_eq!(e.location.line.value, "foo &&");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
-    }
 
     #[test]
     fn parser_list_eof() {
