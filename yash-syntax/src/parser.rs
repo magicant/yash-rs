@@ -23,6 +23,7 @@ mod fill;
 mod fromstr;
 
 mod case;
+mod command;
 mod compound_command;
 mod for_loop;
 mod function;
@@ -50,24 +51,6 @@ pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;
 
 impl Parser<'_> {
-    /// Parses a command.
-    ///
-    /// If there is no valid command at the current position, this function
-    /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
-        match self.simple_command().await? {
-            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(None) => self
-                .full_compound_command()
-                .await
-                .map(|c| Rec::Parsed(c.map(Command::Compound))),
-            Rec::Parsed(Some(c)) => self
-                .short_function_definition(c)
-                .await
-                .map(|c| Rec::Parsed(Some(c))),
-        }
-    }
-
     /// Parses a pipeline.
     ///
     /// If there is no valid pipeline at the current position, this function
@@ -319,66 +302,6 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::{Location, Source};
     use futures::executor::block_on;
-
-    #[test]
-    fn parser_command_simple() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo < bar");
-        let mut parser = Parser::new(&mut lexer);
-
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Simple(c) = result {
-            assert_eq!(c.to_string(), "foo <bar");
-        } else {
-            panic!("Not a simple command: {:?}", result);
-        }
-
-        let next = block_on(parser.peek_token()).unwrap();
-        assert_eq!(next.id, EndOfInput);
-    }
-
-    #[test]
-    fn parser_command_compound() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(foo) < bar");
-        let mut parser = Parser::new(&mut lexer);
-
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Compound(c) = result {
-            assert_eq!(c.to_string(), "(foo) <bar");
-        } else {
-            panic!("Not a compound command: {:?}", result);
-        }
-
-        let next = block_on(parser.peek_token()).unwrap();
-        assert_eq!(next.id, EndOfInput);
-    }
-
-    #[test]
-    fn parser_command_function() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "fun () ( echo )");
-        let mut parser = Parser::new(&mut lexer);
-
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Function(f) = result {
-            assert_eq!(f.to_string(), "fun() (echo)");
-        } else {
-            panic!("Not a function definition: {:?}", result);
-        }
-
-        let next = block_on(parser.peek_token()).unwrap();
-        assert_eq!(next.id, EndOfInput);
-    }
-
-    #[test]
-    fn parser_command_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-        let mut parser = Parser::new(&mut lexer);
-
-        let option = block_on(parser.command()).unwrap().unwrap();
-        assert_eq!(option, None);
-    }
 
     #[test]
     fn parser_pipeline_eof() {
