@@ -14,9 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Helper for parsing operator tokens.
+//! Part of the lexer that parses operators.
 
+use super::core::Lexer;
+use super::core::Token;
+use super::core::TokenId;
+use crate::parser::core::Result;
+use crate::source::Location;
+use crate::syntax::Literal;
+use crate::syntax::Unquoted;
+use crate::syntax::Word;
 use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
 
 /// Operator token identifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -272,9 +282,101 @@ pub fn is_operator_char(c: char) -> bool {
     OPERATORS.edge(c).is_some()
 }
 
+/// Return type for [`Lexer::operator_tail`]
+struct OperatorTail {
+    pub operator: Operator,
+    pub location: Location,
+    pub reversed_key: Vec<char>,
+}
+
+impl Lexer {
+    /// Parses an operator that matches a key in the given trie, if any.
+    fn operator_tail(
+        &mut self,
+        trie: Trie,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<OperatorTail>>> + '_>> {
+        Box::pin(async move {
+            if trie.is_empty() {
+                return Ok(None);
+            }
+
+            self.line_continuations().await?;
+
+            let sc = match self.peek_char().await? {
+                None => return Ok(None),
+                Some(sc) => sc.clone(),
+            };
+            let edge = match trie.edge(sc.value) {
+                None => return Ok(None),
+                Some(edge) => edge,
+            };
+
+            let old_index = self.index();
+            self.consume_char();
+
+            if let Some(OperatorTail {
+                operator,
+                location: _,
+                mut reversed_key,
+            }) = self.operator_tail(edge.next).await?
+            {
+                reversed_key.push(sc.value);
+                return Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key,
+                }));
+            }
+
+            match edge.value {
+                None => {
+                    self.rewind(old_index);
+                    Ok(None)
+                }
+                Some(operator) => Ok(Some(OperatorTail {
+                    operator,
+                    location: sc.location,
+                    reversed_key: vec![sc.value],
+                })),
+            }
+        })
+    }
+
+    /// Parses an operator token.
+    pub async fn operator(&mut self) -> Result<Option<Token>> {
+        let index = self.index();
+        self.operator_tail(OPERATORS).await.map(|o| {
+            o.map(|ot| {
+                let OperatorTail {
+                    operator,
+                    location,
+                    reversed_key,
+                } = ot;
+                let units = reversed_key
+                    .into_iter()
+                    .rev()
+                    .map(|c| Unquoted(Literal(c)))
+                    .collect::<Vec<_>>();
+                let word = Word { units, location };
+                let id = TokenId::Operator(operator);
+                Token { word, id, index }
+            })
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::Context;
+    use crate::input::Input;
+    use crate::source::lines;
+    use crate::source::Line;
+    use crate::source::Source;
+    use crate::syntax::TextUnit;
+    use crate::syntax::WordUnit;
+    use futures::executor::block_on;
+    use std::future::ready;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -291,5 +393,110 @@ mod tests {
     #[test]
     fn tries_are_sorted() {
         ensure_sorted(&OPERATORS);
+    }
+
+    #[test]
+    fn lexer_operator_longest_match() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<-");
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 3);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('-')));
+        assert_eq!(t.word.location.line.value, "<<-");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_operator_delimited_by_another_operator() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<>");
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 2);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.location.line.value, "<<>");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.location()).unwrap().column.get(), 3);
+    }
+
+    #[test]
+    fn lexer_operator_delimited_by_eof() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "<<");
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 2);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.location.line.value, "<<");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_operator_containing_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n<\\\n<\\\n>");
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(t.word.units.len(), 2);
+        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
+        assert_eq!(t.word.location.line.value, "<\\\n");
+        assert_eq!(t.word.location.line.number.get(), 3);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '>');
+    }
+
+    #[test]
+    fn lexer_operator_none() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n ");
+
+        let r = block_on(lexer.operator()).unwrap();
+        assert!(r.is_none(), "Unexpected success: {:?}", r);
+    }
+
+    #[test]
+    fn lexer_operator_should_not_peek_beyond_newline() {
+        struct OneLineInput(Option<Line>);
+        impl Input for OneLineInput {
+            fn next_line(
+                &mut self,
+                _: &Context,
+            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
+                if let Some(line) = self.0.take() {
+                    Box::pin(ready(Ok(line)))
+                } else {
+                    panic!("The second line should not be read")
+                }
+            }
+        }
+
+        let line = lines(Source::Unknown, "\n").next().unwrap();
+        let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
+
+        let t = block_on(lexer.operator()).unwrap().unwrap();
+        assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
+        assert_eq!(t.word.location.line.value, "\n");
+        assert_eq!(t.word.location.line.number.get(), 1);
+        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.column.get(), 1);
+        assert_eq!(t.id, TokenId::Operator(Operator::Newline));
     }
 }
