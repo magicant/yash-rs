@@ -22,7 +22,7 @@ use super::core::Rec;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::{Case, Esac, In};
+use super::lex::Keyword::{Case, Esac, In};
 use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
 use crate::syntax::CaseItem;

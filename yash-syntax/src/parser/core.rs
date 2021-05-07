@@ -19,7 +19,7 @@
 //! This module includes common types that are used as building blocks for constructing the syntax
 //! parser.
 
-use super::lex::keyword::Keyword;
+use super::lex::Keyword;
 use super::lex::Lexer;
 use super::lex::PartialHereDoc;
 use super::lex::Token;

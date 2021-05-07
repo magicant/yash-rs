@@ -21,7 +21,7 @@ use super::core::Parser;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::{Until, While};
+use super::lex::Keyword::{Until, While};
 use super::lex::TokenId::Token;
 use crate::syntax::CompoundCommand;
 

@@ -22,7 +22,7 @@ use super::core::Rec;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::{Do, For, In};
+use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
 use crate::source::Location;

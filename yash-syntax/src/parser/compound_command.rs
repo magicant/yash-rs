@@ -24,7 +24,7 @@ use super::core::Parser;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::{Case, Do, Done, For, OpenBrace, Until, While};
+use super::lex::Keyword::{Case, Do, Done, For, OpenBrace, Until, While};
 use super::lex::Operator::OpenParen;
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;
