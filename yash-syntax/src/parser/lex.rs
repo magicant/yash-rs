@@ -25,7 +25,7 @@ mod backquote;
 mod command_subst;
 mod dollar;
 mod heredoc;
-pub mod keyword;
+mod keyword;
 mod misc;
 mod op;
 mod text;
@@ -35,5 +35,6 @@ mod word;
 
 pub use self::core::*;
 pub use self::heredoc::PartialHereDoc;
+pub use self::keyword::Keyword;
 pub use self::op::is_operator_char;
 pub use self::token::is_token_delimiter_char;

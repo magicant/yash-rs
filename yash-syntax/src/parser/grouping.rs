@@ -21,7 +21,7 @@ use super::core::Parser;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::{CloseBrace, OpenBrace};
+use super::lex::Keyword::{CloseBrace, OpenBrace};
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;

@@ -22,7 +22,7 @@ use super::core::Rec;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::keyword::Keyword::Bang;
+use super::lex::Keyword::Bang;
 use super::lex::Operator::Bar;
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Pipeline;
