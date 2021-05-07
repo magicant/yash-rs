@@ -20,7 +20,7 @@
 
 mod core;
 mod fill;
-mod fromstr;
+mod from_str;
 
 mod and_or;
 mod case;
