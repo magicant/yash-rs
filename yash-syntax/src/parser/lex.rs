@@ -19,193 +19,21 @@
 //! TODO Elaborate
 
 mod core;
-// mod heredoc; // See below
-mod misc;
-mod op;
-mod tilde;
 
-pub use self::core::*;
-pub use self::heredoc::PartialHereDoc;
-pub use self::op::is_operator_char;
-
-use self::keyword::Keyword;
-use crate::parser::core::Result;
-use crate::syntax::*;
-use std::convert::TryFrom;
-
-/// Tests whether the given character is a token delimiter.
-///
-/// A character is a token delimiter if it is either a whitespace or [operator](is_operator_char).
-pub fn is_token_delimiter_char(c: char) -> bool {
-    is_operator_char(c) || is_blank(c)
-}
-
-impl Lexer {
-    /// Determines the token ID for the word.
-    ///
-    /// This is a helper function used by [`Lexer::token`] and does not support
-    /// operators.
-    async fn token_id(&mut self, word: &Word) -> Result<TokenId> {
-        if word.units.is_empty() {
-            return Ok(TokenId::EndOfInput);
-        }
-
-        if let Some(literal) = word.to_string_if_literal() {
-            if let Ok(keyword) = Keyword::try_from(literal.as_str()) {
-                return Ok(TokenId::Token(Some(keyword)));
-            }
-
-            if literal.chars().all(|c| c.is_ascii_digit()) {
-                // TODO Do we need to handle line continuations?
-                if let Some(next) = self.peek_char().await? {
-                    if next.value == '<' || next.value == '>' {
-                        return Ok(TokenId::IoNumber);
-                    }
-                }
-            }
-        }
-
-        Ok(TokenId::Token(None))
-    }
-
-    /// Parses a token.
-    ///
-    /// If there is no more token that can be parsed, the result is a token with an empty word and
-    /// [`EndOfInput`](TokenId::EndOfInput) token identifier.
-    pub async fn token(&mut self) -> Result<Token> {
-        if let Some(op) = self.operator().await? {
-            return Ok(op);
-        }
-
-        let index = self.index();
-        let mut word = self.word(is_token_delimiter_char).await?;
-        word.parse_tilde_front();
-        let id = self.token_id(&word).await?;
-        Ok(Token { word, id, index })
-    }
-}
-
-// This is here to get better order of Lexer members in the doc.
 mod arith;
 mod backquote;
 mod command_subst;
 mod dollar;
 mod heredoc;
 pub mod keyword;
+mod misc;
+mod op;
 mod text;
+mod tilde;
+mod token;
 mod word;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::source::Source;
-    use futures::executor::block_on;
-
-    #[test]
-    fn lexer_token_empty() {
-        // If there's no word unit that can be parsed, it is the end of input.
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-
-        let t = block_on(lexer.token()).unwrap();
-        assert_eq!(t.word.location.line.value, "");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
-        assert_eq!(t.word.location.column.get(), 1);
-        assert_eq!(t.id, TokenId::EndOfInput);
-        assert_eq!(t.index, 0);
-    }
-
-    #[test]
-    fn lexer_token_non_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc ");
-
-        let t = block_on(lexer.token()).unwrap();
-        assert_eq!(t.word.units.len(), 3);
-        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('a')));
-        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('b')));
-        assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('c')));
-        assert_eq!(t.word.location.line.value, "abc ");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
-        assert_eq!(t.word.location.column.get(), 1);
-        assert_eq!(t.id, TokenId::Token(None));
-        assert_eq!(t.index, 0);
-
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ' ');
-    }
-
-    #[test]
-    fn lexer_token_tilde() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "~a:~");
-
-        let t = block_on(lexer.token()).unwrap();
-        assert_eq!(
-            t.word.units,
-            [
-                WordUnit::Tilde("a".to_string()),
-                WordUnit::Unquoted(TextUnit::Literal(':')),
-                WordUnit::Unquoted(TextUnit::Literal('~'))
-            ]
-        );
-    }
-
-    #[test]
-    fn lexer_token_io_number_delimited_by_less() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "12<");
-
-        let t = block_on(lexer.token()).unwrap();
-        assert_eq!(t.word.units.len(), 2);
-        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
-        assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
-        assert_eq!(t.word.location.line.value, "12<");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
-        assert_eq!(t.word.location.column.get(), 1);
-        assert_eq!(t.id, TokenId::IoNumber);
-        assert_eq!(t.index, 0);
-
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
-    }
-
-    #[test]
-    fn lexer_token_io_number_delimited_by_greater() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "0>>");
-
-        let t = block_on(lexer.token()).unwrap();
-        assert_eq!(t.word.units.len(), 1);
-        assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
-        assert_eq!(t.word.location.line.value, "0>>");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
-        assert_eq!(t.word.location.column.get(), 1);
-        assert_eq!(t.id, TokenId::IoNumber);
-        assert_eq!(t.index, 0);
-
-        assert_eq!(block_on(lexer.location()).unwrap().column.get(), 2);
-    }
-
-    #[test]
-    fn lexer_token_after_blank() {
-        block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, " a  ");
-
-            lexer.skip_blanks().await.unwrap();
-            let t = lexer.token().await.unwrap();
-            assert_eq!(t.word.location.line.value, " a  ");
-            assert_eq!(t.word.location.line.number.get(), 1);
-            assert_eq!(t.word.location.line.source, Source::Unknown);
-            assert_eq!(t.word.location.column.get(), 2);
-            assert_eq!(t.id, TokenId::Token(None));
-            assert_eq!(t.index, 1);
-
-            lexer.skip_blanks().await.unwrap();
-            let t = lexer.token().await.unwrap();
-            assert_eq!(t.word.location.line.value, " a  ");
-            assert_eq!(t.word.location.line.number.get(), 1);
-            assert_eq!(t.word.location.line.source, Source::Unknown);
-            assert_eq!(t.word.location.column.get(), 5);
-            assert_eq!(t.id, TokenId::EndOfInput);
-            assert_eq!(t.index, 4);
-        });
-    }
-}
+pub use self::core::*;
+pub use self::heredoc::PartialHereDoc;
+pub use self::op::is_operator_char;
+pub use self::token::is_token_delimiter_char;
