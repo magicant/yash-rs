@@ -17,7 +17,7 @@
 //! Fundamental building blocks for the lexical analyzer.
 
 use super::keyword::Keyword;
-pub use super::op::Operator;
+use super::op::Operator;
 use crate::alias::Alias;
 use crate::input::Context;
 use crate::input::Input;
