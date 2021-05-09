@@ -24,7 +24,7 @@ use super::core::Parser;
 use super::core::Result;
 use super::core::SyntaxError;
 use super::fill::MissingHereDoc;
-use super::lex::Keyword::{Case, Do, Done, For, OpenBrace, Until, While};
+use super::lex::Keyword::{Case, Do, Done, For, If, OpenBrace, Until, While};
 use super::lex::Operator::OpenParen;
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;
@@ -70,6 +70,7 @@ impl Parser<'_> {
             Token(Some(For)) => self.for_loop().await.map(Some),
             Token(Some(While)) => self.while_loop().await.map(Some),
             Token(Some(Until)) => self.until_loop().await.map(Some),
+            Token(Some(If)) => self.if_command().await.map(Some),
             Token(Some(Case)) => self.case_command().await.map(Some),
             _ => Ok(None),
         }
