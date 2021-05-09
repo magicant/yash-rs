@@ -93,6 +93,22 @@ pub enum SyntaxError {
     UnclosedUntilClause { opening_location: Location },
     /// An until loop's condition is empty.
     EmptyUntilCondition,
+    /// An if command is missing the then clause.
+    IfMissingThen { if_location: Location },
+    /// An if command's condition is empty.
+    EmptyIfCondition,
+    /// An if command's body is empty.
+    EmptyIfBody,
+    /// An elif clause is missing the then clause.
+    ElifMissingThen { elif_location: Location },
+    /// An elif clause's condition is empty.
+    EmptyElifCondition,
+    /// An elif clause's body is empty.
+    EmptyElifBody,
+    /// An else clause is empty.
+    EmptyElse,
+    /// An if command is not closed.
+    UnclosedIf { opening_location: Location },
     /// The case command is missing its subject.
     MissingCaseSubject,
     /// The subject of the case command is not a valid word.
@@ -170,6 +186,14 @@ impl fmt::Display for SyntaxError {
                 f.write_str("The `until` loop is missing its `do` clause")
             }
             EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
+            IfMissingThen { .. } => f.write_str("The `if` command is missing the `then` clause"),
+            EmptyIfCondition => f.write_str("The `if` command is missing its condition"),
+            EmptyIfBody => f.write_str("The `if` command is missing its body"),
+            ElifMissingThen { .. } => f.write_str("The `elif` clause is missing the `then` clause"),
+            EmptyElifCondition => f.write_str("The `elif` clause is missing its condition"),
+            EmptyElifBody => f.write_str("The `elif` clause is missing its body"),
+            EmptyElse => f.write_str("The `else` clause is missing its content"),
+            UnclosedIf { .. } => f.write_str("The `if` command is missing its closing `fi`"),
             MissingCaseSubject => f.write_str("The subject is missing after `case`"),
             InvalidCaseSubject => f.write_str("The `case` command subject is not a valid word"),
             MissingIn { .. } => f.write_str("`in` is missing in the `case` command"),
