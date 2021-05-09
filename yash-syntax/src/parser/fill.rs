@@ -57,6 +57,16 @@ pub trait Fill<T = HereDoc> {
     fn fill(self, i: &mut dyn Iterator<Item = T>) -> Result<Self::Full>;
 }
 
+impl<T> Fill for Option<T>
+where
+    T: Fill,
+{
+    type Full = Option<<T as Fill>::Full>;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+        self.map(|v| v.fill(i)).transpose()
+    }
+}
+
 impl<T> Fill for Vec<T>
 where
     T: Fill,
@@ -128,6 +138,16 @@ impl Fill for CaseItem<MissingHereDoc> {
     }
 }
 
+impl Fill for ElifThen<MissingHereDoc> {
+    type Full = ElifThen;
+    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<ElifThen> {
+        let ElifThen { condition, body } = self;
+        let condition = condition.fill(i)?;
+        let body = body.fill(i)?;
+        Ok(ElifThen { condition, body })
+    }
+}
+
 impl Fill for CompoundCommand<MissingHereDoc> {
     type Full = CompoundCommand;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CompoundCommand> {
@@ -140,14 +160,33 @@ impl Fill for CompoundCommand<MissingHereDoc> {
                 values,
                 body: body.fill(i)?,
             },
-            While { condition, body } => While {
-                condition: condition.fill(i)?,
-                body: body.fill(i)?,
-            },
-            Until { condition, body } => Until {
-                condition: condition.fill(i)?,
-                body: body.fill(i)?,
-            },
+            While { condition, body } => {
+                let condition = condition.fill(i)?;
+                let body = body.fill(i)?;
+                While { condition, body }
+            }
+            Until { condition, body } => {
+                let condition = condition.fill(i)?;
+                let body = body.fill(i)?;
+                Until { condition, body }
+            }
+            If {
+                condition,
+                body,
+                elifs,
+                r#else,
+            } => {
+                let condition = condition.fill(i)?;
+                let body = body.fill(i)?;
+                let elifs = elifs.fill(i)?;
+                let r#else = r#else.fill(i)?;
+                If {
+                    condition,
+                    body,
+                    elifs,
+                    r#else,
+                }
+            }
             Case { subject, items } => Case {
                 subject,
                 items: items.fill(i)?,
