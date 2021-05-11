@@ -29,6 +29,7 @@ mod compound_command;
 mod for_loop;
 mod function;
 mod grouping;
+mod r#if;
 mod list;
 mod pipeline;
 mod redir;

@@ -616,6 +616,24 @@ impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
     }
 }
 
+/// `elif-then` clause.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ElifThen<H = HereDoc> {
+    pub condition: List<H>,
+    pub body: List<H>,
+}
+
+impl<H: fmt::Display> fmt::Display for ElifThen<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "elif {:#} then ", self.condition)?;
+        if f.alternate() {
+            write!(f, "{:#}", self.body)
+        } else {
+            write!(f, "{}", self.body)
+        }
+    }
+}
+
 /// Branch item of a `case` compound command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseItem<H = HereDoc> {
@@ -656,7 +674,13 @@ pub enum CompoundCommand<H = HereDoc> {
     While { condition: List<H>, body: List<H> },
     /// Until loop.
     Until { condition: List<H>, body: List<H> },
-    // TODO if
+    /// If conditional construct.
+    If {
+        condition: List<H>,
+        body: List<H>,
+        elifs: Vec<ElifThen<H>>,
+        r#else: Option<List<H>>,
+    },
     /// Case conditional construct.
     Case {
         subject: Word,
@@ -684,6 +708,21 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
             }
             While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
             Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
+            If {
+                condition,
+                body,
+                elifs,
+                r#else,
+            } => {
+                write!(f, "if {:#} then {:#} ", condition, body)?;
+                for elif in elifs {
+                    write!(f, "{:#} ", elif)?;
+                }
+                if let Some(r#else) = r#else {
+                    write!(f, "else {:#} ", r#else)?;
+                }
+                f.write_str("fi")
+            }
             Case { subject, items } => {
                 write!(f, "case {} in ", subject)?;
                 for item in items {
@@ -1310,6 +1349,21 @@ mod tests {
     }
 
     #[test]
+    fn elif_then_display() {
+        let condition: List = "c 1& c 2".parse().unwrap();
+        let body = "b 1& b 2".parse().unwrap();
+        let elif = ElifThen { condition, body };
+        assert_eq!(format!("{}", elif), "elif c 1& c 2; then b 1& b 2");
+        assert_eq!(format!("{:#}", elif), "elif c 1& c 2; then b 1& b 2;");
+
+        let condition: List = "c&".parse().unwrap();
+        let body = "b&".parse().unwrap();
+        let elif = ElifThen { condition, body };
+        assert_eq!(format!("{}", elif), "elif c& then b&");
+        assert_eq!(format!("{:#}", elif), "elif c& then b&");
+    }
+
+    #[test]
     fn case_item_display() {
         let patterns = vec!["foo".parse().unwrap()];
         let body = "".parse::<List>().unwrap();
@@ -1378,6 +1432,51 @@ mod tests {
         let body = "echo ok".parse::<List>().unwrap();
         let until = CompoundCommand::Until { condition, body };
         assert_eq!(until.to_string(), "until true& false; do echo ok; done");
+    }
+
+    #[test]
+    fn if_display() {
+        let r#if: CompoundCommand = CompoundCommand::If {
+            condition: "c 1; c 2&".parse().unwrap(),
+            body: "b 1; b 2&".parse().unwrap(),
+            elifs: vec![],
+            r#else: None,
+        };
+        assert_eq!(r#if.to_string(), "if c 1; c 2& then b 1; b 2& fi");
+
+        let r#if: CompoundCommand = CompoundCommand::If {
+            condition: "c 1& c 2;".parse().unwrap(),
+            body: "b 1& b 2;".parse().unwrap(),
+            elifs: vec![ElifThen {
+                condition: "c 3&".parse().unwrap(),
+                body: "b 3&".parse().unwrap(),
+            }],
+            r#else: Some("b 4".parse().unwrap()),
+        };
+        assert_eq!(
+            r#if.to_string(),
+            "if c 1& c 2; then b 1& b 2; elif c 3& then b 3& else b 4; fi"
+        );
+
+        let r#if: CompoundCommand = CompoundCommand::If {
+            condition: "true".parse().unwrap(),
+            body: ":".parse().unwrap(),
+            elifs: vec![
+                ElifThen {
+                    condition: "false".parse().unwrap(),
+                    body: "a".parse().unwrap(),
+                },
+                ElifThen {
+                    condition: "echo&".parse().unwrap(),
+                    body: "b&".parse().unwrap(),
+                },
+            ],
+            r#else: None,
+        };
+        assert_eq!(
+            r#if.to_string(),
+            "if true; then :; elif false; then a; elif echo& then b& fi"
+        );
     }
 
     #[test]
