@@ -34,7 +34,7 @@ impl Lexer {
     /// begin an arithmetic expansion. If the characters are `((`, then the
     /// arithmetic expansion is parsed, in which case this function consumes up
     /// to the closing `))` (inclusive). Otherwise, no characters are consumed
-    /// and the return value is `Ok(Err(opening_location))`.
+    /// and the return value is `Ok(Err(location))`.
     ///
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
