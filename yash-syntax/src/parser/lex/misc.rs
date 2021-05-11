@@ -40,7 +40,7 @@ impl Lexer {
             let ok = this.skip_if(|c| c == '\\').await? && this.skip_if(|c| c == '\n').await?;
             Ok(if ok { Some(()) } else { None })
         }
-        self.many(line_continuation).await.map(|_| ())
+        self.many(line_continuation).await.map(drop)
     }
 
     /// Skips blank characters until reaching a non-blank.

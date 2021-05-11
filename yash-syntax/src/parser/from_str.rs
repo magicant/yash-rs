@@ -115,7 +115,7 @@ impl FromStr for Operator {
     fn from_str(s: &str) -> Result<Operator, ()> {
         block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, s);
-            let token = lexer.operator().await.map_err(|_| ())?.ok_or(())?;
+            let token = lexer.operator().await.map_err(drop)?.ok_or(())?;
             if let TokenId::Operator(op) = token.id {
                 Ok(op)
             } else {
