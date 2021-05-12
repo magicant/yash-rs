@@ -38,7 +38,11 @@ impl Lexer {
 
         // TODO line continuations following $
         // TODO braced parameter expansion
-        // TODO non-braced parameter expansion
+
+        let location = match self.raw_param(location).await? {
+            Ok(result) => return Ok(Some(result)),
+            Err(location) => location,
+        };
 
         let location = match self.arithmetic_expansion(location).await? {
             Ok(result) => return Ok(Some(result)),
@@ -49,6 +53,7 @@ impl Lexer {
             return Ok(Some(result));
         }
 
+        // TODO maybe reject unrecognized dollar unit?
         self.rewind(index);
         Ok(None)
     }
@@ -88,6 +93,22 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "$&");
         let result = block_on(lexer.dollar_unit()).unwrap();
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lexer_dollar_unit_raw_special_parameter() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$0");
+        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
+        if let TextUnit::RawParam { name, location } = result {
+            assert_eq!(name, "0");
+            assert_eq!(location.line.value, "$0");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not a raw parameter: {:?}", result);
+        }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
