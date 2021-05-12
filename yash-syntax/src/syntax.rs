@@ -966,6 +966,12 @@ mod tests {
         let backslashed = Backslashed('X');
         assert_eq!(backslashed.to_string(), r"\X");
 
+        let raw_param = RawParam {
+            name: "PARAM".to_string(),
+            location: Location::dummy("".to_string()),
+        };
+        assert_eq!(raw_param.to_string(), "$PARAM");
+
         let command_subst = CommandSubst {
             content: r"foo\bar".to_string(),
             location: Location::dummy("".to_string()),
@@ -1004,7 +1010,11 @@ mod tests {
         assert_eq!(is_quoted, false);
 
         let nonempty = Text(vec![
-            Literal('X'),
+            Literal('W'),
+            RawParam {
+                name: "X".to_string(),
+                location: Location::dummy("".to_string()),
+            },
             CommandSubst {
                 content: "Y".to_string(),
                 location: Location::dummy("".to_string()),
@@ -1019,7 +1029,7 @@ mod tests {
             },
         ]);
         let (unquoted, is_quoted) = nonempty.unquote();
-        assert_eq!(unquoted, "X$(Y)`Z`$((0))");
+        assert_eq!(unquoted, "W$X$(Y)`Z`$((0))");
         assert_eq!(is_quoted, false);
     }
 
