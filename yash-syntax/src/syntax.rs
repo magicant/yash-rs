@@ -131,7 +131,14 @@ pub enum TextUnit {
     Literal(char),
     /// Backslash-escaped single character.
     Backslashed(char),
-    // Parameter(TODO),
+    /// Parameter expansion that is not enclosed in braces.
+    RawParam {
+        /// Parameter name.
+        name: String,
+        /// Location of the initial `$` character of this parameter expansion.
+        location: Location,
+    },
+    // BracedParam(TODO),
     /// Command substitution of the form `$(...)`.
     CommandSubst {
         /// Command string that will be parsed and executed when the command
@@ -164,6 +171,7 @@ impl fmt::Display for TextUnit {
         match self {
             Literal(c) => write!(f, "{}", c),
             Backslashed(c) => write!(f, "\\{}", c),
+            RawParam { name, .. } => write!(f, "${}", name),
             CommandSubst { content, .. } => write!(f, "$({})", content),
             Backquote { content, .. } => {
                 f.write_str("`")?;
@@ -185,6 +193,10 @@ impl Unquote for TextUnit {
             Backslashed(c) => {
                 w.write_char(*c)?;
                 Ok(true)
+            }
+            RawParam { name, .. } => {
+                write!(w, "${}", name)?;
+                Ok(false)
             }
             CommandSubst { content, .. } => {
                 write!(w, "$({})", content)?;
