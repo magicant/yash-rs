@@ -43,6 +43,10 @@ pub enum SyntaxError {
     UnclosedSingleQuote { opening_location: Location },
     /// A double quotation lacks a closing `"`.
     UnclosedDoubleQuote { opening_location: Location },
+    /// A parameter expansion lacks a closing `}`.
+    UnclosedParam { opening_location: Location },
+    /// A parameter expansion lacks a name.
+    EmptyParam,
     /// A command substitution started with `$(` but lacks a closing `)`.
     UnclosedCommandSubstitution { opening_location: Location },
     /// A command substitution started with `` ` `` but lacks a closing `` ` ``.
@@ -150,6 +154,8 @@ impl fmt::Display for SyntaxError {
             UnclosedParen { .. } => f.write_str("The parenthesis is not closed."),
             UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed."),
             UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed."),
+            UnclosedParam { .. } => f.write_str("The parameter expansion is not closed."),
+            EmptyParam => f.write_str("The parameter name is missing."),
             UnclosedCommandSubstitution { .. } => {
                 f.write_str("The command substitution is not closed")
             }
