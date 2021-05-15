@@ -151,16 +151,16 @@ impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use SyntaxError::*;
         match self {
-            UnclosedParen { .. } => f.write_str("The parenthesis is not closed."),
-            UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed."),
-            UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed."),
-            UnclosedParam { .. } => f.write_str("The parameter expansion is not closed."),
-            EmptyParam => f.write_str("The parameter name is missing."),
+            UnclosedParen { .. } => f.write_str("The parenthesis is not closed"),
+            UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed"),
+            UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed"),
+            UnclosedParam { .. } => f.write_str("The parameter expansion is not closed"),
+            EmptyParam => f.write_str("The parameter name is missing"),
             UnclosedCommandSubstitution { .. } => {
                 f.write_str("The command substitution is not closed")
             }
-            UnclosedBackquote { .. } => f.write_str("The backquote is not closed."),
-            UnclosedArith { .. } => f.write_str("The arithmetic expansion is not closed."),
+            UnclosedBackquote { .. } => f.write_str("The backquote is not closed"),
+            UnclosedArith { .. } => f.write_str("The arithmetic expansion is not closed"),
             UnexpectedToken => f.write_str("Unexpected token"),
             FdOutOfRange => f.write_str("The file descriptor is too large"),
             MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
