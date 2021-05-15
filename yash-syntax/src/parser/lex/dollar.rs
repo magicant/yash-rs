@@ -36,7 +36,7 @@ impl Lexer {
             Some(c) => c.location.clone(),
         };
 
-        // TODO line continuations following $
+        self.line_continuations().await?;
 
         let location = match self.raw_param(location).await? {
             Ok(result) => return Ok(Some(result)),
@@ -156,6 +156,18 @@ mod tests {
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
+        }
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_dollar_unit_line_continuation() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "$\\\n\\\n0");
+        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
+        if let TextUnit::RawParam { name, .. } = result {
+            assert_eq!(name, "0");
+        } else {
+            panic!("Not a raw parameter: {:?}", result);
         }
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
