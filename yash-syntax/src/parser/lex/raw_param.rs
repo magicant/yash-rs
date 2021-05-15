@@ -52,7 +52,7 @@ pub fn is_single_char_name(c: char) -> bool {
 impl Lexer {
     /// Consumes a POSIXly-portable name character optionally preceded by line
     /// continuations.
-    async fn consume_name_char(&mut self) -> Result<Option<&SourceChar>> {
+    async fn consume_portable_name_char(&mut self) -> Result<Option<&SourceChar>> {
         self.line_continuations().await?;
         self.consume_char_if(is_portable_name_char).await
     }
@@ -79,7 +79,7 @@ impl Lexer {
             Ok(Ok(TextUnit::RawParam { name, location }))
         } else if let Some(c) = self.consume_char_if(is_portable_name_char).await? {
             let mut name = c.value.to_string();
-            while let Some(c) = self.consume_name_char().await? {
+            while let Some(c) = self.consume_portable_name_char().await? {
                 name.push(c.value);
             }
             Ok(Ok(TextUnit::RawParam { name, location }))

@@ -37,10 +37,14 @@ impl Lexer {
         };
 
         // TODO line continuations following $
-        // TODO braced parameter expansion
 
         let location = match self.raw_param(location).await? {
             Ok(result) => return Ok(Some(result)),
+            Err(location) => location,
+        };
+
+        let location = match self.braced_param(location).await? {
+            Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
             Err(location) => location,
         };
 

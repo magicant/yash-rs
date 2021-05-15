@@ -22,6 +22,7 @@ mod core;
 
 mod arith;
 mod backquote;
+mod braced_param;
 mod command_subst;
 mod dollar;
 mod heredoc;
@@ -34,6 +35,7 @@ mod tilde;
 mod token;
 mod word;
 
+pub use self::braced_param::is_name_char;
 pub use self::core::*;
 pub use self::heredoc::PartialHereDoc;
 pub use self::keyword::Keyword;

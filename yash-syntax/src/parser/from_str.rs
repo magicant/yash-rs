@@ -50,6 +50,17 @@ impl<T, E> Shift for Result<Option<T>, E> {
     }
 }
 
+impl FromStr for Param {
+    type Err = Option<Error>;
+    fn from_str(s: &str) -> Result<Param, Option<Error>> {
+        match TextUnit::from_str(s) {
+            Err(e) => Err(Some(e)),
+            Ok(TextUnit::BracedParam(param)) => Ok(param),
+            Ok(_) => Err(None),
+        }
+    }
+}
+
 impl FromStr for TextUnit {
     type Err = Error;
     /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
@@ -266,6 +277,12 @@ impl FromStr for List {
 mod tests {
     use super::*;
     use std::iter::empty;
+
+    #[test]
+    fn param_from_str() {
+        let parse: Param = "${foo}".parse().unwrap();
+        assert_eq!(parse.to_string(), "${foo}");
+    }
 
     #[test]
     fn text_unit_from_str() {

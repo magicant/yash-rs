@@ -91,6 +91,36 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
+/// Parameter expansion enclosed in braces.
+///
+/// This struct is used only for parameter expansions that are enclosed braces.
+/// Expansions that are not enclosed in braces are directly encoded with
+/// [`TextUnit::RawParam`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Param {
+    // TODO length prefix
+    // TODO recursive expansion
+    /// Parameter name.
+    pub name: String,
+    // TODO index
+    // TODO modifier
+    /// Location of the initial `$` character of this parameter expansion.
+    pub location: Location,
+}
+
+impl fmt::Display for Param {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "${{{}}}", self.name)
+    }
+}
+
+impl Unquote for Param {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        write!(w, "${{{}}}", self.name)?;
+        Ok(false)
+    }
+}
+
 /// Element of [`TextUnit::Backquote`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackquoteUnit {
@@ -138,7 +168,8 @@ pub enum TextUnit {
         /// Location of the initial `$` character of this parameter expansion.
         location: Location,
     },
-    // BracedParam(TODO),
+    /// Parameter expansion that is enclosed in braces.
+    BracedParam(Param),
     /// Command substitution of the form `$(...)`.
     CommandSubst {
         /// Command string that will be parsed and executed when the command
@@ -172,6 +203,7 @@ impl fmt::Display for TextUnit {
             Literal(c) => write!(f, "{}", c),
             Backslashed(c) => write!(f, "\\{}", c),
             RawParam { name, .. } => write!(f, "${}", name),
+            BracedParam(param) => param.fmt(f),
             CommandSubst { content, .. } => write!(f, "$({})", content),
             Backquote { content, .. } => {
                 f.write_str("`")?;
@@ -198,6 +230,7 @@ impl Unquote for TextUnit {
                 write!(w, "${}", name)?;
                 Ok(false)
             }
+            BracedParam(param) => param.write_unquoted(w),
             CommandSubst { content, .. } => {
                 write!(w, "$({})", content)?;
                 Ok(false)
@@ -937,6 +970,24 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 mod tests {
     use super::*;
     use std::str::FromStr;
+
+    #[test]
+    fn braced_param_display() {
+        let name = "foo".to_string();
+        let location = Location::dummy("".to_string());
+        let param = Param { name, location };
+        assert_eq!(param.to_string(), "${foo}");
+    }
+
+    #[test]
+    fn braced_param_unquote() {
+        let name = "foo".to_string();
+        let location = Location::dummy("".to_string());
+        let param = Param { name, location };
+        let (unquoted, is_quoted) = param.unquote();
+        assert_eq!(unquoted, "${foo}");
+        assert_eq!(is_quoted, false);
+    }
 
     #[test]
     fn backquote_unit_display() {
