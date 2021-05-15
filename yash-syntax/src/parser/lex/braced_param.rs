@@ -61,7 +61,8 @@ impl Lexer {
             return Ok(Err(location));
         }
 
-        // TODO line continuations
+        self.line_continuations().await?;
+
         let sc = self.peek_char().await?.unwrap();
         let c = sc.value;
         let name = if is_special_parameter_char(c) {
@@ -85,7 +86,8 @@ impl Lexer {
             return Err(Error { cause, location });
         };
 
-        // TODO line continuations
+        self.line_continuations().await?;
+
         if !self.skip_if(|c| c == '}').await? {
             let opening_location = location;
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
@@ -203,5 +205,21 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
+    }
+
+    #[test]
+    fn lexer_braced_param_line_continuations() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{\\\n\\\na_\\\n1\\\n\\\n}z");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "a_1");
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
     }
 }
