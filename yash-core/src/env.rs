@@ -16,6 +16,9 @@
 
 //! Shell execution environment.
 //!
+//! A shell execution environment is a collection of data that may affect or be
+//! affected by execution of commands.
+//!
 //! TODO Elaborate
 
 use crate::alias::AliasSet;

@@ -399,7 +399,22 @@ where
     }
 }
 
-/// Set of data used in syntax parsing.
+/// The shell syntax parser.
+///
+/// This `struct` contains a set of data used in syntax parsing.
+///
+/// Because of the nature of here-document contents that cannot be parsed by a
+/// standard recursive descent parser, most intrinsic functions of `Parser`
+/// return an AST with [`MissingHereDoc`](super::MissingHereDoc) filled in place
+/// of a proper here-document data. When the parser parses a here-document
+/// content, the content is accumulated in the parser so that it can be merged
+/// into the main AST in the final step of parsing.
+///
+/// Unless you are interested in parsing a specific syntactic construct that is
+/// only part of source code, you will want to use a function that returns a
+/// complete result filled with proper here-document contents if any.
+/// Then the [`command_line`](Self::command_line) function is for you.
+/// See also the [module documentation](super).
 #[derive(Debug)]
 pub struct Parser<'l> {
     /// Lexer that provides tokens.

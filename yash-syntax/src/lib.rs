@@ -14,7 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! TODO Elaborate
+//! Shell language syntax and parser.
+//!
+//! This crate defines data types for constructing abstract syntax trees (AST)
+//! of the shell language. See the [`syntax`] module for details.
+//!
+//! To parse source code into an AST, you can use the `parse` function on a
+//! `&str`, which is allowed by the implementations of
+//! [`FromStr`](std::str::FromStr) for the AST data types.
+//! However, ASTs constructed in this way do not contain very meaningful
+//! [source](crate::source) information.  All
+//! [location](crate::source::Location)s in the ASTs only have [unknown
+//! source](crate::source::Source::Unknown).
+//!
+//! To include a proper source information, you need to prepare a
+//! [lexer](crate::parser::lex::Lexer) with source information and then pass it
+//! to a parser. See the [`parser`] module for details.
 
 pub mod input;
 pub mod parser;

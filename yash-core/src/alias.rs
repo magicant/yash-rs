@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Defining aliases
+//! Defining aliases.
 //!
-//! TODO Elaborate
+//! This module provides data structures for defining aliases in the shell
+//! execution environment.
 
 use crate::source::Location;
 use std::borrow::Borrow;

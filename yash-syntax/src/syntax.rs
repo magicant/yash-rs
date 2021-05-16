@@ -16,14 +16,70 @@
 
 //! Shell command language syntax.
 //!
-//! This module contains types that represent abstract syntax trees (ASTs) of the shell language.
+//! This module contains types that represent abstract syntax trees (ASTs) of
+//! the shell language.
 //!
-//! Some types in this module has the type parameter `<H = HereDoc>`. As a user of the AST, you
-//! will never have to specify the parameter other than the default `HereDoc`. The parameter is
-//! used by the parser to create intermediate ASTs that lack sub-trees for here-documents, since
-//! the contents of here-documents have to be parsed separately from the normal flow of source code.
+//! Some types in this module has the type parameter `<H = HereDoc>`. As a user
+//! of the AST, you will never have to specify the parameter other than the
+//! default `HereDoc`. The parameter with non-default types is used internally
+//! by the parser to create intermediate ASTs that lack sub-trees for
+//! here-documents, because the contents of here-documents have to be parsed
+//! separately from the normal flow of source code.
 //!
-//! TODO Elaborate
+//! ## Syntactic elements
+//!
+//! The AST type that represents the whole shell script is [`List`], which is a
+//! vector of [`Item`]s. An `Item` is a possibly asynchronous [`AndOrList`],
+//! which is a sequence of conditionally executed [`Pipeline`]s. A `Pipeline` is
+//! a sequence of [`Command`]s separated by `|`.
+//!
+//! The shell syntax has many types of `Command`s, that is, [`SimpleCommand`],
+//! [`CompoundCommand`] and [`FunctionDefinition`], where `CompoundCommand` in
+//! turn has different types.
+//!
+//! ## Lexical elements
+//!
+//! Tokens that make up commands may contain quotations and expansions. A
+//! [`Word`], a sequence of [`WordUnit`]s, represents such a token that appears
+//! in a simple command or some kinds of other commands.
+//!
+//! In some contexts, tilde expansion and single- and double-quotes are not
+//! recognized while other kinds of expansions are allowed. Such part is
+//! represented as [`Text`], a sequence of [`TextUnit`]s.
+//!
+//! ## Parsing
+//!
+//! Most AST types defined in this modules implement the
+//! [`FromStr`](std::str::FromStr) trait, which means you can call `parse` on a
+//! `&str` and easily get the parsed AST instance. However, ASTs constructed in
+//! this way do not contain very meaningful [source](crate::source) information.
+//! All [location](crate::source::Location)s in such ASTs only have [unknown
+//! source](crate::source::Source::Unknown).
+//!
+//! ```
+//! use std::str::FromStr;
+//! # use yash_syntax::syntax::List;
+//! let list: List = "diff foo bar; echo $?".parse().unwrap();
+//! assert_eq!(list.to_string(), "diff foo bar; echo $?");
+//!
+//! use yash_syntax::source::Source;
+//! # use yash_syntax::syntax::Word;
+//! let word: Word = "foo".parse().unwrap();
+//! assert_eq!(word.location.line.source, Source::Unknown);
+//! ```
+//!
+//! To include a proper source information, you need to prepare a
+//! [lexer](crate::parser::lex::Lexer) with source information and then use it
+//! to parse the source code. See the [`parser`](crate::parser) module for
+//! details.
+//!
+//! ## Displaying
+//!
+//! Most AST types support the [`Display`](std::fmt::Display) trait, which
+//! allows you to convert an AST to a source code string. Note that the
+//! `Display` trait implementations always produce a single-line source code
+//! with here-document contents omitted. To pretty-format an AST in multiple
+//! lines with here-document contents included, you can use ... TODO TBD.
 
 use crate::parser::lex::Operator;
 use crate::source::Location;
@@ -39,6 +95,10 @@ use std::os::unix::io::RawFd;
 type UnquoteResult = Result<bool, fmt::Error>;
 
 /// Removing quotes from syntax without performing expansion.
+///
+/// This trail will be useful only in a limited number of use cases. In the
+/// normal word expansion process, quote removal is done after other kinds of
+/// expansions like parameter expansion, so this trait is not used.
 pub trait Unquote {
     /// Converts `self` to a string with all quotes removed and writes to `w`.
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult;
@@ -60,8 +120,25 @@ pub trait Unquote {
 /// Possibly literal syntax element.
 ///
 /// A syntax element is _literal_ if it is not quoted and does not contain any
-/// expansions. Such an element can be converted to a string independently of the
+/// expansions. Such an element can be expanded to a string independently of the
 /// shell execution environment.
+///
+/// ```
+/// # use yash_syntax::syntax::MaybeLiteral;
+/// # use yash_syntax::syntax::Text;
+/// # use yash_syntax::syntax::TextUnit::Literal;
+/// let text = Text(vec![Literal('f'), Literal('o'), Literal('o')]);
+/// let expanded = text.to_string_if_literal().unwrap();
+/// assert_eq!(expanded, "foo");
+/// ```
+///
+/// ```
+/// # use yash_syntax::syntax::MaybeLiteral;
+/// # use yash_syntax::syntax::Text;
+/// # use yash_syntax::syntax::TextUnit::Backslashed;
+/// let backslashed = Text(vec![Backslashed('a')]);
+/// assert_eq!(backslashed.to_string_if_literal(), None);
+/// ```
 pub trait MaybeLiteral {
     /// Checks if `self` is literal and, if so, converts to a string and appends
     /// it to `result`.
@@ -395,9 +472,13 @@ pub enum Value {
     ///
     /// Note: Because a scalar assignment value is created from a normal command
     /// word, the location of the word in the scalar value points to the first
-    /// character of the entire assignment word rather than the assigned value.
+    /// character of the entire assignment word rather than that of the assigned
+    /// value.
     Scalar(Word),
+
     /// Array, possibly empty list of non-empty words.
+    ///
+    /// Array assignment is a POSIXly non-portable extension.
     Array(Vec<Word>),
 }
 

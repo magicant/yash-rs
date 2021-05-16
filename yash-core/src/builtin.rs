@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for Built-in utilities.
+//! Type definitions for built-in utilities.
 //!
-//! TODO Elaborate
+//! This module provides data types for defining built-in utilities.
 
 use crate::env::Env;
 use crate::exec::Abort;

@@ -16,7 +16,8 @@
 
 //! Lexical analyzer.
 //!
-//! TODO Elaborate
+//! See the [parent module](super)'s documentation to learn how to use the
+//! [lexer](Lexer).
 
 mod core;
 

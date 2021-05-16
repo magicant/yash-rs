@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! TODO Elaborate
+//! Common fundamental data types for other yash crates.
+//!
+//! The `yash_core` crate provides basic data definitions that can be used to
+//! implement features of the POSIX shell.
 
 pub mod alias;
 pub mod builtin;

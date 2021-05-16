@@ -26,6 +26,10 @@ use crate::source::Location;
 use crate::source::SourceChar;
 use crate::syntax::Param;
 
+/// Tests if a character can be part of a variable name.
+///
+/// The current implementation is the same as [`is_portable_name_char`].
+/// Other (POSIXly non-portable) characters may be supported in the future.
 pub fn is_name_char(c: char) -> bool {
     // TODO support other Unicode name characters
     is_portable_name_char(c)
