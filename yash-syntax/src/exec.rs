@@ -38,8 +38,8 @@ impl SimpleCommand {
             Err(_) => return Ok(()),
         };
         if let Some(name) = fields.get(0) {
-            if let Some(built_in) = env.builtin(&name.value) {
-                let (_exit_status, abort) = (built_in.execute)(env, fields).await;
+            if let Some(builtin) = env.builtin(&name.value) {
+                let (_exit_status, abort) = (builtin.execute)(env, fields).await;
                 if let Some(abort) = abort {
                     return Err(abort);
                 }

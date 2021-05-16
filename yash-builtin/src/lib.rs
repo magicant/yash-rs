@@ -18,8 +18,8 @@
 
 mod alias;
 
-pub use self::alias::alias_built_in;
-pub use self::alias::alias_built_in_async;
+pub use self::alias::alias_builtin;
+pub use self::alias::alias_builtin_async;
 pub use yash_core::builtin::*;
 
 use Type::Intrinsic;
@@ -29,6 +29,6 @@ pub const BUILTINS: &[(&str, Builtin)] = &[(
     "alias",
     Builtin {
         r#type: Intrinsic,
-        execute: alias_built_in_async,
+        execute: alias_builtin_async,
     },
 )];
