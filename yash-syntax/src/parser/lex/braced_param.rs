@@ -24,6 +24,7 @@ use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
 use crate::source::Location;
 use crate::source::SourceChar;
+use crate::syntax::Modifier;
 use crate::syntax::Param;
 
 /// Tests if a character can be part of a variable name.
@@ -99,7 +100,12 @@ impl Lexer {
             return Err(Error { cause, location });
         }
 
-        Ok(Ok(Param { name, location }))
+        let modifier = Modifier::None;
+        Ok(Ok(Param {
+            name,
+            modifier,
+            location,
+        }))
     }
 }
 

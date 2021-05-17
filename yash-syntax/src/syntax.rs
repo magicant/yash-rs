@@ -168,6 +168,15 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
+/// Attribute that modifies a parameter expansion.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Modifier {
+    /// No modifier.
+    None,
+    /// `#` prefix. (`${#foo}`)
+    Length,
+}
+
 /// Parameter expansion enclosed in braces.
 ///
 /// This struct is used only for parameter expansions that are enclosed braces.
@@ -175,12 +184,12 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
 /// [`TextUnit::RawParam`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Param {
-    // TODO length prefix
     // TODO recursive expansion
     /// Parameter name.
     pub name: String,
     // TODO index
-    // TODO modifier
+    /// Modifier.
+    pub modifier: Modifier,
     /// Location of the initial `$` character of this parameter expansion.
     pub location: Location,
 }
