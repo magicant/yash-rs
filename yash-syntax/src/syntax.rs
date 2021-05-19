@@ -196,13 +196,19 @@ pub struct Param {
 
 impl fmt::Display for Param {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "${{{}}}", self.name)
+        match self.modifier {
+            Modifier::None => write!(f, "${{{}}}", self.name),
+            Modifier::Length => write!(f, "${{#{}}}", self.name),
+        }
     }
 }
 
 impl Unquote for Param {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
-        write!(w, "${{{}}}", self.name)?;
+        match self.modifier {
+            Modifier::None => write!(w, "${{{}}}", self.name)?,
+            Modifier::Length => write!(w, "${{#{}}}", self.name)?,
+        }
         Ok(false)
     }
 }
@@ -1063,19 +1069,37 @@ mod tests {
 
     #[test]
     fn braced_param_display() {
-        let name = "foo".to_string();
-        let location = Location::dummy("".to_string());
-        let param = Param { name, location };
+        let param = Param {
+            name: "foo".to_string(),
+            modifier: Modifier::None,
+            location: Location::dummy("".to_string()),
+        };
         assert_eq!(param.to_string(), "${foo}");
+
+        let param = Param {
+            modifier: Modifier::Length,
+            ..param
+        };
+        assert_eq!(param.to_string(), "${#foo}");
     }
 
     #[test]
     fn braced_param_unquote() {
-        let name = "foo".to_string();
-        let location = Location::dummy("".to_string());
-        let param = Param { name, location };
+        let param = Param {
+            name: "foo".to_string(),
+            modifier: Modifier::None,
+            location: Location::dummy("".to_string()),
+        };
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${foo}");
+        assert_eq!(is_quoted, false);
+
+        let param = Param {
+            modifier: Modifier::Length,
+            ..param
+        };
+        let (unquoted, is_quoted) = param.unquote();
+        assert_eq!(unquoted, "${#foo}");
         assert_eq!(is_quoted, false);
     }
 
