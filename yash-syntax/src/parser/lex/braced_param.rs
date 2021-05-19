@@ -37,6 +37,21 @@ pub fn is_name_char(c: char) -> bool {
 }
 
 impl Lexer {
+    /// Consumes a length prefix (`#`) if any.
+    async fn length_prefix(&mut self) -> Result<bool> {
+        // TODO line continuations
+        let index = self.index();
+        if !self.skip_if(|c| c == '#').await? {
+            return Ok(false);
+        }
+        if let Some(&SourceChar { value: '}', .. }) = self.peek_char().await? {
+            self.rewind(index);
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
     /// Consumes a POSIXly-portable name character optionally preceded by line
     /// continuations.
     async fn consume_name_char(&mut self) -> Result<Option<&SourceChar>> {
@@ -65,6 +80,8 @@ impl Lexer {
         if !self.skip_if(|c| c == '{').await? {
             return Ok(Err(location));
         }
+
+        let has_length_prefix = self.length_prefix().await?;
 
         self.line_continuations().await?;
 
@@ -100,7 +117,11 @@ impl Lexer {
             return Err(Error { cause, location });
         }
 
-        let modifier = Modifier::None;
+        let modifier = if has_length_prefix {
+            Modifier::Length
+        } else {
+            Modifier::None
+        };
         Ok(Ok(Param {
             name,
             modifier,
@@ -168,6 +189,23 @@ mod tests {
     }
 
     #[test]
+    fn lexer_braced_param_hash() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        assert_eq!(result.modifier, Modifier::None);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
     fn lexer_braced_param_missing_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{};");
         let location = Location::dummy("$".to_string());
@@ -219,6 +257,76 @@ mod tests {
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
+
+    #[test]
+    fn lexer_braced_param_length_alphanumeric_name() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#foo_123}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "foo_123");
+        assert_eq!(result.modifier, Modifier::Length);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_length_hash() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{##}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        assert_eq!(result.modifier, Modifier::Length);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_length_question() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#?}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "?");
+        assert_eq!(result.modifier, Modifier::Length);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_length_hyphen() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#-}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "-");
+        assert_eq!(result.modifier, Modifier::Length);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    // TODO ${###} ${#%}
 
     #[test]
     fn lexer_braced_param_line_continuations() {
