@@ -123,6 +123,7 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "@");
+        assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
         assert_eq!(result.location.line.value, "$");
         assert_eq!(result.location.line.number.get(), 1);
@@ -139,6 +140,7 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
+        assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
         assert_eq!(result.location.line.value, "$");
         assert_eq!(result.location.line.number.get(), 1);
@@ -155,6 +157,7 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "123");
+        assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
         assert_eq!(result.location.line.value, "$");
         assert_eq!(result.location.line.number.get(), 1);
@@ -224,6 +227,7 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "a_1");
+        assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
         assert_eq!(result.location.line.value, "$");
         assert_eq!(result.location.line.number.get(), 1);
