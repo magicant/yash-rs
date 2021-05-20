@@ -39,11 +39,13 @@ pub fn is_name_char(c: char) -> bool {
 impl Lexer {
     /// Consumes a length prefix (`#`) if any.
     async fn length_prefix(&mut self) -> Result<bool> {
-        // TODO line continuations
+        self.line_continuations().await?;
         let index = self.index();
         if !self.skip_if(|c| c == '#').await? {
             return Ok(false);
         }
+
+        self.line_continuations().await?;
         if let Some(&SourceChar { value: '}', .. }) = self.peek_char().await? {
             self.rewind(index);
             Ok(false)
@@ -330,11 +332,28 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{\\\n\\\na_\\\n1\\\n\\\n}z");
+        let mut lexer = Lexer::with_source(Source::Unknown, "{\\\n#\\\n\\\na_\\\n1\\\n\\\n}z");
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "a_1");
+        assert_eq!(result.modifier, Modifier::Length);
+        // TODO assert about other result members
+        assert_eq!(result.location.line.value, "$");
+        assert_eq!(result.location.line.number.get(), 1);
+        assert_eq!(result.location.line.source, Source::Unknown);
+        assert_eq!(result.location.column.get(), 1);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
+    }
+
+    #[test]
+    fn lexer_braced_param_line_continuations_hash() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#\\\n\\\n}z");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
         assert_eq!(result.location.line.value, "$");
