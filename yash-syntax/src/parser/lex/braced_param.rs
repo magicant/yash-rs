@@ -139,6 +139,13 @@ mod tests {
     use crate::source::Source;
     use futures::executor::block_on;
 
+    fn assert_opening_location(location: &Location) {
+        assert_eq!(location.line.value, "$");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 1);
+    }
+
     #[test]
     fn lexer_braced_param_minimum() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{@};");
@@ -148,10 +155,7 @@ mod tests {
         assert_eq!(result.name, "@");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
     }
@@ -165,10 +169,7 @@ mod tests {
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -182,10 +183,7 @@ mod tests {
         assert_eq!(result.name, "123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -199,10 +197,7 @@ mod tests {
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -227,10 +222,7 @@ mod tests {
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "$");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
+            assert_opening_location(&opening_location);
         } else {
             panic!("Unexpected cause: {:?}", e.cause);
         }
@@ -247,10 +239,7 @@ mod tests {
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "$");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
+            assert_opening_location(&opening_location);
         } else {
             panic!("Unexpected cause: {:?}", e.cause);
         }
@@ -269,10 +258,7 @@ mod tests {
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -286,10 +272,7 @@ mod tests {
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -303,10 +286,7 @@ mod tests {
         assert_eq!(result.name, "?");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -320,10 +300,7 @@ mod tests {
         assert_eq!(result.name, "-");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
@@ -339,10 +316,7 @@ mod tests {
         assert_eq!(result.name, "a_1");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
     }
@@ -356,10 +330,7 @@ mod tests {
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_eq!(result.location.line.value, "$");
-        assert_eq!(result.location.line.number.get(), 1);
-        assert_eq!(result.location.line.source, Source::Unknown);
-        assert_eq!(result.location.column.get(), 1);
+        assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
     }
