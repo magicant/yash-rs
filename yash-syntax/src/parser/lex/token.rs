@@ -50,7 +50,6 @@ impl Lexer {
             }
 
             if literal.chars().all(|c| c.is_ascii_digit()) {
-                // TODO Do we need to handle line continuations?
                 if let Some(next) = self.peek_char().await? {
                     if next.value == '<' || next.value == '>' {
                         return Ok(TokenId::IoNumber);

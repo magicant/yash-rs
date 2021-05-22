@@ -83,12 +83,12 @@ impl Lexer {
     ///
     /// `is_delimiter` is a function that decides a character is a delimiter. An
     /// unquoted character is parsed only if `is_delimiter` returns false for it.
+    ///
+    /// This function does not parse tilde expansion. See [`word`](Self::word).
     pub async fn word_unit<F>(&mut self, is_delimiter: F) -> Result<Option<WordUnit>>
     where
         F: FnOnce(char) -> bool,
     {
-        // TODO Parse line continuations before the word unit
-        // TODO Parse other types of word units
         match self.consume_char_if(|c| c == '\'' || c == '"').await? {
             None => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
             Some(sc) => {

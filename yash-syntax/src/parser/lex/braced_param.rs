@@ -63,9 +63,6 @@ impl Lexer {
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
     /// actually is a location of `$`.
-    ///
-    /// This function does not consume line continuations after the initial `$`.
-    /// They should have been consumed beforehand.
     pub async fn braced_param(
         &mut self,
         location: Location,

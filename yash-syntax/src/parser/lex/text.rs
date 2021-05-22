@@ -29,8 +29,7 @@ impl Lexer {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
-    /// [dollar unit](Self::dollar_unit), or [backquote](Self::backquote),
-    /// optionally preceded by line continuations.
+    /// [dollar unit](Self::dollar_unit), or [backquote](Self::backquote).
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for

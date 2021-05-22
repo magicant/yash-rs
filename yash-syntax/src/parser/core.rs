@@ -584,9 +584,6 @@ impl Parser<'_> {
     /// [`take_token_auto`](Self::take_token_auto)) and before the next token is
     /// [peeked](Self::peek_token). Otherwise, this function would panic.
     ///
-    /// This function consumes and ignores line continuations that may lie
-    /// between the tokens.
-    ///
     /// # Panics
     ///
     /// If the previous token has not been taken or the next token has been

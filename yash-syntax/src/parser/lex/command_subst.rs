@@ -36,9 +36,6 @@ impl Lexer {
     /// `opening_location` should be the location of the initial `$`. It is used
     /// to construct the result, but this function does not check if it actually
     /// is a location of `$`.
-    ///
-    /// This function does not consume line continuations between `$` and `(`.
-    /// Line continuations should have been consumed beforehand.
     pub async fn command_substitution(
         &mut self,
         opening_location: Location,

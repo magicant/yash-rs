@@ -35,8 +35,6 @@ impl Lexer {
     }
 
     /// Skips blank characters until reaching a non-blank.
-    ///
-    /// This function also skips line continuations.
     pub async fn skip_blanks(&mut self) -> Result<()> {
         while self.skip_if(is_blank).await? {}
         Ok(())
@@ -46,7 +44,7 @@ impl Lexer {
     ///
     /// A comment ends just before a newline. The newline is *not* part of the comment.
     ///
-    /// This function does not recognize any line continuations.
+    /// This function does not recognize line continuation inside the comment.
     pub async fn skip_comment(&mut self) -> Result<()> {
         if self.skip_if(|c| c == '#').await? {
             self.disable_line_continuation();
@@ -58,8 +56,8 @@ impl Lexer {
 
     /// Skips blank characters and a comment, if any.
     ///
-    /// This function also skips line continuations between blanks. It is the same as
-    /// [`skip_blanks`](Lexer::skip_blanks) followed by [`skip_comment`](Lexer::skip_comment).
+    /// This function is the same as [`skip_blanks`](Lexer::skip_blanks)
+    /// followed by [`skip_comment`](Lexer::skip_comment).
     pub async fn skip_blanks_and_comment(&mut self) -> Result<()> {
         self.skip_blanks().await?;
         self.skip_comment().await
