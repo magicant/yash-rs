@@ -379,26 +379,6 @@ impl<T> Rec<T> {
     }
 }
 
-/// Dummy trait for working around type error.
-///
-/// cf. https://stackoverflow.com/a/64325742
-pub trait AsyncFnMut<'a, T, R> {
-    type Output: Future<Output = R>;
-    fn call(&mut self, t: &'a mut T) -> Self::Output;
-}
-
-impl<'a, T, F, R, Fut> AsyncFnMut<'a, T, R> for F
-where
-    T: 'a,
-    F: FnMut(&'a mut T) -> Fut,
-    Fut: Future<Output = R>,
-{
-    type Output = Fut;
-    fn call(&mut self, t: &'a mut T) -> Fut {
-        self(t)
-    }
-}
-
 /// The shell syntax parser.
 ///
 /// This `struct` contains a set of data used in syntax parsing.

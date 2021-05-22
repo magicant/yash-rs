@@ -22,7 +22,6 @@ use crate::alias::Alias;
 use crate::input::Context;
 use crate::input::Input;
 use crate::input::Memory;
-use crate::parser::core::AsyncFnMut;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::source::lines;
@@ -502,34 +501,6 @@ impl Lexer {
                 Ok(Some(self.core.peek_char_at(index)))
             }
             _ => Ok(None),
-        }
-    }
-
-    /// Applies the given parser repeatedly until it fails.
-    ///
-    /// Returns a vector of accumulated successful results from the parser.
-    ///
-    /// A parse result is considered successful if it is an `Ok(Some(_))`, failed if
-    /// `Ok(None)` or `Err(_)`. In case of `Err(_)`, all the accumulated results are abandoned
-    /// and only the error is returned.
-    ///
-    /// When the parser fails, the current position is reset to the position just after the
-    /// last successful parse. This cancels the effect of the failed parse that may have
-    /// consumed some characters.
-    pub async fn many<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
-    where
-        F: for<'a> AsyncFnMut<'a, Lexer, Result<Option<R>>>,
-    {
-        let mut results = vec![];
-        loop {
-            let old_index = self.index();
-            match f.call(self).await? {
-                Some(r) => results.push(r),
-                None => {
-                    self.rewind(old_index);
-                    return Ok(results);
-                }
-            }
         }
     }
 
@@ -1240,49 +1211,6 @@ mod tests {
             panic!("Unexpected call to the decider function: argument={}", c)
         }));
         assert_eq!(r, Ok(None));
-    }
-
-    #[test]
-    fn lexer_many_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-
-        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            l.consume_char_if(|c| c == 'a').await.map(|o| o.cloned())
-        }
-        let r = block_on(lexer.many(f)).unwrap();
-        assert!(r.is_empty());
-    }
-
-    #[test]
-    fn lexer_many_one() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "ab");
-
-        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if l.consume_char_if(|c| c == 'a').await?.is_none() {
-                return Ok(None);
-            }
-            l.consume_char_if(|c| c == 'b').await.map(|o| o.cloned())
-        }
-        let r = block_on(lexer.many(f)).unwrap();
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].value, 'b');
-    }
-
-    #[test]
-    fn lexer_many_three() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "xyxyxyxz");
-
-        async fn f(l: &mut Lexer) -> Result<Option<SourceChar>> {
-            if l.consume_char_if(|c| c == 'x').await?.is_none() {
-                return Ok(None);
-            }
-            l.consume_char_if(|c| c == 'y').await.map(|o| o.cloned())
-        }
-        let r = block_on(lexer.many(f)).unwrap();
-        assert_eq!(r.len(), 3);
-        assert_eq!(r[0].value, 'y');
-        assert_eq!(r[1].value, 'y');
-        assert_eq!(r[2].value, 'y');
     }
 
     #[test]
