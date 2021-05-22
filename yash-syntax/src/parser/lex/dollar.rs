@@ -36,8 +36,6 @@ impl Lexer {
             Some(c) => c.location.clone(),
         };
 
-        self.line_continuations().await?;
-
         let location = match self.raw_param(location).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,

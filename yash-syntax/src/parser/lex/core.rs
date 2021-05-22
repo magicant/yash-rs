@@ -35,6 +35,7 @@ use std::future::Future;
 use std::num::NonZeroU64;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::slice::SliceIndex;
 
 /// Returns true if the character is a blank character.
 pub fn is_blank(c: char) -> bool {
@@ -42,7 +43,7 @@ pub fn is_blank(c: char) -> bool {
     c != '\n' && c.is_whitespace()
 }
 
-/// Result of [`Lexer::peek_char_or_end`].
+/// Result of [`LexerCore::peek_char`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PeekChar<'a> {
     Char(&'a SourceChar),
@@ -122,28 +123,19 @@ enum InputState {
     Error(Error),
 }
 
-/// Lexical analyzer.
-///
-/// A lexer reads lines using an input function and parses the characters into tokens. It has an
-/// internal buffer containing the characters that have been read and the position (or the
-/// index) of the character that is to be parsed next.
-///
-/// `Lexer` has primitive functions such as [`peek_char`](Lexer::peek_char) that provide access
-/// to the character at the current position. Derived functions such as
-/// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
-/// parse more complex structures in the source code.
-pub struct Lexer {
+/// Core part of the lexical analyzer.
+struct LexerCore {
     input: Box<dyn Input>,
     state: InputState,
     source: Vec<SourceChar>,
     index: usize,
 }
 
-impl Lexer {
-    /// Creates a new lexer that reads using the given input function.
+impl LexerCore {
+    /// Creates a new lexer core that reads using the given input function.
     #[must_use]
-    pub fn new(input: Box<dyn Input>) -> Lexer {
-        Lexer {
+    fn new(input: Box<dyn Input>) -> LexerCore {
+        LexerCore {
             input,
             state: InputState::Alive,
             source: Vec::new(),
@@ -151,14 +143,8 @@ impl Lexer {
         }
     }
 
-    /// Creates a new lexer with a fixed source code.
-    #[must_use]
-    pub fn with_source(source: Source, code: &str) -> Lexer {
-        Lexer::new(Box::new(Memory::new(source, code)))
-    }
-
-    /// Peeks the next character.
-    async fn peek_char_or_end(&mut self) -> Result<PeekChar<'_>> {
+    /// Peeks the next character, reading the next line if necessary.
+    async fn peek_char(&mut self) -> Result<PeekChar<'_>> {
         loop {
             if self.index < self.source.len() {
                 return Ok(PeekChar::Char(&self.source[self.index]));
@@ -206,30 +192,12 @@ impl Lexer {
         }
     }
 
-    /// Peeks the next character.
-    ///
-    /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
-    pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
-        self.peek_char_or_end().await.map(|p| p.as_option())
-    }
-
-    /// Returns the location of the next character.
-    ///
-    /// If there is no more character (that is, it is the end of input), an imaginary location
-    /// is returned that would be returned if a character existed.
-    ///
-    /// This function required a mutable reference to `self` since it may need to read a next
-    /// line if it is not yet read.
-    pub async fn location(&mut self) -> Result<&Location> {
-        self.peek_char_or_end().await.map(|p| p.location())
-    }
-
     /// Consumes the next character.
     ///
     /// This function must be called after [`peek_char`](Lexer::peek_char) has successfully
     /// returned the character. Consuming a character that has not yet been peeked would result
     /// in a panic!
-    pub fn consume_char(&mut self) {
+    fn consume_char(&mut self) {
         assert!(
             self.index < self.source.len(),
             "A character must have been peeked before being consumed: index={}",
@@ -238,47 +206,26 @@ impl Lexer {
         self.index += 1;
     }
 
-    /// Returns the position of the next character, counted from zero.
-    ///
-    /// ```
-    /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures::executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
-    ///     assert_eq!(lexer.index(), 0);
-    ///     let _ = lexer.peek_char().await;
-    ///     assert_eq!(lexer.index(), 0);
-    ///     lexer.consume_char();
-    ///     assert_eq!(lexer.index(), 1);
-    /// })
-    /// ```
+    /// Returns a reference to the character at the given index.
     #[must_use]
-    pub fn index(&self) -> usize {
+    fn peek_char_at(&self, index: usize) -> &SourceChar {
+        assert!(
+            index <= self.index,
+            "The index {} must not be larger than the current index {}",
+            index,
+            self.index
+        );
+        &self.source[index]
+    }
+
+    /// Returns the current index.
+    #[must_use]
+    fn index(&self) -> usize {
         self.index
     }
 
-    /// Moves the current position back to the given index so that characters that have been
-    /// consumed can be read again.
-    ///
-    /// The given index must not be larger than the [current index](Lexer::index), or this
-    /// function would panic.
-    ///
-    /// ```
-    /// # use yash_syntax::parser::lex::Lexer;
-    /// # use yash_syntax::source::Source;
-    /// futures::executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
-    ///     let saved_index = lexer.index();
-    ///     let a = lexer.peek_char().await.unwrap().cloned();
-    ///     lexer.consume_char();
-    ///     let b = lexer.peek_char().await.unwrap().cloned();
-    ///     lexer.rewind(saved_index);
-    ///     let a2 = lexer.peek_char().await.unwrap().cloned();
-    ///     assert_eq!(a, a2);
-    ///     assert_ne!(a, b);
-    /// })
-    /// ```
-    pub fn rewind(&mut self, index: usize) {
+    /// Rewinds the index to the given value.
+    fn rewind(&mut self, index: usize) {
         assert!(
             index <= self.index,
             "The new index {} must not be larger than the current index {}",
@@ -288,72 +235,23 @@ impl Lexer {
         self.index = index;
     }
 
-    /// Peeks the next character and, if the given decider function returns true for it,
-    /// advances the position.
-    ///
-    /// Returns the consumed character if the function returned true. Returns `Ok(None)` if it
-    /// returned false or there is no more character.
-    pub async fn consume_char_if<F>(&mut self, f: F) -> Result<Option<&SourceChar>>
+    /// Extracts a string from the source code.
+    fn source_string<I>(&self, i: I) -> String
     where
-        F: FnOnce(char) -> bool,
+        I: SliceIndex<[SourceChar], Output = [SourceChar]>,
     {
-        match self.peek_char().await? {
-            Some(c) if f(c.value) => {
-                let index = self.index;
-                self.consume_char();
-                Ok(Some(&self.source[index]))
-            }
-            _ => Ok(None),
-        }
+        self.source[i].iter().map(|c| c.value).collect()
     }
 
-    /// Applies the given parser repeatedly until it fails.
-    ///
-    /// Returns a vector of accumulated successful results from the parser.
-    ///
-    /// A parse result is considered successful if it is an `Ok(Some(_))`, failed if
-    /// `Ok(None)` or `Err(_)`. In case of `Err(_)`, all the accumulated results are abandoned
-    /// and only the error is returned.
-    ///
-    /// When the parser fails, the current position is reset to the position just after the
-    /// last successful parse. This cancels the effect of the failed parse that may have
-    /// consumed some characters.
-    pub async fn many<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
-    where
-        F: for<'a> AsyncFnMut<'a, Lexer, Result<Option<R>>>,
-    {
-        let mut results = vec![];
-        loop {
-            let old_index = self.index;
-            match f.call(self).await? {
-                Some(r) => results.push(r),
-                None => {
-                    self.index = old_index;
-                    return Ok(results);
-                }
-            }
-        }
-    }
-
-    /// Performs alias substitution right before the current position.
-    ///
-    /// This function must be called just after a [word](Lexer::word) has been parsed that
-    /// matches the name of the argument alias. No check is done in this function that there is
-    /// a matching word before the current position. The characters starting from the `begin`
-    /// index up to the current position are silently replaced with the alias value.
-    ///
-    /// The resulting part of code will be characters with a [`Source::Alias`] origin.
-    ///
-    /// After the substitution, the position will be set before the replaced string.
-    ///
-    /// # Panics
-    ///
-    /// If the replaced part is empty, i.e., `begin >= self.index()`.
-    pub fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
+    /// Performs alias substitution.
+    fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
         let end = self.index;
-        if begin >= end {
-            panic!("Lexer::substitute_alias: begin={}, end={}", begin, end);
-        }
+        assert!(
+            begin < end,
+            "begin index {} should be less than end index {}",
+            begin,
+            end
+        );
 
         let original = self.source[begin].location.clone();
         let source = Source::Alias {
@@ -375,7 +273,7 @@ impl Lexer {
     /// # Panics
     ///
     /// If `index` is larger than the currently read index.
-    pub fn is_after_blank_ending_alias(&self, index: usize) -> bool {
+    fn is_after_blank_ending_alias(&self, index: usize) -> bool {
         fn ends_with_blank(s: &str) -> bool {
             s.chars().rev().next().map_or(false, is_blank)
         }
@@ -405,6 +303,254 @@ impl Lexer {
 
         false
     }
+}
+
+impl fmt::Debug for LexerCore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LexerCore")
+            .field("state", &self.state)
+            .field("source", &self.source)
+            .field("index", &self.index)
+            .finish()
+        // TODO Call finish_non_exhaustive instead of finish
+    }
+}
+
+/// Lexical analyzer.
+///
+/// A lexer reads lines using an input function and parses the characters into tokens. It has an
+/// internal buffer containing the characters that have been read and the position (or the
+/// index) of the character that is to be parsed next.
+///
+/// `Lexer` has primitive functions such as [`peek_char`](Lexer::peek_char) that provide access
+/// to the character at the current position. Derived functions such as
+/// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
+/// parse more complex structures in the source code.
+#[derive(Debug)]
+pub struct Lexer {
+    // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
+    // functions to `LexerCore`. `Lexer` adds automatic line-continuation
+    // skipping to `LexerCore`.
+    core: LexerCore,
+    line_continuation_enabled: bool,
+}
+
+impl Lexer {
+    /// Creates a new lexer that reads using the given input function.
+    #[must_use]
+    pub fn new(input: Box<dyn Input>) -> Lexer {
+        Lexer {
+            core: LexerCore::new(input),
+            line_continuation_enabled: true,
+        }
+    }
+
+    /// Creates a new lexer with a fixed source code.
+    #[must_use]
+    pub fn with_source(source: Source, code: &str) -> Lexer {
+        Lexer::new(Box::new(Memory::new(source, code)))
+    }
+
+    /// Enables line continuation recognition onward.
+    ///
+    /// When line continuation recognition is enabled,
+    /// [`peek_char`](Self::peek_char) silently skips line continuation
+    /// sequences.
+    ///
+    /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
+    /// switch line continuation recognition off.
+    ///
+    /// When a new lexer is created, line continuation recognition is enabled by
+    /// default.
+    pub fn enable_line_continuation(&mut self) {
+        self.line_continuation_enabled = true;
+    }
+
+    /// Disables line continuation recognition onward.
+    ///
+    /// When line continuation recognition is enabled,
+    /// [`peek_char`](Self::peek_char) silently skips line continuation
+    /// sequences.
+    ///
+    /// Call [`enable_line_continuation`](Self::enable_line_continuation) to
+    /// switch line continuation recognition on.
+    ///
+    /// When a new lexer is created, line continuation recognition is enabled by
+    /// default.
+    pub fn disable_line_continuation(&mut self) {
+        self.line_continuation_enabled = false;
+    }
+
+    /// Peeks the next character.
+    ///
+    /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
+    ///
+    /// If line continuation recognition is enabled, combinations of a backslash
+    /// and a newline are silently skipped before returning the next character.
+    /// Call [`enable_line_continuation`](Self::enable_line_continuation) and
+    /// [`disable_line_continuation`](Self::disable_line_continuation) to switch
+    /// line continuation recognition on and off, respectively.
+    pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
+        if self.line_continuation_enabled {
+            loop {
+                let index = self.core.index();
+                match self.core.peek_char().await? {
+                    PeekChar::Char(c) if c.value == '\\' => (),
+                    _ => break,
+                }
+                self.core.consume_char();
+                match self.core.peek_char().await? {
+                    PeekChar::Char(c) if c.value == '\n' => (),
+                    _ => {
+                        self.core.rewind(index);
+                        break;
+                    }
+                }
+                self.core.consume_char();
+            }
+        }
+
+        self.core.peek_char().await.map(|p| p.as_option())
+    }
+
+    /// Returns the location of the next character.
+    ///
+    /// If there is no more character (that is, it is the end of input), an imaginary location
+    /// is returned that would be returned if a character existed.
+    ///
+    /// This function required a mutable reference to `self` since it may need to read a next
+    /// line if it is not yet read.
+    pub async fn location(&mut self) -> Result<&Location> {
+        self.core.peek_char().await.map(|p| p.location())
+    }
+
+    /// Consumes the next character.
+    ///
+    /// This function must be called after [`peek_char`](Lexer::peek_char) has successfully
+    /// returned the character. Consuming a character that has not yet been peeked would result
+    /// in a panic!
+    pub fn consume_char(&mut self) {
+        self.core.consume_char()
+    }
+
+    /// Returns the position of the next character, counted from zero.
+    ///
+    /// ```
+    /// # use yash_syntax::parser::lex::Lexer;
+    /// # use yash_syntax::source::Source;
+    /// futures::executor::block_on(async {
+    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     assert_eq!(lexer.index(), 0);
+    ///     let _ = lexer.peek_char().await;
+    ///     assert_eq!(lexer.index(), 0);
+    ///     lexer.consume_char();
+    ///     assert_eq!(lexer.index(), 1);
+    /// })
+    /// ```
+    #[must_use]
+    pub fn index(&self) -> usize {
+        self.core.index()
+    }
+
+    /// Moves the current position back to the given index so that characters that have been
+    /// consumed can be read again.
+    ///
+    /// The given index must not be larger than the [current index](Lexer::index), or this
+    /// function would panic.
+    ///
+    /// ```
+    /// # use yash_syntax::parser::lex::Lexer;
+    /// # use yash_syntax::source::Source;
+    /// futures::executor::block_on(async {
+    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     let saved_index = lexer.index();
+    ///     let a = lexer.peek_char().await.unwrap().cloned();
+    ///     lexer.consume_char();
+    ///     let b = lexer.peek_char().await.unwrap().cloned();
+    ///     lexer.rewind(saved_index);
+    ///     let a2 = lexer.peek_char().await.unwrap().cloned();
+    ///     assert_eq!(a, a2);
+    ///     assert_ne!(a, b);
+    /// })
+    /// ```
+    pub fn rewind(&mut self, index: usize) {
+        self.core.rewind(index)
+    }
+
+    /// Peeks the next character and, if the given decider function returns true for it,
+    /// advances the position.
+    ///
+    /// Returns the consumed character if the function returned true. Returns `Ok(None)` if it
+    /// returned false or there is no more character.
+    pub async fn consume_char_if<F>(&mut self, f: F) -> Result<Option<&SourceChar>>
+    where
+        F: FnOnce(char) -> bool,
+    {
+        match self.peek_char().await? {
+            Some(c) if f(c.value) => {
+                let index = self.index();
+                self.consume_char();
+                Ok(Some(self.core.peek_char_at(index)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Applies the given parser repeatedly until it fails.
+    ///
+    /// Returns a vector of accumulated successful results from the parser.
+    ///
+    /// A parse result is considered successful if it is an `Ok(Some(_))`, failed if
+    /// `Ok(None)` or `Err(_)`. In case of `Err(_)`, all the accumulated results are abandoned
+    /// and only the error is returned.
+    ///
+    /// When the parser fails, the current position is reset to the position just after the
+    /// last successful parse. This cancels the effect of the failed parse that may have
+    /// consumed some characters.
+    pub async fn many<F, R>(&mut self, mut f: F) -> Result<Vec<R>>
+    where
+        F: for<'a> AsyncFnMut<'a, Lexer, Result<Option<R>>>,
+    {
+        let mut results = vec![];
+        loop {
+            let old_index = self.index();
+            match f.call(self).await? {
+                Some(r) => results.push(r),
+                None => {
+                    self.rewind(old_index);
+                    return Ok(results);
+                }
+            }
+        }
+    }
+
+    /// Performs alias substitution right before the current position.
+    ///
+    /// This function must be called just after a [word](Lexer::word) has been parsed that
+    /// matches the name of the argument alias. No check is done in this function that there is
+    /// a matching word before the current position. The characters starting from the `begin`
+    /// index up to the current position are silently replaced with the alias value.
+    ///
+    /// The resulting part of code will be characters with a [`Source::Alias`] origin.
+    ///
+    /// After the substitution, the position will be set before the replaced string.
+    ///
+    /// # Panics
+    ///
+    /// If the replaced part is empty, i.e., `begin >= self.index()`.
+    pub fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
+        self.core.substitute_alias(begin, alias)
+    }
+
+    /// Tests if the given index is after the replacement string of alias
+    /// substitution that ends with a blank.
+    ///
+    /// # Panics
+    ///
+    /// If `index` is larger than the currently read index.
+    pub fn is_after_blank_ending_alias(&self, index: usize) -> bool {
+        self.core.is_after_blank_ending_alias(index)
+    }
 
     /// Parses an optional compound list that is the content of a command
     /// substitution.
@@ -413,29 +559,20 @@ impl Lexer {
     /// beginning of an and-or list is found and returns the string that was
     /// consumed.
     pub async fn inner_program(&mut self) -> Result<String> {
-        let begin = self.index;
+        let begin = self.index();
 
         let mut parser = super::super::Parser::new(self);
         parser.maybe_compound_list().await?;
 
         let end = parser.peek_token().await?.index;
         self.rewind(end);
-        Ok(self.source[begin..end].iter().map(|c| c.value).collect())
+
+        Ok(self.core.source_string(begin..end))
     }
 
     /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
     pub fn inner_program_boxed(&mut self) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
         Box::pin(self.inner_program())
-    }
-}
-
-impl fmt::Debug for Lexer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
-        f.debug_struct("Lexer")
-            .field("source", &self.source)
-            .field("index", &self.index)
-            .finish()
-        // TODO Call finish_non_exhaustive instead of finish
     }
 }
 
@@ -448,92 +585,22 @@ mod tests {
     use std::future::ready;
 
     #[test]
-    fn lexer_with_empty_source() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    fn lexer_core_peek_char_empty_source() {
+        let input = Memory::new(Source::Unknown, "");
+        let mut lexer = LexerCore::new(Box::new(input));
+        let result = block_on(lexer.peek_char());
+        if let Ok(PeekChar::EndOfInput(location)) = result {
+            assert_eq!(location.line.value, "");
+            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 1);
+        } else {
+            panic!("Not end-of-input: {:?}", result);
+        }
     }
 
     #[test]
-    fn lexer_with_multiline_source() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo\nbar\n");
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap().clone();
-        assert_eq!(c.value, 'f');
-        assert_eq!(c.location.line.value, "foo\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
-
-        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c, *c2);
-        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c, *c2);
-        let c2 = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c, *c2);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, 'o');
-        assert_eq!(c.location.line.value, "foo\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, 'o');
-        assert_eq!(c.location.line.value, "foo\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 3);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "foo\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 4);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, 'b');
-        assert_eq!(c.location.line.value, "bar\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, 'a');
-        assert_eq!(c.location.line.value, "bar\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, 'r');
-        assert_eq!(c.location.line.value, "bar\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 3);
-        lexer.consume_char();
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "bar\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 4);
-        lexer.consume_char();
-
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
-    }
-
-    #[test]
-    fn lexer_peek_char_io_error() {
+    fn lexer_core_peek_char_io_error() {
         #[derive(Debug)]
         struct Failing;
         impl fmt::Display for Failing {
@@ -552,7 +619,7 @@ mod tests {
                 Box::pin(ready(Err((location, error))))
             }
         }
-        let mut lexer = Lexer::new(Box::new(Failing));
+        let mut lexer = LexerCore::new(Box::new(Failing));
 
         let e = block_on(lexer.peek_char()).unwrap_err();
         if let ErrorCause::Io(io_error) = e.cause {
@@ -567,65 +634,128 @@ mod tests {
     }
 
     #[test]
-    fn lexer_consume_char() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    fn lexer_core_consume_char_success() {
+        let input = Memory::new(Source::Unknown, "a\nb");
+        let mut lexer = LexerCore::new(Box::new(input));
 
-        block_on(async {
-            let _ = lexer.peek_char().await;
-            lexer.consume_char();
+        let result = block_on(lexer.peek_char());
+        if let Ok(PeekChar::Char(c)) = result {
+            assert_eq!(c.value, 'a');
+            assert_eq!(c.location.line.value, "a\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 1);
+        } else {
+            panic!("Not a char: {:?}", result);
+        }
+        if let Ok(PeekChar::Char(c)) = result {
+            assert_eq!(c.value, 'a');
+            assert_eq!(c.location.line.value, "a\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 1);
+        } else {
+            panic!("Not a char: {:?}", result);
+        }
+        lexer.consume_char();
 
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'b');
-            assert_eq!(c.location.line.value, "abc");
+        let result = block_on(lexer.peek_char());
+        if let Ok(PeekChar::Char(c)) = result {
+            assert_eq!(c.value, '\n');
+            assert_eq!(c.location.line.value, "a\n");
             assert_eq!(c.location.line.number.get(), 1);
             assert_eq!(c.location.line.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
-            lexer.consume_char();
+        } else {
+            panic!("Not a char: {:?}", result);
+        }
+        lexer.consume_char();
 
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'c');
-            assert_eq!(c.location.line.value, "abc");
-            assert_eq!(c.location.line.number.get(), 1);
+        let result = block_on(lexer.peek_char());
+        if let Ok(PeekChar::Char(c)) = result {
+            assert_eq!(c.value, 'b');
+            assert_eq!(c.location.line.value, "b");
+            assert_eq!(c.location.line.number.get(), 2);
             assert_eq!(c.location.line.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 3);
-        });
+            assert_eq!(c.location.column.get(), 1);
+        } else {
+            panic!("Not a char: {:?}", result);
+        }
+        lexer.consume_char();
+
+        let result = block_on(lexer.peek_char());
+        if let Ok(PeekChar::EndOfInput(location)) = result {
+            assert_eq!(location.line.value, "b");
+            assert_eq!(location.line.number.get(), 2);
+            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.column.get(), 2);
+        } else {
+            panic!("Not end-of-input: {:?}", result);
+        }
     }
 
     #[test]
     #[should_panic(expected = "A character must have been peeked before being consumed: index=0")]
-    fn lexer_consume_char_without_peeking() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    fn lexer_core_consume_char_panic() {
+        let input = Memory::new(Source::Unknown, "a");
+        let mut lexer = LexerCore::new(Box::new(input));
         lexer.consume_char();
     }
 
     #[test]
-    fn lexer_index() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    fn lexer_core_peek_char_at() {
+        let input = Memory::new(Source::Unknown, "a\nb");
+        let mut lexer = LexerCore::new(Box::new(input));
 
-        block_on(async {
-            assert_eq!(lexer.index(), 0);
+        let c0 = match block_on(lexer.peek_char()) {
+            Ok(PeekChar::Char(c)) => c.clone(),
+            other => panic!("Not a char: {:?}", other),
+        };
+        lexer.consume_char();
 
-            let _ = lexer.peek_char().await;
-            assert_eq!(lexer.index(), 0);
-            lexer.consume_char();
-            assert_eq!(lexer.index(), 1);
+        let c1 = match block_on(lexer.peek_char()) {
+            Ok(PeekChar::Char(c)) => c.clone(),
+            other => panic!("Not a char: {:?}", other),
+        };
+        lexer.consume_char();
 
-            let _ = lexer.peek_char().await;
-            assert_eq!(lexer.index(), 1);
-            lexer.consume_char();
-            assert_eq!(lexer.index(), 2);
+        let c2 = match block_on(lexer.peek_char()) {
+            Ok(PeekChar::Char(c)) => c.clone(),
+            other => panic!("Not a char: {:?}", other),
+        };
 
-            let _ = lexer.peek_char().await;
-            assert_eq!(lexer.index(), 2);
-            lexer.consume_char();
-            assert_eq!(lexer.index(), 3);
-        });
+        assert_eq!(lexer.peek_char_at(0), &c0);
+        assert_eq!(lexer.peek_char_at(1), &c1);
+        assert_eq!(lexer.peek_char_at(2), &c2);
     }
 
     #[test]
-    fn lexer_rewind() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    fn lexer_core_index() {
+        let input = Memory::new(Source::Unknown, "a\nb");
+        let mut lexer = LexerCore::new(Box::new(input));
+
+        assert_eq!(lexer.index(), 0);
+        block_on(lexer.peek_char()).unwrap();
+        assert_eq!(lexer.index(), 0);
+        lexer.consume_char();
+
+        assert_eq!(lexer.index(), 1);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+
+        assert_eq!(lexer.index(), 2);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+
+        assert_eq!(lexer.index(), 3);
+    }
+
+    #[test]
+    fn lexer_core_rewind_success() {
+        let input = Memory::new(Source::Unknown, "abc");
+        let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(0);
+        assert_eq!(lexer.index(), 0);
 
         block_on(async {
             let _ = lexer.peek_char().await;
@@ -634,20 +764,395 @@ mod tests {
             lexer.consume_char();
             lexer.rewind(0);
 
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'a');
-            assert_eq!(c.location.line.value, "abc");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 1);
+            let result = lexer.peek_char().await;
+            if let Ok(PeekChar::Char(c)) = result {
+                assert_eq!(c.value, 'a');
+                assert_eq!(c.location.line.value, "abc");
+                assert_eq!(c.location.line.number.get(), 1);
+                assert_eq!(c.location.line.source, Source::Unknown);
+                assert_eq!(c.location.column.get(), 1);
+            } else {
+                panic!("Not a char: {:?}", result);
+            }
         });
     }
 
     #[test]
     #[should_panic(expected = "The new index 1 must not be larger than the current index 0")]
-    fn lexer_rewind_invalid_index() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    fn lexer_core_rewind_invalid_index() {
+        let input = Memory::new(Source::Unknown, "abc");
+        let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(1);
+    }
+
+    #[test]
+    fn lexer_core_source_string() {
+        let input = Memory::new(Source::Unknown, "ab\ncd");
+        let mut lexer = LexerCore::new(Box::new(input));
+        block_on(async {
+            for _ in 0..4 {
+                let _ = lexer.peek_char().await;
+                lexer.consume_char();
+            }
+        });
+
+        let result = lexer.source_string(1..4);
+        assert_eq!(result, "b\nc");
+    }
+
+    #[test]
+    #[should_panic(expected = "begin index 0 should be less than end index 0")]
+    fn lexer_core_substitute_alias_with_invalid_index() {
+        let input = Memory::new(Source::Unknown, "a b");
+        let mut lexer = LexerCore::new(Box::new(input));
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: "".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+        lexer.substitute_alias(0, &alias);
+    }
+
+    #[test]
+    fn lexer_core_substitute_alias_single_line_replacement() {
+        let input = Memory::new(Source::Unknown, "a b");
+        let mut lexer = LexerCore::new(Box::new(input));
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: "lex".to_string(),
+            global: false,
+            origin: Location::dummy("dummy".to_string()),
+        });
+
+        block_on(async {
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, 'l');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, 'e');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, 'x');
+            assert_eq!(c.location.line.value, "lex");
+            assert_eq!(c.location.line.number.get(), 1);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, "a b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 1);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 3);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, "a b");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+        });
+    }
+
+    #[test]
+    fn lexer_core_substitute_alias_multi_line_replacement() {
+        let input = Memory::new(Source::Unknown, " foo b");
+        let mut lexer = LexerCore::new(Box::new(input));
+        let alias = Rc::new(Alias {
+            name: "foo".to_string(),
+            replacement: "x\ny".to_string(),
+            global: true,
+            origin: Location::dummy("loc".to_string()),
+        });
+
+        block_on(async {
+            for _ in 0..4 {
+                let _ = lexer.peek_char().await;
+                lexer.consume_char();
+            }
+
+            lexer.substitute_alias(1, &alias);
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, 'x');
+            assert_eq!(c.location.line.value, "x\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, '\n');
+            assert_eq!(c.location.line.value, "x\n");
+            assert_eq!(c.location.line.number.get(), 1);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 2);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, 'y');
+            assert_eq!(c.location.line.value, "y");
+            assert_eq!(c.location.line.number.get(), 2);
+            if let Source::Alias {
+                original,
+                alias: alias2,
+            } = &c.location.line.source
+            {
+                assert_eq!(original.line.value, " foo b");
+                assert_eq!(original.line.number.get(), 1);
+                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.column.get(), 2);
+                assert_eq!(alias2, &alias);
+            } else {
+                panic!("Wrong source: {:?}", c.location.line.source);
+            }
+            assert_eq!(c.location.column.get(), 1);
+            lexer.consume_char();
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, " foo b");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 5);
+            lexer.consume_char();
+        });
+    }
+
+    #[test]
+    fn lexer_core_substitute_alias_empty_replacement() {
+        block_on(async {
+            let input = Memory::new(Source::Unknown, "x ");
+            let mut lexer = LexerCore::new(Box::new(input));
+            let alias = Rc::new(Alias {
+                name: "x".to_string(),
+                replacement: "".to_string(),
+                global: false,
+                origin: Location::dummy("dummy".to_string()),
+            });
+
+            let _ = lexer.peek_char().await;
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            let c = match lexer.peek_char().await {
+                Ok(PeekChar::Char(c)) => c,
+                other => panic!("Not a char: {:?}", other),
+            };
+            assert_eq!(c.value, ' ');
+            assert_eq!(c.location.line.value, "x ");
+            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.column.get(), 2);
+        });
+    }
+
+    #[test]
+    fn lexer_core_is_after_blank_ending_alias_index_0() {
+        let original = Location::dummy("original".to_string());
+        let alias = Rc::new(Alias {
+            name: "a".to_string(),
+            replacement: " ".to_string(),
+            global: false,
+            origin: Location::dummy("origin".to_string()),
+        });
+        let input = Memory::new(Source::Alias { original, alias }, "a");
+        let lexer = LexerCore::new(Box::new(input));
+        let result = lexer.is_after_blank_ending_alias(0);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn lexer_core_is_after_blank_ending_alias_not_blank_ending() {
+        block_on(async {
+            let input = Memory::new(Source::Unknown, "a x");
+            let mut lexer = LexerCore::new(Box::new(input));
+            let alias = Rc::new(Alias {
+                name: "a".to_string(),
+                replacement: " b".to_string(),
+                global: false,
+                origin: Location::dummy("dummy".to_string()),
+            });
+
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(3), false);
+        });
+    }
+
+    #[test]
+    fn lexer_core_is_after_blank_ending_alias_blank_ending() {
+        block_on(async {
+            let input = Memory::new(Source::Unknown, "a x");
+            let mut lexer = LexerCore::new(Box::new(input));
+            let alias = Rc::new(Alias {
+                name: "a".to_string(),
+                replacement: " b ".to_string(),
+                global: false,
+                origin: Location::dummy("dummy".to_string()),
+            });
+
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+
+            lexer.substitute_alias(0, &alias);
+
+            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
+            assert_eq!(lexer.is_after_blank_ending_alias(3), true);
+            assert_eq!(lexer.is_after_blank_ending_alias(4), true);
+        });
+    }
+
+    #[test]
+    fn lexer_with_empty_source() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
+        lexer.enable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\n');
+        assert_eq!(c.location.line.value, "\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 2);
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
+        lexer.enable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.value, "\\\\");
+        assert_eq!(c.location.line.number.get(), 4);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 6);
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_disabled() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
+        lexer.disable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.value, "\\\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 0);
     }
 
     #[test]
@@ -769,280 +1274,6 @@ mod tests {
         assert_eq!(r[0].value, 'y');
         assert_eq!(r[1].value, 'y');
         assert_eq!(r[2].value, 'y');
-    }
-
-    #[test]
-    #[should_panic(expected = "Lexer::substitute_alias: begin=0, end=0")]
-    fn lexer_substitute_alias_with_invalid_index() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a b");
-        let alias = Rc::new(Alias {
-            name: "a".to_string(),
-            replacement: "".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-        lexer.substitute_alias(0, &alias);
-    }
-
-    #[test]
-    fn lexer_substitute_alias_single_line_replacement() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a b");
-        let alias = Rc::new(Alias {
-            name: "a".to_string(),
-            replacement: "lex".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-
-        block_on(async {
-            let _ = lexer.peek_char().await;
-            lexer.consume_char();
-
-            lexer.substitute_alias(0, &alias);
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'l');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 1);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 1);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'e');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 1);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 2);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'x');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 1);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 3);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, "a b");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 2);
-            lexer.consume_char();
-        });
-    }
-
-    #[test]
-    fn lexer_substitute_alias_multi_line_replacement() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " foo b");
-        let alias = Rc::new(Alias {
-            name: "foo".to_string(),
-            replacement: "x\ny".to_string(),
-            global: true,
-            origin: Location::dummy("loc".to_string()),
-        });
-
-        block_on(async {
-            for _ in 0usize..4 {
-                let _ = lexer.peek_char().await;
-                lexer.consume_char();
-            }
-
-            lexer.substitute_alias(1, &alias);
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'x');
-            assert_eq!(c.location.line.value, "x\n");
-            assert_eq!(c.location.line.number.get(), 1);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 2);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 1);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, '\n');
-            assert_eq!(c.location.line.value, "x\n");
-            assert_eq!(c.location.line.number.get(), 1);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 2);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 2);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, 'y');
-            assert_eq!(c.location.line.value, "y");
-            assert_eq!(c.location.line.number.get(), 2);
-            if let Source::Alias {
-                original,
-                alias: alias2,
-            } = &c.location.line.source
-            {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
-                assert_eq!(original.column.get(), 2);
-                assert_eq!(alias2, &alias);
-            } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
-            }
-            assert_eq!(c.location.column.get(), 1);
-            lexer.consume_char();
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, " foo b");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 5);
-            lexer.consume_char();
-        });
-    }
-
-    #[test]
-    fn lexer_substitute_alias_empty_replacement() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "x ");
-        let alias = Rc::new(Alias {
-            name: "x".to_string(),
-            replacement: "".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-
-        block_on(async {
-            let _ = lexer.peek_char().await;
-            lexer.consume_char();
-
-            lexer.substitute_alias(0, &alias);
-
-            let c = lexer.peek_char().await.unwrap().unwrap();
-            assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, "x ");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 2);
-            lexer.consume_char();
-        });
-    }
-
-    #[test]
-    fn lexer_is_after_blank_ending_alias_index_0() {
-        let original = Location::dummy("original".to_string());
-        let alias = Rc::new(Alias {
-            name: "a".to_string(),
-            replacement: " ".to_string(),
-            global: false,
-            origin: Location::dummy("origin".to_string()),
-        });
-        let lexer = Lexer::with_source(Source::Alias { original, alias }, "a");
-        let result = lexer.is_after_blank_ending_alias(0);
-        assert_eq!(result, false);
-    }
-
-    #[test]
-    fn lexer_is_after_blank_ending_alias_not_blank_ending() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a x");
-        let alias = Rc::new(Alias {
-            name: "a".to_string(),
-            replacement: " b".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-
-        block_on(async {
-            lexer.peek_char().await.unwrap();
-            lexer.consume_char();
-
-            lexer.substitute_alias(0, &alias);
-
-            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(3), false);
-        });
-    }
-
-    #[test]
-    fn lexer_is_after_blank_ending_alias_blank_ending() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a x");
-        let alias = Rc::new(Alias {
-            name: "a".to_string(),
-            replacement: " b ".to_string(),
-            global: false,
-            origin: Location::dummy("dummy".to_string()),
-        });
-
-        block_on(async {
-            lexer.peek_char().await.unwrap();
-            lexer.consume_char();
-
-            lexer.substitute_alias(0, &alias);
-
-            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(3), true);
-            assert_eq!(lexer.is_after_blank_ending_alias(4), true);
-        });
     }
 
     #[test]

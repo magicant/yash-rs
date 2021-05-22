@@ -36,9 +36,10 @@ impl Lexer {
     /// actually is a location of `'`.
     async fn single_quote(&mut self, opening_location: Location) -> Result<WordUnit> {
         let mut content = String::new();
+        self.disable_line_continuation();
         loop {
             match self.consume_char_if(|_| true).await? {
-                Some(&SourceChar { value: '\'', .. }) => return Ok(SingleQuote(content)),
+                Some(&SourceChar { value: '\'', .. }) => break,
                 Some(&SourceChar { value, .. }) => content.push(value),
                 None => {
                     let cause = SyntaxError::UnclosedSingleQuote { opening_location }.into();
@@ -47,6 +48,8 @@ impl Lexer {
                 }
             }
         }
+        self.enable_line_continuation();
+        Ok(SingleQuote(content))
     }
 
     /// Parses a double-quoted string.
@@ -80,12 +83,12 @@ impl Lexer {
     ///
     /// `is_delimiter` is a function that decides a character is a delimiter. An
     /// unquoted character is parsed only if `is_delimiter` returns false for it.
+    ///
+    /// This function does not parse tilde expansion. See [`word`](Self::word).
     pub async fn word_unit<F>(&mut self, is_delimiter: F) -> Result<Option<WordUnit>>
     where
         F: FnOnce(char) -> bool,
     {
-        // TODO Parse line continuations before the word unit
-        // TODO Parse other types of word units
         match self.consume_char_if(|c| c == '\'' || c == '"').await? {
             None => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
             Some(sc) => {
@@ -206,13 +209,13 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_single_quote_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\n$def\\'");
+        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\\\n$def\\'");
         let result =
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         if let SingleQuote(content) = result {
-            assert_eq!(content, "abc\n$def\\");
+            assert_eq!(content, "abc\\\n$def\\");
         } else {
             panic!("unexpected result {:?}", result);
         }

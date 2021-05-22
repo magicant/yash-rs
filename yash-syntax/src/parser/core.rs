@@ -584,16 +584,12 @@ impl Parser<'_> {
     /// [`take_token_auto`](Self::take_token_auto)) and before the next token is
     /// [peeked](Self::peek_token). Otherwise, this function would panic.
     ///
-    /// This function consumes and ignores line continuations that may lie
-    /// between the tokens.
-    ///
     /// # Panics
     ///
     /// If the previous token has not been taken or the next token has been
     /// peeked.
     pub async fn has_blank(&mut self) -> Result<bool> {
         assert!(self.token.is_none(), "There should be no pending token");
-        self.lexer.line_continuations().await?;
         let c = self.lexer.peek_char().await?;
         Ok(c.map_or(false, |c| is_blank(c.value)))
     }

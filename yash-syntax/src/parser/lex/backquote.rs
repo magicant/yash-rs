@@ -24,13 +24,11 @@ use crate::syntax::BackquoteUnit;
 use crate::syntax::TextUnit;
 
 impl Lexer {
-    /// Parses a backquote unit, possibly preceded by line continuations.
+    /// Parses a backquote unit.
     async fn backquote_unit(
         &mut self,
         double_quote_escapable: bool,
     ) -> Result<Option<BackquoteUnit>> {
-        self.line_continuations().await?;
-
         if self.skip_if(|c| c == '\\').await? {
             let is_escapable =
                 |c| matches!(c, '$' | '`' | '\\') || c == '"' && double_quote_escapable;
@@ -55,10 +53,9 @@ impl Lexer {
     /// no closing backquote.
     ///
     /// Between the backquotes, only backslashes can have special meanings. A
-    /// backslash followed by a newline is parsed as line continuation. A
     /// backslash is an escape character if it precedes a dollar, backquote, or
-    /// another backslash. If `double_quote_escapable` is true, double quotes can
-    /// also be backslash-escaped.
+    /// another backslash. If `double_quote_escapable` is true, double quotes
+    /// can also be backslash-escaped.
     pub async fn backquote(&mut self, double_quote_escapable: bool) -> Result<Option<TextUnit>> {
         let location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),

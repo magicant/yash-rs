@@ -39,9 +39,6 @@ impl Lexer {
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
     /// actually is a location of `$`.
-    ///
-    /// This function does not consume line continuations between `$` and `(`.
-    /// Line continuations should have been consumed beforehand.
     pub async fn arithmetic_expansion(
         &mut self,
         location: Location,
@@ -52,7 +49,6 @@ impl Lexer {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(Err(location));
         }
-        self.line_continuations().await?;
         if !self.skip_if(|c| c == '(').await? {
             self.rewind(index);
             return Ok(Err(location));
@@ -77,7 +73,6 @@ impl Lexer {
                 return Err(Error { cause, location });
             }
         }
-        self.line_continuations().await?;
         match self.peek_char().await? {
             Some(sc) if sc.value == ')' => self.consume_char(),
             Some(_) => {
