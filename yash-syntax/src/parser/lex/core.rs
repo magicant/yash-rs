@@ -381,6 +381,32 @@ impl Lexer {
         self.line_continuation_enabled = false;
     }
 
+    /// Skips line continuation, i.e., a backslash followed by a newline.
+    ///
+    /// This function does nothing if line continuation has been
+    /// [disabled](Self::disable_line_continuation).
+    async fn line_continuation(&mut self) -> Result<bool> {
+        if !self.line_continuation_enabled {
+            return Ok(false);
+        }
+
+        let index = self.core.index();
+        match self.core.peek_char().await? {
+            PeekChar::Char(c) if c.value == '\\' => self.core.consume_char(),
+            _ => return Ok(false),
+        }
+
+        match self.core.peek_char().await? {
+            PeekChar::Char(c) if c.value == '\n' => self.core.consume_char(),
+            _ => {
+                self.core.rewind(index);
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
     /// Peeks the next character.
     ///
     /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
@@ -391,24 +417,7 @@ impl Lexer {
     /// [`disable_line_continuation`](Self::disable_line_continuation) to switch
     /// line continuation recognition on and off, respectively.
     pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
-        if self.line_continuation_enabled {
-            loop {
-                let index = self.core.index();
-                match self.core.peek_char().await? {
-                    PeekChar::Char(c) if c.value == '\\' => (),
-                    _ => break,
-                }
-                self.core.consume_char();
-                match self.core.peek_char().await? {
-                    PeekChar::Char(c) if c.value == '\n' => (),
-                    _ => {
-                        self.core.rewind(index);
-                        break;
-                    }
-                }
-                self.core.consume_char();
-            }
-        }
+        while self.line_continuation().await? {}
 
         self.core.peek_char().await.map(|p| p.as_option())
     }
