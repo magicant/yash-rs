@@ -39,26 +39,17 @@ pub fn is_name_char(c: char) -> bool {
 impl Lexer {
     /// Consumes a length prefix (`#`) if any.
     async fn length_prefix(&mut self) -> Result<bool> {
-        self.line_continuations().await?;
         let index = self.index();
         if !self.skip_if(|c| c == '#').await? {
             return Ok(false);
         }
 
-        self.line_continuations().await?;
         if let Some(&SourceChar { value: '}', .. }) = self.peek_char().await? {
             self.rewind(index);
             Ok(false)
         } else {
             Ok(true)
         }
-    }
-
-    /// Consumes a POSIXly-portable name character optionally preceded by line
-    /// continuations.
-    async fn consume_name_char(&mut self) -> Result<Option<&SourceChar>> {
-        self.line_continuations().await?;
-        self.consume_char_if(is_name_char).await
     }
 
     /// Parses a parameter expansion that is enclosed in braces.
@@ -85,8 +76,6 @@ impl Lexer {
 
         let has_length_prefix = self.length_prefix().await?;
 
-        self.line_continuations().await?;
-
         let sc = self.peek_char().await?.unwrap();
         let c = sc.value;
         let name = if is_special_parameter_char(c) {
@@ -95,7 +84,7 @@ impl Lexer {
         } else if is_name_char(c) {
             self.consume_char();
             let mut name = c.to_string();
-            while let Some(c) = self.consume_name_char().await? {
+            while let Some(c) = self.consume_char_if(is_name_char).await? {
                 name.push(c.value);
             }
             name
@@ -109,8 +98,6 @@ impl Lexer {
             let location = sc.location.clone();
             return Err(Error { cause, location });
         };
-
-        self.line_continuations().await?;
 
         if !self.skip_if(|c| c == '}').await? {
             let opening_location = location;

@@ -593,7 +593,6 @@ impl Parser<'_> {
     /// peeked.
     pub async fn has_blank(&mut self) -> Result<bool> {
         assert!(self.token.is_none(), "There should be no pending token");
-        self.lexer.line_continuations().await?;
         let c = self.lexer.peek_char().await?;
         Ok(c.map_or(false, |c| is_blank(c.value)))
     }

@@ -29,8 +29,6 @@ impl Lexer {
         &mut self,
         double_quote_escapable: bool,
     ) -> Result<Option<BackquoteUnit>> {
-        self.line_continuations().await?;
-
         if self.skip_if(|c| c == '\\').await? {
             let is_escapable =
                 |c| matches!(c, '$' | '`' | '\\') || c == '"' && double_quote_escapable;

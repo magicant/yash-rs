@@ -300,8 +300,6 @@ impl Lexer {
                 return Ok(None);
             }
 
-            self.line_continuations().await?;
-
             let sc = match self.peek_char().await? {
                 None => return Ok(None),
                 Some(sc) => sc.clone(),

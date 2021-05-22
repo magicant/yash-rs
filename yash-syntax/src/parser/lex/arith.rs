@@ -52,7 +52,6 @@ impl Lexer {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(Err(location));
         }
-        self.line_continuations().await?;
         if !self.skip_if(|c| c == '(').await? {
             self.rewind(index);
             return Ok(Err(location));
@@ -77,7 +76,6 @@ impl Lexer {
                 return Err(Error { cause, location });
             }
         }
-        self.line_continuations().await?;
         match self.peek_char().await? {
             Some(sc) if sc.value == ')' => self.consume_char(),
             Some(_) => {

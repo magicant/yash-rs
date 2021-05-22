@@ -19,7 +19,6 @@
 use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::source::Location;
-use crate::source::SourceChar;
 use crate::syntax::TextUnit;
 
 /// Tests if a character can be part of a POSIXly-portable name.
@@ -50,13 +49,6 @@ pub fn is_single_char_name(c: char) -> bool {
 }
 
 impl Lexer {
-    /// Consumes a POSIXly-portable name character optionally preceded by line
-    /// continuations.
-    async fn consume_portable_name_char(&mut self) -> Result<Option<&SourceChar>> {
-        self.line_continuations().await?;
-        self.consume_char_if(is_portable_name_char).await
-    }
-
     /// Parses a parameter expansion that is not enclosed in braces.
     ///
     /// The initial `$` must have been consumed before calling this function.
@@ -79,7 +71,7 @@ impl Lexer {
             Ok(Ok(TextUnit::RawParam { name, location }))
         } else if let Some(c) = self.consume_char_if(is_portable_name_char).await? {
             let mut name = c.value.to_string();
-            while let Some(c) = self.consume_portable_name_char().await? {
+            while let Some(c) = self.consume_char_if(is_portable_name_char).await? {
                 name.push(c.value);
             }
             Ok(Ok(TextUnit::RawParam { name, location }))

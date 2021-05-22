@@ -34,25 +34,12 @@ impl Lexer {
         Ok(self.consume_char_if(f).await?.is_some())
     }
 
-    /// Skips line continuations, if any.
-    pub async fn line_continuations(&mut self) -> Result<()> {
-        async fn line_continuation(this: &mut Lexer) -> Result<Option<()>> {
-            let ok = this.skip_if(|c| c == '\\').await? && this.skip_if(|c| c == '\n').await?;
-            Ok(if ok { Some(()) } else { None })
-        }
-        self.many(line_continuation).await.map(drop)
-    }
-
     /// Skips blank characters until reaching a non-blank.
     ///
     /// This function also skips line continuations.
     pub async fn skip_blanks(&mut self) -> Result<()> {
-        loop {
-            self.line_continuations().await?;
-            if !self.skip_if(is_blank).await? {
-                break Ok(());
-            }
-        }
+        while self.skip_if(is_blank).await? {}
+        Ok(())
     }
 
     /// Skips a comment, if any.
@@ -84,68 +71,6 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use futures::executor::block_on;
-
-    #[test]
-    fn lexer_line_continuations_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
-
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
-    }
-
-    #[test]
-    fn lexer_line_continuations_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
-    }
-
-    #[test]
-    fn lexer_line_continuations_not_backslash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.column.get(), 1);
-    }
-
-    #[test]
-    fn lexer_line_continuations_only_backslash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\\');
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.column.get(), 1);
-    }
-
-    #[test]
-    fn lexer_line_continuations_not_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\\");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\\');
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.column.get(), 1);
-    }
-
-    #[test]
-    fn lexer_line_continuations_partial_match_after_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\\");
-        assert!(block_on(lexer.line_continuations()).is_ok());
-
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\\');
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.column.get(), 1);
-    }
 
     #[test]
     fn lexer_skip_blanks() {
