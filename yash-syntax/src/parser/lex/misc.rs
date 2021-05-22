@@ -62,7 +62,9 @@ impl Lexer {
     /// This function does not recognize any line continuations.
     pub async fn skip_comment(&mut self) -> Result<()> {
         if self.skip_if(|c| c == '#').await? {
+            self.disable_line_continuation();
             while self.skip_if(|c| c != '\n').await? {}
+            self.enable_line_continuation();
         }
         Ok(())
     }
@@ -260,7 +262,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_non_empty_comment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "### foo bar\\\n");
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n### foo bar\\\n");
 
         let c = block_on(async {
             lexer.skip_comment().await?;
@@ -270,7 +272,7 @@ mod tests {
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
-        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 13);
 
@@ -283,7 +285,7 @@ mod tests {
         .unwrap();
         assert_eq!(c.value, '\n');
         assert_eq!(c.location.line.value, "### foo bar\\\n");
-        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.number.get(), 2);
         assert_eq!(c.location.line.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 13);
     }

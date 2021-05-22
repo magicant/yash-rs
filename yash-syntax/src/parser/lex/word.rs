@@ -36,9 +36,10 @@ impl Lexer {
     /// actually is a location of `'`.
     async fn single_quote(&mut self, opening_location: Location) -> Result<WordUnit> {
         let mut content = String::new();
+        self.disable_line_continuation();
         loop {
             match self.consume_char_if(|_| true).await? {
-                Some(&SourceChar { value: '\'', .. }) => return Ok(SingleQuote(content)),
+                Some(&SourceChar { value: '\'', .. }) => break,
                 Some(&SourceChar { value, .. }) => content.push(value),
                 None => {
                     let cause = SyntaxError::UnclosedSingleQuote { opening_location }.into();
@@ -47,6 +48,8 @@ impl Lexer {
                 }
             }
         }
+        self.enable_line_continuation();
+        Ok(SingleQuote(content))
     }
 
     /// Parses a double-quoted string.
@@ -206,13 +209,13 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_single_quote_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\n$def\\'");
+        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\\\n$def\\'");
         let result =
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         if let SingleQuote(content) = result {
-            assert_eq!(content, "abc\n$def\\");
+            assert_eq!(content, "abc\\\n$def\\");
         } else {
             panic!("unexpected result {:?}", result);
         }

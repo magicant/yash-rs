@@ -341,7 +341,7 @@ impl Lexer {
     pub fn new(input: Box<dyn Input>) -> Lexer {
         Lexer {
             core: LexerCore::new(input),
-            line_continuation_enabled: false, // TODO should be true by default
+            line_continuation_enabled: true,
         }
     }
 

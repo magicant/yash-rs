@@ -59,9 +59,11 @@ impl Lexer {
     /// terminating newline.
     pub async fn line(&mut self) -> Result<String> {
         let mut line = String::new();
+        self.disable_line_continuation();
         while let Some(c) = self.consume_char_if(|c| c != NEWLINE).await? {
             line.push(c.value);
         }
+        self.enable_line_continuation();
         Ok(line)
     }
 
