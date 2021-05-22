@@ -332,14 +332,17 @@ pub struct Lexer {
     // functions to `LexerCore`. `Lexer` adds automatic line-continuation
     // skipping to `LexerCore`.
     core: LexerCore,
+    line_continuation_enabled: bool,
 }
 
 impl Lexer {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
     pub fn new(input: Box<dyn Input>) -> Lexer {
-        let core = LexerCore::new(input);
-        Lexer { core }
+        Lexer {
+            core: LexerCore::new(input),
+            line_continuation_enabled: false, // TODO should be true by default
+        }
     }
 
     /// Creates a new lexer with a fixed source code.
@@ -348,10 +351,65 @@ impl Lexer {
         Lexer::new(Box::new(Memory::new(source, code)))
     }
 
+    /// Enables line continuation recognition onward.
+    ///
+    /// When line continuation recognition is enabled,
+    /// [`peek_char`](Self::peek_char) silently skips line continuation
+    /// sequences.
+    ///
+    /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
+    /// switch line continuation recognition off.
+    ///
+    /// When a new lexer is created, line continuation recognition is enabled by
+    /// default.
+    pub fn enable_line_continuation(&mut self) {
+        self.line_continuation_enabled = true;
+    }
+
+    /// Disables line continuation recognition onward.
+    ///
+    /// When line continuation recognition is enabled,
+    /// [`peek_char`](Self::peek_char) silently skips line continuation
+    /// sequences.
+    ///
+    /// Call [`enable_line_continuation`](Self::enable_line_continuation) to
+    /// switch line continuation recognition on.
+    ///
+    /// When a new lexer is created, line continuation recognition is enabled by
+    /// default.
+    pub fn disable_line_continuation(&mut self) {
+        self.line_continuation_enabled = false;
+    }
+
     /// Peeks the next character.
     ///
     /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
+    ///
+    /// If line continuation recognition is enabled, combinations of a backslash
+    /// and a newline are silently skipped before returning the next character.
+    /// Call [`enable_line_continuation`](Self::enable_line_continuation) and
+    /// [`disable_line_continuation`](Self::disable_line_continuation) to switch
+    /// line continuation recognition on and off, respectively.
     pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
+        if self.line_continuation_enabled {
+            loop {
+                let index = self.core.index();
+                match self.core.peek_char().await? {
+                    PeekChar::Char(c) if c.value == '\\' => (),
+                    _ => break,
+                }
+                self.core.consume_char();
+                match self.core.peek_char().await? {
+                    PeekChar::Char(c) if c.value == '\n' => (),
+                    _ => {
+                        self.core.rewind(index);
+                        break;
+                    }
+                }
+                self.core.consume_char();
+            }
+        }
+
         self.core.peek_char().await.map(|p| p.as_option())
     }
 
@@ -1053,6 +1111,48 @@ mod tests {
     fn lexer_with_empty_source() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
+        lexer.enable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\n');
+        assert_eq!(c.location.line.value, "\n");
+        assert_eq!(c.location.line.number.get(), 2);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 2);
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
+        lexer.enable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.value, "\\\\");
+        assert_eq!(c.location.line.number.get(), 4);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 6);
+    }
+
+    #[test]
+    fn lexer_peek_char_with_line_continuation_disabled() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
+        lexer.disable_line_continuation();
+
+        let c = block_on(lexer.peek_char()).unwrap().unwrap();
+        assert_eq!(c.value, '\\');
+        assert_eq!(c.location.line.value, "\\\n");
+        assert_eq!(c.location.line.number.get(), 1);
+        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(lexer.index(), 0);
     }
 
     #[test]
