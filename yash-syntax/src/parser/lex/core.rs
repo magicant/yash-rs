@@ -43,7 +43,7 @@ pub fn is_blank(c: char) -> bool {
     c != '\n' && c.is_whitespace()
 }
 
-/// Result of [`Lexer::peek_char_or_end`].
+/// Result of [`LexerCore::peek_char`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PeekChar<'a> {
     Char(&'a SourceChar),
@@ -326,23 +326,20 @@ impl fmt::Debug for LexerCore {
 /// to the character at the current position. Derived functions such as
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
 /// parse more complex structures in the source code.
+#[derive(Debug)]
 pub struct Lexer {
-    input: Box<dyn Input>,
-    state: InputState,
-    source: Vec<SourceChar>,
-    index: usize,
+    // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
+    // functions to `LexerCore`. `Lexer` adds automatic line-continuation
+    // skipping to `LexerCore`.
+    core: LexerCore,
 }
 
 impl Lexer {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
     pub fn new(input: Box<dyn Input>) -> Lexer {
-        Lexer {
-            input,
-            state: InputState::Alive,
-            source: Vec::new(),
-            index: 0,
-        }
+        let core = LexerCore::new(input);
+        Lexer { core }
     }
 
     /// Creates a new lexer with a fixed source code.
@@ -352,59 +349,10 @@ impl Lexer {
     }
 
     /// Peeks the next character.
-    async fn peek_char_or_end(&mut self) -> Result<PeekChar<'_>> {
-        loop {
-            if self.index < self.source.len() {
-                return Ok(PeekChar::Char(&self.source[self.index]));
-            }
-
-            match self.state {
-                InputState::Alive => (),
-                InputState::EndOfInput(ref location) => return Ok(PeekChar::EndOfInput(location)),
-                InputState::Error(ref error) => return Err(error.clone()),
-            }
-
-            // Read more input
-            match self.input.next_line(&Context).await {
-                Ok(line) => {
-                    if line.value.is_empty() {
-                        // End of input
-                        let location = if let Some(c) = self.source.last() {
-                            // TODO correctly count line number after newline
-                            //if sc.value == '\n' {
-                            //} else {
-                            let mut location = c.location.clone();
-                            location.advance(1);
-                            location
-                        //}
-                        } else {
-                            // Completely empty source
-                            Location {
-                                line: Rc::new(line),
-                                column: NonZeroU64::new(1).unwrap(),
-                            }
-                        };
-                        self.state = InputState::EndOfInput(location);
-                    } else {
-                        // Successful read
-                        self.source.extend(Rc::new(line).enumerate())
-                    }
-                }
-                Err((location, io_error)) => {
-                    self.state = InputState::Error(Error {
-                        cause: io_error.into(),
-                        location,
-                    });
-                }
-            }
-        }
-    }
-
-    /// Peeks the next character.
     ///
     /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
     pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
-        self.peek_char_or_end().await.map(|p| p.as_option())
+        self.core.peek_char().await.map(|p| p.as_option())
     }
 
     /// Returns the location of the next character.
@@ -415,7 +363,7 @@ impl Lexer {
     /// This function required a mutable reference to `self` since it may need to read a next
     /// line if it is not yet read.
     pub async fn location(&mut self) -> Result<&Location> {
-        self.peek_char_or_end().await.map(|p| p.location())
+        self.core.peek_char().await.map(|p| p.location())
     }
 
     /// Consumes the next character.
@@ -424,12 +372,7 @@ impl Lexer {
     /// returned the character. Consuming a character that has not yet been peeked would result
     /// in a panic!
     pub fn consume_char(&mut self) {
-        assert!(
-            self.index < self.source.len(),
-            "A character must have been peeked before being consumed: index={}",
-            self.index
-        );
-        self.index += 1;
+        self.core.consume_char()
     }
 
     /// Returns the position of the next character, counted from zero.
@@ -448,7 +391,7 @@ impl Lexer {
     /// ```
     #[must_use]
     pub fn index(&self) -> usize {
-        self.index
+        self.core.index()
     }
 
     /// Moves the current position back to the given index so that characters that have been
@@ -473,13 +416,7 @@ impl Lexer {
     /// })
     /// ```
     pub fn rewind(&mut self, index: usize) {
-        assert!(
-            index <= self.index,
-            "The new index {} must not be larger than the current index {}",
-            index,
-            self.index
-        );
-        self.index = index;
+        self.core.rewind(index)
     }
 
     /// Peeks the next character and, if the given decider function returns true for it,
@@ -493,9 +430,9 @@ impl Lexer {
     {
         match self.peek_char().await? {
             Some(c) if f(c.value) => {
-                let index = self.index;
+                let index = self.index();
                 self.consume_char();
-                Ok(Some(&self.source[index]))
+                Ok(Some(self.core.peek_char_at(index)))
             }
             _ => Ok(None),
         }
@@ -518,11 +455,11 @@ impl Lexer {
     {
         let mut results = vec![];
         loop {
-            let old_index = self.index;
+            let old_index = self.index();
             match f.call(self).await? {
                 Some(r) => results.push(r),
                 None => {
-                    self.index = old_index;
+                    self.rewind(old_index);
                     return Ok(results);
                 }
             }
@@ -544,23 +481,7 @@ impl Lexer {
     ///
     /// If the replaced part is empty, i.e., `begin >= self.index()`.
     pub fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
-        let end = self.index;
-        if begin >= end {
-            panic!("Lexer::substitute_alias: begin={}, end={}", begin, end);
-        }
-
-        let original = self.source[begin].location.clone();
-        let source = Source::Alias {
-            original,
-            alias: alias.clone(),
-        };
-        let mut repl = vec![];
-        for line in lines(source, &alias.replacement) {
-            repl.extend(Rc::new(line).enumerate());
-        }
-
-        self.source.splice(begin..end, repl);
-        self.index = begin;
+        self.core.substitute_alias(begin, alias)
     }
 
     /// Tests if the given index is after the replacement string of alias
@@ -570,34 +491,7 @@ impl Lexer {
     ///
     /// If `index` is larger than the currently read index.
     pub fn is_after_blank_ending_alias(&self, index: usize) -> bool {
-        fn ends_with_blank(s: &str) -> bool {
-            s.chars().rev().next().map_or(false, is_blank)
-        }
-        fn is_same_alias(alias: &Alias, sc: Option<&SourceChar>) -> bool {
-            match sc {
-                None => false,
-                Some(sc) => sc.location.line.source.is_alias_for(&alias.name),
-            }
-        }
-
-        for index in (0..index).rev() {
-            let sc = &self.source[index];
-
-            if !is_blank(sc.value) {
-                return false;
-            }
-
-            if let Source::Alias { ref alias, .. } = sc.location.line.source {
-                #[allow(clippy::collapsible_if)]
-                if ends_with_blank(&alias.replacement) {
-                    if !is_same_alias(alias, self.source.get(index + 1)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        false
+        self.core.is_after_blank_ending_alias(index)
     }
 
     /// Parses an optional compound list that is the content of a command
@@ -607,29 +501,20 @@ impl Lexer {
     /// beginning of an and-or list is found and returns the string that was
     /// consumed.
     pub async fn inner_program(&mut self) -> Result<String> {
-        let begin = self.index;
+        let begin = self.index();
 
         let mut parser = super::super::Parser::new(self);
         parser.maybe_compound_list().await?;
 
         let end = parser.peek_token().await?.index;
         self.rewind(end);
-        Ok(self.source[begin..end].iter().map(|c| c.value).collect())
+
+        Ok(self.core.source_string(begin..end))
     }
 
     /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
     pub fn inner_program_boxed(&mut self) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
         Box::pin(self.inner_program())
-    }
-}
-
-impl fmt::Debug for Lexer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
-        f.debug_struct("Lexer")
-            .field("source", &self.source)
-            .field("index", &self.index)
-            .finish()
-        // TODO Call finish_non_exhaustive instead of finish
     }
 }
 
@@ -1489,7 +1374,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Lexer::substitute_alias: begin=0, end=0")]
+    #[should_panic(expected = "begin index 0 should be less than end index 0")]
     fn lexer_substitute_alias_with_invalid_index() {
         let mut lexer = Lexer::with_source(Source::Unknown, "a b");
         let alias = Rc::new(Alias {
