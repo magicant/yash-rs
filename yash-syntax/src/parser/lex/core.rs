@@ -504,6 +504,23 @@ impl Lexer {
         }
     }
 
+    /// Extracts a string from the source code.
+    ///
+    /// This function returns the source code string for the range specified by
+    /// the argument. The range must specify a valid index. If the index points
+    /// to a character that have not yet read, this function will panic!.
+    ///
+    /// # Panics
+    ///
+    /// If the argument index is out of bounds, i.e., pointing to an unread
+    /// character.
+    pub fn source_string<I>(&self, i: I) -> String
+    where
+        I: SliceIndex<[SourceChar], Output = [SourceChar]>,
+    {
+        self.core.source_string(i)
+    }
+
     /// Performs alias substitution right before the current position.
     ///
     /// This function must be called just after a [word](Lexer::word) has been parsed that

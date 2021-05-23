@@ -85,8 +85,10 @@ impl Lexer {
                 let line_text = Text::from_literal_chars(line_string.chars());
                 (line_text, line_string)
             } else {
+                let begin = self.index();
                 let line_text = self.text(|c| c == NEWLINE, is_escapable).await?;
-                let line_string = line_text.to_string();
+                let end = self.index();
+                let line_string = self.source_string(begin..end);
                 (line_text, line_string)
             };
 
