@@ -168,6 +168,49 @@ impl<T: MaybeLiteral> MaybeLiteral for [T] {
     }
 }
 
+/// Flag that specifies how the value is substituted in a [switch](Switch).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SwitchType {
+    /// Alter an existing value, if any. (`+`)
+    Alter,
+    /// Substitute a missing value with a default. (`-`)
+    Default,
+    /// Assign a default to the variable if the value is missing. (`=`)
+    Assign,
+    /// Error out if the value is missing. (`?`)
+    Error,
+}
+
+/// Condition that triggers a [switch](Switch).
+///
+/// In the lexical grammar of the shell language, a switch condition is an
+/// optional colon that precedes a switch type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SwitchCondition {
+    /// Without a colon, the switch is triggered if the parameter is unset.
+    Unset,
+    /// With a colon, the switch is triggered if the parameter is unset or
+    /// empty.
+    UnsetOrEmpty,
+}
+
+/// Parameter expansion [modifier](Modifier) that conditionally substitutes the
+/// value being expanded.
+///
+/// Examples of switches include `+foo`, `:-bar` and `:=baz`.
+///
+/// A switch is composed of a [condition](SwitchCondition) (an optional `:`), a
+/// [type](SwitchType) (one of `+`, `-`, `=` and `?`) and a [word](Word).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Switch {
+    /// How the value is substituted.
+    pub r#type: SwitchType,
+    /// Condition that determines whether the value is substituted or not.
+    pub condition: SwitchCondition,
+    /// Word that substitutes the parameter value.
+    pub word: Word,
+}
+
 /// Attribute that modifies a parameter expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Modifier {
@@ -175,6 +218,10 @@ pub enum Modifier {
     None,
     /// `#` prefix. (`${#foo}`)
     Length,
+    /// `+`, `-`, `=` or `?` suffix, optionally with `:`. (`${foo:-bar}`)
+    Switch(Switch),
+    // TODO Trim
+    // TODO Subst
 }
 
 /// Parameter expansion enclosed in braces.
