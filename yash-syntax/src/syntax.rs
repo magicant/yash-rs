@@ -86,6 +86,7 @@ use crate::source::Location;
 use itertools::Itertools;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::Write;
 use std::os::unix::io::RawFd;
 
 /// Result of [`Unquote::write_unquoted`].
@@ -181,6 +182,19 @@ pub enum SwitchType {
     Error,
 }
 
+impl fmt::Display for SwitchType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use SwitchType::*;
+        let c = match self {
+            Alter => '+',
+            Default => '-',
+            Assign => '=',
+            Error => '?',
+        };
+        f.write_char(c)
+    }
+}
+
 /// Condition that triggers a [switch](Switch).
 ///
 /// In the lexical grammar of the shell language, a switch condition is an
@@ -192,6 +206,16 @@ pub enum SwitchCondition {
     /// With a colon, the switch is triggered if the parameter is unset or
     /// empty.
     UnsetOrEmpty,
+}
+
+impl fmt::Display for SwitchCondition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use SwitchCondition::*;
+        match self {
+            Unset => Ok(()),
+            UnsetOrEmpty => f.write_char(':'),
+        }
+    }
 }
 
 /// Parameter expansion [modifier](Modifier) that conditionally substitutes the
@@ -209,6 +233,19 @@ pub struct Switch {
     pub condition: SwitchCondition,
     /// Word that substitutes the parameter value.
     pub word: Word,
+}
+
+impl fmt::Display for Switch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}{}", self.condition, self.r#type, self.word)
+    }
+}
+
+impl Unquote for Switch {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        write!(w, "{}{}", self.condition, self.r#type)?;
+        self.word.write_unquoted(w)
+    }
 }
 
 /// Attribute that modifies a parameter expansion.
@@ -243,20 +280,34 @@ pub struct Param {
 
 impl fmt::Display for Param {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Modifier::*;
         match self.modifier {
-            Modifier::None => write!(f, "${{{}}}", self.name),
-            Modifier::Length => write!(f, "${{#{}}}", self.name),
+            None => write!(f, "${{{}}}", self.name),
+            Length => write!(f, "${{#{}}}", self.name),
+            Switch(ref switch) => write!(f, "${{{}{}}}", self.name, switch),
         }
     }
 }
 
 impl Unquote for Param {
     fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        use Modifier::*;
         match self.modifier {
-            Modifier::None => write!(w, "${{{}}}", self.name)?,
-            Modifier::Length => write!(w, "${{#{}}}", self.name)?,
+            None => {
+                write!(w, "${{{}}}", self.name)?;
+                Ok(false)
+            }
+            Length => {
+                write!(w, "${{#{}}}", self.name)?;
+                Ok(false)
+            }
+            Switch(ref switch) => {
+                write!(w, "${{{}", self.name)?;
+                let quoted = switch.write_unquoted(w)?;
+                w.write_char('}')?;
+                Ok(quoted)
+            }
         }
-        Ok(false)
     }
 }
 
@@ -1115,6 +1166,58 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
+    fn switch_display() {
+        let switch = Switch {
+            r#type: SwitchType::Alter,
+            condition: SwitchCondition::Unset,
+            word: "".parse().unwrap(),
+        };
+        assert_eq!(switch.to_string(), "+");
+
+        let switch = Switch {
+            r#type: SwitchType::Default,
+            condition: SwitchCondition::UnsetOrEmpty,
+            word: "foo".parse().unwrap(),
+        };
+        assert_eq!(switch.to_string(), ":-foo");
+
+        let switch = Switch {
+            r#type: SwitchType::Assign,
+            condition: SwitchCondition::UnsetOrEmpty,
+            word: "bar baz".parse().unwrap(),
+        };
+        assert_eq!(switch.to_string(), ":=bar baz");
+
+        let switch = Switch {
+            r#type: SwitchType::Error,
+            condition: SwitchCondition::Unset,
+            word: "?error".parse().unwrap(),
+        };
+        assert_eq!(switch.to_string(), "??error");
+    }
+
+    #[test]
+    fn switch_unquote() {
+        let switch = Switch {
+            r#type: SwitchType::Default,
+            condition: SwitchCondition::UnsetOrEmpty,
+            word: "foo bar".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = switch.unquote();
+        assert_eq!(unquoted, ":-foo bar");
+        assert_eq!(is_quoted, false);
+
+        let switch = Switch {
+            r#type: SwitchType::Error,
+            condition: SwitchCondition::Unset,
+            word: r"e\r\ror".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = switch.unquote();
+        assert_eq!(unquoted, "?error");
+        assert_eq!(is_quoted, true);
+    }
+
+    #[test]
     fn braced_param_display() {
         let param = Param {
             name: "foo".to_string(),
@@ -1128,6 +1231,17 @@ mod tests {
             ..param
         };
         assert_eq!(param.to_string(), "${#foo}");
+
+        let switch = Switch {
+            r#type: SwitchType::Assign,
+            condition: SwitchCondition::UnsetOrEmpty,
+            word: "bar baz".parse().unwrap(),
+        };
+        let param = Param {
+            modifier: Modifier::Switch(switch),
+            ..param
+        };
+        assert_eq!(param.to_string(), "${foo:=bar baz}");
     }
 
     #[test]
@@ -1148,6 +1262,19 @@ mod tests {
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${#foo}");
         assert_eq!(is_quoted, false);
+
+        let switch = Switch {
+            r#type: SwitchType::Assign,
+            condition: SwitchCondition::UnsetOrEmpty,
+            word: "'bar'".parse().unwrap(),
+        };
+        let param = Param {
+            modifier: Modifier::Switch(switch),
+            ..param
+        };
+        let (unquoted, is_quoted) = param.unquote();
+        assert_eq!(unquoted, "${foo:=bar}");
+        assert_eq!(is_quoted, true);
     }
 
     #[test]
