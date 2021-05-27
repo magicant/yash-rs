@@ -96,6 +96,9 @@ impl Lexer {
             return Err(Error { cause, location });
         };
 
+        let suffix_location = self.location().await?.clone();
+        let suffix = self.suffix_modifier().await?;
+
         if !self.skip_if(|c| c == '}').await? {
             let opening_location = location;
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
@@ -103,11 +106,16 @@ impl Lexer {
             return Err(Error { cause, location });
         }
 
-        let modifier = if has_length_prefix {
-            Modifier::Length
-        } else {
-            Modifier::None
+        let modifier = match (has_length_prefix, suffix) {
+            (true, Modifier::None) => Modifier::Length,
+            (true, _) => {
+                let cause = SyntaxError::MultipleModifier.into();
+                let location = suffix_location;
+                return Err(Error { cause, location });
+            }
+            (false, suffix) => suffix,
         };
+
         Ok(Ok(Param {
             name,
             modifier,
@@ -121,6 +129,8 @@ mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
     use crate::source::Source;
+    use crate::syntax::SwitchCondition;
+    use crate::syntax::SwitchType;
     use futures::executor::block_on;
 
     fn assert_opening_location(location: &Location) {
@@ -289,7 +299,58 @@ mod tests {
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
 
+    #[test]
+    fn lexer_braced_param_switch_minimum() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{x+})");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "x");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.condition, SwitchCondition::Unset);
+            assert_eq!(switch.word.to_string(), "");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+    }
+
+    #[test]
+    fn lexer_braced_param_switch_full() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{foo:?'!'})");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "foo");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
+            assert_eq!(switch.word.to_string(), "'!'");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+    }
+
     // TODO ${###} ${#%}
+
+    #[test]
+    fn lexer_braced_param_multiple_modifier() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#x+};");
+        let location = Location::dummy("$".to_string());
+
+        let e = block_on(lexer.braced_param(location)).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
+        assert_eq!(e.location.line.value, "{#x+};");
+        assert_eq!(e.location.column.get(), 4);
+    }
 
     #[test]
     fn lexer_braced_param_line_continuations() {

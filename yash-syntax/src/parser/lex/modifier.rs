@@ -24,6 +24,9 @@ use crate::syntax::Modifier;
 use crate::syntax::Switch;
 use crate::syntax::SwitchCondition;
 use crate::syntax::SwitchType;
+use crate::syntax::Word;
+use std::future::Future;
+use std::pin::Pin;
 
 impl Lexer {
     async fn suffix_modifier_not_found(&mut self, colon: bool) -> Result<Modifier> {
@@ -59,10 +62,14 @@ impl Lexer {
             SwitchCondition::Unset
         };
 
+        // Boxing needed for recursion
+        let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
+        let word = word.await?;
+
         let switch = Switch {
             r#type,
             condition,
-            word: self.word(|c| c == '}').await?,
+            word,
         };
         Ok(Modifier::Switch(switch))
     }
