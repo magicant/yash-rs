@@ -23,7 +23,6 @@ use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
 use crate::source::Location;
-use crate::source::SourceChar;
 use crate::syntax::Modifier;
 use crate::syntax::Param;
 
@@ -37,19 +36,45 @@ pub fn is_name_char(c: char) -> bool {
 }
 
 impl Lexer {
-    /// Consumes a length prefix (`#`) if any.
-    async fn length_prefix(&mut self) -> Result<bool> {
-        let index = self.index();
+    /// Tests if there is a length prefix (`#`).
+    ///
+    /// This function may consume many characters, possibly beyond the length
+    /// prefix, regardless of the result. The caller should rewind to the index
+    /// this function returns.
+    async fn has_length_prefix(&mut self) -> Result<bool> {
         if !self.skip_if(|c| c == '#').await? {
             return Ok(false);
         }
 
-        if let Some(&SourceChar { value: '}', .. }) = self.peek_char().await? {
-            self.rewind(index);
-            Ok(false)
-        } else {
-            Ok(true)
+        // Remember that a parameter expansion cannot have both a prefix and
+        // suffix modifier. For example, `${#-?}` is not considered to have a
+        // prefix. We need to look ahead to see if it is okay to treat the `#`
+        // as a prefix.
+        if let Some(c) = self.peek_char().await? {
+            if matches!(c.value, '}' | '+' | '=' | ':') {
+                return Ok(false);
+            }
+            if matches!(c.value, '-' | '?') {
+                self.consume_char();
+                if let Some(c) = self.peek_char().await? {
+                    return Ok(c.value == '}');
+                }
+            }
         }
+
+        Ok(true)
+    }
+
+    /// Consumes a length prefix (`#`) if any.
+    async fn length_prefix(&mut self) -> Result<bool> {
+        let initial_index = self.index();
+        let has_length_prefix = self.has_length_prefix().await?;
+        self.rewind(initial_index);
+        if has_length_prefix {
+            self.peek_char().await?;
+            self.consume_char();
+        }
+        Ok(has_length_prefix)
     }
 
     /// Parses a parameter expansion that is enclosed in braces.
@@ -337,6 +362,106 @@ mod tests {
         assert_opening_location(&result.location);
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_suffix_alter() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#+?}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Alter);
+            assert_eq!(switch.condition, SwitchCondition::Unset);
+            assert_eq!(switch.word.to_string(), "?");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_suffix_default() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#--}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.condition, SwitchCondition::Unset);
+            assert_eq!(switch.word.to_string(), "-");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_suffix_assign() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#=?}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Assign);
+            assert_eq!(switch.condition, SwitchCondition::Unset);
+            assert_eq!(switch.word.to_string(), "?");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_suffix_error() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#??}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Error);
+            assert_eq!(switch.condition, SwitchCondition::Unset);
+            assert_eq!(switch.word.to_string(), "?");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_suffix_with_colon() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#:-}<");
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Switch(switch) = result.modifier {
+            assert_eq!(switch.r#type, SwitchType::Default);
+            assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
+            assert_eq!(switch.word.to_string(), "");
+        } else {
+            panic!("Not a switch: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
 
     // TODO ${###} ${#%}
