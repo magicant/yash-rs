@@ -29,6 +29,7 @@ mod dollar;
 mod heredoc;
 mod keyword;
 mod misc;
+mod modifier;
 mod op;
 mod raw_param;
 mod text;

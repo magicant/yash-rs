@@ -39,6 +39,10 @@ use std::rc::Rc;
 pub enum SyntaxError {
     /// A `(` lacks a closing `)`.
     UnclosedParen { opening_location: Location },
+    /// A modifier does not have a valid form in a parameter expansion.
+    InvalidModifier,
+    /// A braced parameter expansion has both a prefix and suffix modifier.
+    MultipleModifier,
     /// A single quotation lacks a closing `'`.
     UnclosedSingleQuote { opening_location: Location },
     /// A double quotation lacks a closing `"`.
@@ -152,6 +156,10 @@ impl fmt::Display for SyntaxError {
         use SyntaxError::*;
         match self {
             UnclosedParen { .. } => f.write_str("The parenthesis is not closed"),
+            InvalidModifier => f.write_str("The parameter expansion contains a malformed modifier"),
+            MultipleModifier => {
+                f.write_str("A suffix modifier cannot be used together with a prefix modifier")
+            }
             UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed"),
             UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed"),
             UnclosedParam { .. } => f.write_str("The parameter expansion is not closed"),
