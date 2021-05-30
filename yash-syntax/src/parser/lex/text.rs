@@ -31,7 +31,7 @@ impl WordLexer<'_> {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
-    /// [dollar unit](Lexer::dollar_unit), or [backquote](Lexer::backquote).
+    /// [dollar unit](WordLexer::dollar_unit), or [backquote](Lexer::backquote).
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for
