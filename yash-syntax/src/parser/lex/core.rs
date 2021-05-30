@@ -525,7 +525,7 @@ impl Lexer {
 
     /// Performs alias substitution right before the current position.
     ///
-    /// This function must be called just after a [word](Lexer::word) has been parsed that
+    /// This function must be called just after a [word](WordLexer::word) has been parsed that
     /// matches the name of the argument alias. No check is done in this function that there is
     /// a matching word before the current position. The characters starting from the `begin`
     /// index up to the current position are silently replaced with the alias value.

@@ -17,6 +17,8 @@
 //! Part of the lexer that parses suffix modifiers.
 
 use super::core::Lexer;
+use super::core::WordContext;
+use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
@@ -62,8 +64,14 @@ impl Lexer {
             SwitchCondition::Unset
         };
 
+        // TODO use correct word context
+        let mut word_lexer = WordLexer {
+            lexer: self,
+            context: WordContext::Word,
+        };
         // Boxing needed for recursion
-        let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
+        let word =
+            Box::pin(word_lexer.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
         let word = word.await?;
 
         let switch = Switch {
