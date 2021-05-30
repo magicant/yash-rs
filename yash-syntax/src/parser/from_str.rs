@@ -68,6 +68,10 @@ impl FromStr for TextUnit {
     /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<TextUnit, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         block_on(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
     }
 }
