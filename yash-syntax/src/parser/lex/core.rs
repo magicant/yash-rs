@@ -32,6 +32,8 @@ use crate::syntax::Word;
 use std::fmt;
 use std::future::Future;
 use std::num::NonZeroU64;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::slice::SliceIndex;
@@ -570,6 +572,43 @@ impl Lexer {
     /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
     pub fn inner_program_boxed(&mut self) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
         Box::pin(self.inner_program())
+    }
+}
+
+/// Context in which a [word](crate::syntax::Word) is parsed.
+///
+/// The parse of the word of a [switch](crate::syntax::Switch) depends on
+/// whether the parameter expansion containing the switch is part of a text or a
+/// word. A `WordContext` value is used to decide the behavior of the lexer.
+///
+/// Parser functions that depend on the context are implemented in
+/// [`WordLexer`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WordContext {
+    /// The text unit being parsed is part of a [text](crate::syntax::Text).
+    Text,
+    /// The text unit being parsed is part of a [word](crate::syntax::Word).
+    Word,
+}
+
+/// Lexer with additional information for parsing [texts](crate::syntax::Text)
+/// and [words](crate::syntax::Word).
+#[derive(Debug)]
+pub struct WordLexer<'a> {
+    pub lexer: &'a mut Lexer,
+    pub context: WordContext,
+}
+
+impl Deref for WordLexer<'_> {
+    type Target = Lexer;
+    fn deref(&self) -> &Lexer {
+        &self.lexer
+    }
+}
+
+impl DerefMut for WordLexer<'_> {
+    fn deref_mut(&mut self) -> &mut Lexer {
+        &mut self.lexer
     }
 }
 
