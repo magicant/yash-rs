@@ -17,7 +17,6 @@
 //! Part of the lexer that parses suffix modifiers.
 
 use super::core::Lexer;
-use super::core::WordContext;
 use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
@@ -40,7 +39,9 @@ impl Lexer {
             Ok(Modifier::None)
         }
     }
+}
 
+impl WordLexer<'_> {
     /// Parses a suffix modifier, i.e., a modifier other than the length prefix.
     pub async fn suffix_modifier(&mut self) -> Result<Modifier> {
         let colon = self.skip_if(|c| c == ':').await?;
@@ -64,14 +65,8 @@ impl Lexer {
             SwitchCondition::Unset
         };
 
-        // TODO use correct word context
-        let mut word_lexer = WordLexer {
-            lexer: self,
-            context: WordContext::Word,
-        };
         // Boxing needed for recursion
-        let word =
-            Box::pin(word_lexer.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
+        let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
         let word = word.await?;
 
         let switch = Switch {
@@ -87,6 +82,7 @@ impl Lexer {
 mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
+    use crate::parser::lex::WordContext;
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
@@ -95,6 +91,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier());
         assert_eq!(result, Ok(Modifier::None));
@@ -103,6 +103,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_none() {
         let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier());
         assert_eq!(result, Ok(Modifier::None));
@@ -113,6 +117,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_alter_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "+}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -131,6 +139,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_alter_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"+a  z}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -157,6 +169,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_alter_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, ":+}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -175,6 +191,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_default_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "-}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -193,6 +213,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_default_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":-cool}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -219,6 +243,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_assign_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, ":=}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -237,6 +265,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_assign_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"=Yes}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -262,6 +294,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_error_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "?}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -280,6 +316,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_error_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":?No}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -304,6 +344,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_orphan_colon_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
@@ -314,6 +358,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_orphan_colon() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":x}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
