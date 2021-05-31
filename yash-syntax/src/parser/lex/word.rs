@@ -17,6 +17,7 @@
 //! Part of the lexer that parses words.
 
 use super::core::Lexer;
+use super::core::WordContext;
 use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
@@ -92,16 +93,23 @@ impl WordLexer<'_> {
     where
         F: FnOnce(char) -> bool,
     {
-        match self.consume_char_if(|c| c == '\'' || c == '"').await? {
-            None => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
-            Some(sc) => {
-                let location = sc.location.clone();
-                match sc.value {
-                    '\'' => self.single_quote(location).await.map(Some),
-                    '"' => self.double_quote(location).await.map(Some),
-                    _ => unreachable!(),
-                }
+        let allow_single_quote = match self.context {
+            WordContext::Word => true,
+            WordContext::Text => false,
+        };
+
+        match self.peek_char().await? {
+            Some(c) if c.value == '\'' && allow_single_quote => {
+                let location = c.location.clone();
+                self.consume_char();
+                self.single_quote(location).await.map(Some)
             }
+            Some(c) if c.value == '"' => {
+                let location = c.location.clone();
+                self.consume_char();
+                self.double_quote(location).await.map(Some)
+            }
+            _ => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
         }
     }
 
@@ -267,6 +275,25 @@ mod tests {
         assert_eq!(e.location.line.number.get(), 2);
         assert_eq!(e.location.line.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
+    }
+
+    #[test]
+    fn lexer_word_unit_not_single_quote_in_text_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "'");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
+
+        let result = block_on(lexer.word_unit(|c| {
+            assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+            false
+        }))
+        .unwrap()
+        .unwrap();
+        assert_eq!(result, Unquoted(Literal('\'')));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
