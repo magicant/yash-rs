@@ -136,8 +136,10 @@ mod tests {
     use crate::parser::core::ErrorCause;
     use crate::parser::lex::WordContext;
     use crate::source::Source;
+    use crate::syntax::Modifier;
     use crate::syntax::Text;
-    use crate::syntax::TextUnit::{self, Backslashed, CommandSubst, Literal};
+    use crate::syntax::TextUnit::{self, Backslashed, BracedParam, CommandSubst, Literal};
+    use crate::syntax::WordUnit::Tilde;
     use futures::executor::block_on;
 
     #[test]
@@ -418,5 +420,59 @@ mod tests {
         assert_eq!(word.location.line.number.get(), 1);
         assert_eq!(word.location.line.source, Source::Unknown);
         assert_eq!(word.location.column.get(), 1);
+    }
+
+    #[test]
+    fn lexer_word_with_switch_in_word_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"${x-~}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+
+        let result = block_on(lexer.word(|c| {
+            assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+            false
+        }))
+        .unwrap();
+        if let [Unquoted(BracedParam(ref param))] = result.units[..] {
+            if let Modifier::Switch(ref switch) = param.modifier {
+                assert_eq!(switch.word.units, [Tilde("".to_string())]);
+            } else {
+                panic!("Not a switch: {:?}", param.modifier);
+            }
+        } else {
+            panic!("Not a single parameter: {:?}", result.units);
+        }
+    }
+
+    #[test]
+    fn lexer_word_with_switch_in_text_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r#""${x-~}""#);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+
+        let result = block_on(lexer.word(|c| {
+            assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+            false
+        }))
+        .unwrap();
+        if let [DoubleQuote(Text(ref units))] = result.units[..] {
+            if let [BracedParam(ref param)] = units[..] {
+                if let Modifier::Switch(ref switch) = param.modifier {
+                    assert_eq!(switch.word.units, [Unquoted(Literal('~'))]);
+                } else {
+                    panic!("Not a switch: {:?}", param.modifier);
+                }
+            } else {
+                panic!("Not a single parameter: {:?}", units);
+            }
+        } else {
+            panic!("Not a single double-quote: {:?}", result);
+        }
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 }

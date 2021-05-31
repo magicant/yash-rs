@@ -17,6 +17,7 @@
 //! Part of the lexer that parses suffix modifiers.
 
 use super::core::Lexer;
+use super::core::WordContext;
 use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
@@ -67,7 +68,11 @@ impl WordLexer<'_> {
 
         // Boxing needed for recursion
         let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
-        let word = word.await?;
+        let mut word = word.await?;
+        match self.context {
+            WordContext::Text => (),
+            WordContext::Word => word.parse_tilde_front(),
+        }
 
         let switch = Switch {
             r#type,
@@ -82,7 +87,6 @@ impl WordLexer<'_> {
 mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
-    use crate::parser::lex::WordContext;
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
@@ -339,6 +343,41 @@ mod tests {
         }
 
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+    }
+
+    #[test]
+    fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_word_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+
+        let result = block_on(lexer.suffix_modifier()).unwrap();
+        if let Modifier::Switch(switch) = result {
+            assert_eq!(switch.word.units, [WordUnit::Tilde("".to_string())]);
+        } else {
+            panic!("Not a switch: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_text_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
+
+        let result = block_on(lexer.suffix_modifier()).unwrap();
+        if let Modifier::Switch(switch) = result {
+            assert_eq!(
+                switch.word.units,
+                [WordUnit::Unquoted(TextUnit::Literal('~'))]
+            );
+        } else {
+            panic!("Not a switch: {:?}", result);
+        }
     }
 
     #[test]
