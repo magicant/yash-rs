@@ -88,14 +88,24 @@ impl WordLexer<'_> {
     /// `is_delimiter` is a function that decides a character is a delimiter. An
     /// unquoted character is parsed only if `is_delimiter` returns false for it.
     ///
+    /// The word context defines what characters can be escaped by a backslash.
+    /// If the context is `Word`, any character can be escaped. If `Text`, then
+    /// `$`, `"`, `` ` `` and `\` can be escaped as well as delimiters.
+    ///
     /// This function does not parse tilde expansion. See [`word`](Self::word).
     pub async fn word_unit<F>(&mut self, is_delimiter: F) -> Result<Option<WordUnit>>
     where
-        F: FnOnce(char) -> bool,
+        F: Fn(char) -> bool,
     {
         let allow_single_quote = match self.context {
             WordContext::Word => true,
             WordContext::Text => false,
+        };
+        let escape_all = |_| true;
+        let escape_some = |c| matches!(c, '$' | '"' | '`' | '\\') || is_delimiter(c);
+        let is_escapable: &dyn Fn(char) -> bool = match self.context {
+            WordContext::Word => &escape_all,
+            WordContext::Text => &escape_some,
         };
 
         match self.peek_char().await? {
@@ -109,7 +119,10 @@ impl WordLexer<'_> {
                 self.consume_char();
                 self.double_quote(location).await.map(Some)
             }
-            _ => Ok(self.text_unit(is_delimiter, |_| true).await?.map(Unquoted)),
+            _ => Ok(self
+                .text_unit(&is_delimiter, is_escapable)
+                .await?
+                .map(Unquoted)),
         }
     }
 
@@ -125,13 +138,13 @@ impl WordLexer<'_> {
     /// This function does not parse any tilde expansions in the word.
     /// To parse them, you need to call [`Word::parse_tilde_front`] or
     /// [`Word::parse_tilde_everywhere`] on the resultant word.
-    pub async fn word<F>(&mut self, mut is_delimiter: F) -> Result<Word>
+    pub async fn word<F>(&mut self, is_delimiter: F) -> Result<Word>
     where
-        F: FnMut(char) -> bool,
+        F: Fn(char) -> bool,
     {
         let location = self.location().await?.clone();
         let mut units = vec![];
-        while let Some(unit) = self.word_unit(&mut is_delimiter).await? {
+        while let Some(unit) = self.word_unit(&is_delimiter).await? {
             units.push(unit)
         }
         Ok(Word { units, location })
@@ -172,14 +185,15 @@ mod tests {
     }
 
     #[test]
-    fn lexer_word_unit_unquoted_escapes() {
+    fn lexer_word_unit_unquoted_escapes_in_word_context() {
         // Any characters can be escaped in this context.
         block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, r#"\a\$\`\"\\\'\#"#);
+            let mut lexer = Lexer::with_source(Source::Unknown, r#"\a\$\`\"\\\'\#\{\}"#);
             let mut lexer = WordLexer {
                 lexer: &mut lexer,
                 context: WordContext::Word,
             };
+
             let result = lexer
                 .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
                 .await;
@@ -208,6 +222,56 @@ mod tests {
                 .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('#')))));
+            let result = lexer
+                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('{')))));
+            let result = lexer
+                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('}')))));
+
+            assert_eq!(lexer.peek_char().await, Ok(None));
+        })
+    }
+
+    #[test]
+    fn lexer_word_unit_unquoted_escapes_in_text_context() {
+        // $, `, " and \ can be escaped as well as delimiters
+        block_on(async {
+            let mut lexer = Lexer::with_source(Source::Unknown, r#"\a\$\`\"\\\'\#\{\}"#);
+            let mut lexer = WordLexer {
+                lexer: &mut lexer,
+                context: WordContext::Text,
+            };
+            let is_delimiter = |c| c == '}';
+
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('\\')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('a')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('$')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('`')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('"')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('\\')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('\\')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('\'')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('\\')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('#')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('\\')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Literal('{')))));
+            let result = lexer.word_unit(is_delimiter).await;
+            assert_eq!(result, Ok(Some(Unquoted(Backslashed('}')))));
 
             assert_eq!(lexer.peek_char().await, Ok(None));
         })
@@ -285,12 +349,7 @@ mod tests {
             context: WordContext::Text,
         };
 
-        let result = block_on(lexer.word_unit(|c| {
-            assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
-            false
-        }))
-        .unwrap()
-        .unwrap();
+        let result = block_on(lexer.word_unit(|_| false)).unwrap().unwrap();
         assert_eq!(result, Unquoted(Literal('\'')));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
