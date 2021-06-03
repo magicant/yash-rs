@@ -20,6 +20,8 @@ use super::core::is_blank;
 use super::core::Lexer;
 use super::core::Token;
 use super::core::TokenId;
+use super::core::WordContext;
+use super::core::WordLexer;
 use super::keyword::Keyword;
 use super::op::is_operator_char;
 use crate::parser::core::Result;
@@ -71,9 +73,16 @@ impl Lexer {
         }
 
         let index = self.index();
-        let mut word = self.word(is_token_delimiter_char).await?;
+
+        let mut word_lexer = WordLexer {
+            lexer: self,
+            context: WordContext::Word,
+        };
+        let mut word = word_lexer.word(is_token_delimiter_char).await?;
         word.parse_tilde_front();
+
         let id = self.token_id(&word).await?;
+
         Ok(Token { word, id, index })
     }
 }

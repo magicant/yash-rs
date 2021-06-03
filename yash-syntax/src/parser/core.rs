@@ -1061,10 +1061,9 @@ mod tests {
 
     #[test]
     fn parser_reading_one_here_doc_content() {
-        block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, "END");
-            let delimiter = lexer.word(|_| false).await.unwrap();
+        let delimiter = "END".parse().unwrap();
 
+        block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "END\nX");
             let mut parser = Parser::new(&mut lexer);
             let remove_tabs = false;
@@ -1089,14 +1088,11 @@ mod tests {
 
     #[test]
     fn parser_reading_many_here_doc_contents() {
-        block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, "ONE");
-            let delimiter1 = lexer.word(|_| false).await.unwrap();
-            let mut lexer = Lexer::with_source(Source::Unknown, "TWO");
-            let delimiter2 = lexer.word(|_| false).await.unwrap();
-            let mut lexer = Lexer::with_source(Source::Unknown, "THREE");
-            let delimiter3 = lexer.word(|_| false).await.unwrap();
+        let delimiter1 = "ONE".parse().unwrap();
+        let delimiter2 = "TWO".parse().unwrap();
+        let delimiter3 = "THREE".parse().unwrap();
 
+        block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "1\nONE\nTWO\n3\nTHREE\nX");
             let mut parser = Parser::new(&mut lexer);
             parser.memorize_unread_here_doc(PartialHereDoc {
@@ -1128,12 +1124,10 @@ mod tests {
 
     #[test]
     fn parser_reading_here_doc_contents_twice() {
-        block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, "ONE");
-            let delimiter1 = lexer.word(|_| false).await.unwrap();
-            let mut lexer = Lexer::with_source(Source::Unknown, "TWO");
-            let delimiter2 = lexer.word(|_| false).await.unwrap();
+        let delimiter1 = "ONE".parse().unwrap();
+        let delimiter2 = "TWO".parse().unwrap();
 
+        block_on(async {
             let mut lexer = Lexer::with_source(Source::Unknown, "1\nONE\n2\nTWO\n");
             let mut parser = Parser::new(&mut lexer);
             parser.memorize_unread_here_doc(PartialHereDoc {

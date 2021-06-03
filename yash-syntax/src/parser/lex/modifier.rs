@@ -17,6 +17,8 @@
 //! Part of the lexer that parses suffix modifiers.
 
 use super::core::Lexer;
+use super::core::WordContext;
+use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
@@ -38,8 +40,17 @@ impl Lexer {
             Ok(Modifier::None)
         }
     }
+}
 
+impl WordLexer<'_> {
     /// Parses a suffix modifier, i.e., a modifier other than the length prefix.
+    ///
+    /// If there is a [switch](Switch), [`self.context`](Self::context) affects
+    /// how the word of the switch is parsed: If the context is `Word`, a tilde
+    /// expansion is recognized at the beginning of the word and any character
+    /// can be escaped by a backslash. If the context is `Text`, only `$`, `"`,
+    /// `` ` ``, `\` and `}` can be escaped and single quotes are not recognized
+    /// in the word.
     pub async fn suffix_modifier(&mut self) -> Result<Modifier> {
         let colon = self.skip_if(|c| c == ':').await?;
 
@@ -64,7 +75,11 @@ impl Lexer {
 
         // Boxing needed for recursion
         let word = Box::pin(self.word(|c| c == '}')) as Pin<Box<dyn Future<Output = Result<Word>>>>;
-        let word = word.await?;
+        let mut word = word.await?;
+        match self.context {
+            WordContext::Text => (),
+            WordContext::Word => word.parse_tilde_front(),
+        }
 
         let switch = Switch {
             r#type,
@@ -87,6 +102,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier());
         assert_eq!(result, Ok(Modifier::None));
@@ -95,6 +114,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_none() {
         let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier());
         assert_eq!(result, Ok(Modifier::None));
@@ -105,6 +128,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_alter_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "+}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -123,6 +150,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_alter_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"+a  z}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -149,6 +180,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_alter_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, ":+}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -167,6 +202,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_default_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "-}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -185,6 +224,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_default_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":-cool}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -211,6 +254,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_assign_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, ":=}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -229,6 +276,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_assign_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"=Yes}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -254,6 +305,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_error_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "?}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -272,6 +327,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_colon_error_word() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":?No}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let result = block_on(lexer.suffix_modifier()).unwrap();
         if let Modifier::Switch(switch) = result {
@@ -294,8 +353,47 @@ mod tests {
     }
 
     #[test]
+    fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_word_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+
+        let result = block_on(lexer.suffix_modifier()).unwrap();
+        if let Modifier::Switch(switch) = result {
+            assert_eq!(switch.word.units, [WordUnit::Tilde("".to_string())]);
+        } else {
+            panic!("Not a switch: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_text_context() {
+        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
+
+        let result = block_on(lexer.suffix_modifier()).unwrap();
+        if let Modifier::Switch(switch) = result {
+            assert_eq!(
+                switch.word.units,
+                [WordUnit::Unquoted(TextUnit::Literal('~'))]
+            );
+        } else {
+            panic!("Not a switch: {:?}", result);
+        }
+    }
+
+    #[test]
     fn lexer_suffix_modifier_orphan_colon_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
@@ -306,6 +404,10 @@ mod tests {
     #[test]
     fn lexer_suffix_modifier_orphan_colon() {
         let mut lexer = Lexer::with_source(Source::Unknown, r":x}");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
 
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));

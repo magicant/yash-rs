@@ -17,6 +17,8 @@
 //! Part of the lexer that parses texts.
 
 use super::core::Lexer;
+use super::core::WordContext;
+use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
@@ -25,11 +27,11 @@ use crate::syntax::Literal;
 use crate::syntax::Text;
 use crate::syntax::TextUnit;
 
-impl Lexer {
+impl WordLexer<'_> {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
-    /// [dollar unit](Self::dollar_unit), or [backquote](Self::backquote).
+    /// [dollar unit](WordLexer::dollar_unit), or [backquote](Lexer::backquote).
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for
@@ -74,12 +76,14 @@ impl Lexer {
 
         Ok(None)
     }
+}
 
+impl Lexer {
     /// Parses a text, i.e., a (possibly empty) sequence of [`TextUnit`]s.
     ///
     /// `is_delimiter` tests if an unquoted character is a delimiter. When
-    /// `is_delimiter` returns true, the parser ends parsing and returns the text
-    /// up to the character as a result.
+    /// `is_delimiter` returns true, the parser stops parsing and returns the
+    /// text up to the delimiter.
     ///
     /// `is_escapable` tests if a backslash can escape a character. When the
     /// parser founds an unquoted backslash, the next character is passed to
@@ -88,7 +92,8 @@ impl Lexer {
     /// literal (`TextUnit::Literal`).
     ///
     /// `is_escapable` also affects escaping of double-quotes inside backquotes.
-    /// See [`text_unit`](Self::text_unit) for details.
+    /// See [`text_unit`](WordLexer::text_unit) for details. Note that this
+    /// function calls `text_unit` with [`WordContext::Text`].
     pub async fn text<F, G>(&mut self, mut is_delimiter: F, mut is_escapable: G) -> Result<Text>
     where
         F: FnMut(char) -> bool,
@@ -96,7 +101,14 @@ impl Lexer {
     {
         let mut units = vec![];
 
-        while let Some(unit) = self.text_unit(&mut is_delimiter, &mut is_escapable).await? {
+        let mut word_lexer = WordLexer {
+            lexer: self,
+            context: WordContext::Text,
+        };
+        while let Some(unit) = word_lexer
+            .text_unit(&mut is_delimiter, &mut is_escapable)
+            .await?
+        {
             units.push(unit);
         }
 
@@ -171,6 +183,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_literal_accepted() {
         let mut lexer = Lexer::with_source(Source::Unknown, "X");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let mut called = false;
         let result = block_on(lexer.text_unit(
             |c| {
@@ -198,6 +214,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_literal_rejected() {
         let mut lexer = Lexer::with_source(Source::Unknown, ";");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let mut called = false;
         let result = block_on(lexer.text_unit(
             |c| {
@@ -220,6 +240,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_backslash_accepted() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"\#");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let mut called = false;
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
@@ -240,6 +264,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_backslash_eof() {
         let mut lexer = Lexer::with_source(Source::Unknown, r"\");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| panic!("unexpected call to is_escapable({:?})", c),
@@ -254,6 +282,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_dollar() {
         let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| panic!("unexpected call to is_escapable({:?})", c),
@@ -273,6 +305,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_backquote_double_quote_escapable() {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| {
@@ -295,6 +331,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_backquote_double_quote_not_escapable() {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| {
@@ -320,6 +360,10 @@ mod tests {
     #[test]
     fn lexer_text_unit_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\nX");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.text_unit(
             |_| false,
             |c| {

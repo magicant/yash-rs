@@ -19,6 +19,8 @@ use super::fill::MissingHereDoc;
 use super::lex::Lexer;
 use super::lex::Operator;
 use super::lex::TokenId;
+use super::lex::WordContext;
+use super::lex::WordLexer;
 use super::Error;
 use super::Parser;
 use super::Rec;
@@ -66,6 +68,10 @@ impl FromStr for TextUnit {
     /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<TextUnit, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         block_on(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
     }
 }
@@ -83,6 +89,10 @@ impl FromStr for WordUnit {
     type Err = Error;
     fn from_str(s: &str) -> Result<WordUnit, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         block_on(lexer.word_unit(|_| false)).map(Option::unwrap)
     }
 }
@@ -97,6 +107,10 @@ impl FromStr for Word {
     /// [`Word::parse_tilde_everywhere`] on the resultant word.
     fn from_str(s: &str) -> Result<Word, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         block_on(lexer.word(|_| false))
     }
 }

@@ -16,7 +16,7 @@
 
 //! Part of the lexer that parses braced parameter expansion.
 
-use super::core::Lexer;
+use super::core::WordLexer;
 use super::raw_param::is_portable_name_char;
 use super::raw_param::is_special_parameter_char;
 use crate::parser::core::Error;
@@ -35,7 +35,7 @@ pub fn is_name_char(c: char) -> bool {
     is_portable_name_char(c)
 }
 
-impl Lexer {
+impl WordLexer<'_> {
     /// Tests if there is a length prefix (`#`).
     ///
     /// This function may consume many characters, possibly beyond the length
@@ -153,6 +153,8 @@ impl Lexer {
 mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
+    use crate::parser::lex::Lexer;
+    use crate::parser::lex::WordContext;
     use crate::source::Source;
     use crate::syntax::SwitchCondition;
     use crate::syntax::SwitchType;
@@ -168,6 +170,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_minimum() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{@};");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -182,6 +188,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_alphanumeric_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{foo_123}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -196,6 +206,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_numeric_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{123}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -210,6 +224,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -224,6 +242,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_missing_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{};");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
@@ -237,6 +259,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_unclosed_without_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{;");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
@@ -254,6 +280,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_unclosed_with_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{_;");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
@@ -271,6 +301,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_length_alphanumeric_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#foo_123}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -285,6 +319,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_length_hash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{##}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -299,6 +337,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_length_question() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#?}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -313,6 +355,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_length_hyphen() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#-}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -327,6 +373,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_switch_minimum() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{x+})");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -347,6 +397,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_switch_full() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{foo:?'!'})");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -367,6 +421,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash_suffix_alter() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#+?}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -387,6 +445,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash_suffix_default() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#--}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -407,6 +469,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash_suffix_assign() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#=?}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -427,6 +493,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash_suffix_error() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#??}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -447,6 +517,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_hash_suffix_with_colon() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#:-}<");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -469,6 +543,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_multiple_modifier() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#x+};");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
@@ -480,6 +558,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{\\\n#\\\n\\\na_\\\n1\\\n\\\n}z");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
@@ -494,6 +576,10 @@ mod tests {
     #[test]
     fn lexer_braced_param_line_continuations_hash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "{#\\\n\\\n}z");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let location = Location::dummy("$".to_string());
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
