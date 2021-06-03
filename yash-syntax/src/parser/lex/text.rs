@@ -82,8 +82,8 @@ impl Lexer {
     /// Parses a text, i.e., a (possibly empty) sequence of [`TextUnit`]s.
     ///
     /// `is_delimiter` tests if an unquoted character is a delimiter. When
-    /// `is_delimiter` returns true, the parser ends parsing and returns the text
-    /// up to the character as a result.
+    /// `is_delimiter` returns true, the parser stops parsing and returns the
+    /// text up to the delimiter.
     ///
     /// `is_escapable` tests if a backslash can escape a character. When the
     /// parser founds an unquoted backslash, the next character is passed to
@@ -92,7 +92,8 @@ impl Lexer {
     /// literal (`TextUnit::Literal`).
     ///
     /// `is_escapable` also affects escaping of double-quotes inside backquotes.
-    /// See [`text_unit`](WordLexer::text_unit) for details.
+    /// See [`text_unit`](WordLexer::text_unit) for details. Note that this
+    /// function calls `text_unit` with [`WordContext::Text`].
     pub async fn text<F, G>(&mut self, mut is_delimiter: F, mut is_escapable: G) -> Result<Text>
     where
         F: FnMut(char) -> bool,

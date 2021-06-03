@@ -89,8 +89,9 @@ impl WordLexer<'_> {
     /// unquoted character is parsed only if `is_delimiter` returns false for it.
     ///
     /// The word context defines what characters can be escaped by a backslash.
-    /// If the context is `Word`, any character can be escaped. If `Text`, then
-    /// `$`, `"`, `` ` `` and `\` can be escaped as well as delimiters.
+    /// If [`self.context`](Self::context) is `Word`, any character can be
+    /// escaped. If `Text`, then `$`, `"`, `` ` `` and `\` can be escaped as
+    /// well as delimiters.
     ///
     /// This function does not parse tilde expansion. See [`word`](Self::word).
     pub async fn word_unit<F>(&mut self, is_delimiter: F) -> Result<Option<WordUnit>>

@@ -44,6 +44,13 @@ impl Lexer {
 
 impl WordLexer<'_> {
     /// Parses a suffix modifier, i.e., a modifier other than the length prefix.
+    ///
+    /// If there is a [switch](Switch), [`self.context`](Self::context) affects
+    /// how the word of the switch is parsed: If the context is `Word`, a tilde
+    /// expansion is recognized at the beginning of the word and any character
+    /// can be escaped by a backslash. If the context is `Text`, only `$`, `"`,
+    /// `` ` ``, `\` and `}` can be escaped and single quotes are not recognized
+    /// in the word.
     pub async fn suffix_modifier(&mut self) -> Result<Modifier> {
         let colon = self.skip_if(|c| c == ':').await?;
 
