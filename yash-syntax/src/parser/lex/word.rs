@@ -350,7 +350,12 @@ mod tests {
             context: WordContext::Text,
         };
 
-        let result = block_on(lexer.word_unit(|_| false)).unwrap().unwrap();
+        let result = block_on(lexer.word_unit(|c| {
+            assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+            false
+        }))
+        .unwrap()
+        .unwrap();
         assert_eq!(result, Unquoted(Literal('\'')));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
