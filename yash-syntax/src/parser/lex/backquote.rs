@@ -16,6 +16,7 @@
 
 //! Part of the lexer that parses backquotes.
 
+use super::core::WordContext;
 use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
@@ -25,11 +26,12 @@ use crate::syntax::TextUnit;
 
 impl WordLexer<'_> {
     /// Parses a backquote unit.
-    async fn backquote_unit(
-        &mut self,
-        double_quote_escapable: bool,
-    ) -> Result<Option<BackquoteUnit>> {
+    async fn backquote_unit(&mut self) -> Result<Option<BackquoteUnit>> {
         if self.skip_if(|c| c == '\\').await? {
+            let double_quote_escapable = match self.context {
+                WordContext::Word => false,
+                WordContext::Text => true,
+            };
             let is_escapable =
                 |c| matches!(c, '$' | '`' | '\\') || c == '"' && double_quote_escapable;
             if let Some(c) = self.consume_char_if(is_escapable).await? {
@@ -54,16 +56,16 @@ impl WordLexer<'_> {
     ///
     /// Between the backquotes, only backslashes can have special meanings. A
     /// backslash is an escape character if it precedes a dollar, backquote, or
-    /// another backslash. If `double_quote_escapable` is true, double quotes
-    /// can also be backslash-escaped.
-    pub async fn backquote(&mut self, double_quote_escapable: bool) -> Result<Option<TextUnit>> {
+    /// another backslash. If `self.context` is `Text`, double quotes can also
+    /// be backslash-escaped.
+    pub async fn backquote(&mut self) -> Result<Option<TextUnit>> {
         let location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
         };
 
         let mut content = Vec::new();
-        while let Some(unit) = self.backquote_unit(double_quote_escapable).await? {
+        while let Some(unit) = self.backquote_unit().await? {
             content.push(unit);
         }
 
@@ -83,7 +85,6 @@ mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
     use crate::parser::lex::Lexer;
-    use crate::parser::lex::WordContext;
     use crate::source::Source;
     use futures::executor::block_on;
 
@@ -94,7 +95,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote(false)).unwrap();
+        let result = block_on(lexer.backquote()).unwrap();
         assert_eq!(result, None);
     }
 
@@ -105,7 +106,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(content, []);
             assert_eq!(location.column.get(), 1);
@@ -123,7 +124,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
                 content,
@@ -149,7 +150,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Text,
         };
-        let result = block_on(lexer.backquote(true)).unwrap().unwrap();
+        let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
                 content,
@@ -180,7 +181,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
                 content,
@@ -212,7 +213,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote(false)).unwrap().unwrap();
+        let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
                 content,
@@ -233,7 +234,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let e = block_on(lexer.backquote(false)).unwrap_err();
+        let e = block_on(lexer.backquote()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "`");
             assert_eq!(opening_location.line.number.get(), 1);
@@ -255,7 +256,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let e = block_on(lexer.backquote(false)).unwrap_err();
+        let e = block_on(lexer.backquote()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "`foo");
             assert_eq!(opening_location.line.number.get(), 1);

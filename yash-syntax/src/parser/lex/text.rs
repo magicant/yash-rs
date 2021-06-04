@@ -66,11 +66,7 @@ impl WordLexer<'_> {
             return Ok(Some(u));
         }
 
-        let double_quote_escapable = match self.context {
-            WordContext::Word => false,
-            WordContext::Text => true,
-        };
-        if let Some(u) = self.backquote(double_quote_escapable).await? {
+        if let Some(u) = self.backquote().await? {
             return Ok(Some(u));
         }
 
