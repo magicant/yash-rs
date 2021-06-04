@@ -31,7 +31,8 @@ impl WordLexer<'_> {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
-    /// [dollar unit](WordLexer::dollar_unit), or [backquote](Lexer::backquote).
+    /// [dollar unit](WordLexer::dollar_unit), or
+    /// [backquote](WordLexer::backquote).
     ///
     /// `is_delimiter` is a function that decides if a character is a delimiter.
     /// An unquoted character is parsed only if `is_delimiter` returns false for
@@ -42,9 +43,8 @@ impl WordLexer<'_> {
     /// literal.
     ///
     /// If the text unit is a backquote, treatment of `\"` inside the backquote
-    /// depends on `is_escapable('_')`. If it is false, the text unit is in a
-    /// double-quoted context and `\"` is an escaped double-quote. Otherwise, the
-    /// text unit is in an unquoted context and `\"` is treated literally.
+    /// depends on `self.context`. If it is `Text`, `\"` is an escaped
+    /// double-quote. If `Word`, `\"` is treated literally.
     pub async fn text_unit<F, G>(
         &mut self,
         is_delimiter: F,
@@ -66,7 +66,7 @@ impl WordLexer<'_> {
             return Ok(Some(u));
         }
 
-        if let Some(u) = self.backquote(!is_escapable('_')).await? {
+        if let Some(u) = self.backquote().await? {
             return Ok(Some(u));
         }
 
@@ -194,10 +194,7 @@ mod tests {
                 assert_eq!(c, 'X');
                 false
             },
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -225,10 +222,7 @@ mod tests {
                 assert_eq!(c, ';');
                 true
             },
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert!(called);
@@ -307,14 +301,11 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
-            context: WordContext::Word,
+            context: WordContext::Text,
         };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| {
-                assert_eq!(c, '_');
-                false
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -337,10 +328,7 @@ mod tests {
         };
         let result = block_on(lexer.text_unit(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -366,10 +354,7 @@ mod tests {
         };
         let result = block_on(lexer.text_unit(
             |_| false,
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -387,10 +372,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let Text(units) = block_on(lexer.text(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[]);
@@ -411,10 +393,7 @@ mod tests {
                 called += 1;
                 false
             },
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
@@ -438,10 +417,7 @@ mod tests {
                 called += 1;
                 c == 'c'
             },
-            |c| {
-                assert_eq!(c, '_');
-                true
-            },
+            |c| panic!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b')]);
@@ -466,7 +442,7 @@ mod tests {
             units,
             &[Literal('a'), Backslashed('b'), Literal('\\'), Literal('c')]
         );
-        assert_eq!(tested_chars, "_bc__");
+        assert_eq!(tested_chars, "bc");
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
