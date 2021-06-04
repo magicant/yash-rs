@@ -16,14 +16,14 @@
 
 //! Part of the lexer that parses backquotes.
 
-use super::core::Lexer;
+use super::core::WordLexer;
 use crate::parser::core::Error;
 use crate::parser::core::Result;
 use crate::parser::core::SyntaxError;
 use crate::syntax::BackquoteUnit;
 use crate::syntax::TextUnit;
 
-impl Lexer {
+impl WordLexer<'_> {
     /// Parses a backquote unit.
     async fn backquote_unit(
         &mut self,
@@ -82,12 +82,18 @@ impl Lexer {
 mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
+    use crate::parser::lex::Lexer;
+    use crate::parser::lex::WordContext;
     use crate::source::Source;
     use futures::executor::block_on;
 
     #[test]
     fn lexer_backquote_not_backquote() {
         let mut lexer = Lexer::with_source(Source::Unknown, "X");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.backquote(false)).unwrap();
         assert_eq!(result, None);
     }
@@ -95,6 +101,10 @@ mod tests {
     #[test]
     fn lexer_backquote_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "``");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.backquote(false)).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(content, []);
@@ -109,6 +119,10 @@ mod tests {
     #[test]
     fn lexer_backquote_literals() {
         let mut lexer = Lexer::with_source(Source::Unknown, "`echo`");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.backquote(false)).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
@@ -131,6 +145,10 @@ mod tests {
     #[test]
     fn lexer_backquote_with_escapes_double_quote_escapable() {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Text,
+        };
         let result = block_on(lexer.backquote(true)).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
@@ -158,6 +176,10 @@ mod tests {
     #[test]
     fn lexer_backquote_with_escapes_double_quote_not_escapable() {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.backquote(false)).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
@@ -186,6 +208,10 @@ mod tests {
     #[test]
     fn lexer_backquote_line_continuation() {
         let mut lexer = Lexer::with_source(Source::Unknown, "`\\\na\\\n\\\nb\\\n`");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let result = block_on(lexer.backquote(false)).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(
@@ -203,6 +229,10 @@ mod tests {
     #[test]
     fn lexer_backquote_unclosed_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "`");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let e = block_on(lexer.backquote(false)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "`");
@@ -221,6 +251,10 @@ mod tests {
     #[test]
     fn lexer_backquote_unclosed_nonempty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "`foo");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
         let e = block_on(lexer.backquote(false)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "`foo");
