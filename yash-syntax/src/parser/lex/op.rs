@@ -25,6 +25,7 @@ use crate::syntax::Literal;
 use crate::syntax::Unquoted;
 use crate::syntax::Word;
 use std::fmt;
+use std::fmt::Write;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -81,27 +82,27 @@ impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Operator::*;
         match self {
-            Newline => f.write_str("\n"),
-            And => f.write_str("&"),
+            Newline => f.write_char('\n'),
+            And => f.write_char('&'),
             AndAnd => f.write_str("&&"),
-            OpenParen => f.write_str("("),
-            CloseParen => f.write_str(")"),
-            Semicolon => f.write_str(";"),
+            OpenParen => f.write_char('('),
+            CloseParen => f.write_char(')'),
+            Semicolon => f.write_char(';'),
             SemicolonSemicolon => f.write_str(";;"),
-            Less => f.write_str("<"),
+            Less => f.write_char('<'),
             LessAnd => f.write_str("<&"),
             LessOpenParen => f.write_str("<("),
             LessLess => f.write_str("<<"),
             LessLessDash => f.write_str("<<-"),
             LessLessLess => f.write_str("<<<"),
             LessGreater => f.write_str("<>"),
-            Greater => f.write_str(">"),
+            Greater => f.write_char('>'),
             GreaterAnd => f.write_str(">&"),
             GreaterOpenParen => f.write_str(">("),
             GreaterGreater => f.write_str(">>"),
             GreaterGreaterBar => f.write_str(">>|"),
             GreaterBar => f.write_str(">|"),
-            Bar => f.write_str("|"),
+            Bar => f.write_char('|'),
             BarBar => f.write_str("||"),
         }
     }

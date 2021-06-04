@@ -396,9 +396,9 @@ impl fmt::Display for TextUnit {
             BracedParam(param) => param.fmt(f),
             CommandSubst { content, .. } => write!(f, "$({})", content),
             Backquote { content, .. } => {
-                f.write_str("`")?;
+                f.write_char('`')?;
                 content.iter().try_for_each(|unit| unit.fmt(f))?;
-                f.write_str("`")
+                f.write_char('`')
             }
             Arith { content, .. } => write!(f, "$(({}))", content),
         }
@@ -750,7 +750,7 @@ impl fmt::Display for HereDoc {
 
         // This space is to disambiguate `<< --` and `<<- -`
         if let Some(Unquoted(Literal('-'))) = self.delimiter.units.get(0) {
-            f.write_str(" ")?;
+            f.write_char(' ')?;
         }
 
         write!(f, "{}", self.delimiter)
@@ -941,7 +941,7 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
                     for value in values {
                         write!(f, " {}", value)?;
                     }
-                    f.write_str(";")?;
+                    f.write_char(';')?;
                 }
                 write!(f, " do {:#} done", body)
             }
