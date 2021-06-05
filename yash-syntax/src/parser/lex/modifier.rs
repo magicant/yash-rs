@@ -91,10 +91,17 @@ impl Lexer {
 impl WordLexer<'_> {
     /// Parses a [switch](Switch), except the optional initial colon.
     ///
-    /// This function blindly consumes the current character, which must
-    /// correspond to the `type` parameter.
-    async fn switch(&mut self, colon: bool, r#type: SwitchType) -> Result<Modifier> {
+    /// This function blindly consumes the current character, which must be
+    /// `symbol`.
+    async fn switch(&mut self, colon: bool, symbol: char) -> Result<Modifier> {
         self.consume_char();
+        let r#type = match symbol {
+            '+' => SwitchType::Alter,
+            '-' => SwitchType::Default,
+            '=' => SwitchType::Assign,
+            '?' => SwitchType::Error,
+            _ => unreachable!(),
+        };
 
         let condition = if colon {
             SwitchCondition::UnsetOrEmpty
@@ -110,12 +117,11 @@ impl WordLexer<'_> {
             WordContext::Word => word.parse_tilde_front(),
         }
 
-        let switch = Switch {
+        Ok(Modifier::Switch(Switch {
             r#type,
             condition,
             word,
-        };
-        Ok(Modifier::Switch(switch))
+        }))
     }
 
     /// Parses a suffix modifier, i.e., a modifier other than the length prefix.
@@ -132,10 +138,7 @@ impl WordLexer<'_> {
         if let Some(c) = self.peek_char().await? {
             let symbol = c.value;
             match symbol {
-                '+' => self.switch(colon, SwitchType::Alter).await,
-                '-' => self.switch(colon, SwitchType::Default).await,
-                '=' => self.switch(colon, SwitchType::Assign).await,
-                '?' => self.switch(colon, SwitchType::Error).await,
+                '+' | '-' | '=' | '?' => self.switch(colon, symbol).await,
                 '#' | '%' => self.trim(colon, symbol).await,
                 _ => self.suffix_modifier_not_found(colon).await,
             }
