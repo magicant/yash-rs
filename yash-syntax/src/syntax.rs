@@ -248,6 +248,74 @@ impl Unquote for Switch {
     }
 }
 
+/// Flag that specifies which side of the expanded value is removed in a
+/// [trim](Trim).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrimSide {
+    /// Beginning of the value.
+    Prefix,
+    /// End of the value.
+    Suffix,
+}
+
+impl fmt::Display for TrimSide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use TrimSide::*;
+        let c = match self {
+            Prefix => '#',
+            Suffix => '%',
+        };
+        f.write_char(c)
+    }
+}
+
+/// Flag that specifies pattern matching strategy in a [trim](Trim).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrimLength {
+    /// Match as small number of characters as possible.
+    Shortest,
+    /// Match as large number of characters as possible.
+    Longest,
+}
+
+/// Parameter expansion [modifier](Modifier) that removes the beginning or end
+/// of the value being expanded.
+///
+/// Examples of trims include `#foo`, `##bar` and `%%baz*`.
+///
+/// A trim is composed of a side, length and pattern.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Trim {
+    /// Which side of the value should be removed?
+    pub side: TrimSide,
+    /// How long the pattern should match?
+    pub length: TrimLength,
+    /// Pattern to be matched with the expanded value.
+    pub pattern: Word,
+}
+
+impl fmt::Display for Trim {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.side.fmt(f)?;
+        match self.length {
+            TrimLength::Shortest => (),
+            TrimLength::Longest => self.side.fmt(f)?,
+        }
+        self.pattern.fmt(f)
+    }
+}
+
+impl Unquote for Trim {
+    fn write_unquoted<W: fmt::Write>(&self, w: &mut W) -> UnquoteResult {
+        write!(w, "{}", self.side)?;
+        match self.length {
+            TrimLength::Shortest => (),
+            TrimLength::Longest => write!(w, "{}", self.side)?,
+        }
+        self.pattern.write_unquoted(w)
+    }
+}
+
 /// Attribute that modifies a parameter expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Modifier {
@@ -257,7 +325,8 @@ pub enum Modifier {
     Length,
     /// `+`, `-`, `=` or `?` suffix, optionally with `:`. (`${foo:-bar}`)
     Switch(Switch),
-    // TODO Trim
+    /// `#`, `##`, `%` or `%%` suffix.
+    Trim(Trim),
     // TODO Subst
 }
 
@@ -285,6 +354,7 @@ impl fmt::Display for Param {
             None => write!(f, "${{{}}}", self.name),
             Length => write!(f, "${{#{}}}", self.name),
             Switch(ref switch) => write!(f, "${{{}{}}}", self.name, switch),
+            Trim(ref trim) => write!(f, "${{{}{}}}", self.name, trim),
         }
     }
 }
@@ -304,6 +374,12 @@ impl Unquote for Param {
             Switch(ref switch) => {
                 write!(w, "${{{}", self.name)?;
                 let quoted = switch.write_unquoted(w)?;
+                w.write_char('}')?;
+                Ok(quoted)
+            }
+            Trim(ref trim) => {
+                write!(w, "${{{}", self.name)?;
+                let quoted = trim.write_unquoted(w)?;
                 w.write_char('}')?;
                 Ok(quoted)
             }
@@ -1218,6 +1294,76 @@ mod tests {
     }
 
     #[test]
+    fn trim_display() {
+        let trim = Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Shortest,
+            pattern: "foo".parse().unwrap(),
+        };
+        assert_eq!(trim.to_string(), "#foo");
+
+        let trim = Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Longest,
+            pattern: "".parse().unwrap(),
+        };
+        assert_eq!(trim.to_string(), "##");
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Shortest,
+            pattern: "bar".parse().unwrap(),
+        };
+        assert_eq!(trim.to_string(), "%bar");
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Longest,
+            pattern: "*".parse().unwrap(),
+        };
+        assert_eq!(trim.to_string(), "%%*");
+    }
+
+    #[test]
+    fn trim_unquote() {
+        let trim = Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Shortest,
+            pattern: "".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = trim.unquote();
+        assert_eq!(unquoted, "#");
+        assert_eq!(is_quoted, false);
+
+        let trim = Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Longest,
+            pattern: "'yes'".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = trim.unquote();
+        assert_eq!(unquoted, "##yes");
+        assert_eq!(is_quoted, true);
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Shortest,
+            pattern: r"\no".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = trim.unquote();
+        assert_eq!(unquoted, "%no");
+        assert_eq!(is_quoted, true);
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Longest,
+            pattern: "?".parse().unwrap(),
+        };
+        let (unquoted, is_quoted) = trim.unquote();
+        assert_eq!(unquoted, "%%?");
+        assert_eq!(is_quoted, false);
+    }
+
+    #[test]
     fn braced_param_display() {
         let param = Param {
             name: "foo".to_string(),
@@ -1242,6 +1388,17 @@ mod tests {
             ..param
         };
         assert_eq!(param.to_string(), "${foo:=bar baz}");
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Shortest,
+            pattern: "baz' 'bar".parse().unwrap(),
+        };
+        let param = Param {
+            modifier: Modifier::Trim(trim),
+            ..param
+        };
+        assert_eq!(param.to_string(), "${foo%baz' 'bar}");
     }
 
     #[test]
@@ -1274,6 +1431,19 @@ mod tests {
         };
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${foo:=bar}");
+        assert_eq!(is_quoted, true);
+
+        let trim = Trim {
+            side: TrimSide::Suffix,
+            length: TrimLength::Shortest,
+            pattern: "baz' 'bar".parse().unwrap(),
+        };
+        let param = Param {
+            modifier: Modifier::Trim(trim),
+            ..param
+        };
+        let (unquoted, is_quoted) = param.unquote();
+        assert_eq!(unquoted, "${foo%baz bar}");
         assert_eq!(is_quoted, true);
     }
 
