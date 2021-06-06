@@ -53,7 +53,7 @@ impl Lexer {
 
             if literal.chars().all(|c| c.is_ascii_digit()) {
                 if let Some(next) = self.peek_char().await? {
-                    if next.value == '<' || next.value == '>' {
+                    if next == '<' || next == '>' {
                         return Ok(TokenId::IoNumber);
                     }
                 }
@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ' ');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(' ')));
     }
 
     #[test]
@@ -158,7 +158,7 @@ mod tests {
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]

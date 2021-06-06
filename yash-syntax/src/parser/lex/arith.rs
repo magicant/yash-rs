@@ -64,7 +64,7 @@ impl Lexer {
 
         // Part 3: Parse `))`
         match self.peek_char().await? {
-            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(sc) if sc == ')' => self.consume_char(),
             Some(_) => unreachable!(),
             None => {
                 let opening_location = location;
@@ -74,7 +74,7 @@ impl Lexer {
             }
         }
         match self.peek_char().await? {
-            Some(sc) if sc.value == ')' => self.consume_char(),
+            Some(sc) if sc == ')' => self.consume_char(),
             Some(_) => {
                 self.rewind(index);
                 return Ok(Err(location));
@@ -118,7 +118,7 @@ mod tests {
             panic!("Not an arithmetic expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(location.line.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
     }
 
     #[test]
@@ -155,7 +155,7 @@ mod tests {
             panic!("Not an arithmetic expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -185,7 +185,7 @@ mod tests {
             panic!("Not an arithmetic expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]

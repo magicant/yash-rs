@@ -100,7 +100,7 @@ mod tests {
             panic!("Not a parameter expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -119,7 +119,7 @@ mod tests {
             panic!("Not a parameter expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '2');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('2')));
     }
 
     #[test]
@@ -138,7 +138,7 @@ mod tests {
             panic!("Not a parameter expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
             panic!("Not a parameter expansion: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '>');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
     }
 
     #[test]
@@ -171,6 +171,6 @@ mod tests {
         assert_eq!(location.line.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 }

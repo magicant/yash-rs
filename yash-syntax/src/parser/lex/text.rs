@@ -228,7 +228,7 @@ mod tests {
         assert!(called);
         assert_eq!(result, None);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -423,7 +423,7 @@ mod tests {
         assert_eq!(units, &[Literal('a'), Literal('b')]);
         assert_eq!(called, 3);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'c');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('c')));
     }
 
     #[test]
@@ -472,7 +472,7 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
 
     #[test]
@@ -502,7 +502,7 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -529,7 +529,7 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]

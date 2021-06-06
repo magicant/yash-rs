@@ -110,13 +110,13 @@ impl WordLexer<'_> {
         };
 
         match self.peek_char().await? {
-            Some(c) if c.value == '\'' && allow_single_quote => {
-                let location = c.location.clone();
+            Some(c) if c == '\'' && allow_single_quote => {
+                let location = self.location().await?.clone();
                 self.consume_char();
                 self.single_quote(location).await.map(Some)
             }
-            Some(c) if c.value == '"' => {
-                let location = c.location.clone();
+            Some(c) if c == '"' => {
+                let location = self.location().await?.clone();
                 self.consume_char();
                 self.double_quote(location).await.map(Some)
             }

@@ -301,16 +301,17 @@ impl Lexer {
                 return Ok(None);
             }
 
-            let sc = match self.peek_char().await? {
+            let c = match self.peek_char().await? {
                 None => return Ok(None),
-                Some(sc) => sc.clone(),
+                Some(c) => c,
             };
-            let edge = match trie.edge(sc.value) {
+            let edge = match trie.edge(c) {
                 None => return Ok(None),
                 Some(edge) => edge,
             };
 
             let old_index = self.index();
+            let location = self.location().await?.clone();
             self.consume_char();
 
             if let Some(OperatorTail {
@@ -319,10 +320,10 @@ impl Lexer {
                 mut reversed_key,
             }) = self.operator_tail(edge.next).await?
             {
-                reversed_key.push(sc.value);
+                reversed_key.push(c);
                 return Ok(Some(OperatorTail {
                     operator,
-                    location: sc.location,
+                    location,
                     reversed_key,
                 }));
             }
@@ -334,8 +335,8 @@ impl Lexer {
                 }
                 Some(operator) => Ok(Some(OperatorTail {
                     operator,
-                    location: sc.location,
-                    reversed_key: vec![sc.value],
+                    location,
+                    reversed_key: vec![c],
                 })),
             }
         })
@@ -460,7 +461,7 @@ mod tests {
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '>');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
     }
 
     #[test]

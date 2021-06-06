@@ -52,15 +52,6 @@ enum PeekChar<'a> {
 }
 
 impl<'a> PeekChar<'a> {
-    /// Converts `PeekChar` to `Option`.
-    #[must_use]
-    fn as_option<'b>(self: &'b PeekChar<'a>) -> Option<&'a SourceChar> {
-        match self {
-            PeekChar::Char(c) => Some(c),
-            PeekChar::EndOfInput(_) => None,
-        }
-    }
-
     /// Returns the location that was peeked.
     #[must_use]
     fn location<'b>(self: &'b PeekChar<'a>) -> &'a Location {
@@ -417,10 +408,13 @@ impl Lexer {
     /// Call [`enable_line_continuation`](Self::enable_line_continuation) and
     /// [`disable_line_continuation`](Self::disable_line_continuation) to switch
     /// line continuation recognition on and off, respectively.
-    pub async fn peek_char(&mut self) -> Result<Option<&SourceChar>> {
+    pub async fn peek_char(&mut self) -> Result<Option<char>> {
         while self.line_continuation().await? {}
 
-        self.core.peek_char().await.map(|p| p.as_option())
+        match self.core.peek_char().await? {
+            PeekChar::Char(source_char) => Ok(Some(source_char.value)),
+            PeekChar::EndOfInput(_) => Ok(None),
+        }
     }
 
     /// Returns the location of the next character.
@@ -474,13 +468,11 @@ impl Lexer {
     /// futures::executor::block_on(async {
     ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
     ///     let saved_index = lexer.index();
-    ///     let a = lexer.peek_char().await.unwrap().cloned();
+    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
     ///     lexer.consume_char();
-    ///     let b = lexer.peek_char().await.unwrap().cloned();
+    ///     assert_eq!(lexer.peek_char().await, Ok(Some('b')));
     ///     lexer.rewind(saved_index);
-    ///     let a2 = lexer.peek_char().await.unwrap().cloned();
-    ///     assert_eq!(a, a2);
-    ///     assert_ne!(a, b);
+    ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
     /// })
     /// ```
     pub fn rewind(&mut self, index: usize) {
@@ -497,7 +489,7 @@ impl Lexer {
         F: FnOnce(char) -> bool,
     {
         match self.peek_char().await? {
-            Some(c) if f(c.value) => {
+            Some(c) if f(c) => {
                 let index = self.index();
                 self.consume_char();
                 Ok(Some(self.core.peek_char_at(index)))
@@ -1154,12 +1146,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
         lexer.enable_line_continuation();
 
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
 
@@ -1168,12 +1155,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
         lexer.enable_line_continuation();
 
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\\');
-        assert_eq!(c.location.line.value, "\\\\");
-        assert_eq!(c.location.line.number.get(), 4);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
 
@@ -1182,12 +1164,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
         lexer.disable_line_continuation();
 
-        let c = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(c.value, '\\');
-        assert_eq!(c.location.line.value, "\\\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
     }
 

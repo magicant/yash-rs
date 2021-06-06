@@ -146,7 +146,7 @@ mod tests {
         let line = block_on(lexer.line()).unwrap();
         assert_eq!(line, "foo");
         let next = block_on(lexer.peek_char()).unwrap().unwrap();
-        assert_eq!(next.value, '\n');
+        assert_eq!(next, '\n');
     }
 
     fn partial_here_doc(delimiter: &str, remove_tabs: bool) -> PartialHereDoc {

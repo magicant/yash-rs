@@ -77,39 +77,24 @@ mod tests {
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, 'w');
-        assert_eq!(c.location.line.value, " \t w");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 4);
+        });
+        assert_eq!(c, Ok(Some('w')));
 
         // Test idempotence
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, 'w');
-        assert_eq!(c.location.line.value, " \t w");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 4);
+        });
+        assert_eq!(c, Ok(Some('w')));
     }
 
     #[test]
     fn lexer_skip_blanks_does_not_skip_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-        let (c1, c2) = block_on(async {
-            let c1 = lexer.peek_char().await.unwrap().cloned();
+        block_on(async {
             lexer.skip_blanks().await.unwrap();
-            let c2 = lexer.peek_char().await.unwrap().cloned();
-            (c1, c2)
+            assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
         });
-        assert_eq!(c1, c2);
     }
 
     #[test]
@@ -118,39 +103,24 @@ mod tests {
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, 'X');
-        assert_eq!(c.location.line.value, "X");
-        assert_eq!(c.location.line.number.get(), 6);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
+        });
+        assert_eq!(c, Ok(Some('X')));
 
         let mut lexer = Lexer::with_source(Source::Unknown, "  \\\n\\\n  \\\n Y");
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, 'Y');
-        assert_eq!(c.location.line.value, " Y");
-        assert_eq!(c.location.line.number.get(), 4);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
+        });
+        assert_eq!(c, Ok(Some('Y')));
     }
 
     #[test]
     fn lexer_skip_comment_no_comment() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\n");
-        let (c1, c2) = block_on(async {
-            let c1 = lexer.peek_char().await.unwrap().cloned();
+        block_on(async {
             lexer.skip_comment().await.unwrap();
-            let c2 = lexer.peek_char().await.unwrap().cloned();
-            (c1, c2)
+            assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
         });
-        assert_eq!(c1, c2);
     }
 
     #[test]
@@ -160,27 +130,15 @@ mod tests {
         let c = block_on(async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "#\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
+        });
+        assert_eq!(c, Ok(Some('\n')));
 
         // Test idempotence
         let c = block_on(async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "#\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
+        });
+        assert_eq!(c, Ok(Some('\n')));
     }
 
     #[test]
@@ -190,27 +148,17 @@ mod tests {
         let c = block_on(async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "### foo bar\\\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 13);
+        });
+        assert_eq!(c, Ok(Some('\n')));
+        assert_eq!(lexer.index(), 14);
 
         // Test idempotence
         let c = block_on(async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        })
-        .unwrap()
-        .unwrap();
-        assert_eq!(c.value, '\n');
-        assert_eq!(c.location.line.value, "### foo bar\\\n");
-        assert_eq!(c.location.line.number.get(), 2);
-        assert_eq!(c.location.line.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 13);
+        });
+        assert_eq!(c, Ok(Some('\n')));
+        assert_eq!(lexer.index(), 14);
     }
 
     #[test]

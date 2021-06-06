@@ -88,7 +88,7 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap();
         assert_eq!(result, None);
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '(');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
 
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut lexer = WordLexer {
@@ -108,7 +108,7 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap();
         assert_eq!(result, None);
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '$');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('$')));
 
         let mut lexer = Lexer::with_source(Source::Unknown, "$&");
         let mut lexer = WordLexer {

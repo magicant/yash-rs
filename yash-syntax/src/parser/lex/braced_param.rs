@@ -52,16 +52,16 @@ impl WordLexer<'_> {
         // as a prefix.
         if let Some(c) = self.peek_char().await? {
             // Check characters that cannot be a special parameter.
-            if matches!(c.value, '}' | '+' | '=' | ':' | '%') {
+            if matches!(c, '}' | '+' | '=' | ':' | '%') {
                 return Ok(false);
             }
 
             // Check characters that can be either a special parameter or the
             // beginning of a modifier
-            if matches!(c.value, '-' | '?' | '#') {
+            if matches!(c, '-' | '?' | '#') {
                 self.consume_char();
                 if let Some(c) = self.peek_char().await? {
-                    return Ok(c.value == '}');
+                    return Ok(c == '}');
                 }
             }
         }
@@ -102,8 +102,7 @@ impl WordLexer<'_> {
 
         let has_length_prefix = self.length_prefix().await?;
 
-        let sc = self.peek_char().await?.unwrap();
-        let c = sc.value;
+        let c = self.peek_char().await?.unwrap();
         let name = if is_special_parameter_char(c) {
             self.consume_char();
             c.to_string()
@@ -116,12 +115,12 @@ impl WordLexer<'_> {
             name
         } else if c == '}' {
             let cause = SyntaxError::EmptyParam.into();
-            let location = sc.location.clone();
+            let location = self.location().await?.clone();
             return Err(Error { cause, location });
         } else {
             let opening_location = location;
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
-            let location = sc.location.clone();
+            let location = self.location().await?.clone();
             return Err(Error { cause, location });
         };
 
@@ -188,7 +187,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -206,7 +205,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -224,7 +223,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -242,7 +241,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -319,7 +318,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -337,7 +336,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -355,7 +354,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -373,7 +372,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -397,7 +396,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
 
     #[test]
@@ -421,7 +420,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ')');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
 
     #[test]
@@ -445,7 +444,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -469,7 +468,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -493,7 +492,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -517,7 +516,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -541,7 +540,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
@@ -565,7 +564,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -589,7 +588,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
@@ -622,7 +621,7 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }
 
     #[test]
@@ -640,6 +639,6 @@ mod tests {
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, 'z');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }
 }

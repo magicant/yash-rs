@@ -135,8 +135,7 @@ impl WordLexer<'_> {
     pub async fn suffix_modifier(&mut self) -> Result<Modifier> {
         let colon = self.skip_if(|c| c == ':').await?;
 
-        if let Some(c) = self.peek_char().await? {
-            let symbol = c.value;
+        if let Some(symbol) = self.peek_char().await? {
             match symbol {
                 '+' | '-' | '=' | '?' => self.switch(colon, symbol).await,
                 '#' | '%' => self.trim(colon, symbol).await,
@@ -181,7 +180,7 @@ mod tests {
         let result = block_on(lexer.suffix_modifier());
         assert_eq!(result, Ok(Modifier::None));
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -203,7 +202,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -233,7 +232,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -255,7 +254,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -277,7 +276,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -307,7 +306,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -329,7 +328,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -358,7 +357,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -380,7 +379,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -408,7 +407,7 @@ mod tests {
             panic!("Not a switch: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -465,7 +464,7 @@ mod tests {
             panic!("Not a trim: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -487,7 +486,7 @@ mod tests {
             panic!("Not a trim: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -514,7 +513,7 @@ mod tests {
             panic!("Not a trim: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -539,7 +538,7 @@ mod tests {
             panic!("Not a trim: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
@@ -564,7 +563,7 @@ mod tests {
             panic!("Not a trim: {:?}", result);
         }
 
-        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '}');
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
     }
 
     #[test]
