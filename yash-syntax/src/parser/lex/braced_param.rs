@@ -51,10 +51,14 @@ impl WordLexer<'_> {
         // prefix. We need to look ahead to see if it is okay to treat the `#`
         // as a prefix.
         if let Some(c) = self.peek_char().await? {
-            if matches!(c.value, '}' | '+' | '=' | ':') {
+            // Check characters that cannot be a special parameter.
+            if matches!(c.value, '}' | '+' | '=' | ':' | '%') {
                 return Ok(false);
             }
-            if matches!(c.value, '-' | '?') {
+
+            // Check characters that can be either a special parameter or the
+            // beginning of a modifier
+            if matches!(c.value, '-' | '?' | '#') {
                 self.consume_char();
                 if let Some(c) = self.peek_char().await? {
                     return Ok(c.value == '}');
@@ -158,6 +162,8 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::SwitchCondition;
     use crate::syntax::SwitchType;
+    use crate::syntax::TrimLength;
+    use crate::syntax::TrimSide;
     use futures::executor::block_on;
 
     fn assert_opening_location(location: &Location) {
@@ -538,7 +544,53 @@ mod tests {
         assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, '<');
     }
 
-    // TODO ${###} ${#%}
+    #[test]
+    fn lexer_braced_param_hash_with_longest_prefix_trim() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{###};");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Trim(trim) = result.modifier {
+            assert_eq!(trim.side, TrimSide::Prefix);
+            assert_eq!(trim.length, TrimLength::Longest);
+            assert_eq!(trim.pattern.to_string(), "");
+        } else {
+            panic!("Not a modifier: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
+
+    #[test]
+    fn lexer_braced_param_hash_with_suffix_trim() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "{#%};");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let location = Location::dummy("$".to_string());
+
+        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        assert_eq!(result.name, "#");
+        if let Modifier::Trim(trim) = result.modifier {
+            assert_eq!(trim.side, TrimSide::Suffix);
+            assert_eq!(trim.length, TrimLength::Shortest);
+            assert_eq!(trim.pattern.to_string(), "");
+        } else {
+            panic!("Not a modifier: {:?}", result.modifier);
+        }
+        // TODO assert about other result members
+        assert_opening_location(&result.location);
+
+        assert_eq!(block_on(lexer.peek_char()).unwrap().unwrap().value, ';');
+    }
 
     #[test]
     fn lexer_braced_param_multiple_modifier() {
