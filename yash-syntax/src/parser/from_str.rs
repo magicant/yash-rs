@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use self::future_util::unwrap_ready;
 use super::fill::Fill;
 use super::fill::MissingHereDoc;
 use super::lex::Lexer;
@@ -26,7 +27,6 @@ use super::Parser;
 use super::Rec;
 use crate::source::Source;
 use crate::syntax::*;
-use futures::executor::block_on;
 use std::convert::TryInto;
 use std::str::FromStr;
 
@@ -34,6 +34,40 @@ use std::str::FromStr;
 
 // TODO Most FromStr implementations in this file ignore trailing redundant
 // tokens, which should be rejected.
+
+mod future_util {
+    use std::future::Future;
+    use std::task::Context;
+    use std::task::Poll;
+    use std::task::RawWaker;
+    use std::task::RawWakerVTable;
+    use std::task::Waker;
+
+    const DUMMY_TABLE: RawWakerVTable =
+        RawWakerVTable::new(dummy_clone, dummy_drop, dummy_drop, dummy_drop);
+
+    fn dummy_clone(data: *const ()) -> RawWaker {
+        RawWaker::new(data, &DUMMY_TABLE)
+    }
+    fn dummy_drop(_: *const ()) {}
+
+    /// Polls the given future, assuming it returns `Ready`.
+    ///
+    /// We could have used `futures::executor::block_on` to get the future
+    /// results, but it does not support reentrance; `block_on` cannot be called
+    /// inside another `block_on`. `unwrap_ready` works around that limitation
+    /// of `block_on`.
+    pub fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
+        let raw_waker = RawWaker::new(std::ptr::null(), &DUMMY_TABLE);
+        let waker = unsafe { Waker::from_raw(raw_waker) };
+        let mut context = Context::from_waker(&waker);
+        futures::pin_mut!(f);
+        match f.poll(&mut context) {
+            Poll::Ready(result) => result,
+            Poll::Pending => panic!("Expected Ready but received Pending"),
+        }
+    }
+}
 
 /// Helper for implementing FromStr.
 trait Shift {
@@ -72,7 +106,7 @@ impl FromStr for TextUnit {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        block_on(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
+        unwrap_ready(lexer.text_unit(|_| false, |_| true)).map(Option::unwrap)
     }
 }
 
@@ -81,7 +115,7 @@ impl FromStr for Text {
     // Parses a text by `lexer.text(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<Text, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
-        block_on(lexer.text(|_| false, |_| true))
+        unwrap_ready(lexer.text(|_| false, |_| true))
     }
 }
 
@@ -93,7 +127,7 @@ impl FromStr for WordUnit {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        block_on(lexer.word_unit(|_| false)).map(Option::unwrap)
+        unwrap_ready(lexer.word_unit(|_| false)).map(Option::unwrap)
     }
 }
 
@@ -111,7 +145,7 @@ impl FromStr for Word {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        block_on(lexer.word(|_| false))
+        unwrap_ready(lexer.word(|_| false))
     }
 }
 
@@ -138,15 +172,13 @@ impl FromStr for Assign {
 impl FromStr for Operator {
     type Err = ();
     fn from_str(s: &str) -> Result<Operator, ()> {
-        block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, s);
-            let token = lexer.operator().await.map_err(drop)?.ok_or(())?;
-            if let TokenId::Operator(op) = token.id {
-                Ok(op)
-            } else {
-                Err(())
-            }
-        })
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let token = unwrap_ready(lexer.operator()).map_err(drop)?.ok_or(())?;
+        if let TokenId::Operator(op) = token.id {
+            Ok(op)
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -165,7 +197,7 @@ impl FromStr for Redir<MissingHereDoc> {
     fn from_str(s: &str) -> Result<Redir<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.redirection()).shift()
+        unwrap_ready(parser.redirection()).shift()
     }
 }
 
@@ -177,7 +209,9 @@ impl FromStr for SimpleCommand<MissingHereDoc> {
     fn from_str(s: &str) -> Result<SimpleCommand<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.simple_command()).map(Rec::unwrap).shift()
+        unwrap_ready(parser.simple_command())
+            .map(Rec::unwrap)
+            .shift()
     }
 }
 
@@ -189,7 +223,7 @@ impl FromStr for CaseItem<MissingHereDoc> {
     fn from_str(s: &str) -> Result<CaseItem<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.case_item()).shift()
+        unwrap_ready(parser.case_item()).shift()
     }
 }
 
@@ -201,7 +235,7 @@ impl FromStr for CompoundCommand<MissingHereDoc> {
     fn from_str(s: &str) -> Result<CompoundCommand<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.compound_command()).shift()
+        unwrap_ready(parser.compound_command()).shift()
     }
 }
 
@@ -213,7 +247,7 @@ impl FromStr for FullCompoundCommand<MissingHereDoc> {
     fn from_str(s: &str) -> Result<FullCompoundCommand<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.full_compound_command()).shift()
+        unwrap_ready(parser.full_compound_command()).shift()
     }
 }
 
@@ -225,7 +259,7 @@ impl FromStr for Command<MissingHereDoc> {
     fn from_str(s: &str) -> Result<Command<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.command()).map(Rec::unwrap).shift()
+        unwrap_ready(parser.command()).map(Rec::unwrap).shift()
     }
 }
 
@@ -237,7 +271,7 @@ impl FromStr for Pipeline<MissingHereDoc> {
     fn from_str(s: &str) -> Result<Pipeline<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.pipeline()).map(Rec::unwrap).shift()
+        unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()
     }
 }
 
@@ -256,7 +290,7 @@ impl FromStr for AndOrList<MissingHereDoc> {
     fn from_str(s: &str) -> Result<AndOrList<MissingHereDoc>, Option<Error>> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.and_or_list()).map(Rec::unwrap).shift()
+        unwrap_ready(parser.and_or_list()).map(Rec::unwrap).shift()
     }
 }
 
@@ -268,7 +302,7 @@ impl FromStr for List<MissingHereDoc> {
     fn from_str(s: &str) -> Result<List<MissingHereDoc>, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        block_on(parser.list()).map(Rec::unwrap)
+        unwrap_ready(parser.list()).map(Rec::unwrap)
     }
 }
 
@@ -280,7 +314,7 @@ impl FromStr for List {
     fn from_str(s: &str) -> Result<List, Error> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
-        let list = block_on(parser.maybe_compound_list())?;
+        let list = unwrap_ready(parser.maybe_compound_list())?;
         parser.ensure_no_unread_here_doc()?;
         let mut here_docs = parser.take_read_here_docs().into_iter();
         list.fill(&mut here_docs)
@@ -290,114 +324,163 @@ impl FromStr for List {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use std::iter::empty;
+
+    // Most of the tests below are surrounded with `block_on(async {...})` in
+    // order to make sure `str::parse` can be called in an executor context.
 
     #[test]
     fn param_from_str() {
-        let parse: Param = "${foo}".parse().unwrap();
-        assert_eq!(parse.to_string(), "${foo}");
+        block_on(async {
+            let parse: Param = "${foo}".parse().unwrap();
+            assert_eq!(parse.to_string(), "${foo}");
+        })
     }
 
     #[test]
     fn text_unit_from_str() {
-        let parse: TextUnit = "a".parse().unwrap();
-        assert_eq!(parse.to_string(), "a");
+        block_on(async {
+            let parse: TextUnit = "a".parse().unwrap();
+            assert_eq!(parse.to_string(), "a");
+        })
     }
 
     #[test]
     fn text_from_str() {
-        let parse: Text = r"a\b$(c)".parse().unwrap();
-        assert_eq!(parse.0.len(), 3);
-        assert_eq!(parse.0[0], Literal('a'));
-        assert_eq!(parse.0[1], Backslashed('b'));
-        if let CommandSubst { content, .. } = &parse.0[2] {
-            assert_eq!(content, "c");
-        } else {
-            panic!("not a command substitution: {:?}", parse.0[2]);
-        }
+        block_on(async {
+            let parse: Text = r"a\b$(c)".parse().unwrap();
+            assert_eq!(parse.0.len(), 3);
+            assert_eq!(parse.0[0], Literal('a'));
+            assert_eq!(parse.0[1], Backslashed('b'));
+            if let CommandSubst { content, .. } = &parse.0[2] {
+                assert_eq!(content, "c");
+            } else {
+                panic!("not a command substitution: {:?}", parse.0[2]);
+            }
+        })
+    }
+
+    #[test]
+    fn word_unit_from_str() {
+        block_on(async {
+            let parse: WordUnit = "a".parse().unwrap();
+            assert_eq!(parse.to_string(), "a");
+        })
     }
 
     #[test]
     fn word_from_str() {
-        let parse: Word = "a".parse().unwrap();
-        assert_eq!(parse.to_string(), "a");
+        block_on(async {
+            let parse: Word = "a".parse().unwrap();
+            assert_eq!(parse.to_string(), "a");
+        })
     }
 
     #[test]
     fn value_from_str() {
-        let parse: Value = "v".parse().unwrap();
-        assert_eq!(parse.to_string(), "v");
+        block_on(async {
+            let parse: Value = "v".parse().unwrap();
+            assert_eq!(parse.to_string(), "v");
 
-        let parse: Value = "(1 2 3)".parse().unwrap();
-        assert_eq!(parse.to_string(), "(1 2 3)");
+            let parse: Value = "(1 2 3)".parse().unwrap();
+            assert_eq!(parse.to_string(), "(1 2 3)");
+        })
     }
 
     #[test]
     fn assign_from_str() {
-        let parse: Assign = "a=b".parse().unwrap();
-        assert_eq!(parse.to_string(), "a=b");
+        block_on(async {
+            let parse: Assign = "a=b".parse().unwrap();
+            assert_eq!(parse.to_string(), "a=b");
 
-        let parse: Assign = "x=(1 2 3)".parse().unwrap();
-        assert_eq!(parse.to_string(), "x=(1 2 3)");
+            let parse: Assign = "x=(1 2 3)".parse().unwrap();
+            assert_eq!(parse.to_string(), "x=(1 2 3)");
+        })
     }
 
     #[test]
     fn operator_from_str() {
-        let parse: Operator = "<<".parse().unwrap();
-        assert_eq!(parse, Operator::LessLess);
+        block_on(async {
+            let parse: Operator = "<<".parse().unwrap();
+            assert_eq!(parse, Operator::LessLess);
+        })
     }
 
     #[test]
     fn redir_op_from_str() {
-        let parse: RedirOp = ">|".parse().unwrap();
-        assert_eq!(parse, RedirOp::FileClobber);
+        block_on(async {
+            let parse: RedirOp = ">|".parse().unwrap();
+            assert_eq!(parse, RedirOp::FileClobber);
+        })
     }
 
     #[test]
     fn redir_from_str() {
-        let parse: Redir<MissingHereDoc> = "2> /dev/null".parse().unwrap();
-        assert_eq!(parse.fd, Some(2));
-        if let RedirBody::Normal { operator, operand } = parse.body {
-            assert_eq!(operator, RedirOp::FileOut);
-            assert_eq!(operand.to_string(), "/dev/null");
-        } else {
-            panic!("Not normal redirection: {:?}", parse.body);
-        }
+        block_on(async {
+            let parse: Redir<MissingHereDoc> = "2> /dev/null".parse().unwrap();
+            assert_eq!(parse.fd, Some(2));
+            if let RedirBody::Normal { operator, operand } = parse.body {
+                assert_eq!(operator, RedirOp::FileOut);
+                assert_eq!(operand.to_string(), "/dev/null");
+            } else {
+                panic!("Not normal redirection: {:?}", parse.body);
+            }
+        })
     }
 
     #[test]
     fn simple_command_from_str() {
-        let parse: SimpleCommand<MissingHereDoc> = " a=b</dev/null foo ".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "a=b foo </dev/null");
+        block_on(async {
+            let parse: SimpleCommand<MissingHereDoc> = " a=b</dev/null foo ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "a=b foo </dev/null");
+        })
+    }
+
+    #[test]
+    fn case_item_from_str() {
+        block_on(async {
+            let parse: CaseItem<MissingHereDoc> = " foo) ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "(foo) ;;");
+        })
     }
 
     #[test]
     fn compound_command_from_str() {
-        let parse: CompoundCommand<MissingHereDoc> = " { :; } ".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "{ :; }");
+        block_on(async {
+            let parse: CompoundCommand<MissingHereDoc> = " { :; } ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "{ :; }");
+        })
     }
 
     #[test]
     fn full_compound_command_from_str() {
-        let parse: FullCompoundCommand<MissingHereDoc> = " { :; } <&- ".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "{ :; } <&-");
+        block_on(async {
+            let parse: FullCompoundCommand<MissingHereDoc> = " { :; } <&- ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "{ :; } <&-");
+        })
     }
 
     #[test]
     fn command_from_str() {
-        let parse: Command<MissingHereDoc> = "f(){ :; }>&2".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "f() { :; } >&2");
+        block_on(async {
+            let parse: Command<MissingHereDoc> = "f(){ :; }>&2".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "f() { :; } >&2");
+        })
     }
 
     #[test]
     fn pipeline_from_str() {
-        let parse: Pipeline<MissingHereDoc> = " ! a|b|c".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "! a | b | c");
+        block_on(async {
+            let parse: Pipeline<MissingHereDoc> = " ! a|b|c".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "! a | b | c");
+        })
     }
 
     #[test]
@@ -408,15 +491,22 @@ mod tests {
 
     #[test]
     fn and_or_list_from_str() {
-        let parse: AndOrList<MissingHereDoc> = " a|b&&! c||d|e ".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "a | b && ! c || d | e");
+        block_on(async {
+            let parse: AndOrList<MissingHereDoc> = " a|b&&! c||d|e ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "a | b && ! c || d | e");
+        })
     }
 
     #[test]
     fn list_from_str() {
-        let parse: List<MissingHereDoc> = " a;b&&c&d ".parse().unwrap();
-        let parse = parse.fill(&mut empty()).unwrap();
-        assert_eq!(parse.to_string(), "a; b && c& d");
+        block_on(async {
+            let parse: List<MissingHereDoc> = " a;b&&c&d ".parse().unwrap();
+            let parse = parse.fill(&mut empty()).unwrap();
+            assert_eq!(parse.to_string(), "a; b && c& d");
+
+            let parse: List = " a;b&&c&d ".parse().unwrap();
+            assert_eq!(parse.to_string(), "a; b && c& d");
+        })
     }
 }
