@@ -16,6 +16,10 @@
 
 //! Type definitions for command execution.
 
+// TODO should be a struct
+/// TODO describe
+pub type ExitStatus = u32;
+
 /// Result of command execution that requires stack unwinding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Abort {
