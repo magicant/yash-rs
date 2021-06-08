@@ -610,7 +610,6 @@ mod tests {
     use crate::parser::core::ErrorCause;
     use crate::parser::core::SyntaxError;
     use futures::executor::block_on;
-    use std::future::ready;
 
     #[test]
     fn lexer_core_peek_char_empty_source() {
@@ -637,14 +636,12 @@ mod tests {
             }
         }
         impl std::error::Error for Failing {}
+        #[async_trait::async_trait(?Send)]
         impl Input for Failing {
-            fn next_line(
-                &mut self,
-                _: &Context,
-            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
+            async fn next_line(&mut self, _: &Context) -> crate::input::Result {
                 let location = Location::dummy("line".to_string());
                 let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
-                Box::pin(ready(Err((location, error))))
+                Err((location, error))
             }
         }
         let mut lexer = LexerCore::new(Box::new(Failing));

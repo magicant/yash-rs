@@ -376,7 +376,6 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use futures::executor::block_on;
-    use std::future::ready;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -475,13 +474,11 @@ mod tests {
     #[test]
     fn lexer_operator_should_not_peek_beyond_newline() {
         struct OneLineInput(Option<Line>);
+        #[async_trait::async_trait(?Send)]
         impl Input for OneLineInput {
-            fn next_line(
-                &mut self,
-                _: &Context,
-            ) -> Pin<Box<dyn Future<Output = crate::input::Result>>> {
+            async fn next_line(&mut self, _: &Context) -> crate::input::Result {
                 if let Some(line) = self.0.take() {
-                    Box::pin(ready(Ok(line)))
+                    Ok(line)
                 } else {
                     panic!("The second line should not be read")
                 }

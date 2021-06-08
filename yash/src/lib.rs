@@ -30,30 +30,23 @@ pub use yash_syntax::syntax;
 async fn parse_and_print() {
     use env::AliasEnv;
     use env::NativeEnv;
-    use std::future::ready;
-    use std::future::Future;
     use std::num::NonZeroU64;
-    use std::pin::Pin;
 
     struct Stdin;
 
+    #[async_trait::async_trait(?Send)]
     impl input::Input for Stdin {
-        fn next_line(
-            &mut self,
-            _: &input::Context,
-        ) -> Pin<Box<dyn Future<Output = input::Result>>> {
-            Box::pin(ready({
-                let mut code = String::new();
-                std::io::stdin()
-                    .read_line(&mut code)
-                    .map(|_| source::Line {
-                        value: code,
-                        // TODO correct line number
-                        number: NonZeroU64::new(1).unwrap(),
-                        source: source::Source::Unknown,
-                    })
-                    .map_err(|e| (source::Location::dummy("".to_string()), e))
-            }))
+        async fn next_line(&mut self, _: &input::Context) -> input::Result {
+            let mut code = String::new();
+            std::io::stdin()
+                .read_line(&mut code)
+                .map(|_| source::Line {
+                    value: code,
+                    // TODO correct line number
+                    number: NonZeroU64::new(1).unwrap(),
+                    source: source::Source::Unknown,
+                })
+                .map_err(|e| (source::Location::dummy("".to_string()), e))
         }
     }
 

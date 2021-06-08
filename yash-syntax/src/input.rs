@@ -20,11 +20,9 @@ use crate::source::lines;
 use crate::source::Line;
 use crate::source::Location;
 use crate::source::Source;
+use async_trait::async_trait;
 use std::collections::VecDeque;
-use std::future::ready;
-use std::future::Future;
 use std::num::NonZeroU64;
-use std::pin::Pin;
 
 /// Current state in which source code is read.
 ///
@@ -45,6 +43,7 @@ pub type Result = std::result::Result<Line, Error>;
 /// Line-oriented source code reader.
 ///
 /// An `Input` object provides the parser with source code by reading from underlying source.
+#[async_trait(?Send)]
 pub trait Input {
     /// Reads a next line of the source code.
     ///
@@ -58,7 +57,7 @@ pub trait Input {
     ///
     /// Because the current Rust compiler does not support `async` functions in a trait, this
     /// function is explicitly declared to return a `Future` in a pinned box.
-    fn next_line(&mut self, context: &Context) -> Pin<Box<dyn Future<Output = Result>>>;
+    async fn next_line(&mut self, context: &Context) -> Result;
 }
 
 /// Input function that reads from a string in memory.
@@ -91,9 +90,10 @@ impl Memory {
     }
 }
 
+#[async_trait(?Send)]
 impl Input for Memory {
-    fn next_line(&mut self, context: &Context) -> Pin<Box<dyn Future<Output = Result>>> {
-        Box::pin(ready(Ok(self.next_line_sync(context))))
+    async fn next_line(&mut self, context: &Context) -> Result {
+        Ok(self.next_line_sync(context))
     }
 }
 
