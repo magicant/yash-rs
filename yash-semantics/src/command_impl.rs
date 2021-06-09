@@ -14,29 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Command execution.
+//! Implementations for Command.
 
-use crate::env::Env;
-use crate::syntax::*;
+use super::Command;
+use async_trait::async_trait;
+use yash_core::env::Env;
+use yash_core::exec::Result;
+use yash_core::expansion::Field;
+use yash_syntax::syntax;
 
-pub use yash_core::exec::*;
-
-impl SimpleCommand {
-    /// Executes this simple command.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
-        let fields: crate::expansion::Result<Vec<_>> =
-            self.words.iter().try_fold(vec![], |mut fs, w| {
-                fs.extend(w.expand_multiple(env)?);
-                Ok(fs)
-            });
+#[async_trait(?Send)]
+impl Command for syntax::SimpleCommand {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
+        // TODO expand words correctly
+        let fields: Vec<_> = self
+            .words
+            .iter()
+            .map(|w| Field {
+                value: w.to_string(),
+                origin: w.location.clone(),
+            })
+            .collect();
 
         // TODO open redirections
         // TODO expand and perform assignments
 
-        let fields = match fields {
-            Ok(fields) => fields,
-            Err(_) => return Ok(()),
-        };
         if let Some(name) = fields.get(0) {
             if let Some(builtin) = env.builtin(&name.value) {
                 let (_exit_status, abort) = (builtin.execute)(env, fields).await;
@@ -54,21 +56,22 @@ impl SimpleCommand {
     }
 }
 
-impl Command {
-    /// Executes this command.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+#[async_trait(?Send)]
+impl Command for syntax::Command {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
+        use syntax::Command::*;
         match self {
-            Command::Simple(command) => command.execute(env).await,
+            Simple(command) => command.execute(env).await,
             #[allow(clippy::unit_arg)]
-            Command::Compound(_) | Command::Function(_) => Ok(println!("{}", self)),
+            Compound(_) | Function(_) => Ok(println!("{}", self)),
             // TODO execute compound command / function definition
         }
     }
 }
 
-impl Pipeline {
-    /// Executes this pipeline.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+#[async_trait(?Send)]
+impl Command for syntax::Pipeline {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
         // TODO correctly execute pipeline
         self.commands
             .get(0)
@@ -78,28 +81,33 @@ impl Pipeline {
     }
 }
 
-impl AndOrList {
-    /// Executes this and-or list.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+#[async_trait(?Send)]
+impl Command for syntax::AndOrList {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
         self.first.execute(env).await
         // TODO rest
     }
 }
 
-impl Item {
-    /// Executes this item.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+#[async_trait(?Send)]
+impl Command for syntax::Item {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
         self.and_or.execute(env).await
         // TODO async
     }
 }
 
-impl List {
-    /// Executes this list.
-    pub async fn execute(&self, env: &mut dyn Env) -> Result {
+#[async_trait(?Send)]
+impl Command for syntax::List {
+    async fn execute(&self, env: &mut dyn Env) -> Result {
         for item in &self.0 {
             item.execute(env).await?
         }
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // TODO test
 }

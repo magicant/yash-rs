@@ -19,5 +19,39 @@
 //! This crate defines the standard semantics for the shell language. The core
 //! of the semantics is word expansion and command execution. They respectively
 //! have a corresponding trait that is implemented by syntactic constructs.
+//!
+//! TODO Elaborate
+
+mod command_impl;
+
+use async_trait::async_trait;
+use yash_core::env::Env;
 
 pub use yash_core::exec::*;
+
+/// Syntactic construct that can be executed.
+#[async_trait(?Send)]
+pub trait Command {
+    /// Executes this command.
+    ///
+    /// TODO Elaborate: The exit status must be updated during execution.
+    async fn execute(&self, env: &mut dyn Env) -> Result;
+}
+
+/// Result of expansion.
+///
+/// TODO elaborate
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Expansion {
+    // TODO define value
+}
+
+// TODO Reconsider the name
+/// TODO describe
+#[async_trait(?Send)]
+pub trait Word {
+    /// TODO describe
+    async fn expand(&self, env: &mut dyn Env) -> Result<Expansion>;
+}
+
+// TODO Probably we should implement a read-execute loop in here
