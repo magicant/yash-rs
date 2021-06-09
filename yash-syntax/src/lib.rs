@@ -36,5 +36,4 @@ pub mod parser;
 pub mod syntax;
 
 pub use yash_core::alias;
-pub use yash_core::env;
 pub use yash_core::source;
