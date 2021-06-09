@@ -31,7 +31,6 @@ use crate::syntax::AndOr;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
 use std::fmt;
-use std::future::Future;
 use std::rc::Rc;
 
 /// Types of syntax errors.
@@ -320,20 +319,6 @@ pub enum Rec<T> {
     Parsed(T),
 }
 
-/// Repeatedly applies the parser that may involve alias substitution until the final result is
-/// obtained.
-pub async fn finish<T, F, Fut>(mut f: F) -> Result<T>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<Rec<T>>>,
-{
-    loop {
-        if let Rec::Parsed(t) = f().await? {
-            return Ok(t);
-        }
-    }
-}
-
 impl<T> Rec<T> {
     /// Tests if `self` is `AliasSubstituted`.
     pub fn is_alias_substituted(&self) -> bool {
@@ -352,26 +337,6 @@ impl<T> Rec<T> {
         match self {
             Rec::AliasSubstituted => panic!("Rec::AliasSubstituted cannot be unwrapped"),
             Rec::Parsed(v) => v,
-        }
-    }
-
-    /// Combines `self` with another parser.
-    ///
-    /// If `self` is `AliasSubstituted`, `zip` returns `AliasSubstituted` without calling `f`.
-    /// If `self` is `Parsed(_)`, `f` is called repeatedly until it returns a
-    /// result that is `Parsed(_)`. Lastly, the values of the two `Rec` objects
-    /// are packed into a tuple.
-    pub async fn zip<U, F, Fut>(self, mut f: F) -> Result<Rec<(T, U)>>
-    where
-        F: FnMut(&T) -> Fut,
-        Fut: Future<Output = Result<Rec<U>>>,
-    {
-        match self {
-            Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
-            Rec::Parsed(t) => {
-                let u = finish(|| f(&t)).await?;
-                Ok(Rec::Parsed((t, u)))
-            }
         }
     }
 
