@@ -35,5 +35,5 @@ pub mod input;
 pub mod parser;
 pub mod syntax;
 
-pub use yash_core::alias;
-pub use yash_core::source;
+pub(crate) use yash_core::alias;
+pub(crate) use yash_core::source;
