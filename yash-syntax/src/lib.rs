@@ -35,10 +35,5 @@ pub mod input;
 pub mod parser;
 pub mod syntax;
 
-// TODO Move to some other package
-pub mod exec;
-pub mod expansion;
-
 pub use yash_core::alias;
-pub use yash_core::env;
 pub use yash_core::source;

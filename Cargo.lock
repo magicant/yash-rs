@@ -220,6 +220,7 @@ dependencies = [
  "futures",
  "yash-builtin",
  "yash-core",
+ "yash-semantics",
  "yash-syntax",
 ]
 
@@ -233,6 +234,16 @@ dependencies = [
 [[package]]
 name = "yash-core"
 version = "0.1.0"
+
+[[package]]
+name = "yash-semantics"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "itertools",
+ "yash-core",
+ "yash-syntax",
+]
 
 [[package]]
 name = "yash-syntax"

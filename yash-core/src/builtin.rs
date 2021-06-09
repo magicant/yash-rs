@@ -20,13 +20,11 @@
 
 use crate::env::Env;
 use crate::exec::Abort;
+use crate::exec::ExitStatus;
 use crate::expansion::Field;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
-
-// TODO should be defined somewhere else.
-type ExitStatus = u32;
 
 /// Types of built-in utilities.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

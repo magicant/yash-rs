@@ -20,8 +20,7 @@ pub use yash_builtin as builtin;
 pub use yash_core::alias;
 pub use yash_core::env;
 pub use yash_core::source;
-pub use yash_syntax::exec;
-pub use yash_syntax::expansion;
+pub use yash_semantics as semantics;
 pub use yash_syntax::input;
 pub use yash_syntax::parser;
 pub use yash_syntax::syntax;
@@ -30,6 +29,7 @@ pub use yash_syntax::syntax;
 async fn parse_and_print() {
     use env::AliasEnv;
     use env::NativeEnv;
+    use semantics::Command;
     use std::num::NonZeroU64;
 
     struct Stdin;
