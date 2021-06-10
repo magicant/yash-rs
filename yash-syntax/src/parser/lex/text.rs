@@ -47,12 +47,12 @@ impl WordLexer<'_> {
     /// double-quote. If `Word`, `\"` is treated literally.
     pub async fn text_unit<F, G>(
         &mut self,
-        is_delimiter: F,
+        mut is_delimiter: F,
         is_escapable: G,
     ) -> Result<Option<TextUnit>>
     where
-        F: FnOnce(char) -> bool,
-        G: FnOnce(char) -> bool,
+        F: FnMut(char) -> bool,
+        G: FnMut(char) -> bool,
     {
         if self.skip_if(|c| c == '\\').await? {
             if let Some(c) = self.consume_char_if(is_escapable).await? {
