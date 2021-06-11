@@ -152,10 +152,20 @@ impl Lexer {
         F: FnMut(char) -> bool,
         G: FnMut(char) -> bool,
     {
+        self.text_with_parentheses_dyn(&mut is_delimiter, &mut is_escapable)
+            .await
+    }
+
+    /// Dynamic version of [`Self::text_with_parentheses`].
+    async fn text_with_parentheses_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Text> {
         let mut units = Vec::new();
         let mut open_paren_locations = Vec::new();
         loop {
-            let is_delimiter_or_paren = |c| {
+            let mut is_delimiter_or_paren = |c| {
                 if c == '(' {
                     return true;
                 }
@@ -165,8 +175,13 @@ impl Lexer {
                     c == ')'
                 }
             };
-            let next_units = self.text(is_delimiter_or_paren, &mut is_escapable).await?.0;
+            let next_units = self
+                .text_dyn(&mut is_delimiter_or_paren, is_escapable)
+                .await?
+                .0;
+
             units.extend(next_units);
+
             if let Some(sc) = self.consume_char_if(|c| c == '(').await? {
                 units.push(Literal('('));
                 open_paren_locations.push(sc.location.clone());
