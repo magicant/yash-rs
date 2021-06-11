@@ -492,7 +492,7 @@ impl Lexer {
     }
 
     /// Dynamic version of [`Self::consume_char_if`].
-    async fn consume_char_if_dyn(
+    pub(crate) async fn consume_char_if_dyn(
         &mut self,
         f: &mut dyn FnMut(char) -> bool,
     ) -> Result<Option<&SourceChar>> {

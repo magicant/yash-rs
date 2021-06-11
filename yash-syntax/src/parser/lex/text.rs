@@ -48,14 +48,24 @@ impl WordLexer<'_> {
     pub async fn text_unit<F, G>(
         &mut self,
         mut is_delimiter: F,
-        is_escapable: G,
+        mut is_escapable: G,
     ) -> Result<Option<TextUnit>>
     where
         F: FnMut(char) -> bool,
         G: FnMut(char) -> bool,
     {
+        self.text_unit_dyn(&mut is_delimiter, &mut is_escapable)
+            .await
+    }
+
+    /// Dynamic version of [`Self::text_unit`].
+    async fn text_unit_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Option<TextUnit>> {
         if self.skip_if(|c| c == '\\').await? {
-            if let Some(c) = self.consume_char_if(is_escapable).await? {
+            if let Some(c) = self.consume_char_if_dyn(is_escapable).await? {
                 return Ok(Some(Backslashed(c.value)));
             } else {
                 return Ok(Some(Literal('\\')));
