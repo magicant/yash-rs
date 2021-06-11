@@ -109,16 +109,22 @@ impl Lexer {
         F: FnMut(char) -> bool,
         G: FnMut(char) -> bool,
     {
+        self.text_dyn(&mut is_delimiter, &mut is_escapable).await
+    }
+
+    /// Dynamic version of [`Self::text`].
+    async fn text_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Text> {
         let mut units = vec![];
 
         let mut word_lexer = WordLexer {
             lexer: self,
             context: WordContext::Text,
         };
-        while let Some(unit) = word_lexer
-            .text_unit(&mut is_delimiter, &mut is_escapable)
-            .await?
-        {
+        while let Some(unit) = word_lexer.text_unit_dyn(is_delimiter, is_escapable).await? {
             units.push(unit);
         }
 
