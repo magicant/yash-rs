@@ -488,6 +488,14 @@ impl Lexer {
     where
         F: FnMut(char) -> bool,
     {
+        self.consume_char_if_dyn(&mut f).await
+    }
+
+    /// Dynamic version of [`Self::consume_char_if`].
+    async fn consume_char_if_dyn(
+        &mut self,
+        f: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Option<&SourceChar>> {
         match self.peek_char().await? {
             Some(c) if f(c) => {
                 let index = self.index();
