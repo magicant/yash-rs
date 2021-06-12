@@ -55,7 +55,7 @@ pub trait BuiltinEnv {
 }
 
 /// Minimal implementor of [`BuiltinEnv`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Builtins(pub HashMap<&'static str, Builtin>);
 
 impl BuiltinEnv for Builtins {
@@ -66,7 +66,7 @@ impl BuiltinEnv for Builtins {
 
 /// Subset of the shell execution environment that can be implemented
 /// independently of the underlying OS features.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct LocalEnv {
     pub aliases: Aliases,
     pub builtins: Builtins,
@@ -141,7 +141,7 @@ impl Env for NativeEnv {}
 /// Simulated shell execution environment.
 ///
 /// TODO Elaborate
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct SimEnv {
     /// Local part of the environment.
     pub local: LocalEnv,

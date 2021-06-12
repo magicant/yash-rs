@@ -75,11 +75,3 @@ impl Debug for Builtin {
             .finish()
     }
 }
-
-impl PartialEq for Builtin {
-    fn eq(&self, other: &Builtin) -> bool {
-        self.r#type == other.r#type
-    }
-}
-
-impl Eq for Builtin {}
