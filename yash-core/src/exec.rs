@@ -20,9 +20,9 @@
 /// TODO describe
 pub type ExitStatus = u32;
 
-/// Result of command execution that requires stack unwinding.
+/// Result of interrupted command execution.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Abort {
+pub enum Divert {
     /// Break the current loop.
     Break {
         /// Number of loops to break.
@@ -35,4 +35,7 @@ pub enum Abort {
 }
 
 /// Result of command execution.
-pub type Result<T = ()> = std::result::Result<T, Abort>;
+///
+/// If the command was interrupted in the middle of execution, the result value
+/// will be a [`Divert`] which specifies what to execute next.
+pub type Result<T = ()> = std::result::Result<T, Divert>;

@@ -19,7 +19,7 @@
 //! This module provides data types for defining built-in utilities.
 
 use crate::env::Env;
-use crate::exec::Abort;
+use crate::exec::Divert;
 use crate::exec::ExitStatus;
 use crate::expansion::Field;
 use std::fmt::Debug;
@@ -53,7 +53,7 @@ pub enum Type {
 }
 
 /// Result of built-in utility execution.
-pub type Result = (ExitStatus, Option<Abort>);
+pub type Result = (ExitStatus, Option<Divert>);
 
 /// Type of functions that implement the behavior of a built-in.
 pub type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
