@@ -98,6 +98,14 @@ impl WordLexer<'_> {
     where
         F: Fn(char) -> bool,
     {
+        self.word_unit_dyn(&is_delimiter).await
+    }
+
+    /// Dynamic version of [`Self::word_unit`].
+    async fn word_unit_dyn(
+        &mut self,
+        is_delimiter: &dyn Fn(char) -> bool,
+    ) -> Result<Option<WordUnit>> {
         let allow_single_quote = match self.context {
             WordContext::Word => true,
             WordContext::Text => false,
@@ -121,7 +129,7 @@ impl WordLexer<'_> {
                 self.double_quote(location).await.map(Some)
             }
             _ => Ok(self
-                .text_unit(&is_delimiter, is_escapable)
+                .text_unit(is_delimiter, is_escapable)
                 .await?
                 .map(Unquoted)),
         }
@@ -143,9 +151,14 @@ impl WordLexer<'_> {
     where
         F: Fn(char) -> bool,
     {
+        self.word_dyn(&is_delimiter).await
+    }
+
+    /// Dynamic version of [`Self::word`].
+    async fn word_dyn(&mut self, is_delimiter: &dyn Fn(char) -> bool) -> Result<Word> {
         let location = self.location().await?.clone();
         let mut units = vec![];
-        while let Some(unit) = self.word_unit(&is_delimiter).await? {
+        while let Some(unit) = self.word_unit_dyn(is_delimiter).await? {
             units.push(unit)
         }
         Ok(Word { units, location })

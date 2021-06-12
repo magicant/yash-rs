@@ -484,10 +484,18 @@ impl Lexer {
     ///
     /// Returns the consumed character if the function returned true. Returns `Ok(None)` if it
     /// returned false or there is no more character.
-    pub async fn consume_char_if<F>(&mut self, f: F) -> Result<Option<&SourceChar>>
+    pub async fn consume_char_if<F>(&mut self, mut f: F) -> Result<Option<&SourceChar>>
     where
-        F: FnOnce(char) -> bool,
+        F: FnMut(char) -> bool,
     {
+        self.consume_char_if_dyn(&mut f).await
+    }
+
+    /// Dynamic version of [`Self::consume_char_if`].
+    pub(crate) async fn consume_char_if_dyn(
+        &mut self,
+        f: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Option<&SourceChar>> {
         match self.peek_char().await? {
             Some(c) if f(c) => {
                 let index = self.index();

@@ -47,15 +47,25 @@ impl WordLexer<'_> {
     /// double-quote. If `Word`, `\"` is treated literally.
     pub async fn text_unit<F, G>(
         &mut self,
-        is_delimiter: F,
-        is_escapable: G,
+        mut is_delimiter: F,
+        mut is_escapable: G,
     ) -> Result<Option<TextUnit>>
     where
-        F: FnOnce(char) -> bool,
-        G: FnOnce(char) -> bool,
+        F: FnMut(char) -> bool,
+        G: FnMut(char) -> bool,
     {
+        self.text_unit_dyn(&mut is_delimiter, &mut is_escapable)
+            .await
+    }
+
+    /// Dynamic version of [`Self::text_unit`].
+    async fn text_unit_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Option<TextUnit>> {
         if self.skip_if(|c| c == '\\').await? {
-            if let Some(c) = self.consume_char_if(is_escapable).await? {
+            if let Some(c) = self.consume_char_if_dyn(is_escapable).await? {
                 return Ok(Some(Backslashed(c.value)));
             } else {
                 return Ok(Some(Literal('\\')));
@@ -99,16 +109,22 @@ impl Lexer {
         F: FnMut(char) -> bool,
         G: FnMut(char) -> bool,
     {
+        self.text_dyn(&mut is_delimiter, &mut is_escapable).await
+    }
+
+    /// Dynamic version of [`Self::text`].
+    async fn text_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Text> {
         let mut units = vec![];
 
         let mut word_lexer = WordLexer {
             lexer: self,
             context: WordContext::Text,
         };
-        while let Some(unit) = word_lexer
-            .text_unit(&mut is_delimiter, &mut is_escapable)
-            .await?
-        {
+        while let Some(unit) = word_lexer.text_unit_dyn(is_delimiter, is_escapable).await? {
             units.push(unit);
         }
 
@@ -136,10 +152,20 @@ impl Lexer {
         F: FnMut(char) -> bool,
         G: FnMut(char) -> bool,
     {
+        self.text_with_parentheses_dyn(&mut is_delimiter, &mut is_escapable)
+            .await
+    }
+
+    /// Dynamic version of [`Self::text_with_parentheses`].
+    async fn text_with_parentheses_dyn(
+        &mut self,
+        is_delimiter: &mut dyn FnMut(char) -> bool,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Text> {
         let mut units = Vec::new();
         let mut open_paren_locations = Vec::new();
         loop {
-            let is_delimiter_or_paren = |c| {
+            let mut is_delimiter_or_paren = |c| {
                 if c == '(' {
                     return true;
                 }
@@ -149,8 +175,13 @@ impl Lexer {
                     c == ')'
                 }
             };
-            let next_units = self.text(is_delimiter_or_paren, &mut is_escapable).await?.0;
+            let next_units = self
+                .text_dyn(&mut is_delimiter_or_paren, is_escapable)
+                .await?
+                .0;
+
             units.extend(next_units);
+
             if let Some(sc) = self.consume_char_if(|c| c == '(').await? {
                 units.push(Literal('('));
                 open_paren_locations.push(sc.location.clone());

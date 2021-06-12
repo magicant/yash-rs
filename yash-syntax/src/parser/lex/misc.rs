@@ -29,7 +29,7 @@ impl Lexer {
     /// `skip_if` is a simpler version of [`consume_char_if`](Lexer::consume_char_if).
     pub async fn skip_if<F>(&mut self, f: F) -> Result<bool>
     where
-        F: FnOnce(char) -> bool,
+        F: FnMut(char) -> bool,
     {
         Ok(self.consume_char_if(f).await?.is_some())
     }
