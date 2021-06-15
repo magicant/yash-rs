@@ -22,11 +22,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use yash_core::alias::*;
 use yash_core::builtin::Result;
-use yash_core::env::Env;
+use yash_core::env::Enx;
 use yash_core::expansion::Field;
 
 /// Implementation of the alias built-in.
-pub fn alias_builtin(env: &mut dyn Env, args: Vec<Field>) -> Result {
+pub fn alias_builtin(env: &mut dyn Enx, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -64,7 +64,7 @@ pub fn alias_builtin(env: &mut dyn Env, args: Vec<Field>) -> Result {
 ///
 /// This function calls [`alias_builtin`] and wraps the result in a `Future`.
 pub fn alias_builtin_async(
-    env: &mut dyn Env,
+    env: &mut dyn Enx,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
     Box::pin(ready(alias_builtin(env, args)))

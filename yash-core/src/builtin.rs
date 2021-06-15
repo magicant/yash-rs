@@ -18,7 +18,7 @@
 //!
 //! This module provides data types for defining built-in utilities.
 
-use crate::env::Env;
+use crate::env::Enx;
 use crate::exec::Divert;
 use crate::exec::ExitStatus;
 use crate::expansion::Field;
@@ -56,7 +56,7 @@ pub enum Type {
 pub type Result = (ExitStatus, Option<Divert>);
 
 /// Type of functions that implement the behavior of a built-in.
-pub type Main = fn(&mut dyn Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
+pub type Main = fn(&mut dyn Enx, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
 
 /// Built-in utility definition.
 #[derive(Clone, Copy)]

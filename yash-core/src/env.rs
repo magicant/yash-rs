@@ -98,9 +98,9 @@ impl BuiltinEnv for LocalEnv {
 }
 
 /// Whole shell execution environment.
-pub trait Env: AliasEnv + BuiltinEnv {}
+pub trait Enx: AliasEnv + BuiltinEnv {}
 
-/// Implementation of [`Env`] that is based on the state of the current process.
+/// Implementation of [`Enx`] that is based on the state of the current process.
 #[derive(Debug)]
 pub struct NativeEnv {
     /// Local part of the environment.
@@ -136,7 +136,7 @@ impl BuiltinEnv for NativeEnv {
     }
 }
 
-impl Env for NativeEnv {}
+impl Enx for NativeEnv {}
 
 /// Simulated shell execution environment.
 ///
@@ -171,4 +171,4 @@ impl BuiltinEnv for SimEnv {
     }
 }
 
-impl Env for SimEnv {}
+impl Enx for SimEnv {}

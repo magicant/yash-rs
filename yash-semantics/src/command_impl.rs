@@ -18,14 +18,14 @@
 
 use super::Command;
 use async_trait::async_trait;
-use yash_core::env::Env;
+use yash_core::env::Enx;
 use yash_core::exec::Result;
 use yash_core::expansion::Field;
 use yash_syntax::syntax;
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         // TODO expand words correctly
         let fields: Vec<_> = self
             .words
@@ -58,7 +58,7 @@ impl Command for syntax::SimpleCommand {
 
 #[async_trait(?Send)]
 impl Command for syntax::Command {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         use syntax::Command::*;
         match self {
             Simple(command) => command.execute(env).await,
@@ -71,7 +71,7 @@ impl Command for syntax::Command {
 
 #[async_trait(?Send)]
 impl Command for syntax::Pipeline {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         // TODO correctly execute pipeline
         self.commands
             .get(0)
@@ -83,7 +83,7 @@ impl Command for syntax::Pipeline {
 
 #[async_trait(?Send)]
 impl Command for syntax::AndOrList {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         self.first.execute(env).await
         // TODO rest
     }
@@ -91,7 +91,7 @@ impl Command for syntax::AndOrList {
 
 #[async_trait(?Send)]
 impl Command for syntax::Item {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         self.and_or.execute(env).await
         // TODO async
     }
@@ -99,7 +99,7 @@ impl Command for syntax::Item {
 
 #[async_trait(?Send)]
 impl Command for syntax::List {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut dyn Enx) -> Result {
         for item in &self.0 {
             item.execute(env).await?
         }

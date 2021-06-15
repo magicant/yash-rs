@@ -25,7 +25,7 @@
 mod command_impl;
 
 use async_trait::async_trait;
-use yash_core::env::Env;
+use yash_core::env::Enx;
 
 pub use yash_core::exec::*;
 
@@ -35,7 +35,7 @@ pub trait Command {
     /// Executes this command.
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
-    async fn execute(&self, env: &mut dyn Env) -> Result;
+    async fn execute(&self, env: &mut dyn Enx) -> Result;
 }
 
 /// Result of expansion.
@@ -51,7 +51,7 @@ pub struct Expansion {
 #[async_trait(?Send)]
 pub trait Word {
     /// TODO describe
-    async fn expand(&self, env: &mut dyn Env) -> Result<Expansion>;
+    async fn expand(&self, env: &mut dyn Enx) -> Result<Expansion>;
 }
 
 // TODO Probably we should implement a read-execute loop in here
