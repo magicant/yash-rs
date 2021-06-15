@@ -172,3 +172,37 @@ impl BuiltinEnv for SimEnv {
 }
 
 impl Enx for SimEnv {}
+
+/// Whole shell execution environment.
+///
+/// The shell execution environment consists of application-managed parts and
+/// system-managed parts. Application-managed parts are directly implemented in
+/// the `Env` instance. System-managed parts are... TODO Elaborate
+#[derive(Clone, Debug)]
+pub struct Env {
+    /// Aliases defined in the environment.
+    ///
+    /// The `AliasSet` is reference-counted so that the shell can execute traps
+    /// while the parser is reading a command line.
+    pub aliases: Rc<AliasSet>,
+
+    /// Built-in utilities available in the environment.
+    pub builtins: HashMap<&'static str, Builtin>,
+}
+
+impl AliasEnv for Env {
+    fn aliases(&self) -> &Rc<AliasSet> {
+        &self.aliases
+    }
+    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
+        &mut self.aliases
+    }
+}
+
+impl BuiltinEnv for Env {
+    fn builtin(&self, name: &str) -> Option<&Builtin> {
+        self.builtins.get(name)
+    }
+}
+
+impl Enx for Env {}
