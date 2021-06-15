@@ -22,11 +22,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use yash_core::alias::*;
 use yash_core::builtin::Result;
-use yash_core::env::Enx;
+use yash_core::env::Env;
 use yash_core::expansion::Field;
 
 /// Implementation of the alias built-in.
-pub fn alias_builtin(env: &mut dyn Enx, args: Vec<Field>) -> Result {
+pub fn alias_builtin(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -34,7 +34,7 @@ pub fn alias_builtin(env: &mut dyn Enx, args: Vec<Field>) -> Result {
     args.next(); // ignore the first argument, which is the command name
 
     if args.as_ref().is_empty() {
-        for alias in env.aliases().as_ref() {
+        for alias in env.aliases.as_ref() {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
@@ -46,12 +46,7 @@ pub fn alias_builtin(env: &mut dyn Enx, args: Vec<Field>) -> Result {
             let name = value[..eq_index].to_owned();
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
-            Rc::make_mut(env.aliases_mut()).insert(HashEntry::new(
-                name,
-                replacement,
-                false,
-                origin,
-            ));
+            Rc::make_mut(&mut env.aliases).insert(HashEntry::new(name, replacement, false, origin));
         } else {
             // TODO print alias definition
         }
@@ -64,7 +59,7 @@ pub fn alias_builtin(env: &mut dyn Enx, args: Vec<Field>) -> Result {
 ///
 /// This function calls [`alias_builtin`] and wraps the result in a `Future`.
 pub fn alias_builtin_async(
-    env: &mut dyn Enx,
+    env: &mut Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
     Box::pin(ready(alias_builtin(env, args)))
@@ -74,13 +69,18 @@ pub fn alias_builtin_async(
 mod tests {
     use super::*;
     use yash_core::env::AliasEnv;
-    use yash_core::env::SimEnv;
     use yash_core::source::Location;
     use yash_core::source::Source;
 
+    fn dummy_env() -> Env {
+        let aliases = Default::default();
+        let builtins = Default::default();
+        Env { aliases, builtins }
+    }
+
     #[test]
     fn alias_builtin_defines_alias() {
-        let mut env = SimEnv::new();
+        let mut env = dummy_env();
         let arg0 = Field::dummy("".to_string());
         let arg1 = Field::dummy("foo=bar baz".to_string());
         let args = vec![arg0, arg1];
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn alias_builtin_defines_many_aliases() {
-        let mut env = SimEnv::new();
+        let mut env = dummy_env();
         let arg0 = Field::dummy("alias".to_string());
         let arg1 = Field::dummy("abc=xyz".to_string());
         let arg2 = Field::dummy("yes=no".to_string());
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn alias_builtin_prints_all_aliases() {
-        let mut env = SimEnv::new();
+        let mut env = dummy_env();
         let aliases = Rc::make_mut(env.aliases_mut());
         aliases.insert(HashEntry::new(
             "foo".to_string(),
