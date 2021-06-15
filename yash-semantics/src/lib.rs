@@ -25,6 +25,7 @@
 mod command_impl;
 
 use async_trait::async_trait;
+use yash_core::env::Env;
 use yash_core::env::Enx;
 
 pub use yash_core::exec::*;
@@ -35,7 +36,7 @@ pub trait Command {
     /// Executes this command.
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
-    async fn execute(&self, env: &mut dyn Enx) -> Result;
+    async fn execute(&self, env: &mut Env) -> Result;
 }
 
 /// Result of expansion.

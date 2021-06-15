@@ -27,8 +27,7 @@ pub use yash_syntax::syntax;
 
 // TODO Allow user to select input source
 async fn parse_and_print() {
-    use env::AliasEnv;
-    use env::NativeEnv;
+    use env::Env;
     use semantics::Command;
     use std::num::NonZeroU64;
 
@@ -50,13 +49,13 @@ async fn parse_and_print() {
         }
     }
 
-    let mut env = NativeEnv::new();
-    let builtins = &mut env.local.builtins.0;
-    builtins.extend(builtin::BUILTINS.iter().copied());
+    let aliases = Default::default();
+    let builtins = builtin::BUILTINS.iter().copied().collect();
+    let mut env = Env { aliases, builtins };
 
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
-        let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases().clone());
+        let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
         match parser.command_line().await {
             Ok(None) => break,
             Ok(Some(command)) => command
