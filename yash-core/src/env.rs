@@ -64,39 +64,6 @@ impl BuiltinEnv for Builtins {
     }
 }
 
-/// Subset of the shell execution environment that can be implemented
-/// independently of the underlying OS features.
-#[derive(Clone, Debug)]
-pub struct LocalEnv {
-    pub aliases: Aliases,
-    pub builtins: Builtins,
-}
-
-impl LocalEnv {
-    /// Creates a new local environment.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> LocalEnv {
-        let aliases = Aliases(Rc::new(AliasSet::new()));
-        let builtins = Builtins(HashMap::new());
-        LocalEnv { aliases, builtins }
-    }
-}
-
-impl AliasEnv for LocalEnv {
-    fn aliases(&self) -> &Rc<AliasSet> {
-        self.aliases.aliases()
-    }
-    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
-        self.aliases.aliases_mut()
-    }
-}
-
-impl BuiltinEnv for LocalEnv {
-    fn builtin(&self, name: &str) -> Option<&Builtin> {
-        self.builtins.builtin(name)
-    }
-}
-
 /// Whole shell execution environment.
 pub trait Enx: AliasEnv + BuiltinEnv {}
 
