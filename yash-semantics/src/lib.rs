@@ -26,7 +26,6 @@ mod command_impl;
 
 use async_trait::async_trait;
 use yash_core::env::Env;
-use yash_core::env::Enx;
 
 pub use yash_core::exec::*;
 
@@ -52,7 +51,7 @@ pub struct Expansion {
 #[async_trait(?Send)]
 pub trait Word {
     /// TODO describe
-    async fn expand(&self, env: &mut dyn Enx) -> Result<Expansion>;
+    async fn expand(&self, env: &mut Env) -> Result<Expansion>;
 }
 
 // TODO Probably we should implement a read-execute loop in here
