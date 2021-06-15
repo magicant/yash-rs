@@ -26,47 +26,6 @@ use crate::builtin::Builtin;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Alias-related part of the shell execution environment.
-pub trait AliasEnv {
-    /// Returns a reference to the alias set.
-    fn aliases(&self) -> &Rc<AliasSet>;
-    /// Returns a mutable reference to the alias set.
-    fn aliases_mut(&mut self) -> &mut Rc<AliasSet>;
-}
-
-/// Minimal implementor of [`AliasEnv`].
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Aliases(pub Rc<AliasSet>);
-
-impl AliasEnv for Aliases {
-    fn aliases(&self) -> &Rc<AliasSet> {
-        &self.0
-    }
-    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
-        &mut self.0
-    }
-}
-
-/// Part of the shell execution environment that is related with built-in
-/// utilities.
-pub trait BuiltinEnv {
-    /// Returns a reference to the built-in for the specified name.
-    fn builtin(&self, name: &str) -> Option<&Builtin>;
-}
-
-/// Minimal implementor of [`BuiltinEnv`].
-#[derive(Clone, Debug)]
-pub struct Builtins(pub HashMap<&'static str, Builtin>);
-
-impl BuiltinEnv for Builtins {
-    fn builtin(&self, name: &str) -> Option<&Builtin> {
-        self.0.get(name)
-    }
-}
-
-/// Whole shell execution environment.
-pub trait Enx: AliasEnv + BuiltinEnv {}
-
 /// Whole shell execution environment.
 ///
 /// The shell execution environment consists of application-managed parts and
@@ -83,20 +42,3 @@ pub struct Env {
     /// Built-in utilities available in the environment.
     pub builtins: HashMap<&'static str, Builtin>,
 }
-
-impl AliasEnv for Env {
-    fn aliases(&self) -> &Rc<AliasSet> {
-        &self.aliases
-    }
-    fn aliases_mut(&mut self) -> &mut Rc<AliasSet> {
-        &mut self.aliases
-    }
-}
-
-impl BuiltinEnv for Env {
-    fn builtin(&self, name: &str) -> Option<&Builtin> {
-        self.builtins.get(name)
-    }
-}
-
-impl Enx for Env {}
