@@ -68,7 +68,6 @@ pub fn alias_builtin_async(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_core::env::AliasEnv;
     use yash_core::source::Location;
     use yash_core::source::Source;
 
@@ -88,7 +87,7 @@ mod tests {
         let result = alias_builtin(&mut env, args);
         assert_eq!(result, (0, None));
 
-        let aliases = env.aliases().as_ref();
+        let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 1);
 
         let alias = aliases.get("foo").unwrap().0.as_ref();
@@ -113,7 +112,7 @@ mod tests {
         let result = alias_builtin(&mut env, args);
         assert_eq!(result, (0, None));
 
-        let aliases = env.aliases().as_ref();
+        let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 3);
 
         let abc = aliases.get("abc").unwrap().0.as_ref();
@@ -147,7 +146,7 @@ mod tests {
     #[test]
     fn alias_builtin_prints_all_aliases() {
         let mut env = dummy_env();
-        let aliases = Rc::make_mut(env.aliases_mut());
+        let aliases = Rc::make_mut(&mut env.aliases);
         aliases.insert(HashEntry::new(
             "foo".to_string(),
             "bar".to_string(),
