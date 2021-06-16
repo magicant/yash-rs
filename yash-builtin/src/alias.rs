@@ -25,8 +25,21 @@ use yash_core::builtin::Result;
 use yash_core::env::Env;
 use yash_core::expansion::Field;
 
+/// Part of the shell execution environment the alias built-in depends on.
+pub trait AliasBuiltinEnv {
+    /// Accesses the alias set in the environment.
+    fn alias_set(&mut self) -> &mut Rc<AliasSet>;
+    // TODO stdout, stderr
+}
+
+impl AliasBuiltinEnv for Env {
+    fn alias_set(&mut self) -> &mut Rc<AliasSet> {
+        &mut self.aliases
+    }
+}
+
 /// Implementation of the alias built-in.
-pub fn alias_builtin(env: &mut Env, args: Vec<Field>) -> Result {
+pub fn alias_builtin<E: AliasBuiltinEnv>(env: &mut E, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -34,7 +47,7 @@ pub fn alias_builtin(env: &mut Env, args: Vec<Field>) -> Result {
     args.next(); // ignore the first argument, which is the command name
 
     if args.as_ref().is_empty() {
-        for alias in env.aliases.as_ref() {
+        for alias in env.alias_set().as_ref() {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
@@ -46,7 +59,8 @@ pub fn alias_builtin(env: &mut Env, args: Vec<Field>) -> Result {
             let name = value[..eq_index].to_owned();
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
-            Rc::make_mut(&mut env.aliases).insert(HashEntry::new(name, replacement, false, origin));
+            let entry = HashEntry::new(name, replacement, false, origin);
+            Rc::make_mut(&mut env.alias_set()).insert(entry);
         } else {
             // TODO print alias definition
         }
@@ -71,15 +85,20 @@ mod tests {
     use yash_core::source::Location;
     use yash_core::source::Source;
 
-    fn dummy_env() -> Env {
-        let aliases = Default::default();
-        let builtins = Default::default();
-        Env { aliases, builtins }
+    #[derive(Default)]
+    struct DummyEnv {
+        aliases: Rc<AliasSet>,
+    }
+
+    impl AliasBuiltinEnv for DummyEnv {
+        fn alias_set(&mut self) -> &mut Rc<AliasSet> {
+            &mut self.aliases
+        }
     }
 
     #[test]
     fn alias_builtin_defines_alias() {
-        let mut env = dummy_env();
+        let mut env = DummyEnv::default();
         let arg0 = Field::dummy("".to_string());
         let arg1 = Field::dummy("foo=bar baz".to_string());
         let args = vec![arg0, arg1];
@@ -102,7 +121,7 @@ mod tests {
 
     #[test]
     fn alias_builtin_defines_many_aliases() {
-        let mut env = dummy_env();
+        let mut env = DummyEnv::default();
         let arg0 = Field::dummy("alias".to_string());
         let arg1 = Field::dummy("abc=xyz".to_string());
         let arg2 = Field::dummy("yes=no".to_string());
@@ -145,7 +164,7 @@ mod tests {
 
     #[test]
     fn alias_builtin_prints_all_aliases() {
-        let mut env = dummy_env();
+        let mut env = DummyEnv::default();
         let aliases = Rc::make_mut(&mut env.aliases);
         aliases.insert(HashEntry::new(
             "foo".to_string(),

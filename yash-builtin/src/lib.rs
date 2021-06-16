@@ -20,6 +20,7 @@ mod alias;
 
 pub use self::alias::alias_builtin;
 pub use self::alias::alias_builtin_async;
+pub use self::alias::AliasBuiltinEnv;
 pub use yash_core::builtin::*;
 
 use Type::Intrinsic;
