@@ -45,9 +45,11 @@ async fn parse_and_print() {
         }
     }
 
-    let aliases = Default::default();
-    let builtins = builtin::BUILTINS.iter().copied().collect();
-    let mut env = Env { aliases, builtins };
+    let mut env = Env {
+        aliases: Default::default(),
+        builtins: builtin::BUILTINS.iter().copied().collect(),
+        functions: Default::default(),
+    };
 
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
