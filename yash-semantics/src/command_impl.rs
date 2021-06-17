@@ -25,7 +25,7 @@ use yash_syntax::syntax;
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         // TODO expand words correctly
         let fields: Vec<_> = self
             .words
@@ -40,7 +40,7 @@ impl Command for syntax::SimpleCommand {
         // TODO expand and perform assignments
 
         if let Some(name) = fields.get(0) {
-            if let Some(builtin) = env.builtin(&name.value) {
+            if let Some(builtin) = env.builtins.get(name.value.as_str()) {
                 let (_exit_status, abort) = (builtin.execute)(env, fields).await;
                 if let Some(abort) = abort {
                     return Err(abort);
@@ -58,7 +58,7 @@ impl Command for syntax::SimpleCommand {
 
 #[async_trait(?Send)]
 impl Command for syntax::Command {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         use syntax::Command::*;
         match self {
             Simple(command) => command.execute(env).await,
@@ -71,7 +71,7 @@ impl Command for syntax::Command {
 
 #[async_trait(?Send)]
 impl Command for syntax::Pipeline {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         // TODO correctly execute pipeline
         self.commands
             .get(0)
@@ -83,7 +83,7 @@ impl Command for syntax::Pipeline {
 
 #[async_trait(?Send)]
 impl Command for syntax::AndOrList {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         self.first.execute(env).await
         // TODO rest
     }
@@ -91,7 +91,7 @@ impl Command for syntax::AndOrList {
 
 #[async_trait(?Send)]
 impl Command for syntax::Item {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         self.and_or.execute(env).await
         // TODO async
     }
@@ -99,7 +99,7 @@ impl Command for syntax::Item {
 
 #[async_trait(?Send)]
 impl Command for syntax::List {
-    async fn execute(&self, env: &mut dyn Env) -> Result {
+    async fn execute(&self, env: &mut Env) -> Result {
         for item in &self.0 {
             item.execute(env).await?
         }
