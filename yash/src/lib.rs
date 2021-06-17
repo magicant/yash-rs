@@ -18,8 +18,8 @@
 
 pub use yash_builtin as builtin;
 pub use yash_core::alias;
-pub use yash_core::env;
 pub use yash_core::source;
+pub use yash_env::env;
 pub use yash_semantics as semantics;
 pub use yash_syntax::input;
 pub use yash_syntax::parser;

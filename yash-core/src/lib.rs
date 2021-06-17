@@ -20,8 +20,4 @@
 //! implement features of the POSIX shell.
 
 pub mod alias;
-pub mod builtin;
-pub mod env;
-pub mod exec;
-pub mod expansion;
 pub mod source;

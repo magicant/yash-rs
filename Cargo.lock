@@ -230,6 +230,7 @@ name = "yash-builtin"
 version = "0.1.0"
 dependencies = [
  "yash-core",
+ "yash-env",
 ]
 
 [[package]]
@@ -240,6 +241,7 @@ version = "0.1.0"
 name = "yash-env"
 version = "0.1.0"
 dependencies = [
+ "yash-core",
  "yash-syntax",
 ]
 
@@ -250,6 +252,7 @@ dependencies = [
  "async-trait",
  "itertools",
  "yash-core",
+ "yash-env",
  "yash-syntax",
 ]
 

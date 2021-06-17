@@ -21,9 +21,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_core::alias::*;
-use yash_core::builtin::Result;
-use yash_core::env::Env;
-use yash_core::expansion::Field;
+use yash_env::builtin::Result;
+use yash_env::env::Env;
+use yash_env::expansion::Field;
 
 /// Part of the shell execution environment the alias built-in depends on.
 pub trait AliasBuiltinEnv {

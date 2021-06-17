@@ -18,7 +18,7 @@
 //!
 //! TODO Elaborate
 
-use crate::source::Location;
+use yash_core::source::Location;
 
 /// Errors that may happen in word expansions.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
