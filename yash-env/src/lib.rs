@@ -23,3 +23,4 @@ pub mod builtin;
 pub mod env;
 pub mod exec;
 pub mod expansion;
+pub mod function;
