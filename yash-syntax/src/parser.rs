@@ -16,8 +16,8 @@
 
 //! Syntax parser for the shell language.
 //!
-//! The shell language parsing system has two important components. One is the
-//! lexical analyzer and the other the syntax parser.
+//! The shell language parsing system has two important components: the lexical
+//! analyzer and the syntax parser.
 //!
 //! The lexical analyzer, or simply [lexer](lex::Lexer), extracts tokens from
 //! the source code string. Tokenization for the shell language involves parsing
@@ -45,7 +45,7 @@
 //! # use yash_syntax::parser::Parser;
 //! let mut parser = Parser::new(&mut lexer);
 //!
-//! // Lastly, call the parser's function to get the AST.
+//! // Lastly, call the parser's function to get an AST.
 //! use futures::executor::block_on;
 //! let list = block_on(parser.command_line()).unwrap().unwrap();
 //! assert_eq!(list.to_string(), "echo $?");
@@ -56,8 +56,12 @@
 //! object's [cause](ErrorCause) will be a value of [`SyntaxError`] that
 //! describes it.
 //!
+//! Most lexer and parser functions are asynchronous because underlying
+//! [input](crate::input::Input) is asynchronous. Only as many lines are read
+//! from the input as needed to parse a complete AST.
+//!
 //! Note that most AST types have the [`FromStr`](std::str::FromStr) trait
-//! implemented for them. If you don't need to include a proper source
+//! implemented for them. If you don't need to include source location
 //! information in the resultant AST, calling the `parse` function on a string
 //! is a convenient way to parse a code fragment.
 //! See the [`syntax`](crate::syntax) module for an example of this.

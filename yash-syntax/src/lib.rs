@@ -19,17 +19,24 @@
 //! This crate defines data types for constructing abstract syntax trees (AST)
 //! of the shell language. See the [`syntax`] module for details.
 //!
-//! To parse source code into an AST, you can use the `parse` function on a
-//! `&str`, which is allowed by the implementations of
-//! [`FromStr`](std::str::FromStr) for the AST data types.
-//! However, ASTs constructed in this way do not contain very meaningful
-//! [source](crate::source) information.  All
-//! [location](crate::source::Location)s in the ASTs only have [unknown
-//! source](crate::source::Source::Unknown).
+//! Some AST elements (e.g. [`Word`](syntax::Word)) provide a
+//! [location](source::Location) where the element appears in the source code.
+//! See the [`source`] module to learn how locations are coded in this crate.
 //!
-//! To include a proper source information, you need to prepare a
-//! [lexer](crate::parser::lex::Lexer) with source information and then pass it
-//! to a parser. See the [`parser`] module for details.
+//! To parse source code into an AST, you can use the `parse` function on a
+//! `&str`, which is enabled by the implementations of
+//! [`FromStr`](std::str::FromStr) for the AST data types. However, ASTs
+//! constructed this way do not contain very meaningful source information: All
+//! locations' source will be [unknown](source::Source::Unknown). To include
+//! substantial source information, you need to prepare a
+//! [lexer](parser::lex::Lexer) with source information and then pass it to a
+//! [parser](parser::Parser). See the [`parser`] module for details.
+//!
+//! The [`input`] module defines an abstract method for feeding the parser with
+//! source code.
+//!
+//! This crate also defines the [`alias`] module that can be used to define
+//! aliases that are recognized while parsing.
 
 pub mod alias;
 pub mod input;

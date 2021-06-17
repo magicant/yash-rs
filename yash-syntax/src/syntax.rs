@@ -20,11 +20,11 @@
 //! the shell language.
 //!
 //! Some types in this module has the type parameter `<H = HereDoc>`. As a user
-//! of the AST, you will never have to specify the parameter other than the
-//! default `HereDoc`. The parameter with non-default types is used internally
-//! by the parser to create intermediate ASTs that lack sub-trees for
-//! here-documents, because the contents of here-documents have to be parsed
-//! separately from the normal flow of source code.
+//! of ASTs, you will never have to specify the parameter other than the default
+//! `HereDoc`. The parameter with non-default types is used internally by the
+//! parser to create intermediate ASTs that lack sub-trees for here-documents,
+//! as the contents of here-documents have to be parsed separately from the
+//! normal flow of source code.
 //!
 //! ## Syntactic elements
 //!
@@ -33,15 +33,15 @@
 //! which is a sequence of conditionally executed [`Pipeline`]s. A `Pipeline` is
 //! a sequence of [`Command`]s separated by `|`.
 //!
-//! The shell syntax has many types of `Command`s, that is, [`SimpleCommand`],
+//! There are several types of `Command`s, namely [`SimpleCommand`],
 //! [`CompoundCommand`] and [`FunctionDefinition`], where `CompoundCommand` in
-//! turn has different types.
+//! turn comes in many variants.
 //!
 //! ## Lexical elements
 //!
 //! Tokens that make up commands may contain quotations and expansions. A
 //! [`Word`], a sequence of [`WordUnit`]s, represents such a token that appears
-//! in a simple command or some kinds of other commands.
+//! in a simple command and some kinds of other commands.
 //!
 //! In some contexts, tilde expansion and single- and double-quotes are not
 //! recognized while other kinds of expansions are allowed. Such part is
@@ -49,12 +49,11 @@
 //!
 //! ## Parsing
 //!
-//! Most AST types defined in this modules implement the
-//! [`FromStr`](std::str::FromStr) trait, which means you can call `parse` on a
-//! `&str` and easily get the parsed AST instance. However, ASTs constructed in
-//! this way do not contain very meaningful [source](crate::source) information.
-//! All [location](crate::source::Location)s in such ASTs only have [unknown
-//! source](crate::source::Source::Unknown).
+//! Most AST types defined in this module implement the
+//! [`FromStr`](std::str::FromStr) trait, which means you can easily get an AST
+//! out of source code by calling `parse` on a `&str`. However, all
+//! [location](crate::source::Location)s in ASTs constructed this way will only
+//! have [unknown source](crate::source::Source::Unknown).
 //!
 //! ```
 //! use std::str::FromStr;
@@ -68,7 +67,7 @@
 //! assert_eq!(word.location.line.source, Source::Unknown);
 //! ```
 //!
-//! To include a proper source information, you need to prepare a
+//! To include substantial source information in the AST, you need to prepare a
 //! [lexer](crate::parser::lex::Lexer) with source information and then use it
 //! to parse the source code. See the [`parser`](crate::parser) module for
 //! details.
@@ -77,9 +76,9 @@
 //!
 //! Most AST types support the [`Display`](std::fmt::Display) trait, which
 //! allows you to convert an AST to a source code string. Note that the
-//! `Display` trait implementations always produce a single-line source code
-//! with here-document contents omitted. To pretty-format an AST in multiple
-//! lines with here-document contents included, you can use ... TODO TBD.
+//! `Display` trait implementations always produce single-line source code with
+//! here-document contents omitted. To pretty-format an AST in multiple lines
+//! with here-document contents included, you can use ... TODO TBD.
 
 use crate::parser::lex::Operator;
 use crate::source::Location;
