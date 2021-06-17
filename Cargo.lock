@@ -220,6 +220,7 @@ dependencies = [
  "futures",
  "yash-builtin",
  "yash-core",
+ "yash-env",
  "yash-semantics",
  "yash-syntax",
 ]
@@ -234,6 +235,13 @@ dependencies = [
 [[package]]
 name = "yash-core"
 version = "0.1.0"
+
+[[package]]
+name = "yash-env"
+version = "0.1.0"
+dependencies = [
+ "yash-syntax",
+]
 
 [[package]]
 name = "yash-semantics"
