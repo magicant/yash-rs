@@ -18,6 +18,3 @@
 //!
 //! The `yash_core` crate provides basic data definitions that can be used to
 //! implement features of the POSIX shell.
-
-pub mod alias;
-pub mod source;

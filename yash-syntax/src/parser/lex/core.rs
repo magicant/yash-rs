@@ -440,8 +440,8 @@ impl Lexer {
     /// Returns the position of the next character, counted from zero.
     ///
     /// ```
-    /// # use yash_core::source::Source;
     /// # use yash_syntax::parser::lex::Lexer;
+    /// # use yash_syntax::source::Source;
     /// futures::executor::block_on(async {
     ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
     ///     assert_eq!(lexer.index(), 0);
@@ -463,8 +463,8 @@ impl Lexer {
     /// function would panic.
     ///
     /// ```
-    /// # use yash_core::source::Source;
     /// # use yash_syntax::parser::lex::Lexer;
+    /// # use yash_syntax::source::Source;
     /// futures::executor::block_on(async {
     ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
     ///     let saved_index = lexer.index();

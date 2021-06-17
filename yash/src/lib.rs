@@ -17,13 +17,9 @@
 //! TODO Elaborate
 
 pub use yash_builtin as builtin;
-pub use yash_core::alias;
-pub use yash_core::source;
 pub use yash_env::env;
 pub use yash_semantics as semantics;
-pub use yash_syntax::input;
-pub use yash_syntax::parser;
-pub use yash_syntax::syntax;
+pub use yash_syntax::*;
 
 // TODO Allow user to select input source
 async fn parse_and_print() {

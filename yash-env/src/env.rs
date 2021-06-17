@@ -24,7 +24,7 @@
 use crate::builtin::Builtin;
 use std::collections::HashMap;
 use std::rc::Rc;
-use yash_core::alias::AliasSet;
+use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
 ///

@@ -231,6 +231,7 @@ version = "0.1.0"
 dependencies = [
  "yash-core",
  "yash-env",
+ "yash-syntax",
 ]
 
 [[package]]

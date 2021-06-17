@@ -31,9 +31,8 @@
 //! [lexer](crate::parser::lex::Lexer) with source information and then pass it
 //! to a parser. See the [`parser`] module for details.
 
+pub mod alias;
 pub mod input;
 pub mod parser;
+pub mod source;
 pub mod syntax;
-
-pub(crate) use yash_core::alias;
-pub(crate) use yash_core::source;
