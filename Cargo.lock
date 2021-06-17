@@ -219,7 +219,6 @@ dependencies = [
  "async-trait",
  "futures",
  "yash-builtin",
- "yash-core",
  "yash-env",
  "yash-semantics",
  "yash-syntax",
@@ -229,20 +228,14 @@ dependencies = [
 name = "yash-builtin"
 version = "0.1.0"
 dependencies = [
- "yash-core",
  "yash-env",
  "yash-syntax",
 ]
 
 [[package]]
-name = "yash-core"
-version = "0.1.0"
-
-[[package]]
 name = "yash-env"
 version = "0.1.0"
 dependencies = [
- "yash-core",
  "yash-syntax",
 ]
 
@@ -252,7 +245,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "itertools",
- "yash-core",
  "yash-env",
  "yash-syntax",
 ]
@@ -264,5 +256,4 @@ dependencies = [
  "async-trait",
  "futures",
  "itertools",
- "yash-core",
 ]

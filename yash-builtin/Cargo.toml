@@ -15,6 +15,5 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-yash-core = { path = "../yash-core", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
