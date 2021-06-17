@@ -62,7 +62,7 @@
 //! let list: List = "diff foo bar; echo $?".parse().unwrap();
 //! assert_eq!(list.to_string(), "diff foo bar; echo $?");
 //!
-//! use yash_core::source::Source;
+//! use yash_syntax::source::Source;
 //! # use yash_syntax::syntax::Word;
 //! let word: Word = "foo".parse().unwrap();
 //! assert_eq!(word.location.line.source, Source::Unknown);

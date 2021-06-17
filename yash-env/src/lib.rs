@@ -14,14 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Common fundamental data types for other yash crates.
+//! This crate defines the shell execution environment interface and implements
+//! application-managed parts of it.
 //!
-//! The `yash_core` crate provides basic data definitions that can be used to
-//! implement features of the POSIX shell.
+//! TODO Elaborate
 
-pub mod alias;
 pub mod builtin;
 pub mod env;
 pub mod exec;
 pub mod expansion;
-pub mod source;

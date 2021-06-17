@@ -32,8 +32,8 @@
 //!
 //! ```
 //! // First, prepare an input object that the lexer reads from.
-//! use yash_core::source::Source;
 //! use yash_syntax::input::Memory;
+//! use yash_syntax::source::Source;
 //! # // TODO demonstrate with a Source other than Unknown
 //! let input = Box::new(Memory::new(Source::Unknown, "echo $?"));
 //!

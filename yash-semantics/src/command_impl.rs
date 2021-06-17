@@ -18,9 +18,9 @@
 
 use super::Command;
 use async_trait::async_trait;
-use yash_core::env::Env;
-use yash_core::exec::Result;
-use yash_core::expansion::Field;
+use yash_env::env::Env;
+use yash_env::exec::Result;
+use yash_env::expansion::Field;
 use yash_syntax::syntax;
 
 #[async_trait(?Send)]

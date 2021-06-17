@@ -25,9 +25,9 @@
 mod command_impl;
 
 use async_trait::async_trait;
-use yash_core::env::Env;
+use yash_env::env::Env;
 
-pub use yash_core::exec::*;
+pub use yash_env::exec::*;
 
 /// Syntactic construct that can be executed.
 #[async_trait(?Send)]

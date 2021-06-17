@@ -18,4 +18,3 @@ publish = false
 async-trait = "0.1.50"
 futures = "0.3.8"
 itertools = "0.9.0"
-yash-core = { path = "../yash-core", version = "0.1.0" }

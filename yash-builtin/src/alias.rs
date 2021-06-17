@@ -20,10 +20,10 @@ use std::future::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use yash_core::alias::*;
-use yash_core::builtin::Result;
-use yash_core::env::Env;
-use yash_core::expansion::Field;
+use yash_env::builtin::Result;
+use yash_env::env::Env;
+use yash_env::expansion::Field;
+use yash_syntax::alias::{AliasSet, HashEntry};
 
 /// Part of the shell execution environment the alias built-in depends on.
 pub trait AliasBuiltinEnv {
@@ -82,8 +82,8 @@ pub fn alias_builtin_async(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_core::source::Location;
-    use yash_core::source::Source;
+    use yash_syntax::source::Location;
+    use yash_syntax::source::Source;
 
     #[derive(Default)]
     struct DummyEnv {

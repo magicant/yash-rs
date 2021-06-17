@@ -1,9 +1,9 @@
 [package]
-name = "yash-core"
+name = "yash-env"
 version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2018"
-description = "Fundamental items of yash"
+description = "Yash shell execution environment interface"
 # documentation = "https://yash.osdn.jp/doc/"
 # readme = "README.md"
 # homepage = "https://yash.osdn.jp/"
@@ -15,3 +15,4 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
+yash-syntax = { path = "../yash-syntax", version = "0.1.0" }

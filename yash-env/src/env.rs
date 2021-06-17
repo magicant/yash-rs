@@ -21,10 +21,10 @@
 //!
 //! TODO Elaborate
 
-use crate::alias::AliasSet;
 use crate::builtin::Builtin;
 use std::collections::HashMap;
 use std::rc::Rc;
+use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
 ///
