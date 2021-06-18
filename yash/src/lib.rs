@@ -49,6 +49,7 @@ async fn parse_and_print() {
         aliases: Default::default(),
         builtins: builtin::BUILTINS.iter().copied().collect(),
         functions: Default::default(),
+        variables: Default::default(),
     };
 
     loop {

@@ -23,6 +23,7 @@
 
 use crate::builtin::Builtin;
 use crate::function::FunctionSet;
+use crate::variable::VariableSet;
 use std::collections::HashMap;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -45,4 +46,7 @@ pub struct Env {
 
     /// Functions defined in the environment.
     pub functions: FunctionSet,
+
+    /// Variables defined in the environment.
+    pub variables: VariableSet,
 }

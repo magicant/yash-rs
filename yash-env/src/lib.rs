@@ -24,3 +24,4 @@ pub mod env;
 pub mod exec;
 pub mod expansion;
 pub mod function;
+pub mod variable;
