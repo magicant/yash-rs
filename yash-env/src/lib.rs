@@ -38,6 +38,8 @@ use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::variable::VariableSet;
 use std::collections::HashMap;
+use std::ffi::CStr;
+use std::fmt::Debug;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
 
@@ -62,4 +64,31 @@ pub struct Env {
 
     /// Variables defined in the environment.
     pub variables: VariableSet,
+    // /// Interface to the system-managed parts of the environment.
+    // pub system: Box<dyn System>,
 }
+
+/// Abstraction of the system-managed parts of the environment.
+///
+/// TODO Elaborate
+pub trait System: Debug {
+    /// Clones the `System` instance and returns it in a box.
+    ///
+    /// The semantics of cloning is determined by the implementor. Especially,
+    /// a cloned [`RealSystem`] might render a surprising behavior.
+    fn clone_box(&self) -> Box<dyn System>;
+
+    /// Whether there is an executable file at the specified path.
+    fn is_executable_file(&self, path: &CStr) -> bool;
+}
+
+// Auto-derived Clone cannot be used for this because `System` cannot be a
+// super-trait of `Clone` as that would make the trait non-object-safe.
+impl Clone for Box<dyn System> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+// TODO RealSystem
+// TODO VirtualSystem
