@@ -24,6 +24,7 @@ pub use yash_syntax::*;
 // TODO Allow user to select input source
 async fn parse_and_print() {
     use env::Env;
+    use env::VirtualSystem;
     use semantics::Command;
     use std::num::NonZeroU64;
 
@@ -50,6 +51,7 @@ async fn parse_and_print() {
         builtins: builtin::BUILTINS.iter().copied().collect(),
         functions: Default::default(),
         variables: Default::default(),
+        system: Box::new(VirtualSystem::default()),
     };
 
     loop {

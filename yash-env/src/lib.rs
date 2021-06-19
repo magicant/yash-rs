@@ -54,7 +54,8 @@ use yash_syntax::alias::AliasSet;
 ///
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are... TODO Elaborate
+/// the `Env` instance. System-managed parts are abstracted as [`System`] so
+/// that they can be replaced with a dummy implementation.
 #[derive(Clone, Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
@@ -71,8 +72,9 @@ pub struct Env {
 
     /// Variables defined in the environment.
     pub variables: VariableSet,
-    // /// Interface to the system-managed parts of the environment.
-    // pub system: Box<dyn System>,
+
+    /// Interface to the system-managed parts of the environment.
+    pub system: Box<dyn System>,
 }
 
 /// Abstraction of the system-managed parts of the environment.

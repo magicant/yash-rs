@@ -34,6 +34,20 @@ use std::ffi::CStr;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VirtualSystem {}
 
+impl VirtualSystem {
+    /// Creates a virtual system with an empty state.
+    pub fn new() -> VirtualSystem {
+        VirtualSystem {}
+    }
+}
+
+impl Default for VirtualSystem {
+    /// Creates a virtual system with a sensible default state.
+    fn default() -> VirtualSystem {
+        VirtualSystem::new()
+    }
+}
+
 impl System for VirtualSystem {
     fn clone_box(&self) -> Box<dyn System> {
         Box::new(self.clone())
