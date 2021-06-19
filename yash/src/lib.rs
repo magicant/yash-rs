@@ -17,7 +17,7 @@
 //! TODO Elaborate
 
 pub use yash_builtin as builtin;
-pub use yash_env::env;
+pub use yash_env as env;
 pub use yash_semantics as semantics;
 pub use yash_syntax::*;
 

@@ -17,11 +17,15 @@
 //! Type definitions for built-in utilities.
 //!
 //! This module provides data types for defining built-in utilities.
+//!
+//! Note that concrete implementations of built-ins are not included in the
+//! `yash_env` crate. For implementations of specific built-ins like `cd` and
+//! `export`, see the `yash_builtin` crate.
 
-use crate::env::Env;
 use crate::exec::Divert;
 use crate::exec::ExitStatus;
 use crate::expansion::Field;
+use crate::Env;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;

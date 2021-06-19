@@ -25,7 +25,7 @@
 mod command_impl;
 
 use async_trait::async_trait;
-use yash_env::env::Env;
+use yash_env::Env;
 
 pub use yash_env::exec::*;
 
