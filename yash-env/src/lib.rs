@@ -16,8 +16,8 @@
 
 //! This crate defines the shell execution environment.
 //!
-//! A shell execution environment is a collection of data that may affect or be
-//! affected by execution of commands. The environment consists of
+//! A shell execution environment, [`Env`], is a collection of data that may
+//! affect or be affected by execution of commands. The environment consists of
 //! application-managed parts and system-managed parts. Application-managed
 //! parts are implemented in pure Rust in this crate. Many application-managed
 //! parts like [function]s and [variable]s can be manipulated independently of
@@ -27,16 +27,16 @@
 //! interaction with the system interface.
 //!
 //! The system-managed parts are abstracted as the [`System`] trait.
-//! [`RealSystem`] provides an implementation for `System` that actually
-//! interacts with the underlying system.
-//!
-//! TODO Elaborate
+//! [`RealSystem`] provides an implementation for `System` that interacts with
+//! the underlying system. [`VirtualSystem`] is a dummy for simulation that
+//! works without affecting the actual system.
 
 pub mod builtin;
 pub mod exec;
 pub mod expansion;
 pub mod function;
 pub mod variable;
+pub mod virtual_system;
 
 #[cfg(feature = "real-system")]
 mod real_system;
@@ -100,4 +100,4 @@ impl Clone for Box<dyn System> {
 #[cfg(feature = "real-system")]
 pub use real_system::RealSystem;
 
-// TODO VirtualSystem
+pub use virtual_system::VirtualSystem;
