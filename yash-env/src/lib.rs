@@ -26,6 +26,10 @@
 //! and umask are managed by the system, so they can be accessed only by
 //! interaction with the system interface.
 //!
+//! The system-managed parts are abstracted as the [`System`] trait.
+//! [`RealSystem`] provides an implementation for `System` that actually
+//! interacts with the underlying system.
+//!
 //! TODO Elaborate
 
 pub mod builtin;
@@ -33,6 +37,9 @@ pub mod exec;
 pub mod expansion;
 pub mod function;
 pub mod variable;
+
+#[cfg(feature = "real-system")]
+mod real_system;
 
 use self::builtin::Builtin;
 use self::function::FunctionSet;
@@ -90,5 +97,7 @@ impl Clone for Box<dyn System> {
     }
 }
 
-// TODO RealSystem
+#[cfg(feature = "real-system")]
+pub use real_system::RealSystem;
+
 // TODO VirtualSystem
