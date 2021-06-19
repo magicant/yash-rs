@@ -15,4 +15,9 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
+nix = { version = "0.21.0", optional = true }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
+
+[features]
+default = ["real-system"]
+real-system = ["nix"]
