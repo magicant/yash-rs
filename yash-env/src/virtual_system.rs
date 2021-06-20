@@ -37,12 +37,17 @@ use std::path::PathBuf;
 /// The `Clone` implementation for `VirtualSystem` creates an entire copy that
 /// works independently of the original.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VirtualSystem {}
+pub struct VirtualSystem {
+    /// Collection of files existing in the virtual system.
+    pub file_system: FileSystem,
+}
 
 impl VirtualSystem {
     /// Creates a virtual system with an empty state.
     pub fn new() -> VirtualSystem {
-        VirtualSystem {}
+        VirtualSystem {
+            file_system: FileSystem::default(),
+        }
     }
 }
 
