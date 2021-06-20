@@ -73,7 +73,10 @@ impl System for VirtualSystem {
             Ok(path) => PathBuf::from(path),
             Err(_) => return false,
         };
-        self.file_system.get(&path).is_some()
+        match self.file_system.get(&path) {
+            None => false,
+            Some(inode) => inode.permissions.0 & 0o111 != 0,
+        }
     }
 }
 
@@ -147,6 +150,16 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let content = INode::default();
+        system.file_system.save(path, content);
+        assert!(!system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    fn is_executable_file_with_executable_file() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
         system.file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
