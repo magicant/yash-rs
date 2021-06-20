@@ -27,6 +27,7 @@ use crate::System;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fmt::Debug;
+use std::path::Path;
 use std::path::PathBuf;
 
 /// Simulated system.
@@ -67,17 +68,36 @@ impl System for VirtualSystem {
     ///
     /// The current implementation only checks if the file has any executable
     /// bit in the permissions. The file owner and group are not considered.
-    fn is_executable_file(&self, _: &CStr) -> bool {
-        false
+    fn is_executable_file(&self, path: &CStr) -> bool {
+        let path = match path.to_str() {
+            Ok(path) => PathBuf::from(path),
+            Err(_) => return false,
+        };
+        self.file_system.get(&path).is_some()
     }
 }
 
 /// Collection of files.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FileSystem(pub HashMap<PathBuf, INode>);
+pub struct FileSystem(HashMap<PathBuf, INode>);
 // TODO should be a link to the root i-node
 // In the current implementation, this hash map stores all files in a flat
 // namespace, without any recursive directory structure.
+
+impl FileSystem {
+    /// Saves a file.
+    ///
+    /// If there is an existing file at the specified path, it is replaced with
+    /// the new file and returned.
+    pub fn save(&mut self, path: PathBuf, content: INode) -> Option<INode> {
+        self.0.insert(path, content)
+    }
+
+    /// Returns a reference to the existing file at the specified path.
+    pub fn get(&self, path: &Path) -> Option<&INode> {
+        self.0.get(path)
+    }
+}
 
 /// File on the file system.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -120,5 +140,14 @@ mod tests {
     fn is_executable_file_non_existing_file() {
         let system = VirtualSystem::new();
         assert!(!system.is_executable_file(&CString::new("/no/such/file").unwrap()));
+    }
+
+    #[test]
+    fn is_executable_file_existing_but_non_executable_file() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let content = INode::default();
+        system.file_system.save(path, content);
+        assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
 }
