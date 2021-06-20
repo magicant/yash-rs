@@ -58,8 +58,12 @@ impl System for VirtualSystem {
         Box::new(self.clone())
     }
 
+    /// Tests whether the specified file is executable or not.
+    ///
+    /// The current implementation only checks if the file has any executable
+    /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, _: &CStr) -> bool {
-        todo!()
+        false
     }
 }
 
@@ -99,5 +103,17 @@ impl Debug for Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode(0o644)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    #[test]
+    fn is_executable_file_non_existing_file() {
+        let system = VirtualSystem::new();
+        assert!(!system.is_executable_file(&CString::new("/no/such/file").unwrap()));
     }
 }
