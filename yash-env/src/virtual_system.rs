@@ -20,9 +20,14 @@
 //! the behavior of the underlying system without any interaction with the
 //! actual system. `VirtualSystem` is used for testing the behavior of the shell
 //! in unit tests.
+//!
+//! This module also defines elements that compose a virtual system.
 
 use crate::System;
+use std::collections::HashMap;
 use std::ffi::CStr;
+use std::fmt::Debug;
+use std::path::PathBuf;
 
 /// Simulated system.
 ///
@@ -55,5 +60,44 @@ impl System for VirtualSystem {
 
     fn is_executable_file(&self, _: &CStr) -> bool {
         todo!()
+    }
+}
+
+/// Collection of files.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FileSystem(pub HashMap<PathBuf, INode>);
+// TODO should be a link to the root i-node
+// In the current implementation, this hash map stores all files in a flat
+// namespace, without any recursive directory structure.
+
+/// File on the file system.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct INode {
+    pub permissions: Mode,
+    // TODO File content, owner user and group, etc.
+}
+
+impl INode {
+    /// Create an empty regular file.
+    pub fn new() -> INode {
+        INode::default()
+    }
+}
+
+/// File permission bits.
+///
+/// The `Default` mode is `0o644`, not `0o000`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub struct Mode(pub u32);
+
+impl Debug for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Mode({:#o})", self.0)
+    }
+}
+
+impl Default for Mode {
+    fn default() -> Mode {
+        Mode(0o644)
     }
 }
