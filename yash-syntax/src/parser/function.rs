@@ -88,6 +88,7 @@ impl Parser<'_> {
     }
 }
 
+#[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::super::core::ErrorCause;

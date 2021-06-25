@@ -53,7 +53,7 @@ impl Parser<'_> {
             cause: SyntaxError::MissingRedirOperand.into(),
             location: operator_location,
         })?;
-        return Ok(RedirBody::Normal { operator, operand });
+        Ok(RedirBody::Normal { operator, operand })
     }
 
     /// Parses the redirection body for a here-document.
@@ -131,6 +131,7 @@ impl Parser<'_> {
     }
 }
 
+#[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::super::core::ErrorCause;

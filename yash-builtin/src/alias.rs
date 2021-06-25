@@ -79,6 +79,7 @@ pub fn alias_builtin_async(
     Box::pin(ready(alias_builtin(env, args)))
 }
 
+#[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::*;

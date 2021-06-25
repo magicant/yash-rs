@@ -1087,8 +1087,7 @@ mod tests {
         });
         let input = Memory::new(Source::Alias { original, alias }, "a");
         let lexer = LexerCore::new(Box::new(input));
-        let result = lexer.is_after_blank_ending_alias(0);
-        assert_eq!(result, false);
+        assert!(!lexer.is_after_blank_ending_alias(0));
     }
 
     #[test]
@@ -1108,10 +1107,10 @@ mod tests {
 
             lexer.substitute_alias(0, &alias);
 
-            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(3), false);
+            assert!(!lexer.is_after_blank_ending_alias(0));
+            assert!(!lexer.is_after_blank_ending_alias(1));
+            assert!(!lexer.is_after_blank_ending_alias(2));
+            assert!(!lexer.is_after_blank_ending_alias(3));
         });
     }
 
@@ -1132,11 +1131,11 @@ mod tests {
 
             lexer.substitute_alias(0, &alias);
 
-            assert_eq!(lexer.is_after_blank_ending_alias(0), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(1), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(2), false);
-            assert_eq!(lexer.is_after_blank_ending_alias(3), true);
-            assert_eq!(lexer.is_after_blank_ending_alias(4), true);
+            assert!(!lexer.is_after_blank_ending_alias(0));
+            assert!(!lexer.is_after_blank_ending_alias(1));
+            assert!(!lexer.is_after_blank_ending_alias(2));
+            assert!(lexer.is_after_blank_ending_alias(3));
+            assert!(lexer.is_after_blank_ending_alias(4));
         });
     }
 

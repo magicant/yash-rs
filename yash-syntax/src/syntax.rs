@@ -1235,6 +1235,7 @@ impl<H: fmt::Display> fmt::Display for List<H> {
     }
 }
 
+#[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::*;
