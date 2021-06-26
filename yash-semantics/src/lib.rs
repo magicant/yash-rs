@@ -23,6 +23,7 @@
 //! TODO Elaborate
 
 mod command_impl;
+pub mod command_search;
 
 use async_trait::async_trait;
 use yash_env::Env;
