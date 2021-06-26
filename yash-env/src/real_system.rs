@@ -17,9 +17,24 @@
 //! Implementation of `System` that actually interacts with the system.
 
 use super::System;
+use nix::libc::{S_IFMT, S_IFREG};
+use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use std::ffi::CStr;
+
+fn is_executable(path: &CStr) -> bool {
+    let flags = AccessFlags::X_OK;
+    access(path, flags).is_ok()
+    // TODO Should use eaccess
+}
+
+fn is_regular_file(path: &CStr) -> bool {
+    match stat(path) {
+        Ok(stat) => stat.st_mode & S_IFMT == S_IFREG,
+        Err(_) => false,
+    }
+}
 
 /// Implementation of `System` that actually interacts with the system.
 ///
@@ -52,8 +67,6 @@ impl System for RealSystem {
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {
-        let flags = AccessFlags::X_OK;
-        access(path, flags).is_ok()
-        // TODO Should use eaccess
+        is_regular_file(path) && is_executable(path)
     }
 }
