@@ -16,9 +16,60 @@
 
 //! Type definitions for command execution.
 
-// TODO should be a struct
-/// TODO describe
-pub type ExitStatus = u32;
+/// Number that summarizes the result of command execution.
+///
+/// An exit status is a non-negative integer returned from a utility (or
+/// command) when executed. It usually is a summarized result of the execution.
+/// Many utilities return an exit status of zero when successful and non-zero
+/// otherwise.
+///
+/// In the shell language, the special parameter `$?` expands to the exit status
+/// of the last executed command. Exit statuses also affect the behavior of some
+/// compound commands.
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ExitStatus(pub u32);
+
+impl std::fmt::Display for ExitStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<u32> for ExitStatus {
+    fn from(value: u32) -> ExitStatus {
+        ExitStatus(value)
+    }
+}
+
+impl From<ExitStatus> for u32 {
+    fn from(exit_status: ExitStatus) -> u32 {
+        exit_status.0
+    }
+}
+
+// TODO Convert between ExitStatus and signal number
+
+impl ExitStatus {
+    /// Exit status of 0: success.
+    pub const SUCCESS: ExitStatus = ExitStatus(0);
+
+    /// Exit status of 1: failure.
+    pub const FAILURE: ExitStatus = ExitStatus(1);
+
+    /// Exit status of 2: error severer than failure.
+    pub const ERROR: ExitStatus = ExitStatus(2);
+
+    /// Exit Status of 126: command not executable.
+    pub const NOEXEC: ExitStatus = ExitStatus(126);
+
+    /// Exit status of 127: command not found.
+    pub const NOT_FOUND: ExitStatus = ExitStatus(127);
+
+    /// Returns true if and only if `self` is zero.
+    pub const fn is_successful(&self) -> bool {
+        self.0 == 0
+    }
+}
 
 /// Result of interrupted command execution.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

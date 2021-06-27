@@ -21,6 +21,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_env::builtin::Result;
+use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
 use yash_env::Env;
 use yash_syntax::alias::{AliasSet, HashEntry};
@@ -51,7 +52,7 @@ pub fn alias_builtin<E: AliasBuiltinEnv>(env: &mut E, args: Vec<Field>) -> Resul
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
-        return (0, None);
+        return (ExitStatus::SUCCESS, None);
     }
 
     for Field { value, origin } in args {
@@ -66,7 +67,7 @@ pub fn alias_builtin<E: AliasBuiltinEnv>(env: &mut E, args: Vec<Field>) -> Resul
         }
     }
 
-    (0, None)
+    (ExitStatus::SUCCESS, None)
 }
 
 /// Implementation of the alias built-in.
@@ -105,7 +106,7 @@ mod tests {
         let args = vec![arg0, arg1];
 
         let result = alias_builtin(&mut env, args);
-        assert_eq!(result, (0, None));
+        assert_eq!(result, (ExitStatus::SUCCESS, None));
 
         let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 1);
@@ -130,7 +131,7 @@ mod tests {
         let args = vec![arg0, arg1, arg2, arg3];
 
         let result = alias_builtin(&mut env, args);
-        assert_eq!(result, (0, None));
+        assert_eq!(result, (ExitStatus::SUCCESS, None));
 
         let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 3);
