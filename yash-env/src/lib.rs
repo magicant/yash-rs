@@ -42,6 +42,7 @@ pub mod virtual_system;
 mod real_system;
 
 use self::builtin::Builtin;
+use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::variable::VariableSet;
 use std::collections::HashMap;
@@ -67,10 +68,13 @@ pub struct Env {
     /// Built-in utilities available in the environment.
     pub builtins: HashMap<&'static str, Builtin>,
 
+    /// Exit status of the last executed command.
+    pub exit_status: ExitStatus,
+
     /// Functions defined in the environment.
     pub functions: FunctionSet,
 
-    /// Variables defined in the environment.
+    /// Variables and positional parameters defined in the environment.
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.

@@ -51,6 +51,7 @@ async fn parse_and_print() {
     let mut env = Env {
         aliases: Default::default(),
         builtins: builtin::BUILTINS.iter().copied().collect(),
+        exit_status: Default::default(),
         functions: Default::default(),
         variables: Default::default(),
         system: Box::new(RealSystem),
