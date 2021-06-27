@@ -24,9 +24,11 @@ pub use yash_syntax::*;
 // TODO Allow user to select input source
 async fn parse_and_print() {
     use env::Env;
-    use env::VirtualSystem;
+    use env::RealSystem;
     use semantics::Command;
     use std::num::NonZeroU64;
+    use yash_env::variable::Value::Scalar;
+    use yash_env::variable::Variable;
 
     struct Stdin;
 
@@ -51,8 +53,19 @@ async fn parse_and_print() {
         builtins: builtin::BUILTINS.iter().copied().collect(),
         functions: Default::default(),
         variables: Default::default(),
-        system: Box::new(VirtualSystem::default()),
+        system: Box::new(RealSystem),
     };
+    // TODO std::env::vars() would panic on broken UTF-8, which should rather be
+    // ignored.
+    for (name, value) in std::env::vars() {
+        let value = Variable {
+            value: Scalar(value),
+            last_assigned_location: None,
+            is_exported: true,
+            read_only_location: None,
+        };
+        env.variables.assign(name, value);
+    }
 
     loop {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));

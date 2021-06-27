@@ -17,6 +17,8 @@
 //! Implementations for Command.
 
 use super::Command;
+use crate::command_search::search;
+use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
@@ -40,19 +42,31 @@ impl Command for syntax::SimpleCommand {
         // TODO expand and perform assignments
 
         if let Some(name) = fields.get(0) {
-            if let Some(builtin) = env.builtins.get(name.value.as_str()) {
-                let (_exit_status, abort) = (builtin.execute)(env, fields).await;
-                if let Some(abort) = abort {
-                    return Err(abort);
+            match search(env, &name.value) {
+                Some(Builtin(builtin)) => {
+                    let (_exit_status, abort) = (builtin.execute)(env, fields).await;
+                    if let Some(abort) = abort {
+                        return Err(abort);
+                    }
+                    // TODO Set exit status to $?
                 }
-            // TOOD Set exit status to $?
-            } else {
-                use itertools::Itertools;
-                println!("{}", fields.iter().format(" "));
-                // TODO execute non-built-in utilities
+                Some(Function(function)) => {
+                    println!("Function: {:?}", function);
+                    // TODO Call the function
+                }
+                Some(External { path }) => {
+                    println!("External: {:?}", path);
+                    // TODO Execute the external utility
+                }
+                None => {
+                    eprintln!("{}: command not found", name.value);
+                    // TODO The error message should be printed via Env
+                    // TODO The exit status should be 127
+                }
             }
         }
-        Ok(()) // TODO proper command search and execution
+
+        Ok(())
     }
 }
 
