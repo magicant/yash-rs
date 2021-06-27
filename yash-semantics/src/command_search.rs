@@ -35,8 +35,6 @@
 //! corresponding executable file must be present in a directory specified in
 //! the `$PATH` variable.
 
-use either::Left;
-use either::Right;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -47,7 +45,6 @@ use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Intrinsic, NonIntrinsic, Special};
 use yash_env::function::Function;
 use yash_env::function::FunctionSet;
-use yash_env::variable::Value::{Array, Scalar};
 use yash_env::variable::Variable;
 use yash_env::Env;
 
@@ -171,12 +168,7 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 /// absolute if the `$PATH` contains a relative path.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
     if let Some(path) = env.path() {
-        let dirs = match &path.value {
-            Scalar(dirs) => Left(dirs.split(':')),
-            Array(dirs) => Right(dirs.iter().map(String::as_str)),
-        };
-
-        for dir in dirs {
+        for dir in path.value.split() {
             let mut file = PathBuf::new();
             file.push(dir);
             file.push(name);
@@ -197,6 +189,7 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
     use yash_env::function::HashEntry as FunctionEntry;
+    use yash_env::variable::Value::{Array, Scalar};
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;

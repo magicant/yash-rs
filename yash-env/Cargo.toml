@@ -15,6 +15,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
+either = "1.6.1"
 nix = { version = "0.21.0", optional = true }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
 

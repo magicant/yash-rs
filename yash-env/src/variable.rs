@@ -18,6 +18,7 @@
 //!
 //! This module provides data types for defining shell variables.
 
+use either::{Left, Right};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -30,6 +31,34 @@ pub enum Value {
     Scalar(String),
     /// Array of strings.
     Array(Vec<String>),
+}
+
+impl Value {
+    /// Splits the value by colons.
+    ///
+    /// If this value is `Scalar`, the value is separated at each occurrence of
+    /// colon (`:`). For `Array`, each array item is returned without further
+    /// splitting the value.
+    ///
+    /// ```
+    /// # use yash_env::variable::Value::Scalar;
+    /// let scalar = Scalar("/usr/local/bin:/usr/bin:/bin".to_string());
+    /// let values: Vec<&str> = scalar.split().collect();
+    /// assert_eq!(values, ["/usr/local/bin", "/usr/bin", "/bin"]);
+    /// ```
+    ///
+    /// ```
+    /// # use yash_env::variable::Value::Array;
+    /// let array = Array(vec!["foo".to_string(), "bar".to_string()]);
+    /// let values: Vec<&str> = array.split().collect();
+    /// assert_eq!(values, ["foo", "bar"]);
+    /// ```
+    pub fn split(&self) -> impl Iterator<Item = &str> {
+        match self {
+            Value::Scalar(value) => Left(value.split(':')),
+            Value::Array(values) => Right(values.iter().map(String::as_str)),
+        }
+    }
 }
 
 /// Definition of a variable.
