@@ -107,3 +107,17 @@ impl Clone for Box<dyn System> {
 pub use real_system::RealSystem;
 
 pub use virtual_system::VirtualSystem;
+
+impl Env {
+    /// Creates a new empty virtual environment.
+    pub fn new_virtual() -> Env {
+        Env {
+            aliases: Default::default(),
+            builtins: Default::default(),
+            exit_status: Default::default(),
+            functions: Default::default(),
+            variables: Default::default(),
+            system: Box::new(VirtualSystem::default()),
+        }
+    }
+}
