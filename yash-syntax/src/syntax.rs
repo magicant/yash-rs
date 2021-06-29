@@ -1239,6 +1239,7 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::MissingHereDoc;
     use std::str::FromStr;
 
     #[test]
@@ -2018,12 +2019,15 @@ mod tests {
         assert_eq!(case.to_string(), "case foo in esac");
 
         let subject = "bar".parse().unwrap();
-        let items = vec!["foo)".parse().unwrap()];
+        let items = vec!["foo)".parse::<CaseItem<MissingHereDoc>>().unwrap()];
         let case = CompoundCommand::Case { subject, items };
         assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
 
         let subject = "baz".parse().unwrap();
-        let items = vec!["1)".parse().unwrap(), "(a|b|c) :&".parse().unwrap()];
+        let items = vec![
+            "1)".parse::<CaseItem<MissingHereDoc>>().unwrap(),
+            "(a|b|c) :&".parse().unwrap(),
+        ];
         let case = CompoundCommand::Case { subject, items };
         assert_eq!(case.to_string(), "case baz in (1) ;; (a | b | c) :&;; esac");
     }
@@ -2031,7 +2035,9 @@ mod tests {
     #[test]
     fn function_definition_display() {
         let body = FullCompoundCommand {
-            command: "( bar )".parse().unwrap(),
+            command: "( bar )"
+                .parse::<CompoundCommand<MissingHereDoc>>()
+                .unwrap(),
             redirs: vec![],
         };
         let fd = FunctionDefinition {
@@ -2045,10 +2051,9 @@ mod tests {
     #[test]
     fn pipeline_display() {
         let mut p = Pipeline {
-            commands: vec![],
+            commands: vec!["first".parse::<Command<MissingHereDoc>>().unwrap()],
             negation: false,
         };
-        p.commands.push("first".parse().unwrap());
         assert_eq!(p.to_string(), "first");
 
         p.negation = true;
@@ -2072,7 +2077,7 @@ mod tests {
 
     #[test]
     fn and_or_list_display() {
-        let p = "first".parse().unwrap();
+        let p = "first".parse::<Pipeline<MissingHereDoc>>().unwrap();
         let mut aol = AndOrList {
             first: p,
             rest: vec![],
@@ -2090,7 +2095,7 @@ mod tests {
 
     #[test]
     fn list_display() {
-        let and_or = "first".parse().unwrap();
+        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
             and_or,
             is_async: false,
@@ -2117,7 +2122,7 @@ mod tests {
 
     #[test]
     fn list_display_alternate() {
-        let and_or = "first".parse().unwrap();
+        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
             and_or,
             is_async: false,

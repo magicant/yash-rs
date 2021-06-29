@@ -28,6 +28,7 @@ use super::Rec;
 use crate::source::Source;
 use crate::syntax::*;
 use std::convert::TryInto;
+use std::iter::empty;
 use std::str::FromStr;
 
 // TODO Consider moving FromStr implementations to dedicated files
@@ -164,7 +165,7 @@ impl FromStr for Assign {
     ///
     /// Returns `Err(None)` if the string is not an assignment word.
     fn from_str(s: &str) -> Result<Assign, Option<Error>> {
-        let c = SimpleCommand::from_str(s)?;
+        let c: SimpleCommand<MissingHereDoc> = s.parse()?;
         Ok(c.assigns.into_iter().next()).shift()
     }
 }
@@ -201,6 +202,25 @@ impl FromStr for Redir<MissingHereDoc> {
     }
 }
 
+impl FromStr for Redir {
+    type Err = Option<Error>;
+    /// Converts a string to a redirection.
+    ///
+    /// Returns `Err(None)` if the first token is not a redirection operator.
+    ///
+    /// This function does not support parsing a here-document.
+    fn from_str(s: &str) -> Result<Redir, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let redir = unwrap_ready(parser.redirection()).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        // If this redirection is a here-document, its content cannot be filled
+        // because there is no newline token that would make the content to be
+        // read.
+        redir.fill(&mut empty()).map_err(Some)
+    }
+}
+
 impl FromStr for SimpleCommand<MissingHereDoc> {
     type Err = Option<Error>;
     /// Converts a string to a simple command.
@@ -212,6 +232,28 @@ impl FromStr for SimpleCommand<MissingHereDoc> {
         unwrap_ready(parser.simple_command())
             .map(Rec::unwrap)
             .shift()
+    }
+}
+
+impl FromStr for SimpleCommand {
+    type Err = Option<Error>;
+    /// Converts a string to a simple command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a simple command.
+    ///
+    /// This function does not support parsing a command that contains a
+    /// here-document.
+    fn from_str(s: &str) -> Result<SimpleCommand, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let command = unwrap_ready(parser.simple_command())
+            .map(Rec::unwrap)
+            .shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        // If the simple command contains a here-document, its content cannot be
+        // filled because there is no newline token that would make the content
+        // to be read.
+        command.fill(&mut empty()).map_err(Some)
     }
 }
 
@@ -227,6 +269,21 @@ impl FromStr for CaseItem<MissingHereDoc> {
     }
 }
 
+impl FromStr for CaseItem {
+    type Err = Option<Error>;
+    /// Converts a string to a case item.
+    ///
+    /// Returns `Err(None)` if the first token is `esac`.
+    fn from_str(s: &str) -> Result<CaseItem, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let item = unwrap_ready(parser.case_item()).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        item.fill(&mut here_docs).map_err(Some)
+    }
+}
+
 impl FromStr for CompoundCommand<MissingHereDoc> {
     type Err = Option<Error>;
     /// Converts a string to a compound command.
@@ -236,6 +293,21 @@ impl FromStr for CompoundCommand<MissingHereDoc> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.compound_command()).shift()
+    }
+}
+
+impl FromStr for CompoundCommand {
+    type Err = Option<Error>;
+    /// Converts a string to a compound command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a compound command.
+    fn from_str(s: &str) -> Result<CompoundCommand, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let command = unwrap_ready(parser.compound_command()).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        command.fill(&mut here_docs).map_err(Some)
     }
 }
 
@@ -251,6 +323,21 @@ impl FromStr for FullCompoundCommand<MissingHereDoc> {
     }
 }
 
+impl FromStr for FullCompoundCommand {
+    type Err = Option<Error>;
+    /// Converts a string to a compound command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a compound command.
+    fn from_str(s: &str) -> Result<FullCompoundCommand, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let command = unwrap_ready(parser.full_compound_command()).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        command.fill(&mut here_docs).map_err(Some)
+    }
+}
+
 impl FromStr for Command<MissingHereDoc> {
     type Err = Option<Error>;
     /// Converts a string to a command.
@@ -263,6 +350,21 @@ impl FromStr for Command<MissingHereDoc> {
     }
 }
 
+impl FromStr for Command {
+    type Err = Option<Error>;
+    /// Converts a string to a command.
+    ///
+    /// Returns `Err(None)` if the first token does not start a command.
+    fn from_str(s: &str) -> Result<Command, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let command = unwrap_ready(parser.command()).map(Rec::unwrap).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        command.fill(&mut here_docs).map_err(Some)
+    }
+}
+
 impl FromStr for Pipeline<MissingHereDoc> {
     type Err = Option<Error>;
     /// Converts a string to a pipeline.
@@ -272,6 +374,21 @@ impl FromStr for Pipeline<MissingHereDoc> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for Pipeline {
+    type Err = Option<Error>;
+    /// Converts a string to a pipeline.
+    ///
+    /// Returns `Err(None)` if the first token does not start a pipeline.
+    fn from_str(s: &str) -> Result<Pipeline, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let pipeline = unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        pipeline.fill(&mut here_docs).map_err(Some)
     }
 }
 
@@ -291,6 +408,23 @@ impl FromStr for AndOrList<MissingHereDoc> {
         let mut lexer = Lexer::with_source(Source::Unknown, s);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.and_or_list()).map(Rec::unwrap).shift()
+    }
+}
+
+impl FromStr for AndOrList {
+    type Err = Option<Error>;
+    /// Converts a string to an and-or list.
+    ///
+    /// Returns `Err(None)` if the first token does not start an and-or list.
+    fn from_str(s: &str) -> Result<AndOrList, Option<Error>> {
+        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut parser = Parser::new(&mut lexer);
+        let list = unwrap_ready(parser.and_or_list())
+            .map(Rec::unwrap)
+            .shift()?;
+        parser.ensure_no_unread_here_doc()?;
+        let mut here_docs = parser.take_read_here_docs().into_iter();
+        list.fill(&mut here_docs).map_err(Some)
     }
 }
 
@@ -324,8 +458,9 @@ impl FromStr for List {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ErrorCause;
+    use crate::parser::SyntaxError;
     use futures::executor::block_on;
-    use std::iter::empty;
 
     // Most of the tests below are surrounded with `block_on(async {...})` in
     // order to make sure `str::parse` can be called in an executor context.
@@ -430,11 +565,35 @@ mod tests {
     }
 
     #[test]
+    fn redir_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<Redir, _> = "<<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
+        })
+    }
+
+    #[test]
     fn simple_command_from_str() {
         block_on(async {
             let parse: SimpleCommand<MissingHereDoc> = " a=b</dev/null foo ".parse().unwrap();
             let parse = parse.fill(&mut empty()).unwrap();
             assert_eq!(parse.to_string(), "a=b foo </dev/null");
+        })
+    }
+
+    #[test]
+    fn simple_command_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<SimpleCommand, _> = "<<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
         })
     }
 
@@ -448,11 +607,35 @@ mod tests {
     }
 
     #[test]
+    fn case_item_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<CaseItem, _> = "(foo) <<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
+        })
+    }
+
+    #[test]
     fn compound_command_from_str() {
         block_on(async {
             let parse: CompoundCommand<MissingHereDoc> = " { :; } ".parse().unwrap();
             let parse = parse.fill(&mut empty()).unwrap();
             assert_eq!(parse.to_string(), "{ :; }");
+        })
+    }
+
+    #[test]
+    fn compound_command_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<CompoundCommand, _> = "{ <<FOO; }".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
         })
     }
 
@@ -466,6 +649,18 @@ mod tests {
     }
 
     #[test]
+    fn full_compound_command_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<FullCompoundCommand, _> = "{ :; } <<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
+        })
+    }
+
+    #[test]
     fn command_from_str() {
         block_on(async {
             let parse: Command<MissingHereDoc> = "f(){ :; }>&2".parse().unwrap();
@@ -475,11 +670,35 @@ mod tests {
     }
 
     #[test]
+    fn command_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<Command, _> = "<<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
+        })
+    }
+
+    #[test]
     fn pipeline_from_str() {
         block_on(async {
             let parse: Pipeline<MissingHereDoc> = " ! a|b|c".parse().unwrap();
             let parse = parse.fill(&mut empty()).unwrap();
             assert_eq!(parse.to_string(), "! a | b | c");
+        })
+    }
+
+    #[test]
+    fn pipeline_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<Pipeline, _> = "<<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
         })
     }
 
@@ -499,6 +718,18 @@ mod tests {
     }
 
     #[test]
+    fn and_or_list_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<AndOrList, _> = "<<FOO".parse();
+            let e = result.unwrap_err().unwrap();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
+        })
+    }
+
+    #[test]
     fn list_from_str() {
         block_on(async {
             let parse: List<MissingHereDoc> = " a;b&&c&d ".parse().unwrap();
@@ -507,6 +738,18 @@ mod tests {
 
             let parse: List = " a;b&&c&d ".parse().unwrap();
             assert_eq!(parse.to_string(), "a; b && c& d");
+        })
+    }
+
+    #[test]
+    fn list_from_str_unfillable_here_doc_content() {
+        block_on(async {
+            let result: Result<List, _> = "<<FOO".parse();
+            let e = result.unwrap_err();
+            assert_eq!(
+                e.cause,
+                ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
+            );
         })
     }
 }
