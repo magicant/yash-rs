@@ -300,6 +300,7 @@ name = "yash-semantics"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "yash-env",
  "yash-syntax",
 ]

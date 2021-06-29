@@ -20,6 +20,7 @@ use super::Command;
 use crate::command_search::search;
 use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
+use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::Env;
@@ -61,7 +62,7 @@ impl Command for syntax::SimpleCommand {
                 None => {
                     eprintln!("{}: command not found", name.value);
                     // TODO The error message should be printed via Env
-                    // TODO The exit status should be 127
+                    env.exit_status = ExitStatus::NOT_FOUND;
                 }
             }
         }
@@ -123,5 +124,15 @@ impl Command for syntax::List {
 
 #[cfg(test)]
 mod tests {
-    // TODO test
+    use super::*;
+    use futures::executor::block_on;
+
+    #[test]
+    fn exit_status_is_127_on_command_not_found() {
+        let mut env = Env::new_virtual();
+        let command: syntax::SimpleCommand = "no_such_command".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
+    }
 }
