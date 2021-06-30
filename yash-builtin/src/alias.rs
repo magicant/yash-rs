@@ -101,8 +101,8 @@ mod tests {
     #[test]
     fn alias_builtin_defines_alias() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("".to_string());
-        let arg1 = Field::dummy("foo=bar baz".to_string());
+        let arg0 = Field::dummy("");
+        let arg1 = Field::dummy("foo=bar baz");
         let args = vec![arg0, arg1];
 
         let result = alias_builtin(&mut env, args);
@@ -124,10 +124,10 @@ mod tests {
     #[test]
     fn alias_builtin_defines_many_aliases() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("alias".to_string());
-        let arg1 = Field::dummy("abc=xyz".to_string());
-        let arg2 = Field::dummy("yes=no".to_string());
-        let arg3 = Field::dummy("ls=ls --color".to_string());
+        let arg0 = Field::dummy("alias");
+        let arg1 = Field::dummy("abc=xyz");
+        let arg2 = Field::dummy("yes=no");
+        let arg3 = Field::dummy("ls=ls --color");
         let args = vec![arg0, arg1, arg2, arg3];
 
         let result = alias_builtin(&mut env, args);

@@ -120,9 +120,9 @@ mod tests {
     #[test]
     fn returns_exit_status_12_with_n_option() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("return".to_string());
-        let arg1 = Field::dummy("-n".to_string());
-        let arg2 = Field::dummy("12".to_string());
+        let arg0 = Field::dummy("return");
+        let arg1 = Field::dummy("-n");
+        let arg2 = Field::dummy("12");
         let args = vec![arg0, arg1, arg2];
 
         let result = return_builtin(&mut env, args);
@@ -132,9 +132,9 @@ mod tests {
     #[test]
     fn returns_exit_status_47_with_n_option() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("return".to_string());
-        let arg1 = Field::dummy("-n".to_string());
-        let arg2 = Field::dummy("47".to_string());
+        let arg0 = Field::dummy("return");
+        let arg1 = Field::dummy("-n");
+        let arg2 = Field::dummy("47");
         let args = vec![arg0, arg1, arg2];
 
         let result = return_builtin(&mut env, args);
