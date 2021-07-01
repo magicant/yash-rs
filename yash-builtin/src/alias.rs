@@ -26,20 +26,20 @@ use yash_env::expansion::Field;
 use yash_syntax::alias::{AliasSet, HashEntry};
 
 /// Part of the shell execution environment the alias built-in depends on.
-pub trait AliasBuiltinEnv {
+pub trait Env {
     /// Accesses the alias set in the environment.
     fn alias_set(&mut self) -> &mut Rc<AliasSet>;
     // TODO stdout, stderr
 }
 
-impl AliasBuiltinEnv for yash_env::Env {
+impl Env for yash_env::Env {
     fn alias_set(&mut self) -> &mut Rc<AliasSet> {
         &mut self.aliases
     }
 }
 
 /// Implementation of the alias built-in.
-pub fn alias_builtin<E: AliasBuiltinEnv>(env: &mut E, args: Vec<Field>) -> Result {
+pub fn alias_builtin<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -91,7 +91,7 @@ mod tests {
         aliases: Rc<AliasSet>,
     }
 
-    impl AliasBuiltinEnv for DummyEnv {
+    impl Env for DummyEnv {
         fn alias_set(&mut self) -> &mut Rc<AliasSet> {
             &mut self.aliases
         }
