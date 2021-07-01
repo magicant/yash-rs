@@ -22,7 +22,6 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
-use yash_env::Env;
 
 /// Part of the shell execution environment the return built-in depends on.
 pub trait ReturnBuiltinEnv {
@@ -31,7 +30,7 @@ pub trait ReturnBuiltinEnv {
     // TODO stderr
 }
 
-impl ReturnBuiltinEnv for Env {}
+impl ReturnBuiltinEnv for yash_env::Env {}
 
 // TODO Describe in terms of Divert. Should we differentiate API-level
 // description from end-user-level one?
@@ -101,7 +100,7 @@ pub fn return_builtin<E: ReturnBuiltinEnv>(_env: &mut E, args: Vec<Field>) -> Re
 ///
 /// This function calls [`return_builtin`] and wraps the result in a `Future`.
 pub fn return_builtin_async(
-    env: &mut Env,
+    env: &mut yash_env::Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
     Box::pin(ready(return_builtin(env, args)))

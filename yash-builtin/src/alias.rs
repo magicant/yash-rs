@@ -23,7 +23,6 @@ use std::rc::Rc;
 use yash_env::builtin::Result;
 use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
-use yash_env::Env;
 use yash_syntax::alias::{AliasSet, HashEntry};
 
 /// Part of the shell execution environment the alias built-in depends on.
@@ -33,7 +32,7 @@ pub trait AliasBuiltinEnv {
     // TODO stdout, stderr
 }
 
-impl AliasBuiltinEnv for Env {
+impl AliasBuiltinEnv for yash_env::Env {
     fn alias_set(&mut self) -> &mut Rc<AliasSet> {
         &mut self.aliases
     }
@@ -74,7 +73,7 @@ pub fn alias_builtin<E: AliasBuiltinEnv>(env: &mut E, args: Vec<Field>) -> Resul
 ///
 /// This function calls [`alias_builtin`] and wraps the result in a `Future`.
 pub fn alias_builtin_async(
-    env: &mut Env,
+    env: &mut yash_env::Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
     Box::pin(ready(alias_builtin(env, args)))
