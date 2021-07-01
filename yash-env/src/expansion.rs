@@ -53,6 +53,17 @@ impl Field {
         }
         with_value(value.into())
     }
+
+    /// Creates an array of fields with dummy origin locations.
+    ///
+    /// This function calls [`dummy`](Self::dummy) to create the results.
+    pub fn dummies<I, S>(values: I) -> Vec<Field>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        values.into_iter().map(Self::dummy).collect()
+    }
 }
 
 impl std::fmt::Display for Field {
