@@ -15,6 +15,60 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Return built-in.
+//!
+//! The return built-in quits the currently executing innermost function or
+//! script.  If the shell is not currently executing any function or script, the
+//! built-in will exit the current shell execution environment unless it is an
+//! interactive session.
+//!
+//! # Syntax
+//!
+//! ```sh
+//! return [-n] [exit_status]
+//! ```
+//!
+//! # Options
+//!
+//! The **`-n`** (**`--no-return`**) option makes the built-in not actually quit
+//! a function or script. This option will be helpful when you want to set the
+//! exit status to an arbitrary value without any other side effect.
+//!
+//! # Operands
+//!
+//! The optional ***exit_status*** operand, if given, should be a non-negative
+//! integer and will be the exit status of the built-in.
+//!
+//! # Exit status
+//!
+//! The *exit_status* operand will be the exit status of the built-in.
+//!
+//! If the operand is not given:
+//!
+//! - If the currently executing script is a trap, the exit status will be the
+//!   value of `$?` before entering the trap.
+//! - Otherwise, the exit status will be the current value of `$?`.
+//!
+//! # Errors
+//!
+//! If the *exit_status* operand is given but not a valid non-negative integer,
+//! it is a syntax error. In that case, an error message is printed, and the
+//! exit status will be 2, but the built-in still quits a function or script.
+//!
+//! This implementation treats an *exit_status* value greater than 4294967295 as
+//! a syntax error.
+//!
+//! # Portability
+//!
+//! POSIX only requires the return built-in to quit a function or dot script.
+//! The behavior for other kinds of scripts is a non-standard extension.
+//!
+//! The `-n` (`--no-return`) option is a non-standard extension.
+//!
+//! Many implementations do not support *exit_status* values greater than 255.
+//!
+//! # Implementation notes
+//!
+//! TODO Describe in terms of Divert.
 
 use std::future::ready;
 use std::future::Future;
@@ -32,61 +86,9 @@ pub trait Env {
 
 impl Env for yash_env::Env {}
 
-// TODO Describe in terms of Divert. Should we differentiate API-level
-// description from end-user-level one?
 /// Implementation of the return built-in.
 ///
-/// The return built-in quits the currently executing innermost function or
-/// script.
-///
-/// If the shell is not currently executing any function or script, the built-in
-/// will exit the current shell execution environment unless it is an
-/// interactive session.
-///
-/// # Syntax
-///
-/// ```sh
-/// return [-n] [exit_status]
-/// ```
-///
-/// # Options
-///
-/// The **`-n`** (**`--no-return`**) option makes the built-in not actually quit
-/// a function or script. This option will be helpful when you want to set the
-/// exit status to an arbitrary value without any other side effect.
-///
-/// # Operands
-///
-/// The optional ***exit_status*** operand, if given, should be a non-negative
-/// integer and will be the exit status of the built-in.
-///
-/// # Exit status
-///
-/// The *exit_status* operand will be the exit status of the built-in.
-///
-/// If the operand is not given:
-///
-/// - If the currently executing script is a trap, the exit status will be the
-///   value of `$?` before entering the trap.
-/// - Otherwise, the exit status will be the current value of `$?`.
-///
-/// # Errors
-///
-/// If the *exit_status* operand is given but not a valid non-negative integer,
-/// it is a syntax error. In that case, an error message is printed, and the
-/// exit status will be 2, but the built-in still quits a function or script.
-///
-/// This implementation treats an *exit_status* value greater than 4294967295 as
-/// a syntax error.
-///
-/// # Portability
-///
-/// POSIX only requires the return built-in to quit a function or dot script.
-/// The behavior for other kinds of scripts is a non-standard extension.
-///
-/// The `-n` (`--no-return`) option is a non-standard extension.
-///
-/// Many implementations do not support *exit_status* values greater than 255.
+/// See the [module-level documentation](self) for details.
 pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
     let exit_status: u32 = match args.get(2) {
