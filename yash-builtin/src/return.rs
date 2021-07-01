@@ -24,13 +24,13 @@ use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
 
 /// Part of the shell execution environment the return built-in depends on.
-pub trait ReturnBuiltinEnv {
+pub trait Env {
     // TODO Current value of $?
     // TODO Current execution context (stack trace)
     // TODO stderr
 }
 
-impl ReturnBuiltinEnv for yash_env::Env {}
+impl Env for yash_env::Env {}
 
 // TODO Describe in terms of Divert. Should we differentiate API-level
 // description from end-user-level one?
@@ -87,7 +87,7 @@ impl ReturnBuiltinEnv for yash_env::Env {}
 /// The `-n` (`--no-return`) option is a non-standard extension.
 ///
 /// Many implementations do not support *exit_status* values greater than 255.
-pub fn return_builtin<E: ReturnBuiltinEnv>(_env: &mut E, args: Vec<Field>) -> Result {
+pub fn return_builtin<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
     let exit_status: u32 = match args.get(2) {
         Some(field) => field.value.parse().unwrap_or(2),
@@ -114,7 +114,7 @@ mod tests {
     #[derive(Default)]
     struct DummyEnv;
 
-    impl ReturnBuiltinEnv for DummyEnv {}
+    impl Env for DummyEnv {}
 
     #[test]
     fn returns_exit_status_12_with_n_option() {

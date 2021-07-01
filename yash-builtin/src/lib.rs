@@ -25,7 +25,6 @@ pub use self::alias::alias_builtin;
 pub use self::alias::alias_builtin_async;
 pub use self::r#return::return_builtin;
 pub use self::r#return::return_builtin_async;
-pub use self::r#return::ReturnBuiltinEnv;
 pub use yash_env::builtin::*;
 
 use Type::{Intrinsic, Special};
