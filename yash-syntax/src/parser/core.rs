@@ -639,7 +639,7 @@ mod tests {
                 "X".to_string(),
                 "x".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -664,7 +664,7 @@ mod tests {
                 "X".to_string(),
                 "x".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -682,13 +682,13 @@ mod tests {
                 "X".to_string(),
                 "x".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             aliases.insert(HashEntry::new(
                 r"\X".to_string(),
                 "quoted".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -706,7 +706,7 @@ mod tests {
                 ";".to_string(),
                 "x".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -737,13 +737,13 @@ mod tests {
                 "X".to_string(),
                 "Y x".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             aliases.insert(HashEntry::new(
                 "Y".to_string(),
                 "X y".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -781,13 +781,13 @@ mod tests {
                 "X".to_string(),
                 " X ".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             aliases.insert(HashEntry::new(
                 "Y".to_string(),
                 "y".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -822,13 +822,13 @@ mod tests {
                 "X".to_string(),
                 " X".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             aliases.insert(HashEntry::new(
                 "Y".to_string(),
                 "y".to_string(),
                 false,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -856,7 +856,7 @@ mod tests {
                 "X".to_string(),
                 "x".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -881,7 +881,7 @@ mod tests {
                 "X".to_string(),
                 "x".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -899,7 +899,7 @@ mod tests {
                 "if".to_string(),
                 "x".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -917,7 +917,7 @@ mod tests {
                 "if".to_string(),
                 "x".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 
@@ -935,13 +935,13 @@ mod tests {
                 "X".to_string(),
                 "if".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             aliases.insert(HashEntry::new(
                 "if".to_string(),
                 "x".to_string(),
                 true,
-                Location::dummy("?".to_string()),
+                Location::dummy("?"),
             ));
             let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
 

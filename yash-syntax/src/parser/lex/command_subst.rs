@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn lexer_command_substitution_success() {
         let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
-        let location = Location::dummy("X".to_string());
+        let location = Location::dummy("X");
 
         let result = block_on(lexer.command_substitution(location))
             .unwrap()
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn lexer_command_substitution_none() {
         let mut lexer = Lexer::with_source(Source::Unknown, " foo bar )baz");
-        let location = Location::dummy("Y".to_string());
+        let location = Location::dummy("Y");
 
         let result = block_on(lexer.command_substitution(location)).unwrap();
         assert_eq!(result, None);
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn lexer_command_substitution_unclosed() {
         let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar baz");
-        let location = Location::dummy("Z".to_string());
+        let location = Location::dummy("Z");
 
         let e = block_on(lexer.command_substitution(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) =

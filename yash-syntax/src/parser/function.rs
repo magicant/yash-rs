@@ -209,7 +209,7 @@ mod tests {
     fn parser_short_function_definition_close_parenthesis_alias() {
         let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "a".to_string(),
             "f( ".to_string(),
@@ -252,7 +252,7 @@ mod tests {
     fn parser_short_function_definition_body_alias_and_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, " a b ");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "a".to_string(),
             "f() ".to_string(),
@@ -295,7 +295,7 @@ mod tests {
     fn parser_short_function_definition_alias_inapplicable() {
         let mut lexer = Lexer::with_source(Source::Unknown, "()b");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "b".to_string(),
             " c".to_string(),

@@ -181,7 +181,7 @@ mod tests {
     fn parser_while_loop_aliasing() {
         let mut lexer = Lexer::with_source(Source::Unknown, " while :; DO :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "DO".to_string(),
             "do".to_string(),
@@ -280,7 +280,7 @@ mod tests {
     fn parser_until_loop_aliasing() {
         let mut lexer = Lexer::with_source(Source::Unknown, " until :; DO :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "DO".to_string(),
             "do".to_string(),

@@ -44,7 +44,7 @@ async fn parse_and_print() {
                     number: NonZeroU64::new(1).unwrap(),
                     source: source::Source::Unknown,
                 })
-                .map_err(|e| (source::Location::dummy("".to_string()), e))
+                .map_err(|e| (source::Location::dummy(""), e))
         }
     }
 

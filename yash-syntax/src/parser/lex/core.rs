@@ -647,7 +647,7 @@ mod tests {
         #[async_trait::async_trait(?Send)]
         impl Input for Failing {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
-                let location = Location::dummy("line".to_string());
+                let location = Location::dummy("line");
                 let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
                 Err((location, error))
             }
@@ -842,7 +842,7 @@ mod tests {
             name: "a".to_string(),
             replacement: "".to_string(),
             global: false,
-            origin: Location::dummy("dummy".to_string()),
+            origin: Location::dummy("dummy"),
         });
         lexer.substitute_alias(0, &alias);
     }
@@ -855,7 +855,7 @@ mod tests {
             name: "a".to_string(),
             replacement: "lex".to_string(),
             global: false,
-            origin: Location::dummy("dummy".to_string()),
+            origin: Location::dummy("dummy"),
         });
 
         block_on(async {
@@ -954,7 +954,7 @@ mod tests {
             name: "foo".to_string(),
             replacement: "x\ny".to_string(),
             global: true,
-            origin: Location::dummy("loc".to_string()),
+            origin: Location::dummy("loc"),
         });
 
         block_on(async {
@@ -1056,7 +1056,7 @@ mod tests {
                 name: "x".to_string(),
                 replacement: "".to_string(),
                 global: false,
-                origin: Location::dummy("dummy".to_string()),
+                origin: Location::dummy("dummy"),
             });
 
             let _ = lexer.peek_char().await;
@@ -1078,12 +1078,12 @@ mod tests {
 
     #[test]
     fn lexer_core_is_after_blank_ending_alias_index_0() {
-        let original = Location::dummy("original".to_string());
+        let original = Location::dummy("original");
         let alias = Rc::new(Alias {
             name: "a".to_string(),
             replacement: " ".to_string(),
             global: false,
-            origin: Location::dummy("origin".to_string()),
+            origin: Location::dummy("origin"),
         });
         let input = Memory::new(Source::Alias { original, alias }, "a");
         let lexer = LexerCore::new(Box::new(input));
@@ -1099,7 +1099,7 @@ mod tests {
                 name: "a".to_string(),
                 replacement: " b".to_string(),
                 global: false,
-                origin: Location::dummy("dummy".to_string()),
+                origin: Location::dummy("dummy"),
             });
 
             lexer.peek_char().await.unwrap();
@@ -1123,7 +1123,7 @@ mod tests {
                 name: "a".to_string(),
                 replacement: " b ".to_string(),
                 global: false,
-                origin: Location::dummy("dummy".to_string()),
+                origin: Location::dummy("dummy"),
             });
 
             lexer.peek_char().await.unwrap();

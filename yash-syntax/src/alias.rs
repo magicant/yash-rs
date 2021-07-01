@@ -49,7 +49,7 @@ pub struct Alias {
 /// ```
 /// let mut entries = std::collections::HashSet::new();
 /// let name = "foo";
-/// let origin = yash_syntax::source::Location::dummy("".to_string());
+/// let origin = yash_syntax::source::Location::dummy("");
 /// let old = yash_syntax::alias::HashEntry::new(
 ///     name.to_string(), "old".to_string(), false, origin.clone());
 /// let new = yash_syntax::alias::HashEntry::new(

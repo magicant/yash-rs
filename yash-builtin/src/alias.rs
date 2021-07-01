@@ -172,13 +172,13 @@ mod tests {
             "foo".to_string(),
             "bar".to_string(),
             false,
-            Location::dummy("".to_string()),
+            Location::dummy(""),
         ));
         aliases.insert(HashEntry::new(
             "hello".to_string(),
             "world".to_string(),
             false,
-            Location::dummy("".to_string()),
+            Location::dummy(""),
         ));
         // TODO alias_builtin should print to IoEnv rather than real standard output
     }

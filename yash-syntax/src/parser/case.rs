@@ -189,7 +189,7 @@ mod tests {
     fn parser_case_item_esac() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\nESAC");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "ESAC".to_string(),
             "\n\nesac".to_string(),
@@ -391,7 +391,7 @@ mod tests {
         // Alias substitution results in "case x \n\n \nin esac"
         let mut lexer = Lexer::with_source(Source::Unknown, "CASE_X IN_ESAC");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "CASE_X".to_string(),
             " case x \n\n ".to_string(),
@@ -427,7 +427,7 @@ mod tests {
         // Alias substitution results in " case   in in  a|b) esac"
         let mut lexer = Lexer::with_source(Source::Unknown, "CASE in a|b) esac");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "CASE".to_string(),
             " case ".to_string(),
@@ -464,7 +464,7 @@ mod tests {
         // Alias substitution results in "case x  in esac"
         let mut lexer = Lexer::with_source(Source::Unknown, "CASE_X in esac");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "CASE_X".to_string(),
             "case x ".to_string(),

@@ -56,7 +56,7 @@ impl Source {
     /// ```
     /// // `is_alias_for` returns true if the names match
     /// # use yash_syntax::source::*;
-    /// let original = Location::dummy("".to_string());
+    /// let original = Location::dummy("");
     /// let alias = std::rc::Rc::new(yash_syntax::alias::Alias{
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
@@ -72,7 +72,7 @@ impl Source {
     /// // `is_alias_for` checks aliases recursively.
     /// # use std::rc::Rc;
     /// # use yash_syntax::source::*;
-    /// let mut original = Location::dummy("".to_string());
+    /// let mut original = Location::dummy("");
     /// let alias = Rc::new(yash_syntax::alias::Alias{
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
@@ -185,17 +185,20 @@ impl Location {
     /// line and column numbers are 1.
     ///
     /// This function is mainly for use in testing.
-    pub fn dummy(line: String) -> Location {
-        let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
-            value: line,
-            number,
-            source: Source::Unknown,
-        });
-        Location {
-            line,
-            column: number,
+    pub fn dummy<S: Into<String>>(line: S) -> Location {
+        fn with_line(line: String) -> Location {
+            let number = NonZeroU64::new(1).unwrap();
+            let line = Rc::new(Line {
+                value: line,
+                number,
+                source: Source::Unknown,
+            });
+            Location {
+                line,
+                column: number,
+            }
         }
+        with_line(line.into())
     }
 
     /// Increases the column number

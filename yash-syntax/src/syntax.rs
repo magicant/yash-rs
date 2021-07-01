@@ -1369,7 +1369,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         assert_eq!(param.to_string(), "${foo}");
 
@@ -1407,7 +1407,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${foo}");
@@ -1478,13 +1478,13 @@ mod tests {
 
         let raw_param = RawParam {
             name: "PARAM".to_string(),
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         assert_eq!(raw_param.to_string(), "$PARAM");
 
         let command_subst = CommandSubst {
             content: r"foo\bar".to_string(),
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         assert_eq!(command_subst.to_string(), r"$(foo\bar)");
 
@@ -1495,13 +1495,13 @@ mod tests {
                 BackquoteUnit::Backslashed('c'),
                 BackquoteUnit::Literal('d'),
             ],
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         assert_eq!(backquote.to_string(), r"`a\b\cd`");
 
         let arith = Arith {
             content: Text(vec![literal, backslashed, command_subst, backquote]),
-            location: Location::dummy("".to_string()),
+            location: Location::dummy(""),
         };
         assert_eq!(arith.to_string(), r"$((A\X$(foo\bar)`a\b\cd`))");
     }
@@ -1523,19 +1523,19 @@ mod tests {
             Literal('W'),
             RawParam {
                 name: "X".to_string(),
-                location: Location::dummy("".to_string()),
+                location: Location::dummy(""),
             },
             CommandSubst {
                 content: "Y".to_string(),
-                location: Location::dummy("".to_string()),
+                location: Location::dummy(""),
             },
             Backquote {
                 content: vec![BackquoteUnit::Literal('Z')],
-                location: Location::dummy("".to_string()),
+                location: Location::dummy(""),
             },
             Arith {
                 content: Text(vec![Literal('0')]),
-                location: Location::dummy("".to_string()),
+                location: Location::dummy(""),
             },
         ]);
         let (unquoted, is_quoted) = nonempty.unquote();
@@ -1551,7 +1551,7 @@ mod tests {
             Literal('c'),
             Arith {
                 content: Text(vec![Literal('d')]),
-                location: Location::dummy("".to_string()),
+                location: Location::dummy(""),
             },
             Literal('e'),
         ]);
@@ -1560,14 +1560,14 @@ mod tests {
         assert_eq!(is_quoted, true);
 
         let content = vec![BackquoteUnit::Backslashed('X')];
-        let location = Location::dummy("".to_string());
+        let location = Location::dummy("");
         let quoted = Text(vec![Backquote { content, location }]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "`X`");
         assert_eq!(is_quoted, true);
 
         let content = Text(vec![Backslashed('X')]);
-        let location = Location::dummy("".to_string());
+        let location = Location::dummy("");
         let quoted = Text(vec![Arith { content, location }]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "$((X))");
@@ -1640,7 +1640,7 @@ mod tests {
 
     #[test]
     fn word_to_string_if_literal_failure() {
-        let location = Location::dummy("foo".to_string());
+        let location = Location::dummy("foo");
         let backslashed = Unquoted(Backslashed('?'));
         let word = Word {
             units: vec![backslashed],

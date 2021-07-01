@@ -220,7 +220,7 @@ mod tests {
     fn parser_pipeline_no_aliasing_of_bang() {
         let mut lexer = Lexer::with_source(Source::Unknown, "! ok");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "!".to_string(),
             "; ; ;".to_string(),

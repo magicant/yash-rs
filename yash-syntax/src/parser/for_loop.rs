@@ -350,7 +350,7 @@ mod tests {
     fn parser_for_loop_aliasing_on_semicolon() {
         let mut lexer = Lexer::with_source(Source::Unknown, " FOR_A if :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "if".to_string(),
             " ;\n\ndo".to_string(),
@@ -380,7 +380,7 @@ mod tests {
     fn parser_for_loop_aliasing_on_do() {
         let mut lexer = Lexer::with_source(Source::Unknown, " FOR_A if :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "if".to_string(),
             "\ndo".to_string(),
@@ -450,7 +450,7 @@ mod tests {
         // Alias substitution results in "for & do :; done"
         let mut lexer = Lexer::with_source(Source::Unknown, "FOR if do :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "FOR".to_string(),
             "for ".to_string(),
@@ -509,7 +509,7 @@ mod tests {
         // Alias substitution results in "for A in a b & c; do :; done"
         let mut lexer = Lexer::with_source(Source::Unknown, "for_A_in_a_b if c; do :; done");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "for_A_in_a_b".to_string(),
             "for A in a b ".to_string(),

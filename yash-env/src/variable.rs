@@ -139,7 +139,7 @@ mod tests {
             value: Value::Scalar("my value".to_string()),
             last_assigned_location: None,
             is_exported: false,
-            read_only_location: Some(Location::dummy("dummy".to_string())),
+            read_only_location: Some(Location::dummy("dummy")),
         };
         variables.assign("foo".to_string(), variable.clone());
         assert_eq!(variables.get("foo"), Some(&variable));

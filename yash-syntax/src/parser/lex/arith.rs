@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_empty() {
         let mut lexer = Lexer::with_source(Source::Unknown, "(());");
-        let location = Location::dummy("X".to_string());
+        let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_none() {
         let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
-        let location = Location::dummy("Y".to_string());
+        let location = Location::dummy("Y");
 
         let location = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "(\\\n\\\n(\\\n)\\\n\\\n);");
-        let location = Location::dummy("X".to_string());
+        let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_escapes() {
         let mut lexer = Lexer::with_source(Source::Unknown, r#"((\\\"\`\$));"#);
-        let location = Location::dummy("X".to_string());
+        let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_unclosed_first() {
         let mut lexer = Lexer::with_source(Source::Unknown, "((1");
-        let location = Location::dummy("Z".to_string());
+        let location = Location::dummy("Z");
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_unclosed_second() {
         let mut lexer = Lexer::with_source(Source::Unknown, "((1)");
-        let location = Location::dummy("Z".to_string());
+        let location = Location::dummy("Z");
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
         let mut lexer = Lexer::with_source(Source::Unknown, "((1) ");
-        let location = Location::dummy("Z".to_string());
+        let location = Location::dummy("Z");
 
         let location = block_on(lexer.arithmetic_expansion(location))
             .unwrap()

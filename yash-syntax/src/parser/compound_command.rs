@@ -179,7 +179,7 @@ mod tests {
     fn parser_do_clause_aliasing() {
         let mut lexer = Lexer::with_source(Source::Unknown, " do :; end ");
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("".to_string());
+        let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
             "do".to_string(),
             "".to_string(),

@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn lexer_raw_param_special_parameter() {
         let mut lexer = Lexer::with_source(Source::Unknown, "@;");
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn lexer_raw_param_digit() {
         let mut lexer = Lexer::with_source(Source::Unknown, "12");
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn lexer_raw_param_posix_name() {
         let mut lexer = Lexer::with_source(Source::Unknown, "az_AZ_019<");
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
         let mut lexer = Lexer::with_source(Source::Unknown, "a\\\n\\\nb\\\n\\\nc\\\n>");
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn lexer_raw_param_not_parameter() {
         let mut lexer = Lexer::with_source(Source::Unknown, ";");
-        let location = Location::dummy("X".to_string());
+        let location = Location::dummy("X");
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
         assert_eq!(location.line.value, "X");

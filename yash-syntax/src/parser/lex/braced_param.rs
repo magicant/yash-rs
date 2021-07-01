@@ -179,7 +179,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "@");
@@ -197,7 +197,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
@@ -215,7 +215,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "123");
@@ -233,7 +233,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -251,7 +251,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
@@ -268,7 +268,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
@@ -289,7 +289,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
@@ -310,7 +310,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
@@ -328,7 +328,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -346,7 +346,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "?");
@@ -364,7 +364,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "-");
@@ -382,7 +382,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "x");
@@ -406,7 +406,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo");
@@ -430,7 +430,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -454,7 +454,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -478,7 +478,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -502,7 +502,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -526,7 +526,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -550,7 +550,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -574,7 +574,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -598,7 +598,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
@@ -613,7 +613,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "a_1");
@@ -631,7 +631,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$".to_string());
+        let location = Location::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");

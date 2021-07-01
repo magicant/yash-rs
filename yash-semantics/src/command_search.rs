@@ -251,7 +251,7 @@ mod tests {
         env.functions.insert(FunctionEntry::new(
             "foo".to_string(),
             full_compound_command(""),
-            Location::dummy("".to_string()),
+            Location::dummy(""),
             false,
         ));
 
@@ -280,7 +280,7 @@ mod tests {
         let function = FunctionEntry::new(
             "foo".to_string(),
             full_compound_command("bar"),
-            Location::dummy("location".to_string()),
+            Location::dummy("location"),
             false,
         );
         env.functions.insert(function.clone());
@@ -302,7 +302,7 @@ mod tests {
         env.functions.insert(FunctionEntry::new(
             "foo".to_string(),
             full_compound_command("bar"),
-            Location::dummy("location".to_string()),
+            Location::dummy("location"),
             false,
         ));
 
@@ -341,7 +341,7 @@ mod tests {
         let function = FunctionEntry::new(
             "foo".to_string(),
             full_compound_command("bar"),
-            Location::dummy("location".to_string()),
+            Location::dummy("location"),
             false,
         );
         env.functions.insert(function.clone());
@@ -406,7 +406,7 @@ mod tests {
         let function = FunctionEntry::new(
             "foo".to_string(),
             full_compound_command("bar"),
-            Location::dummy("location".to_string()),
+            Location::dummy("location"),
             false,
         );
         env.functions.insert(function.clone());
@@ -445,7 +445,7 @@ mod tests {
         env.functions.insert(FunctionEntry::new(
             "foo".to_string(),
             full_compound_command("bar"),
-            Location::dummy("location".to_string()),
+            Location::dummy("location"),
             false,
         ));
 
