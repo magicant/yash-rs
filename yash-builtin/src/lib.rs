@@ -31,7 +31,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "alias",
         Builtin {
             r#type: Intrinsic,
-            execute: alias::alias_builtin_async,
+            execute: alias::builtin_main,
         },
     ),
     (

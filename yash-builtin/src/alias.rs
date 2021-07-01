@@ -39,7 +39,7 @@ impl Env for yash_env::Env {
 }
 
 /// Implementation of the alias built-in.
-pub fn alias_builtin<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
+pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -71,12 +71,12 @@ pub fn alias_builtin<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
 
 /// Implementation of the alias built-in.
 ///
-/// This function calls [`alias_builtin`] and wraps the result in a `Future`.
-pub fn alias_builtin_async(
+/// This function calls [`builtin_main_sync`] and wraps the result in a `Future`.
+pub fn builtin_main(
     env: &mut yash_env::Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(alias_builtin(env, args)))
+    Box::pin(ready(builtin_main_sync(env, args)))
 }
 
 #[allow(clippy::bool_assert_comparison)]
@@ -98,13 +98,13 @@ mod tests {
     }
 
     #[test]
-    fn alias_builtin_defines_alias() {
+    fn builtin_defines_alias() {
         let mut env = DummyEnv::default();
         let arg0 = Field::dummy("");
         let arg1 = Field::dummy("foo=bar baz");
         let args = vec![arg0, arg1];
 
-        let result = alias_builtin(&mut env, args);
+        let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, None));
 
         let aliases = env.aliases.as_ref();
@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn alias_builtin_defines_many_aliases() {
+    fn builtin_defines_many_aliases() {
         let mut env = DummyEnv::default();
         let arg0 = Field::dummy("alias");
         let arg1 = Field::dummy("abc=xyz");
@@ -129,7 +129,7 @@ mod tests {
         let arg3 = Field::dummy("ls=ls --color");
         let args = vec![arg0, arg1, arg2, arg3];
 
-        let result = alias_builtin(&mut env, args);
+        let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, None));
 
         let aliases = env.aliases.as_ref();
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn alias_builtin_prints_all_aliases() {
+    fn builtin_prints_all_aliases() {
         let mut env = DummyEnv::default();
         let aliases = Rc::make_mut(&mut env.aliases);
         aliases.insert(HashEntry::new(
@@ -179,7 +179,7 @@ mod tests {
             false,
             Location::dummy(""),
         ));
-        // TODO alias_builtin should print to IoEnv rather than real standard output
+        // TODO builtin should print to IoEnv rather than real standard output
     }
     // TODO test case with global aliases
 }
