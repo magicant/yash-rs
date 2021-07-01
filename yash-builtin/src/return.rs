@@ -87,7 +87,7 @@ impl Env for yash_env::Env {}
 /// The `-n` (`--no-return`) option is a non-standard extension.
 ///
 /// Many implementations do not support *exit_status* values greater than 255.
-pub fn return_builtin<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
+pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
     let exit_status: u32 = match args.get(2) {
         Some(field) => field.value.parse().unwrap_or(2),
@@ -98,12 +98,13 @@ pub fn return_builtin<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
 
 /// Implementation of the return built-in.
 ///
-/// This function calls [`return_builtin`] and wraps the result in a `Future`.
-pub fn return_builtin_async(
+/// This function calls [`builtin_main_sync`] and wraps the result in a
+/// `Future`.
+pub fn builtin_main(
     env: &mut yash_env::Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(return_builtin(env, args)))
+    Box::pin(ready(builtin_main_sync(env, args)))
 }
 
 #[cfg(test)]
@@ -120,7 +121,7 @@ mod tests {
     fn returns_exit_status_12_with_n_option() {
         let mut env = DummyEnv::default();
         let args = Field::dummies(["return", "-n", "12"]);
-        let result = return_builtin(&mut env, args);
+        let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(12), None));
     }
 
@@ -128,7 +129,7 @@ mod tests {
     fn returns_exit_status_47_with_n_option() {
         let mut env = DummyEnv::default();
         let args = Field::dummies(["return", "-n", "47"]);
-        let result = return_builtin(&mut env, args);
+        let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(47), None));
     }
 }

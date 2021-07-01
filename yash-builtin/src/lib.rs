@@ -38,7 +38,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "return",
         Builtin {
             r#type: Special,
-            execute: r#return::return_builtin_async,
+            execute: r#return::builtin_main,
         },
     ),
 ];
