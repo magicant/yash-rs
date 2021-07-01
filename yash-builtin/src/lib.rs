@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Implementation of the shell built-in utilities.
+//!
 //! TODO Elaborate
 
-mod alias;
-mod r#return;
+pub mod alias;
+pub mod r#return;
 
 pub use self::alias::alias_builtin;
 pub use self::alias::alias_builtin_async;
