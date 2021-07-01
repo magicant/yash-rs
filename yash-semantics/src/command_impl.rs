@@ -45,11 +45,11 @@ impl Command for syntax::SimpleCommand {
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => {
-                    let (_exit_status, abort) = (builtin.execute)(env, fields).await;
+                    let (exit_status, abort) = (builtin.execute)(env, fields).await;
+                    env.exit_status = exit_status;
                     if let Some(abort) = abort {
                         return Err(abort);
                     }
-                    // TODO Set exit status to $?
                 }
                 Some(Function(function)) => {
                     println!("Function: {:?}", function);
@@ -126,6 +126,57 @@ impl Command for syntax::List {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+    use std::future::ready;
+    use std::future::Future;
+    use std::pin::Pin;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
+    use yash_env::exec::Divert;
+
+    fn return_builtin_main(
+        _env: &mut Env,
+        mut args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        let divert = match args.get(1) {
+            Some(field) if field.value == "-n" => {
+                args.remove(1);
+                None
+            }
+            _ => Some(Divert::Return),
+        };
+        let exit_status: u32 = match args.get(1) {
+            Some(field) => field.value.parse().unwrap_or(2),
+            None => 0,
+        };
+        Box::pin(ready((ExitStatus(exit_status), divert)))
+    }
+
+    fn return_builtin() -> Builtin {
+        Builtin {
+            r#type: Special,
+            execute: return_builtin_main,
+        }
+    }
+
+    #[test]
+    fn simple_command_returns_exit_status_from_builtin_without_divert() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let command: syntax::SimpleCommand = "return -n 93".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(93));
+    }
+
+    #[test]
+    fn simple_command_returns_exit_status_from_builtin_with_divert() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let command: syntax::SimpleCommand = "return 37".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(37));
+    }
 
     #[test]
     fn exit_status_is_127_on_command_not_found() {

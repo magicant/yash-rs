@@ -83,6 +83,8 @@ pub enum Divert {
     },
     /// Continue the current loop.
     Continue,
+    /// Return from the current function or script.
+    Return,
 }
 
 /// Result of command execution.
