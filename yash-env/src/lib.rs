@@ -91,6 +91,18 @@ pub trait System: Debug {
 
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
+
+    /// Clones the current shell process.
+    ///
+    /// This is a thin wrapper around the `fork` system call. Users of `Env`
+    /// should not call it directly. Instead, use [`Env::new_subshell`] so that
+    /// the environment can manage the created child process as a job member.
+    ///
+    /// # Safety
+    ///
+    /// See [nix's documentation](nix::unistd::fork) to learn why this function
+    /// is unsafe.
+    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult>;
 }
 
 // Auto-derived Clone cannot be used for this because `System` cannot be a
@@ -116,5 +128,10 @@ impl Env {
             variables: Default::default(),
             system: Box::new(VirtualSystem::default()),
         }
+    }
+
+    /// TODO
+    pub fn new_subshell(&mut self) {
+        todo!()
     }
 }

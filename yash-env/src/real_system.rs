@@ -63,4 +63,8 @@ impl System for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
     }
+
+    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
+        nix::unistd::fork()
+    }
 }
