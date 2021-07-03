@@ -123,8 +123,8 @@ pub use real_system::RealSystem;
 pub use virtual_system::VirtualSystem;
 
 impl Env {
-    /// Creates a new empty virtual environment.
-    pub fn new_virtual() -> Env {
+    /// Creates a new environment with the given system.
+    pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
             builtins: Default::default(),
@@ -132,8 +132,13 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             variables: Default::default(),
-            system: Box::new(VirtualSystem::default()),
+            system,
         }
+    }
+
+    /// Creates a new empty virtual environment.
+    pub fn new_virtual() -> Env {
+        Env::with_system(Box::new(VirtualSystem::default()))
     }
 
     /// TODO
