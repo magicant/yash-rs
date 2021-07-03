@@ -14,17 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Implementation of the shell built-in utilities.
+//!
 //! TODO Elaborate
 
-mod alias;
-mod r#return;
+pub mod alias;
+pub mod r#return;
 
-pub use self::alias::alias_builtin;
-pub use self::alias::alias_builtin_async;
-pub use self::alias::AliasBuiltinEnv;
-pub use self::r#return::return_builtin;
-pub use self::r#return::return_builtin_async;
-pub use self::r#return::ReturnBuiltinEnv;
 pub use yash_env::builtin::*;
 
 use Type::{Intrinsic, Special};
@@ -35,14 +31,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "alias",
         Builtin {
             r#type: Intrinsic,
-            execute: alias_builtin_async,
+            execute: alias::builtin_main,
         },
     ),
     (
         "return",
         Builtin {
             r#type: Special,
-            execute: return_builtin_async,
+            execute: r#return::builtin_main,
         },
     ),
 ];
