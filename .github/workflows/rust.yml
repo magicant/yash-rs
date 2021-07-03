@@ -17,9 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: |
-        cargo build --verbose
-        cargo build --verbose --no-default-features --package yash-env
+      run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
     - name: Lint

@@ -48,12 +48,6 @@ fn is_regular_file(path: &CStr) -> bool {
 /// `RealSystem`. Having more than one instance of `RealSystem` to manipulate
 /// the system concurrently is not a good idea since all the `RealSystem`s
 /// interact with one and the same system.
-///
-/// # Feature availability
-///
-/// `RealSystem` is available by default, but can be excluded by disabling the
-/// `real-system` feature of the `yash-env` crate. This would remove dependency
-/// on the `nix` crate.
 #[derive(Debug)]
 pub struct RealSystem;
 

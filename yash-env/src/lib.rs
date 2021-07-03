@@ -35,11 +35,9 @@ pub mod builtin;
 pub mod exec;
 pub mod expansion;
 pub mod function;
+mod real_system;
 pub mod variable;
 pub mod virtual_system;
-
-#[cfg(feature = "real-system")]
-mod real_system;
 
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
@@ -103,7 +101,6 @@ impl Clone for Box<dyn System> {
     }
 }
 
-#[cfg(feature = "real-system")]
 pub use real_system::RealSystem;
 
 pub use virtual_system::VirtualSystem;
