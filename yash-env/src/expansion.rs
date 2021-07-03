@@ -46,6 +46,7 @@ impl Field {
     /// The value of the resulting field will be `value.into()`.
     /// The origin of the field will be created by [`Location::dummy`] with a
     /// clone of the value.
+    #[inline]
     pub fn dummy<S: Into<String>>(value: S) -> Field {
         fn with_value(value: String) -> Field {
             let origin = Location::dummy(value.clone());

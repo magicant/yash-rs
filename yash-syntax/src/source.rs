@@ -185,6 +185,7 @@ impl Location {
     /// line and column numbers are 1.
     ///
     /// This function is mainly for use in testing.
+    #[inline]
     pub fn dummy<S: Into<String>>(line: S) -> Location {
         fn with_line(line: String) -> Location {
             let number = NonZeroU64::new(1).unwrap();
