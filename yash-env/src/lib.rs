@@ -35,6 +35,7 @@ pub mod builtin;
 pub mod exec;
 pub mod expansion;
 pub mod function;
+pub mod job;
 mod real_system;
 pub mod variable;
 pub mod virtual_system;
@@ -42,6 +43,7 @@ pub mod virtual_system;
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
+use self::job::JobSet;
 use self::variable::VariableSet;
 use std::collections::HashMap;
 use std::ffi::CStr;
@@ -71,6 +73,9 @@ pub struct Env {
 
     /// Functions defined in the environment.
     pub functions: FunctionSet,
+
+    /// Jobs managed in the environment.
+    pub jobs: JobSet,
 
     /// Variables and positional parameters defined in the environment.
     pub variables: VariableSet,
@@ -125,6 +130,7 @@ impl Env {
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
+            jobs: Default::default(),
             variables: Default::default(),
             system: Box::new(VirtualSystem::default()),
         }
