@@ -91,7 +91,7 @@ impl Env for yash_env::Env {}
 /// See the [module-level documentation](self) for details.
 pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
-    let exit_status: u32 = match args.get(2) {
+    let exit_status = match args.get(2) {
         Some(field) => field.value.parse().unwrap_or(2),
         None => 0,
     };
