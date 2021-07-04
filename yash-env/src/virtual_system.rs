@@ -46,6 +46,9 @@ pub struct VirtualSystem {
 
     /// Results of future calls to [`fork`](Self::fork).
     pub pending_forks: VecDeque<nix::Result<nix::unistd::ForkResult>>,
+
+    /// Results of future calls to [`wait`](Self::wait).
+    pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
 }
 
 impl VirtualSystem {
@@ -54,6 +57,7 @@ impl VirtualSystem {
         VirtualSystem {
             file_system: FileSystem::default(),
             pending_forks: Default::default(),
+            pending_waits: Default::default(),
         }
     }
 }
@@ -99,6 +103,17 @@ impl System for VirtualSystem {
         self.pending_forks
             .pop_front()
             .expect("pending_forks must be filled before calling fork")
+    }
+
+    /// Simulates awaiting child process status update.
+    ///
+    /// This implementation pops the first entry from
+    /// [`pending_waits`](VirtualSystem::pending_waits) and returns it.
+    /// If `pending_waits` is empty, this function will **panic**!
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+        self.pending_waits
+            .pop_front()
+            .expect("pending_waits must be filled before calling wait")
     }
 }
 

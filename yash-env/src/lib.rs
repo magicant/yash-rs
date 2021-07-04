@@ -108,6 +108,15 @@ pub trait System: Debug {
     /// See [nix's documentation](nix::unistd::fork) to learn why this function
     /// is unsafe.
     unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult>;
+
+    /// Reports updated status of a child process.
+    ///
+    /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
+    /// should not call it directly. Use dedicated job-managing functions
+    /// instead.
+    ///
+    /// TODO Describe the non-blocking nature of this function
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 }
 
 // Auto-derived Clone cannot be used for this because `System` cannot be a

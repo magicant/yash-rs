@@ -67,4 +67,11 @@ impl System for RealSystem {
     unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
         nix::unistd::fork()
     }
+
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+        use nix::sys::wait::WaitPidFlag;
+        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
+        // TODO Should set WNOHANG too
+        nix::sys::wait::waitpid(None, options.into())
+    }
 }
