@@ -216,6 +216,7 @@ impl Env {
                 }
             }
             Ok(Child) => {
+                // TODO Reset traps
                 // TODO Push a subshell state to the execution context stack
                 f(self);
                 Err(Divert::Exit(self.exit_status))
