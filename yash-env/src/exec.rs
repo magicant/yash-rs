@@ -87,6 +87,8 @@ pub enum Divert {
     Continue,
     /// Return from the current function or script.
     Return,
+    /// Exit from the current shell execution environment.
+    Exit(ExitStatus),
 }
 
 /// Result of command execution.
