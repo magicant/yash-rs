@@ -26,7 +26,9 @@
 use crate::System;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::fmt::Debug;
 use std::path::Path;
 use std::path::PathBuf;
@@ -114,6 +116,22 @@ impl System for VirtualSystem {
         self.pending_waits
             .pop_front()
             .expect("pending_waits must be filled before calling wait")
+    }
+
+    /// **Panic!**
+    ///
+    /// The `execve` system call cannot be simulated in the userland. This
+    /// function always panics.
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        _envs: &[CString],
+    ) -> nix::Result<Infallible> {
+        panic!(
+            "VirtualSystem::execve called for path={:?}, args={:?}",
+            path, args
+        );
     }
 }
 

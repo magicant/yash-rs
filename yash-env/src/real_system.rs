@@ -21,7 +21,9 @@ use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
+use std::convert::Infallible;
 use std::ffi::CStr;
+use std::ffi::CString;
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -73,5 +75,21 @@ impl System for RealSystem {
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
         // TODO Should set WNOHANG too
         nix::sys::wait::waitpid(None, options.into())
+    }
+
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> nix::Result<Infallible> {
+        loop {
+            use nix::errno::Errno::EINTR;
+            // TODO Use Result::into_err
+            let result = nix::unistd::execve(path, args, envs);
+            if result != Err(nix::Error::Sys(EINTR)) {
+                return result;
+            }
+        }
     }
 }

@@ -47,7 +47,9 @@ use self::job::JobSet;
 use self::variable::VariableSet;
 use crate::exec::Divert;
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::fmt::Debug;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -119,6 +121,17 @@ pub trait System: Debug {
     ///
     /// TODO Describe the non-blocking nature of this function
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
+
+    // TODO Consider passing raw pointers for optimization
+    /// Replaces the current process with an external utility.
+    ///
+    /// This is a thin wrapper around the `execve` system call.
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> nix::Result<Infallible>;
 }
 
 // Auto-derived Clone cannot be used for this because `System` cannot be a
