@@ -25,11 +25,13 @@
 
 use crate::System;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::path::Path;
 use std::path::PathBuf;
 
+// TODO VirtualSystem is not PartialEq because ForkResult is not.
 /// Simulated system.
 ///
 /// See the [module-level documentation](self) to grasp a basic understanding of
@@ -37,10 +39,16 @@ use std::path::PathBuf;
 ///
 /// The `Clone` implementation for `VirtualSystem` creates an entire copy that
 /// works independently of the original.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct VirtualSystem {
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
+
+    /// Results of future calls to [`fork`](Self::fork).
+    pub pending_forks: VecDeque<nix::Result<nix::unistd::ForkResult>>,
+
+    /// Results of future calls to [`wait`](Self::wait).
+    pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
 }
 
 impl VirtualSystem {
@@ -48,6 +56,8 @@ impl VirtualSystem {
     pub fn new() -> VirtualSystem {
         VirtualSystem {
             file_system: FileSystem::default(),
+            pending_forks: Default::default(),
+            pending_waits: Default::default(),
         }
     }
 }
@@ -77,6 +87,33 @@ impl System for VirtualSystem {
             None => false,
             Some(inode) => inode.permissions.0 & 0o111 != 0,
         }
+    }
+
+    /// Simulates cloning the current shell process.
+    ///
+    /// This implementation pops the first entry from
+    /// [`pending_forks`](VirtualSystem::pending_forks) and returns it.
+    /// If `pending_forks` is empty, this function will **panic**!
+    ///
+    /// # Safety
+    ///
+    /// Though [`System::fork`] is declared `unsafe`, this implementation of
+    /// `fork` is safe.
+    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
+        self.pending_forks
+            .pop_front()
+            .expect("pending_forks must be filled before calling fork")
+    }
+
+    /// Simulates awaiting child process status update.
+    ///
+    /// This implementation pops the first entry from
+    /// [`pending_waits`](VirtualSystem::pending_waits) and returns it.
+    /// If `pending_waits` is empty, this function will **panic**!
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+        self.pending_waits
+            .pop_front()
+            .expect("pending_waits must be filled before calling wait")
     }
 }
 

@@ -16,18 +16,20 @@
 
 //! Type definitions for command execution.
 
+use std::os::raw::c_int;
+
 /// Number that summarizes the result of command execution.
 ///
-/// An exit status is a non-negative integer returned from a utility (or
-/// command) when executed. It usually is a summarized result of the execution.
-/// Many utilities return an exit status of zero when successful and non-zero
+/// An exit status is an integer returned from a utility (or command) when
+/// executed. It usually is a summarized result of the execution.  Many
+/// utilities return an exit status of zero when successful and non-zero
 /// otherwise.
 ///
 /// In the shell language, the special parameter `$?` expands to the exit status
 /// of the last executed command. Exit statuses also affect the behavior of some
 /// compound commands.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ExitStatus(pub u32);
+pub struct ExitStatus(pub c_int);
 
 impl std::fmt::Display for ExitStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -35,14 +37,14 @@ impl std::fmt::Display for ExitStatus {
     }
 }
 
-impl From<u32> for ExitStatus {
-    fn from(value: u32) -> ExitStatus {
+impl From<c_int> for ExitStatus {
+    fn from(value: c_int) -> ExitStatus {
         ExitStatus(value)
     }
 }
 
-impl From<ExitStatus> for u32 {
-    fn from(exit_status: ExitStatus) -> u32 {
+impl From<ExitStatus> for c_int {
+    fn from(exit_status: ExitStatus) -> c_int {
         exit_status.0
     }
 }
@@ -85,6 +87,8 @@ pub enum Divert {
     Continue,
     /// Return from the current function or script.
     Return,
+    /// Exit from the current shell execution environment.
+    Exit(ExitStatus),
 }
 
 /// Result of command execution.

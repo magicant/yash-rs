@@ -144,7 +144,7 @@ mod tests {
             }
             _ => Some(Divert::Return),
         };
-        let exit_status: u32 = match args.get(1) {
+        let exit_status = match args.get(1) {
             Some(field) => field.value.parse().unwrap_or(2),
             None => 0,
         };

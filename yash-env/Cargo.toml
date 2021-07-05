@@ -16,9 +16,5 @@ publish = false
 
 [dependencies]
 either = "1.6.1"
-nix = { version = "0.21.0", optional = true }
+nix = "0.21.0"
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
-
-[features]
-default = ["real-system"]
-real-system = ["nix"]

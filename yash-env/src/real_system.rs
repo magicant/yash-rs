@@ -48,12 +48,6 @@ fn is_regular_file(path: &CStr) -> bool {
 /// `RealSystem`. Having more than one instance of `RealSystem` to manipulate
 /// the system concurrently is not a good idea since all the `RealSystem`s
 /// interact with one and the same system.
-///
-/// # Feature availability
-///
-/// `RealSystem` is available by default, but can be excluded by disabling the
-/// `real-system` feature of the `yash-env` crate. This would remove dependency
-/// on the `nix` crate.
 #[derive(Debug)]
 pub struct RealSystem;
 
@@ -68,5 +62,16 @@ impl System for RealSystem {
 
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
+    }
+
+    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
+        nix::unistd::fork()
+    }
+
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+        use nix::sys::wait::WaitPidFlag;
+        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
+        // TODO Should set WNOHANG too
+        nix::sys::wait::waitpid(None, options.into())
     }
 }

@@ -53,6 +53,7 @@ async fn parse_and_print() {
         builtins: builtin::BUILTINS.iter().copied().collect(),
         exit_status: Default::default(),
         functions: Default::default(),
+        jobs: Default::default(),
         variables: Default::default(),
         system: Box::new(RealSystem),
     };

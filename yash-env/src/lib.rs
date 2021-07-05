@@ -35,16 +35,17 @@ pub mod builtin;
 pub mod exec;
 pub mod expansion;
 pub mod function;
+pub mod job;
+mod real_system;
 pub mod variable;
 pub mod virtual_system;
-
-#[cfg(feature = "real-system")]
-mod real_system;
 
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
+use self::job::JobSet;
 use self::variable::VariableSet;
+use crate::exec::Divert;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fmt::Debug;
@@ -74,6 +75,9 @@ pub struct Env {
     /// Functions defined in the environment.
     pub functions: FunctionSet,
 
+    /// Jobs managed in the environment.
+    pub jobs: JobSet,
+
     /// Variables and positional parameters defined in the environment.
     pub variables: VariableSet,
 
@@ -93,6 +97,28 @@ pub trait System: Debug {
 
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
+
+    /// Clones the current shell process.
+    ///
+    /// This is a thin wrapper around the `fork` system call. Users of `Env`
+    /// should not call it directly. Instead, use [`Env::run_in_subshell`] so
+    /// that the environment can manage the created child process as a job
+    /// member.
+    ///
+    /// # Safety
+    ///
+    /// See [nix's documentation](nix::unistd::fork) to learn why this function
+    /// is unsafe.
+    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult>;
+
+    /// Reports updated status of a child process.
+    ///
+    /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
+    /// should not call it directly. Use dedicated job-managing functions
+    /// instead.
+    ///
+    /// TODO Describe the non-blocking nature of this function
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 }
 
 // Auto-derived Clone cannot be used for this because `System` cannot be a
@@ -103,21 +129,140 @@ impl Clone for Box<dyn System> {
     }
 }
 
-#[cfg(feature = "real-system")]
 pub use real_system::RealSystem;
 
 pub use virtual_system::VirtualSystem;
 
 impl Env {
-    /// Creates a new empty virtual environment.
-    pub fn new_virtual() -> Env {
+    /// Creates a new environment with the given system.
+    pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
+            jobs: Default::default(),
             variables: Default::default(),
-            system: Box::new(VirtualSystem::default()),
+            system,
         }
     }
+
+    /// Creates a new empty virtual environment.
+    pub fn new_virtual() -> Env {
+        Env::with_system(Box::new(VirtualSystem::default()))
+    }
+
+    /// Runs the argument function in a subshell.
+    ///
+    /// This function creates a new (real or virtual) subshell in which the
+    /// argument function is run and waits for the subshell to finish.
+    ///
+    /// A real subshell is a subshell that is implemented as a child process of
+    /// the current shell process. After executing the argument function, the
+    /// child process must immediately exit with the exit status returned from
+    /// the function.
+    ///
+    /// A virtual subshell is a separate shell execution environment that is
+    /// simulated in the current shell process. It is used to avoid the overhead
+    /// of forking a real subshell when the function's task does not depend on a
+    /// real subshell. Note that this function can start with a virtual subshell
+    /// and then switch to a real subshell if needed in the middle of the
+    /// execution.
+    ///
+    /// This function does not support job control. If the subshell suspends,
+    /// the current shell continues waiting for the subshell to finish, so it
+    /// must be resumed by some other means.
+    ///
+    /// # Return value
+    ///
+    /// If this function chooses to create a real subshell, it returns twice:
+    /// once in the current (original) shell process and the other in the child
+    /// process.
+    ///
+    /// In the current process, this function usually returns `Ok(Ok(e))`, where
+    /// `e` is the exit status of the subshell that is obtained from the
+    /// subshell environment after the argument function returns. If an error
+    /// occurs in [`fork`](System::fork), the error is returned as
+    /// `Ok(Err(...))`.
+    ///
+    /// In the child process, this function returns `Err(Divert::Exit(e))`. The
+    /// `Divert` value must be propagated in the call stack so that the child
+    /// process immediately exits with the exit status contained in the value.
+    pub fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
+    where
+        F: FnOnce(&mut Env),
+    {
+        // TODO Use a virtual subshell when possible
+        use nix::sys::wait::WaitStatus;
+        use nix::unistd::ForkResult::*;
+        match unsafe { self.system.fork() } {
+            Ok(Parent { child }) => {
+                match self.system.wait() {
+                    Ok(WaitStatus::Exited(pid, exit_status)) => {
+                        // TODO This assertion is not correct. We need to handle
+                        // other possibly existing child processes.
+                        assert_eq!(pid, child);
+                        Ok(Ok(ExitStatus(exit_status)))
+                    }
+                    Ok(WaitStatus::Signaled(pid, _signal, _core_dumped)) => {
+                        // TODO This assertion is not correct. We need to handle
+                        // other possibly existing child processes.
+                        assert_eq!(pid, child);
+                        // TODO Convert signal to exit status
+                        Ok(Ok(ExitStatus(128)))
+                    }
+                    Ok(_) => todo!(),
+                    Err(e) => Ok(Err(e)),
+                }
+            }
+            Ok(Child) => {
+                // TODO Reset traps
+                // TODO Push a subshell state to the execution context stack
+                f(self);
+                Err(Divert::Exit(self.exit_status))
+            }
+            Err(_e) => {
+                // TODO Return error
+                todo!()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nix::sys::wait::WaitStatus;
+    use nix::unistd::ForkResult;
+    use nix::unistd::Pid;
+
+    #[test]
+    fn run_in_subshell_parent() {
+        let child = Pid::from_raw(12345);
+        let status = 97;
+        let mut system = VirtualSystem::default();
+        system
+            .pending_forks
+            .push_back(Ok(ForkResult::Parent { child }));
+        system
+            .pending_waits
+            .push_back(Ok(WaitStatus::Exited(child, status)));
+        let mut env = Env::with_system(Box::new(system));
+        let result = env.run_in_subshell(|_| unreachable!());
+        assert_eq!(result, Ok(Ok(ExitStatus(status))));
+    }
+
+    // TODO Test case for parent with signaled child
+
+    #[test]
+    fn run_in_subshell_child() {
+        let status = ExitStatus(71);
+        let mut system = VirtualSystem::default();
+        system.pending_forks.push_back(Ok(ForkResult::Child));
+        let mut env = Env::with_system(Box::new(system));
+        let result = env.run_in_subshell(|env| env.exit_status = status);
+        assert_eq!(result, Err(Divert::Exit(status)));
+    }
+
+    // TODO Test case where fork fails
 }
