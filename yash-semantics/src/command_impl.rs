@@ -20,11 +20,20 @@ use super::Command;
 use crate::command_search::search;
 use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
+use std::ffi::CString;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::Env;
 use yash_syntax::syntax;
+
+/// Converts fields to C strings.
+fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
+    // TODO return something rather than dropping null-containing strings
+    s.into_iter()
+        .filter_map(|f| CString::new(f.value).ok())
+        .collect()
+}
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
