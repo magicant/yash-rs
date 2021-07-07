@@ -65,8 +65,21 @@ impl Command for syntax::SimpleCommand {
                     // TODO Call the function
                 }
                 Some(External { path }) => {
-                    println!("External: {:?}", path);
-                    // TODO Execute the external utility
+                    let args = to_c_strings(fields);
+                    let envs = env.variables.env_c_strings();
+                    let result = env.run_in_subshell(|env| {
+                        match env.system.execve(path.as_c_str(), &args, &envs) {
+                            Ok(_) => unreachable!(),
+                            Err(e) => eprintln!("execve failed: {:?}", e),
+                        }
+                        // TODO Reopen as shell script on ENOEXEC
+                        // TODO Exit on failure
+                    })?;
+                    if let Ok(exit_status) = result {
+                        env.exit_status = exit_status;
+                    } else {
+                        // TODO Print message on fork failure
+                    }
                 }
                 None => {
                     eprintln!("{}: command not found", name.value);
