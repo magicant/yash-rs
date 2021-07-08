@@ -233,6 +233,13 @@ impl Env {
                 // TODO Push a subshell state to the execution context stack
                 f(self);
                 Err(Divert::Exit(self.exit_status))
+                // TODO Should we directly exit here rather than returning
+                // Divert::Exit?
+                //  - Does stack unwinding not have any unexpected side effect?
+                //  - How does the caller know that we're exiting from a
+                //    subshell, not from the main shell process? For example,
+                //    an interactive shell with a suspended job may refuse to
+                //    exit.
             }
             Err(e) => Ok(Err(e)),
         }

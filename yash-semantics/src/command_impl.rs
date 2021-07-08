@@ -76,6 +76,8 @@ impl Command for syntax::SimpleCommand {
                     let args = to_c_strings(fields);
                     let envs = env.variables.env_c_strings();
                     let result = env.run_in_subshell(|env| {
+                        // TODO Remove signal handlers not set by current traps
+
                         let result = env.system.execve(path.as_c_str(), &args, &envs);
                         // TODO Prefer into_err to unwrap_err
                         let e = result.unwrap_err();
