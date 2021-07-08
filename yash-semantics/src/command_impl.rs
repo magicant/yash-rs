@@ -20,6 +20,7 @@ use super::Command;
 use crate::command_search::search;
 use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
+use nix::errno::Errno;
 use std::ffi::CString;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
@@ -37,6 +38,13 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
+    /// Executes the simple command.
+    ///
+    /// TODO Elaborate
+    ///
+    /// POSIX does not define the exit status when the `execve` system call
+    /// fails for a reason other than `ENOEXEC`. In this implementation, the
+    /// exit status is 127 for `ENOENT` and `ENOTDIR` and 126 for others.
     async fn execute(&self, env: &mut Env) -> Result {
         // TODO expand words correctly
         let fields: Vec<_> = self
@@ -68,12 +76,20 @@ impl Command for syntax::SimpleCommand {
                     let args = to_c_strings(fields);
                     let envs = env.variables.env_c_strings();
                     let result = env.run_in_subshell(|env| {
-                        match env.system.execve(path.as_c_str(), &args, &envs) {
-                            Ok(_) => unreachable!(),
-                            Err(e) => eprintln!("execve failed: {:?}", e),
-                        }
+                        let result = env.system.execve(path.as_c_str(), &args, &envs);
+                        // TODO Prefer into_err to unwrap_err
+                        let e = result.unwrap_err();
                         // TODO Reopen as shell script on ENOEXEC
-                        // TODO Exit on failure
+                        match e {
+                            nix::Error::Sys(Errno::ENOENT) | nix::Error::Sys(Errno::ENOTDIR) => {
+                                env.exit_status = ExitStatus::NOT_FOUND;
+                            }
+                            _ => {
+                                env.exit_status = ExitStatus::NOEXEC;
+                            }
+                        }
+                        // TODO The error message should be printed via Env
+                        eprintln!("command execution failed: {:?}", e);
                     })?;
                     if let Ok(exit_status) = result {
                         env.exit_status = exit_status;
@@ -222,7 +238,32 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         unreachable!("{:?}", result);
     }
-    // TODO test external utility invocation
+
+    #[test]
+    fn simple_command_subshell_exits_with_127_for_non_existing_file() {
+        let mut system = VirtualSystem::new();
+        system.pending_forks.push_back(Ok(ForkResult::Child));
+
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOT_FOUND)));
+    }
+
+    #[test]
+    fn simple_command_subshell_exits_with_126_on_exec_failure() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
+        system.file_system.save(path, content);
+        system.pending_forks.push_back(Ok(ForkResult::Child));
+
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
+    }
 
     #[test]
     fn exit_status_is_127_on_command_not_found() {
