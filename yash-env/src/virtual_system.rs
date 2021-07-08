@@ -44,7 +44,7 @@ use std::path::PathBuf;
 ///
 /// The `Clone` implementation for `VirtualSystem` creates an entire copy that
 /// works independently of the original.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct VirtualSystem {
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
@@ -59,18 +59,7 @@ pub struct VirtualSystem {
 impl VirtualSystem {
     /// Creates a virtual system with an empty state.
     pub fn new() -> VirtualSystem {
-        VirtualSystem {
-            file_system: FileSystem::default(),
-            pending_forks: Default::default(),
-            pending_waits: Default::default(),
-        }
-    }
-}
-
-impl Default for VirtualSystem {
-    /// Creates a virtual system with a sensible default state.
-    fn default() -> VirtualSystem {
-        VirtualSystem::new()
+        VirtualSystem::default()
     }
 }
 
