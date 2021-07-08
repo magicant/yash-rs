@@ -91,10 +91,16 @@ impl Command for syntax::SimpleCommand {
                         // TODO The error message should be printed via Env
                         eprintln!("command execution failed: {:?}", e);
                     })?;
-                    if let Ok(exit_status) = result {
-                        env.exit_status = exit_status;
-                    } else {
-                        // TODO Print message on fork failure
+
+                    match result {
+                        Ok(exit_status) => {
+                            env.exit_status = exit_status;
+                        }
+                        Err(e) => {
+                            // TODO The error message should be printed via Env
+                            eprintln!("command execution failed: {:?}", e);
+                            env.exit_status = ExitStatus::NOEXEC;
+                        }
                     }
                 }
                 None => {
@@ -284,6 +290,18 @@ mod tests {
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
+    }
+
+    #[test]
+    fn simple_command_returns_126_on_fork_failure() {
+        let mut system = VirtualSystem::new();
+        system.pending_forks.push_back(Err(Errno::ENOMEM.into()));
+
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
     #[test]

@@ -234,10 +234,7 @@ impl Env {
                 f(self);
                 Err(Divert::Exit(self.exit_status))
             }
-            Err(_e) => {
-                // TODO Return error
-                todo!()
-            }
+            Err(e) => Ok(Err(e)),
         }
     }
 }
