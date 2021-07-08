@@ -19,8 +19,11 @@
 //! This module provides data types for defining shell variables.
 
 use either::{Left, Right};
+use itertools::Itertools;
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::ffi::CString;
+use std::fmt::Write;
 use std::hash::Hash;
 use yash_syntax::source::Location;
 
@@ -126,6 +129,28 @@ impl VariableSet {
     pub fn assign(&mut self, name: String, value: Variable) -> Option<Variable> {
         self.0.insert(name, value)
     }
+
+    /// Returns environment variables in a new vector of C string.
+    #[must_use]
+    pub fn env_c_strings(&self) -> Vec<CString> {
+        self.0
+            .iter()
+            .filter_map(|(name, var)| {
+                if var.is_exported {
+                    let mut s = name.clone();
+                    s.push('=');
+                    match &var.value {
+                        Value::Scalar(value) => s.push_str(value),
+                        Value::Array(values) => write!(s, "{}", values.iter().format(":")).ok()?,
+                    }
+                    // TODO return something rather than dropping null-containing strings
+                    CString::new(s).ok()
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -143,5 +168,58 @@ mod tests {
         };
         variables.assign("foo".to_string(), variable.clone());
         assert_eq!(variables.get("foo"), Some(&variable));
+    }
+
+    #[test]
+    fn env_c_strings() {
+        let mut variables = VariableSet::new();
+        assert_eq!(&variables.env_c_strings(), &[]);
+
+        variables.assign(
+            "foo".to_string(),
+            Variable {
+                value: Value::Scalar("FOO".to_string()),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        );
+        variables.assign(
+            "bar".to_string(),
+            Variable {
+                value: Value::Array(vec!["BAR".to_string()]),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        );
+        variables.assign(
+            "baz".to_string(),
+            Variable {
+                value: Value::Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        );
+        variables.assign(
+            "null".to_string(),
+            Variable {
+                value: Value::Scalar("not exported".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        );
+        let mut ss = variables.env_c_strings();
+        ss.sort_unstable();
+        assert_eq!(
+            &ss,
+            &[
+                CString::new("bar=BAR").unwrap(),
+                CString::new("baz=1:two:3").unwrap(),
+                CString::new("foo=FOO").unwrap()
+            ]
+        );
     }
 }

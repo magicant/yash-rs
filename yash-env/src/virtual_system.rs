@@ -24,10 +24,15 @@
 //! This module also defines elements that compose a virtual system.
 
 use crate::System;
+use nix::errno::Errno;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::ffi::CStr;
+use std::ffi::CString;
+use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -115,6 +120,34 @@ impl System for VirtualSystem {
             .pop_front()
             .expect("pending_waits must be filled before calling wait")
     }
+
+    /// **Panic!**
+    ///
+    /// The `execve` system call cannot be simulated in the userland. This
+    /// function panics if the file at `path` is a native executable. Otherwise,
+    /// it returns an error.
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        _envs: &[CString],
+    ) -> nix::Result<Infallible> {
+        let path = OsStr::from_bytes(path.to_bytes()).as_ref();
+        if let Some(file) = self.file_system.get(path) {
+            // TODO Check file permissions
+            if file.is_native_executable {
+                panic!(
+                    "VirtualSystem::execve called for path={:?}, args={:?}",
+                    path, args
+                );
+            } else {
+                Err(Errno::ENOEXEC.into())
+            }
+        } else {
+            // TODO Maybe ENOTDIR
+            Err(Errno::ENOENT.into())
+        }
+    }
 }
 
 /// Collection of files.
@@ -135,6 +168,7 @@ impl FileSystem {
 
     /// Returns a reference to the existing file at the specified path.
     pub fn get(&self, path: &Path) -> Option<&INode> {
+        // TODO Return ENOTDIR or ENOENT if not found
         self.0.get(path)
     }
 }
@@ -142,7 +176,10 @@ impl FileSystem {
 /// File on the file system.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct INode {
+    /// Access permissions.
     pub permissions: Mode,
+    /// Whether this file is a native binary that can be exec'ed.
+    pub is_native_executable: bool,
     // TODO File content, owner user and group, etc.
 }
 
@@ -199,5 +236,39 @@ mod tests {
         content.permissions.0 |= 0o100;
         system.file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    #[should_panic(expected = r#"VirtualSystem::execve called for path="/some/file", args=[]"#)]
+    fn execve_panics_for_executable_file() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
+        content.is_native_executable = true;
+        system.file_system.save(path.clone(), content);
+        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let result = system.execve(&path, &[], &[]);
+        unreachable!("{:?}", result);
+    }
+
+    #[test]
+    fn execve_returns_for_non_executable_file() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
+        system.file_system.save(path.clone(), content);
+        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let result = system.execve(&path, &[], &[]);
+        assert_eq!(result, Err(Errno::ENOEXEC.into()));
+    }
+
+    #[test]
+    fn execve_returns_on_file_not_found() {
+        let mut system = VirtualSystem::new();
+        let path = CString::new("/no/such/file").unwrap();
+        let result = system.execve(&path, &[], &[]);
+        assert_eq!(result, Err(Errno::ENOENT.into()));
     }
 }
