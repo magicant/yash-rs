@@ -164,7 +164,9 @@ impl Command for syntax::List {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+    use nix::sys::wait::WaitStatus;
     use nix::unistd::ForkResult;
+    use nix::unistd::Pid;
     use std::future::ready;
     use std::future::Future;
     use std::path::PathBuf;
@@ -218,6 +220,25 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
+    }
+
+    #[test]
+    fn simple_command_returns_exit_status_from_external_utility() {
+        let child = Pid::from_raw(1234);
+        let status = 54;
+        let mut system = VirtualSystem::new();
+        system
+            .pending_forks
+            .push_back(Ok(ForkResult::Parent { child }));
+        system
+            .pending_waits
+            .push_back(Ok(WaitStatus::Exited(child, status)));
+
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(status));
     }
 
     #[test]
