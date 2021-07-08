@@ -148,12 +148,16 @@ impl Command for syntax::List {
 mod tests {
     use super::*;
     use futures::executor::block_on;
+    use nix::unistd::ForkResult;
     use std::future::ready;
     use std::future::Future;
+    use std::path::PathBuf;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
+    use yash_env::virtual_system::INode;
+    use yash_env::VirtualSystem;
 
     fn return_builtin_main(
         _env: &mut Env,
@@ -199,6 +203,26 @@ mod tests {
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
+
+    #[test]
+    #[should_panic(
+        expected = r#"VirtualSystem::execve called for path="/some/file", args=["/some/file", "foo", "bar"]"#
+    )]
+    fn simple_command_invokes_external_utility_in_subshell() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
+        content.is_native_executable = true;
+        system.file_system.save(path, content);
+        system.pending_forks.push_back(Ok(ForkResult::Child));
+
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        unreachable!("{:?}", result);
+    }
+    // TODO test external utility invocation
 
     #[test]
     fn exit_status_is_127_on_command_not_found() {
