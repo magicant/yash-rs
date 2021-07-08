@@ -17,5 +17,5 @@
 //! TODO Elaborate
 
 fn main() {
-    yash::bin_main()
+    std::process::exit(yash::bin_main());
 }

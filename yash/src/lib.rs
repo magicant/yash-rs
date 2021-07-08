@@ -22,7 +22,7 @@ pub use yash_semantics as semantics;
 pub use yash_syntax::*;
 
 // TODO Allow user to select input source
-async fn parse_and_print() {
+async fn parse_and_print() -> i32 {
     use env::Env;
     use env::RealSystem;
     use semantics::Command;
@@ -73,7 +73,7 @@ async fn parse_and_print() {
         let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
         let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
         match parser.command_line().await {
-            Ok(None) => break,
+            Ok(None) => break env.exit_status.0,
             Ok(Some(command)) => command
                 .execute(&mut env)
                 .await
@@ -85,11 +85,7 @@ async fn parse_and_print() {
     }
 }
 
-pub fn bin_main() {
+pub fn bin_main() -> i32 {
     let mut pool = futures::executor::LocalPool::new();
-    use futures::task::LocalSpawnExt;
-    pool.spawner()
-        .spawn_local(parse_and_print())
-        .expect("spawn should succeed");
-    pool.run();
+    pool.run_until(parse_and_print())
 }
