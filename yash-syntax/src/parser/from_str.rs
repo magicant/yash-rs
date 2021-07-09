@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use self::future_util::unwrap_ready;
 use super::fill::Fill;
 use super::fill::MissingHereDoc;
 use super::lex::Lexer;
@@ -28,46 +27,18 @@ use super::Rec;
 use crate::source::Source;
 use crate::syntax::*;
 use std::convert::TryInto;
+use std::future::Future;
 use std::iter::empty;
 use std::str::FromStr;
-
-// TODO Consider moving FromStr implementations to dedicated files
 
 // TODO Most FromStr implementations in this file ignore trailing redundant
 // tokens, which should be rejected.
 
-mod future_util {
-    use std::future::Future;
-    use std::task::Context;
-    use std::task::Poll;
-    use std::task::RawWaker;
-    use std::task::RawWakerVTable;
-    use std::task::Waker;
-
-    const DUMMY_TABLE: RawWakerVTable =
-        RawWakerVTable::new(dummy_clone, dummy_drop, dummy_drop, dummy_drop);
-
-    fn dummy_clone(data: *const ()) -> RawWaker {
-        RawWaker::new(data, &DUMMY_TABLE)
-    }
-    fn dummy_drop(_: *const ()) {}
-
-    /// Polls the given future, assuming it returns `Ready`.
-    ///
-    /// We could have used `futures::executor::block_on` to get the future
-    /// results, but it does not support reentrance; `block_on` cannot be called
-    /// inside another `block_on`. `unwrap_ready` works around that limitation
-    /// of `block_on`.
-    pub fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
-        let raw_waker = RawWaker::new(std::ptr::null(), &DUMMY_TABLE);
-        let waker = unsafe { Waker::from_raw(raw_waker) };
-        let mut context = Context::from_waker(&waker);
-        futures::pin_mut!(f);
-        match f.poll(&mut context) {
-            Poll::Ready(result) => result,
-            Poll::Pending => panic!("Expected Ready but received Pending"),
-        }
-    }
+/// Polls the given future, assuming it returns `Ready`.
+fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
+    use futures::future::FutureExt;
+    f.now_or_never()
+        .expect("Expected Ready but received Pending")
 }
 
 /// Helper for implementing FromStr.
