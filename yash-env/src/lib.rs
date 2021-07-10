@@ -17,19 +17,19 @@
 //! This crate defines the shell execution environment.
 //!
 //! A shell execution environment, [`Env`], is a collection of data that may
-//! affect or be affected by execution of commands. The environment consists of
-//! application-managed parts and system-managed parts. Application-managed
+//! affect or be affected by the execution of commands. The environment consists
+//! of application-managed parts and system-managed parts. Application-managed
 //! parts are implemented in pure Rust in this crate. Many application-managed
 //! parts like [function]s and [variable]s can be manipulated independently of
 //! interactions with the underlying system. System-managed parts, on the other
 //! hand, depend on the underlying system. Attributes like the working directory
-//! and umask are managed by the system, so they can be accessed only by
-//! interaction with the system interface.
+//! and umask are managed by the system to be accessed only by interaction with
+//! the system interface.
 //!
-//! The system-managed parts are abstracted as the [`System`] trait.
+//! The [`System`] trait is the interface to the system-managed parts.
 //! [`RealSystem`] provides an implementation for `System` that interacts with
-//! the underlying system. [`VirtualSystem`] is a dummy for simulation that
-//! works without affecting the actual system.
+//! the underlying system. [`VirtualSystem`] is a dummy for simulating the
+//! system's behavior without affecting the actual system.
 
 pub mod builtin;
 pub mod exec;
