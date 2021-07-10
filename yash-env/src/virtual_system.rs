@@ -25,6 +25,9 @@
 
 use crate::System;
 use nix::errno::Errno;
+use nix::sys::wait::WaitStatus;
+use nix::unistd::Pid;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
@@ -35,6 +38,7 @@ use std::fmt::Debug;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::task::Waker;
 
 // TODO VirtualSystem is not PartialEq because ForkResult is not.
 /// Simulated system.
@@ -54,6 +58,11 @@ pub struct VirtualSystem {
 
     /// Results of future calls to [`wait`](Self::wait).
     pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
+
+    /// State of processes in the system.
+    ///
+    /// This map does not include the initial shell process.
+    pub processes: BTreeMap<Pid, Process>,
 }
 
 impl VirtualSystem {
@@ -190,6 +199,36 @@ impl Debug for Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode(0o644)
+    }
+}
+
+/// State of a process in a [`VirtualSystem`].
+#[derive(Clone, Debug)]
+pub struct Process {
+    /// Current state of the process.
+    state: WaitStatus,
+    /// References to tasks waiting for the `state` to change.
+    awaiters: Vec<Waker>,
+}
+
+impl Process {
+    /// Creates a new process that is alive.
+    pub fn new() -> Process {
+        Process {
+            state: WaitStatus::StillAlive,
+            awaiters: Vec::new(),
+        }
+    }
+
+    /// Returns the current state of the process.
+    pub fn state(&self) -> WaitStatus {
+        self.state
+    }
+}
+
+impl Default for Process {
+    fn default() -> Self {
+        Process::new()
     }
 }
 
