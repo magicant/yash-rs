@@ -259,9 +259,12 @@ mod tests {
         let status = 97;
         let mut system = VirtualSystem::default();
         system
+            .state
+            .borrow_mut()
             .pending_forks
             .push_back(Ok(ForkResult::Parent { child }));
         system
+            .current_process_mut()
             .pending_waits
             .push_back(Ok(WaitStatus::Exited(child, status)));
         let mut env = Env::with_system(Box::new(system));
@@ -274,8 +277,12 @@ mod tests {
     #[test]
     fn run_in_subshell_child() {
         let status = ExitStatus(71);
-        let mut system = VirtualSystem::default();
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        let system = VirtualSystem::default();
+        system
+            .state
+            .borrow_mut()
+            .pending_forks
+            .push_back(Ok(ForkResult::Child));
         let mut env = Env::with_system(Box::new(system));
         let result = env.run_in_subshell(|env| env.exit_status = status);
         assert_eq!(result, Err(Divert::Exit(status)));

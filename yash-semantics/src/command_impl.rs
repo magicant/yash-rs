@@ -236,9 +236,12 @@ mod tests {
         let status = 54;
         let mut system = VirtualSystem::new();
         system
+            .state
+            .borrow_mut()
             .pending_forks
             .push_back(Ok(ForkResult::Parent { child }));
         system
+            .current_process_mut()
             .pending_waits
             .push_back(Ok(WaitStatus::Exited(child, status)));
 
@@ -254,13 +257,17 @@ mod tests {
         expected = r#"VirtualSystem::execve called for path="/some/file", args=["/some/file", "foo", "bar"]"#
     )]
     fn simple_command_invokes_external_utility_in_subshell() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
-        system.file_system.save(path, content);
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().file_system.save(path, content);
+        system
+            .state
+            .borrow_mut()
+            .pending_forks
+            .push_back(Ok(ForkResult::Child));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
@@ -270,8 +277,12 @@ mod tests {
 
     #[test]
     fn simple_command_subshell_exits_with_127_for_non_existing_file() {
-        let mut system = VirtualSystem::new();
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .pending_forks
+            .push_back(Ok(ForkResult::Child));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
@@ -281,12 +292,16 @@ mod tests {
 
     #[test]
     fn simple_command_subshell_exits_with_126_on_exec_failure() {
-        let mut system = VirtualSystem::new();
+        let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
-        system.file_system.save(path, content);
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().file_system.save(path, content);
+        system
+            .state
+            .borrow_mut()
+            .pending_forks
+            .push_back(Ok(ForkResult::Child));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
@@ -296,8 +311,12 @@ mod tests {
 
     #[test]
     fn simple_command_returns_126_on_fork_failure() {
-        let mut system = VirtualSystem::new();
-        system.pending_forks.push_back(Err(Errno::ENOMEM.into()));
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .pending_forks
+            .push_back(Err(Errno::ENOMEM.into()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
