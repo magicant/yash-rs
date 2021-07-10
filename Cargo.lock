@@ -270,6 +270,7 @@ name = "yash-env"
 version = "0.1.0"
 dependencies = [
  "either",
+ "futures",
  "itertools",
  "nix",
  "yash-syntax",

@@ -35,9 +35,11 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::future::Future;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::task::Waker;
 
 // TODO VirtualSystem is not PartialEq because ForkResult is not.
@@ -58,6 +60,9 @@ pub struct VirtualSystem {
 
     /// Results of future calls to [`wait`](Self::wait).
     pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
+
+    /// Spawner used to start a new subshell virtually.
+    pub spawner: Option<Box<dyn Spawn>>,
 
     /// State of processes in the system.
     ///
@@ -199,6 +204,35 @@ impl Debug for Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode(0o644)
+    }
+}
+
+/// Reference to an executor that can start new async tasks.
+pub trait Spawn: Debug {
+    /// Clones the spawner and returns it in a box.
+    fn clone_box(&self) -> Box<dyn Spawn>;
+
+    /// Starts a new async task.
+    ///
+    /// Returns `Ok(())` if the task has been started successfully and `Err(())`
+    /// otherwise.
+    fn spawn(&self, task: Pin<Box<dyn Future<Output = ()>>>) -> Result<(), ()>;
+}
+
+impl Clone for Box<dyn Spawn> {
+    fn clone(&self) -> Box<dyn Spawn> {
+        self.clone_box()
+    }
+}
+
+impl Spawn for futures::executor::LocalSpawner {
+    fn clone_box(&self) -> Box<dyn Spawn> {
+        Box::new(self.clone())
+    }
+
+    fn spawn(&self, task: Pin<Box<dyn Future<Output = ()>>>) -> Result<(), ()> {
+        use futures::task::LocalSpawnExt;
+        self.spawn_local(task).map_err(|_| ())
     }
 }
 
