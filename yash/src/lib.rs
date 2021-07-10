@@ -26,7 +26,9 @@ async fn parse_and_print() -> i32 {
     use env::Env;
     use env::RealSystem;
     use semantics::Command;
+    use std::cell::RefCell;
     use std::num::NonZeroU64;
+    use std::rc::Rc;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
 
@@ -55,7 +57,7 @@ async fn parse_and_print() -> i32 {
         functions: Default::default(),
         jobs: Default::default(),
         variables: Default::default(),
-        system: Box::new(RealSystem),
+        system: Rc::new(RefCell::new(RealSystem)),
     };
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.

@@ -64,10 +64,6 @@ impl VirtualSystem {
 }
 
 impl System for VirtualSystem {
-    fn clone_box(&self) -> Box<dyn System> {
-        Box::new(self.clone())
-    }
-
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable

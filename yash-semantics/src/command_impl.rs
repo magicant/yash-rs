@@ -78,7 +78,10 @@ impl Command for syntax::SimpleCommand {
                     let result = env.run_in_subshell(|env| {
                         // TODO Remove signal handlers not set by current traps
 
-                        let result = env.system.execve(path.as_c_str(), &args, &envs);
+                        let result = env
+                            .system
+                            .borrow_mut()
+                            .execve(path.as_c_str(), &args, &envs);
                         // TODO Prefer into_err to unwrap_err
                         let e = result.unwrap_err();
                         // TODO Reopen as shell script on ENOEXEC
@@ -175,10 +178,12 @@ mod tests {
     use nix::sys::wait::WaitStatus;
     use nix::unistd::ForkResult;
     use nix::unistd::Pid;
+    use std::cell::RefCell;
     use std::future::ready;
     use std::future::Future;
     use std::path::PathBuf;
     use std::pin::Pin;
+    use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
@@ -242,7 +247,7 @@ mod tests {
             .pending_waits
             .push_back(Ok(WaitStatus::Exited(child, status)));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Ok(()));
@@ -262,7 +267,7 @@ mod tests {
         system.file_system.save(path, content);
         system.pending_forks.push_back(Ok(ForkResult::Child));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         unreachable!("{:?}", result);
@@ -273,7 +278,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system.pending_forks.push_back(Ok(ForkResult::Child));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Exit(ExitStatus::NOT_FOUND)));
@@ -288,7 +293,7 @@ mod tests {
         system.file_system.save(path, content);
         system.pending_forks.push_back(Ok(ForkResult::Child));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
@@ -299,7 +304,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         system.pending_forks.push_back(Err(Errno::ENOMEM.into()));
 
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Ok(()));

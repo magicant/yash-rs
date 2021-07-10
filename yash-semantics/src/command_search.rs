@@ -111,7 +111,7 @@ impl PathEnv for Env {
         self.variables.get("PATH")
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
-        self.system.is_executable_file(path)
+        self.system.borrow().is_executable_file(path)
     }
 }
 

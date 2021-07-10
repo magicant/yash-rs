@@ -46,6 +46,7 @@ use self::function::FunctionSet;
 use self::job::JobSet;
 use self::variable::VariableSet;
 use crate::exec::Divert;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -59,7 +60,11 @@ use yash_syntax::alias::AliasSet;
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
 /// the `Env` instance. System-managed parts are abstracted as [`System`] so
-/// that they can be replaced with a dummy implementation.
+/// that you can replace them with a dummy implementation.
+///
+/// The `Clone` implementation for `Env` duplicates application-managed parts.
+/// The system-managed parts are shared among cloned `Env`s as the `System`
+/// instance is contained in `Rc<RefCell<_>>`.
 #[derive(Clone, Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
@@ -84,19 +89,22 @@ pub struct Env {
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.
-    pub system: Box<dyn System>,
+    ///
+    /// Since the `System` instance is contained in `Rc<RefCell<_>>`, you need
+    /// to borrow the `RefCell` dynamically to access the `System`. Note that if
+    /// you `.await` a future while keeping the borrow, the current thread may
+    /// switch to another async task that may simultaneously borrow the
+    /// `System`, resulting in a panic! Make sure you drop the borrow (`Ref` or
+    /// `RefMut`) before `.await`ing.
+    ///
+    /// TODO Add example code illustrating the borrow-and-await problem.
+    pub system: Rc<RefCell<dyn System>>,
 }
 
 /// Abstraction of the system-managed parts of the environment.
 ///
 /// TODO Elaborate
 pub trait System: Debug {
-    /// Clones the `System` instance and returns it in a box.
-    ///
-    /// The semantics of cloning is determined by the implementor. Especially,
-    /// a cloned [`RealSystem`] might render a surprising behavior.
-    fn clone_box(&self) -> Box<dyn System>;
-
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
 
@@ -134,21 +142,13 @@ pub trait System: Debug {
     ) -> nix::Result<Infallible>;
 }
 
-// Auto-derived Clone cannot be used for this because `System` cannot be a
-// super-trait of `Clone` as that would make the trait non-object-safe.
-impl Clone for Box<dyn System> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
 pub use real_system::RealSystem;
 
 pub use virtual_system::VirtualSystem;
 
 impl Env {
     /// Creates a new environment with the given system.
-    pub fn with_system(system: Box<dyn System>) -> Env {
+    pub fn with_system(system: Rc<RefCell<dyn System>>) -> Env {
         Env {
             aliases: Default::default(),
             builtins: Default::default(),
@@ -162,7 +162,7 @@ impl Env {
 
     /// Creates a new empty virtual environment.
     pub fn new_virtual() -> Env {
-        Env::with_system(Box::new(VirtualSystem::default()))
+        Env::with_system(Rc::new(RefCell::new(VirtualSystem::default())))
     }
 
     /// Runs the argument function in a subshell.
@@ -208,9 +208,12 @@ impl Env {
         // TODO Use a virtual subshell when possible
         use nix::sys::wait::WaitStatus;
         use nix::unistd::ForkResult::*;
-        match unsafe { self.system.fork() } {
+        let mut system = self.system.borrow_mut();
+        match unsafe { system.fork() } {
             Ok(Parent { child }) => {
-                match self.system.wait() {
+                let wait_result = system.wait();
+                drop(system);
+                match wait_result {
                     Ok(WaitStatus::Exited(pid, exit_status)) => {
                         // TODO This assertion is not correct. We need to handle
                         // other possibly existing child processes.
@@ -229,6 +232,7 @@ impl Env {
                 }
             }
             Ok(Child) => {
+                drop(system);
                 // TODO Reset traps
                 // TODO Push a subshell state to the execution context stack
                 f(self);
@@ -264,7 +268,7 @@ mod tests {
         system
             .pending_waits
             .push_back(Ok(WaitStatus::Exited(child, status)));
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let result = env.run_in_subshell(|_| unreachable!());
         assert_eq!(result, Ok(Ok(ExitStatus(status))));
     }
@@ -276,7 +280,7 @@ mod tests {
         let status = ExitStatus(71);
         let mut system = VirtualSystem::default();
         system.pending_forks.push_back(Ok(ForkResult::Child));
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::with_system(Rc::new(RefCell::new(system)));
         let result = env.run_in_subshell(|env| env.exit_status = status);
         assert_eq!(result, Err(Divert::Exit(status)));
     }
