@@ -23,8 +23,10 @@
 //!
 //! This module also defines elements that compose a virtual system.
 
+use crate::exec::ExitStatus;
 use crate::System;
 use nix::errno::Errno;
+use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -41,6 +43,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::task::Waker;
 
 // TODO VirtualSystem is not PartialEq because ForkResult is not.
 /// Simulated system.
@@ -269,24 +272,49 @@ impl Default for Mode {
 }
 
 /// Process in a virtual system.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct Process {
+    /// State of the process.
+    state: ProcessState,
+
+    /// References to tasks that are waiting for the process state to change.
+    ///
+    /// If this is `None`, the `state` has changed but not yet been reported by
+    /// the `wait` system call. The next `wait` call should immediately notify
+    /// the current state. If this is `Some(_)`, the `state` has not changed
+    /// since the last `wait` call. The next `wait` call should leave a waker
+    /// so that the caller is woken when the state changes later.
+    state_awaiters: Option<Vec<Waker>>,
+
     /// Results of future calls to [`wait`](VirtualSystem::wait).
     pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
 }
 
 impl Process {
-    /// Creates a new process that is alive.
+    /// Creates a new running process.
     pub fn new() -> Process {
-        Process {
-            pending_waits: Default::default(),
-        }
+        Process::default()
+    }
+
+    /// Returns the process state.
+    pub fn state(&self) -> ProcessState {
+        self.state
     }
 }
 
-impl Default for Process {
-    fn default() -> Self {
-        Process::new()
+/// State of a process.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProcessState {
+    Running,
+    Stopped(Signal),
+    Exited(ExitStatus),
+    Signaled(Signal),
+}
+
+impl Default for ProcessState {
+    /// Returns `Running`.
+    fn default() -> ProcessState {
+        ProcessState::Running
     }
 }
 
