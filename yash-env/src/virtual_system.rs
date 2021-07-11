@@ -39,9 +39,11 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::future::Future;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Waker;
 
@@ -203,6 +205,12 @@ impl System for VirtualSystem {
 /// State of the virtual system.
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
+    /// Task manager that can execute asynchronous tasks.
+    ///
+    /// The virtual system uses this executor to run (virtual) child processes.
+    /// If `executor` is `None`, the `fork` function will fail.
+    pub executor: Option<Rc<dyn Executor>>,
+
     /// Processes running in the system.
     pub processes: BTreeMap<Pid, Process>,
 
@@ -268,6 +276,35 @@ impl Debug for Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode(0o644)
+    }
+}
+
+/// Executor that can start new async tasks.
+///
+/// This trait abstracts the executor interface so that [`SystemState`] does not
+/// depend on a specific executor implementation.
+///
+/// Note that [`VirtualSystem`] does not support multi-threading. The executor
+/// should run concurrent tasks on a single thread.
+pub trait Executor: Debug {
+    /// Starts a new async task.
+    ///
+    /// Returns `Ok(())` if the task has been started successfully and `Err(_)`
+    /// otherwise.
+    fn spawn(
+        &self,
+        task: Pin<Box<dyn Future<Output = ()>>>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+impl Executor for futures::executor::LocalSpawner {
+    fn spawn(
+        &self,
+        task: Pin<Box<dyn Future<Output = ()>>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use futures::task::LocalSpawnExt;
+        self.spawn_local(task)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 }
 
