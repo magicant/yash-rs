@@ -87,7 +87,8 @@ impl VirtualSystem {
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
         let process_id = Pid::from_raw(2);
-        state.processes.insert(process_id, Process::new());
+        let process = Process::with_parent(Pid::from_raw(1));
+        state.processes.insert(process_id, process);
 
         let state = Rc::new(RefCell::new(state));
         VirtualSystem { state, process_id }
@@ -185,7 +186,8 @@ impl System for VirtualSystem {
             .keys()
             .max()
             .map_or(Pid::from_raw(2), |pid| Pid::from_raw(pid.as_raw() + 1));
-        state.processes.insert(process_id, Process::new());
+        let child_process = Process::with_parent(self.process_id);
+        state.processes.insert(process_id, child_process);
         drop(state);
 
         Ok(Box::new(DummyChildProcess {
@@ -394,6 +396,9 @@ impl Executor for futures::executor::LocalSpawner {
 /// Process in a virtual system.
 #[derive(Clone, Debug)]
 pub struct Process {
+    /// Process ID of the parent process.
+    parent_process_id: Pid,
+
     /// State of the process.
     state: ProcessState,
 
@@ -412,8 +417,9 @@ pub struct Process {
 
 impl Process {
     /// Creates a new running process.
-    pub fn new() -> Process {
+    pub fn with_parent(parent_process_id: Pid) -> Process {
         Process {
+            parent_process_id,
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
             pending_waits: VecDeque::new(),
@@ -440,12 +446,6 @@ impl Process {
         } else {
             self.state_awaiters.take().unwrap_or_else(Vec::new)
         }
-    }
-}
-
-impl Default for Process {
-    fn default() -> Self {
-        Process::new()
     }
 }
 
