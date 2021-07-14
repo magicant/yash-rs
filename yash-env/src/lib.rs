@@ -46,11 +46,15 @@ use self::function::FunctionSet;
 use self::job::JobSet;
 use self::variable::VariableSet;
 use crate::exec::Divert;
+use async_trait::async_trait;
+use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
 
@@ -113,6 +117,40 @@ pub trait System: Debug {
     /// is unsafe.
     unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult>;
 
+    /// Creates a new child process.
+    ///
+    /// This is a thin wrapper around the `fork` system call. Users of `Env`
+    /// should not call it directly. Instead, use [`Env::run_in_subshell`] so
+    /// that the environment can manage the created child process as a job
+    /// member.
+    ///
+    /// If successful, this function returns a [`ChildProcess`] object. The
+    /// caller must call [`ChildProcess::run`] exactly once so that the child
+    /// process performs its task and finally exit.
+    ///
+    /// This function does not return any information about whether the current
+    /// process is the original (parent) process or the new (child) process. The
+    /// caller does not have to (and should not) care that because
+    /// `ChildProcess::run` takes care of it.
+    ///
+    /// # Safety
+    ///
+    /// This function can never be safely called in a multi-threaded process.
+    /// [POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html#tag_16_156_03)
+    /// says:
+    ///
+    /// > If a multi-threaded process calls fork(), the new process shall
+    /// contain a replica of the calling thread and its entire address space,
+    /// possibly including the states of mutexes and other resources.
+    /// Consequently, to avoid errors, the child process may only execute
+    /// async-signal-safe operations until such time as one of the exec
+    /// functions is called.
+    ///
+    /// Since this function needs to allocate memory for the returned `Box`,
+    /// which is not async-signal-safe, this function must be called in a
+    /// single-threaded program.
+    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
+
     /// Reports updated status of a child process.
     ///
     /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
@@ -140,6 +178,26 @@ impl Clone for Box<dyn System> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
+}
+
+/// Abstraction of a child process that can run a task.
+///
+/// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
+/// must call [`run`](Self::run) exactly once.
+#[async_trait(?Send)]
+pub trait ChildProcess: Debug {
+    /// Runs a task in the child process.
+    ///
+    /// When called in the parent process, this function returns the process ID
+    /// of the child. When in the child, this function never returns.
+    async fn run(
+        &mut self,
+        env: &mut Env,
+        task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+    ) -> Pid;
+    // TODO When unsized_fn_params is stabilized,
+    // 1. `&mut self` should be `self`
+    // 2. `task` should be `FnOnce` rather than `FnMut`
 }
 
 pub use real_system::RealSystem;
@@ -251,7 +309,6 @@ mod tests {
     use super::*;
     use nix::sys::wait::WaitStatus;
     use nix::unistd::ForkResult;
-    use nix::unistd::Pid;
 
     #[test]
     fn run_in_subshell_parent() {

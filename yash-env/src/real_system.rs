@@ -16,14 +16,20 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+use super::ChildProcess;
+use super::Env;
 use super::System;
+use async_trait::async_trait;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
+use nix::unistd::Pid;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::future::Future;
+use std::pin::Pin;
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -70,6 +76,23 @@ impl System for RealSystem {
         nix::unistd::fork()
     }
 
+    /// Creates a new child process.
+    ///
+    /// This implementation calls the `fork` system call and returns both in the
+    /// parent and child process. In the parent, the `run` function of the
+    /// returned `ChildProcess` ignores arguments and returns the child process
+    /// ID. In the child, the `run` function runs the task and exits the
+    /// process.
+    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+        use nix::unistd::ForkResult::*;
+        match nix::unistd::fork()? {
+            Parent { child } => Ok(Box::new(DummyChildProcess {
+                child_process_id: child,
+            })),
+            Child => Ok(Box::new(RealChildProcess)),
+        }
+    }
+
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
@@ -91,5 +114,40 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+}
+
+/// Implementor of [`ChildProcess`] that is returned from
+/// [`RealSystem::new_child_process`] in the parent process.
+#[derive(Debug)]
+struct DummyChildProcess {
+    child_process_id: Pid,
+}
+
+#[async_trait(?Send)]
+impl ChildProcess for DummyChildProcess {
+    async fn run(
+        &mut self,
+        _env: &mut Env,
+        _task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+    ) -> Pid {
+        self.child_process_id
+    }
+}
+
+/// Implementor of [`ChildProcess`] that is returned from
+/// [`RealSystem::new_child_process`] in the child process.
+#[derive(Debug)]
+struct RealChildProcess;
+
+#[async_trait(?Send)]
+impl ChildProcess for RealChildProcess {
+    async fn run(
+        &mut self,
+        env: &mut Env,
+        mut task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+    ) -> Pid {
+        task(env).await;
+        std::process::exit(env.exit_status.0)
     }
 }

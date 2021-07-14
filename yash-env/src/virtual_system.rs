@@ -24,7 +24,10 @@
 //! This module also defines elements that compose a virtual system.
 
 use crate::exec::ExitStatus;
+use crate::ChildProcess;
+use crate::Env;
 use crate::System;
+use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -159,6 +162,39 @@ impl System for VirtualSystem {
             .expect("pending_forks must be filled before calling fork")
     }
 
+    /// Creates a new child process.
+    ///
+    /// This implementation does not create any real child process. Instead,
+    /// it returns an implementor of [`ChildProcess`] that `run`s its task
+    /// concurrently in the same process.
+    ///
+    /// To run the concurrent task, this function needs an executor that has
+    /// been set in the system state. If the system state does not have an
+    /// executor, this function fails with `Errno::ENOSYS`.
+    ///
+    /// The process ID of the child will be the maximum of existing process IDs
+    /// plus 1. If there are no other processes, it will be 2.
+    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+        let mut state = self.state.borrow_mut();
+        let executor = state
+            .executor
+            .clone()
+            .ok_or(nix::Error::Sys(Errno::ENOSYS))?;
+        let process_id = state
+            .processes
+            .keys()
+            .max()
+            .map_or(Pid::from_raw(2), |pid| Pid::from_raw(pid.as_raw() + 1));
+        state.processes.insert(process_id, Process::new());
+        drop(state);
+
+        Ok(Box::new(DummyChildProcess {
+            state: self.state.clone(),
+            executor,
+            process_id,
+        }))
+    }
+
     /// Simulates awaiting child process status update.
     ///
     /// This implementation pops the first entry from
@@ -201,6 +237,53 @@ impl System for VirtualSystem {
     }
 }
 
+/// Implementor of [`ChildProcess`] that is returned from
+/// [`VirtualSystem::new_child_process`].
+#[derive(Debug)]
+struct DummyChildProcess {
+    /// State of the system.
+    state: Rc<RefCell<SystemState>>,
+    /// Executor to run the child process's task.
+    executor: Rc<dyn Executor>,
+    /// Process ID of this child process.
+    process_id: Pid,
+}
+
+#[async_trait(?Send)]
+impl ChildProcess for DummyChildProcess {
+    async fn run(
+        &mut self,
+        env: &mut Env,
+        mut task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+    ) -> Pid {
+        let state = self.state.clone();
+        let process_id = self.process_id;
+        let system = VirtualSystem { state, process_id };
+        let mut child_env = env.clone();
+        child_env.system = Box::new(system);
+
+        let state = self.state.clone();
+        let run_task_and_set_exit_status = Box::pin(async move {
+            task(&mut child_env).await;
+
+            let mut state = state.borrow_mut();
+            let process = state
+                .processes
+                .get_mut(&process_id)
+                .expect("the child process is missing");
+            let wakers = process.set_state(ProcessState::Exited(child_env.exit_status));
+            drop(state);
+            wakers.into_iter().for_each(Waker::wake);
+        });
+
+        self.executor
+            .spawn(run_task_and_set_exit_status)
+            .expect("the executor failed to start the child process task");
+
+        process_id
+    }
+}
+
 // TODO SystemState is not Eq because ForkResult is not.
 /// State of the virtual system.
 #[derive(Clone, Debug, Default)]
@@ -208,7 +291,7 @@ pub struct SystemState {
     /// Task manager that can execute asynchronous tasks.
     ///
     /// The virtual system uses this executor to run (virtual) child processes.
-    /// If `executor` is `None`, the `fork` function will fail.
+    /// If `executor` is `None`, [`VirtualSystem::new_child_process`] will fail.
     pub executor: Option<Rc<dyn Executor>>,
 
     /// Processes running in the system.
@@ -309,7 +392,7 @@ impl Executor for futures::executor::LocalSpawner {
 }
 
 /// Process in a virtual system.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Process {
     /// State of the process.
     state: ProcessState,
@@ -330,12 +413,39 @@ pub struct Process {
 impl Process {
     /// Creates a new running process.
     pub fn new() -> Process {
-        Process::default()
+        Process {
+            state: ProcessState::Running,
+            state_awaiters: Some(Vec::new()),
+            pending_waits: VecDeque::new(),
+        }
     }
 
     /// Returns the process state.
     pub fn state(&self) -> ProcessState {
         self.state
+    }
+
+    /// Sets the state of this process.
+    ///
+    /// This function returns wakers that must be woken. The caller must first
+    /// drop the `RefMut` borrowing the [`SystemState`] containing this
+    /// `Process` and then wake the wakers returned from this function. This is
+    /// to prevent a possible second borrow by another task.
+    #[must_use]
+    pub fn set_state(&mut self, state: ProcessState) -> Vec<Waker> {
+        let old_state = std::mem::replace(&mut self.state, state);
+
+        if old_state == state {
+            Vec::new()
+        } else {
+            self.state_awaiters.take().unwrap_or_else(Vec::new)
+        }
+    }
+}
+
+impl Default for Process {
+    fn default() -> Self {
+        Process::new()
     }
 }
 
@@ -346,13 +456,6 @@ pub enum ProcessState {
     Stopped(Signal),
     Exited(ExitStatus),
     Signaled(Signal),
-}
-
-impl Default for ProcessState {
-    /// Returns `Running`.
-    fn default() -> ProcessState {
-        ProcessState::Running
-    }
 }
 
 #[cfg(test)]
@@ -383,6 +486,35 @@ mod tests {
         content.permissions.0 |= 0o100;
         system.state.borrow_mut().file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    fn new_child_process_without_executor() {
+        let mut system = VirtualSystem::new();
+        let result = unsafe { system.new_child_process() };
+        assert_eq!(result.unwrap_err(), Errno::ENOSYS.into());
+    }
+
+    #[test]
+    fn new_child_process_with_executor() {
+        use futures::executor::LocalPool;
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let result = unsafe { system.new_child_process() };
+
+        let state = system.state.borrow();
+        assert_eq!(state.processes.len(), 2);
+        drop(state);
+
+        let mut env = Env::with_system(Box::new(system));
+        let mut child_process = result.unwrap();
+        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
+        let pid = executor.run_until(future);
+        assert_eq!(pid, Pid::from_raw(3));
     }
 
     #[test]
