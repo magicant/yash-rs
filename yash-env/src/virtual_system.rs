@@ -30,6 +30,7 @@ use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -48,6 +49,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::task::Poll;
 use std::task::Waker;
 
 // TODO VirtualSystem is not PartialEq because ForkResult is not.
@@ -202,11 +204,43 @@ impl System for VirtualSystem {
     /// This implementation pops the first entry from
     /// [`pending_waits`](Process::pending_waits) and returns it.
     /// If `pending_waits` is empty, this function will **panic**!
-    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+    fn wait(&mut self) -> nix::Result<WaitStatus> {
         self.current_process_mut()
             .pending_waits
             .pop_front()
             .expect("pending_waits must be filled before calling wait")
+    }
+
+    /// Reports updated status of a child process.
+    ///
+    /// This function does not block, but the caller must await the returned
+    /// future to obtain the result.
+    ///
+    /// This function does not remove terminated processes from the system state
+    /// so you can examine them later.
+    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>> + '_>> {
+        Box::pin(futures::future::poll_fn(move |context| {
+            let parent_pid = self.process_id;
+            let mut state = self.state.borrow_mut();
+
+            // If any child's state has changed, return it
+            for (pid, process) in &mut state.processes {
+                if process.parent_process_id == parent_pid && process.state_awaiters.is_none() {
+                    process.state_awaiters = Some(Vec::new());
+                    return Poll::Ready(Ok(process.state.to_wait_status(*pid)));
+                }
+            }
+
+            // Save a waker so the future is polled again when the state has changed
+            for process in state.processes.values_mut() {
+                if process.parent_process_id == parent_pid {
+                    if let Some(awaiters) = &mut process.state_awaiters {
+                        awaiters.push(context.waker().clone());
+                    }
+                }
+            }
+            Poll::Pending
+        }))
     }
 
     /// **Panic!**
@@ -412,7 +446,7 @@ pub struct Process {
     state_awaiters: Option<Vec<Waker>>,
 
     /// Results of future calls to [`wait`](VirtualSystem::wait).
-    pub pending_waits: VecDeque<nix::Result<nix::sys::wait::WaitStatus>>,
+    pub pending_waits: VecDeque<nix::Result<WaitStatus>>,
 }
 
 impl Process {
@@ -458,9 +492,23 @@ pub enum ProcessState {
     Signaled(Signal),
 }
 
+impl ProcessState {
+    /// Converts `ProcessState` to `WaitStatus`.
+    #[must_use]
+    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
+        match self {
+            ProcessState::Running => WaitStatus::Continued(pid),
+            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
+            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
+            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::LocalPool;
     use std::ffi::CString;
 
     #[test]
@@ -497,7 +545,6 @@ mod tests {
 
     #[test]
     fn new_child_process_with_executor() {
-        use futures::executor::LocalPool;
         let mut system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let mut state = system.state.borrow_mut();
@@ -515,6 +562,34 @@ mod tests {
         let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
         let pid = executor.run_until(future);
         assert_eq!(pid, Pid::from_raw(3));
+    }
+
+    #[test]
+    fn wait_sync_for_exited_process() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let child_process = unsafe { system.new_child_process() };
+
+        let mut env = Env::with_system(Box::new(system));
+        let mut child_process = child_process.unwrap();
+        let future = child_process.run(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(5);
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+
+        #[allow(deprecated)]
+        let future = env.system.wait_sync();
+        let result = executor.run_until(future);
+        assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
     }
 
     #[test]

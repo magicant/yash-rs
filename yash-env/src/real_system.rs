@@ -100,6 +100,20 @@ impl System for RealSystem {
         nix::sys::wait::waitpid(None, options.into())
     }
 
+    /// Reports updated status of a child process.
+    ///
+    /// This implementation blocks inside the function and returns a future that
+    /// will immediately return a `Ready`.
+    fn wait_sync(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>> + '_>> {
+        use nix::sys::wait::WaitPidFlag;
+        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
+        // TODO Should set WNOHANG too
+        let result = nix::sys::wait::waitpid(None, options.into());
+        Box::pin(std::future::ready(result))
+    }
+
     fn execve(
         &mut self,
         path: &CStr,
