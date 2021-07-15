@@ -75,24 +75,27 @@ impl Command for syntax::SimpleCommand {
                 Some(External { path }) => {
                     let args = to_c_strings(fields);
                     let envs = env.variables.env_c_strings();
-                    let result = env.run_in_subshell(|env| {
-                        // TODO Remove signal handlers not set by current traps
+                    let result = env
+                        .run_in_subshell(|env| {
+                            // TODO Remove signal handlers not set by current traps
 
-                        let result = env.system.execve(path.as_c_str(), &args, &envs);
-                        // TODO Prefer into_err to unwrap_err
-                        let e = result.unwrap_err();
-                        // TODO Reopen as shell script on ENOEXEC
-                        match e {
-                            nix::Error::Sys(Errno::ENOENT) | nix::Error::Sys(Errno::ENOTDIR) => {
-                                env.exit_status = ExitStatus::NOT_FOUND;
+                            let result = env.system.execve(path.as_c_str(), &args, &envs);
+                            // TODO Prefer into_err to unwrap_err
+                            let e = result.unwrap_err();
+                            // TODO Reopen as shell script on ENOEXEC
+                            match e {
+                                nix::Error::Sys(Errno::ENOENT)
+                                | nix::Error::Sys(Errno::ENOTDIR) => {
+                                    env.exit_status = ExitStatus::NOT_FOUND;
+                                }
+                                _ => {
+                                    env.exit_status = ExitStatus::NOEXEC;
+                                }
                             }
-                            _ => {
-                                env.exit_status = ExitStatus::NOEXEC;
-                            }
-                        }
-                        // TODO The error message should be printed via Env
-                        eprintln!("command execution failed: {:?}", e);
-                    })?;
+                            // TODO The error message should be printed via Env
+                            eprintln!("command execution failed: {:?}", e);
+                        })
+                        .await?;
 
                     match result {
                         Ok(exit_status) => {

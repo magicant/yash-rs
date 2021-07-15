@@ -274,7 +274,7 @@ impl Env {
     /// In the child process, this function returns `Err(Divert::Exit(e))`. The
     /// `Divert` value must be propagated in the call stack so that the child
     /// process immediately exits with the exit status contained in the value.
-    pub fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
+    pub async fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
     where
         F: FnOnce(&mut Env),
     {
@@ -322,6 +322,7 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use nix::sys::wait::WaitStatus;
     use nix::unistd::ForkResult;
 
@@ -340,7 +341,7 @@ mod tests {
             .pending_waits
             .push_back(Ok(WaitStatus::Exited(child, status)));
         let mut env = Env::with_system(Box::new(system));
-        let result = env.run_in_subshell(|_| unreachable!());
+        let result = block_on(env.run_in_subshell(|_| unreachable!()));
         assert_eq!(result, Ok(Ok(ExitStatus(status))));
     }
 
@@ -356,7 +357,7 @@ mod tests {
             .pending_forks
             .push_back(Ok(ForkResult::Child));
         let mut env = Env::with_system(Box::new(system));
-        let result = env.run_in_subshell(|env| env.exit_status = status);
+        let result = block_on(env.run_in_subshell(|env| env.exit_status = status));
         assert_eq!(result, Err(Divert::Exit(status)));
     }
 
