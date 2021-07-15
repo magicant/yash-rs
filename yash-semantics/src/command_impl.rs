@@ -253,9 +253,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = r#"VirtualSystem::execve called for path="/some/file", args=["/some/file", "foo", "bar"]"#
-    )]
     fn simple_command_invokes_external_utility_in_subshell() {
         let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
@@ -272,7 +269,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        unreachable!("{:?}", result);
+        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
     }
 
     #[test]

@@ -243,15 +243,15 @@ impl System for VirtualSystem {
         }))
     }
 
-    /// **Panic!**
+    /// Stub for the `execve` system call.
     ///
     /// The `execve` system call cannot be simulated in the userland. This
-    /// function panics if the file at `path` is a native executable. Otherwise,
-    /// it returns an error.
+    /// function returns `ENOSYS` if the file at `path` is a native executable,
+    /// `ENOEXEC` if a non-executable file, and `ENOENT` otherwise.
     fn execve(
         &mut self,
         path: &CStr,
-        args: &[CString],
+        _args: &[CString],
         _envs: &[CString],
     ) -> nix::Result<Infallible> {
         let path = OsStr::from_bytes(path.to_bytes()).as_ref();
@@ -259,10 +259,7 @@ impl System for VirtualSystem {
         if let Some(file) = fs.get(path) {
             // TODO Check file permissions
             if file.is_native_executable {
-                panic!(
-                    "VirtualSystem::execve called for path={:?}, args={:?}",
-                    path, args
-                );
+                Err(Errno::ENOSYS.into())
             } else {
                 Err(Errno::ENOEXEC.into())
             }
@@ -593,8 +590,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = r#"VirtualSystem::execve called for path="/some/file", args=[]"#)]
-    fn execve_panics_for_executable_file() {
+    fn execve_returns_enosys_for_executable_file() {
         let mut system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
@@ -607,11 +603,11 @@ mod tests {
             .save(path.clone(), content);
         let path = CString::new(path.as_os_str().as_bytes()).unwrap();
         let result = system.execve(&path, &[], &[]);
-        unreachable!("{:?}", result);
+        assert_eq!(result, Err(Errno::ENOSYS.into()));
     }
 
     #[test]
-    fn execve_returns_for_non_executable_file() {
+    fn execve_returns_enoexec_for_non_executable_file() {
         let mut system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
@@ -627,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn execve_returns_on_file_not_found() {
+    fn execve_returns_enoent_on_file_not_found() {
         let mut system = VirtualSystem::new();
         let path = CString::new("/no/such/file").unwrap();
         let result = system.execve(&path, &[], &[]);
