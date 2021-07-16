@@ -184,6 +184,8 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
 
@@ -230,6 +232,57 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
+    }
+
+    #[test]
+    fn simple_command_calls_execve_with_correct_arguments() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        let mut executor = LocalPool::new();
+        content.permissions.0 |= 0o100;
+        content.is_native_executable = true;
+        system.state.borrow_mut().file_system.save(path, content);
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let mut env = Env::with_system(Box::new(system));
+        env.variables.assign(
+            "env".to_string(),
+            Variable {
+                value: Value::Scalar("scalar".to_string()),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        );
+        env.variables.assign(
+            "local".to_string(),
+            Variable {
+                value: Value::Scalar("ignored".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        );
+        let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+
+        let state = state.borrow();
+        let process = state.processes.values().last().unwrap();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, CString::new("/some/file").unwrap());
+        assert_eq!(
+            arguments.1,
+            [
+                CString::new("/some/file").unwrap(),
+                CString::new("foo").unwrap(),
+                CString::new("bar").unwrap()
+            ]
+        );
+        assert_eq!(arguments.2, [CString::new("env=scalar").unwrap()]);
     }
 
     #[test]

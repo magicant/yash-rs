@@ -259,14 +259,22 @@ impl System for VirtualSystem {
     fn execve(
         &mut self,
         path: &CStr,
-        _args: &[CString],
-        _envs: &[CString],
+        args: &[CString],
+        envs: &[CString],
     ) -> nix::Result<Infallible> {
-        let path = OsStr::from_bytes(path.to_bytes()).as_ref();
-        let fs = &self.state.borrow().file_system;
-        if let Some(file) = fs.get(path) {
+        let os_path = OsStr::from_bytes(path.to_bytes()).as_ref();
+        let mut state = self.state.borrow_mut();
+        let fs = &state.file_system;
+        if let Some(file) = fs.get(os_path) {
             // TODO Check file permissions
             if file.is_native_executable {
+                // Save arguments in the Process
+                let process = state.processes.get_mut(&self.process_id).unwrap();
+                let path = path.to_owned();
+                let args = args.to_owned();
+                let envs = envs.to_owned();
+                process.last_exec = Some((path, args, envs));
+
                 Err(Errno::ENOSYS.into())
             } else {
                 Err(Errno::ENOEXEC.into())
@@ -450,6 +458,9 @@ pub struct Process {
     /// so that the caller is woken when the state changes later.
     state_awaiters: Option<Vec<Waker>>,
 
+    /// Copy of arguments passed to [`execve`](VirtualSystem::execve).
+    last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
+
     /// Results of future calls to [`wait`](VirtualSystem::wait).
     pub pending_waits: VecDeque<nix::Result<WaitStatus>>,
 }
@@ -461,6 +472,7 @@ impl Process {
             parent_process_id,
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
+            last_exec: None,
             pending_waits: VecDeque::new(),
         }
     }
@@ -485,6 +497,13 @@ impl Process {
         } else {
             self.state_awaiters.take().unwrap_or_else(Vec::new)
         }
+    }
+
+    /// Returns the arguments to the last call to
+    /// [`execve`](VirtualSystem::execve) on this process.
+    #[must_use]
+    pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {
+        &self.last_exec
     }
 }
 
@@ -621,6 +640,33 @@ mod tests {
         let path = CString::new(path.as_os_str().as_bytes()).unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOSYS.into()));
+    }
+
+    #[test]
+    fn execve_saves_arguments() {
+        let mut system = VirtualSystem::new();
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        content.permissions.0 |= 0o100;
+        content.is_native_executable = true;
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(path.clone(), content);
+        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let args = [CString::new("file").unwrap(), CString::new("bar").unwrap()];
+        let envs = [
+            CString::new("foo=FOO").unwrap(),
+            CString::new("baz").unwrap(),
+        ];
+        let _ = system.execve(&path, &args, &envs);
+
+        let process = system.current_process();
+        let arguments = process.last_exec.as_ref().unwrap();
+        assert_eq!(arguments.0, path);
+        assert_eq!(arguments.1, args);
+        assert_eq!(arguments.2, envs);
     }
 
     #[test]
