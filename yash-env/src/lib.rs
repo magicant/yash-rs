@@ -63,7 +63,7 @@ use yash_syntax::alias::AliasSet;
 /// system-managed parts. Application-managed parts are directly implemented in
 /// the `Env` instance. System-managed parts are abstracted as [`System`] so
 /// that they can be replaced with a dummy implementation.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
     ///
@@ -94,12 +94,6 @@ pub struct Env {
 ///
 /// TODO Elaborate
 pub trait System: Debug {
-    /// Clones the `System` instance and returns it in a box.
-    ///
-    /// The semantics of cloning is determined by the implementor. Especially,
-    /// a cloned [`RealSystem`] might render a surprising behavior.
-    fn clone_box(&self) -> Box<dyn System>;
-
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
 
@@ -186,14 +180,6 @@ pub trait System: Debug {
     ) -> nix::Result<Infallible>;
 }
 
-// Auto-derived Clone cannot be used for this because `System` cannot be a
-// super-trait of `Clone` as that would make the trait non-object-safe.
-impl Clone for Box<dyn System> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
 /// Abstraction of a child process that can run a task.
 ///
 /// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
@@ -235,6 +221,23 @@ impl Env {
     /// Creates a new empty virtual environment.
     pub fn new_virtual() -> Env {
         Env::with_system(Box::new(VirtualSystem::default()))
+    }
+
+    /// Clones this environment.
+    ///
+    /// The application-managed parts of the environment are cloned normally.
+    /// The system-managed parts cannot be cloned, so you must provide a
+    /// `System` instance.
+    pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
+        Env {
+            aliases: self.aliases.clone(),
+            builtins: self.builtins.clone(),
+            exit_status: self.exit_status,
+            functions: self.functions.clone(),
+            jobs: self.jobs.clone(),
+            variables: self.variables.clone(),
+            system,
+        }
     }
 
     /// Runs the argument function in a subshell.

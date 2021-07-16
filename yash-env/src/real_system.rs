@@ -48,26 +48,10 @@ fn is_regular_file(path: &CStr) -> bool {
 ///
 /// `RealSystem` has no state at the Rust level because the relevant state of
 /// the environment is managed by the underlying operating system.
-///
-/// # Cloning semantics
-///
-/// Although this struct implements `System::clone_box`, the state of the
-/// underlying system cannot be cloned. It just returns another `Box` of
-/// `RealSystem`. Having more than one instance of `RealSystem` to manipulate
-/// the system concurrently is not a good idea since all the `RealSystem`s
-/// interact with one and the same system.
 #[derive(Debug)]
 pub struct RealSystem;
 
 impl System for RealSystem {
-    /// Returns `RealSystem` in a new box.
-    ///
-    /// See the [documentation for the struct](RealSystem) for the implications
-    /// of cloning `RealSystem`.
-    fn clone_box(&self) -> Box<dyn System> {
-        Box::new(RealSystem)
-    }
-
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
     }

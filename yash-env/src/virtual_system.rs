@@ -128,10 +128,6 @@ impl Default for VirtualSystem {
 }
 
 impl System for VirtualSystem {
-    fn clone_box(&self) -> Box<dyn System> {
-        Box::new(self.clone())
-    }
-
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -308,8 +304,7 @@ impl ChildProcess for DummyChildProcess {
         let state = self.state.clone();
         let process_id = self.process_id;
         let system = VirtualSystem { state, process_id };
-        let mut child_env = env.clone();
-        child_env.system = Box::new(system);
+        let mut child_env = env.clone_with_system(Box::new(system));
 
         let state = self.state.clone();
         let run_task_and_set_exit_status = Box::pin(async move {
