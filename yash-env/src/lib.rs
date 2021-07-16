@@ -45,7 +45,6 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::job::JobSet;
 use self::variable::VariableSet;
-use crate::exec::Divert;
 use async_trait::async_trait;
 use nix::unistd::Pid;
 use std::collections::HashMap;
@@ -261,39 +260,46 @@ impl Env {
     ///
     /// # Return value
     ///
-    /// If this function chooses to create a real subshell, it returns twice:
-    /// once in the current (original) shell process and the other in the child
-    /// process.
-    ///
-    /// In the current process, this function usually returns `Ok(Ok(e))`, where
-    /// `e` is the exit status of the subshell that is obtained from the
-    /// subshell environment after the argument function returns. If an error
-    /// occurs in [`fork`](System::fork), the error is returned as
-    /// `Ok(Err(...))`.
-    ///
-    /// In the child process, this function returns `Err(Divert::Exit(e))`. The
-    /// `Divert` value must be propagated in the call stack so that the child
-    /// process immediately exits with the exit status contained in the value.
+    /// This function usually returns `Ok(Ok(e))`, where `e` is the exit status
+    /// of the subshell that is obtained from the subshell environment after the
+    /// argument function returns. If an error occurs in creating a
+    /// [`new_child_process`](System::new_child_process), the error is returned
+    /// as `Ok(Err(...))`.
     pub async fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
+    // TODO Should return nix::Result<ExitStatus>
     where
-        F: FnOnce(&mut Env),
+        F: FnOnce(&mut Env) + 'static,
     {
         // TODO Use a virtual subshell when possible
         use nix::sys::wait::WaitStatus;
-        use nix::unistd::ForkResult::*;
-        match unsafe { self.system.fork() } {
-            Ok(Parent { child }) => {
-                match self.system.wait() {
+        match unsafe { self.system.new_child_process() } {
+            Err(e) => Ok(Err(e)),
+            Ok(mut child_process) => {
+                let mut f = Some(f);
+                let child_pid = child_process
+                    .run(
+                        self,
+                        Box::new(move |env| {
+                            if let Some(f) = f.take() {
+                                Box::pin(async move { f(env) })
+                            } else {
+                                Box::pin(async {})
+                            }
+                        }),
+                    )
+                    .await;
+                #[allow(deprecated)]
+                match self.system.wait_sync().await {
                     Ok(WaitStatus::Exited(pid, exit_status)) => {
                         // TODO This assertion is not correct. We need to handle
                         // other possibly existing child processes.
-                        assert_eq!(pid, child);
+                        assert_eq!(pid, child_pid);
                         Ok(Ok(ExitStatus(exit_status)))
                     }
                     Ok(WaitStatus::Signaled(pid, _signal, _core_dumped)) => {
                         // TODO This assertion is not correct. We need to handle
                         // other possibly existing child processes.
-                        assert_eq!(pid, child);
+                        assert_eq!(pid, child_pid);
                         // TODO Convert signal to exit status
                         Ok(Ok(ExitStatus(128)))
                     }
@@ -301,20 +307,6 @@ impl Env {
                     Err(e) => Ok(Err(e)),
                 }
             }
-            Ok(Child) => {
-                // TODO Reset traps
-                // TODO Push a subshell state to the execution context stack
-                f(self);
-                Err(Divert::Exit(self.exit_status))
-                // TODO Should we directly exit here rather than returning
-                // Divert::Exit?
-                //  - Does stack unwinding not have any unexpected side effect?
-                //  - How does the caller know that we're exiting from a
-                //    subshell, not from the main shell process? For example,
-                //    an interactive shell with a suspended job may refuse to
-                //    exit.
-            }
-            Err(e) => Ok(Err(e)),
         }
     }
 }
@@ -322,44 +314,23 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::executor::block_on;
-    use nix::sys::wait::WaitStatus;
-    use nix::unistd::ForkResult;
+    use futures::executor::LocalPool;
 
     #[test]
-    fn run_in_subshell_parent() {
-        let child = Pid::from_raw(12345);
-        let status = 97;
-        let mut system = VirtualSystem::default();
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Parent { child }));
-        system
-            .current_process_mut()
-            .pending_waits
-            .push_back(Ok(WaitStatus::Exited(child, status)));
+    fn run_in_subshell_with_child_normally_exiting() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let status = ExitStatus(97);
         let mut env = Env::with_system(Box::new(system));
-        let result = block_on(env.run_in_subshell(|_| unreachable!()));
-        assert_eq!(result, Ok(Ok(ExitStatus(status))));
+        let result = executor.run_until(env.run_in_subshell(move |env| env.exit_status = status));
+        assert_eq!(result, Ok(Ok(status)));
     }
 
     // TODO Test case for parent with signaled child
-
-    #[test]
-    fn run_in_subshell_child() {
-        let status = ExitStatus(71);
-        let system = VirtualSystem::default();
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Child));
-        let mut env = Env::with_system(Box::new(system));
-        let result = block_on(env.run_in_subshell(|env| env.exit_status = status));
-        assert_eq!(result, Err(Divert::Exit(status)));
-    }
 
     // TODO Test case where fork fails
 }

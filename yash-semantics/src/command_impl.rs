@@ -76,7 +76,7 @@ impl Command for syntax::SimpleCommand {
                     let args = to_c_strings(fields);
                     let envs = env.variables.env_c_strings();
                     let result = env
-                        .run_in_subshell(|env| {
+                        .run_in_subshell(move |env| {
                             // TODO Remove signal handlers not set by current traps
 
                             let result = env.system.execve(path.as_c_str(), &args, &envs);
@@ -175,13 +175,12 @@ impl Command for syntax::List {
 mod tests {
     use super::*;
     use futures::executor::block_on;
-    use nix::sys::wait::WaitStatus;
-    use nix::unistd::ForkResult;
-    use nix::unistd::Pid;
+    use futures::executor::LocalPool;
     use std::future::ready;
     use std::future::Future;
     use std::path::PathBuf;
     use std::pin::Pin;
+    use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
@@ -235,90 +234,56 @@ mod tests {
 
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
-        let child = Pid::from_raw(1234);
-        let status = 54;
-        let mut system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Parent { child }));
-        system
-            .current_process_mut()
-            .pending_waits
-            .push_back(Ok(WaitStatus::Exited(child, status)));
-
-        let mut env = Env::with_system(Box::new(system));
-        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
-        assert_eq!(env.exit_status, ExitStatus(status));
-    }
-
-    #[test]
-    fn simple_command_invokes_external_utility_in_subshell() {
         let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
         system.state.borrow_mut().file_system.save(path, content);
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        // In VirtualSystem, execve fails with ENOSYS.
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
     #[test]
-    fn simple_command_subshell_exits_with_127_for_non_existing_file() {
+    fn simple_command_returns_127_for_non_existing_file() {
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Child));
+        let mut executor = LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOT_FOUND)));
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
     }
 
     #[test]
-    fn simple_command_subshell_exits_with_126_on_exec_failure() {
+    fn simple_command_returns_126_on_exec_failure() {
         let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
         system.state.borrow_mut().file_system.save(path, content);
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
     #[test]
     fn simple_command_returns_126_on_fork_failure() {
-        let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .pending_forks
-            .push_back(Err(Errno::ENOMEM.into()));
-
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Ok(()));
