@@ -56,10 +56,6 @@ impl System for RealSystem {
         is_regular_file(path) && is_executable(path)
     }
 
-    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
-        nix::unistd::fork()
-    }
-
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

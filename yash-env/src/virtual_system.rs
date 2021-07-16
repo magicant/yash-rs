@@ -52,7 +52,6 @@ use std::rc::Rc;
 use std::task::Poll;
 use std::task::Waker;
 
-// TODO VirtualSystem is not PartialEq because ForkResult is not.
 /// Simulated system.
 ///
 /// See the [module-level documentation](self) to grasp a basic understanding of
@@ -141,24 +140,6 @@ impl System for VirtualSystem {
             None => false,
             Some(inode) => inode.permissions.0 & 0o111 != 0,
         }
-    }
-
-    /// Simulates cloning the current shell process.
-    ///
-    /// This implementation pops the first entry from
-    /// [`pending_forks`](SystemState::pending_forks) and returns it.
-    /// If `pending_forks` is empty, this function will **panic**!
-    ///
-    /// # Safety
-    ///
-    /// Though [`System::fork`] is declared `unsafe`, this implementation of
-    /// `fork` is safe.
-    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult> {
-        self.state
-            .borrow_mut()
-            .pending_forks
-            .pop_front()
-            .expect("pending_forks must be filled before calling fork")
     }
 
     /// Creates a new child process.
@@ -328,7 +309,6 @@ impl ChildProcess for DummyChildProcess {
     }
 }
 
-// TODO SystemState is not Eq because ForkResult is not.
 /// State of the virtual system.
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
@@ -343,9 +323,6 @@ pub struct SystemState {
 
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
-
-    /// Results of future calls to [`fork`](VirtualSystem::fork).
-    pub pending_forks: VecDeque<nix::Result<nix::unistd::ForkResult>>,
 }
 
 /// Collection of files.
