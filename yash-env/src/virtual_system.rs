@@ -224,11 +224,19 @@ impl System for VirtualSystem {
             let mut state = self.state.borrow_mut();
 
             // If any child's state has changed, return it
+            let mut found_child = false;
             for (pid, process) in &mut state.processes {
-                if process.parent_process_id == parent_pid && process.state_awaiters.is_none() {
-                    process.state_awaiters = Some(Vec::new());
-                    return Poll::Ready(Ok(process.state.to_wait_status(*pid)));
+                if process.parent_process_id == parent_pid {
+                    found_child = true;
+                    if process.state_awaiters.is_none() {
+                        process.state_awaiters = Some(Vec::new());
+                        return Poll::Ready(Ok(process.state.to_wait_status(*pid)));
+                    }
                 }
+            }
+
+            if !found_child {
+                return Poll::Ready(Err(Errno::ECHILD.into()));
             }
 
             // Save a waker so the future is polled again when the state has changed
@@ -505,6 +513,7 @@ impl ProcessState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use futures::executor::LocalPool;
     use std::ffi::CString;
 
@@ -587,6 +596,14 @@ mod tests {
         let future = env.system.wait_sync();
         let result = executor.run_until(future);
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
+    }
+
+    #[test]
+    fn wait_sync_without_child() {
+        let mut system = VirtualSystem::new();
+        #[allow(deprecated)]
+        let result = block_on(system.wait_sync());
+        assert_eq!(result, Err(Errno::ECHILD.into()));
     }
 
     #[test]
