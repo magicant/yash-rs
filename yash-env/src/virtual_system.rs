@@ -226,7 +226,7 @@ impl System for VirtualSystem {
             // If any child's state has changed, return it
             let mut found_child = false;
             for (pid, process) in &mut state.processes {
-                if process.parent_process_id == parent_pid {
+                if process.ppid == parent_pid {
                     found_child = true;
                     if process.state_awaiters.is_none() {
                         process.state_awaiters = Some(Vec::new());
@@ -241,7 +241,7 @@ impl System for VirtualSystem {
 
             // Save a waker so the future is polled again when the state has changed
             for process in state.processes.values_mut() {
-                if process.parent_process_id == parent_pid {
+                if process.ppid == parent_pid {
                     if let Some(awaiters) = &mut process.state_awaiters {
                         awaiters.push(context.waker().clone());
                     }
@@ -444,7 +444,7 @@ impl Executor for futures::executor::LocalSpawner {
 #[derive(Clone, Debug)]
 pub struct Process {
     /// Process ID of the parent process.
-    parent_process_id: Pid,
+    ppid: Pid,
 
     /// State of the process.
     state: ProcessState,
@@ -467,14 +467,19 @@ pub struct Process {
 
 impl Process {
     /// Creates a new running process.
-    pub fn with_parent(parent_process_id: Pid) -> Process {
+    pub fn with_parent(ppid: Pid) -> Process {
         Process {
-            parent_process_id,
+            ppid,
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
             last_exec: None,
             pending_waits: VecDeque::new(),
         }
+    }
+
+    /// Returns the process ID of the parent process.
+    pub fn ppid(&self) -> Pid {
+        self.ppid
     }
 
     /// Returns the process state.
