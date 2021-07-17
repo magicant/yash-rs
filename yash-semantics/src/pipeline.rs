@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementations for Command.
+//! Implementation of pipeline semantics.
 
 use super::Command;
 use async_trait::async_trait;
@@ -23,40 +23,13 @@ use yash_env::Env;
 use yash_syntax::syntax;
 
 #[async_trait(?Send)]
-impl Command for syntax::Command {
+impl Command for syntax::Pipeline {
     async fn execute(&self, env: &mut Env) -> Result {
-        use syntax::Command::*;
-        match self {
-            Simple(command) => command.execute(env).await,
-            #[allow(clippy::unit_arg)]
-            Compound(_) | Function(_) => Ok(println!("{}", self)),
-            // TODO execute compound command / function definition
-        }
-    }
-}
-
-#[async_trait(?Send)]
-impl Command for syntax::AndOrList {
-    async fn execute(&self, env: &mut Env) -> Result {
-        self.first.execute(env).await
-        // TODO rest
-    }
-}
-
-#[async_trait(?Send)]
-impl Command for syntax::Item {
-    async fn execute(&self, env: &mut Env) -> Result {
-        self.and_or.execute(env).await
-        // TODO async
-    }
-}
-
-#[async_trait(?Send)]
-impl Command for syntax::List {
-    async fn execute(&self, env: &mut Env) -> Result {
-        for item in &self.0 {
-            item.execute(env).await?
-        }
-        Ok(())
+        // TODO correctly execute pipeline
+        self.commands
+            .get(0)
+            .expect("empty pipeline not yet handled")
+            .execute(env)
+            .await
     }
 }

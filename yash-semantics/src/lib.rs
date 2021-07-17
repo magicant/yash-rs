@@ -24,6 +24,7 @@
 
 mod command_impl;
 pub mod command_search;
+mod pipeline;
 mod simple_command;
 
 use async_trait::async_trait;
