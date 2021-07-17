@@ -17,19 +17,19 @@
 //! This crate defines the shell execution environment.
 //!
 //! A shell execution environment, [`Env`], is a collection of data that may
-//! affect or be affected by execution of commands. The environment consists of
-//! application-managed parts and system-managed parts. Application-managed
+//! affect or be affected by the execution of commands. The environment consists
+//! of application-managed parts and system-managed parts. Application-managed
 //! parts are implemented in pure Rust in this crate. Many application-managed
 //! parts like [function]s and [variable]s can be manipulated independently of
 //! interactions with the underlying system. System-managed parts, on the other
 //! hand, depend on the underlying system. Attributes like the working directory
-//! and umask are managed by the system, so they can be accessed only by
-//! interaction with the system interface.
+//! and umask are managed by the system to be accessed only by interaction with
+//! the system interface.
 //!
-//! The system-managed parts are abstracted as the [`System`] trait.
+//! The [`System`] trait is the interface to the system-managed parts.
 //! [`RealSystem`] provides an implementation for `System` that interacts with
-//! the underlying system. [`VirtualSystem`] is a dummy for simulation that
-//! works without affecting the actual system.
+//! the underlying system. [`VirtualSystem`] is a dummy for simulating the
+//! system's behavior without affecting the actual system.
 
 pub mod builtin;
 pub mod exec;
@@ -45,12 +45,15 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::job::JobSet;
 use self::variable::VariableSet;
-use crate::exec::Divert;
+use async_trait::async_trait;
+use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
 
@@ -60,7 +63,7 @@ use yash_syntax::alias::AliasSet;
 /// system-managed parts. Application-managed parts are directly implemented in
 /// the `Env` instance. System-managed parts are abstracted as [`System`] so
 /// that they can be replaced with a dummy implementation.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
     ///
@@ -91,27 +94,50 @@ pub struct Env {
 ///
 /// TODO Elaborate
 pub trait System: Debug {
-    /// Clones the `System` instance and returns it in a box.
-    ///
-    /// The semantics of cloning is determined by the implementor. Especially,
-    /// a cloned [`RealSystem`] might render a surprising behavior.
-    fn clone_box(&self) -> Box<dyn System>;
-
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
 
-    /// Clones the current shell process.
+    /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
     /// should not call it directly. Instead, use [`Env::run_in_subshell`] so
     /// that the environment can manage the created child process as a job
     /// member.
     ///
+    /// If successful, this function returns a [`ChildProcess`] object. The
+    /// caller must call [`ChildProcess::run`] exactly once so that the child
+    /// process performs its task and finally exit.
+    ///
+    /// This function does not return any information about whether the current
+    /// process is the original (parent) process or the new (child) process. The
+    /// caller does not have to (and should not) care that because
+    /// `ChildProcess::run` takes care of it.
+    ///
     /// # Safety
     ///
-    /// See [nix's documentation](nix::unistd::fork) to learn why this function
-    /// is unsafe.
-    unsafe fn fork(&mut self) -> nix::Result<nix::unistd::ForkResult>;
+    /// This function can never be safely called in a multi-threaded process.
+    /// [POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html#tag_16_156_03)
+    /// says:
+    ///
+    /// > If a multi-threaded process calls fork(), the new process shall
+    /// contain a replica of the calling thread and its entire address space,
+    /// possibly including the states of mutexes and other resources.
+    /// Consequently, to avoid errors, the child process may only execute
+    /// async-signal-safe operations until such time as one of the exec
+    /// functions is called.
+    ///
+    /// Since this function needs to allocate memory for the returned `Box`,
+    /// which is not async-signal-safe, this function must be called in a
+    /// single-threaded program.
+    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
+
+    /// Reports updated status of a child process.
+    ///
+    /// This is a thin wrapper around the `waitpid` system call. It calls
+    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`. Users of `Env`
+    /// should not call it directly. Use dedicated job-managing functions
+    /// instead.
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 
     /// Reports updated status of a child process.
     ///
@@ -119,8 +145,14 @@ pub trait System: Debug {
     /// should not call it directly. Use dedicated job-managing functions
     /// instead.
     ///
-    /// TODO Describe the non-blocking nature of this function
-    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
+    /// This function is a temporary API that performs synchronous wait by
+    /// blocking in the function or by returning a future you need to await.
+    /// Eventually, a new function that only polls the state of children will
+    /// substitute this function.
+    #[deprecated]
+    fn wait_sync(
+        &mut self,
+    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>> + '_>>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
@@ -134,12 +166,24 @@ pub trait System: Debug {
     ) -> nix::Result<Infallible>;
 }
 
-// Auto-derived Clone cannot be used for this because `System` cannot be a
-// super-trait of `Clone` as that would make the trait non-object-safe.
-impl Clone for Box<dyn System> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
+/// Abstraction of a child process that can run a task.
+///
+/// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
+/// must call [`run`](Self::run) exactly once.
+#[async_trait(?Send)]
+pub trait ChildProcess: Debug {
+    /// Runs a task in the child process.
+    ///
+    /// When called in the parent process, this function returns the process ID
+    /// of the child. When in the child, this function never returns.
+    async fn run(
+        &mut self,
+        env: &mut Env,
+        task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+    ) -> Pid;
+    // TODO When unsized_fn_params is stabilized,
+    // 1. `&mut self` should be `self`
+    // 2. `task` should be `FnOnce` rather than `FnMut`
 }
 
 pub use real_system::RealSystem;
@@ -165,6 +209,23 @@ impl Env {
         Env::with_system(Box::new(VirtualSystem::default()))
     }
 
+    /// Clones this environment.
+    ///
+    /// The application-managed parts of the environment are cloned normally.
+    /// The system-managed parts cannot be cloned, so you must provide a
+    /// `System` instance.
+    pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
+        Env {
+            aliases: self.aliases.clone(),
+            builtins: self.builtins.clone(),
+            exit_status: self.exit_status,
+            functions: self.functions.clone(),
+            jobs: self.jobs.clone(),
+            variables: self.variables.clone(),
+            system,
+        }
+    }
+
     /// Runs the argument function in a subshell.
     ///
     /// This function creates a new (real or virtual) subshell in which the
@@ -188,60 +249,47 @@ impl Env {
     ///
     /// # Return value
     ///
-    /// If this function chooses to create a real subshell, it returns twice:
-    /// once in the current (original) shell process and the other in the child
-    /// process.
-    ///
-    /// In the current process, this function usually returns `Ok(Ok(e))`, where
-    /// `e` is the exit status of the subshell that is obtained from the
-    /// subshell environment after the argument function returns. If an error
-    /// occurs in [`fork`](System::fork), the error is returned as
-    /// `Ok(Err(...))`.
-    ///
-    /// In the child process, this function returns `Err(Divert::Exit(e))`. The
-    /// `Divert` value must be propagated in the call stack so that the child
-    /// process immediately exits with the exit status contained in the value.
-    pub fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
+    /// This function usually returns the exit status of the subshell that is
+    /// obtained from the subshell environment after the argument function
+    /// returns. If an error occurs in creating or awaiting a
+    /// [`new_child_process`](System::new_child_process), the error is returned.
+    pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
-        F: FnOnce(&mut Env),
+        F: FnOnce(&mut Env) + 'static,
     {
         // TODO Use a virtual subshell when possible
-        use nix::sys::wait::WaitStatus;
-        use nix::unistd::ForkResult::*;
-        match unsafe { self.system.fork() } {
-            Ok(Parent { child }) => {
-                match self.system.wait() {
-                    Ok(WaitStatus::Exited(pid, exit_status)) => {
-                        // TODO This assertion is not correct. We need to handle
-                        // other possibly existing child processes.
-                        assert_eq!(pid, child);
-                        Ok(Ok(ExitStatus(exit_status)))
+        let mut f = Some(f);
+
+        let child_pid = unsafe { self.system.new_child_process()? }
+            .run(
+                self,
+                Box::new(move |env| {
+                    if let Some(f) = f.take() {
+                        Box::pin(async move { f(env) })
+                    } else {
+                        Box::pin(async {})
                     }
-                    Ok(WaitStatus::Signaled(pid, _signal, _core_dumped)) => {
-                        // TODO This assertion is not correct. We need to handle
-                        // other possibly existing child processes.
-                        assert_eq!(pid, child);
-                        // TODO Convert signal to exit status
-                        Ok(Ok(ExitStatus(128)))
-                    }
-                    Ok(_) => todo!(),
-                    Err(e) => Ok(Err(e)),
-                }
+                }),
+            )
+            .await;
+
+        use nix::sys::wait::WaitStatus::*;
+        #[allow(deprecated)]
+        match self.system.wait_sync().await? {
+            Exited(pid, exit_status) => {
+                // TODO This assertion is not correct. We need to handle
+                // other possibly existing child processes.
+                assert_eq!(pid, child_pid);
+                Ok(ExitStatus(exit_status))
             }
-            Ok(Child) => {
-                // TODO Reset traps
-                // TODO Push a subshell state to the execution context stack
-                f(self);
-                Err(Divert::Exit(self.exit_status))
-                // TODO Should we directly exit here rather than returning
-                // Divert::Exit?
-                //  - Does stack unwinding not have any unexpected side effect?
-                //  - How does the caller know that we're exiting from a
-                //    subshell, not from the main shell process? For example,
-                //    an interactive shell with a suspended job may refuse to
-                //    exit.
+            Signaled(pid, _signal, _core_dumped) => {
+                // TODO This assertion is not correct. We need to handle
+                // other possibly existing child processes.
+                assert_eq!(pid, child_pid);
+                // TODO Convert signal to exit status
+                Ok(ExitStatus(128))
             }
-            Err(e) => Ok(Err(e)),
+            _ => todo!(),
         }
     }
 }
@@ -249,37 +297,23 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nix::sys::wait::WaitStatus;
-    use nix::unistd::ForkResult;
-    use nix::unistd::Pid;
+    use futures::executor::LocalPool;
 
     #[test]
-    fn run_in_subshell_parent() {
-        let child = Pid::from_raw(12345);
-        let status = 97;
-        let mut system = VirtualSystem::default();
-        system
-            .pending_forks
-            .push_back(Ok(ForkResult::Parent { child }));
-        system
-            .pending_waits
-            .push_back(Ok(WaitStatus::Exited(child, status)));
+    fn run_in_subshell_with_child_normally_exiting() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let status = ExitStatus(97);
         let mut env = Env::with_system(Box::new(system));
-        let result = env.run_in_subshell(|_| unreachable!());
-        assert_eq!(result, Ok(Ok(ExitStatus(status))));
+        let result = executor.run_until(env.run_in_subshell(move |env| env.exit_status = status));
+        assert_eq!(result, Ok(status));
     }
 
     // TODO Test case for parent with signaled child
-
-    #[test]
-    fn run_in_subshell_child() {
-        let status = ExitStatus(71);
-        let mut system = VirtualSystem::default();
-        system.pending_forks.push_back(Ok(ForkResult::Child));
-        let mut env = Env::with_system(Box::new(system));
-        let result = env.run_in_subshell(|env| env.exit_status = status);
-        assert_eq!(result, Err(Divert::Exit(status)));
-    }
 
     // TODO Test case where fork fails
 }

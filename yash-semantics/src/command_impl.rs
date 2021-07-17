@@ -75,24 +75,27 @@ impl Command for syntax::SimpleCommand {
                 Some(External { path }) => {
                     let args = to_c_strings(fields);
                     let envs = env.variables.env_c_strings();
-                    let result = env.run_in_subshell(|env| {
-                        // TODO Remove signal handlers not set by current traps
+                    let result = env
+                        .run_in_subshell(move |env| {
+                            // TODO Remove signal handlers not set by current traps
 
-                        let result = env.system.execve(path.as_c_str(), &args, &envs);
-                        // TODO Prefer into_err to unwrap_err
-                        let e = result.unwrap_err();
-                        // TODO Reopen as shell script on ENOEXEC
-                        match e {
-                            nix::Error::Sys(Errno::ENOENT) | nix::Error::Sys(Errno::ENOTDIR) => {
-                                env.exit_status = ExitStatus::NOT_FOUND;
+                            let result = env.system.execve(path.as_c_str(), &args, &envs);
+                            // TODO Prefer into_err to unwrap_err
+                            let e = result.unwrap_err();
+                            // TODO Reopen as shell script on ENOEXEC
+                            match e {
+                                nix::Error::Sys(Errno::ENOENT)
+                                | nix::Error::Sys(Errno::ENOTDIR) => {
+                                    env.exit_status = ExitStatus::NOT_FOUND;
+                                }
+                                _ => {
+                                    env.exit_status = ExitStatus::NOEXEC;
+                                }
                             }
-                            _ => {
-                                env.exit_status = ExitStatus::NOEXEC;
-                            }
-                        }
-                        // TODO The error message should be printed via Env
-                        eprintln!("command execution failed: {:?}", e);
-                    })?;
+                            // TODO The error message should be printed via Env
+                            eprintln!("command execution failed: {:?}", e);
+                        })
+                        .await;
 
                     match result {
                         Ok(exit_status) => {
@@ -172,16 +175,17 @@ impl Command for syntax::List {
 mod tests {
     use super::*;
     use futures::executor::block_on;
-    use nix::sys::wait::WaitStatus;
-    use nix::unistd::ForkResult;
-    use nix::unistd::Pid;
+    use futures::executor::LocalPool;
     use std::future::ready;
     use std::future::Future;
     use std::path::PathBuf;
     use std::pin::Pin;
+    use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
 
@@ -231,75 +235,108 @@ mod tests {
     }
 
     #[test]
-    fn simple_command_returns_exit_status_from_external_utility() {
-        let child = Pid::from_raw(1234);
-        let status = 54;
-        let mut system = VirtualSystem::new();
-        system
-            .pending_forks
-            .push_back(Ok(ForkResult::Parent { child }));
-        system
-            .pending_waits
-            .push_back(Ok(WaitStatus::Exited(child, status)));
+    fn simple_command_calls_execve_with_correct_arguments() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+
+        let path = PathBuf::from("/some/file");
+        let mut content = INode::default();
+        let mut executor = LocalPool::new();
+        content.permissions.0 |= 0o100;
+        content.is_native_executable = true;
+        system.state.borrow_mut().file_system.save(path, content);
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
-        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        env.variables.assign(
+            "env".to_string(),
+            Variable {
+                value: Value::Scalar("scalar".to_string()),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        );
+        env.variables.assign(
+            "local".to_string(),
+            Variable {
+                value: Value::Scalar("ignored".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        );
+        let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+        let result = executor.run_until(command.execute(&mut env));
         assert_eq!(result, Ok(()));
-        assert_eq!(env.exit_status, ExitStatus(status));
+
+        let state = state.borrow();
+        let process = state.processes.values().last().unwrap();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, CString::new("/some/file").unwrap());
+        assert_eq!(
+            arguments.1,
+            [
+                CString::new("/some/file").unwrap(),
+                CString::new("foo").unwrap(),
+                CString::new("bar").unwrap()
+            ]
+        );
+        assert_eq!(arguments.2, [CString::new("env=scalar").unwrap()]);
     }
 
     #[test]
-    #[should_panic(
-        expected = r#"VirtualSystem::execve called for path="/some/file", args=["/some/file", "foo", "bar"]"#
-    )]
-    fn simple_command_invokes_external_utility_in_subshell() {
-        let mut system = VirtualSystem::new();
+    fn simple_command_returns_exit_status_from_external_utility() {
+        let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
-        system.file_system.save(path, content);
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().file_system.save(path, content);
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        unreachable!("{:?}", result);
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        // In VirtualSystem, execve fails with ENOSYS.
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
     #[test]
-    fn simple_command_subshell_exits_with_127_for_non_existing_file() {
-        let mut system = VirtualSystem::new();
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+    fn simple_command_returns_127_for_non_existing_file() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOT_FOUND)));
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
     }
 
     #[test]
-    fn simple_command_subshell_exits_with_126_on_exec_failure() {
-        let mut system = VirtualSystem::new();
+    fn simple_command_returns_126_on_exec_failure() {
+        let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
-        system.file_system.save(path, content);
-        system.pending_forks.push_back(Ok(ForkResult::Child));
+        system.state.borrow_mut().file_system.save(path, content);
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Exit(ExitStatus::NOEXEC)));
+        let result = executor.run_until(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
     #[test]
     fn simple_command_returns_126_on_fork_failure() {
-        let mut system = VirtualSystem::new();
-        system.pending_forks.push_back(Err(Errno::ENOMEM.into()));
-
-        let mut env = Env::with_system(Box::new(system));
+        let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Ok(()));

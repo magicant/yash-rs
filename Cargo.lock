@@ -269,7 +269,9 @@ dependencies = [
 name = "yash-env"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "either",
+ "futures",
  "itertools",
  "nix",
  "yash-syntax",
