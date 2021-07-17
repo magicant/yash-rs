@@ -37,40 +37,10 @@ impl Command for syntax::Pipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::return_builtin;
     use futures::executor::block_on;
-    use std::future::ready;
-    use std::future::Future;
-    use std::pin::Pin;
-    use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
-    use yash_env::expansion::Field;
-
-    fn return_builtin_main(
-        _env: &mut Env,
-        mut args: Vec<Field>,
-    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let divert = match args.get(1) {
-            Some(field) if field.value == "-n" => {
-                args.remove(1);
-                None
-            }
-            _ => Some(Divert::Return),
-        };
-        let exit_status = match args.get(1) {
-            Some(field) => field.value.parse().unwrap_or(2),
-            None => 0,
-        };
-        Box::pin(ready((ExitStatus(exit_status), divert)))
-    }
-
-    fn return_builtin() -> Builtin {
-        Builtin {
-            r#type: Special,
-            execute: return_builtin_main,
-        }
-    }
 
     #[test]
     fn single_command_pipeline_returns_exit_status_intact_without_divert() {

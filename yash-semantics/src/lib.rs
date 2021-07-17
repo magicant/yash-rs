@@ -58,3 +58,42 @@ pub trait Word {
 }
 
 // TODO Probably we should implement a read-execute loop in here
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::future::ready;
+    use std::future::Future;
+    use std::pin::Pin;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
+    use yash_env::exec::Divert;
+    use yash_env::exec::ExitStatus;
+    use yash_env::expansion::Field;
+    use yash_env::Env;
+
+    fn return_builtin_main(
+        _env: &mut Env,
+        mut args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        let divert = match args.get(1) {
+            Some(field) if field.value == "-n" => {
+                args.remove(1);
+                None
+            }
+            _ => Some(Divert::Return),
+        };
+        let exit_status = match args.get(1) {
+            Some(field) => field.value.parse().unwrap_or(2),
+            None => 0,
+        };
+        Box::pin(ready((ExitStatus(exit_status), divert)))
+    }
+
+    /// Returns a minimal implementation of the `return` built-in.
+    pub fn return_builtin() -> Builtin {
+        Builtin {
+            r#type: Special,
+            execute: return_builtin_main,
+        }
+    }
+}

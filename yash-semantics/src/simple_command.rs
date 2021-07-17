@@ -123,45 +123,16 @@ impl Command for syntax::SimpleCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::return_builtin;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
-    use std::future::ready;
-    use std::future::Future;
     use std::path::PathBuf;
-    use std::pin::Pin;
     use std::rc::Rc;
-    use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::Special;
     use yash_env::exec::Divert;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
-
-    fn return_builtin_main(
-        _env: &mut Env,
-        mut args: Vec<Field>,
-    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let divert = match args.get(1) {
-            Some(field) if field.value == "-n" => {
-                args.remove(1);
-                None
-            }
-            _ => Some(Divert::Return),
-        };
-        let exit_status = match args.get(1) {
-            Some(field) => field.value.parse().unwrap_or(2),
-            None => 0,
-        };
-        Box::pin(ready((ExitStatus(exit_status), divert)))
-    }
-
-    fn return_builtin() -> Builtin {
-        Builtin {
-            r#type: Special,
-            execute: return_builtin_main,
-        }
-    }
 
     #[test]
     fn simple_command_returns_exit_status_from_builtin_without_divert() {
