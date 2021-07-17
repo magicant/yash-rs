@@ -37,7 +37,6 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -176,16 +175,9 @@ impl System for VirtualSystem {
         }))
     }
 
-    /// Simulates awaiting child process status update.
-    ///
-    /// This implementation pops the first entry from
-    /// [`pending_waits`](Process::pending_waits) and returns it.
-    /// If `pending_waits` is empty, this function will **panic**!
+    /// This function is currently not implemented.
     fn wait(&mut self) -> nix::Result<WaitStatus> {
-        self.current_process_mut()
-            .pending_waits
-            .pop_front()
-            .expect("pending_waits must be filled before calling wait")
+        todo!()
     }
 
     /// Reports updated status of a child process.
@@ -432,9 +424,6 @@ pub struct Process {
 
     /// Copy of arguments passed to [`execve`](VirtualSystem::execve).
     last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
-
-    /// Results of future calls to [`wait`](VirtualSystem::wait).
-    pub pending_waits: VecDeque<nix::Result<WaitStatus>>,
 }
 
 impl Process {
@@ -445,7 +434,6 @@ impl Process {
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
             last_exec: None,
-            pending_waits: VecDeque::new(),
         }
     }
 

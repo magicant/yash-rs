@@ -133,11 +133,10 @@ pub trait System: Debug {
 
     /// Reports updated status of a child process.
     ///
-    /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
+    /// This is a thin wrapper around the `waitpid` system call. It calls
+    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`. Users of `Env`
     /// should not call it directly. Use dedicated job-managing functions
     /// instead.
-    ///
-    /// TODO Describe the non-blocking nature of this function
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 
     /// Reports updated status of a child process.

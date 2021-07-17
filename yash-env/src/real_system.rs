@@ -75,8 +75,7 @@ impl System for RealSystem {
 
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
         use nix::sys::wait::WaitPidFlag;
-        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
-        // TODO Should set WNOHANG too
+        let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
         nix::sys::wait::waitpid(None, options.into())
     }
 
