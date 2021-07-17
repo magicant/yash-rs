@@ -226,6 +226,33 @@ impl Env {
         }
     }
 
+    /// Starts a subshell.
+    ///
+    /// This function creates a new child process in which the argument function
+    /// is run. If the child was started successfully, this function returns the
+    /// child's process ID. Otherwise, it returns an error.
+    ///
+    /// Although this function is `async`, it does not wait for the child to
+    /// finish, which means the parent and child processes will run
+    /// concurrently.
+    pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
+    where
+        F: FnOnce(&mut Env) + 'static,
+    {
+        let mut f = Some(f);
+        let task: ChildProcessTask = Box::new(move |env| {
+            if let Some(f) = f.take() {
+                Box::pin(async move { f(env) })
+            } else {
+                Box::pin(async {})
+            }
+        });
+        let child_pid = unsafe { self.system.new_child_process()? }
+            .run(self, task)
+            .await;
+        Ok(child_pid)
+    }
+
     /// Runs the argument function in a subshell.
     ///
     /// This function creates a new (real or virtual) subshell in which the
@@ -258,20 +285,7 @@ impl Env {
         F: FnOnce(&mut Env) + 'static,
     {
         // TODO Use a virtual subshell when possible
-        let mut f = Some(f);
-
-        let child_pid = unsafe { self.system.new_child_process()? }
-            .run(
-                self,
-                Box::new(move |env| {
-                    if let Some(f) = f.take() {
-                        Box::pin(async move { f(env) })
-                    } else {
-                        Box::pin(async {})
-                    }
-                }),
-            )
-            .await;
+        let child_pid = self.start_subshell(f).await?;
 
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
