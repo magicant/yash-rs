@@ -166,6 +166,10 @@ pub trait System: Debug {
     ) -> nix::Result<Infallible>;
 }
 
+/// Type of an argument to [`ChildProcess::run`].
+pub type ChildProcessTask =
+    Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+
 /// Abstraction of a child process that can run a task.
 ///
 /// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
@@ -176,11 +180,7 @@ pub trait ChildProcess: Debug {
     ///
     /// When called in the parent process, this function returns the process ID
     /// of the child. When in the child, this function never returns.
-    async fn run(
-        &mut self,
-        env: &mut Env,
-        task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
-    ) -> Pid;
+    async fn run(&mut self, env: &mut Env, task: ChildProcessTask) -> Pid;
     // TODO When unsized_fn_params is stabilized,
     // 1. `&mut self` should be `self`
     // 2. `task` should be `FnOnce` rather than `FnMut`

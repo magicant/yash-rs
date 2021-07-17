@@ -119,11 +119,7 @@ struct DummyChildProcess {
 
 #[async_trait(?Send)]
 impl ChildProcess for DummyChildProcess {
-    async fn run(
-        &mut self,
-        _env: &mut Env,
-        _task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
-    ) -> Pid {
+    async fn run(&mut self, _env: &mut Env, _task: super::ChildProcessTask) -> Pid {
         self.child_process_id
     }
 }
