@@ -95,7 +95,7 @@ impl Command for syntax::SimpleCommand {
                             // TODO The error message should be printed via Env
                             eprintln!("command execution failed: {:?}", e);
                         })
-                        .await?;
+                        .await;
 
                     match result {
                         Ok(exit_status) => {

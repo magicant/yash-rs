@@ -260,53 +260,47 @@ impl Env {
     ///
     /// # Return value
     ///
-    /// This function usually returns `Ok(Ok(e))`, where `e` is the exit status
-    /// of the subshell that is obtained from the subshell environment after the
-    /// argument function returns. If an error occurs in creating a
-    /// [`new_child_process`](System::new_child_process), the error is returned
-    /// as `Ok(Err(...))`.
-    pub async fn run_in_subshell<F>(&mut self, f: F) -> exec::Result<nix::Result<ExitStatus>>
-    // TODO Should return nix::Result<ExitStatus>
+    /// This function usually returns the exit status of the subshell that is
+    /// obtained from the subshell environment after the argument function
+    /// returns. If an error occurs in creating or awaiting a
+    /// [`new_child_process`](System::new_child_process), the error is returned.
+    pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
         F: FnOnce(&mut Env) + 'static,
     {
         // TODO Use a virtual subshell when possible
-        use nix::sys::wait::WaitStatus;
-        match unsafe { self.system.new_child_process() } {
-            Err(e) => Ok(Err(e)),
-            Ok(mut child_process) => {
-                let mut f = Some(f);
-                let child_pid = child_process
-                    .run(
-                        self,
-                        Box::new(move |env| {
-                            if let Some(f) = f.take() {
-                                Box::pin(async move { f(env) })
-                            } else {
-                                Box::pin(async {})
-                            }
-                        }),
-                    )
-                    .await;
-                #[allow(deprecated)]
-                match self.system.wait_sync().await {
-                    Ok(WaitStatus::Exited(pid, exit_status)) => {
-                        // TODO This assertion is not correct. We need to handle
-                        // other possibly existing child processes.
-                        assert_eq!(pid, child_pid);
-                        Ok(Ok(ExitStatus(exit_status)))
+        let mut f = Some(f);
+
+        let child_pid = unsafe { self.system.new_child_process()? }
+            .run(
+                self,
+                Box::new(move |env| {
+                    if let Some(f) = f.take() {
+                        Box::pin(async move { f(env) })
+                    } else {
+                        Box::pin(async {})
                     }
-                    Ok(WaitStatus::Signaled(pid, _signal, _core_dumped)) => {
-                        // TODO This assertion is not correct. We need to handle
-                        // other possibly existing child processes.
-                        assert_eq!(pid, child_pid);
-                        // TODO Convert signal to exit status
-                        Ok(Ok(ExitStatus(128)))
-                    }
-                    Ok(_) => todo!(),
-                    Err(e) => Ok(Err(e)),
-                }
+                }),
+            )
+            .await;
+
+        use nix::sys::wait::WaitStatus::*;
+        #[allow(deprecated)]
+        match self.system.wait_sync().await? {
+            Exited(pid, exit_status) => {
+                // TODO This assertion is not correct. We need to handle
+                // other possibly existing child processes.
+                assert_eq!(pid, child_pid);
+                Ok(ExitStatus(exit_status))
             }
+            Signaled(pid, _signal, _core_dumped) => {
+                // TODO This assertion is not correct. We need to handle
+                // other possibly existing child processes.
+                assert_eq!(pid, child_pid);
+                // TODO Convert signal to exit status
+                Ok(ExitStatus(128))
+            }
+            _ => todo!(),
         }
     }
 }
@@ -327,7 +321,7 @@ mod tests {
         let status = ExitStatus(97);
         let mut env = Env::with_system(Box::new(system));
         let result = executor.run_until(env.run_in_subshell(move |env| env.exit_status = status));
-        assert_eq!(result, Ok(Ok(status)));
+        assert_eq!(result, Ok(status));
     }
 
     // TODO Test case for parent with signaled child
