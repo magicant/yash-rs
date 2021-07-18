@@ -27,15 +27,20 @@ use yash_syntax::syntax;
 impl Command for syntax::Pipeline {
     /// Executes the pipeline.
     ///
+    /// # Executing simple commands
+    ///
     /// If this pipeline contains one simple command, it is executed in the
     /// current shell execution environment.
     ///
     /// TODO Elaborate
     ///
+    /// If the pipeline has no simple command, it is a no-op.
+    ///
     /// # Exit status
     ///
-    /// If the pipeline starts with an `!`, the exit status is inverted: zero
-    /// becomes one, and non-zero becomes zero.
+    /// The exit status of the pipeline is that of the last simple command (or
+    /// zero if no command). If the pipeline starts with an `!`, the exit status
+    /// is inverted: zero becomes one, and non-zero becomes zero.
     ///
     /// In POSIX, the expected exit status is unclear when an inverted pipeline
     /// performs a jump as in `! return 42`. The behavior disagrees among
@@ -58,12 +63,17 @@ impl Command for syntax::Pipeline {
 }
 
 async fn execute_commands_in_pipeline(env: &mut Env, commands: &[syntax::Command]) -> Result {
-    // TODO support multi-command pipelines
-    commands
-        .get(0)
-        .expect("empty pipeline not yet handled")
-        .execute(env)
-        .await
+    match commands.len() {
+        0 => {
+            env.exit_status = ExitStatus::SUCCESS;
+            Ok(())
+        }
+        1 => commands[0].execute(env).await,
+        _ => {
+            // TODO execute multi-command pipeline
+            commands[0].execute(env).await
+        }
+    }
 }
 
 #[cfg(test)]
@@ -73,6 +83,18 @@ mod tests {
     use futures::executor::block_on;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
+
+    #[test]
+    fn empty_pipeline() {
+        let mut env = Env::new_virtual();
+        let pipeline = syntax::Pipeline {
+            commands: vec![],
+            negation: false,
+        };
+        let result = block_on(pipeline.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(0));
+    }
 
     #[test]
     fn single_command_pipeline_returns_exit_status_intact_without_divert() {
