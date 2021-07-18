@@ -126,6 +126,7 @@ mod tests {
     use crate::tests::return_builtin;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
+    use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::exec::Divert;
@@ -164,6 +165,7 @@ mod tests {
         let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
+        let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
@@ -213,6 +215,7 @@ mod tests {
         let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
+        let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
@@ -244,6 +247,7 @@ mod tests {
         let mut content = INode::default();
         let mut executor = LocalPool::new();
         content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 

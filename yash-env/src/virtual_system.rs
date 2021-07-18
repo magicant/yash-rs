@@ -138,7 +138,7 @@ impl System for VirtualSystem {
         };
         match self.state.borrow().file_system.get(&path) {
             None => false,
-            Some(inode) => inode.permissions.0 & 0o111 != 0,
+            Some(inode) => inode.borrow().permissions.0 & 0o111 != 0,
         }
     }
 
@@ -237,7 +237,7 @@ impl System for VirtualSystem {
         let fs = &state.file_system;
         if let Some(file) = fs.get(os_path) {
             // TODO Check file permissions
-            if file.is_native_executable {
+            if file.borrow().is_native_executable {
                 // Save arguments in the Process
                 let process = state.processes.get_mut(&self.process_id).unwrap();
                 let path = path.to_owned();
@@ -361,7 +361,7 @@ mod tests {
     fn is_executable_file_existing_but_non_executable_file() {
         let system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
-        let content = INode::default();
+        let content = Rc::new(RefCell::new(INode::default()));
         system.state.borrow_mut().file_system.save(path, content);
         assert!(!system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
@@ -372,6 +372,7 @@ mod tests {
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
@@ -447,6 +448,7 @@ mod tests {
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
+        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
@@ -464,6 +466,7 @@ mod tests {
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         content.is_native_executable = true;
+        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()
@@ -490,6 +493,7 @@ mod tests {
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
         system
             .state
             .borrow_mut()

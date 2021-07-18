@@ -16,14 +16,16 @@
 
 //! File system in a virtual system.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 /// Collection of files.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FileSystem(HashMap<PathBuf, INode>);
+pub struct FileSystem(HashMap<PathBuf, Rc<RefCell<INode>>>);
 // TODO should be a link to the root i-node
 // In the current implementation, this hash map stores all files in a flat
 // namespace, without any recursive directory structure.
@@ -33,12 +35,16 @@ impl FileSystem {
     ///
     /// If there is an existing file at the specified path, it is replaced with
     /// the new file and returned.
-    pub fn save(&mut self, path: PathBuf, content: INode) -> Option<INode> {
+    pub fn save(
+        &mut self,
+        path: PathBuf,
+        content: Rc<RefCell<INode>>,
+    ) -> Option<Rc<RefCell<INode>>> {
         self.0.insert(path, content)
     }
 
     /// Returns a reference to the existing file at the specified path.
-    pub fn get(&self, path: &Path) -> Option<&INode> {
+    pub fn get(&self, path: &Path) -> Option<&Rc<RefCell<INode>>> {
         // TODO Return ENOTDIR or ENOENT if not found
         self.0.get(path)
     }
