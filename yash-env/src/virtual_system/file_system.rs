@@ -53,11 +53,13 @@ impl FileSystem {
 /// File on the file system.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct INode {
+    /// File content.
+    pub content: Vec<u8>,
     /// Access permissions.
     pub permissions: Mode,
     /// Whether this file is a native binary that can be exec'ed.
     pub is_native_executable: bool,
-    // TODO File content, owner user and group, etc.
+    // TODO owner user and group, etc.
 }
 
 impl INode {
