@@ -24,15 +24,15 @@
 //! This module also defines elements that compose a virtual system.
 
 mod file_system;
+mod process;
 
 pub use self::file_system::*;
-use crate::exec::ExitStatus;
+pub use self::process::*;
 use crate::ChildProcess;
 use crate::Env;
 use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
-use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
@@ -343,99 +343,10 @@ impl Executor for futures::executor::LocalSpawner {
     }
 }
 
-/// Process in a virtual system.
-#[derive(Clone, Debug)]
-pub struct Process {
-    /// Process ID of the parent process.
-    ppid: Pid,
-
-    /// State of the process.
-    state: ProcessState,
-
-    /// References to tasks that are waiting for the process state to change.
-    ///
-    /// If this is `None`, the `state` has changed but not yet been reported by
-    /// the `wait` system call. The next `wait` call should immediately notify
-    /// the current state. If this is `Some(_)`, the `state` has not changed
-    /// since the last `wait` call. The next `wait` call should leave a waker
-    /// so that the caller is woken when the state changes later.
-    state_awaiters: Option<Vec<Waker>>,
-
-    /// Copy of arguments passed to [`execve`](VirtualSystem::execve).
-    last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
-}
-
-impl Process {
-    /// Creates a new running process.
-    pub fn with_parent(ppid: Pid) -> Process {
-        Process {
-            ppid,
-            state: ProcessState::Running,
-            state_awaiters: Some(Vec::new()),
-            last_exec: None,
-        }
-    }
-
-    /// Returns the process ID of the parent process.
-    pub fn ppid(&self) -> Pid {
-        self.ppid
-    }
-
-    /// Returns the process state.
-    pub fn state(&self) -> ProcessState {
-        self.state
-    }
-
-    /// Sets the state of this process.
-    ///
-    /// This function returns wakers that must be woken. The caller must first
-    /// drop the `RefMut` borrowing the [`SystemState`] containing this
-    /// `Process` and then wake the wakers returned from this function. This is
-    /// to prevent a possible second borrow by another task.
-    #[must_use]
-    pub fn set_state(&mut self, state: ProcessState) -> Vec<Waker> {
-        let old_state = std::mem::replace(&mut self.state, state);
-
-        if old_state == state {
-            Vec::new()
-        } else {
-            self.state_awaiters.take().unwrap_or_else(Vec::new)
-        }
-    }
-
-    /// Returns the arguments to the last call to
-    /// [`execve`](VirtualSystem::execve) on this process.
-    #[must_use]
-    pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {
-        &self.last_exec
-    }
-}
-
-/// State of a process.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProcessState {
-    Running,
-    Stopped(Signal),
-    Exited(ExitStatus),
-    Signaled(Signal),
-}
-
-impl ProcessState {
-    /// Converts `ProcessState` to `WaitStatus`.
-    #[must_use]
-    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
-        match self {
-            ProcessState::Running => WaitStatus::Continued(pid),
-            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
-            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
-            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::exec::ExitStatus;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
     use std::ffi::CString;
