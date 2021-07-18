@@ -58,11 +58,15 @@ impl Process {
     }
 
     /// Returns the process ID of the parent process.
+    #[inline(always)]
+    #[must_use]
     pub fn ppid(&self) -> Pid {
         self.ppid
     }
 
     /// Returns the process state.
+    #[inline(always)]
+    #[must_use]
     pub fn state(&self) -> ProcessState {
         self.state
     }
@@ -73,7 +77,7 @@ impl Process {
     /// drop the `RefMut` borrowing the [`SystemState`](super::SystemState) containing this
     /// `Process` and then wake the wakers returned from this function. This is
     /// to prevent a possible second borrow by another task.
-    #[must_use]
+    #[must_use = "You must wake up the returned waker"]
     pub fn set_state(&mut self, state: ProcessState) -> Vec<Waker> {
         let old_state = std::mem::replace(&mut self.state, state);
 
@@ -86,6 +90,7 @@ impl Process {
 
     /// Returns the arguments to the last call to
     /// [`execve`](crate::VirtualSystem::execve) on this process.
+    #[inline(always)]
     #[must_use]
     pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {
         &self.last_exec
