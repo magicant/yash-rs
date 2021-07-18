@@ -41,6 +41,8 @@ impl Parser<'_> {
                 // Parse the `!` reserved word
                 if let Token(Some(Bang)) = self.peek_token().await?.id {
                     let location = self.take_token_raw().await?.word.location;
+                    // TODO Warn if `!` is immediately followed by `(`, which is
+                    // not POSIXly portable.
                     loop {
                         // Parse the command after the `!`
                         if let Rec::Parsed(option) = self.command().await? {
