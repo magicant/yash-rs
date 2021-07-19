@@ -24,9 +24,11 @@
 //! This module also defines elements that compose a virtual system.
 
 mod file_system;
+mod io;
 mod process;
 
 pub use self::file_system::*;
+pub use self::io::*;
 pub use self::process::*;
 use crate::ChildProcess;
 use crate::Env;
