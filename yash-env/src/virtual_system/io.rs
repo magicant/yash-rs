@@ -23,6 +23,7 @@ use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::rc::Weak;
 
 /// Abstract handle to perform I/O with.
 pub trait OpenFileDescription {
@@ -141,6 +142,109 @@ impl OpenFileDescription for OpenFile {
         let new_offset = add(base, offset).ok_or(nix::Error::Sys(Errno::EOVERFLOW))?;
         self.offset = usize::try_from(new_offset).map_err(|_| nix::Error::Sys(Errno::EINVAL))?;
         Ok(new_offset)
+    }
+}
+
+/// Unnamed FIFO byte channel.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Pipe {
+    /// Bytes that have been written to (but not yet read from) the pipe.
+    pub content: Vec<u8>,
+}
+
+impl Pipe {
+    /// Creates a new pipe.
+    pub fn new() -> Pipe {
+        Pipe::default()
+    }
+}
+
+/// Reading end of a [`Pipe`].
+#[derive(Clone, Debug)]
+pub struct PipeReader {
+    pub pipe: Rc<RefCell<Pipe>>,
+}
+
+impl PartialEq for PipeReader {
+    /// Compares two `PipeReader`s.
+    ///
+    /// Returns true if the two readers are reading from the same pipe.
+    fn eq(&self, rhs: &Self) -> bool {
+        Rc::ptr_eq(&self.pipe, &rhs.pipe)
+    }
+}
+
+impl Eq for PipeReader {}
+
+impl OpenFileDescription for PipeReader {
+    fn is_readable(&self) -> bool {
+        true
+    }
+    fn is_writable(&self) -> bool {
+        false
+    }
+    fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
+        let mut pipe = self.pipe.borrow_mut();
+        let limit = pipe.content.len();
+        if limit == 0 && Rc::weak_count(&self.pipe) > 0 {
+            return Err(Errno::EAGAIN.into());
+        }
+        if buffer.len() > limit {
+            buffer = &mut buffer[..limit];
+        }
+        let count = buffer.len();
+        buffer.copy_from_slice(&pipe.content[..count]);
+        pipe.content.drain(..count);
+        Ok(count)
+    }
+    fn write(&mut self, _buffer: &[u8]) -> nix::Result<usize> {
+        Err(Errno::EBADF.into())
+    }
+    fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
+        Err(Errno::ESPIPE.into())
+    }
+}
+
+/// Writing end of a [`Pipe`].
+#[derive(Clone, Debug)]
+pub struct PipeWriter {
+    pub pipe: Weak<RefCell<Pipe>>,
+}
+
+impl PartialEq for PipeWriter {
+    /// Compares two `PipeWriter`s.
+    ///
+    /// Returns true if the two readers are reading from the same pipe.
+    fn eq(&self, rhs: &Self) -> bool {
+        Weak::ptr_eq(&self.pipe, &rhs.pipe)
+    }
+}
+
+impl Eq for PipeWriter {}
+
+impl OpenFileDescription for PipeWriter {
+    fn is_readable(&self) -> bool {
+        false
+    }
+    fn is_writable(&self) -> bool {
+        true
+    }
+    fn read(&mut self, _buffer: &mut [u8]) -> nix::Result<usize> {
+        Err(Errno::EBADF.into())
+    }
+    fn write(&mut self, buffer: &[u8]) -> nix::Result<usize> {
+        let pipe = match self.pipe.upgrade() {
+            // TODO SIGPIPE
+            None => return Err(Errno::EPIPE.into()),
+            Some(pipe) => pipe,
+        };
+        let mut pipe = pipe.borrow_mut();
+        // TODO EAGAIN if full
+        pipe.content.extend(buffer);
+        Ok(buffer.len())
+    }
+    fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
+        Err(Errno::ESPIPE.into())
     }
 }
 
@@ -362,5 +466,40 @@ mod tests {
         let result = open_file.seek(-4, Whence::SeekEnd);
         assert_eq!(result, Err(Errno::EINVAL.into()));
         assert_eq!(open_file.offset, 0);
+    }
+
+    #[test]
+    fn pipe_read_write() {
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let mut writer = PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        };
+        let mut reader = PipeReader { pipe };
+
+        let mut buffer = [100; 5];
+        let result = reader.read(&mut buffer);
+        assert_eq!(result, Err(Errno::EAGAIN.into()));
+
+        let result = writer.write(&[1, 2, 3, 4, 5, 9, 8]);
+        assert_eq!(result, Ok(7));
+
+        let result = reader.read(&mut buffer);
+        assert_eq!(result, Ok(5));
+        assert_eq!(buffer, [1, 2, 3, 4, 5]);
+
+        let result = writer.write(&[0, 1]);
+        assert_eq!(result, Ok(2));
+
+        let result = reader.read(&mut buffer);
+        assert_eq!(result, Ok(4));
+        assert_eq!(buffer[..4], [9, 8, 0, 1]);
+
+        let result = reader.read(&mut buffer);
+        assert_eq!(result, Err(Errno::EAGAIN.into()));
+
+        drop(writer);
+
+        let result = reader.read(&mut buffer);
+        assert_eq!(result, Ok(0));
     }
 }
