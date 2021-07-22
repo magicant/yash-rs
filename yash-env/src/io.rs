@@ -25,6 +25,15 @@ use std::os::unix::io::RawFd;
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Fd(pub RawFd);
 
+impl Fd {
+    /// File descriptor for the standard input.
+    pub const STDIN: Fd = Fd(0);
+    /// File descriptor for the standard output.
+    pub const STDOUT: Fd = Fd(1);
+    /// File descriptor for the standard error.
+    pub const STDERR: Fd = Fd(2);
+}
+
 impl From<RawFd> for Fd {
     fn from(raw_fd: RawFd) -> Fd {
         Fd(raw_fd)

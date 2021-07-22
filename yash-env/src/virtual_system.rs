@@ -30,6 +30,7 @@ mod process;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+use crate::io::Fd;
 use crate::ChildProcess;
 use crate::Env;
 use crate::System;
@@ -85,12 +86,33 @@ impl VirtualSystem {
     /// it as a default value.)
     ///
     /// The `state` of the returned `VirtualSystem` will have a [`Process`] with
-    /// process ID 2 in the process set ([`SystemState::processes`]). Other
-    /// members of `SystemState` will be empty.
+    /// process ID 2 in the process set ([`SystemState::processes`]). The file
+    /// system will contain files named `/dev/stdin`, `/dev/stdout`, and
+    /// `/dev/stderr` that are opened in the process with file descriptor 0, 1,
+    /// and 2, respectively.
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
+        let mut process = Process::with_parent(Pid::from_raw(1));
+        let mut set_std_fd = |path, fd| {
+            let file_system = &mut state.file_system;
+            let file = Rc::new(RefCell::new(INode::new()));
+            file_system.save(PathBuf::from(path), Rc::clone(&file));
+            let body = FdBody {
+                open_file_description: Rc::new(RefCell::new(OpenFile {
+                    file,
+                    offset: 0,
+                    is_readable: true,
+                    is_writable: false,
+                })),
+                cloexec: false,
+            };
+            process.set_fd(fd, body).unwrap();
+        };
+        set_std_fd("/dev/stdin", Fd::STDIN);
+        set_std_fd("/dev/stdout", Fd::STDOUT);
+        set_std_fd("/dev/stderr", Fd::STDERR);
+
         let process_id = Pid::from_raw(2);
-        let process = Process::with_parent(Pid::from_raw(1));
         state.processes.insert(process_id, process);
 
         let state = Rc::new(RefCell::new(state));
