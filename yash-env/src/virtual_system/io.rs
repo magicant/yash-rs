@@ -22,11 +22,12 @@ use nix::libc::off_t;
 use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::rc::Rc;
 use std::rc::Weak;
 
 /// Abstract handle to perform I/O with.
-pub trait OpenFileDescription {
+pub trait OpenFileDescription: Debug {
     /// Returns true if you can read from this open file description.
     fn is_readable(&self) -> bool;
 
@@ -247,6 +248,24 @@ impl OpenFileDescription for PipeWriter {
         Err(Errno::ESPIPE.into())
     }
 }
+
+/// State of a file descriptor.
+#[derive(Clone, Debug)]
+pub struct FdBody {
+    /// Underlying open file description.
+    pub open_file_description: Rc<RefCell<dyn OpenFileDescription>>,
+    /// True if this FD has the CLOEXEC flag set.
+    pub cloexec: bool,
+}
+
+impl PartialEq for FdBody {
+    fn eq(&self, rhs: &Self) -> bool {
+        Rc::ptr_eq(&self.open_file_description, &rhs.open_file_description)
+            && self.cloexec == rhs.cloexec
+    }
+}
+
+impl Eq for FdBody {}
 
 #[cfg(test)]
 mod tests {
