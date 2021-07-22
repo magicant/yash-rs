@@ -167,7 +167,8 @@ impl System for VirtualSystem {
             .keys()
             .max()
             .map_or(Pid::from_raw(2), |pid| Pid::from_raw(pid.as_raw() + 1));
-        let child_process = Process::with_parent(self.process_id);
+        let parent_process = &state.processes[&self.process_id];
+        let child_process = Process::fork_from(self.process_id, parent_process);
         state.processes.insert(process_id, child_process);
         drop(state);
 

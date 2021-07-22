@@ -16,10 +16,13 @@
 
 //! Processes in a virtual system.
 
+use super::io::FdBody;
 use crate::exec::ExitStatus;
+use crate::io::Fd;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
+use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::task::Waker;
@@ -30,7 +33,10 @@ pub struct Process {
     /// Process ID of the parent process.
     pub(crate) ppid: Pid,
 
-    /// State of the process.
+    /// Set of file descriptors open in this process.
+    pub(crate) fds: BTreeMap<Fd, FdBody>,
+
+    /// Execution state of the process.
     pub(crate) state: ProcessState,
 
     /// References to tasks that are waiting for the process state to change.
@@ -46,15 +52,42 @@ pub struct Process {
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
 
+/// Returns minimal available FD not included in `existings`.
+///
+/// Items of `existings` must be sorted.
+fn min_unused_fd<'a, I: IntoIterator<Item = &'a Fd>>(existings: I) -> Fd {
+    let candidates = (0..).map(Fd);
+    let rejections = existings
+        .into_iter()
+        .map(Some)
+        .chain(std::iter::repeat(None));
+    candidates
+        .zip(rejections)
+        .skip_while(|(candidate, rejection)| Some(candidate) == *rejection)
+        .map(|(candidate, _rejection)| candidate)
+        .next()
+        .unwrap()
+}
+
 impl Process {
     /// Creates a new running process.
     pub fn with_parent(ppid: Pid) -> Process {
         Process {
             ppid,
+            fds: BTreeMap::new(),
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
             last_exec: None,
         }
+    }
+
+    /// Creates a new running process as a child of the given parent.
+    ///
+    /// Some part of the parent process state is copied to the new process.
+    pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
+        let mut child = Self::with_parent(ppid);
+        child.fds = parent.fds.clone();
+        child
     }
 
     /// Returns the process ID of the parent process.
@@ -62,6 +95,47 @@ impl Process {
     #[must_use]
     pub fn ppid(&self) -> Pid {
         self.ppid
+    }
+
+    /// Returns FDs open in this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn fds(&self) -> &BTreeMap<Fd, FdBody> {
+        &self.fds
+    }
+
+    /// Returns the body for the given FD.
+    #[inline]
+    #[must_use]
+    pub fn get_fd_mut(&mut self, fd: Fd) -> Option<&mut FdBody> {
+        self.fds.get_mut(&fd)
+    }
+
+    /// Assigns the given FD to the body.
+    ///
+    /// If successful, returns an `Ok` value containing the body for the FD. If
+    /// the FD is out of bounds, returns `Err(body)`.
+    pub fn set_fd(&mut self, fd: Fd, body: FdBody) -> Result<Option<FdBody>, FdBody> {
+        // TODO fail if fd is out of bounds (cf. EMFILE)
+        Ok(self.fds.insert(fd, body))
+    }
+
+    /// Assigns a new FD to the given body.
+    ///
+    /// The new FD will be the minimum unused FD, which will be returned as an
+    /// `Ok` value.
+    ///
+    /// If no more FD can be opened, returns `Err(body)`.
+    pub fn open_fd(&mut self, body: FdBody) -> Result<Fd, FdBody> {
+        let fd = min_unused_fd(self.fds.keys());
+        let old_body = self.set_fd(fd, body)?;
+        debug_assert_eq!(old_body, None);
+        Ok(fd)
+    }
+
+    /// Removes the FD body for the given FD.
+    pub fn close_fd(&mut self, fd: Fd) -> Option<FdBody> {
+        self.fds.remove(&fd)
     }
 
     /// Returns the process state.
@@ -116,5 +190,22 @@ impl ProcessState {
             ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
             ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn min_unused_fd_for_various_arguments() {
+        assert_eq!(min_unused_fd([]), Fd(0));
+        assert_eq!(min_unused_fd([&Fd(1)]), Fd(0));
+        assert_eq!(min_unused_fd([&Fd(3), &Fd(4)]), Fd(0));
+        assert_eq!(min_unused_fd([&Fd(0)]), Fd(1));
+        assert_eq!(min_unused_fd([&Fd(0), &Fd(2)]), Fd(1));
+        assert_eq!(min_unused_fd([&Fd(0), &Fd(1)]), Fd(2));
+        assert_eq!(min_unused_fd([&Fd(0), &Fd(1), &Fd(4)]), Fd(2));
+        assert_eq!(min_unused_fd([&Fd(0), &Fd(1), &Fd(2)]), Fd(3));
     }
 }
