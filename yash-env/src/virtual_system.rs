@@ -22,6 +22,23 @@
 //! in unit tests.
 //!
 //! This module also defines elements that compose a virtual system.
+//!
+//! # File system
+//!
+//! Currently, only regular files are supported in virtual systems.
+//!
+//! Pathname resolution is not yet fully simulated. Currently, files are naively
+//! identified by their full path.
+//!
+//! # Processes
+//!
+//! A virtual system initially has one process, but can have more processes as a
+//! result of simulating fork. Each process has its own state.
+//!
+//! # I/O
+//!
+//! Currently, read and write operations on files and unnamed pipes are
+//! supported.
 
 mod file_system;
 mod io;
