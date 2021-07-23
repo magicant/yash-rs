@@ -52,13 +52,15 @@ pub struct Process {
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
 
-/// Returns minimal available FD not included in `existings`.
+/// Finds the minimum available FD.
 ///
-/// Items of `existings` must be sorted.
-fn min_unused_fd<'a, I: IntoIterator<Item = &'a Fd>>(existings: I) -> Fd {
-    let candidates = (0..).map(Fd);
+/// The returned FD is the minimum that is equal to or greater than `min` and
+/// not included in `existings`. Items of `existings` must be sorted.
+fn min_unused_fd<'a, I: IntoIterator<Item = &'a Fd>>(min: Fd, existings: I) -> Fd {
+    let candidates = (min.0..).map(Fd);
     let rejections = existings
         .into_iter()
+        .skip_while(|fd| **fd < min)
         .map(Some)
         .chain(std::iter::repeat(None));
     candidates
@@ -122,15 +124,26 @@ impl Process {
 
     /// Assigns a new FD to the given body.
     ///
+    /// The new FD will be the minimum unused FD equal to or greater than
+    /// `min_fd`.
+    ///
+    /// If successful, the new FD is returned in `Ok`.
+    /// If no more FD can be opened, returns `Err(body)`.
+    pub fn open_fd_ge(&mut self, min_fd: Fd, body: FdBody) -> Result<Fd, FdBody> {
+        let fd = min_unused_fd(min_fd, self.fds.keys());
+        let old_body = self.set_fd(fd, body)?;
+        debug_assert_eq!(old_body, None);
+        Ok(fd)
+    }
+
+    /// Assigns a new FD to the given body.
+    ///
     /// The new FD will be the minimum unused FD, which will be returned as an
     /// `Ok` value.
     ///
     /// If no more FD can be opened, returns `Err(body)`.
     pub fn open_fd(&mut self, body: FdBody) -> Result<Fd, FdBody> {
-        let fd = min_unused_fd(self.fds.keys());
-        let old_body = self.set_fd(fd, body)?;
-        debug_assert_eq!(old_body, None);
-        Ok(fd)
+        self.open_fd_ge(Fd(0), body)
     }
 
     /// Removes the FD body for the given FD.
@@ -199,13 +212,24 @@ mod tests {
 
     #[test]
     fn min_unused_fd_for_various_arguments() {
-        assert_eq!(min_unused_fd([]), Fd(0));
-        assert_eq!(min_unused_fd([&Fd(1)]), Fd(0));
-        assert_eq!(min_unused_fd([&Fd(3), &Fd(4)]), Fd(0));
-        assert_eq!(min_unused_fd([&Fd(0)]), Fd(1));
-        assert_eq!(min_unused_fd([&Fd(0), &Fd(2)]), Fd(1));
-        assert_eq!(min_unused_fd([&Fd(0), &Fd(1)]), Fd(2));
-        assert_eq!(min_unused_fd([&Fd(0), &Fd(1), &Fd(4)]), Fd(2));
-        assert_eq!(min_unused_fd([&Fd(0), &Fd(1), &Fd(2)]), Fd(3));
+        assert_eq!(min_unused_fd(Fd(0), []), Fd(0));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(1)]), Fd(0));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(3), &Fd(4)]), Fd(0));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(0)]), Fd(1));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(0), &Fd(2)]), Fd(1));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(0), &Fd(1)]), Fd(2));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(0), &Fd(1), &Fd(4)]), Fd(2));
+        assert_eq!(min_unused_fd(Fd(0), [&Fd(0), &Fd(1), &Fd(2)]), Fd(3));
+
+        assert_eq!(min_unused_fd(Fd(1), []), Fd(1));
+        assert_eq!(min_unused_fd(Fd(1), [&Fd(1)]), Fd(2));
+        assert_eq!(min_unused_fd(Fd(1), [&Fd(2)]), Fd(1));
+
+        assert_eq!(min_unused_fd(Fd(1), [&Fd(1), &Fd(3), &Fd(4)]), Fd(2));
+        assert_eq!(min_unused_fd(Fd(2), [&Fd(1), &Fd(3), &Fd(4)]), Fd(2));
+        assert_eq!(min_unused_fd(Fd(3), [&Fd(1), &Fd(3), &Fd(4)]), Fd(5));
+        assert_eq!(min_unused_fd(Fd(4), [&Fd(1), &Fd(3), &Fd(4)]), Fd(5));
+        assert_eq!(min_unused_fd(Fd(5), [&Fd(1), &Fd(3), &Fd(4)]), Fd(5));
+        assert_eq!(min_unused_fd(Fd(6), [&Fd(1), &Fd(3), &Fd(4)]), Fd(6));
     }
 }

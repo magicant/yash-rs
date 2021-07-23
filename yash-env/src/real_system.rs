@@ -58,6 +58,12 @@ impl System for RealSystem {
         is_regular_file(path) && is_executable(path)
     }
 
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
+        use nix::fcntl::FcntlArg::{F_DUPFD, F_DUPFD_CLOEXEC};
+        let arg = if cloexec { F_DUPFD_CLOEXEC } else { F_DUPFD };
+        nix::fcntl::fcntl(from.0, arg(to_min.0)).map(Fd)
+    }
+
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         loop {
             use nix::Error::Sys;

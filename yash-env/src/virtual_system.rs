@@ -183,6 +183,15 @@ impl System for VirtualSystem {
         }
     }
 
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
+        let mut process = self.current_process_mut();
+        let error = nix::Error::Sys(Errno::EBADF);
+        let mut body = process.fds.get(&from).ok_or(error)?.clone();
+        body.cloexec = cloexec;
+        let error = nix::Error::Sys(Errno::EMFILE);
+        process.open_fd_ge(to_min, body).map_err(|_| error)
+    }
+
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
         let error = nix::Error::Sys(Errno::EBADF);
@@ -431,6 +440,29 @@ mod tests {
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    fn dup_shares_open_file_description() {
+        let mut system = VirtualSystem::new();
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, false);
+        assert_eq!(result, Ok(Fd(3)));
+
+        let process = system.current_process();
+        let fd1 = process.fds.get(&Fd(1)).unwrap();
+        let fd3 = process.fds.get(&Fd(3)).unwrap();
+        assert_eq!(fd1, fd3);
+    }
+
+    #[test]
+    fn dup_can_set_cloexec() {
+        let mut system = VirtualSystem::new();
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, true);
+        assert_eq!(result, Ok(Fd(3)));
+
+        let process = system.current_process();
+        let fd3 = process.fds.get(&Fd(3)).unwrap();
+        assert!(fd3.cloexec);
     }
 
     #[test]

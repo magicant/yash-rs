@@ -101,6 +101,15 @@ pub trait System: Debug {
 
     /// Duplicates a file descriptor.
     ///
+    /// This is a thin wrapper around the `fcntl` system call that opens a new
+    /// FD that shares the open file description with `from`. The new FD will be
+    /// the minimum unused FD not less than `to_min`.  The `cloexec` parameter
+    /// specifies whether the new FD should have the `CLOEXEC` flag set. If
+    /// successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd>;
+
+    /// Duplicates a file descriptor.
+    ///
     /// This is a thin wrapper around the `dup2` system call. If successful,
     /// returns `Ok(to)`. On error, returns `Err(_)`.
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
