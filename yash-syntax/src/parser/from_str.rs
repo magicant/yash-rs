@@ -525,7 +525,7 @@ mod tests {
     fn redir_from_str() {
         block_on(async {
             let parse: Redir<MissingHereDoc> = "2> /dev/null".parse().unwrap();
-            assert_eq!(parse.fd, Some(2));
+            assert_eq!(parse.fd, Some(Fd(2)));
             if let RedirBody::Normal { operator, operand } = parse.body {
                 assert_eq!(operator, RedirOp::FileOut);
                 assert_eq!(operand.to_string(), "/dev/null");

@@ -731,6 +731,34 @@ impl TryFrom<Word> for Assign {
     }
 }
 
+/// File descriptor.
+///
+/// This is the `newtype` pattern applied to [`RawFd`], which is merely a type
+/// alias.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Fd(pub RawFd);
+
+impl Fd {
+    /// File descriptor for the standard input.
+    pub const STDIN: Fd = Fd(0);
+    /// File descriptor for the standard output.
+    pub const STDOUT: Fd = Fd(1);
+    /// File descriptor for the standard error.
+    pub const STDERR: Fd = Fd(2);
+}
+
+impl From<RawFd> for Fd {
+    fn from(raw_fd: RawFd) -> Fd {
+        Fd(raw_fd)
+    }
+}
+
+impl fmt::Display for Fd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// Redirection operators.
 ///
 /// This enum defines the redirection operator types except here-document and
@@ -861,28 +889,24 @@ impl From<HereDoc> for RedirBody {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Redir<H = HereDoc> {
     /// File descriptor that is modified by this redirection.
-    pub fd: Option<RawFd>,
+    pub fd: Option<Fd>,
     /// Nature of the resulting file descriptor.
     pub body: RedirBody<H>,
 }
-
-// TODO Should be somewhere else.
-const STDIN_FD: RawFd = 0;
-const STDOUT_FD: RawFd = 1;
 
 impl<H> Redir<H> {
     /// Computes the file descriptor that is modified by this redirection.
     ///
     /// If `self.fd` is `Some(_)`, the `RawFd` value is returned intact. Otherwise,
     /// the default file descriptor is selected depending on the type of `self.body`.
-    pub fn fd_or_default(&self) -> RawFd {
+    pub fn fd_or_default(&self) -> Fd {
         use RedirOp::*;
         self.fd.unwrap_or_else(|| match self.body {
             RedirBody::Normal { operator, .. } => match operator {
-                FileIn | FileInOut | FdIn | String => STDIN_FD,
-                FileOut | FileAppend | FileClobber | FdOut | Pipe => STDOUT_FD,
+                FileIn | FileInOut | FdIn | String => Fd::STDIN,
+                FileOut | FileAppend | FileClobber | FdOut | Pipe => Fd::STDOUT,
             },
-            RedirBody::HereDoc { .. } => STDIN_FD,
+            RedirBody::HereDoc { .. } => Fd::STDIN,
         })
     }
 }
@@ -1814,12 +1838,12 @@ mod tests {
         };
         assert_eq!(redir.to_string(), "<<END");
         let redir = Redir {
-            fd: Some(0),
+            fd: Some(Fd(0)),
             ..redir
         };
         assert_eq!(redir.to_string(), "0<<END");
         let redir = Redir {
-            fd: Some(9),
+            fd: Some(Fd(9)),
             ..redir
         };
         assert_eq!(redir.to_string(), "9<<END");
@@ -1867,7 +1891,7 @@ mod tests {
         assert_eq!(command.to_string(), "<<END");
 
         command.redirs.push(Redir {
-            fd: Some(1),
+            fd: Some(Fd(1)),
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,

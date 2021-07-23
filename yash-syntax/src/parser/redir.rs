@@ -24,6 +24,7 @@ use super::fill::MissingHereDoc;
 use super::lex::Operator::{LessLess, LessLessDash};
 use super::lex::PartialHereDoc;
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
+use crate::syntax::Fd;
 use crate::syntax::Redir;
 use crate::syntax::RedirBody;
 use crate::syntax::RedirOp;
@@ -103,7 +104,7 @@ impl Parser<'_> {
         let fd = if self.peek_token().await?.id == IoNumber {
             let token = self.take_token_raw().await?;
             if let Ok(fd) = token.word.to_string().parse() {
-                Some(fd)
+                Some(Fd(fd))
             } else {
                 return Err(Error {
                     cause: SyntaxError::FdOutOfRange.into(),
@@ -319,7 +320,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
-        assert_eq!(redir.fd, Some(12));
+        assert_eq!(redir.fd, Some(Fd(12)));
         if let RedirBody::Normal { operator, operand } = redir.body {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")
