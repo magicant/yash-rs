@@ -99,6 +99,12 @@ pub trait System: Debug {
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
 
+    /// Creates an unnamed pipe.
+    ///
+    /// This is a thin wrapper around the `pipe` system call.
+    /// If successful, returns the reading and writing ends of the pipe.
+    fn pipe(&mut self) -> nix::Result<(Fd, Fd)>;
+
     /// Duplicates a file descriptor.
     ///
     /// This is a thin wrapper around the `fcntl` system call that opens a new

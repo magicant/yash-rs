@@ -183,6 +183,32 @@ impl System for VirtualSystem {
         }
     }
 
+    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let writer = Rc::new(RefCell::new(PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        }));
+        let reader = Rc::new(RefCell::new(PipeReader { pipe }));
+
+        let reader = FdBody {
+            open_file_description: reader,
+            cloexec: false,
+        };
+        let writer = FdBody {
+            open_file_description: writer,
+            cloexec: false,
+        };
+
+        let mut process = self.current_process_mut();
+        let error = nix::Error::Sys(Errno::EMFILE);
+        let reader = process.open_fd(reader).map_err(|_| error)?;
+        let writer = process.open_fd(writer).map_err(|_| {
+            process.close_fd(reader);
+            error
+        })?;
+        Ok((reader, writer))
+    }
+
     fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
         let error = nix::Error::Sys(Errno::EBADF);
@@ -440,6 +466,13 @@ mod tests {
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    fn pipe() {
+        let mut system = VirtualSystem::new();
+        let (_reader, _writer) = system.pipe().unwrap();
+        // TODO Test reading and writing
     }
 
     #[test]

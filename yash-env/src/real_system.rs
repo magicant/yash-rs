@@ -58,6 +58,10 @@ impl System for RealSystem {
         is_regular_file(path) && is_executable(path)
     }
 
+    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+        nix::unistd::pipe().map(|(reader, writer)| (Fd(reader), Fd(writer)))
+    }
+
     fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
         use nix::fcntl::FcntlArg::{F_DUPFD, F_DUPFD_CLOEXEC};
         let arg = if cloexec { F_DUPFD_CLOEXEC } else { F_DUPFD };
