@@ -127,6 +127,12 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> nix::Result<()>;
 
+    /// Reads from the file descriptor.
+    ///
+    /// This is a thin wrapper around the `read` system call.
+    /// If successful, returns the number of bytes read.
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`

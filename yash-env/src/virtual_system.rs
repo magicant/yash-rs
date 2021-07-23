@@ -232,6 +232,14 @@ impl System for VirtualSystem {
         Ok(())
     }
 
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+        let mut process = self.current_process_mut();
+        let error = nix::Error::Sys(Errno::EBADF);
+        let body = process.get_fd_mut(fd).ok_or(error)?;
+        let mut ofd = body.open_file_description.borrow_mut();
+        ofd.read(buffer)
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,

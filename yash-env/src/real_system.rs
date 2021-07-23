@@ -90,6 +90,15 @@ impl System for RealSystem {
         }
     }
 
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+        loop {
+            let result = nix::unistd::read(fd.0, buffer);
+            if result != Err(Errno::EINTR.into()) {
+                return result;
+            }
+        }
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
