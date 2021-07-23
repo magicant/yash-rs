@@ -58,6 +58,17 @@ impl System for RealSystem {
         is_regular_file(path) && is_executable(path)
     }
 
+    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+        loop {
+            use nix::Error::Sys;
+            match nix::unistd::dup2(from.0, to.0) {
+                Ok(fd) => return Ok(Fd(fd)),
+                Err(Sys(Errno::EINTR)) => (),
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         loop {
             use nix::Error::Sys;

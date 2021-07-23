@@ -99,6 +99,12 @@ pub trait System: Debug {
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
 
+    /// Duplicates a file descriptor.
+    ///
+    /// This is a thin wrapper around the `dup2` system call. If successful,
+    /// returns `Ok(to)`. On error, returns `Err(_)`.
+    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
+
     /// Closes a file descriptor.
     ///
     /// This is a thin wrapper around the `close` system call.
