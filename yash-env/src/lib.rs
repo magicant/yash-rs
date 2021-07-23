@@ -133,6 +133,12 @@ pub trait System: Debug {
     /// If successful, returns the number of bytes read.
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
 
+    /// Writes to the file descriptor.
+    ///
+    /// This is a thin wrapper around the `write` system call.
+    /// If successful, returns the number of bytes written.
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`

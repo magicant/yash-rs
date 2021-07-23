@@ -159,6 +159,21 @@ impl VirtualSystem {
             state.processes.get_mut(&self.process_id).unwrap()
         })
     }
+
+    /// Calls the given closure passing the open file description for the FD.
+    ///
+    /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    pub fn with_open_file_description<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
+    where
+        F: FnOnce(&mut dyn OpenFileDescription) -> nix::Result<R>,
+    {
+        let mut process = self.current_process_mut();
+        let error = nix::Error::Sys(Errno::EBADF);
+        let body = process.get_fd_mut(fd).ok_or(error)?;
+        let mut ofd = body.open_file_description.borrow_mut();
+        use std::ops::DerefMut;
+        f(ofd.deref_mut())
+    }
 }
 
 impl Default for VirtualSystem {
@@ -233,11 +248,11 @@ impl System for VirtualSystem {
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
-        let mut process = self.current_process_mut();
-        let error = nix::Error::Sys(Errno::EBADF);
-        let body = process.get_fd_mut(fd).ok_or(error)?;
-        let mut ofd = body.open_file_description.borrow_mut();
-        ofd.read(buffer)
+        self.with_open_file_description(fd, |ofd| ofd.read(buffer))
+    }
+
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+        self.with_open_file_description(fd, |ofd| ofd.write(buffer))
     }
 
     /// Creates a new child process.
@@ -477,10 +492,22 @@ mod tests {
     }
 
     #[test]
-    fn pipe() {
+    fn pipe_read_write() {
         let mut system = VirtualSystem::new();
-        let (_reader, _writer) = system.pipe().unwrap();
-        // TODO Test reading and writing
+        let (reader, writer) = system.pipe().unwrap();
+        let result = system.write(writer, &[5, 42, 29]);
+        assert_eq!(result, Ok(3));
+
+        let mut buffer = [1; 4];
+        let result = system.read(reader, &mut buffer);
+        assert_eq!(result, Ok(3));
+        assert_eq!(buffer, [5, 42, 29, 1]);
+
+        let result = system.close(writer);
+        assert_eq!(result, Ok(()));
+
+        let result = system.read(reader, &mut buffer);
+        assert_eq!(result, Ok(0));
     }
 
     #[test]

@@ -99,6 +99,15 @@ impl System for RealSystem {
         }
     }
 
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+        loop {
+            let result = nix::unistd::write(fd.0, buffer);
+            if result != Err(Errno::EINTR.into()) {
+                return result;
+            }
+        }
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
