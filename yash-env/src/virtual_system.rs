@@ -183,6 +183,11 @@ impl System for VirtualSystem {
         }
     }
 
+    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+        self.current_process_mut().close_fd(fd);
+        Ok(())
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
@@ -417,6 +422,18 @@ mod tests {
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
+    }
+
+    #[test]
+    fn close() {
+        let mut system = VirtualSystem::new();
+
+        let result = system.close(Fd::STDERR);
+        assert_eq!(result, Ok(()));
+        assert_eq!(system.current_process().fds.get(&Fd::STDERR), None);
+
+        let result = system.close(Fd::STDERR);
+        assert_eq!(result, Ok(()));
     }
 
     #[test]

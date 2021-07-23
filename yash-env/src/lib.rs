@@ -44,6 +44,7 @@ pub mod virtual_system;
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
+use self::io::Fd;
 use self::job::JobSet;
 use self::variable::VariableSet;
 use async_trait::async_trait;
@@ -97,6 +98,13 @@ pub struct Env {
 pub trait System: Debug {
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
+
+    /// Closes a file descriptor.
+    ///
+    /// This is a thin wrapper around the `close` system call.
+    ///
+    /// This function returns `Ok(())` when the FD is already closed.
+    fn close(&mut self, fd: Fd) -> nix::Result<()>;
 
     /// Creates a new child process.
     ///

@@ -19,7 +19,9 @@
 use super::ChildProcess;
 use super::Env;
 use super::System;
+use crate::io::Fd;
 use async_trait::async_trait;
+use nix::errno::Errno;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::stat::stat;
 use nix::unistd::access;
@@ -54,6 +56,17 @@ pub struct RealSystem;
 impl System for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
+    }
+
+    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+        loop {
+            use nix::Error::Sys;
+            match nix::unistd::close(fd.0) {
+                Err(Sys(Errno::EBADF)) => return Ok(()),
+                Err(Sys(Errno::EINTR)) => (),
+                other => return other,
+            }
+        }
     }
 
     /// Creates a new child process.
@@ -100,10 +113,9 @@ impl System for RealSystem {
         envs: &[CString],
     ) -> nix::Result<Infallible> {
         loop {
-            use nix::errno::Errno::EINTR;
             // TODO Use Result::into_err
             let result = nix::unistd::execve(path, args, envs);
-            if result != Err(nix::Error::Sys(EINTR)) {
+            if result != Err(Errno::EINTR.into()) {
                 return result;
             }
         }
