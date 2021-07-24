@@ -137,7 +137,26 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `write` system call.
     /// If successful, returns the number of bytes written.
+    ///
+    /// This function may write only part of the `buffer`. Use
+    /// [`write_all`](Self::write_all) instead to ensure the whole `buffer` is
+    /// written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Writes to the file descriptor.
+    ///
+    /// This function calls [`write`](Self::write) repeatedly until the whole
+    /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
+    /// called at all, so any error that would be returned from `write` is not
+    /// returned.
+    fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> nix::Result<usize> {
+        let len = buffer.len();
+        while !buffer.is_empty() {
+            let count = self.write(fd, buffer)?;
+            buffer = &buffer[count..];
+        }
+        Ok(len)
+    }
 
     /// Creates a new child process.
     ///
