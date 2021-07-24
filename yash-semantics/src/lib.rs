@@ -119,4 +119,33 @@ pub(crate) mod tests {
             execute: echo_builtin_main,
         }
     }
+
+    fn cat_builtin_main(
+        env: &mut Env,
+        _args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        fn inner(env: &mut Env) -> nix::Result<()> {
+            let mut buffer = [0; 1024];
+            loop {
+                let count = env.system.read(Fd::STDIN, &mut buffer)?;
+                if count == 0 {
+                    break Ok(());
+                }
+                env.system.write_all(Fd::STDOUT, &buffer[..count])?;
+            }
+        }
+        let result = match inner(env) {
+            Ok(_) => ExitStatus::SUCCESS,
+            Err(_) => ExitStatus::FAILURE,
+        };
+        Box::pin(ready((result, None)))
+    }
+
+    /// Returns a minimal implementation of the `cat` built-in.
+    pub fn cat_builtin() -> Builtin {
+        Builtin {
+            r#type: NonIntrinsic,
+            execute: cat_builtin_main,
+        }
+    }
 }
