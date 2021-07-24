@@ -61,14 +61,16 @@ pub trait Word {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use itertools::Itertools;
     use std::future::ready;
     use std::future::Future;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::Special;
+    use yash_env::builtin::Type::{NonIntrinsic, Special};
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
     use yash_env::expansion::Field;
+    use yash_env::io::Fd;
     use yash_env::Env;
 
     fn return_builtin_main(
@@ -94,6 +96,27 @@ pub(crate) mod tests {
         Builtin {
             r#type: Special,
             execute: return_builtin_main,
+        }
+    }
+
+    fn echo_builtin_main(
+        env: &mut Env,
+        args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        let fields = (&args[1..]).iter().map(|f| &f.value).format(" ");
+        let message = format!("{}\n", fields);
+        let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()) {
+            Ok(_) => ExitStatus::SUCCESS,
+            Err(_) => ExitStatus::FAILURE,
+        };
+        Box::pin(ready((result, None)))
+    }
+
+    /// Returns a minimal implementation of the `echo` built-in.
+    pub fn echo_builtin() -> Builtin {
+        Builtin {
+            r#type: NonIntrinsic,
+            execute: echo_builtin_main,
         }
     }
 }
