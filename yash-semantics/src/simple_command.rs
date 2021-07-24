@@ -22,6 +22,7 @@ use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
+use std::future::ready;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
@@ -94,6 +95,7 @@ impl Command for syntax::SimpleCommand {
                             }
                             // TODO The error message should be printed via Env
                             eprintln!("command execution failed: {:?}", e);
+                            Box::pin(ready(()))
                         })
                         .await;
 

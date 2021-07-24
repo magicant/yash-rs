@@ -54,6 +54,7 @@ use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::future::ready;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -298,14 +299,14 @@ impl Env {
     /// concurrently.
     pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
     where
-        F: FnOnce(&mut Env) + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
     {
         let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
             if let Some(f) = f.take() {
-                Box::pin(async move { f(env) })
+                Box::pin(f(env))
             } else {
-                Box::pin(async {})
+                Box::pin(ready(()))
             }
         });
         let child_pid = unsafe { self.system.new_child_process()? }
@@ -343,7 +344,7 @@ impl Env {
     /// [`new_child_process`](System::new_child_process), the error is returned.
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
-        F: FnOnce(&mut Env) + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
     {
         // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
@@ -384,7 +385,10 @@ mod tests {
 
         let status = ExitStatus(97);
         let mut env = Env::with_system(Box::new(system));
-        let result = executor.run_until(env.run_in_subshell(move |env| env.exit_status = status));
+        let result = executor.run_until(env.run_in_subshell(move |env| {
+            env.exit_status = status;
+            Box::pin(ready(()))
+        }));
         assert_eq!(result, Ok(status));
     }
 
