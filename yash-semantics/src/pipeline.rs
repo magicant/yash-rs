@@ -20,6 +20,7 @@ use super::Command;
 use async_trait::async_trait;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
+use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::syntax;
 
@@ -78,12 +79,22 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[syntax::Command
 }
 
 async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Command]) -> Result {
+    // Start commands
     // TODO avoid cloning commands for efficiency
+    let mut commands = commands.to_owned().into_iter().peekable();
+    let mut pipes = PipeSet::new();
     let mut pids = Vec::new();
-    for command in commands.to_owned() {
-        // TODO connect pipe FDs
-        let subshell = env.start_subshell(|env| {
+    while let Some(command) = commands.next() {
+        let has_next = commands.peek().is_some();
+        // TODO print some message if shift fails
+        let _ = pipes.shift(env, has_next);
+        let pipes2 = pipes;
+
+        let subshell = env.start_subshell(move |env| {
             Box::pin(async move {
+                // TODO print some message if move_to_stdin_stdout fails
+                let _ = pipes2.move_to_stdin_stdout(env);
+
                 match command.execute(env).await {
                     Ok(()) => (),
                     Err(_) => todo!("subshell finished in Divert"),
@@ -97,6 +108,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Comma
         }
     }
 
+    // Await the last command
     loop {
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
@@ -120,12 +132,75 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Comma
     }
 }
 
+/// Set of pipe file descriptors that connect commands.
+#[derive(Clone, Copy, Default)]
+struct PipeSet {
+    read_previous: Option<Fd>,
+    /// Reader and writer to the next command.
+    next: Option<(Fd, Fd)>,
+}
+
+impl PipeSet {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    /// Updates the pipe set for the next command.
+    ///
+    /// Closes FDs that are no longer necessary and opens a new pipe if there is
+    /// a next command.
+    fn shift(&mut self, env: &mut Env, has_next: bool) -> nix::Result<()> {
+        if let Some(fd) = self.read_previous {
+            let _ = env.system.close(fd);
+        }
+
+        if let Some((reader, writer)) = self.next {
+            let _ = env.system.close(writer);
+            self.read_previous = Some(reader);
+        } else {
+            self.read_previous = None;
+        }
+
+        self.next = None;
+        if has_next {
+            self.next = Some(env.system.pipe()?);
+        }
+
+        Ok(())
+    }
+
+    /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
+    /// necessary.
+    fn move_to_stdin_stdout(self, env: &mut Env) -> nix::Result<()> {
+        if let Some(reader) = self.read_previous {
+            // TODO What if self.next.writer == stdin?
+            if reader != Fd::STDIN {
+                // TODO What if dup2 fails?
+                let _ = env.system.dup2(reader, Fd::STDIN);
+                let _ = env.system.close(reader);
+            }
+        }
+        if let Some((reader, writer)) = self.next {
+            if writer != Fd::STDOUT {
+                // TODO What if dup2 fails?
+                let _ = env.system.dup2(writer, Fd::STDOUT);
+                let _ = env.system.close(writer);
+            }
+            let _ = env.system.close(reader);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::cat_builtin;
+    use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
+    use std::path::Path;
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
@@ -177,6 +252,32 @@ mod tests {
         let result = executor.run_until(pipeline.execute(&mut env));
         assert_eq!(result, Ok(()));
         assert_eq!(env.exit_status, ExitStatus(20));
+    }
+
+    #[test]
+    #[ignore] // TODO don't ignore this test case
+    fn pipe_connects_commands_in_pipeline() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let state = Rc::clone(&system.state);
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("cat", cat_builtin());
+        let pipeline: syntax::Pipeline = "echo ok | cat | cat".parse().unwrap();
+        let result = executor.run_until(pipeline.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let stdout = state
+            .file_system
+            .get(Path::new("/dev/stdout"))
+            .unwrap()
+            .borrow();
+        assert_eq!(stdout.content, "ok\n".as_bytes());
+        // TODO should also test stdin
     }
 
     #[test]
