@@ -27,18 +27,22 @@ use yash_syntax::syntax;
 impl Command for syntax::Pipeline {
     /// Executes the pipeline.
     ///
-    /// # Executing simple commands
+    /// # Executing commands
     ///
-    /// If this pipeline contains one simple command, it is executed in the
+    /// If this pipeline contains one command, it is executed in the
     /// current shell execution environment.
     ///
-    /// TODO Elaborate
+    /// If the pipeline has more than one command, all the commands are executed
+    /// concurrently. Every command is executed in a new subshell. The standard
+    /// output of a command is connected to the standard input of the next
+    /// command via a pipe, except for the standard output of the last command
+    /// and the standard input of the first command, which are not modified.
     ///
-    /// If the pipeline has no simple command, it is a no-op.
+    /// If the pipeline has no command, it is a no-op.
     ///
     /// # Exit status
     ///
-    /// The exit status of the pipeline is that of the last simple command (or
+    /// The exit status of the pipeline is that of the last command (or
     /// zero if no command). If the pipeline starts with an `!`, the exit status
     /// is inverted: zero becomes one, and non-zero becomes zero.
     ///
@@ -69,9 +73,49 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[syntax::Command
             Ok(())
         }
         1 => commands[0].execute(env).await,
-        _ => {
-            // TODO execute multi-command pipeline
-            commands[0].execute(env).await
+        _ => execute_multi_command_pipeline(env, commands).await,
+    }
+}
+
+async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Command]) -> Result {
+    // TODO avoid cloning commands for efficiency
+    let mut pids = Vec::new();
+    for command in commands.to_owned() {
+        // TODO connect pipe FDs
+        let subshell = env.start_subshell(|env| {
+            Box::pin(async move {
+                match command.execute(env).await {
+                    Ok(()) => (),
+                    Err(_) => todo!("subshell finished in Divert"),
+                }
+            })
+        });
+
+        match subshell.await {
+            Ok(pid) => pids.push(pid),
+            Err(_) => todo!("fork failed, report to stderr"),
+        }
+    }
+
+    loop {
+        use nix::sys::wait::WaitStatus::*;
+        #[allow(deprecated)]
+        match env.system.wait_sync().await {
+            Ok(Exited(pid, exit_status)) => {
+                if pid == *pids.last().unwrap() {
+                    env.exit_status = ExitStatus(exit_status);
+                    break Ok(());
+                }
+                // TODO should not ignore other PIDs
+            }
+            Ok(Signaled(pid, _signal, _core_dumped)) => {
+                if pid == *pids.last().unwrap() {
+                    env.exit_status = ExitStatus(128);
+                    // TODO Convert signal to exit status
+                }
+                // TODO should not ignore other PIDs
+            }
+            _ => todo!(),
         }
     }
 }
@@ -81,8 +125,11 @@ mod tests {
     use super::*;
     use crate::tests::return_builtin;
     use futures::executor::block_on;
+    use futures::executor::LocalPool;
+    use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
+    use yash_env::VirtualSystem;
 
     #[test]
     fn empty_pipeline() {
@@ -114,6 +161,22 @@ mod tests {
         let result = block_on(pipeline.execute(&mut env));
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
+    }
+
+    #[test]
+    fn multi_command_pipeline_returns_last_command_exit_status() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("return", return_builtin());
+        let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
+        let result = executor.run_until(pipeline.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(20));
     }
 
     #[test]
