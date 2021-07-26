@@ -174,22 +174,29 @@ impl PipeSet {
 
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
-    fn move_to_stdin_stdout(self, env: &mut Env) -> nix::Result<()> {
+    fn move_to_stdin_stdout(mut self, env: &mut Env) -> nix::Result<()> {
+        if let Some((reader, writer)) = self.next {
+            assert_ne!(reader, writer);
+            assert_ne!(self.read_previous, Some(reader));
+            assert_ne!(self.read_previous, Some(writer));
+
+            let _ = env.system.close(reader);
+            if writer != Fd::STDOUT {
+                if self.read_previous == Some(Fd::STDOUT) {
+                    // TODO What if dup fails?
+                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false).unwrap());
+                }
+                // TODO What if dup2 fails?
+                let _ = env.system.dup2(writer, Fd::STDOUT);
+                let _ = env.system.close(writer);
+            }
+        }
         if let Some(reader) = self.read_previous {
-            // TODO What if self.next.writer == stdin?
             if reader != Fd::STDIN {
                 // TODO What if dup2 fails?
                 let _ = env.system.dup2(reader, Fd::STDIN);
                 let _ = env.system.close(reader);
             }
-        }
-        if let Some((reader, writer)) = self.next {
-            if writer != Fd::STDOUT {
-                // TODO What if dup2 fails?
-                let _ = env.system.dup2(writer, Fd::STDOUT);
-                let _ = env.system.close(writer);
-            }
-            let _ = env.system.close(reader);
         }
         Ok(())
     }
