@@ -108,6 +108,9 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Comma
         }
     }
 
+    // TODO print some message if shift fails
+    let _ = pipes.shift(env, false);
+
     // Await the last command
     loop {
         use nix::sys::wait::WaitStatus::*;
@@ -281,6 +284,25 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_leaves_no_pipe_fds_leftover() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut executor = LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("cat", cat_builtin());
+        let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
+        let _ = executor.run_until(pipeline.execute(&mut env));
+        let state = state.borrow();
+        let fds = state.processes[&process_id].fds();
+        for fd in 3..10 {
+            assert!(!fds.contains_key(&Fd(fd)), "fd={}", fd);
+        }
+    }
+
+    #[test]
     fn inverting_exit_status_to_0_without_divert() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
@@ -309,4 +331,62 @@ mod tests {
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(15));
     }
+
+    #[test]
+    fn pipe_set_shift_to_first_command() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut pipes = PipeSet::new();
+
+        let result = pipes.shift(&mut env, true);
+        assert_eq!(result, Ok(()));
+        assert_eq!(pipes.read_previous, None);
+        assert_eq!(pipes.next, Some((Fd(3), Fd(4))));
+        let state = state.borrow();
+        let process = &state.processes[&process_id];
+        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
+        assert!(!process.fds().get(&Fd(4)).unwrap().cloexec);
+    }
+
+    #[test]
+    fn pipe_set_shift_to_middle_command() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut pipes = PipeSet::new();
+
+        let _ = pipes.shift(&mut env, true);
+        let result = pipes.shift(&mut env, true);
+        assert_eq!(result, Ok(()));
+        assert_eq!(pipes.read_previous, Some(Fd(3)));
+        assert_eq!(pipes.next, Some((Fd(4), Fd(5))));
+        let state = state.borrow();
+        let process = &state.processes[&process_id];
+        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
+        assert!(!process.fds().get(&Fd(4)).unwrap().cloexec);
+        assert!(!process.fds().get(&Fd(5)).unwrap().cloexec);
+    }
+
+    #[test]
+    fn pipe_set_shift_to_last_command() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut pipes = PipeSet::new();
+
+        let _ = pipes.shift(&mut env, true);
+        let result = pipes.shift(&mut env, false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(pipes.read_previous, Some(Fd(3)));
+        assert_eq!(pipes.next, None);
+        let state = state.borrow();
+        let process = &state.processes[&process_id];
+        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
+    }
+
+    // TODO test PipeSet::move_to_stdin_stdout
 }
