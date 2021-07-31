@@ -18,6 +18,7 @@
 
 use super::Command;
 use async_trait::async_trait;
+use std::rc::Rc;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::io::Fd;
@@ -67,7 +68,7 @@ impl Command for syntax::Pipeline {
     }
 }
 
-async fn execute_commands_in_pipeline(env: &mut Env, commands: &[syntax::Command]) -> Result {
+async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
     match commands.len() {
         0 => {
             env.exit_status = ExitStatus::SUCCESS;
@@ -78,10 +79,9 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[syntax::Command
     }
 }
 
-async fn execute_multi_command_pipeline(env: &mut Env, commands: &[syntax::Command]) -> Result {
+async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
     // Start commands
-    // TODO avoid cloning commands for efficiency
-    let mut commands = commands.to_owned().into_iter().peekable();
+    let mut commands = commands.iter().cloned().peekable();
     let mut pipes = PipeSet::new();
     let mut pids = Vec::new();
     while let Some(command) = commands.next() {

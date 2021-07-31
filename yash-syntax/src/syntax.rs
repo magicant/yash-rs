@@ -87,6 +87,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Write;
 use std::os::unix::io::RawFd;
+use std::rc::Rc;
 
 /// Result of [`Unquote::write_unquoted`].
 ///
@@ -1136,7 +1137,10 @@ pub struct Pipeline<H = HereDoc> {
     /// Elements of the pipeline.
     ///
     /// A valid pipeline must have at least one command.
-    pub commands: Vec<Command<H>>,
+    ///
+    /// The commands are contained in `Rc` to allow executing them
+    /// asynchronously without cloning them.
+    pub commands: Vec<Rc<Command<H>>>,
     /// True if the pipeline begins with a `!`.
     pub negation: bool,
 }
@@ -2075,7 +2079,7 @@ mod tests {
     #[test]
     fn pipeline_display() {
         let mut p = Pipeline {
-            commands: vec!["first".parse::<Command<MissingHereDoc>>().unwrap()],
+            commands: vec![Rc::new("first".parse::<Command<MissingHereDoc>>().unwrap())],
             negation: false,
         };
         assert_eq!(p.to_string(), "first");
@@ -2083,10 +2087,10 @@ mod tests {
         p.negation = true;
         assert_eq!(p.to_string(), "! first");
 
-        p.commands.push("second".parse().unwrap());
+        p.commands.push(Rc::new("second".parse().unwrap()));
         assert_eq!(p.to_string(), "! first | second");
 
-        p.commands.push("third".parse().unwrap());
+        p.commands.push(Rc::new("third".parse().unwrap()));
         p.negation = false;
         assert_eq!(p.to_string(), "first | second | third");
     }
