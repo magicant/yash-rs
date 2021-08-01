@@ -91,24 +91,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         let pipes2 = pipes;
 
         let subshell = env.start_subshell(move |env| {
-            Box::pin(async move {
-                match pipes2.move_to_stdin_stdout(env) {
-                    Ok(()) => (),
-                    Err(errno) => {
-                        env.print_system_error(
-                            errno,
-                            &format_args!("cannot connect pipes in the subshell"),
-                        );
-                        env.exit_status = ExitStatus::NOEXEC;
-                        return;
-                    }
-                }
-
-                match command.execute(env).await {
-                    Ok(()) => (),
-                    Err(_) => todo!("subshell finished in Divert"),
-                }
-            })
+            Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
 
         match subshell.await {
@@ -141,6 +124,26 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
             }
             _ => todo!(),
         }
+    }
+}
+
+async fn connect_pipe_and_execute_command(
+    env: &mut Env,
+    pipes: PipeSet,
+    command: Rc<syntax::Command>,
+) {
+    match pipes.move_to_stdin_stdout(env) {
+        Ok(()) => (),
+        Err(errno) => {
+            env.print_system_error(errno, &format_args!("cannot connect pipes in the subshell"));
+            env.exit_status = ExitStatus::NOEXEC;
+            return;
+        }
+    }
+
+    match command.execute(env).await {
+        Ok(()) => (),
+        Err(_) => todo!("subshell finished in Divert"),
     }
 }
 
