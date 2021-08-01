@@ -48,6 +48,7 @@ use self::io::Fd;
 use self::job::JobSet;
 use self::variable::VariableSet;
 use async_trait::async_trait;
+use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -288,6 +289,20 @@ impl Env {
         }
     }
 
+    /// Convenience function that prints an error message for the given `errno`.
+    ///
+    /// This function prints `format!("{}: {}\n", message, errno.desc())` to the
+    /// standard error of this environment. (The exact format of the printed
+    /// message is subject to change.)
+    ///
+    /// Any errors that may happen writing to the standard error are ignored.
+    pub fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
+        // TODO print `$0` first
+        // TODO localize message
+        let message = format!("{}: {}\n", message, errno.desc());
+        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+    }
+
     /// Starts a subshell.
     ///
     /// This function creates a new child process in which the argument function
@@ -374,6 +389,24 @@ impl Env {
 mod tests {
     use super::*;
     use futures::executor::LocalPool;
+    use std::path::Path;
+
+    #[test]
+    fn print_system_error_einval() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42));
+
+        let state = state.borrow();
+        let stderr = state
+            .file_system
+            .get(&Path::new("/dev/stderr"))
+            .unwrap()
+            .borrow();
+        let message = format!("dummy message {}: {}\n", 42, Errno::EINVAL.desc());
+        assert_eq!(stderr.content, message.as_bytes());
+    }
 
     #[test]
     fn run_in_subshell_with_child_normally_exiting() {
