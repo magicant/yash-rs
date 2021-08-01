@@ -119,7 +119,7 @@ impl VirtualSystem {
                     file,
                     offset: 0,
                     is_readable: true,
-                    is_writable: false,
+                    is_writable: true,
                 })),
                 cloexec: false,
             };
