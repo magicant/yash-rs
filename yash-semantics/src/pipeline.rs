@@ -92,8 +92,17 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 
         let subshell = env.start_subshell(move |env| {
             Box::pin(async move {
-                // TODO print some message if move_to_stdin_stdout fails
-                let _ = pipes2.move_to_stdin_stdout(env);
+                match pipes2.move_to_stdin_stdout(env) {
+                    Ok(()) => (),
+                    Err(errno) => {
+                        env.print_system_error(
+                            errno,
+                            &format_args!("cannot connect pipes in the subshell"),
+                        );
+                        env.exit_status = ExitStatus::NOEXEC;
+                        return;
+                    }
+                }
 
                 match command.execute(env).await {
                     Ok(()) => (),
@@ -180,22 +189,19 @@ impl PipeSet {
             assert_ne!(self.read_previous, Some(reader));
             assert_ne!(self.read_previous, Some(writer));
 
-            let _ = env.system.close(reader);
+            env.system.close(reader)?;
             if writer != Fd::STDOUT {
                 if self.read_previous == Some(Fd::STDOUT) {
-                    // TODO What if dup fails?
-                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false).unwrap());
+                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false)?);
                 }
-                // TODO What if dup2 fails?
-                let _ = env.system.dup2(writer, Fd::STDOUT);
-                let _ = env.system.close(writer);
+                env.system.dup2(writer, Fd::STDOUT)?;
+                env.system.close(writer)?;
             }
         }
         if let Some(reader) = self.read_previous {
             if reader != Fd::STDIN {
-                // TODO What if dup2 fails?
-                let _ = env.system.dup2(reader, Fd::STDIN);
-                let _ = env.system.close(reader);
+                env.system.dup2(reader, Fd::STDIN)?;
+                env.system.close(reader)?;
             }
         }
         Ok(())
