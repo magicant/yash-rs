@@ -168,8 +168,7 @@ impl VirtualSystem {
         F: FnOnce(&mut dyn OpenFileDescription) -> nix::Result<R>,
     {
         let mut process = self.current_process_mut();
-        let error = nix::Error::Sys(Errno::EBADF);
-        let body = process.get_fd_mut(fd).ok_or(error)?;
+        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         let mut ofd = body.open_file_description.borrow_mut();
         use std::ops::DerefMut;
         f(ofd.deref_mut())
@@ -215,30 +214,26 @@ impl System for VirtualSystem {
         };
 
         let mut process = self.current_process_mut();
-        let error = nix::Error::Sys(Errno::EMFILE);
-        let reader = process.open_fd(reader).map_err(|_| error)?;
+        let reader = process.open_fd(reader).map_err(|_| Errno::EMFILE)?;
         let writer = process.open_fd(writer).map_err(|_| {
             process.close_fd(reader);
-            error
+            Errno::EMFILE
         })?;
         Ok((reader, writer))
     }
 
     fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
-        let error = nix::Error::Sys(Errno::EBADF);
-        let mut body = process.fds.get(&from).ok_or(error)?.clone();
+        let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.cloexec = cloexec;
-        let error = nix::Error::Sys(Errno::EMFILE);
-        process.open_fd_ge(to_min, body).map_err(|_| error)
+        process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
-        let error = nix::Error::Sys(Errno::EBADF);
-        let mut body = process.fds.get(&from).ok_or(error)?.clone();
+        let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
         body.cloexec = false;
-        process.set_fd(to, body).map_err(|_| error)?;
+        process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
 
@@ -269,10 +264,7 @@ impl System for VirtualSystem {
     /// plus 1. If there are no other processes, it will be 2.
     unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         let mut state = self.state.borrow_mut();
-        let executor = state
-            .executor
-            .clone()
-            .ok_or(nix::Error::Sys(Errno::ENOSYS))?;
+        let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
             .processes
             .keys()
@@ -320,7 +312,7 @@ impl System for VirtualSystem {
             }
 
             if !found_child {
-                return Poll::Ready(Err(Errno::ECHILD.into()));
+                return Poll::Ready(Err(Errno::ECHILD));
             }
 
             // Save a waker so the future is polled again when the state has changed
@@ -359,13 +351,13 @@ impl System for VirtualSystem {
                 let envs = envs.to_owned();
                 process.last_exec = Some((path, args, envs));
 
-                Err(Errno::ENOSYS.into())
+                Err(Errno::ENOSYS)
             } else {
-                Err(Errno::ENOEXEC.into())
+                Err(Errno::ENOEXEC)
             }
         } else {
             // TODO Maybe ENOTDIR
-            Err(Errno::ENOENT.into())
+            Err(Errno::ENOENT)
         }
     }
 }
@@ -576,7 +568,7 @@ mod tests {
     fn new_child_process_without_executor() {
         let mut system = VirtualSystem::new();
         let result = unsafe { system.new_child_process() };
-        assert_eq!(result.unwrap_err(), Errno::ENOSYS.into());
+        assert_eq!(result.unwrap_err(), Errno::ENOSYS);
     }
 
     #[test]
@@ -633,7 +625,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         #[allow(deprecated)]
         let result = block_on(system.wait_sync());
-        assert_eq!(result, Err(Errno::ECHILD.into()));
+        assert_eq!(result, Err(Errno::ECHILD));
     }
 
     #[test]
@@ -651,7 +643,7 @@ mod tests {
             .save(path.clone(), content);
         let path = CString::new(path.as_os_str().as_bytes()).unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(Errno::ENOSYS.into()));
+        assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]
@@ -696,7 +688,7 @@ mod tests {
             .save(path.clone(), content);
         let path = CString::new(path.as_os_str().as_bytes()).unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(Errno::ENOEXEC.into()));
+        assert_eq!(result, Err(Errno::ENOEXEC));
     }
 
     #[test]
@@ -704,6 +696,6 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = CString::new("/no/such/file").unwrap();
         let result = system.execve(&path, &[], &[]);
-        assert_eq!(result, Err(Errno::ENOENT.into()));
+        assert_eq!(result, Err(Errno::ENOENT));
     }
 }

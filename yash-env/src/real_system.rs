@@ -70,10 +70,9 @@ impl System for RealSystem {
 
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         loop {
-            use nix::Error::Sys;
             match nix::unistd::dup2(from.0, to.0) {
                 Ok(fd) => return Ok(Fd(fd)),
-                Err(Sys(Errno::EINTR)) => (),
+                Err(Errno::EINTR) => (),
                 Err(e) => return Err(e),
             }
         }
@@ -81,10 +80,9 @@ impl System for RealSystem {
 
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         loop {
-            use nix::Error::Sys;
             match nix::unistd::close(fd.0) {
-                Err(Sys(Errno::EBADF)) => return Ok(()),
-                Err(Sys(Errno::EINTR)) => (),
+                Err(Errno::EBADF) => return Ok(()),
+                Err(Errno::EINTR) => (),
                 other => return other,
             }
         }
@@ -93,7 +91,7 @@ impl System for RealSystem {
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::read(fd.0, buffer);
-            if result != Err(Errno::EINTR.into()) {
+            if result != Err(Errno::EINTR) {
                 return result;
             }
         }
@@ -102,7 +100,7 @@ impl System for RealSystem {
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::write(fd.0, buffer);
-            if result != Err(Errno::EINTR.into()) {
+            if result != Err(Errno::EINTR) {
                 return result;
             }
         }
@@ -154,7 +152,7 @@ impl System for RealSystem {
         loop {
             // TODO Use Result::into_err
             let result = nix::unistd::execve(path, args, envs);
-            if result != Err(Errno::EINTR.into()) {
+            if result != Err(Errno::EINTR) {
                 return result;
             }
         }

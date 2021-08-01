@@ -84,7 +84,7 @@ impl OpenFileDescription for OpenFile {
 
     fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
         if !self.is_readable {
-            return Err(Errno::EBADF.into());
+            return Err(Errno::EBADF);
         }
         let file = self.file.borrow();
         let len = file.content.len();
@@ -104,7 +104,7 @@ impl OpenFileDescription for OpenFile {
 
     fn write(&mut self, buffer: &[u8]) -> nix::Result<usize> {
         if !self.is_writable {
-            return Err(Errno::EBADF.into());
+            return Err(Errno::EBADF);
         }
         let mut file = self.file.borrow_mut();
         let len = file.content.len();
@@ -133,15 +133,15 @@ impl OpenFileDescription for OpenFile {
             Whence::SeekCur => self.offset,
             Whence::SeekEnd => self.file.borrow().content.len(),
             #[allow(unreachable_patterns)]
-            _ => return Err(Errno::EINVAL.into()),
+            _ => return Err(Errno::EINVAL),
         };
 
         fn add(a: usize, b: off_t) -> Option<off_t> {
             off_t::try_from(a).ok()?.checked_add(b)
         }
 
-        let new_offset = add(base, offset).ok_or(nix::Error::Sys(Errno::EOVERFLOW))?;
-        self.offset = usize::try_from(new_offset).map_err(|_| nix::Error::Sys(Errno::EINVAL))?;
+        let new_offset = add(base, offset).ok_or(Errno::EOVERFLOW)?;
+        self.offset = usize::try_from(new_offset).map_err(|_| Errno::EINVAL)?;
         Ok(new_offset)
     }
 }
@@ -188,7 +188,7 @@ impl OpenFileDescription for PipeReader {
         let mut pipe = self.pipe.borrow_mut();
         let limit = pipe.content.len();
         if limit == 0 && Rc::weak_count(&self.pipe) > 0 {
-            return Err(Errno::EAGAIN.into());
+            return Err(Errno::EAGAIN);
         }
         if buffer.len() > limit {
             buffer = &mut buffer[..limit];
@@ -199,10 +199,10 @@ impl OpenFileDescription for PipeReader {
         Ok(count)
     }
     fn write(&mut self, _buffer: &[u8]) -> nix::Result<usize> {
-        Err(Errno::EBADF.into())
+        Err(Errno::EBADF)
     }
     fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
-        Err(Errno::ESPIPE.into())
+        Err(Errno::ESPIPE)
     }
 }
 
@@ -231,12 +231,12 @@ impl OpenFileDescription for PipeWriter {
         true
     }
     fn read(&mut self, _buffer: &mut [u8]) -> nix::Result<usize> {
-        Err(Errno::EBADF.into())
+        Err(Errno::EBADF)
     }
     fn write(&mut self, buffer: &[u8]) -> nix::Result<usize> {
         let pipe = match self.pipe.upgrade() {
             // TODO SIGPIPE
-            None => return Err(Errno::EPIPE.into()),
+            None => return Err(Errno::EPIPE),
             Some(pipe) => pipe,
         };
         let mut pipe = pipe.borrow_mut();
@@ -245,7 +245,7 @@ impl OpenFileDescription for PipeWriter {
         Ok(buffer.len())
     }
     fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
-        Err(Errno::ESPIPE.into())
+        Err(Errno::ESPIPE)
     }
 }
 
@@ -282,7 +282,7 @@ mod tests {
 
         let mut buffer = [0];
         let result = open_file.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EBADF.into()));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
@@ -353,7 +353,7 @@ mod tests {
         };
 
         let result = open_file.write(&[0]);
-        assert_eq!(result, Err(Errno::EBADF.into()));
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
@@ -429,7 +429,7 @@ mod tests {
         assert_eq!(open_file.offset, 3);
 
         let result = open_file.seek(-1, Whence::SeekSet);
-        assert_eq!(result, Err(Errno::EINVAL.into()));
+        assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 3);
     }
 
@@ -455,7 +455,7 @@ mod tests {
         assert_eq!(open_file.offset, 10);
 
         let result = open_file.seek(-11, Whence::SeekCur);
-        assert_eq!(result, Err(Errno::EINVAL.into()));
+        assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 10);
     }
 
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(open_file.offset, 0);
 
         let result = open_file.seek(-4, Whence::SeekEnd);
-        assert_eq!(result, Err(Errno::EINVAL.into()));
+        assert_eq!(result, Err(Errno::EINVAL));
         assert_eq!(open_file.offset, 0);
     }
 
@@ -497,7 +497,7 @@ mod tests {
 
         let mut buffer = [100; 5];
         let result = reader.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EAGAIN.into()));
+        assert_eq!(result, Err(Errno::EAGAIN));
 
         let result = writer.write(&[1, 2, 3, 4, 5, 9, 8]);
         assert_eq!(result, Ok(7));
@@ -514,7 +514,7 @@ mod tests {
         assert_eq!(buffer[..4], [9, 8, 0, 1]);
 
         let result = reader.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EAGAIN.into()));
+        assert_eq!(result, Err(Errno::EAGAIN));
 
         drop(writer);
 

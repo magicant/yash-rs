@@ -85,8 +85,7 @@ impl Command for syntax::SimpleCommand {
                             let e = result.unwrap_err();
                             // TODO Reopen as shell script on ENOEXEC
                             match e {
-                                nix::Error::Sys(Errno::ENOENT)
-                                | nix::Error::Sys(Errno::ENOTDIR) => {
+                                Errno::ENOENT | Errno::ENOTDIR => {
                                     env.exit_status = ExitStatus::NOT_FOUND;
                                 }
                                 _ => {
