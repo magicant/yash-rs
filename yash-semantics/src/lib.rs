@@ -66,7 +66,7 @@ pub(crate) mod tests {
     use std::future::Future;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::{NonIntrinsic, Special};
+    use yash_env::builtin::Type::{Intrinsic, Special};
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
     use yash_env::expansion::Field;
@@ -115,7 +115,7 @@ pub(crate) mod tests {
     /// Returns a minimal implementation of the `echo` built-in.
     pub fn echo_builtin() -> Builtin {
         Builtin {
-            r#type: NonIntrinsic,
+            r#type: Intrinsic,
             execute: echo_builtin_main,
         }
     }
@@ -127,6 +127,7 @@ pub(crate) mod tests {
         fn inner(env: &mut Env) -> nix::Result<()> {
             let mut buffer = [0; 1024];
             loop {
+                // TODO wait until fd is ready for reading
                 let count = env.system.read(Fd::STDIN, &mut buffer)?;
                 if count == 0 {
                     break Ok(());
@@ -144,7 +145,7 @@ pub(crate) mod tests {
     /// Returns a minimal implementation of the `cat` built-in.
     pub fn cat_builtin() -> Builtin {
         Builtin {
-            r#type: NonIntrinsic,
+            r#type: Intrinsic,
             execute: cat_builtin_main,
         }
     }

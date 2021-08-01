@@ -250,7 +250,7 @@ mod tests {
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
-        let cmd = match commands[0] {
+        let cmd = match *commands[0] {
             Command::Simple(ref c) => c,
             _ => panic!("Expected a simple command but got {:?}", commands[0]),
         };

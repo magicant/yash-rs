@@ -26,6 +26,7 @@ use super::lex::Keyword::Bang;
 use super::lex::Operator::Bar;
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Pipeline;
+use std::rc::Rc;
 
 impl Parser<'_> {
     /// Parses a pipeline.
@@ -67,7 +68,7 @@ impl Parser<'_> {
         };
 
         // Parse `|`
-        let mut commands = vec![first];
+        let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
             let bar_location = self.take_token_raw().await?.word.location;
 
@@ -77,7 +78,7 @@ impl Parser<'_> {
                 // Parse the next command
                 if let Rec::Parsed(option) = self.command().await? {
                     if let Some(next) = option {
-                        break next;
+                        break Rc::new(next);
                     }
 
                     // Error: the command is missing
