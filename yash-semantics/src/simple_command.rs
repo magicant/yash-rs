@@ -82,9 +82,9 @@ impl Command for syntax::SimpleCommand {
 
                             let result = env.system.execve(path.as_c_str(), &args, &envs);
                             // TODO Prefer into_err to unwrap_err
-                            let e = result.unwrap_err();
+                            let errno = result.unwrap_err();
                             // TODO Reopen as shell script on ENOEXEC
-                            match e {
+                            match errno {
                                 Errno::ENOENT | Errno::ENOTDIR => {
                                     env.exit_status = ExitStatus::NOT_FOUND;
                                 }
@@ -92,8 +92,10 @@ impl Command for syntax::SimpleCommand {
                                     env.exit_status = ExitStatus::NOEXEC;
                                 }
                             }
-                            // TODO The error message should be printed via Env
-                            eprintln!("command execution failed: {:?}", e);
+                            env.print_system_error(
+                                errno,
+                                &format_args!("cannot execute external command {:?}", path),
+                            );
                             Box::pin(ready(()))
                         })
                         .await;
@@ -102,9 +104,11 @@ impl Command for syntax::SimpleCommand {
                         Ok(exit_status) => {
                             env.exit_status = exit_status;
                         }
-                        Err(e) => {
-                            // TODO The error message should be printed via Env
-                            eprintln!("command execution failed: {:?}", e);
+                        Err(errno) => {
+                            env.print_system_error(
+                                errno,
+                                &format_args!("cannot execute external command"),
+                            );
                             env.exit_status = ExitStatus::NOEXEC;
                         }
                     }
