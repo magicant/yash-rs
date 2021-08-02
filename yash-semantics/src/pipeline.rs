@@ -146,9 +146,15 @@ async fn connect_pipe_and_execute_command(
         }
     }
 
+    // TODO This part of code should be the same as subshell executor. Extract a function.
     match command.execute(env).await {
         Ok(()) => (),
-        Err(_) => todo!("subshell finished in Divert"),
+        Err(Divert::Interrupt(exit_status) | Divert::Exit(exit_status)) => {
+            if let Some(exit_status) = exit_status {
+                env.exit_status = exit_status;
+            }
+        }
+        Err(divert) => todo!("subshell finished with {:?}", divert),
     }
 }
 
