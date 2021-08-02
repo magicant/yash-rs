@@ -289,6 +289,20 @@ impl Env {
         }
     }
 
+    /// Convenience function that prints the given error message.
+    ///
+    /// This function prints the `message` to the standard error of this
+    /// environment. (The exact format of the printed message is subject to
+    /// change.)
+    ///
+    /// Any errors that may happen writing to the standard error are ignored.
+    pub fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
+        // TODO print `$0` first
+        // TODO localize message
+        let message = format!("{}\n", message);
+        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+    }
+
     /// Convenience function that prints an error message for the given `errno`.
     ///
     /// This function prints `format!("{}: {}\n", message, errno.desc())` to the
@@ -297,10 +311,7 @@ impl Env {
     ///
     /// Any errors that may happen writing to the standard error are ignored.
     pub fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
-        // TODO print `$0` first
-        // TODO localize message
-        let message = format!("{}: {}\n", message, errno.desc());
-        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+        self.print_error(&format_args!("{}: {}", message, errno.desc()))
     }
 
     /// Starts a subshell.

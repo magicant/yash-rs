@@ -114,8 +114,7 @@ impl Command for syntax::SimpleCommand {
                     }
                 }
                 None => {
-                    eprintln!("{}: command not found", name.value);
-                    // TODO The error message should be printed via Env
+                    env.print_error(&format_args!("{}: command not found", name.value));
                     env.exit_status = ExitStatus::NOT_FOUND;
                 }
             }
