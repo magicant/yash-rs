@@ -84,7 +84,12 @@ pub enum Divert {
         count: usize,
     },
     /// Continue the current loop.
-    Continue,
+    Continue {
+        /// Number of loops to break before continuing.
+        ///
+        /// `0` for continuing the innermost loop, `1` for one-level outer, and so on.
+        count: usize,
+    },
     /// Return from the current function or script.
     Return,
     /// Exit from the current shell execution environment.
