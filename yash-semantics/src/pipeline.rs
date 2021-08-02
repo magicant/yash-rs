@@ -18,6 +18,7 @@
 
 use super::Command;
 use async_trait::async_trait;
+use nix::unistd::Pid;
 use std::rc::Rc;
 use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
@@ -94,10 +95,8 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
             Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
 
-        match subshell.await {
-            Ok(pid) => pids.push(pid),
-            Err(_) => todo!("fork failed, report to stderr"),
-        }
+        let pid = subshell.await;
+        pids.push(pid_or_fail(env, pid)?);
     }
 
     shift_or_fail(env, &mut pipes, false)?;
@@ -152,6 +151,17 @@ async fn connect_pipe_and_execute_command(
         Ok(()) => (),
         Err(_) => todo!("subshell finished in Divert"),
     }
+}
+
+fn pid_or_fail(env: &mut Env, pid: nix::Result<Pid>) -> Result<Pid> {
+    pid.map_err(|errno| {
+        env.print_system_error(
+            errno,
+            &format_args!("cannot start a subshell in the pipeline"),
+        );
+        // TODO Should be a different variant of Divert?
+        Divert::Exit(ExitStatus::NOEXEC)
+    })
 }
 
 /// Set of pipe file descriptors that connect commands.
