@@ -19,6 +19,7 @@
 use super::Command;
 use async_trait::async_trait;
 use std::rc::Rc;
+use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::io::Fd;
@@ -86,10 +87,9 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     let mut pids = Vec::new();
     while let Some(command) = commands.next() {
         let has_next = commands.peek().is_some();
-        // TODO print some message if shift fails
-        let _ = pipes.shift(env, has_next);
-        let pipes2 = pipes;
+        shift_or_fail(env, &mut pipes, has_next)?;
 
+        let pipes2 = pipes;
         let subshell = env.start_subshell(move |env| {
             Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
@@ -100,8 +100,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         }
     }
 
-    // TODO print some message if shift fails
-    let _ = pipes.shift(env, false);
+    shift_or_fail(env, &mut pipes, false)?;
 
     // Await the last command
     loop {
@@ -127,6 +126,14 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     }
 }
 
+fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
+    pipes.shift(env, has_next).map_err(|errno| {
+        env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"));
+        // TODO Should be a different variant of Divert?
+        Divert::Exit(ExitStatus::NOEXEC)
+    })
+}
+
 async fn connect_pipe_and_execute_command(
     env: &mut Env,
     pipes: PipeSet,
@@ -135,7 +142,7 @@ async fn connect_pipe_and_execute_command(
     match pipes.move_to_stdin_stdout(env) {
         Ok(()) => (),
         Err(errno) => {
-            env.print_system_error(errno, &format_args!("cannot connect pipes in the subshell"));
+            env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"));
             env.exit_status = ExitStatus::NOEXEC;
             return;
         }
