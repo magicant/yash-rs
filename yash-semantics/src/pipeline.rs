@@ -129,7 +129,7 @@ fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
     pipes.shift(env, has_next).map_err(|errno| {
         env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"));
         // TODO Should be a different variant of Divert?
-        Divert::Exit(ExitStatus::NOEXEC)
+        Divert::Interrupt(Some(ExitStatus::NOEXEC))
     })
 }
 
@@ -160,7 +160,7 @@ fn pid_or_fail(env: &mut Env, pid: nix::Result<Pid>) -> Result<Pid> {
             &format_args!("cannot start a subshell in the pipeline"),
         );
         // TODO Should be a different variant of Divert?
-        Divert::Exit(ExitStatus::NOEXEC)
+        Divert::Interrupt(Some(ExitStatus::NOEXEC))
     })
 }
 

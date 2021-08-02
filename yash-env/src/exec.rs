@@ -92,8 +92,14 @@ pub enum Divert {
     },
     /// Return from the current function or script.
     Return,
+    /// Interrupt the current shell execution environment.
+    ///
+    /// This is the same as `Exit` in a non-interactive shell. In an interactive
+    /// shell, this will abort the currently executed command and resume
+    /// prompting for a next command line.
+    Interrupt(Option<ExitStatus>),
     /// Exit from the current shell execution environment.
-    Exit(ExitStatus),
+    Exit(Option<ExitStatus>),
 }
 
 /// Result of command execution.
