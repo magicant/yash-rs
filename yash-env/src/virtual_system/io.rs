@@ -34,6 +34,14 @@ pub trait OpenFileDescription: Debug {
     /// Returns true if you can write to this open file description.
     fn is_writable(&self) -> bool;
 
+    /// Returns true if you can read from this open file description without
+    /// blocking.
+    fn is_ready_for_reading(&self) -> bool;
+
+    /// Returns true if you can write to this open file description without
+    /// blocking.
+    fn is_ready_for_writing(&self) -> bool;
+
     /// Reads from this open file description.
     ///
     /// Returns the number of bytes successfully read.
@@ -80,6 +88,14 @@ impl OpenFileDescription for OpenFile {
 
     fn is_writable(&self) -> bool {
         self.is_writable
+    }
+
+    fn is_ready_for_reading(&self) -> bool {
+        true
+    }
+
+    fn is_ready_for_writing(&self) -> bool {
+        true
     }
 
     fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
@@ -184,6 +200,13 @@ impl OpenFileDescription for PipeReader {
     fn is_writable(&self) -> bool {
         false
     }
+    fn is_ready_for_reading(&self) -> bool {
+        let pipe = self.pipe.borrow();
+        !pipe.content.is_empty() || Rc::weak_count(&self.pipe) == 0
+    }
+    fn is_ready_for_writing(&self) -> bool {
+        false
+    }
     fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
         let mut pipe = self.pipe.borrow_mut();
         let limit = pipe.content.len();
@@ -228,6 +251,13 @@ impl OpenFileDescription for PipeWriter {
         false
     }
     fn is_writable(&self) -> bool {
+        true
+    }
+    fn is_ready_for_reading(&self) -> bool {
+        false
+    }
+    fn is_ready_for_writing(&self) -> bool {
+        // TODO Should depend on whether the pipe is full
         true
     }
     fn read(&mut self, _buffer: &mut [u8]) -> nix::Result<usize> {

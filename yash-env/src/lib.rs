@@ -50,6 +50,7 @@ use self::job::JobSet;
 use self::variable::VariableSet;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::sys::select::FdSet;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -58,6 +59,7 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::future::ready;
 use std::future::Future;
+use std::os::raw::c_int;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -163,6 +165,26 @@ pub trait System: Debug {
         }
         Ok(len)
     }
+
+    // TODO timespec
+    // TODO sigmask
+    /// Waits for a next event.
+    ///
+    /// This function blocks the calling thread until one of the following
+    /// condition is met:
+    ///
+    /// - An FD in `readers` becomes ready for reading.
+    /// - An FD in `writers` becomes ready for writing.
+    ///
+    /// When this function returns, FDs that are not ready for reading and
+    /// writing are removed from `readers` and `writers`, respectively. The
+    /// return value will be the number of FDs left in `readers` and `writers`.
+    ///
+    /// If `readers` and `writers` contain an FD that is not open for reading
+    /// and writing, respectively, this function will fail with `EBADF`. In this
+    /// case, you should remove the FD from `readers` and `writers` and try
+    /// again.
+    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int>;
 
     /// Creates a new child process.
     ///
