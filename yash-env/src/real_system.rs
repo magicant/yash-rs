@@ -23,6 +23,7 @@ use crate::io::Fd;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::libc::{S_IFMT, S_IFREG};
+use nix::sys::select::FdSet;
 use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
@@ -31,6 +32,7 @@ use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::future::Future;
+use std::os::raw::c_int;
 use std::pin::Pin;
 
 fn is_executable(path: &CStr) -> bool {
@@ -104,6 +106,10 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
+        nix::sys::select::pselect(None, readers, writers, None, None, None)
     }
 
     /// Creates a new child process.

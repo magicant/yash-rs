@@ -53,6 +53,7 @@ use crate::Env;
 use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::sys::select::FdSet;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
@@ -60,11 +61,13 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::BTreeMap;
 use std::convert::Infallible;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -248,6 +251,50 @@ impl System for VirtualSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.with_open_file_description(fd, |ofd| ofd.write(buffer))
+    }
+
+    /// Waits for a next event.
+    ///
+    /// The `VirtualSystem` implementation for this method does not actually
+    /// block the calling thread. The method returns immediately in any case.
+    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
+        let process = self.current_process();
+
+        for fd in 0..(nix::sys::select::FD_SETSIZE as c_int) {
+            if readers.contains(fd) {
+                if let Some(body) = process.fds().get(&Fd(fd)) {
+                    let ofd = body.open_file_description.borrow();
+                    if ofd.is_readable() {
+                        if !ofd.is_ready_for_reading() {
+                            readers.remove(fd);
+                        }
+                    } else {
+                        return Err(Errno::EBADF);
+                    }
+                } else {
+                    return Err(Errno::EBADF);
+                }
+            }
+
+            if writers.contains(fd) {
+                if let Some(body) = process.fds().get(&Fd(fd)) {
+                    let ofd = body.open_file_description.borrow();
+                    if ofd.is_writable() {
+                        if !ofd.is_ready_for_writing() {
+                            writers.remove(fd);
+                        }
+                    } else {
+                        return Err(Errno::EBADF);
+                    }
+                } else {
+                    return Err(Errno::EBADF);
+                }
+            }
+        }
+
+        let reader_count = readers.fds(None).count();
+        let writer_count = writers.fds(None).count();
+        Ok((reader_count + writer_count).try_into().unwrap())
     }
 
     /// Creates a new child process.
@@ -562,6 +609,119 @@ mod tests {
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn select_regular_file_is_always_ready() {
+        let mut system = VirtualSystem::new();
+        let mut readers = FdSet::new();
+        readers.insert(Fd::STDIN.0);
+        let mut writers = FdSet::new();
+        readers.insert(Fd::STDOUT.0);
+        readers.insert(Fd::STDERR.0);
+
+        let all_readers = readers;
+        let all_writers = writers;
+        let result = system.select(&mut readers, &mut writers);
+        assert_eq!(result, Ok(3));
+        assert_eq!(readers, all_readers);
+        assert_eq!(writers, all_writers);
+    }
+
+    #[test]
+    fn select_pipe_reader_is_ready_if_writer_is_closed() {
+        let mut system = VirtualSystem::new();
+        let (reader, writer) = system.pipe().unwrap();
+        system.close(writer).unwrap();
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
+        readers.insert(reader.0);
+
+        let all_readers = readers;
+        let all_writers = writers;
+        let result = system.select(&mut readers, &mut writers);
+        assert_eq!(result, Ok(1));
+        assert_eq!(readers, all_readers);
+        assert_eq!(writers, all_writers);
+    }
+
+    #[test]
+    fn select_pipe_reader_is_ready_if_something_has_been_written() {
+        let mut system = VirtualSystem::new();
+        let (reader, writer) = system.pipe().unwrap();
+        system.write(writer, &[0]).unwrap();
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
+        readers.insert(reader.0);
+
+        let all_readers = readers;
+        let all_writers = writers;
+        let result = system.select(&mut readers, &mut writers);
+        assert_eq!(result, Ok(1));
+        assert_eq!(readers, all_readers);
+        assert_eq!(writers, all_writers);
+    }
+
+    #[test]
+    fn select_pipe_reader_is_not_ready_if_writer_has_written_nothing() {
+        let mut system = VirtualSystem::new();
+        let (reader, _writer) = system.pipe().unwrap();
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
+        readers.insert(reader.0);
+
+        let result = system.select(&mut readers, &mut writers);
+        assert_eq!(result, Ok(0));
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::new());
+    }
+
+    #[test]
+    fn select_pipe_writer_is_ready_if_pipe_is_not_full() {
+        let mut system = VirtualSystem::new();
+        let (_reader, writer) = system.pipe().unwrap();
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
+        writers.insert(writer.0);
+
+        let all_readers = readers;
+        let all_writers = writers;
+        let result = system.select(&mut readers, &mut writers);
+        assert_eq!(result, Ok(1));
+        assert_eq!(readers, all_readers);
+        assert_eq!(writers, all_writers);
+    }
+
+    #[test]
+    fn select_on_unreadable_fd() {
+        let mut system = VirtualSystem::new();
+        let (_reader, writer) = system.pipe().unwrap();
+        let mut fds = FdSet::new();
+        fds.insert(writer.0);
+        let result = system.select(&mut fds, &mut FdSet::new());
+        assert_eq!(result, Err(Errno::EBADF));
+    }
+
+    #[test]
+    fn select_on_unwritable_fd() {
+        let mut system = VirtualSystem::new();
+        let (reader, _writer) = system.pipe().unwrap();
+        let mut fds = FdSet::new();
+        fds.insert(reader.0);
+        let result = system.select(&mut FdSet::new(), &mut fds);
+        assert_eq!(result, Err(Errno::EBADF));
+    }
+
+    #[test]
+    fn select_on_closed_fd() {
+        let mut system = VirtualSystem::new();
+        let mut fds = FdSet::new();
+        fds.insert(17);
+        let result = system.select(&mut fds, &mut FdSet::new());
+        assert_eq!(result, Err(Errno::EBADF));
+
+        let result = system.select(&mut FdSet::new(), &mut fds);
+        assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
