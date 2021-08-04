@@ -44,6 +44,7 @@ pub mod virtual_system;
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
+use self::io::AsyncIo;
 use self::io::Fd;
 use self::job::JobSet;
 use self::variable::VariableSet;
@@ -74,6 +75,9 @@ pub struct Env {
     /// The `AliasSet` is reference-counted so that the shell can execute traps
     /// while the parser is reading a command line.
     pub aliases: Rc<AliasSet>,
+
+    /// Internal state for storing wakers waiting for an FD to be ready.
+    pub async_io: AsyncIo,
 
     /// Built-in utilities available in the environment.
     pub builtins: HashMap<&'static str, Builtin>,
@@ -258,6 +262,7 @@ impl Env {
     pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
+            async_io: Default::default(),
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
@@ -280,6 +285,7 @@ impl Env {
     pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
         Env {
             aliases: self.aliases.clone(),
+            async_io: self.async_io.clone(),
             builtins: self.builtins.clone(),
             exit_status: self.exit_status,
             functions: self.functions.clone(),

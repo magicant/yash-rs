@@ -48,15 +48,8 @@ async fn parse_and_print() -> i32 {
         }
     }
 
-    let mut env = Env {
-        aliases: Default::default(),
-        builtins: builtin::BUILTINS.iter().copied().collect(),
-        exit_status: Default::default(),
-        functions: Default::default(),
-        jobs: Default::default(),
-        variables: Default::default(),
-        system: Box::new(RealSystem),
-    };
+    let mut env = Env::with_system(Box::new(RealSystem));
+    env.builtins = builtin::BUILTINS.iter().copied().collect();
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.
     for (name, value) in std::env::vars() {
