@@ -51,6 +51,7 @@ use self::job::JobSet;
 use self::variable::VariableSet;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::unistd::Pid;
 use std::collections::HashMap;
@@ -132,6 +133,12 @@ pub trait System: Debug {
     ///
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> nix::Result<()>;
+
+    /// Returns the file status flags for the file descriptor.
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag>;
+
+    /// Sets the file status flags for the file descriptor.
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
 
     /// Reads from the file descriptor.
     ///

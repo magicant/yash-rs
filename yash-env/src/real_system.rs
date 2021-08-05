@@ -22,6 +22,7 @@ use super::System;
 use crate::io::Fd;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::select::FdSet;
 use nix::sys::stat::stat;
@@ -88,6 +89,14 @@ impl System for RealSystem {
                 other => return other,
             }
         }
+    }
+
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL).map(OFlag::from_bits_truncate)
+    }
+
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags)).map(drop)
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
