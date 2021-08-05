@@ -53,6 +53,7 @@ use crate::Env;
 use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -242,6 +243,18 @@ impl System for VirtualSystem {
 
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.current_process_mut().close_fd(fd);
+        Ok(())
+    }
+
+    /// Current implementation returns `Ok(OFlag::empty())`.
+    fn fcntl_getfl(&self, _fd: Fd) -> nix::Result<OFlag> {
+        // TODO do what this function should do
+        Ok(OFlag::empty())
+    }
+
+    /// Current implementation does nothing but return `Ok(())`.
+    fn fcntl_setfl(&mut self, _fd: Fd, _flags: OFlag) -> nix::Result<()> {
+        // TODO do what this function should do
         Ok(())
     }
 
