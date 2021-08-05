@@ -440,7 +440,7 @@ mod tests {
         let state = state.borrow();
         let stderr = state
             .file_system
-            .get(&Path::new("/dev/stderr"))
+            .get(Path::new("/dev/stderr"))
             .unwrap()
             .borrow();
         let message = format!("dummy message {}: {}\n", 42, Errno::EINVAL.desc());

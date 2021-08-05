@@ -602,13 +602,13 @@ pub struct WordLexer<'a> {
 impl Deref for WordLexer<'_> {
     type Target = Lexer;
     fn deref(&self) -> &Lexer {
-        &self.lexer
+        self.lexer
     }
 }
 
 impl DerefMut for WordLexer<'_> {
     fn deref_mut(&mut self) -> &mut Lexer {
-        &mut self.lexer
+        self.lexer
     }
 }
 
