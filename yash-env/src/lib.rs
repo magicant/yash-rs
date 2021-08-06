@@ -31,6 +31,7 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
+mod async_system;
 pub mod builtin;
 pub mod exec;
 pub mod expansion;
@@ -41,6 +42,7 @@ mod real_system;
 pub mod variable;
 pub mod virtual_system;
 
+pub use self::async_system::AsyncSystem;
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
