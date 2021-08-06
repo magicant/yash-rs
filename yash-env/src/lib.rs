@@ -96,7 +96,7 @@ pub struct Env {
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.
-    pub system: Box<dyn System>,
+    pub system: AsyncSystem,
 }
 
 /// Abstraction of the system-managed parts of the environment.
@@ -294,7 +294,7 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             variables: Default::default(),
-            system,
+            system: AsyncSystem::new(system),
         }
     }
 
@@ -316,7 +316,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             variables: self.variables.clone(),
-            system,
+            system: self.system.clone_with_system(system),
         }
     }
 

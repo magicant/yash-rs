@@ -57,6 +57,18 @@ impl AsyncSystem {
             io: AsyncIo::new(),
         }
     }
+
+    /// Clones this `AsyncSystem` using the provided `System`.
+    ///
+    /// This function clones the internal state of the `AsyncSystem`. However,
+    /// `System` does not implement `Clone` and an instance for the cloned
+    /// `AsyncSystem` must be provided.
+    pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
+        AsyncSystem {
+            system,
+            io: self.io.clone(),
+        }
+    }
 }
 
 /// Helper for `select`ing on FDs.
