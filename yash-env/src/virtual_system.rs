@@ -788,8 +788,7 @@ mod tests {
         let pid = executor.run_until(future);
 
         #[allow(deprecated)]
-        let future = env.system.wait_sync();
-        let result = executor.run_until(future);
+        let result = executor.run_until(env.system.borrow_mut().wait_sync());
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
     }
 

@@ -54,6 +54,7 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -96,7 +97,7 @@ pub struct Env {
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.
-    pub system: AsyncSystem,
+    pub system: Rc<RefCell<AsyncSystem>>,
 }
 
 /// Abstraction of the system-managed parts of the environment.
@@ -294,7 +295,7 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             variables: Default::default(),
-            system: AsyncSystem::new(system),
+            system: Rc::new(RefCell::new(AsyncSystem::new(system))),
         }
     }
 
@@ -316,7 +317,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             variables: self.variables.clone(),
-            system: self.system.clone_with_system(system),
+            system: Rc::new(RefCell::new(self.system.borrow().clone_with_system(system))),
         }
     }
 
@@ -331,7 +332,8 @@ impl Env {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
-        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+        let mut system = self.system.borrow_mut();
+        let _ = system.write_all(Fd::STDERR, message.as_bytes());
     }
 
     /// Convenience function that prints an error message for the given `errno`.
@@ -366,9 +368,8 @@ impl Env {
                 Box::pin(ready(()))
             }
         });
-        let child_pid = unsafe { self.system.new_child_process()? }
-            .run(self, task)
-            .await;
+        let mut child = unsafe { self.system.borrow_mut().new_child_process()? };
+        let child_pid = child.run(self, task).await;
         Ok(child_pid)
     }
 
@@ -408,7 +409,7 @@ impl Env {
 
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match self.system.wait_sync().await? {
+        match self.system.borrow_mut().wait_sync().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
