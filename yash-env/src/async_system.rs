@@ -18,6 +18,10 @@
 
 use crate::io::Fd;
 use crate::System;
+use futures::future::poll_fn;
+use futures::task::Poll;
+use nix::errno::Errno;
+use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -68,6 +72,30 @@ impl AsyncSystem {
             system,
             io: self.io.clone(),
         }
+    }
+
+    /// Reads from the file descriptor.
+    ///
+    /// This function waits for one or more bytes to be available for reading.
+    /// If successful, returns the number of bytes read.
+    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+        let flags = self.fcntl_getfl(fd)?;
+        if !flags.contains(OFlag::O_NONBLOCK) {
+            self.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
+        }
+        poll_fn(|context| match self.read(fd, buffer) {
+            Err(Errno::EAGAIN) => {
+                self.io.wait_for_reading(fd, context.waker().clone());
+                Poll::Pending
+            }
+            result => {
+                if !flags.contains(OFlag::O_NONBLOCK) {
+                    let _ = self.fcntl_setfl(fd, flags);
+                }
+                Poll::Ready(result)
+            }
+        })
+        .await
     }
 }
 
@@ -168,7 +196,54 @@ impl AsyncIo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_system::VirtualSystem;
+    use futures::executor::block_on;
     use futures::task::noop_waker;
+    use futures::task::noop_waker_ref;
+    use std::future::Future;
+    use std::rc::Rc;
+    use std::task::Context;
+
+    #[test]
+    fn async_system_read_async_ready() {
+        let mut system = AsyncSystem::new(Box::new(VirtualSystem::new()));
+        let (reader, writer) = system.pipe().unwrap();
+        system.write(writer, &[42]).unwrap();
+
+        let mut buffer = [0; 2];
+        let result = block_on(system.read_async(reader, &mut buffer));
+        assert_eq!(result, Ok(1));
+        assert_eq!(buffer[..1], [42]);
+    }
+
+    #[test]
+    fn async_system_read_async_not_ready_at_first() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = AsyncSystem::new(Box::new(system));
+        let (reader, writer) = system.pipe().unwrap();
+
+        let mut context = Context::from_waker(noop_waker_ref());
+        let mut buffer = [0; 2];
+        let mut future = Box::pin(system.read_async(reader, &mut buffer));
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+        // TODO assert!(system.io.readers().contains(reader.0));
+
+        let state = state.borrow_mut();
+        let mut ofd = state.processes[&process_id].fds[&writer]
+            .open_file_description
+            .borrow_mut();
+        ofd.write(&[56]).unwrap();
+        drop(ofd);
+        drop(state);
+
+        let result = future.as_mut().poll(&mut context);
+        drop(future);
+        assert_eq!(result, Poll::Ready(Ok(1)));
+        assert_eq!(buffer[..1], [56]);
+    }
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
