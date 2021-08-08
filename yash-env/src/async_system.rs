@@ -59,6 +59,36 @@ impl SharedSystem {
             self.0.borrow().clone_with_system(system),
         )))
     }
+
+    /// Reads from the file descriptor.
+    ///
+    /// This function waits for one or more bytes to be available for reading.
+    /// If successful, returns the number of bytes read.
+    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+        let mut inner = self.0.borrow_mut();
+        let flags = inner.system.fcntl_getfl(fd)?;
+        if !flags.contains(OFlag::O_NONBLOCK) {
+            inner.system.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
+        }
+        drop(inner);
+
+        poll_fn(|context| {
+            let mut inner = self.0.borrow_mut();
+            match inner.system.read(fd, buffer) {
+                Err(Errno::EAGAIN) => {
+                    inner.io.wait_for_reading(fd, context.waker().clone());
+                    Poll::Pending
+                }
+                result => {
+                    if !flags.contains(OFlag::O_NONBLOCK) {
+                        let _ = inner.system.fcntl_setfl(fd, flags);
+                    }
+                    Poll::Ready(result)
+                }
+            }
+        })
+        .await
+    }
 }
 
 impl Deref for SharedSystem {
@@ -170,30 +200,6 @@ impl AsyncSystem {
             io: self.io.clone(),
         }
     }
-
-    /// Reads from the file descriptor.
-    ///
-    /// This function waits for one or more bytes to be available for reading.
-    /// If successful, returns the number of bytes read.
-    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
-        let flags = self.fcntl_getfl(fd)?;
-        if !flags.contains(OFlag::O_NONBLOCK) {
-            self.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
-        }
-        poll_fn(|context| match self.read(fd, buffer) {
-            Err(Errno::EAGAIN) => {
-                self.io.wait_for_reading(fd, context.waker().clone());
-                Poll::Pending
-            }
-            result => {
-                if !flags.contains(OFlag::O_NONBLOCK) {
-                    let _ = self.fcntl_setfl(fd, flags);
-                }
-                Poll::Ready(result)
-            }
-        })
-        .await
-    }
 }
 
 /// Helper for `select`ing on FDs.
@@ -302,8 +308,8 @@ mod tests {
     use std::task::Context;
 
     #[test]
-    fn async_system_read_async_ready() {
-        let mut system = AsyncSystem::new(Box::new(VirtualSystem::new()));
+    fn shared_system_read_async_ready() {
+        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
         let (reader, writer) = system.pipe().unwrap();
         system.write(writer, &[42]).unwrap();
 
@@ -314,11 +320,12 @@ mod tests {
     }
 
     #[test]
-    fn async_system_read_async_not_ready_at_first() {
+    fn shared_system_read_async_not_ready_at_first() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
-        let mut system = AsyncSystem::new(Box::new(system));
+        let mut system = SharedSystem::new(Box::new(system));
+        let system2 = system.clone();
         let (reader, writer) = system.pipe().unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
@@ -326,7 +333,9 @@ mod tests {
         let mut future = Box::pin(system.read_async(reader, &mut buffer));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
-        // TODO assert!(system.io.readers().contains(reader.0));
+
+        // TODO Call system2.select
+        assert!(system2.0.borrow().io.readers().contains(reader.0));
 
         let state = state.borrow_mut();
         let mut ofd = state.processes[&process_id].fds[&writer]
