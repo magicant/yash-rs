@@ -27,6 +27,7 @@ use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::Env;
+use yash_env::System;
 use yash_syntax::syntax;
 
 /// Converts fields to C strings.
@@ -80,10 +81,7 @@ impl Command for syntax::SimpleCommand {
                         .run_in_subshell(move |env| {
                             // TODO Remove signal handlers not set by current traps
 
-                            let result =
-                                env.system
-                                    .borrow_mut()
-                                    .execve(path.as_c_str(), &args, &envs);
+                            let result = env.system.execve(path.as_c_str(), &args, &envs);
                             // TODO Prefer into_err to unwrap_err
                             let errno = result.unwrap_err();
                             // TODO Reopen as shell script on ENOEXEC

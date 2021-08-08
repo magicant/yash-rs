@@ -72,6 +72,7 @@ pub(crate) mod tests {
     use yash_env::expansion::Field;
     use yash_env::io::Fd;
     use yash_env::Env;
+    use yash_env::System;
 
     fn return_builtin_main(
         _env: &mut Env,
@@ -105,11 +106,7 @@ pub(crate) mod tests {
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         let fields = (&args[1..]).iter().map(|f| &f.value).format(" ");
         let message = format!("{}\n", fields);
-        let result = match env
-            .system
-            .borrow_mut()
-            .write_all(Fd::STDOUT, message.as_bytes())
-        {
+        let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()) {
             Ok(_) => ExitStatus::SUCCESS,
             Err(_) => ExitStatus::FAILURE,
         };
@@ -129,15 +126,14 @@ pub(crate) mod tests {
         _args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         fn inner(env: &mut Env) -> nix::Result<()> {
-            let mut system = env.system.borrow_mut();
             let mut buffer = [0; 1024];
             loop {
                 // TODO wait until fd is ready for reading
-                let count = system.read(Fd::STDIN, &mut buffer)?;
+                let count = env.system.read(Fd::STDIN, &mut buffer)?;
                 if count == 0 {
                     break Ok(());
                 }
-                system.write_all(Fd::STDOUT, &buffer[..count])?;
+                env.system.write_all(Fd::STDOUT, &buffer[..count])?;
             }
         }
         let result = match inner(env) {

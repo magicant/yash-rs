@@ -25,6 +25,7 @@ use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::io::Fd;
 use yash_env::Env;
+use yash_env::System;
 use yash_syntax::syntax;
 
 #[async_trait(?Send)]
@@ -105,7 +106,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     loop {
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match env.system.borrow_mut().wait_sync().await {
+        match env.system.0.borrow_mut().wait_sync().await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);
@@ -186,14 +187,12 @@ impl PipeSet {
     /// Closes FDs that are no longer necessary and opens a new pipe if there is
     /// a next command.
     fn shift(&mut self, env: &mut Env, has_next: bool) -> nix::Result<()> {
-        let mut system = env.system.borrow_mut();
-
         if let Some(fd) = self.read_previous {
-            let _ = system.close(fd);
+            let _ = env.system.close(fd);
         }
 
         if let Some((reader, writer)) = self.next {
-            let _ = system.close(writer);
+            let _ = env.system.close(writer);
             self.read_previous = Some(reader);
         } else {
             self.read_previous = None;
@@ -201,7 +200,7 @@ impl PipeSet {
 
         self.next = None;
         if has_next {
-            self.next = Some(system.pipe()?);
+            self.next = Some(env.system.pipe()?);
         }
 
         Ok(())
@@ -210,25 +209,24 @@ impl PipeSet {
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
     fn move_to_stdin_stdout(mut self, env: &mut Env) -> nix::Result<()> {
-        let mut system = env.system.borrow_mut();
         if let Some((reader, writer)) = self.next {
             assert_ne!(reader, writer);
             assert_ne!(self.read_previous, Some(reader));
             assert_ne!(self.read_previous, Some(writer));
 
-            system.close(reader)?;
+            env.system.close(reader)?;
             if writer != Fd::STDOUT {
                 if self.read_previous == Some(Fd::STDOUT) {
-                    self.read_previous = Some(system.dup(Fd::STDOUT, Fd(0), false)?);
+                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false)?);
                 }
-                system.dup2(writer, Fd::STDOUT)?;
-                system.close(writer)?;
+                env.system.dup2(writer, Fd::STDOUT)?;
+                env.system.close(writer)?;
             }
         }
         if let Some(reader) = self.read_previous {
             if reader != Fd::STDIN {
-                system.dup2(reader, Fd::STDIN)?;
-                system.close(reader)?;
+                env.system.dup2(reader, Fd::STDIN)?;
+                env.system.close(reader)?;
             }
         }
         Ok(())

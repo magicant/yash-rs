@@ -47,6 +47,7 @@ use yash_env::function::Function;
 use yash_env::function::FunctionSet;
 use yash_env::variable::Variable;
 use yash_env::Env;
+use yash_env::System;
 
 /// Target of a simple command execution.
 ///
@@ -111,7 +112,7 @@ impl PathEnv for Env {
         self.variables.get("PATH")
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
-        self.system.borrow().is_executable_file(path)
+        self.system.is_executable_file(path)
     }
 }
 

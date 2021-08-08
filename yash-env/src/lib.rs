@@ -43,6 +43,7 @@ pub mod variable;
 pub mod virtual_system;
 
 pub use self::async_system::AsyncSystem;
+pub use self::async_system::SharedSystem;
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
@@ -54,7 +55,6 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::unistd::Pid;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -97,7 +97,7 @@ pub struct Env {
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.
-    pub system: Rc<RefCell<AsyncSystem>>,
+    pub system: SharedSystem,
 }
 
 /// Abstraction of the system-managed parts of the environment.
@@ -295,7 +295,7 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             variables: Default::default(),
-            system: Rc::new(RefCell::new(AsyncSystem::new(system))),
+            system: SharedSystem::new(system),
         }
     }
 
@@ -317,7 +317,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             variables: self.variables.clone(),
-            system: Rc::new(RefCell::new(self.system.borrow().clone_with_system(system))),
+            system: self.system.clone_with_system(system),
         }
     }
 
@@ -332,8 +332,7 @@ impl Env {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
-        let mut system = self.system.borrow_mut();
-        let _ = system.write_all(Fd::STDERR, message.as_bytes());
+        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
     }
 
     /// Convenience function that prints an error message for the given `errno`.
@@ -368,7 +367,7 @@ impl Env {
                 Box::pin(ready(()))
             }
         });
-        let mut child = unsafe { self.system.borrow_mut().new_child_process()? };
+        let mut child = unsafe { self.system.new_child_process()? };
         let child_pid = child.run(self, task).await;
         Ok(child_pid)
     }
@@ -409,7 +408,7 @@ impl Env {
 
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match self.system.borrow_mut().wait_sync().await? {
+        match self.system.0.borrow_mut().wait_sync().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
