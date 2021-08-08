@@ -90,6 +90,17 @@ impl SharedSystem {
         .await
     }
 
+    /// Writes to the file descriptor.
+    ///
+    /// This function calls [`write`](System::write) repeatedly until the whole
+    /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
+    /// called at all, so any error that would be returned from `write` is not
+    /// returned.
+    pub async fn write_all(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
+        // TODO Retry if the entire buffer could not be written in one time.
+        self.0.borrow_mut().write(fd, buffer)
+    }
+
     /// Wait for a next event to occur.
     ///
     /// TODO Elaborate
@@ -366,6 +377,18 @@ mod tests {
         drop(future);
         assert_eq!(result, Poll::Ready(Ok(1)));
         assert_eq!(buffer[..1], [56]);
+    }
+
+    #[test]
+    fn shared_system_write_all_ready() {
+        let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+        let (reader, writer) = system.pipe().unwrap();
+        let result = block_on(system.write_all(writer, &[17]));
+        assert_eq!(result, Ok(1));
+
+        let mut buffer = [0; 2];
+        system.read(reader, &mut buffer).unwrap();
+        assert_eq!(buffer[..1], [17]);
     }
 
     #[test]

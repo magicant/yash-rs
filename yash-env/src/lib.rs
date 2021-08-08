@@ -332,7 +332,8 @@ impl Env {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
-        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+        let mut system = self.system.0.borrow_mut();
+        let _ = system.write_all(Fd::STDERR, message.as_bytes());
     }
 
     /// Convenience function that prints an error message for the given `errno`.
