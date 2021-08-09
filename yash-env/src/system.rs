@@ -295,6 +295,7 @@ impl AsyncIo {
     }
 
     /// Adds an awaiter for writing.
+    #[cfg(test)] // TODO use this function
     pub fn wait_for_writing(&mut self, fd: Fd, waker: Waker) {
         self.writers.push(Awaiter { fd, waker });
     }
