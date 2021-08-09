@@ -102,14 +102,16 @@ pub(crate) mod tests {
     fn echo_builtin_main(
         env: &mut Env,
         args: Vec<Field>,
-    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let fields = (&args[1..]).iter().map(|f| &f.value).format(" ");
-        let message = format!("{}\n", fields);
-        let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()) {
-            Ok(_) => ExitStatus::SUCCESS,
-            Err(_) => ExitStatus::FAILURE,
-        };
-        Box::pin(ready((result, None)))
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+        Box::pin(async move {
+            let fields = (&args[1..]).iter().map(|f| &f.value).format(" ");
+            let message = format!("{}\n", fields);
+            let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()).await {
+                Ok(_) => ExitStatus::SUCCESS,
+                Err(_) => ExitStatus::FAILURE,
+            };
+            (result, None)
+        })
     }
 
     /// Returns a minimal implementation of the `echo` built-in.
@@ -123,23 +125,25 @@ pub(crate) mod tests {
     fn cat_builtin_main(
         env: &mut Env,
         _args: Vec<Field>,
-    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        fn inner(env: &mut Env) -> nix::Result<()> {
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+        async fn inner(env: &mut Env) -> nix::Result<()> {
             let mut buffer = [0; 1024];
             loop {
-                // TODO wait until fd is ready for reading
-                let count = env.system.read(Fd::STDIN, &mut buffer)?;
+                let count = env.system.read_async(Fd::STDIN, &mut buffer).await?;
                 if count == 0 {
                     break Ok(());
                 }
-                env.system.write_all(Fd::STDOUT, &buffer[..count])?;
+                env.system.write_all(Fd::STDOUT, &buffer[..count]).await?;
             }
         }
-        let result = match inner(env) {
-            Ok(_) => ExitStatus::SUCCESS,
-            Err(_) => ExitStatus::FAILURE,
-        };
-        Box::pin(ready((result, None)))
+
+        Box::pin(async move {
+            let result = match inner(env).await {
+                Ok(_) => ExitStatus::SUCCESS,
+                Err(_) => ExitStatus::FAILURE,
+            };
+            (result, None)
+        })
     }
 
     /// Returns a minimal implementation of the `cat` built-in.

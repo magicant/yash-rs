@@ -60,7 +60,7 @@ pub enum Type {
 pub type Result = (ExitStatus, Option<Divert>);
 
 /// Type of functions that implement the behavior of a built-in.
-pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result>>>;
+pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
 /// Built-in utility definition.
 #[derive(Clone, Copy)]

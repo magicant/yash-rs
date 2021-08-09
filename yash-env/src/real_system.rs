@@ -22,7 +22,9 @@ use super::System;
 use crate::io::Fd;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
+use nix::sys::select::FdSet;
 use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
@@ -31,6 +33,7 @@ use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::future::Future;
+use std::os::raw::c_int;
 use std::pin::Pin;
 
 fn is_executable(path: &CStr) -> bool {
@@ -88,6 +91,14 @@ impl System for RealSystem {
         }
     }
 
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFL).map(OFlag::from_bits_truncate)
+    }
+
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags)).map(drop)
+    }
+
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::read(fd.0, buffer);
@@ -104,6 +115,10 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
+        nix::sys::select::pselect(None, readers, writers, None, None, None)
     }
 
     /// Creates a new child process.

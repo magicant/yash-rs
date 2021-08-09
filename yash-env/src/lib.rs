@@ -38,6 +38,7 @@ pub mod function;
 pub mod io;
 pub mod job;
 mod real_system;
+mod system;
 pub mod variable;
 pub mod virtual_system;
 
@@ -46,9 +47,13 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
+pub use self::system::SelectSystem;
+pub use self::system::SharedSystem;
 use self::variable::VariableSet;
 use async_trait::async_trait;
 use nix::errno::Errno;
+use nix::fcntl::OFlag;
+use nix::sys::select::FdSet;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -57,6 +62,7 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::future::ready;
 use std::future::Future;
+use std::os::raw::c_int;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -91,7 +97,7 @@ pub struct Env {
     pub variables: VariableSet,
 
     /// Interface to the system-managed parts of the environment.
-    pub system: Box<dyn System>,
+    pub system: SharedSystem,
 }
 
 /// Abstraction of the system-managed parts of the environment.
@@ -129,10 +135,20 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> nix::Result<()>;
 
+    /// Returns the file status flags for the file descriptor.
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag>;
+
+    /// Sets the file status flags for the file descriptor.
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
+
     /// Reads from the file descriptor.
     ///
     /// This is a thin wrapper around the `read` system call.
     /// If successful, returns the number of bytes read.
+    ///
+    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
+    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
+    /// concurrent I/O in an `async` function context.
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
 
     /// Writes to the file descriptor.
@@ -140,25 +156,31 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `write` system call.
     /// If successful, returns the number of bytes written.
     ///
-    /// This function may write only part of the `buffer`. Use
-    /// [`write_all`](Self::write_all) instead to ensure the whole `buffer` is
-    /// written.
+    /// This function may write only part of the `buffer` and block if the
+    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
+    /// to support concurrent I/O in an `async` function context and ensure the
+    /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
 
-    /// Writes to the file descriptor.
+    // TODO timespec
+    // TODO sigmask
+    /// Waits for a next event.
     ///
-    /// This function calls [`write`](Self::write) repeatedly until the whole
-    /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
-    /// called at all, so any error that would be returned from `write` is not
-    /// returned.
-    fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> nix::Result<usize> {
-        let len = buffer.len();
-        while !buffer.is_empty() {
-            let count = self.write(fd, buffer)?;
-            buffer = &buffer[count..];
-        }
-        Ok(len)
-    }
+    /// This function blocks the calling thread until one of the following
+    /// condition is met:
+    ///
+    /// - An FD in `readers` becomes ready for reading.
+    /// - An FD in `writers` becomes ready for writing.
+    ///
+    /// When this function returns, FDs that are not ready for reading and
+    /// writing are removed from `readers` and `writers`, respectively. The
+    /// return value will be the number of FDs left in `readers` and `writers`.
+    ///
+    /// If `readers` and `writers` contain an FD that is not open for reading
+    /// and writing, respectively, this function will fail with `EBADF`. In this
+    /// case, you should remove the FD from `readers` and `writers` and try
+    /// again.
+    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int>;
 
     /// Creates a new child process.
     ///
@@ -263,7 +285,7 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             variables: Default::default(),
-            system,
+            system: SharedSystem::new(system),
         }
     }
 
@@ -285,7 +307,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             variables: self.variables.clone(),
-            system,
+            system: self.system.clone_with_system(system),
         }
     }
 
@@ -296,11 +318,11 @@ impl Env {
     /// change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
+    pub async fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
-        let _ = self.system.write_all(Fd::STDERR, message.as_bytes());
+        let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
     }
 
     /// Convenience function that prints an error message for the given `errno`.
@@ -310,8 +332,9 @@ impl Env {
     /// message is subject to change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
+    pub async fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
         self.print_error(&format_args!("{}: {}", message, errno.desc()))
+            .await
     }
 
     /// Starts a subshell.
@@ -335,9 +358,8 @@ impl Env {
                 Box::pin(ready(()))
             }
         });
-        let child_pid = unsafe { self.system.new_child_process()? }
-            .run(self, task)
-            .await;
+        let mut child = unsafe { self.system.new_child_process()? };
+        let child_pid = child.run(self, task).await;
         Ok(child_pid)
     }
 
@@ -377,7 +399,7 @@ impl Env {
 
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match self.system.wait_sync().await? {
+        match self.system.0.borrow_mut().wait_sync().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
@@ -399,6 +421,7 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use futures::executor::LocalPool;
     use std::path::Path;
 
@@ -407,7 +430,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42));
+        block_on(env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42)));
 
         let state = state.borrow();
         let stderr = state
