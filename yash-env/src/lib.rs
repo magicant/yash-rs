@@ -328,12 +328,11 @@ impl Env {
     /// change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
+    pub async fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
-        let mut system = self.system.0.borrow_mut();
-        let _ = system.write_all(Fd::STDERR, message.as_bytes());
+        let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
     }
 
     /// Convenience function that prints an error message for the given `errno`.
@@ -343,8 +342,9 @@ impl Env {
     /// message is subject to change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
+    pub async fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
         self.print_error(&format_args!("{}: {}", message, errno.desc()))
+            .await
     }
 
     /// Starts a subshell.
@@ -431,6 +431,7 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
     use futures::executor::LocalPool;
     use std::path::Path;
 
@@ -439,7 +440,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42));
+        block_on(env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42)));
 
         let state = state.borrow();
         let stderr = state

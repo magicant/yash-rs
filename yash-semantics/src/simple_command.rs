@@ -22,7 +22,6 @@ use crate::command_search::Target::{Builtin, External, Function};
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
-use std::future::ready;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
@@ -79,25 +78,27 @@ impl Command for syntax::SimpleCommand {
                     let envs = env.variables.env_c_strings();
                     let result = env
                         .run_in_subshell(move |env| {
-                            // TODO Remove signal handlers not set by current traps
+                            Box::pin(async move {
+                                // TODO Remove signal handlers not set by current traps
 
-                            let result = env.system.execve(path.as_c_str(), &args, &envs);
-                            // TODO Prefer into_err to unwrap_err
-                            let errno = result.unwrap_err();
-                            // TODO Reopen as shell script on ENOEXEC
-                            match errno {
-                                Errno::ENOENT | Errno::ENOTDIR => {
-                                    env.exit_status = ExitStatus::NOT_FOUND;
+                                let result = env.system.execve(path.as_c_str(), &args, &envs);
+                                // TODO Prefer into_err to unwrap_err
+                                let errno = result.unwrap_err();
+                                // TODO Reopen as shell script on ENOEXEC
+                                match errno {
+                                    Errno::ENOENT | Errno::ENOTDIR => {
+                                        env.exit_status = ExitStatus::NOT_FOUND;
+                                    }
+                                    _ => {
+                                        env.exit_status = ExitStatus::NOEXEC;
+                                    }
                                 }
-                                _ => {
-                                    env.exit_status = ExitStatus::NOEXEC;
-                                }
-                            }
-                            env.print_system_error(
-                                errno,
-                                &format_args!("cannot execute external command {:?}", path),
-                            );
-                            Box::pin(ready(()))
+                                env.print_system_error(
+                                    errno,
+                                    &format_args!("cannot execute external command {:?}", path),
+                                )
+                                .await
+                            })
                         })
                         .await;
 
@@ -109,13 +110,15 @@ impl Command for syntax::SimpleCommand {
                             env.print_system_error(
                                 errno,
                                 &format_args!("cannot execute external command"),
-                            );
+                            )
+                            .await;
                             env.exit_status = ExitStatus::NOEXEC;
                         }
                     }
                 }
                 None => {
-                    env.print_error(&format_args!("{}: command not found", name.value));
+                    env.print_error(&format_args!("{}: command not found", name.value))
+                        .await;
                     env.exit_status = ExitStatus::NOT_FOUND;
                 }
             }
