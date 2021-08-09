@@ -145,6 +145,10 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `read` system call.
     /// If successful, returns the number of bytes read.
+    ///
+    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
+    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
+    /// concurrent I/O in an `async` function context.
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
 
     /// Writes to the file descriptor.
@@ -152,9 +156,10 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `write` system call.
     /// If successful, returns the number of bytes written.
     ///
-    /// This function may write only part of the `buffer`. Use
-    /// [`write_all`](SharedSystem::write_all) instead to ensure the whole
-    /// `buffer` is written.
+    /// This function may write only part of the `buffer` and block if the
+    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
+    /// to support concurrent I/O in an `async` function context and ensure the
+    /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
 
     // TODO timespec

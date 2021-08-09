@@ -37,9 +37,57 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Waker;
 
-/// [System] shared by a reference counter.
+/// System shared by a reference counter.
 ///
-/// TODO Elaborate
+/// A `SharedSystem` is a reference-counted container of a [`System`] instance
+/// accompanied with an internal state for supporting asynchronous interactions
+/// with the system. As it is reference-counted, cloning a `SharedSystem`
+/// instance only increments the reference count without cloning the backing
+/// system instance. This behavior allows calling `SharedSystem`'s methods
+/// concurrently from different `async` tasks that each have a `SharedSystem`
+/// instance sharing the same state.
+///
+/// `SharedSystem` implements [`System`] by delegating to the contained system
+/// instance. You should avoid calling some of the `System` methods, however.
+/// Prefer `async` functions provided by `SharedSystem` (e.g.,
+/// [`read_async`](Self::read_async)) over raw system functions (e.g.,
+/// [`read`](System::read)).
+///
+/// The following example illustrates how multiple concurrent tasks are run in a
+/// single-threaded pool:
+///
+/// ```
+/// # use yash_env::{SharedSystem, System, VirtualSystem};
+/// # use futures::task::LocalSpawnExt;
+/// let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
+/// let mut system2 = system.clone();
+/// let mut system3 = system.clone();
+/// let (reader, writer) = system.pipe().unwrap();
+/// let mut executor = futures::executor::LocalPool::new();
+///
+/// // We add a task that tries to read from the pipe, but nothing has been
+/// // written to it, so the task is stalled.
+/// let read_task = executor.spawner().spawn_local_with_handle(async move {
+///     let mut buffer = [0; 1];
+///     system.read_async(reader, &mut buffer).await.unwrap();
+///     buffer[0]
+/// });
+/// executor.run_until_stalled();
+///
+/// // Let's add a task that writes to the pipe.
+/// executor.spawner().spawn_local(async move {
+///     system2.write_all(writer, &[123]).await.unwrap();
+/// });
+/// executor.run_until_stalled();
+///
+/// // The write task has written a byte to the pipe, but the read task is still
+/// // stalled. We need to wake it up by calling `select`.
+/// system3.select().unwrap();
+///
+/// // Now the read task can proceed to the end.
+/// let number = executor.run_until(read_task.unwrap());
+/// assert_eq!(number, 123);
+/// ```
 #[derive(Clone, Debug)]
 pub struct SharedSystem(pub Rc<RefCell<SelectSystem>>);
 
@@ -92,7 +140,7 @@ impl SharedSystem {
 
     /// Writes to the file descriptor.
     ///
-    /// This function calls [`write`](System::write) repeatedly until the whole
+    /// This function calls [`System::write`] repeatedly until the whole
     /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
     /// called at all, so any error that would be returned from `write` is not
     /// returned.
@@ -103,10 +151,13 @@ impl SharedSystem {
 
     /// Wait for a next event to occur.
     ///
-    /// TODO Elaborate
+    /// This function calls [`System::select`] with arguments computed from the
+    /// current internal state of the `SharedSystem`. It will wake up tasks
+    /// waiting for the file descriptor to be ready in
+    /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all).
     ///
-    /// This function may wake up awaiters spuriously. That is, an awaiter may
-    /// be woken even if an event it is waiting for has not occurred.
+    /// This function may wake up a task even if the condition it is expecting
+    /// has not yet been met.
     pub fn select(&self) -> nix::Result<()> {
         let mut inner = self.0.borrow_mut();
         let mut readers = inner.io.readers();
@@ -179,6 +230,9 @@ impl System for SharedSystem {
     fn wait(&mut self) -> nix::Result<WaitStatus> {
         self.borrow_mut().wait()
     }
+    /// Not supported!
+    ///
+    /// `SharedSystem` does not support this function. If you call it, it will panic!
     fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>> + '_>> {
         panic!("SharedSystem does not support wait_sync")
     }
