@@ -150,7 +150,7 @@ impl System for RealSystem {
     /// will immediately return a `Ready`.
     fn wait_sync(
         &mut self,
-    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>>>> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
         // TODO Should set WNOHANG too

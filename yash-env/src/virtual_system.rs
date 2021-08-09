@@ -354,10 +354,11 @@ impl System for VirtualSystem {
     ///
     /// This function does not remove terminated processes from the system state
     /// so you can examine them later.
-    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>> + '_>> {
+    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
+        let parent_pid = self.process_id;
+        let state = Rc::clone(&self.state);
         Box::pin(futures::future::poll_fn(move |context| {
-            let parent_pid = self.process_id;
-            let mut state = self.state.borrow_mut();
+            let mut state = state.borrow_mut();
 
             // If any child's state has changed, return it
             let mut found_child = false;
@@ -788,7 +789,7 @@ mod tests {
         let pid = executor.run_until(future);
 
         #[allow(deprecated)]
-        let result = executor.run_until(env.system.0.borrow_mut().wait_sync());
+        let result = executor.run_until(env.system.wait_sync());
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
     }
 

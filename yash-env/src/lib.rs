@@ -237,7 +237,7 @@ pub trait System: Debug {
     #[deprecated]
     fn wait_sync(
         &mut self,
-    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>> + '_>>;
+    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>>>>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
@@ -399,7 +399,7 @@ impl Env {
 
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match self.system.0.borrow_mut().wait_sync().await? {
+        match self.system.wait_sync().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.

@@ -106,7 +106,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     loop {
         use nix::sys::wait::WaitStatus::*;
         #[allow(deprecated)]
-        match env.system.0.borrow_mut().wait_sync().await {
+        match env.system.wait_sync().await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);

@@ -230,11 +230,9 @@ impl System for SharedSystem {
     fn wait(&mut self) -> nix::Result<WaitStatus> {
         self.borrow_mut().wait()
     }
-    /// Not supported!
-    ///
-    /// `SharedSystem` does not support this function. If you call it, it will panic!
-    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>> + '_>> {
-        panic!("SharedSystem does not support wait_sync")
+    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
+        #[allow(deprecated)]
+        self.borrow_mut().wait_sync()
     }
     fn execve(
         &mut self,
