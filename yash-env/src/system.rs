@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! `AsyncSystem` implementation.
+//! [System] and related types.
 
 use crate::io::Fd;
 use crate::ChildProcess;
@@ -41,12 +41,12 @@ use std::task::Waker;
 ///
 /// TODO Elaborate
 #[derive(Clone, Debug)]
-pub struct SharedSystem(pub Rc<RefCell<AsyncSystem>>);
+pub struct SharedSystem(pub Rc<RefCell<SelectSystem>>);
 
 impl SharedSystem {
     /// Creates a new shared system.
     pub fn new(system: Box<dyn System>) -> Self {
-        SharedSystem(Rc::new(RefCell::new(AsyncSystem::new(system))))
+        SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
     /// Clones this `SharedSystem` using the provided `System`.
@@ -130,14 +130,14 @@ impl SharedSystem {
 }
 
 impl Deref for SharedSystem {
-    type Target = Rc<RefCell<AsyncSystem>>;
-    fn deref(&self) -> &Rc<RefCell<AsyncSystem>> {
+    type Target = Rc<RefCell<SelectSystem>>;
+    fn deref(&self) -> &Rc<RefCell<SelectSystem>> {
         &self.0
     }
 }
 
 impl DerefMut for SharedSystem {
-    fn deref_mut(&mut self) -> &mut Rc<RefCell<AsyncSystem>> {
+    fn deref_mut(&mut self) -> &mut Rc<RefCell<SelectSystem>> {
         &mut self.0
     }
 }
@@ -192,48 +192,49 @@ impl System for SharedSystem {
     }
 }
 
-/// [System] extended with asynchronous functions.
+/// [System] extended with internal state to support asynchronous functions.
 ///
-/// An `AsyncSystem` wraps a `System` to provide an asynchronous version of I/O,
-/// signal handling, and timer functions. The wrapped `System` can be accessed
-/// via the `Deref` and `DerefMut` implementations.
+/// A `SelectSystem` is a container of a `System` and internal data a
+/// [`SharedSystem`] uses to implement asynchronous I/O, signal handling, and
+/// timer function. The contained `System` can be accessed via the `Deref` and
+/// `DerefMut` implementations.
 ///
 /// TODO Elaborate
 #[derive(Debug)]
-pub struct AsyncSystem {
+pub struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
 }
 
-impl Deref for AsyncSystem {
+impl Deref for SelectSystem {
     type Target = Box<dyn System>;
     fn deref(&self) -> &Box<dyn System> {
         &self.system
     }
 }
 
-impl DerefMut for AsyncSystem {
+impl DerefMut for SelectSystem {
     fn deref_mut(&mut self) -> &mut Box<dyn System> {
         &mut self.system
     }
 }
 
-impl AsyncSystem {
-    /// Creates a new `AsyncSystem` that wraps the given `System`.
+impl SelectSystem {
+    /// Creates a new `SelectSystem` that wraps the given `System`.
     pub fn new(system: Box<dyn System>) -> Self {
-        AsyncSystem {
+        SelectSystem {
             system,
             io: AsyncIo::new(),
         }
     }
 
-    /// Clones this `AsyncSystem` using the provided `System`.
+    /// Clones this `SelectSystem` using the provided `System`.
     ///
-    /// This function clones the internal state of the `AsyncSystem`. However,
+    /// This function clones the internal state of the `SelectSystem`. However,
     /// `System` does not implement `Clone` and an instance for the cloned
-    /// `AsyncSystem` must be provided.
+    /// `SelectSystem` must be provided.
     pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
-        AsyncSystem {
+        SelectSystem {
             system,
             io: self.io.clone(),
         }
