@@ -89,7 +89,7 @@ use std::task::Waker;
 /// assert_eq!(number, 123);
 /// ```
 #[derive(Clone, Debug)]
-pub struct SharedSystem(pub Rc<RefCell<SelectSystem>>);
+pub struct SharedSystem(Rc<RefCell<SelectSystem>>);
 
 impl SharedSystem {
     /// Creates a new shared system.
@@ -180,59 +180,46 @@ impl SharedSystem {
     }
 }
 
-impl Deref for SharedSystem {
-    type Target = Rc<RefCell<SelectSystem>>;
-    fn deref(&self) -> &Rc<RefCell<SelectSystem>> {
-        &self.0
-    }
-}
-
-impl DerefMut for SharedSystem {
-    fn deref_mut(&mut self) -> &mut Rc<RefCell<SelectSystem>> {
-        &mut self.0
-    }
-}
-
 impl System for SharedSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
-        self.borrow().is_executable_file(path)
+        self.0.borrow().is_executable_file(path)
     }
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
-        self.borrow_mut().pipe()
+        self.0.borrow_mut().pipe()
     }
     fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
-        self.borrow_mut().dup(from, to_min, cloexec)
+        self.0.borrow_mut().dup(from, to_min, cloexec)
     }
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
-        self.borrow_mut().dup2(from, to)
+        self.0.borrow_mut().dup2(from, to)
     }
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
-        self.borrow_mut().close(fd)
+        self.0.borrow_mut().close(fd)
     }
     fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
-        self.borrow().fcntl_getfl(fd)
+        self.0.borrow().fcntl_getfl(fd)
     }
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
-        self.borrow_mut().fcntl_setfl(fd, flags)
+        self.0.borrow_mut().fcntl_setfl(fd, flags)
     }
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
-        self.borrow_mut().read(fd, buffer)
+        self.0.borrow_mut().read(fd, buffer)
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
-        self.borrow_mut().write(fd, buffer)
+        self.0.borrow_mut().write(fd, buffer)
     }
     fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        self.borrow_mut().select(readers, writers)
+        self.0.borrow_mut().select(readers, writers)
     }
     unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
-        self.borrow_mut().new_child_process()
+        self.0.borrow_mut().new_child_process()
     }
     fn wait(&mut self) -> nix::Result<WaitStatus> {
-        self.borrow_mut().wait()
+        self.0.borrow_mut().wait()
     }
     fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
         #[allow(deprecated)]
-        self.borrow_mut().wait_sync()
+        self.0.borrow_mut().wait_sync()
     }
     fn execve(
         &mut self,
@@ -240,7 +227,7 @@ impl System for SharedSystem {
         args: &[CString],
         envs: &[CString],
     ) -> nix::Result<Infallible> {
-        self.borrow_mut().execve(path, args, envs)
+        self.0.borrow_mut().execve(path, args, envs)
     }
 }
 
@@ -253,7 +240,7 @@ impl System for SharedSystem {
 ///
 /// TODO Elaborate
 #[derive(Debug)]
-pub struct SelectSystem {
+struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
 }

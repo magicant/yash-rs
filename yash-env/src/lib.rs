@@ -47,7 +47,6 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
-pub use self::system::SelectSystem;
 pub use self::system::SharedSystem;
 use self::variable::VariableSet;
 use async_trait::async_trait;
