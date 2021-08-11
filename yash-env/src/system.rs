@@ -97,17 +97,6 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    /// Clones this `SharedSystem` using the provided `System`.
-    ///
-    /// This function clones the internal state of the `SharedSystem`. However,
-    /// `System` does not implement `Clone` and an instance for the cloned
-    /// `SharedSystem` must be provided.
-    pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
-        SharedSystem(Rc::new(RefCell::new(
-            self.0.borrow().clone_with_system(system),
-        )))
-    }
-
     /// Reads from the file descriptor.
     ///
     /// This function waits for one or more bytes to be available for reading.
@@ -264,18 +253,6 @@ impl SelectSystem {
         SelectSystem {
             system,
             io: AsyncIo::new(),
-        }
-    }
-
-    /// Clones this `SelectSystem` using the provided `System`.
-    ///
-    /// This function clones the internal state of the `SelectSystem`. However,
-    /// `System` does not implement `Clone` and an instance for the cloned
-    /// `SelectSystem` must be provided.
-    pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
-        SelectSystem {
-            system,
-            io: self.io.clone(),
         }
     }
 }
