@@ -490,6 +490,17 @@ pub struct SystemState {
     pub file_system: FileSystem,
 }
 
+impl SystemState {
+    /// Performs [`select`](Process::select) on all processes in the system.
+    ///
+    /// Any errors are ignored.
+    pub fn select_all(&self) {
+        for process in self.processes.values() {
+            let _: nix::Result<()> = process.select();
+        }
+    }
+}
+
 /// Executor that can start new async tasks.
 ///
 /// This trait abstracts the executor interface so that [`SystemState`] does not

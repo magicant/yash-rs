@@ -186,6 +186,25 @@ impl Process {
         }
     }
 
+    /// Performs [`SharedSystem::select`](crate::SharedSystem::select) for this
+    /// process.
+    ///
+    /// If this process is a child process created from another process in the
+    /// system, this function calls `SharedSystem::select` to wake tasks that
+    /// are ready to resume in the process.
+    ///
+    /// For the initial process created when creating a new
+    /// [`VirtualSystem`](crate::VirtualSystem), this function does nothing. To
+    /// `select` on the initial process, directly call `SharedSystem::select`
+    /// for the [`Env`](crate::Env) controlling the process.
+    pub fn select(&self) -> nix::Result<()> {
+        if let Some(system) = Weak::upgrade(&self.selector) {
+            system.borrow_mut().select()
+        } else {
+            Ok(())
+        }
+    }
+
     /// Returns the arguments to the last call to
     /// [`execve`](crate::VirtualSystem::execve) on this process.
     #[inline(always)]
