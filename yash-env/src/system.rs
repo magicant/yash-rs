@@ -148,24 +148,7 @@ impl SharedSystem {
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
     pub fn select(&self) -> nix::Result<()> {
-        let mut inner = self.0.borrow_mut();
-        let mut readers = inner.io.readers();
-        let mut writers = inner.io.writers();
-        match inner.system.select(&mut readers, &mut writers) {
-            Ok(_) => {
-                inner.io.wake(readers, writers);
-                Ok(())
-            }
-            Err(Errno::EBADF) => {
-                // Some of the readers and writers are invalid but we cannot
-                // tell which, so we wake up everything.
-                inner.io.wake_all();
-                Err(Errno::EBADF)
-            }
-            Err(error) => Err(error),
-        }
-        // TODO Support timers
-        // TODO Support signal catchers
+        self.0.borrow_mut().select()
     }
 }
 
@@ -198,7 +181,7 @@ impl System for SharedSystem {
         self.0.borrow_mut().write(fd, buffer)
     }
     fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        self.0.borrow_mut().select(readers, writers)
+        (**self.0.borrow_mut()).select(readers, writers)
     }
     unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -254,6 +237,29 @@ impl SelectSystem {
             system,
             io: AsyncIo::new(),
         }
+    }
+
+    /// Implements the select function for `SharedSystem`.
+    ///
+    /// See [`SharedSystem::select`].
+    pub fn select(&mut self) -> nix::Result<()> {
+        let mut readers = self.io.readers();
+        let mut writers = self.io.writers();
+        match self.system.select(&mut readers, &mut writers) {
+            Ok(_) => {
+                self.io.wake(readers, writers);
+                Ok(())
+            }
+            Err(Errno::EBADF) => {
+                // Some of the readers and writers are invalid but we cannot
+                // tell which, so we wake up everything.
+                self.io.wake_all();
+                Err(Errno::EBADF)
+            }
+            Err(error) => Err(error),
+        }
+        // TODO Support timers
+        // TODO Support signal catchers
     }
 }
 
