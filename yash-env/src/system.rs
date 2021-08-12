@@ -89,7 +89,7 @@ use std::task::Waker;
 /// assert_eq!(number, 123);
 /// ```
 #[derive(Clone, Debug)]
-pub struct SharedSystem(Rc<RefCell<SelectSystem>>);
+pub struct SharedSystem(pub(crate) Rc<RefCell<SelectSystem>>);
 
 impl SharedSystem {
     /// Creates a new shared system.
@@ -212,7 +212,7 @@ impl System for SharedSystem {
 ///
 /// TODO Elaborate
 #[derive(Debug)]
-struct SelectSystem {
+pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
 }

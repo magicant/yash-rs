@@ -19,12 +19,15 @@
 use super::io::FdBody;
 use crate::exec::ExitStatus;
 use crate::io::Fd;
+use crate::system::SelectSystem;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::rc::Weak;
 use std::task::Waker;
 
 /// Process in a virtual system.
@@ -47,6 +50,13 @@ pub struct Process {
     /// since the last `wait` call. The next `wait` call should leave a waker
     /// so that the caller is woken when the state changes later.
     pub(crate) state_awaiters: Option<Vec<Waker>>,
+
+    /// Weak reference to the `SelectSystem` for this process.
+    ///
+    /// This weak reference is empty for the initial process of a
+    /// `VirtualSystem`.  When a new child process is created, a weak reference
+    /// to the `SelectSystem` for the child is set.
+    pub(crate) selector: Weak<RefCell<SelectSystem>>,
 
     /// Copy of arguments passed to [`execve`](crate::VirtualSystem::execve).
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
@@ -79,6 +89,7 @@ impl Process {
             fds: BTreeMap::new(),
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
+            selector: Weak::new(),
             last_exec: None,
         }
     }
