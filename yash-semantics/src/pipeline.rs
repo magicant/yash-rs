@@ -243,7 +243,6 @@ impl PipeSet {
 mod tests {
     use super::*;
     use crate::tests::cat_builtin;
-    use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
@@ -306,13 +305,22 @@ mod tests {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let state = Rc::clone(&system.state);
-        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        {
+            let mut state = state.borrow_mut();
+            state.executor = Some(Rc::new(executor.spawner()));
+            state
+                .file_system
+                .get(Path::new("/dev/stdin"))
+                .unwrap()
+                .borrow_mut()
+                .content
+                .extend("ok\n".as_bytes());
+        }
 
         let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("cat", cat_builtin());
         let shared_system = env.system.clone();
-        let pipeline: syntax::Pipeline = "echo ok | cat | cat".parse().unwrap();
+        let pipeline: syntax::Pipeline = "cat | cat | cat".parse().unwrap();
         let mut task = pipeline.execute(&mut env);
         let result = executor.run_until(futures::future::poll_fn(|context| {
             let poll = task.as_mut().poll(context);
@@ -333,7 +341,6 @@ mod tests {
             .unwrap()
             .borrow();
         assert_eq!(stdout.content, "ok\n".as_bytes());
-        // TODO should also test stdin
     }
 
     #[test]
