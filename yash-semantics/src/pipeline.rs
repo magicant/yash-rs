@@ -302,7 +302,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO don't ignore this test case
     fn pipe_connects_commands_in_pipeline() {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
@@ -312,8 +311,18 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("cat", cat_builtin());
+        let shared_system = env.system.clone();
         let pipeline: syntax::Pipeline = "echo ok | cat | cat".parse().unwrap();
-        let result = executor.run_until(pipeline.execute(&mut env));
+        let mut task = pipeline.execute(&mut env);
+        let result = executor.run_until(futures::future::poll_fn(|context| {
+            let poll = task.as_mut().poll(context);
+            if poll.is_pending() {
+                shared_system.select().unwrap();
+                state.borrow().select_all();
+            }
+            poll
+        }));
+        drop(task);
         assert_eq!(result, Ok(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
