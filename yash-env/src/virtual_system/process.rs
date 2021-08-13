@@ -162,6 +162,11 @@ impl Process {
         self.fds.remove(&fd)
     }
 
+    /// Removes all FD bodies in this process.
+    pub fn close_fds(&mut self) {
+        self.fds.clear();
+    }
+
     /// Returns the process state.
     #[inline(always)]
     #[must_use]
@@ -171,10 +176,13 @@ impl Process {
 
     /// Sets the state of this process.
     ///
+    /// If the new state is `Exited` or `Signaled`, all file descriptors in this
+    /// process are closed.
+    ///
     /// This function returns wakers that must be woken. The caller must first
-    /// drop the `RefMut` borrowing the [`SystemState`](super::SystemState) containing this
-    /// `Process` and then wake the wakers returned from this function. This is
-    /// to prevent a possible second borrow by another task.
+    /// drop the `RefMut` borrowing the [`SystemState`](super::SystemState)
+    /// containing this process and then wake the wakers returned from this
+    /// function. This is to prevent a possible second borrow by another task.
     #[must_use = "You must wake up the returned waker"]
     pub fn set_state(&mut self, state: ProcessState) -> Vec<Waker> {
         let old_state = std::mem::replace(&mut self.state, state);
@@ -182,6 +190,11 @@ impl Process {
         if old_state == state {
             Vec::new()
         } else {
+            match state {
+                ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
+                _ => (),
+            }
+
             self.state_awaiters.take().unwrap_or_else(Vec::new)
         }
     }
@@ -239,6 +252,11 @@ impl ProcessState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_system::io::Pipe;
+    use crate::virtual_system::io::PipeReader;
+    use crate::virtual_system::io::PipeWriter;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn min_unused_fd_for_various_arguments() {
@@ -261,5 +279,41 @@ mod tests {
         assert_eq!(min_unused_fd(Fd(4), [&Fd(1), &Fd(3), &Fd(4)]), Fd(5));
         assert_eq!(min_unused_fd(Fd(5), [&Fd(1), &Fd(3), &Fd(4)]), Fd(5));
         assert_eq!(min_unused_fd(Fd(6), [&Fd(1), &Fd(3), &Fd(4)]), Fd(6));
+    }
+
+    fn process_with_pipe() -> (Process, Fd, Fd) {
+        let mut process = Process::with_parent(Pid::from_raw(10));
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let writer = Rc::new(RefCell::new(PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        }));
+        let reader = Rc::new(RefCell::new(PipeReader { pipe }));
+
+        let reader = FdBody {
+            open_file_description: reader,
+            cloexec: false,
+        };
+        let writer = FdBody {
+            open_file_description: writer,
+            cloexec: false,
+        };
+
+        let reader = process.open_fd(reader).unwrap();
+        let writer = process.open_fd(writer).unwrap();
+        (process, reader, writer)
+    }
+
+    #[test]
+    fn process_set_state_closes_all_fds_on_exit() {
+        let (mut process, _reader, _writer) = process_with_pipe();
+        drop(process.set_state(ProcessState::Exited(ExitStatus(3))));
+        assert!(process.fds().is_empty(), "{:?}", process.fds());
+    }
+
+    #[test]
+    fn process_set_state_closes_all_fds_on_signaled() {
+        let (mut process, _reader, _writer) = process_with_pipe();
+        drop(process.set_state(ProcessState::Signaled(Signal::SIGINT)));
+        assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 }
