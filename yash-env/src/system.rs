@@ -88,6 +88,13 @@ use std::task::Waker;
 /// let number = executor.run_until(read_task.unwrap());
 /// assert_eq!(number, 123);
 /// ```
+///
+/// If there is a child process in the [`VirtualSystem`](crate::VirtualSystem),
+/// you should call
+/// [`SystemState::select_all`](crate::virtual_system::SystemState) in addition
+/// to [`SharedSystem::select`](crate::SharedSystem) so that the child process
+/// task is woken up when needed.
+/// (TBD code example)
 #[derive(Clone, Debug)]
 pub struct SharedSystem(pub(crate) Rc<RefCell<SelectSystem>>);
 
