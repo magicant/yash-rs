@@ -344,7 +344,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO don't ignore this test case
     fn pipeline_leaves_no_pipe_fds_leftover() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
@@ -354,8 +353,19 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("cat", cat_builtin());
+        let shared_system = env.system.clone();
         let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
-        let _ = executor.run_until(pipeline.execute(&mut env));
+        let mut task = pipeline.execute(&mut env);
+        let _ = executor.run_until(futures::future::poll_fn(|context| {
+            let poll = task.as_mut().poll(context);
+            if poll.is_pending() {
+                shared_system.select().unwrap();
+                state.borrow().select_all();
+            }
+            poll
+        }));
+        drop(task);
+
         let state = state.borrow();
         let fds = state.processes[&process_id].fds();
         for fd in 3..10 {
