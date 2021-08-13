@@ -306,7 +306,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             variables: self.variables.clone(),
-            system: self.system.clone_with_system(system),
+            system: SharedSystem::new(system),
         }
     }
 

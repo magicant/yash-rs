@@ -438,12 +438,21 @@ struct DummyChildProcess {
 #[async_trait(?Send)]
 impl ChildProcess for DummyChildProcess {
     async fn run(&mut self, env: &mut Env, mut task: super::ChildProcessTask) -> Pid {
-        let state = self.state.clone();
+        let state = Rc::clone(&self.state);
         let process_id = self.process_id;
         let system = VirtualSystem { state, process_id };
         let mut child_env = env.clone_with_system(Box::new(system));
 
-        let state = self.state.clone();
+        let state = Rc::clone(&self.state);
+        {
+            let mut state = state.borrow_mut();
+            let mut process = state
+                .processes
+                .get_mut(&process_id)
+                .expect("the child process is missing");
+            process.selector = Rc::downgrade(&child_env.system.0);
+        }
+
         let run_task_and_set_exit_status = Box::pin(async move {
             task(&mut child_env).await;
 
@@ -479,6 +488,17 @@ pub struct SystemState {
 
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
+}
+
+impl SystemState {
+    /// Performs [`select`](Process::select) on all processes in the system.
+    ///
+    /// Any errors are ignored.
+    pub fn select_all(&self) {
+        for process in self.processes.values() {
+            let _: nix::Result<()> = process.select();
+        }
+    }
 }
 
 /// Executor that can start new async tasks.

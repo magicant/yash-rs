@@ -88,24 +88,20 @@ use std::task::Waker;
 /// let number = executor.run_until(read_task.unwrap());
 /// assert_eq!(number, 123);
 /// ```
+///
+/// If there is a child process in the [`VirtualSystem`](crate::VirtualSystem),
+/// you should call
+/// [`SystemState::select_all`](crate::virtual_system::SystemState) in addition
+/// to [`SharedSystem::select`](crate::SharedSystem) so that the child process
+/// task is woken up when needed.
+/// (TBD code example)
 #[derive(Clone, Debug)]
-pub struct SharedSystem(Rc<RefCell<SelectSystem>>);
+pub struct SharedSystem(pub(crate) Rc<RefCell<SelectSystem>>);
 
 impl SharedSystem {
     /// Creates a new shared system.
     pub fn new(system: Box<dyn System>) -> Self {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
-    }
-
-    /// Clones this `SharedSystem` using the provided `System`.
-    ///
-    /// This function clones the internal state of the `SharedSystem`. However,
-    /// `System` does not implement `Clone` and an instance for the cloned
-    /// `SharedSystem` must be provided.
-    pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
-        SharedSystem(Rc::new(RefCell::new(
-            self.0.borrow().clone_with_system(system),
-        )))
     }
 
     /// Reads from the file descriptor.
@@ -159,24 +155,7 @@ impl SharedSystem {
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
     pub fn select(&self) -> nix::Result<()> {
-        let mut inner = self.0.borrow_mut();
-        let mut readers = inner.io.readers();
-        let mut writers = inner.io.writers();
-        match inner.system.select(&mut readers, &mut writers) {
-            Ok(_) => {
-                inner.io.wake(readers, writers);
-                Ok(())
-            }
-            Err(Errno::EBADF) => {
-                // Some of the readers and writers are invalid but we cannot
-                // tell which, so we wake up everything.
-                inner.io.wake_all();
-                Err(Errno::EBADF)
-            }
-            Err(error) => Err(error),
-        }
-        // TODO Support timers
-        // TODO Support signal catchers
+        self.0.borrow_mut().select()
     }
 }
 
@@ -209,7 +188,7 @@ impl System for SharedSystem {
         self.0.borrow_mut().write(fd, buffer)
     }
     fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        self.0.borrow_mut().select(readers, writers)
+        (**self.0.borrow_mut()).select(readers, writers)
     }
     unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -240,7 +219,7 @@ impl System for SharedSystem {
 ///
 /// TODO Elaborate
 #[derive(Debug)]
-struct SelectSystem {
+pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
 }
@@ -267,16 +246,27 @@ impl SelectSystem {
         }
     }
 
-    /// Clones this `SelectSystem` using the provided `System`.
+    /// Implements the select function for `SharedSystem`.
     ///
-    /// This function clones the internal state of the `SelectSystem`. However,
-    /// `System` does not implement `Clone` and an instance for the cloned
-    /// `SelectSystem` must be provided.
-    pub fn clone_with_system(&self, system: Box<dyn System>) -> Self {
-        SelectSystem {
-            system,
-            io: self.io.clone(),
+    /// See [`SharedSystem::select`].
+    pub fn select(&mut self) -> nix::Result<()> {
+        let mut readers = self.io.readers();
+        let mut writers = self.io.writers();
+        match self.system.select(&mut readers, &mut writers) {
+            Ok(_) => {
+                self.io.wake(readers, writers);
+                Ok(())
+            }
+            Err(Errno::EBADF) => {
+                // Some of the readers and writers are invalid but we cannot
+                // tell which, so we wake up everything.
+                self.io.wake_all();
+                Err(Errno::EBADF)
+            }
+            Err(error) => Err(error),
         }
+        // TODO Support timers
+        // TODO Support signal catchers
     }
 }
 

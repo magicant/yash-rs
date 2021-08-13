@@ -243,7 +243,6 @@ impl PipeSet {
 mod tests {
     use super::*;
     use crate::tests::cat_builtin;
-    use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures::executor::block_on;
     use futures::executor::LocalPool;
@@ -302,18 +301,36 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO don't ignore this test case
     fn pipe_connects_commands_in_pipeline() {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let state = Rc::clone(&system.state);
-        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        {
+            let mut state = state.borrow_mut();
+            state.executor = Some(Rc::new(executor.spawner()));
+            state
+                .file_system
+                .get(Path::new("/dev/stdin"))
+                .unwrap()
+                .borrow_mut()
+                .content
+                .extend("ok\n".as_bytes());
+        }
 
         let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("cat", cat_builtin());
-        let pipeline: syntax::Pipeline = "echo ok | cat | cat".parse().unwrap();
-        let result = executor.run_until(pipeline.execute(&mut env));
+        let shared_system = env.system.clone();
+        let pipeline: syntax::Pipeline = "cat | cat | cat".parse().unwrap();
+        let mut task = pipeline.execute(&mut env);
+        let result = executor.run_until(futures::future::poll_fn(|context| {
+            let poll = task.as_mut().poll(context);
+            if poll.is_pending() {
+                shared_system.select().unwrap();
+                state.borrow().select_all();
+            }
+            poll
+        }));
+        drop(task);
         assert_eq!(result, Ok(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
@@ -324,11 +341,9 @@ mod tests {
             .unwrap()
             .borrow();
         assert_eq!(stdout.content, "ok\n".as_bytes());
-        // TODO should also test stdin
     }
 
     #[test]
-    #[ignore] // TODO don't ignore this test case
     fn pipeline_leaves_no_pipe_fds_leftover() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
@@ -338,8 +353,19 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("cat", cat_builtin());
+        let shared_system = env.system.clone();
         let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
-        let _ = executor.run_until(pipeline.execute(&mut env));
+        let mut task = pipeline.execute(&mut env);
+        let _ = executor.run_until(futures::future::poll_fn(|context| {
+            let poll = task.as_mut().poll(context);
+            if poll.is_pending() {
+                shared_system.select().unwrap();
+                state.borrow().select_all();
+            }
+            poll
+        }));
+        drop(task);
+
         let state = state.borrow();
         let fds = state.processes[&process_id].fds();
         for fd in 3..10 {
