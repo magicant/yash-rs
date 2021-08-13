@@ -114,10 +114,9 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
                 }
                 // TODO should not ignore other PIDs
             }
-            Ok(Signaled(pid, _signal, _core_dumped)) => {
+            Ok(Signaled(pid, signal, _core_dumped)) => {
                 if pid == *pids.last().unwrap() {
-                    env.exit_status = ExitStatus(128);
-                    // TODO Convert signal to exit status
+                    env.exit_status = ExitStatus::from(signal);
                 }
                 // TODO should not ignore other PIDs
             }

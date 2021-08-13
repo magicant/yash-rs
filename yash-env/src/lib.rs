@@ -405,12 +405,11 @@ impl Env {
                 assert_eq!(pid, child_pid);
                 Ok(ExitStatus(exit_status))
             }
-            Signaled(pid, _signal, _core_dumped) => {
+            Signaled(pid, signal, _core_dumped) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
                 assert_eq!(pid, child_pid);
-                // TODO Convert signal to exit status
-                Ok(ExitStatus(128))
+                Ok(ExitStatus::from(signal))
             }
             _ => todo!(),
         }

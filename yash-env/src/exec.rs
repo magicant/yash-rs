@@ -16,6 +16,8 @@
 
 //! Type definitions for command execution.
 
+use nix::sys::signal::Signal;
+use std::convert::TryFrom;
 use std::os::raw::c_int;
 
 /// Number that summarizes the result of command execution.
@@ -49,7 +51,32 @@ impl From<ExitStatus> for c_int {
     }
 }
 
-// TODO Convert between ExitStatus and signal number
+impl From<Signal> for ExitStatus {
+    /// Converts a signal to the corresponding exit status.
+    ///
+    /// POSIX requires the exit status to be greater than 128. The current
+    /// implementation returns `signal_number + 384`.
+    fn from(signal: Signal) -> Self {
+        Self::from(signal as c_int + 0x180)
+    }
+}
+
+impl TryFrom<ExitStatus> for Signal {
+    type Error = nix::Error;
+    /// Converts an exit status to the corresponding signal.
+    ///
+    /// If there is a signal such that
+    /// `exit_status == ExitStatus::from(signal)`,
+    /// the signal is returned.
+    /// The same if the exit status is the lowest 8 bits of such an exit status.
+    /// The signal is also returned if the exit status is a signal number
+    /// itself. Otherwise, an error is returned.
+    fn try_from(exit_status: ExitStatus) -> nix::Result<Signal> {
+        Signal::try_from(exit_status.0 - 0x180)
+            .or_else(|_| Signal::try_from(exit_status.0 - 0x80))
+            .or_else(|_| Signal::try_from(exit_status.0))
+    }
+}
 
 impl ExitStatus {
     /// Exit status of 0: success.
@@ -107,3 +134,28 @@ pub enum Divert {
 /// If the command was interrupted in the middle of execution, the result value
 /// will be a [`Divert`] which specifies what to execute next.
 pub type Result<T = ()> = std::result::Result<T, Divert>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signal_try_from_exit_status() {
+        let result = Signal::try_from(ExitStatus(0));
+        assert!(result.is_err(), "{:?}", result);
+
+        assert_eq!(
+            Signal::try_from(ExitStatus(Signal::SIGINT as c_int)),
+            Ok(Signal::SIGINT)
+        );
+
+        let mut exit_status = ExitStatus::from(Signal::SIGTERM);
+        exit_status.0 &= 0xFF;
+        assert_eq!(Signal::try_from(exit_status), Ok(Signal::SIGTERM));
+
+        assert_eq!(
+            Signal::try_from(ExitStatus::from(Signal::SIGHUP)),
+            Ok(Signal::SIGHUP)
+        );
+    }
+}
