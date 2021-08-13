@@ -174,6 +174,18 @@ impl Pipe {
     pub fn new() -> Pipe {
         Pipe::default()
     }
+
+    /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
+    ///
+    /// This value is for the virtual system implementation.
+    /// The real system may have a different configuration.
+    pub const PIPE_BUF: usize = 512;
+
+    /// Maximum number of bytes a pipe can hold at a time.
+    ///
+    /// This value is for the virtual system implementation.
+    /// The real system may have a different configuration.
+    pub const PIPE_SIZE: usize = Self::PIPE_BUF * 2;
 }
 
 /// Reading end of a [`Pipe`].
@@ -263,15 +275,22 @@ impl OpenFileDescription for PipeWriter {
     fn read(&mut self, _buffer: &mut [u8]) -> nix::Result<usize> {
         Err(Errno::EBADF)
     }
-    fn write(&mut self, buffer: &[u8]) -> nix::Result<usize> {
+    fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
         let pipe = match self.pipe.upgrade() {
             // TODO SIGPIPE
             None => return Err(Errno::EPIPE),
             Some(pipe) => pipe,
         };
         let mut pipe = pipe.borrow_mut();
-        // TODO EAGAIN if full
+        let room = Pipe::PIPE_SIZE - pipe.content.len();
+        if room < buffer.len() {
+            if room == 0 || buffer.len() <= Pipe::PIPE_BUF {
+                return Err(Errno::EAGAIN);
+            }
+            buffer = &buffer[..room];
+        }
         pipe.content.extend(buffer);
+        debug_assert!(pipe.content.len() <= Pipe::PIPE_SIZE);
         Ok(buffer.len())
     }
     fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
@@ -550,5 +569,57 @@ mod tests {
 
         let result = reader.read(&mut buffer);
         assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn pipe_write_full() {
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let mut writer = PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        };
+        writer.write(&[0; Pipe::PIPE_SIZE]).unwrap();
+
+        // The pipe is full. No more can be written.
+        let result = writer.write(&[1; 1]);
+        assert_eq!(result, Err(Errno::EAGAIN));
+        let result = writer.write(&[1; Pipe::PIPE_BUF + 1]);
+        assert_eq!(result, Err(Errno::EAGAIN));
+
+        // However, empty write should succeed.
+        let result = writer.write(&[1; 0]);
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn pipe_write_atomic_full() {
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let mut writer = PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        };
+        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF + 1;
+        writer.write(&[0; LEN]).unwrap();
+
+        // The remaining room in the pipe is less than the length we're writing
+        // that is PIPE_BUF. Nothing is written in this case.
+        let result = writer.write(&[1; Pipe::PIPE_BUF]);
+        assert_eq!(result, Err(Errno::EAGAIN));
+
+        assert_eq!(pipe.borrow().content.len(), LEN);
+    }
+
+    #[test]
+    fn pipe_write_non_atomic_full() {
+        let pipe = Rc::new(RefCell::new(Pipe::new()));
+        let mut writer = PipeWriter {
+            pipe: Rc::downgrade(&pipe),
+        };
+        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF;
+        writer.write(&[0; LEN]).unwrap();
+
+        // The remaining room in the pipe is less than the length we're writing
+        // that exceeds PIPE_BUF. Only as much as possible is written in this
+        // case.
+        let result = writer.write(&[1; Pipe::PIPE_BUF + 1]);
+        assert_eq!(result, Ok(Pipe::PIPE_BUF));
     }
 }
