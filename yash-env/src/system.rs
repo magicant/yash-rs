@@ -104,34 +104,43 @@ impl SharedSystem {
         SharedSystem(Rc::new(RefCell::new(SelectSystem::new(system))))
     }
 
-    /// Reads from the file descriptor.
-    ///
-    /// This function waits for one or more bytes to be available for reading.
-    /// If successful, returns the number of bytes read.
-    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+    fn set_nonblocking(&mut self, fd: Fd) -> nix::Result<OFlag> {
         let mut inner = self.0.borrow_mut();
         let flags = inner.system.fcntl_getfl(fd)?;
         if !flags.contains(OFlag::O_NONBLOCK) {
             inner.system.fcntl_setfl(fd, flags | OFlag::O_NONBLOCK)?;
         }
-        drop(inner);
+        Ok(flags)
+    }
 
-        poll_fn(|context| {
+    fn reset_nonblocking(&mut self, fd: Fd, old_flags: OFlag) {
+        if !old_flags.contains(OFlag::O_NONBLOCK) {
+            let _: Result<(), _> = self.0.borrow_mut().system.fcntl_setfl(fd, old_flags);
+        }
+    }
+
+    /// Reads from the file descriptor.
+    ///
+    /// This function waits for one or more bytes to be available for reading.
+    /// If successful, returns the number of bytes read.
+    pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
+        let flags = self.set_nonblocking(fd)?;
+
+        let result = poll_fn(|context| {
             let mut inner = self.0.borrow_mut();
             match inner.system.read(fd, buffer) {
                 Err(Errno::EAGAIN) => {
                     inner.io.wait_for_reading(fd, context.waker().clone());
                     Poll::Pending
                 }
-                result => {
-                    if !flags.contains(OFlag::O_NONBLOCK) {
-                        let _ = inner.system.fcntl_setfl(fd, flags);
-                    }
-                    Poll::Ready(result)
-                }
+                result => Poll::Ready(result),
             }
         })
-        .await
+        .await;
+
+        self.reset_nonblocking(fd, flags);
+
+        result
     }
 
     /// Writes to the file descriptor.
