@@ -149,9 +149,37 @@ impl SharedSystem {
     /// `buffer` is written to the FD. If the `buffer` is empty, `write` is not
     /// called at all, so any error that would be returned from `write` is not
     /// returned.
-    pub async fn write_all(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
-        // TODO Retry if the entire buffer could not be written in one time.
-        self.0.borrow_mut().write(fd, buffer)
+    ///
+    /// This function silently ignores signals that may interrupt writes.
+    pub async fn write_all(&mut self, fd: Fd, mut buffer: &[u8]) -> nix::Result<usize> {
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+
+        let flags = self.set_nonblocking(fd)?;
+        let mut written = 0;
+
+        let result = poll_fn(|context| {
+            let mut inner = self.0.borrow_mut();
+            match inner.system.write(fd, buffer) {
+                Ok(count) => {
+                    written += count;
+                    buffer = &buffer[count..];
+                    if buffer.is_empty() {
+                        return Poll::Ready(Ok(written));
+                    }
+                }
+                Err(Errno::EAGAIN | Errno::EINTR) => (),
+                Err(error) => return Poll::Ready(Err(error)),
+            }
+            inner.io.wait_for_writing(fd, context.waker().clone());
+            Poll::Pending
+        })
+        .await;
+
+        self.reset_nonblocking(fd, flags);
+
+        result
     }
 
     /// Wait for a next event to occur.
@@ -333,7 +361,6 @@ impl AsyncIo {
     }
 
     /// Adds an awaiter for writing.
-    #[cfg(test)] // TODO use this function
     pub fn wait_for_writing(&mut self, fd: Fd, waker: Waker) {
         self.writers.push(Awaiter { fd, waker });
     }
@@ -365,6 +392,7 @@ impl AsyncIo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_system::Pipe;
     use crate::virtual_system::VirtualSystem;
     use futures::executor::block_on;
     use futures::task::noop_waker;
@@ -405,13 +433,11 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
-        let state = state.borrow_mut();
-        let mut ofd = state.processes[&process_id].fds[&writer]
+        state.borrow_mut().processes[&process_id].fds[&writer]
             .open_file_description
-            .borrow_mut();
-        ofd.write(&[56]).unwrap();
-        drop(ofd);
-        drop(state);
+            .borrow_mut()
+            .write(&[56])
+            .unwrap();
 
         let result = future.as_mut().poll(&mut context);
         drop(future);
@@ -431,7 +457,89 @@ mod tests {
         assert_eq!(buffer[..1], [17]);
     }
 
-    // TODO test shared_system_write_all_not_ready_at_first
+    #[test]
+    fn shared_system_write_all_not_ready_at_first() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = SharedSystem::new(Box::new(system));
+        let (reader, writer) = system.pipe().unwrap();
+
+        state.borrow_mut().processes[&process_id].fds[&writer]
+            .open_file_description
+            .borrow_mut()
+            .write(&[42; Pipe::PIPE_SIZE])
+            .unwrap();
+
+        let mut context = Context::from_waker(noop_waker_ref());
+        let mut out_buffer = [87; Pipe::PIPE_SIZE];
+        out_buffer[0] = 0;
+        out_buffer[1] = 1;
+        out_buffer[Pipe::PIPE_SIZE - 2] = 0xFE;
+        out_buffer[Pipe::PIPE_SIZE - 1] = 0xFF;
+        let mut future = Box::pin(system.write_all(writer, &out_buffer));
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        let mut in_buffer = [0; Pipe::PIPE_SIZE - 1];
+        state.borrow_mut().processes[&process_id].fds[&reader]
+            .open_file_description
+            .borrow_mut()
+            .read(&mut in_buffer)
+            .unwrap();
+        assert_eq!(in_buffer, [42; Pipe::PIPE_SIZE - 1]);
+
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        in_buffer[0] = 0;
+        state.borrow_mut().processes[&process_id].fds[&reader]
+            .open_file_description
+            .borrow_mut()
+            .read(&mut in_buffer[..1])
+            .unwrap();
+        assert_eq!(in_buffer[..1], [42; 1]);
+
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Ready(Ok(out_buffer.len())));
+
+        state.borrow_mut().processes[&process_id].fds[&reader]
+            .open_file_description
+            .borrow_mut()
+            .read(&mut in_buffer)
+            .unwrap();
+        assert_eq!(in_buffer, out_buffer[..Pipe::PIPE_SIZE - 1]);
+        state.borrow_mut().processes[&process_id].fds[&reader]
+            .open_file_description
+            .borrow_mut()
+            .read(&mut in_buffer)
+            .unwrap();
+        assert_eq!(in_buffer[..1], out_buffer[Pipe::PIPE_SIZE - 1..]);
+    }
+
+    #[test]
+    fn shared_system_write_all_empty() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = SharedSystem::new(Box::new(system));
+        let (_reader, writer) = system.pipe().unwrap();
+
+        state.borrow_mut().processes[&process_id].fds[&writer]
+            .open_file_description
+            .borrow_mut()
+            .write(&[0; Pipe::PIPE_SIZE])
+            .unwrap();
+
+        // Even if the pipe is full, empty write succeeds.
+        let mut context = Context::from_waker(noop_waker_ref());
+        let mut future = Box::pin(system.write_all(writer, &[]));
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Ready(Ok(0)));
+        // TODO Make sure `write` is not called at all
+    }
+
+    // TODO Test SharedSystem::write_all where second write returns EINTR
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
