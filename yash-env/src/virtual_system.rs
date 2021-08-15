@@ -357,7 +357,7 @@ impl System for VirtualSystem {
     fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
         let parent_pid = self.process_id;
         let state = Rc::clone(&self.state);
-        Box::pin(futures::future::poll_fn(move |context| {
+        Box::pin(futures_util::future::poll_fn(move |context| {
             let mut state = state.borrow_mut();
 
             // If any child's state has changed, return it
@@ -519,12 +519,12 @@ pub trait Executor: Debug {
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-impl Executor for futures::executor::LocalSpawner {
+impl Executor for futures_executor::LocalSpawner {
     fn spawn(
         &self,
         task: Pin<Box<dyn Future<Output = ()>>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        use futures::task::LocalSpawnExt;
+        use futures_util::task::LocalSpawnExt;
         self.spawn_local(task)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
@@ -534,8 +534,8 @@ impl Executor for futures::executor::LocalSpawner {
 mod tests {
     use super::*;
     use crate::exec::ExitStatus;
-    use futures::executor::block_on;
-    use futures::executor::LocalPool;
+    use futures_executor::block_on;
+    use futures_executor::LocalPool;
     use std::ffi::CString;
 
     #[test]

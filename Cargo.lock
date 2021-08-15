@@ -271,7 +271,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "either",
- "futures",
+ "futures-executor",
+ "futures-util",
  "itertools",
  "nix",
  "yash-syntax",

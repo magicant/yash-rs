@@ -19,8 +19,8 @@
 use crate::io::Fd;
 use crate::ChildProcess;
 use crate::System;
-use futures::future::poll_fn;
-use futures::task::Poll;
+use futures_util::future::poll_fn;
+use futures_util::task::Poll;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
@@ -58,12 +58,12 @@ use std::task::Waker;
 ///
 /// ```
 /// # use yash_env::{SharedSystem, System, VirtualSystem};
-/// # use futures::task::LocalSpawnExt;
+/// # use futures_util::task::LocalSpawnExt;
 /// let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
 /// let mut system2 = system.clone();
 /// let mut system3 = system.clone();
 /// let (reader, writer) = system.pipe().unwrap();
-/// let mut executor = futures::executor::LocalPool::new();
+/// let mut executor = futures_executor::LocalPool::new();
 ///
 /// // We add a task that tries to read from the pipe, but nothing has been
 /// // written to it, so the task is stalled.
@@ -394,9 +394,9 @@ mod tests {
     use super::*;
     use crate::virtual_system::Pipe;
     use crate::virtual_system::VirtualSystem;
-    use futures::executor::block_on;
-    use futures::task::noop_waker;
-    use futures::task::noop_waker_ref;
+    use futures_executor::block_on;
+    use futures_util::task::noop_waker;
+    use futures_util::task::noop_waker_ref;
     use std::future::Future;
     use std::rc::Rc;
     use std::task::Context;

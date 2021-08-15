@@ -419,8 +419,8 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::executor::block_on;
-    use futures::executor::LocalPool;
+    use futures_executor::block_on;
+    use futures_executor::LocalPool;
     use std::path::Path;
 
     #[test]
