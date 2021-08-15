@@ -519,17 +519,6 @@ pub trait Executor: Debug {
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-impl Executor for futures_executor::LocalSpawner {
-    fn spawn(
-        &self,
-        task: Pin<Box<dyn Future<Output = ()>>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        use futures_util::task::LocalSpawnExt;
-        self.spawn_local(task)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,6 +526,17 @@ mod tests {
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use std::ffi::CString;
+
+    impl Executor for futures_executor::LocalSpawner {
+        fn spawn(
+            &self,
+            task: Pin<Box<dyn Future<Output = ()>>>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            use futures_util::task::LocalSpawnExt;
+            self.spawn_local(task)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        }
+    }
 
     #[test]
     fn is_executable_file_non_existing_file() {

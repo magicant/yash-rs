@@ -17,11 +17,11 @@ publish = false
 [dependencies]
 async-trait = "0.1.50"
 either = "1.6.1"
-futures-executor = "0.3.15"
 futures-util = "0.3.15"
 itertools = "0.10.1"
 nix = "0.22.0"
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
 
 [dev-dependencies]
+futures-executor = "0.3.15"
 futures-util = { version = "0.3.15", features = ["channel"] }

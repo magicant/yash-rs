@@ -61,6 +61,7 @@ pub trait Word {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use futures_executor::LocalSpawner;
     // use itertools::Itertools;
     use std::future::ready;
     use std::future::Future;
@@ -72,6 +73,21 @@ pub(crate) mod tests {
     use yash_env::expansion::Field;
     use yash_env::io::Fd;
     use yash_env::Env;
+
+    #[derive(Clone, Debug)]
+    pub struct LocalExecutor(pub LocalSpawner);
+
+    impl yash_env::virtual_system::Executor for LocalExecutor {
+        fn spawn(
+            &self,
+            task: Pin<Box<dyn Future<Output = ()>>>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            use futures_util::task::LocalSpawnExt;
+            self.0
+                .spawn_local(task)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        }
+    }
 
     fn return_builtin_main(
         _env: &mut Env,

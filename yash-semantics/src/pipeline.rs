@@ -243,6 +243,7 @@ mod tests {
     use super::*;
     use crate::tests::cat_builtin;
     use crate::tests::return_builtin;
+    use crate::tests::LocalExecutor;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use std::path::Path;
@@ -288,7 +289,7 @@ mod tests {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let mut state = system.state.borrow_mut();
-        state.executor = Some(Rc::new(executor.spawner()));
+        state.executor = Some(Rc::new(LocalExecutor(executor.spawner())));
         drop(state);
 
         let mut env = Env::with_system(Box::new(system));
@@ -306,7 +307,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         {
             let mut state = state.borrow_mut();
-            state.executor = Some(Rc::new(executor.spawner()));
+            state.executor = Some(Rc::new(LocalExecutor(executor.spawner())));
             state
                 .file_system
                 .get(Path::new("/dev/stdin"))
@@ -348,7 +349,7 @@ mod tests {
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
         let mut executor = LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("cat", cat_builtin());
