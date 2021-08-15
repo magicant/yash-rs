@@ -132,8 +132,8 @@ impl Command for syntax::SimpleCommand {
 mod tests {
     use super::*;
     use crate::tests::return_builtin;
-    use futures::executor::block_on;
-    use futures::executor::LocalPool;
+    use futures_executor::block_on;
+    use futures_executor::LocalPool;
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;

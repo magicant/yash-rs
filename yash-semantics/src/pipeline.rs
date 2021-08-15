@@ -243,8 +243,8 @@ mod tests {
     use super::*;
     use crate::tests::cat_builtin;
     use crate::tests::return_builtin;
-    use futures::executor::block_on;
-    use futures::executor::LocalPool;
+    use futures_executor::block_on;
+    use futures_executor::LocalPool;
     use std::path::Path;
     use std::rc::Rc;
     use yash_env::exec::Divert;
@@ -321,7 +321,7 @@ mod tests {
         let shared_system = env.system.clone();
         let pipeline: syntax::Pipeline = "cat | cat | cat".parse().unwrap();
         let mut task = pipeline.execute(&mut env);
-        let result = executor.run_until(futures::future::poll_fn(|context| {
+        let result = executor.run_until(futures_util::future::poll_fn(|context| {
             let poll = task.as_mut().poll(context);
             if poll.is_pending() {
                 shared_system.select().unwrap();
@@ -355,7 +355,7 @@ mod tests {
         let shared_system = env.system.clone();
         let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
         let mut task = pipeline.execute(&mut env);
-        let _ = executor.run_until(futures::future::poll_fn(|context| {
+        let _ = executor.run_until(futures_util::future::poll_fn(|context| {
             let poll = task.as_mut().poll(context);
             if poll.is_pending() {
                 shared_system.select().unwrap();
