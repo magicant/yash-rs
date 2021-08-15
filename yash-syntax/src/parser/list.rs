@@ -176,7 +176,7 @@ mod tests {
     use crate::syntax::HereDoc;
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_list_eof() {

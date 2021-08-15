@@ -82,7 +82,7 @@ impl Lexer {
 mod tests {
     use super::*;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_raw_param_special_parameter() {

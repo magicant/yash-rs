@@ -140,7 +140,7 @@ mod tests {
     use super::super::lex::Operator::Newline;
     use super::*;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_redirection_less() {

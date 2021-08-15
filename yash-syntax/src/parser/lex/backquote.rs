@@ -86,7 +86,7 @@ mod tests {
     use crate::parser::core::ErrorCause;
     use crate::parser::lex::Lexer;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_backquote_not_backquote() {

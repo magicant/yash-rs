@@ -142,7 +142,7 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_if_command_minimum() {

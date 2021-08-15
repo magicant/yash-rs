@@ -294,6 +294,7 @@ name = "yash-syntax"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "futures",
+ "futures-executor",
+ "futures-util",
  "itertools",
 ]

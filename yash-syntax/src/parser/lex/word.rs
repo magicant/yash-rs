@@ -175,7 +175,7 @@ mod tests {
     use crate::syntax::Text;
     use crate::syntax::TextUnit::{self, Backslashed, BracedParam, CommandSubst, Literal};
     use crate::syntax::WordUnit::Tilde;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_word_unit_unquoted() {

@@ -105,7 +105,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Command;
     use crate::syntax::SimpleCommand;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_do_clause_none() {

@@ -46,7 +46,7 @@
 //! let mut parser = Parser::new(&mut lexer);
 //!
 //! // Lastly, call the parser's function to get an AST.
-//! use futures::executor::block_on;
+//! use futures_executor::block_on;
 //! let list = block_on(parser.command_line()).unwrap().unwrap();
 //! assert_eq!(list.to_string(), "echo $?");
 //! ```
