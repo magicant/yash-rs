@@ -448,20 +448,30 @@ mod tests {
     fn run_in_subshell_with_child_normally_exiting() {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
-        let mut state = system.state.borrow_mut();
-        state.executor = Some(Rc::new(executor.spawner()));
-        drop(state);
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let status = ExitStatus(97);
         let mut env = Env::with_system(Box::new(system));
         let result = executor.run_until(env.run_in_subshell(move |env| {
-            env.exit_status = status;
-            Box::pin(ready(()))
+            Box::pin(async move {
+                env.exit_status = status;
+            })
         }));
         assert_eq!(result, Ok(status));
     }
 
     // TODO Test case for parent with signaled child
 
-    // TODO Test case where fork fails
+    #[test]
+    fn run_in_subshell_with_fork_failure() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut env = Env::with_system(Box::new(system));
+        let result = executor.run_until(env.run_in_subshell(|_env| {
+            Box::pin(async {
+                panic!("Not expected to reach here");
+            })
+        }));
+        assert_eq!(result, Err(Errno::ENOSYS));
+    }
 }
