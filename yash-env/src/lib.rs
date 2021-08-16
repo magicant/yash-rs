@@ -72,7 +72,14 @@ use yash_syntax::alias::AliasSet;
 /// system-managed parts. Application-managed parts are directly implemented in
 /// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
 /// that contains an instance of [`System`].
-#[derive(Debug)]
+///
+/// # Cloning
+///
+/// `Env::clone` effectively clones the application-managed parts of the
+/// environment. Since [`SharedSystem`] is reference-counted, you will not get a
+/// deep copy of the system-managed parts. See also
+/// [`clone_with_system`](Self::clone_with_system).
+#[derive(Clone, Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
     ///
