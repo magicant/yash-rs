@@ -132,8 +132,9 @@ impl Command for syntax::SimpleCommand {
 mod tests {
     use super::*;
     use crate::tests::return_builtin;
-    use futures::executor::block_on;
-    use futures::executor::LocalPool;
+    use crate::tests::LocalExecutor;
+    use futures_executor::block_on;
+    use futures_executor::LocalPool;
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
@@ -175,7 +176,7 @@ mod tests {
         content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
         env.variables.assign(
@@ -225,7 +226,7 @@ mod tests {
         content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
@@ -239,7 +240,7 @@ mod tests {
     fn simple_command_returns_127_for_non_existing_file() {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
@@ -257,7 +258,7 @@ mod tests {
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
         system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();

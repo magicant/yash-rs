@@ -79,6 +79,6 @@ async fn parse_and_print() -> i32 {
 }
 
 pub fn bin_main() -> i32 {
-    let mut pool = futures::executor::LocalPool::new();
+    let mut pool = futures_executor::LocalPool::new();
     pool.run_until(parse_and_print())
 }

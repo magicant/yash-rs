@@ -101,7 +101,7 @@ impl Input for Memory {
 mod tests {
     use super::*;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn memory_empty_source() {

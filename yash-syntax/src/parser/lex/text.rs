@@ -209,7 +209,7 @@ mod tests {
     use crate::syntax::Backquote;
     use crate::syntax::BackquoteUnit;
     use crate::syntax::CommandSubst;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_text_unit_literal_accepted() {

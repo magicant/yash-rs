@@ -151,7 +151,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_array_values_no_open_parenthesis() {

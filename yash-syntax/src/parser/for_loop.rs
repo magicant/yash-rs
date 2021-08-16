@@ -163,7 +163,7 @@ mod tests {
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_for_loop_short() {

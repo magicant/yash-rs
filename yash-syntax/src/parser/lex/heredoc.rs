@@ -125,7 +125,7 @@ mod tests {
     use crate::parser::core::ErrorCause;
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn leading_tabs_test() {

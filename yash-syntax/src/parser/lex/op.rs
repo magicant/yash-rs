@@ -375,7 +375,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(

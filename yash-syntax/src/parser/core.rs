@@ -604,7 +604,7 @@ mod tests {
     use crate::alias::HashEntry;
     use crate::source::Line;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 

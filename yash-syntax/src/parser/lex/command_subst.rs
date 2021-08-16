@@ -63,7 +63,7 @@ mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_command_substitution_success() {

@@ -36,7 +36,7 @@ use std::str::FromStr;
 
 /// Polls the given future, assuming it returns `Ready`.
 fn unwrap_ready<F: Future>(f: F) -> <F as Future>::Output {
-    use futures::future::FutureExt;
+    use futures_util::future::FutureExt;
     f.now_or_never()
         .expect("Expected Ready but received Pending")
 }
@@ -431,7 +431,7 @@ mod tests {
     use super::*;
     use crate::parser::ErrorCause;
     use crate::parser::SyntaxError;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     // Most of the tests below are surrounded with `block_on(async {...})` in
     // order to make sure `str::parse` can be called in an executor context.

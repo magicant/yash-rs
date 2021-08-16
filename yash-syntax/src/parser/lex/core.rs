@@ -442,7 +442,7 @@ impl Lexer {
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
-    /// futures::executor::block_on(async {
+    /// futures_executor::block_on(async {
     ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
     ///     assert_eq!(lexer.index(), 0);
     ///     let _ = lexer.peek_char().await;
@@ -465,7 +465,7 @@ impl Lexer {
     /// ```
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
-    /// futures::executor::block_on(async {
+    /// futures_executor::block_on(async {
     ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
     ///     let saved_index = lexer.index();
     ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
@@ -617,7 +617,7 @@ mod tests {
     use super::*;
     use crate::parser::core::ErrorCause;
     use crate::parser::core::SyntaxError;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_core_peek_char_empty_source() {

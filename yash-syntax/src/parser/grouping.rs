@@ -99,7 +99,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn parser_grouping_short() {

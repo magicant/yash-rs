@@ -69,7 +69,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Literal;
     use crate::syntax::Text;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_dollar_unit_no_dollar() {

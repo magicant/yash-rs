@@ -163,7 +163,7 @@ mod tests {
     use crate::syntax::SwitchType;
     use crate::syntax::TrimLength;
     use crate::syntax::TrimSide;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     fn assert_opening_location(location: &Location) {
         assert_eq!(location.line.value, "$");

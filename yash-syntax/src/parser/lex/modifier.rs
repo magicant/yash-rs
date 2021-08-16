@@ -155,7 +155,7 @@ mod tests {
     use crate::syntax::Text;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_suffix_modifier_eof() {

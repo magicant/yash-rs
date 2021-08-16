@@ -98,7 +98,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Backslashed;
     use crate::syntax::Literal;
-    use futures::executor::block_on;
+    use futures_executor::block_on;
 
     #[test]
     fn lexer_arithmetic_expansion_empty() {
