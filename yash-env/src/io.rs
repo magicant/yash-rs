@@ -16,4 +16,5 @@
 
 //! Type definitions for I/O.
 
+#[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;

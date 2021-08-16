@@ -21,6 +21,7 @@
 pub mod alias;
 pub mod r#return;
 
+#[doc(no_inline)]
 pub use yash_env::builtin::*;
 
 use Type::{Intrinsic, Special};

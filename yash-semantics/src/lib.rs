@@ -31,6 +31,7 @@ mod simple_command;
 use async_trait::async_trait;
 use yash_env::Env;
 
+#[doc(no_inline)]
 pub use yash_env::exec::*;
 
 /// Syntactic construct that can be executed.
