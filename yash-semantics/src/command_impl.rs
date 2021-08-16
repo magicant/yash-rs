@@ -28,9 +28,13 @@ impl Command for syntax::Command {
         use syntax::Command::*;
         match self {
             Simple(command) => command.execute(env).await,
-            #[allow(clippy::unit_arg)]
-            Compound(_) | Function(_) => Ok(println!("{}", self)),
-            // TODO execute compound command / function definition
+            Compound(command) => command.execute(env).await,
+            Function(_) => {
+                // TODO execute function definition
+                env.print_error(&format_args!("Not implemented: {}", self))
+                    .await;
+                Ok(())
+            }
         }
     }
 }
