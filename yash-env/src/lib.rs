@@ -70,8 +70,8 @@ use yash_syntax::alias::AliasSet;
 ///
 /// The shell execution environment consists of application-managed parts and
 /// system-managed parts. Application-managed parts are directly implemented in
-/// the `Env` instance. System-managed parts are abstracted as [`System`] so
-/// that they can be replaced with a dummy implementation.
+/// the `Env` instance. System-managed parts are managed by a [`SharedSystem`]
+/// that contains an instance of [`System`].
 #[derive(Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
@@ -99,9 +99,13 @@ pub struct Env {
     pub system: SharedSystem,
 }
 
-/// Abstraction of the system-managed parts of the environment.
+/// API to the system-managed parts of the environment.
 ///
-/// TODO Elaborate
+/// The `System` trait defines a collection of methods to access the underlying
+/// operating system from the shell as an application program. There are two
+/// substantial implementors for this trait: [`RealSystem`] and
+/// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
+/// `System` instance to extend the interface with asynchronous methods.
 pub trait System: Debug {
     /// Whether there is an executable file at the specified path.
     fn is_executable_file(&self, path: &CStr) -> bool;
@@ -288,7 +292,7 @@ impl Env {
         }
     }
 
-    /// Creates a new empty virtual environment.
+    /// Creates a new environment with a default-constructed [`VirtualSystem`].
     pub fn new_virtual() -> Env {
         Env::with_system(Box::new(VirtualSystem::default()))
     }
@@ -296,8 +300,8 @@ impl Env {
     /// Clones this environment.
     ///
     /// The application-managed parts of the environment are cloned normally.
-    /// The system-managed parts cannot be cloned, so you must provide a
-    /// `System` instance.
+    /// The system-managed parts are replaced with the provided `System`
+    /// instance.
     pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
         Env {
             aliases: self.aliases.clone(),
