@@ -14,20 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for word expansions.
-//!
-//! TODO Elaborate
+//! Type definitions for word expansion results.
 
 use yash_syntax::source::Location;
-
-/// Errors that may happen in word expansions.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Error {
-    // TODO define error variants
-}
-
-/// Result type for word expansion.
-pub type Result<T = ()> = std::result::Result<T, Error>;
 
 /// Resultant string of word expansion.
 ///
