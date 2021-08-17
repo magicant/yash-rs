@@ -25,6 +25,7 @@
 mod command_impl;
 pub mod command_search;
 mod compound;
+pub mod expansion;
 mod pipeline;
 mod simple_command;
 
@@ -41,22 +42,6 @@ pub trait Command {
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
     async fn execute(&self, env: &mut Env) -> Result;
-}
-
-/// Result of expansion.
-///
-/// TODO elaborate
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Expansion {
-    // TODO define value
-}
-
-// TODO Reconsider the name
-/// TODO describe
-#[async_trait(?Send)]
-pub trait Word {
-    /// TODO describe
-    async fn expand(&self, env: &mut Env) -> Result<Expansion>;
 }
 
 // TODO Probably we should implement a read-execute loop in here
