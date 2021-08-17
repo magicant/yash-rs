@@ -114,18 +114,40 @@ pub struct AttrField {
 */
 
 /// Result of the initial expansion.
-pub trait Expansion: std::fmt::Debug {}
-// TODO impl Expansion::push_char
+pub trait Expansion: std::fmt::Debug {
+    /// Appends a character to the current field.
+    fn push_char(&mut self, c: AttrChar);
+}
 // TODO impl Expansion::push_fields
 
+// TODO Remove Simple and Multiple and directly implement Expansion for
+// AttrField and Vec<AttrField>
 /// Result of the initial expansion for expanding to a single field.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Single(pub AttrField);
+
+impl Expansion for Single {
+    fn push_char(&mut self, c: AttrChar) {
+        self.0 .0.push(c)
+    }
+}
 
 /// Result of the initial expansion for subjecting to field splitting.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Multiple(pub Vec<AttrField>);
 // TODO Consider using smallvec instead of Vec
+
+impl Expansion for Multiple {
+    fn push_char(&mut self, c: AttrChar) {
+        if let Some(field) = self.0.last_mut() {
+            field.0.push(c);
+        } else {
+            let mut field = AttrField::default();
+            field.0.push(c);
+            self.0.push(field);
+        }
+    }
+}
 
 /// Shell execution environment for performing the word expansion in.
 ///
@@ -165,7 +187,13 @@ impl<E: Env> DerefMut for Expander<'_, E> {
     }
 }
 
-impl<E: Env> Expansion for Expander<'_, E> {}
+/// The `Expansion` implementation for `Expander` delegates to the `Expansion`
+/// implementor contained in the `Expander`.
+impl<E: Env> Expansion for Expander<'_, E> {
+    fn push_char(&mut self, c: AttrChar) {
+        self.result.push_char(c)
+    }
+}
 
 /// Syntactic construct that can be subjected to the word expansion.
 #[async_trait(?Send)]
@@ -174,4 +202,55 @@ pub trait Word {
     ///
     /// The results should be pushed to the expander.
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn single_push_char() {
+        let c = AttrChar {
+            value: 'X',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let d = AttrChar {
+            value: 'Y',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let mut s = Single::default();
+        s.push_char(c);
+        assert_eq!(s.0 .0, [c]);
+        s.push_char(d);
+        assert_eq!(s.0 .0, [c, d]);
+    }
+
+    #[test]
+    fn multiple_push_char() {
+        let c = AttrChar {
+            value: 'X',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let d = AttrChar {
+            value: 'Y',
+            origin: Origin::HardExpansion,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let mut m = Multiple::default();
+        m.push_char(c);
+        assert_eq!(m.0.len(), 1);
+        assert_eq!(m.0[0].0, [c]);
+        m.push_char(d);
+        assert_eq!(m.0.len(), 1);
+        assert_eq!(m.0[0].0, [c, d]);
+    }
+
+    // TODO Test Multiple push_char with multiple existing fields
 }
