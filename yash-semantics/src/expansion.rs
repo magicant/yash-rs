@@ -120,31 +120,22 @@ pub trait Expansion: std::fmt::Debug {
 }
 // TODO impl Expansion::push_fields
 
-// TODO Remove Simple and Multiple and directly implement Expansion for
-// AttrField and Vec<AttrField>
-/// Result of the initial expansion for expanding to a single field.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Single(pub AttrField);
-
-impl Expansion for Single {
+/// Produces a single field as a result of the expansion.
+impl Expansion for AttrField {
     fn push_char(&mut self, c: AttrChar) {
-        self.0 .0.push(c)
+        self.0.push(c)
     }
 }
 
-/// Result of the initial expansion for subjecting to field splitting.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Multiple(pub Vec<AttrField>);
-// TODO Consider using smallvec instead of Vec
-
-impl Expansion for Multiple {
+/// Produces any number of fields as a result of the expansion.
+impl Expansion for Vec<AttrField> {
     fn push_char(&mut self, c: AttrChar) {
-        if let Some(field) = self.0.last_mut() {
+        if let Some(field) = self.last_mut() {
             field.0.push(c);
         } else {
             let mut field = AttrField::default();
             field.0.push(c);
-            self.0.push(field);
+            self.push(field);
         }
     }
 }
@@ -209,7 +200,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn single_push_char() {
+    fn attr_field_push_char() {
         let c = AttrChar {
             value: 'X',
             origin: Origin::Literal,
@@ -222,15 +213,15 @@ mod tests {
             is_quoted: true,
             is_quoting: false,
         };
-        let mut s = Single::default();
-        s.push_char(c);
-        assert_eq!(s.0 .0, [c]);
-        s.push_char(d);
-        assert_eq!(s.0 .0, [c, d]);
+        let mut field = AttrField::default();
+        field.push_char(c);
+        assert_eq!(field.0, [c]);
+        field.push_char(d);
+        assert_eq!(field.0, [c, d]);
     }
 
     #[test]
-    fn multiple_push_char() {
+    fn vec_attr_field_push_char() {
         let c = AttrChar {
             value: 'X',
             origin: Origin::Literal,
@@ -243,14 +234,14 @@ mod tests {
             is_quoted: false,
             is_quoting: true,
         };
-        let mut m = Multiple::default();
-        m.push_char(c);
-        assert_eq!(m.0.len(), 1);
-        assert_eq!(m.0[0].0, [c]);
-        m.push_char(d);
-        assert_eq!(m.0.len(), 1);
-        assert_eq!(m.0[0].0, [c, d]);
+        let mut fields = Vec::<AttrField>::default();
+        fields.push_char(c);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, [c]);
+        fields.push_char(d);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, [c, d]);
     }
 
-    // TODO Test Multiple push_char with multiple existing fields
+    // TODO Test Vec<AttrField>::push_char with multiple existing fields
 }
