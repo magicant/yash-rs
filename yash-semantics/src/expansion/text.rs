@@ -38,7 +38,13 @@ impl Word for TextUnit {
                 is_quoted: false,
                 is_quoting: false,
             }),
-            _ => todo!(),
+            // TODO Expand Backslashed correctly
+            // TODO Expand RawParam correctly
+            // TODO Expand BracedParam correctly
+            // TODO Expand CommandSubst correctly
+            // TODO Expand Backquote correctly
+            // TODO Expand Arith correctly
+            _ => e.push_str(&self.to_string(), Origin::Literal, false, false),
         }
         Ok(())
     }
