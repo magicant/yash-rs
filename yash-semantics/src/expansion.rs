@@ -30,6 +30,8 @@
 //!
 //! TODO Elaborate
 
+mod text;
+
 use async_trait::async_trait;
 use std::ops::Deref;
 use std::ops::DerefMut;
