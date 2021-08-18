@@ -119,6 +119,21 @@ pub struct AttrField {
 pub trait Expansion: std::fmt::Debug {
     /// Appends a character to the current field.
     fn push_char(&mut self, c: AttrChar);
+
+    /// Appends characters to the current field.
+    ///
+    /// The appended characters share the same `origin`, `is_quoted`, and
+    /// `is_quoting` attributes.
+    fn push_str(&mut self, s: &str, origin: Origin, is_quoted: bool, is_quoting: bool) {
+        for c in s.chars() {
+            self.push_char(AttrChar {
+                value: c,
+                origin,
+                is_quoted,
+                is_quoting,
+            });
+        }
+    }
 }
 // TODO impl Expansion::push_fields
 
@@ -200,6 +215,32 @@ pub trait Word {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expansion_push_str() {
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let to = AttrChar {
+            value: '-',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let z = AttrChar {
+            value: 'z',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+
+        let mut field = AttrField::default();
+        field.push_str("a-z", Origin::SoftExpansion, true, false);
+        assert_eq!(field.0, [a, to, z]);
+    }
 
     #[test]
     fn attr_field_push_char() {
