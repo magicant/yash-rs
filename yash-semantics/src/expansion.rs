@@ -205,7 +205,7 @@ impl<E: Env> Expansion for Expander<'_, E> {
 
 /// Syntactic construct that can be subjected to the word expansion.
 #[async_trait(?Send)]
-pub trait Word {
+pub trait Expand {
     /// Performs the word expansion.
     ///
     /// The results should be pushed to the expander.

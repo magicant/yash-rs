@@ -18,17 +18,17 @@
 
 use super::AttrChar;
 use super::Env;
+use super::Expand;
 use super::Expander;
 use super::Expansion;
 use super::Origin;
 use super::Result;
-use super::Word;
 use async_trait::async_trait;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit;
 
 #[async_trait(?Send)]
-impl Word for TextUnit {
+impl Expand for TextUnit {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         use TextUnit::*;
         match self {
@@ -52,7 +52,7 @@ impl Word for TextUnit {
 }
 
 #[async_trait(?Send)]
-impl Word for Text {
+impl Expand for Text {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         for text_unit in &self.0 {
             text_unit.expand(e).await?;
