@@ -24,6 +24,7 @@ use super::Origin;
 use super::Result;
 use super::Word;
 use async_trait::async_trait;
+use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit;
 
 #[async_trait(?Send)]
@@ -45,6 +46,16 @@ impl Word for TextUnit {
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
             _ => e.push_str(&self.to_string(), Origin::Literal, false, false),
+        }
+        Ok(())
+    }
+}
+
+#[async_trait(?Send)]
+impl Word for Text {
+    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+        for text_unit in &self.0 {
+            text_unit.expand(e).await?;
         }
         Ok(())
     }
@@ -77,6 +88,38 @@ mod tests {
                 is_quoted: false,
                 is_quoting: false
             }]
+        );
+    }
+
+    #[test]
+    fn text_expand() {
+        let mut field = AttrField::default();
+        let mut env = NullEnv;
+        let mut e = Expander::new(&mut env, &mut field);
+        let text: Text = "<->".parse().unwrap();
+        block_on(text.expand(&mut e)).unwrap();
+        assert_eq!(
+            field.0,
+            [
+                AttrChar {
+                    value: '<',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: '-',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: '>',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                }
+            ]
         );
     }
 }
