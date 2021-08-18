@@ -31,6 +31,7 @@
 //! TODO Elaborate
 
 mod text;
+mod word;
 
 use async_trait::async_trait;
 use std::ops::Deref;
