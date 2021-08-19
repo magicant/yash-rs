@@ -60,7 +60,7 @@ impl Expand for Text {
 
 #[cfg(test)]
 mod tests {
-    use super::super::AttrField;
+    use super::super::AttrChar;
     use super::*;
     use futures_executor::block_on;
     use yash_syntax::syntax::TextUnit;
@@ -72,13 +72,13 @@ mod tests {
 
     #[test]
     fn literal_expand_unquoted() {
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
         let mut e = Expander::new(&mut env, &mut field);
         let l = TextUnit::Literal('&');
         block_on(l.expand(&mut e)).unwrap();
         assert_eq!(
-            field.0,
+            field,
             [AttrChar {
                 value: '&',
                 origin: Origin::Literal,
@@ -90,13 +90,13 @@ mod tests {
 
     #[test]
     fn text_expand() {
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
         let mut e = Expander::new(&mut env, &mut field);
         let text: Text = "<->".parse().unwrap();
         block_on(text.expand(&mut e)).unwrap();
         assert_eq!(
-            field.0,
+            field,
             [
                 AttrChar {
                     value: '<',

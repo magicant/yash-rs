@@ -102,12 +102,12 @@ pub struct AttrChar {
     pub is_quoting: bool,
 }
 
+/*
 /// Result of the initial expansion.
 ///
 /// An `AttrField` is a string of `AttrChar`s.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AttrField(pub Vec<AttrChar>);
-/*
 pub struct AttrField {
     /// Value of the field.
     pub value: Vec<AttrChar>,
@@ -139,21 +139,19 @@ pub trait Expansion: std::fmt::Debug {
 // TODO impl Expansion::push_fields
 
 /// Produces a single field as a result of the expansion.
-impl Expansion for AttrField {
+impl Expansion for Vec<AttrChar> {
     fn push_char(&mut self, c: AttrChar) {
-        self.0.push(c)
+        self.push(c)
     }
 }
 
 /// Produces any number of fields as a result of the expansion.
-impl Expansion for Vec<AttrField> {
+impl Expansion for Vec<Vec<AttrChar>> {
     fn push_char(&mut self, c: AttrChar) {
         if let Some(field) = self.last_mut() {
-            field.0.push(c);
+            field.push(c);
         } else {
-            let mut field = AttrField::default();
-            field.0.push(c);
-            self.push(field);
+            self.push(vec![c]);
         }
     }
 }
@@ -248,9 +246,9 @@ mod tests {
             is_quoting: false,
         };
 
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         field.push_str("a-z", Origin::SoftExpansion, true, false);
-        assert_eq!(field.0, [a, to, z]);
+        assert_eq!(field, [a, to, z]);
     }
 
     #[test]
@@ -267,11 +265,11 @@ mod tests {
             is_quoted: true,
             is_quoting: false,
         };
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         field.push_char(c);
-        assert_eq!(field.0, [c]);
+        assert_eq!(field, [c]);
         field.push_char(d);
-        assert_eq!(field.0, [c, d]);
+        assert_eq!(field, [c, d]);
     }
 
     #[test]
@@ -288,14 +286,14 @@ mod tests {
             is_quoted: false,
             is_quoting: true,
         };
-        let mut fields = Vec::<AttrField>::default();
+        let mut fields = Vec::<Vec<AttrChar>>::default();
         fields.push_char(c);
         assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0].0, [c]);
+        assert_eq!(fields[0], [c]);
         fields.push_char(d);
         assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0].0, [c, d]);
+        assert_eq!(fields[0], [c, d]);
     }
 
-    // TODO Test Vec<AttrField>::push_char with multiple existing fields
+    // TODO Test Vec<Vec<AttrChar>>::push_char with multiple existing fields
 }

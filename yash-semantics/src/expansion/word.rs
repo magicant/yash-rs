@@ -53,7 +53,6 @@ impl Expand for Word {
 #[cfg(test)]
 mod tests {
     use super::super::AttrChar;
-    use super::super::AttrField;
     use super::*;
     use futures_executor::block_on;
 
@@ -64,13 +63,13 @@ mod tests {
 
     #[test]
     fn unquoted_expand() {
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
         let mut e = Expander::new(&mut env, &mut field);
         let u: WordUnit = "x".parse().unwrap();
         block_on(u.expand(&mut e)).unwrap();
         assert_eq!(
-            field.0,
+            field,
             [AttrChar {
                 value: 'x',
                 origin: Origin::Literal,
@@ -82,13 +81,13 @@ mod tests {
 
     #[test]
     fn word_expand() {
-        let mut field = AttrField::default();
+        let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
         let mut e = Expander::new(&mut env, &mut field);
         let w: Word = "xyz".parse().unwrap();
         block_on(w.expand(&mut e)).unwrap();
         assert_eq!(
-            field.0,
+            field,
             [
                 AttrChar {
                     value: 'x',
