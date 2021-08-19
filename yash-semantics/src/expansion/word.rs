@@ -46,10 +46,7 @@ impl Expand for WordUnit {
 #[async_trait(?Send)]
 impl Expand for Word {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
-        for word_unit in &self.units {
-            word_unit.expand(e).await?;
-        }
-        Ok(())
+        self.units.expand(e).await
     }
 }
 

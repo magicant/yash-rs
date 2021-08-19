@@ -213,6 +213,16 @@ pub trait Expand {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result;
 }
 
+#[async_trait(?Send)]
+impl<T: Expand> Expand for [T] {
+    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+        for item in self {
+            item.expand(e).await?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

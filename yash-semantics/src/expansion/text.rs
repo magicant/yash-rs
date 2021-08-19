@@ -54,10 +54,7 @@ impl Expand for TextUnit {
 #[async_trait(?Send)]
 impl Expand for Text {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
-        for text_unit in &self.0 {
-            text_unit.expand(e).await?;
-        }
-        Ok(())
+        self.0.expand(e).await
     }
 }
 
