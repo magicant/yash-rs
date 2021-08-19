@@ -23,6 +23,7 @@ use super::Expansion;
 use super::Origin;
 use super::Result;
 use async_trait::async_trait;
+use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit;
 
 #[async_trait(?Send)]
@@ -39,6 +40,16 @@ impl Expand for WordUnit {
                 Ok(())
             }
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl Expand for Word {
+    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+        for word_unit in &self.units {
+            word_unit.expand(e).await?;
+        }
+        Ok(())
     }
 }
 
@@ -69,6 +80,38 @@ mod tests {
                 is_quoted: false,
                 is_quoting: false
             }]
+        );
+    }
+
+    #[test]
+    fn word_expand() {
+        let mut field = AttrField::default();
+        let mut env = NullEnv;
+        let mut e = Expander::new(&mut env, &mut field);
+        let w: Word = "xyz".parse().unwrap();
+        block_on(w.expand(&mut e)).unwrap();
+        assert_eq!(
+            field.0,
+            [
+                AttrChar {
+                    value: 'x',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'y',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'z',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                }
+            ]
         );
     }
 }
