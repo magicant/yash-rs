@@ -30,6 +30,7 @@
 //!
 //! TODO Elaborate
 
+mod quote_removal;
 mod text;
 mod word;
 
@@ -40,6 +41,8 @@ use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use yash_env::expansion::*;
+
+pub use quote_removal::*;
 
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
