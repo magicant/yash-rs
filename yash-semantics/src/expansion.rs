@@ -102,19 +102,16 @@ pub struct AttrChar {
     pub is_quoting: bool,
 }
 
-/*
 /// Result of the initial expansion.
 ///
-/// An `AttrField` is a string of `AttrChar`s.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct AttrField(pub Vec<AttrChar>);
+/// An `AttrField` is a string of `AttrChar`s with the location of the word.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttrField {
     /// Value of the field.
-    pub value: Vec<AttrChar>,
+    pub chars: Vec<AttrChar>,
     /// Location of the word this field resulted from.
     pub origin: Location,
 }
-*/
 
 /// Result of the initial expansion.
 pub trait Expansion: std::fmt::Debug {
@@ -203,9 +200,12 @@ impl<E: Env> Expansion for Expander<'_, E> {
 }
 
 /// Syntactic construct that can be subjected to the word expansion.
+///
+/// Implementors of this trait expand themselves to an [`Expander`].
+/// See also [`ExpandToField`].
 #[async_trait(?Send)]
 pub trait Expand {
-    /// Performs the word expansion.
+    /// Performs the initial expansion.
     ///
     /// The results should be pushed to the expander.
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result;
@@ -219,6 +219,27 @@ impl<T: Expand> Expand for [T] {
         }
         Ok(())
     }
+}
+
+/// Syntactic construct that can be expanded to an [`AttrField`].
+///
+/// Implementors of this trait expand themselves directly to an `AttrField` or
+/// an array of `AttrField`s.
+/// See also [`Expand`].
+#[async_trait(?Send)]
+pub trait ExpandToField {
+    /// Performs the initial expansion on `self`, producing a single field.
+    ///
+    /// This is usually used in contexts where field splitting will not be
+    /// performed on the result.
+    async fn expand_to_field<E: Env>(&self, env: &mut E) -> Result<AttrField>;
+
+    /// Performs the initial expansion on `self`, producing any number of
+    /// fields.
+    ///
+    /// This is usually used in contexts where field splitting will be performed
+    /// on the result.
+    async fn expand_to_fields<E: Env>(&self, env: &mut E) -> Result<Vec<AttrField>>;
 }
 
 #[cfg(test)]

@@ -16,8 +16,10 @@
 
 //! Initial expansion of word.
 
+use super::AttrField;
 use super::Env;
 use super::Expand;
+use super::ExpandToField;
 use super::Expander;
 use super::Expansion;
 use super::Origin;
@@ -47,6 +49,32 @@ impl Expand for WordUnit {
 impl Expand for Word {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         self.units.expand(e).await
+    }
+}
+
+#[async_trait(?Send)]
+impl ExpandToField for Word {
+    async fn expand_to_field<E: Env>(&self, env: &mut E) -> Result<AttrField> {
+        let mut chars = Vec::new();
+        self.units
+            .expand(&mut Expander::new(env, &mut chars))
+            .await?;
+        let origin = self.location.clone();
+        Ok(AttrField { chars, origin })
+    }
+
+    async fn expand_to_fields<E: Env>(&self, env: &mut E) -> Result<Vec<AttrField>> {
+        let mut fields = Vec::new();
+        self.units
+            .expand(&mut Expander::new(env, &mut fields))
+            .await?;
+        Ok(fields
+            .into_iter()
+            .map(|chars| AttrField {
+                chars,
+                origin: self.location.clone(),
+            })
+            .collect())
     }
 }
 
@@ -109,5 +137,69 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn word_expand_to_field() {
+        let mut env = NullEnv;
+        let w: Word = "abc".parse().unwrap();
+        let result = block_on(w.expand_to_field(&mut env)).unwrap();
+        assert_eq!(
+            result.chars,
+            [
+                AttrChar {
+                    value: 'a',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'b',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'c',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                }
+            ]
+        );
+        assert_eq!(result.origin, w.location);
+    }
+
+    #[test]
+    fn word_expand_to_fields() {
+        let mut env = NullEnv;
+        let w: Word = "abc".parse().unwrap();
+        let result = block_on(w.expand_to_fields(&mut env)).unwrap();
+        assert_eq!(result.len(), 1, "{:?}", result);
+        assert_eq!(
+            result[0].chars,
+            [
+                AttrChar {
+                    value: 'a',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'b',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                },
+                AttrChar {
+                    value: 'c',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false
+                }
+            ]
+        );
+        assert_eq!(result[0].origin, w.location);
+        // TODO Test with a word that expands to more than one field
     }
 }
