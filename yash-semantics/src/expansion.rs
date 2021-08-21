@@ -38,6 +38,7 @@ use async_trait::async_trait;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
 pub use yash_env::expansion::*;
@@ -264,6 +265,26 @@ pub trait ExpandToField {
         self.expand_to_fields_into(env, &mut fields).await?;
         Ok(fields)
     }
+}
+
+/// Expands words to fields.
+///
+/// This function performs all of the initial expansion, multi-field expansion,
+/// and quote removal.
+pub async fn expand_words<'a, E, I>(env: &mut E, words: I) -> Result<Vec<Field>>
+where
+    E: Env,
+    I: IntoIterator<Item = &'a Word>,
+{
+    let mut fields = Vec::new();
+    for word in words {
+        word.expand_to_fields_into(env, &mut fields).await?;
+    }
+    // TODO multi-field expansion
+    Ok(fields
+        .into_iter()
+        .map(QuoteRemoval::do_quote_removal)
+        .collect())
 }
 
 #[cfg(test)]

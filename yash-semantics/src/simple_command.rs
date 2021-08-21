@@ -19,6 +19,7 @@
 use super::Command;
 use crate::command_search::search;
 use crate::command_search::Target::{Builtin, External, Function};
+use crate::expansion::expand_words;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
@@ -47,15 +48,15 @@ impl Command for syntax::SimpleCommand {
     /// fails for a reason other than `ENOEXEC`. In this implementation, the
     /// exit status is 127 for `ENOENT` and `ENOTDIR` and 126 for others.
     async fn execute(&self, env: &mut Env) -> Result {
-        // TODO expand words correctly
-        let fields: Vec<_> = self
-            .words
-            .iter()
-            .map(|w| Field {
-                value: w.to_string(),
-                origin: w.location.clone(),
-            })
-            .collect();
+        let fields = match expand_words(env, &self.words).await {
+            Ok(fields) => fields,
+            Err(error) => {
+                env.print_error(&format_args!("expansion failure: {:?}", error))
+                    .await;
+                // TODO Handle errors that may happen in expansion
+                return Ok(());
+            }
+        };
 
         // TODO open redirections
         // TODO expand and perform assignments
