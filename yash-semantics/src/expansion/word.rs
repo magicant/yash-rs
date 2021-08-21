@@ -63,18 +63,20 @@ impl ExpandToField for Word {
         Ok(AttrField { chars, origin })
     }
 
-    async fn expand_to_fields<E: Env>(&self, env: &mut E) -> Result<Vec<AttrField>> {
-        let mut fields = Vec::new();
+    async fn expand_to_fields_into<E: Env, F: Extend<AttrField>>(
+        &self,
+        env: &mut E,
+        fields: &mut F,
+    ) -> Result {
+        let mut fields_without_origin = Vec::new();
         self.units
-            .expand(&mut Expander::new(env, &mut fields))
+            .expand(&mut Expander::new(env, &mut fields_without_origin))
             .await?;
-        Ok(fields
-            .into_iter()
-            .map(|chars| AttrField {
-                chars,
-                origin: self.location.clone(),
-            })
-            .collect())
+        fields.extend(fields_without_origin.into_iter().map(|chars| AttrField {
+            chars,
+            origin: self.location.clone(),
+        }));
+        Ok(())
     }
 }
 

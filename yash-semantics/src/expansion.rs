@@ -242,7 +242,28 @@ pub trait ExpandToField {
     ///
     /// This is usually used in contexts where field splitting will be performed
     /// on the result.
-    async fn expand_to_fields<E: Env>(&self, env: &mut E) -> Result<Vec<AttrField>>;
+    ///
+    /// This function inserts the results into `fields`.
+    /// See also [`expand_to_fields`](Self::expand_to_fields).
+    async fn expand_to_fields_into<E: Env, F: Extend<AttrField>>(
+        &self,
+        env: &mut E,
+        fields: &mut F,
+    ) -> Result;
+
+    /// Performs the initial expansion on `self`, producing any number of
+    /// fields.
+    ///
+    /// This is usually used in contexts where field splitting will be performed
+    /// on the result.
+    ///
+    /// This function returns a vector of resultant fields.
+    /// See also [`expand_to_fields_into`](Self::expand_to_fields_into).
+    async fn expand_to_fields<E: Env>(&self, env: &mut E) -> Result<Vec<AttrField>> {
+        let mut fields = Vec::new();
+        self.expand_to_fields_into(env, &mut fields).await?;
+        Ok(fields)
+    }
 }
 
 #[cfg(test)]
