@@ -47,8 +47,23 @@ impl Expand for WordUnit {
                 e.push_char(quote);
                 Ok(())
             }
+            DoubleQuote(text) => {
+                let quote = AttrChar {
+                    value: '"',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: true,
+                };
+                e.push_char(quote);
+                {
+                    let mut e = e.begin_quote();
+                    text.expand(&mut e).await?;
+                    Expander::end_quote(e);
+                }
+                e.push_char(quote);
+                Ok(())
+            }
             // TODO Expand Tilde correctly
-            // TODO Expand DoubleQuote correctly
             _ => {
                 e.push_str(&self.to_string(), Origin::Literal, false, false);
                 Ok(())
@@ -154,6 +169,53 @@ mod tests {
                     is_quoted: false,
                     is_quoting: true,
                 },
+            ]
+        );
+    }
+
+    #[test]
+    fn double_quote_expand() {
+        let mut field = Vec::<AttrChar>::default();
+        let mut env = NullEnv;
+        let mut e = Expander::new(&mut env, &mut field);
+        let u: WordUnit = r#""\a\$""#.parse().unwrap();
+        block_on(u.expand(&mut e)).unwrap();
+
+        let quote = AttrChar {
+            value: '"',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        assert_eq!(
+            field,
+            [
+                quote,
+                AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                },
+                AttrChar {
+                    value: 'a',
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                },
+                AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: true,
+                },
+                AttrChar {
+                    value: '$',
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                },
+                quote,
             ]
         );
     }
