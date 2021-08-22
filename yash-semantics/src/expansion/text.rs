@@ -35,12 +35,10 @@ impl Expand for TextUnit {
             Literal(c) => e.push_char(AttrChar {
                 value: *c,
                 origin: Origin::Literal,
-                // TODO is_quoted may be true depending on the context
                 is_quoted: false,
                 is_quoting: false,
             }),
             Backslashed(c) => {
-                // TODO is_quoted may be true depending on the context
                 e.push_char(AttrChar {
                     value: '\\',
                     origin: Origin::Literal,

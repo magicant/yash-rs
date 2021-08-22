@@ -243,9 +243,17 @@ impl<E: Env> DerefMut for Expander<'_, E> {
 
 /// The `Expansion` implementation for `Expander` delegates to the `Expansion`
 /// implementor contained in the `Expander`.
+///
+/// However, if `self.is_quoted()` is `true`, `is_quoted` of resulting
+/// `AttrChar`s will also be `true`.
 impl<E: Env> Expansion for Expander<'_, E> {
-    fn push_char(&mut self, c: AttrChar) {
+    fn push_char(&mut self, mut c: AttrChar) {
+        c.is_quoted |= self.is_quoted;
         self.result.push_char(c)
+    }
+    fn push_str(&mut self, s: &str, origin: Origin, is_quoted: bool, is_quoting: bool) {
+        self.result
+            .push_str(s, origin, is_quoted | self.is_quoted, is_quoting);
     }
 }
 
@@ -290,8 +298,8 @@ impl<'e, E: Env> Expander<'e, E> {
     /// passed to [`end_quote`](Self::end_quote), `is_quoted` is reset to the
     /// previous value.
     ///
-    /// This function does not directly affect `is_quoted` of [`AttrChar`]s
-    /// pushed to the [`Expansion`].
+    /// While `is_quoted` is `true`, all characters pushed to the expander are
+    /// considered quoted; that is, `is_quoted` of [`AttrChar`]s will be `true`.
     pub fn begin_quote(&mut self) -> QuotedExpander<'_, 'e, E> {
         let was_quoted = std::mem::replace(&mut self.is_quoted, true);
         QuotedExpander {
@@ -490,5 +498,54 @@ mod tests {
             Expander::end_quote(expander);
         }
         assert_eq!(expander.is_quoted(), false);
+    }
+
+    #[test]
+    fn expander_put_char_quoted() {
+        let mut field = Vec::<AttrChar>::default();
+        let mut env = NullEnv;
+        let mut expander = Expander::new(&mut env, &mut field);
+        let not_quoted = AttrChar {
+            value: 'X',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let quoted = AttrChar {
+            is_quoted: true,
+            ..not_quoted
+        };
+        expander.push_char(not_quoted);
+        expander.push_char(quoted);
+        let mut expander = expander.begin_quote();
+        expander.push_char(not_quoted);
+        expander.push_char(quoted);
+        Expander::end_quote(expander);
+        assert_eq!(field, [not_quoted, quoted, quoted, quoted]);
+    }
+
+    #[test]
+    fn expander_put_str_quoted() {
+        let mut field = Vec::<AttrChar>::default();
+        let mut env = NullEnv;
+        let mut expander = Expander::new(&mut env, &mut field);
+        expander.push_str("X", Origin::Literal, false, false);
+        expander.push_str("X", Origin::Literal, true, false);
+        let mut expander = expander.begin_quote();
+        expander.push_str("X", Origin::Literal, false, false);
+        expander.push_str("X", Origin::Literal, true, false);
+        Expander::end_quote(expander);
+
+        let not_quoted = AttrChar {
+            value: 'X',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let quoted = AttrChar {
+            is_quoted: true,
+            ..not_quoted
+        };
+        assert_eq!(field, [not_quoted, quoted, quoted, quoted]);
     }
 }
