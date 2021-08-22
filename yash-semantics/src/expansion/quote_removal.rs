@@ -24,10 +24,11 @@ use super::Field;
 ///
 /// The quote removal is a step of the word expansion that removes quotes from
 /// the field. The [`do_quote_removal`](Self::do_quote_removal) function
-/// converts an [`AttrChar`] string to a normal string.
+/// converts an [`AttrChar`] string to a regular string.
 pub trait QuoteRemoval {
     /// Return type of [`do_quote_removal`](Self::do_quote_removal).
     type Output;
+
     /// Performs the quote removal on `self`.
     ///
     /// TODO Add a parameter to specify how characters in the result should be

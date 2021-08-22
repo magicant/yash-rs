@@ -16,19 +16,46 @@
 
 //! Word expansion.
 //!
+//! The word expansion involves many kinds of operations grouped into the
+//! categories described below. The [`expand_words`] function carries out all of
+//! them.
+//!
 //! # Initial expansion
 //!
-//! TODO Elaborate: Tilde expansion, parameter expansion, command substitution,
-//! and arithmetic expansion.
+//! The initial expansion converts a word fragment to attributed characters
+//! ([`AttrChar`]). It may involve the tilde expansion, parameter expansion,
+//! command substitution, and arithmetic expansion performed by the [`Expand`]
+//! implementors.
+//!
+//! Depending on the context, you can configure the expansion to produce either
+//! a single field or any number of fields. Using `Vec<AttrChar>` as
+//! [`Expansion`] will result in a single field. `Vec<Vec<AttrChar>>` may yield
+//! any number of fields.
+//!
+//! To perform the initial expansion on a text/word fragment that implements
+//! `Expand`, you first create an [`Expander`] by providing an [`Env`] and
+//! [`Expansion`] implementors and then call [`expand`](Expand::expand) on the
+//! text/word. If successful, the `Expansion` implementor will contain the
+//! result.
+//!
+//! To expand a whole [word](Word), you can instead call a method of
+//! [`ExpandToField`]. It produces [`AttrField`]s instead of `AttrChar` vectors.
 //!
 //! # Multi-field expansion
 //!
-//! TODO Elaborate: Brace expansion, field splitting, pathname expansion, empty
-//! field removal.
+//! In a context expecting any number of fields, the results of the initial
+//! expansion can be subjected to the multi-field expansion. It consists of the
+//! brace expansion, field splitting, and pathname expansion, performed in this
+//! order. The field splitting includes empty field removal, and the pathname
+//! expansion includes the quote removal described below.
+//!
+//! (TBD: How do users perform multi-field expansion?)
 //!
 //! # Quote removal
 //!
-//! TODO Elaborate
+//! The [quote removal](QuoteRemoval) is the last step of the word expansion
+//! that removes quotes from the field. It takes an [`AttrField`] input and
+//! returns a [`Field`].
 
 mod quote_removal;
 mod text;
@@ -101,7 +128,7 @@ pub struct AttrChar {
     /// Whether this is a quotation character that quotes another character.
     ///
     /// Note that a character can be both quoting and quoted. For example, the
-    /// backslash in the word `"\$"` quotes the dollar and is quoted by the
+    /// backslash in `"\$"` quotes the dollar and is quoted by the
     /// double-quotes.
     pub is_quoting: bool,
 }
@@ -117,7 +144,11 @@ pub struct AttrField {
     pub origin: Location,
 }
 
-/// Result of the initial expansion.
+/// Interface to accumulate results of the initial expansion.
+///
+/// `Expansion` is implemented by types that can accumulate [`AttrChar`]s or
+/// vectors of them. You construct an [`Expander`] using an `Expansion`
+/// implementor and then use it to carry out the initial expansion.
 pub trait Expansion: std::fmt::Debug {
     /// Appends a character to the current field.
     fn push_char(&mut self, c: AttrChar);
@@ -157,14 +188,15 @@ impl Expansion for Vec<Vec<AttrChar>> {
     }
 }
 
-/// Shell execution environment for performing the word expansion in.
+/// Shell execution environment for performing the initial expansion in.
 ///
-/// TODO Elaborate
+/// An expander is a collection of data used in the initial expansion.
+/// It contains a reference to implementors of [`Env`] and [`Expansion`].
 #[derive(Debug)]
 pub struct Expander<'e, E: Env> {
     /// Environment used in the word expansion.
     env: &'e mut E,
-    /// Fields resulting from the word expansion.
+    /// Fields resulting from the initial expansion.
     result: &'e mut dyn Expansion,
     // TODO inside double-quotes?
 }
@@ -228,8 +260,7 @@ impl<T: Expand> Expand for [T] {
 /// Syntactic construct that can be expanded to an [`AttrField`].
 ///
 /// Implementors of this trait expand themselves directly to an `AttrField` or
-/// an array of `AttrField`s.
-/// See also [`Expand`].
+/// a vector of `AttrField`s. See also [`Expand`].
 #[async_trait(?Send)]
 pub trait ExpandToField {
     /// Performs the initial expansion on `self`, producing a single field.

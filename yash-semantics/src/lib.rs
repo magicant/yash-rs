@@ -17,10 +17,10 @@
 //! Semantics of the shell language.
 //!
 //! This crate defines the standard semantics for the shell language. The core
-//! of the semantics is word expansion and command execution. They respectively
-//! have a corresponding trait that is implemented by syntactic constructs.
-//!
-//! TODO Elaborate
+//! of the semantics is command execution and word expansion.
+//! A command can be executed by calling [`Command::execute`].
+//! A word can be expanded by using functions and traits defined in
+//! [`expansion`].
 
 mod command_impl;
 pub mod command_search;
