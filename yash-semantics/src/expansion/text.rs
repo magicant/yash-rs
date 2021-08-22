@@ -39,7 +39,21 @@ impl Expand for TextUnit {
                 is_quoted: false,
                 is_quoting: false,
             }),
-            // TODO Expand Backslashed correctly
+            Backslashed(c) => {
+                // TODO is_quoted may be true depending on the context
+                e.push_char(AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: true,
+                });
+                e.push_char(AttrChar {
+                    value: *c,
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                });
+            }
             // TODO Expand RawParam correctly
             // TODO Expand BracedParam correctly
             // TODO Expand CommandSubst correctly
@@ -85,6 +99,32 @@ mod tests {
                 is_quoted: false,
                 is_quoting: false
             }]
+        );
+    }
+
+    #[test]
+    fn backslashed_expand_unquoted() {
+        let mut field = Vec::<AttrChar>::default();
+        let mut env = NullEnv;
+        let mut e = Expander::new(&mut env, &mut field);
+        let b = TextUnit::Backslashed('$');
+        block_on(b.expand(&mut e)).unwrap();
+        assert_eq!(
+            field,
+            [
+                AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: true,
+                },
+                AttrChar {
+                    value: '$',
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                }
+            ]
         );
     }
 
