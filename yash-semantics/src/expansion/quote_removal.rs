@@ -40,7 +40,10 @@ impl QuoteRemoval for &[AttrChar] {
     type Output = String;
     fn do_quote_removal(self) -> String {
         // TODO Remove quotes correctly
-        self.iter().map(|c| c.value).collect()
+        self.iter()
+            .filter(|c| !c.is_quoting)
+            .map(|c| c.value)
+            .collect()
     }
 }
 
@@ -50,5 +53,42 @@ impl QuoteRemoval for AttrField {
         let AttrField { chars, origin } = self;
         let value = chars.do_quote_removal();
         Field { value, origin }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::Origin;
+    use super::*;
+
+    #[test]
+    fn quote_removal() {
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let b = AttrChar {
+            value: 'b',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let c = AttrChar {
+            value: 'c',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let d = AttrChar {
+            value: 'd',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: true,
+        };
+        let input = [a, b, c, d];
+        let result = input.do_quote_removal();
+        assert_eq!(result, "ab");
     }
 }
