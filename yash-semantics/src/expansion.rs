@@ -262,6 +262,7 @@ impl<E: Env> Expansion for Expander<'_, E> {
 /// When the instance of `QuotedExpander` is dropped, `is_quoted` is reset to
 /// the previous value.
 #[derive(Debug)]
+#[must_use = "You must retain QuotedExpander to keep is_quoted true"]
 pub struct QuotedExpander<'q, 'e, E: Env> {
     /// The expander
     expander: &'q mut Expander<'e, E>,
