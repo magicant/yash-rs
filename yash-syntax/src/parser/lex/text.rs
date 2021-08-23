@@ -65,8 +65,8 @@ impl WordLexer<'_> {
         is_escapable: &mut dyn FnMut(char) -> bool,
     ) -> Result<Option<TextUnit>> {
         if self.skip_if(|c| c == '\\').await? {
-            if let Some(c) = self.consume_char_if_dyn(is_escapable).await? {
-                return Ok(Some(Backslashed(c.value)));
+            if let Some(c) = self.consume_raw_char_if_dyn(is_escapable).await? {
+                return Ok(Some(Backslashed(c)));
             } else {
                 return Ok(Some(Literal('\\')));
             }
@@ -85,6 +85,20 @@ impl WordLexer<'_> {
         }
 
         Ok(None)
+    }
+
+    /// Like `consume_char_if_dyn`, but ignores line continuation.
+    async fn consume_raw_char_if_dyn(
+        &mut self,
+        is_escapable: &mut dyn FnMut(char) -> bool,
+    ) -> Result<Option<char>> {
+        self.disable_line_continuation();
+        let result = self
+            .consume_char_if_dyn(is_escapable)
+            .await?
+            .map(|c| c.value);
+        self.enable_line_continuation();
+        Ok(result)
     }
 }
 
@@ -302,6 +316,30 @@ mod tests {
         assert_eq!(result, Literal('\\'));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
+    }
+
+    #[test]
+    fn lexer_text_unit_backslash_line_continuation_not_recognized() {
+        let mut lexer = Lexer::with_source(Source::Unknown, "\\\\\n");
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+        let mut called = false;
+        let result = block_on(lexer.text_unit(
+            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| {
+                called = true;
+                assert_eq!(c, '\\');
+                true
+            },
+        ))
+        .unwrap()
+        .unwrap();
+        assert!(called);
+        assert_eq!(result, Backslashed('\\'));
+
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
     }
 
     #[test]
