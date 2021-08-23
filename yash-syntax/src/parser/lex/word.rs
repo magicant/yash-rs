@@ -38,19 +38,19 @@ impl Lexer {
     /// actually is a location of `'`.
     async fn single_quote(&mut self, opening_location: Location) -> Result<WordUnit> {
         let mut content = String::new();
-        self.disable_line_continuation();
+        let mut lexer = self.disable_line_continuation();
         loop {
-            match self.consume_char_if(|_| true).await? {
+            match lexer.consume_char_if(|_| true).await? {
                 Some(&SourceChar { value: '\'', .. }) => break,
                 Some(&SourceChar { value, .. }) => content.push(value),
                 None => {
                     let cause = SyntaxError::UnclosedSingleQuote { opening_location }.into();
-                    let location = self.location().await?.clone();
+                    let location = lexer.location().await?.clone();
                     return Err(Error { cause, location });
                 }
             }
         }
-        self.enable_line_continuation();
+        Lexer::enable_line_continuation(lexer);
         Ok(SingleQuote(content))
     }
 

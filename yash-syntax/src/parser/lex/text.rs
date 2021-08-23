@@ -92,13 +92,11 @@ impl WordLexer<'_> {
         &mut self,
         is_escapable: &mut dyn FnMut(char) -> bool,
     ) -> Result<Option<char>> {
-        self.disable_line_continuation();
-        let result = self
+        Ok(self
+            .disable_line_continuation()
             .consume_char_if_dyn(is_escapable)
             .await?
-            .map(|c| c.value);
-        self.enable_line_continuation();
-        Ok(result)
+            .map(|c| c.value))
     }
 }
 

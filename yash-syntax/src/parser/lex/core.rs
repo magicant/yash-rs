@@ -343,35 +343,32 @@ impl Lexer {
         Lexer::new(Box::new(Memory::new(source, code)))
     }
 
-    /// Enables line continuation recognition onward.
-    ///
-    /// When line continuation recognition is enabled,
-    /// [`peek_char`](Self::peek_char) silently skips line continuation
-    /// sequences.
-    ///
-    /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
-    /// switch line continuation recognition off.
-    ///
-    /// When a new lexer is created, line continuation recognition is enabled by
-    /// default.
-    pub fn enable_line_continuation(&mut self) {
-        self.line_continuation_enabled = true;
-    }
-
     /// Disables line continuation recognition onward.
     ///
-    /// When line continuation recognition is enabled,
-    /// [`peek_char`](Self::peek_char) silently skips line continuation
-    /// sequences.
+    /// By default, [`peek_char`](Self::peek_char) silently skips line
+    /// continuation sequences. When line continuation is disabled, however,
+    /// `peek_char` returns characters literally.
     ///
     /// Call [`enable_line_continuation`](Self::enable_line_continuation) to
     /// switch line continuation recognition on.
     ///
-    /// When a new lexer is created, line continuation recognition is enabled by
-    /// default.
-    pub fn disable_line_continuation(&mut self) {
+    /// This function will panic if line continuation has already been disabled.
+    pub fn disable_line_continuation(&mut self) -> PlainLexer<'_> {
+        assert!(
+            self.line_continuation_enabled,
+            "line continuation already disabled"
+        );
         self.line_continuation_enabled = false;
+        PlainLexer { lexer: self }
     }
+
+    /// Re-enables line continuation.
+    ///
+    /// You can pass the `PlainLexer` returned from
+    /// [`disable_line_continuation`](Self::disable_line_continuation) to this
+    /// function to re-enable line continuation. That is equivalent to dropping
+    /// the `PlainLexer` instance, but the code will be more descriptive.
+    pub fn enable_line_continuation(_: PlainLexer<'_>) {}
 
     /// Skips line continuation, i.e., a backslash followed by a newline.
     ///
@@ -401,13 +398,13 @@ impl Lexer {
 
     /// Peeks the next character.
     ///
-    /// If the end of input is reached, `Ok(None)` is returned. On error, `Err(_)` is returned.
+    /// If the end of input is reached, `Ok(None)` is returned. On error,
+    /// `Err(_)` is returned.
     ///
     /// If line continuation recognition is enabled, combinations of a backslash
     /// and a newline are silently skipped before returning the next character.
-    /// Call [`enable_line_continuation`](Self::enable_line_continuation) and
-    /// [`disable_line_continuation`](Self::disable_line_continuation) to switch
-    /// line continuation recognition on and off, respectively.
+    /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
+    /// switch off line continuation recognition.
     pub async fn peek_char(&mut self) -> Result<Option<char>> {
         while self.line_continuation().await? {}
 
@@ -572,6 +569,38 @@ impl Lexer {
     /// Like [`Lexer::inner_program`], but returns the future in a pinned box.
     pub fn inner_program_boxed(&mut self) -> Pin<Box<dyn Future<Output = Result<String>> + '_>> {
         Box::pin(self.inner_program())
+    }
+}
+
+/// Reference to [`Lexer`] with line continuation disabled.
+///
+/// This struct implements the RAII pattern for temporarily disabling line
+/// continuation. When you disable the line continuation of a lexer, you get an
+/// instance of `PlainLexer`. You can access the original lexer via the
+/// `PlainLexer` until you drop it, when the line continuation is automatically
+/// re-enabled.
+#[derive(Debug)]
+#[must_use = "You must retain the PlainLexer to keep line continuation disabled"]
+pub struct PlainLexer<'l> {
+    lexer: &'l mut Lexer,
+}
+
+impl Deref for PlainLexer<'_> {
+    type Target = Lexer;
+    fn deref(&self) -> &Lexer {
+        self.lexer
+    }
+}
+
+impl DerefMut for PlainLexer<'_> {
+    fn deref_mut(&mut self) -> &mut Lexer {
+        self.lexer
+    }
+}
+
+impl Drop for PlainLexer<'_> {
+    fn drop(&mut self) {
+        self.lexer.line_continuation_enabled = true;
     }
 }
 
@@ -1148,8 +1177,6 @@ mod tests {
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
-        lexer.enable_line_continuation();
-
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
@@ -1157,8 +1184,6 @@ mod tests {
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
-        lexer.enable_line_continuation();
-
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
@@ -1166,8 +1191,7 @@ mod tests {
     #[test]
     fn lexer_peek_char_with_line_continuation_disabled() {
         let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
-        lexer.disable_line_continuation();
-
+        let mut lexer = lexer.disable_line_continuation();
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
     }

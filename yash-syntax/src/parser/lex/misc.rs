@@ -47,9 +47,9 @@ impl Lexer {
     /// This function does not recognize line continuation inside the comment.
     pub async fn skip_comment(&mut self) -> Result<()> {
         if self.skip_if(|c| c == '#').await? {
-            self.disable_line_continuation();
-            while self.skip_if(|c| c != '\n').await? {}
-            self.enable_line_continuation();
+            let mut lexer = self.disable_line_continuation();
+            while lexer.skip_if(|c| c != '\n').await? {}
+            Lexer::enable_line_continuation(lexer);
         }
         Ok(())
     }
