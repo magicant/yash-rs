@@ -18,7 +18,11 @@
 
 use super::Command;
 use async_trait::async_trait;
+use std::rc::Rc;
+use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
+use yash_env::function::Function;
+use yash_env::function::HashEntry;
 use yash_env::Env;
 use yash_syntax::syntax;
 
@@ -29,13 +33,27 @@ impl Command for syntax::Command {
         match self {
             Simple(command) => command.execute(env).await,
             Compound(command) => command.execute(env).await,
-            Function(_) => {
-                // TODO execute function definition
-                env.print_error(&format_args!("Not implemented: {}", self))
-                    .await;
-                Ok(())
-            }
+            Function(definition) => definition.execute(env).await,
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl Command for syntax::FunctionDefinition {
+    async fn execute(&self, env: &mut Env) -> Result {
+        // TODO Expand name
+        // TODO Avoid cloning whole body
+        let function = Function {
+            name: self.name.to_string(),
+            body: self.body.clone().into(),
+            origin: self.name.location.clone(),
+            is_read_only: false,
+        };
+        let entry = HashEntry(Rc::new(function));
+        // TODO Don't overwrite read-only functions
+        env.functions.replace(entry);
+        env.exit_status = ExitStatus::SUCCESS;
+        Ok(())
     }
 }
 
@@ -71,7 +89,57 @@ mod tests {
     use crate::tests::return_builtin;
     use futures_executor::block_on;
     use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
+    use yash_syntax::source::Location;
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_new() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::ERROR;
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "{ :; }".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.functions.len(), 1);
+        let function = &env.functions.get("foo").unwrap().0;
+        assert_eq!(function.name, "foo");
+        assert_eq!(function.origin, definition.name.location);
+        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.is_read_only, false);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_overwrite() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::ERROR;
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ :; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "( :; )".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.functions.len(), 1);
+        let function = &env.functions.get("foo").unwrap().0;
+        assert_eq!(function.name, "foo");
+        assert_eq!(function.origin, definition.name.location);
+        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.is_read_only, false);
+    }
 
     #[test]
     fn list_execute_no_divert() {
