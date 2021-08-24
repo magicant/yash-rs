@@ -307,6 +307,8 @@ where
     E: Env,
     I: IntoIterator<Item = &'a Word>,
 {
+    // TODO Optimize by taking advantage of MaybeLiteral
+
     let mut fields = Vec::new();
     for word in words {
         word.expand_to_fields_into(env, &mut fields).await?;
