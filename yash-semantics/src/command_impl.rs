@@ -42,15 +42,27 @@ impl Command for syntax::Command {
 impl Command for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env) -> Result {
         // TODO Expand name
+        let name = self.name.to_string();
+        if let Some(function) = env.functions.get(name.as_str()) {
+            if function.0.is_read_only {
+                env.print_error(&format_args!(
+                    "cannot re-define read-only function {:?}",
+                    name
+                ))
+                .await;
+                env.exit_status = ExitStatus::ERROR;
+                return Ok(());
+            }
+        }
+
         // TODO Avoid cloning whole body
         let function = Function {
-            name: self.name.to_string(),
+            name,
             body: self.body.clone().into(),
             origin: self.name.location.clone(),
             is_read_only: false,
         };
         let entry = HashEntry(Rc::new(function));
-        // TODO Don't overwrite read-only functions
         env.functions.replace(entry);
         env.exit_status = ExitStatus::SUCCESS;
         Ok(())
@@ -88,7 +100,9 @@ mod tests {
     use super::*;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
+    use std::path::Path;
     use yash_env::exec::Divert;
+    use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
     #[allow(clippy::bool_assert_comparison)]
@@ -139,6 +153,45 @@ mod tests {
         assert_eq!(function.origin, definition.name.location);
         assert_eq!(*function.body, definition.body);
         assert_eq!(function.is_read_only, false);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_read_only() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let function = Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ :; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: true,
+        });
+        env.functions.insert(HashEntry(Rc::clone(&function)));
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "( :; )".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_eq!(env.functions.len(), 1);
+        assert_eq!(env.functions.get("foo").unwrap().0, function);
+
+        let state = state.borrow();
+        let stderr = state
+            .file_system
+            .get(Path::new("/dev/stderr"))
+            .unwrap()
+            .borrow();
+        let stderr = std::str::from_utf8(&stderr.content).unwrap();
+        assert!(
+            stderr.contains("foo"),
+            "The error message should contain the function name: {:?}",
+            stderr
+        );
     }
 
     #[test]
