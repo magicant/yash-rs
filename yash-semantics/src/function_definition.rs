@@ -1,0 +1,185 @@
+// This file is part of yash, an extended POSIX shell.
+// Copyright (C) 2021 WATANABE Yuki
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//! Implementations of function definition semantics.
+
+use super::Command;
+use crate::expansion::expand_word;
+use crate::expansion::Field;
+use async_trait::async_trait;
+use std::rc::Rc;
+use yash_env::exec::ExitStatus;
+use yash_env::exec::Result;
+use yash_env::function::Function;
+use yash_env::function::HashEntry;
+use yash_env::Env;
+use yash_syntax::syntax;
+
+#[async_trait(?Send)]
+impl Command for syntax::FunctionDefinition {
+    async fn execute(&self, env: &mut Env) -> Result {
+        let Field {
+            value: name,
+            origin,
+        } = match expand_word(env, &self.name).await {
+            Ok(field) => field,
+            Err(error) => {
+                env.print_error(&format_args!("expansion failure: {:?}", error))
+                    .await;
+                // TODO Handle errors that may happen in expansion
+                return Ok(());
+            }
+        };
+
+        if let Some(function) = env.functions.get(name.as_str()) {
+            if function.0.is_read_only {
+                env.print_error(&format_args!(
+                    "cannot re-define read-only function {:?}",
+                    name
+                ))
+                .await;
+                env.exit_status = ExitStatus::ERROR;
+                return Ok(());
+            }
+        }
+
+        // TODO Avoid cloning whole body
+        let function = Function {
+            name,
+            body: self.body.clone().into(),
+            origin,
+            is_read_only: false,
+        };
+        let entry = HashEntry(Rc::new(function));
+        env.functions.replace(entry);
+        env.exit_status = ExitStatus::SUCCESS;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_executor::block_on;
+    use std::path::Path;
+    use yash_env::VirtualSystem;
+    use yash_syntax::source::Location;
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_new() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::ERROR;
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "{ :; }".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.functions.len(), 1);
+        let function = &env.functions.get("foo").unwrap().0;
+        assert_eq!(function.name, "foo");
+        assert_eq!(function.origin, definition.name.location);
+        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.is_read_only, false);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_overwrite() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::ERROR;
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ :; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "( :; )".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.functions.len(), 1);
+        let function = &env.functions.get("foo").unwrap().0;
+        assert_eq!(function.name, "foo");
+        assert_eq!(function.origin, definition.name.location);
+        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.is_read_only, false);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn function_definition_read_only() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let function = Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ :; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: true,
+        });
+        env.functions.insert(HashEntry(Rc::clone(&function)));
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: "( :; )".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_eq!(env.functions.len(), 1);
+        assert_eq!(env.functions.get("foo").unwrap().0, function);
+
+        let state = state.borrow();
+        let stderr = state
+            .file_system
+            .get(Path::new("/dev/stderr"))
+            .unwrap()
+            .borrow();
+        let stderr = std::str::from_utf8(&stderr.content).unwrap();
+        assert!(
+            stderr.contains("foo"),
+            "The error message should contain the function name: {:?}",
+            stderr
+        );
+    }
+
+    #[test]
+    fn function_definition_name_expansion() {
+        let mut env = Env::new_virtual();
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: r"\a".parse().unwrap(),
+            body: "{ :; }".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
+        assert_eq!(names, ["a"]);
+    }
+}
