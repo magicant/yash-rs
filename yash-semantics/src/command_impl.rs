@@ -64,3 +64,32 @@ impl Command for syntax::List {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::return_builtin;
+    use futures_executor::block_on;
+    use yash_env::exec::Divert;
+    use yash_env::exec::ExitStatus;
+
+    #[test]
+    fn list_execute_no_divert() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: syntax::List = "return -n 1; return -n 2; return -n 4".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(4));
+    }
+
+    #[test]
+    fn list_execute_divert() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: syntax::List = "return -n 1; return 2; return -n 4".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(2));
+    }
+}
