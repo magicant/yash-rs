@@ -17,6 +17,8 @@
 //! Implementations for Command.
 
 use super::Command;
+use crate::expansion::expand_word;
+use crate::expansion::Field;
 use async_trait::async_trait;
 use std::rc::Rc;
 use yash_env::exec::ExitStatus;
@@ -41,8 +43,19 @@ impl Command for syntax::Command {
 #[async_trait(?Send)]
 impl Command for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env) -> Result {
-        // TODO Expand name
-        let name = self.name.to_string();
+        let Field {
+            value: name,
+            origin,
+        } = match expand_word(env, &self.name).await {
+            Ok(field) => field,
+            Err(error) => {
+                env.print_error(&format_args!("expansion failure: {:?}", error))
+                    .await;
+                // TODO Handle errors that may happen in expansion
+                return Ok(());
+            }
+        };
+
         if let Some(function) = env.functions.get(name.as_str()) {
             if function.0.is_read_only {
                 env.print_error(&format_args!(
@@ -59,7 +72,7 @@ impl Command for syntax::FunctionDefinition {
         let function = Function {
             name,
             body: self.body.clone().into(),
-            origin: self.name.location.clone(),
+            origin,
             is_read_only: false,
         };
         let entry = HashEntry(Rc::new(function));
@@ -192,6 +205,22 @@ mod tests {
             "The error message should contain the function name: {:?}",
             stderr
         );
+    }
+
+    #[test]
+    fn function_definition_name_expansion() {
+        let mut env = Env::new_virtual();
+        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+            has_keyword: false,
+            name: r"\a".parse().unwrap(),
+            body: "{ :; }".parse().unwrap(),
+        };
+
+        let result = block_on(definition.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
+        assert_eq!(names, ["a"]);
     }
 
     #[test]
