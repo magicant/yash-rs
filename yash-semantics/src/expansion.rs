@@ -73,9 +73,10 @@ pub use yash_env::expansion::*;
 pub use quote_removal::*;
 
 /// Types of errors that may occur in the word expansion.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
     // TODO Define error cause types
+    Dummy(String),
 }
 
 /// Explanation of an expansion failure.

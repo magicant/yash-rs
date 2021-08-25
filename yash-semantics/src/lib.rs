@@ -27,6 +27,7 @@ pub mod command_search;
 mod compound;
 pub mod expansion;
 mod function_definition;
+mod handle_impl;
 mod pipeline;
 mod simple_command;
 
@@ -43,6 +44,17 @@ pub trait Command {
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
     async fn execute(&self, env: &mut Env) -> Result;
+}
+
+/// Error handler.
+///
+/// Most errors in the shell are handled by printing an error message to the
+/// standard error and returning a non-zero exit status. This trait provides a
+/// standard interface for implementing that behavior.
+#[async_trait(?Send)]
+pub trait Handle<E> {
+    /// Handles the argument error.
+    async fn handle(&mut self, error: E) -> Result;
 }
 
 // TODO Probably we should implement a read-execute loop in here
