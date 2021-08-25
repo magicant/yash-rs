@@ -32,6 +32,7 @@ use yash_syntax::syntax;
 #[async_trait(?Send)]
 impl Command for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env) -> Result {
+        // Expand the function name
         let Field {
             value: name,
             origin,
@@ -40,6 +41,7 @@ impl Command for syntax::FunctionDefinition {
             Err(error) => return env.handle(error).await,
         };
 
+        // Avoid overwriting a read-only function
         if let Some(function) = env.functions.get(name.as_str()) {
             if function.0.is_read_only {
                 env.print_error(&format_args!(
@@ -52,6 +54,7 @@ impl Command for syntax::FunctionDefinition {
             }
         }
 
+        // Define the function
         let function = Function {
             name,
             body: Rc::clone(&self.body),
