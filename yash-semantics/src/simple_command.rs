@@ -16,10 +16,11 @@
 
 //! Implementation of simple command semantics.
 
-use super::Command;
 use crate::command_search::search;
 use crate::command_search::Target::{Builtin, External, Function};
 use crate::expansion::expand_words;
+use crate::Command;
+use crate::Handle;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
@@ -50,12 +51,7 @@ impl Command for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let fields = match expand_words(env, &self.words).await {
             Ok(fields) => fields,
-            Err(error) => {
-                env.print_error(&format_args!("expansion failure: {:?}", error))
-                    .await;
-                // TODO Handle errors that may happen in expansion
-                return Ok(());
-            }
+            Err(error) => return env.handle(error).await,
         };
 
         // TODO open redirections
