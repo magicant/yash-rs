@@ -379,10 +379,23 @@ pub trait ExpandToField {
     }
 }
 
+/// Expands a word to a field.
+///
+/// This function performs the initial expansion and quote removal.
+///
+/// To expand multiple words to multiple fields, use [`expand_words`].
+pub async fn expand_word<E: Env>(env: &mut E, word: &Word) -> Result<Field> {
+    // TODO Optimize by taking advantage of MaybeLiteral
+    let field = word.expand_to_field(env).await?;
+    Ok(field.do_quote_removal())
+}
+
 /// Expands words to fields.
 ///
 /// This function performs all of the initial expansion, multi-field expansion,
 /// and quote removal.
+///
+/// To expand a single word to a single field, use [`expand_word`].
 pub async fn expand_words<'a, E, I>(env: &mut E, words: I) -> Result<Vec<Field>>
 where
     E: Env,

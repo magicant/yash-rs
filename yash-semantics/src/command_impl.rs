@@ -29,12 +29,7 @@ impl Command for syntax::Command {
         match self {
             Simple(command) => command.execute(env).await,
             Compound(command) => command.execute(env).await,
-            Function(_) => {
-                // TODO execute function definition
-                env.print_error(&format_args!("Not implemented: {}", self))
-                    .await;
-                Ok(())
-            }
+            Function(definition) => definition.execute(env).await,
         }
     }
 }

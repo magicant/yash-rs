@@ -26,6 +26,7 @@ mod command_impl;
 pub mod command_search;
 mod compound;
 pub mod expansion;
+mod function_definition;
 mod pipeline;
 mod simple_command;
 
