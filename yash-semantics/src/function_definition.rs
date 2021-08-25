@@ -56,10 +56,9 @@ impl Command for syntax::FunctionDefinition {
             }
         }
 
-        // TODO Avoid cloning whole body
         let function = Function {
             name,
-            body: self.body.clone().into(),
+            body: Rc::clone(&self.body),
             origin,
             is_read_only: false,
         };
@@ -86,7 +85,7 @@ mod tests {
         let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
             has_keyword: false,
             name: "foo".parse().unwrap(),
-            body: "{ :; }".parse().unwrap(),
+            body: Rc::new("{ :; }".parse().unwrap()),
         };
 
         let result = block_on(definition.execute(&mut env));
@@ -96,7 +95,7 @@ mod tests {
         let function = &env.functions.get("foo").unwrap().0;
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
-        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.body, definition.body);
         assert_eq!(function.is_read_only, false);
     }
 
@@ -114,7 +113,7 @@ mod tests {
         let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
             has_keyword: false,
             name: "foo".parse().unwrap(),
-            body: "( :; )".parse().unwrap(),
+            body: Rc::new("( :; )".parse().unwrap()),
         };
 
         let result = block_on(definition.execute(&mut env));
@@ -124,7 +123,7 @@ mod tests {
         let function = &env.functions.get("foo").unwrap().0;
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
-        assert_eq!(*function.body, definition.body);
+        assert_eq!(function.body, definition.body);
         assert_eq!(function.is_read_only, false);
     }
 
@@ -144,7 +143,7 @@ mod tests {
         let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
             has_keyword: false,
             name: "foo".parse().unwrap(),
-            body: "( :; )".parse().unwrap(),
+            body: Rc::new("( :; )".parse().unwrap()),
         };
 
         let result = block_on(definition.execute(&mut env));
@@ -173,7 +172,7 @@ mod tests {
         let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
             has_keyword: false,
             name: r"\a".parse().unwrap(),
-            body: "{ :; }".parse().unwrap(),
+            body: Rc::new("{ :; }".parse().unwrap()),
         };
 
         let result = block_on(definition.execute(&mut env));

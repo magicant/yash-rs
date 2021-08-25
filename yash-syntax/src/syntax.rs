@@ -1098,7 +1098,7 @@ pub struct FunctionDefinition<H = HereDoc> {
     /// Function name.
     pub name: Word,
     /// Function body.
-    pub body: FullCompoundCommand<H>,
+    pub body: Rc<FullCompoundCommand<H>>,
 }
 
 impl<H: fmt::Display> fmt::Display for FunctionDefinition<H> {
@@ -2071,7 +2071,7 @@ mod tests {
         let fd = FunctionDefinition {
             has_keyword: false,
             name: Word::from_str("foo").unwrap(),
-            body,
+            body: Rc::new(body),
         };
         assert_eq!(fd.to_string(), "foo() (bar)");
     }

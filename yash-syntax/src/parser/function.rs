@@ -27,6 +27,7 @@ use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Command;
 use crate::syntax::FunctionDefinition;
 use crate::syntax::SimpleCommand;
+use std::rc::Rc;
 
 impl Parser<'_> {
     /// Parses a function definition command that does not start with the
@@ -68,7 +69,7 @@ impl Parser<'_> {
                 Some(body) => Ok(Command::Function(FunctionDefinition {
                     has_keyword: false,
                     name,
-                    body,
+                    body: Rc::new(body),
                 })),
                 None => {
                     let next = match self.take_token_manual(false).await? {
