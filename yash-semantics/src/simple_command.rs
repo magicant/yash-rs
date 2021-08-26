@@ -67,8 +67,10 @@ impl Command for syntax::SimpleCommand {
                     }
                 }
                 Some(Function(function)) => {
-                    println!("Function: {:?}", function);
-                    // TODO Call the function
+                    // TODO Allocate local variable scope
+                    // TODO Apply positional parameters
+                    function.body.execute(env).await?;
+                    // TODO Consume Divert::Return
                 }
                 Some(External { path }) => {
                     let args = to_c_strings(fields);
@@ -140,6 +142,7 @@ mod tests {
     use yash_env::variable::Variable;
     use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
+    use yash_syntax::source::Location;
 
     #[test]
     fn simple_command_returns_exit_status_from_builtin_without_divert() {
@@ -159,6 +162,23 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Err(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
+    }
+
+    #[test]
+    fn simple_command_returns_exit_status_from_function() {
+        use yash_env::function::{Function, HashEntry};
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ return -n 13; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(13));
     }
 
     #[test]
