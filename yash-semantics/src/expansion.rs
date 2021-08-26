@@ -331,6 +331,9 @@ pub trait Expand {
 
 #[async_trait(?Send)]
 impl<T: Expand> Expand for [T] {
+    /// Expands a slice.
+    ///
+    /// This function expands each item of the slice in sequence.
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         for item in self {
             item.expand(e).await?;

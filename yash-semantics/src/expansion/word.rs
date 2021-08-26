@@ -31,6 +31,9 @@ use yash_syntax::syntax::WordUnit;
 
 #[async_trait(?Send)]
 impl Expand for WordUnit {
+    /// Expands the word unit.
+    ///
+    /// TODO Elaborate
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         use WordUnit::*;
         match self {
@@ -74,6 +77,7 @@ impl Expand for WordUnit {
 
 #[async_trait(?Send)]
 impl Expand for Word {
+    /// Expands the word.
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         self.units.expand(e).await
     }

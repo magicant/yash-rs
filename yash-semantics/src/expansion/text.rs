@@ -29,6 +29,9 @@ use yash_syntax::syntax::TextUnit;
 
 #[async_trait(?Send)]
 impl Expand for TextUnit {
+    /// Expands the text unit.
+    ///
+    /// TODO Elaborate
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         use TextUnit::*;
         match self {
@@ -65,6 +68,7 @@ impl Expand for TextUnit {
 
 #[async_trait(?Send)]
 impl Expand for Text {
+    /// Expands the text.
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         self.0.expand(e).await
     }
