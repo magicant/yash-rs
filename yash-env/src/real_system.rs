@@ -51,10 +51,26 @@ fn is_regular_file(path: &CStr) -> bool {
 
 /// Implementation of `System` that actually interacts with the system.
 ///
-/// `RealSystem` has no state at the Rust level because the relevant state of
-/// the environment is managed by the underlying operating system.
+/// `RealSystem` is an empty `struct` because the underlying operating system
+/// manages the system's internal state.
 #[derive(Debug)]
-pub struct RealSystem;
+pub struct RealSystem(());
+
+impl RealSystem {
+    /// Returns an instance of `RealSystem`.
+    ///
+    /// # Safety
+    ///
+    /// This function is marked `unsafe` because improper use of `RealSystem`
+    /// may lead to undefined behavior. Remember that most operations performed
+    /// on the system by [`Env`] are not thread-safe. You should never use
+    /// `RealSystem` in a multi-threaded program, and it is your responsibility
+    /// to make sure you are using only one instance of `ReadSystem` in the
+    /// process.
+    pub unsafe fn new() -> Self {
+        RealSystem(())
+    }
+}
 
 impl System for RealSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {

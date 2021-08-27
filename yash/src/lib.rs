@@ -48,7 +48,10 @@ async fn parse_and_print() -> i32 {
         }
     }
 
-    let mut env = Env::with_system(Box::new(RealSystem));
+    // SAFETY: This is the only instance of RealSystem we create in the whole
+    // process.
+    let system = unsafe { RealSystem::new() };
+    let mut env = Env::with_system(Box::new(system));
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.
