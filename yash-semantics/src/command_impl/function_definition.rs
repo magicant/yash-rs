@@ -80,7 +80,6 @@ impl Command for syntax::FunctionDefinition {
 mod tests {
     use super::*;
     use futures_executor::block_on;
-    use std::path::Path;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -160,11 +159,7 @@ mod tests {
         assert_eq!(env.functions.get("foo").unwrap().0, function);
 
         let state = state.borrow();
-        let stderr = state
-            .file_system
-            .get(Path::new("/dev/stderr"))
-            .unwrap()
-            .borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
         let stderr = std::str::from_utf8(&stderr.content).unwrap();
         assert!(
             stderr.contains("foo"),

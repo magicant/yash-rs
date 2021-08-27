@@ -246,7 +246,6 @@ mod tests {
     use crate::tests::LocalExecutor;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
-    use std::path::Path;
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
@@ -310,7 +309,7 @@ mod tests {
             state.executor = Some(Rc::new(LocalExecutor(executor.spawner())));
             state
                 .file_system
-                .get(Path::new("/dev/stdin"))
+                .get("/dev/stdin")
                 .unwrap()
                 .borrow_mut()
                 .content
@@ -335,11 +334,7 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
-        let stdout = state
-            .file_system
-            .get(Path::new("/dev/stdout"))
-            .unwrap()
-            .borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "ok\n".as_bytes());
     }
 
