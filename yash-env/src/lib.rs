@@ -432,7 +432,6 @@ mod tests {
     use super::*;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
-    use std::path::Path;
 
     #[test]
     fn print_system_error_einval() {
@@ -442,11 +441,7 @@ mod tests {
         block_on(env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42)));
 
         let state = state.borrow();
-        let stderr = state
-            .file_system
-            .get(Path::new("/dev/stderr"))
-            .unwrap()
-            .borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
         let message = format!("dummy message {}: {}\n", 42, Errno::EINVAL.desc());
         assert_eq!(stderr.content, message.as_bytes());
     }

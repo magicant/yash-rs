@@ -195,7 +195,7 @@ impl System for VirtualSystem {
             Ok(path) => PathBuf::from(path),
             Err(_) => return false,
         };
-        match self.state.borrow().file_system.get(&path) {
+        match self.state.borrow().file_system.get(path) {
             None => false,
             Some(inode) => inode.borrow().permissions.0 & 0o111 != 0,
         }
@@ -399,7 +399,7 @@ impl System for VirtualSystem {
         args: &[CString],
         envs: &[CString],
     ) -> nix::Result<Infallible> {
-        let os_path = OsStr::from_bytes(path.to_bytes()).as_ref();
+        let os_path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
         if let Some(file) = fs.get(os_path) {

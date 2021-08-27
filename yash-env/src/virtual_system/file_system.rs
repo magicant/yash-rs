@@ -44,9 +44,9 @@ impl FileSystem {
     }
 
     /// Returns a reference to the existing file at the specified path.
-    pub fn get(&self, path: &Path) -> Option<&Rc<RefCell<INode>>> {
+    pub fn get<P: AsRef<Path>>(&self, path: P) -> Option<&Rc<RefCell<INode>>> {
         // TODO Return ENOTDIR or ENOENT if not found
-        self.0.get(path)
+        self.0.get(path.as_ref())
     }
 }
 
