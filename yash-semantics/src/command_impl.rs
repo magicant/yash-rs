@@ -16,6 +16,11 @@
 
 //! Implementations for Command.
 
+mod compound;
+mod function_definition;
+mod pipeline;
+mod simple_command;
+
 use super::Command;
 use async_trait::async_trait;
 use yash_env::exec::Result;

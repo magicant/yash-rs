@@ -24,12 +24,8 @@
 
 mod command_impl;
 pub mod command_search;
-mod compound;
 pub mod expansion;
-mod function_definition;
 mod handle_impl;
-mod pipeline;
-mod simple_command;
 
 use async_trait::async_trait;
 use yash_env::Env;
