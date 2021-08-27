@@ -16,6 +16,7 @@
 
 //! Implementations for Command.
 
+mod and_or_list;
 mod compound;
 mod function_definition;
 mod pipeline;
@@ -37,14 +38,6 @@ impl Command for syntax::Command {
             Compound(command) => command.execute(env).await,
             Function(definition) => definition.execute(env).await,
         }
-    }
-}
-
-#[async_trait(?Send)]
-impl Command for syntax::AndOrList {
-    async fn execute(&self, env: &mut Env) -> Result {
-        self.first.execute(env).await
-        // TODO rest
     }
 }
 
