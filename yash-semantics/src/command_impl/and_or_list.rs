@@ -29,11 +29,11 @@ impl Command for AndOrList {
     /// TODO Elaborate
     async fn execute(&self, env: &mut Env) -> Result {
         self.first.execute(env).await?;
-        // TODO or
-        if !env.exit_status.is_successful() {
-            return Ok(());
-        }
         for (_and_or, pipeline) in &self.rest {
+            // TODO or
+            if !env.exit_status.is_successful() {
+                break;
+            }
             pipeline.execute(env).await;
         }
         Ok(())
@@ -100,6 +100,24 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Ok(()));
         assert_eq!(env.exit_status, ExitStatus(1));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, []);
+    }
+
+    #[test]
+    fn true_and_false_and_true() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 0 && return -n 2 && echo !".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(2));
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
