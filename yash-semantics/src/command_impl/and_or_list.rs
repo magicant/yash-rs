@@ -24,18 +24,29 @@ use yash_syntax::syntax::AndOrList;
 
 #[async_trait(?Send)]
 impl Command for AndOrList {
+    /// Executes the and-or list.
+    ///
+    /// TODO Elaborate
     async fn execute(&self, env: &mut Env) -> Result {
-        self.first.execute(env).await
-        // TODO rest
+        self.first.execute(env).await?;
+        if let Some((_and_or, pipeline)) = self.rest.first() {
+            // TODO rest
+            pipeline.execute(env).await;
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
+    use std::rc::Rc;
+    use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
+    use yash_env::VirtualSystem;
 
     #[test]
     fn single_pipeline_list() {
@@ -46,4 +57,33 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(env.exit_status, ExitStatus(36));
     }
+
+    #[test]
+    fn true_and_true() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let list: AndOrList = "echo one && echo two".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "one\ntwo\n".as_bytes());
+    }
+
+    #[test]
+    fn diverting_first() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return 97".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(97));
+    }
+
+    // TODO What if the right-hand-side diverts?
 }
