@@ -26,7 +26,14 @@ use yash_syntax::syntax::AndOrList;
 impl Command for AndOrList {
     /// Executes the and-or list.
     ///
-    /// TODO Elaborate
+    /// The `&&` operator first executes the left-hand-side pipeline, and if and
+    /// only if the exit status is zero, executes the right-hand-side. The `||`
+    /// operator works similarly but runs the right-hand-side if and only if the
+    /// exit status is non-zero. The `&&` and `||` operators are
+    /// left-associative and have equal precedence.
+    ///
+    /// The exit status of the and-or list will be that of the last executed
+    /// pipeline.
     async fn execute(&self, env: &mut Env) -> Result {
         use yash_syntax::syntax::AndOr::*;
         self.first.execute(env).await?;
