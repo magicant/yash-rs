@@ -34,7 +34,7 @@ impl Command for AndOrList {
             let success = env.exit_status.is_successful();
             let stop = match and_or {
                 AndThen => !success,
-                OrElse => false, // TODO success
+                OrElse => success,
             };
             if stop {
                 break;
@@ -130,6 +130,24 @@ mod tests {
     }
 
     #[test]
+    fn true_or_false() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "echo + || return -n 100".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "+\n".as_bytes());
+    }
+
+    #[test]
     fn false_or_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -167,6 +185,24 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "one\ntwo\n".as_bytes());
+    }
+
+    #[test]
+    fn false_or_true_or_false() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 3 || echo + || return -n 4".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "+\n".as_bytes());
     }
 
     #[test]
