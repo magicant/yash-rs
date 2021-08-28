@@ -205,6 +205,17 @@ mod tests {
     }
 
     #[test]
+    fn false_or_false_or_false() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 1 || return -n 2 || return -n 3".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(3));
+    }
+
+    #[test]
     fn false_or_true_or_false() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -221,8 +232,6 @@ mod tests {
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "+\n".as_bytes());
     }
-
-    // TODO three-pipeline or list
 
     #[test]
     fn diverting_first() {
