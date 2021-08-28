@@ -112,6 +112,23 @@ mod tests {
     }
 
     #[test]
+    fn true_and_true_and_true() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let list: AndOrList = "echo 1 && echo 2 && echo 3".parse().unwrap();
+
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "1\n2\n3\n".as_bytes());
+    }
+
+    #[test]
     fn true_and_false_and_true() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -203,23 +220,6 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "+\n".as_bytes());
-    }
-
-    #[test]
-    fn three_pipeline_and_list() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
-        let list: AndOrList = "echo 1 && echo 2 && echo 3".parse().unwrap();
-
-        let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
-        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "1\n2\n3\n".as_bytes());
     }
 
     // TODO three-pipeline or list
