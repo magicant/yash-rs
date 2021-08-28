@@ -32,14 +32,13 @@ impl Command for AndOrList {
         self.first.execute(env).await?;
         for (and_or, pipeline) in &self.rest {
             let success = env.exit_status.is_successful();
-            let stop = match and_or {
-                AndThen => !success,
-                OrElse => success,
+            let run = match and_or {
+                AndThen => success,
+                OrElse => !success,
             };
-            if stop {
-                break;
+            if run {
+                pipeline.execute(env).await;
             }
-            pipeline.execute(env).await;
         }
         Ok(())
     }
@@ -147,6 +146,16 @@ mod tests {
     }
 
     #[test]
+    fn false_and_any_or_true() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 8 && X || return -n 0".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(0));
+    }
+
+    #[test]
     fn true_or_false() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -231,6 +240,16 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "+\n".as_bytes());
+    }
+
+    #[test]
+    fn true_or_any_and_false() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 0 || X && return -n 9".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(9));
     }
 
     #[test]
