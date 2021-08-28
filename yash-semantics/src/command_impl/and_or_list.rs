@@ -37,7 +37,7 @@ impl Command for AndOrList {
                 OrElse => !success,
             };
             if run {
-                pipeline.execute(env).await;
+                pipeline.execute(env).await?;
             }
         }
         Ok(())
@@ -262,5 +262,13 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus(97));
     }
 
-    // TODO What if the right-hand-side diverts?
+    #[test]
+    fn diverting_rest() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 7 || return 0 && X".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(0));
+    }
 }
