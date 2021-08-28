@@ -76,6 +76,16 @@ mod tests {
     }
 
     #[test]
+    fn true_and_false() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let list: AndOrList = "return -n 0 && return -n 5".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus(5));
+    }
+
+    #[test]
     fn diverting_first() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
