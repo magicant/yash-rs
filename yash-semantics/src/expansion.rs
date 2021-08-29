@@ -64,6 +64,7 @@ mod word;
 use async_trait::async_trait;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use yash_env::variable::Variable;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
 
@@ -94,12 +95,18 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 /// Part of the shell execution environment the word expansion depends on.
 pub trait Env: std::fmt::Debug {
+    /// Gets a reference to the variable with the specified name.
+    #[must_use]
+    fn get_variable(&self, name: &str) -> Option<&Variable>;
+
     // TODO define Env methods
 }
 // TODO Should we split Env for the initial expansion and multi-field expansion?
 
 impl Env for yash_env::Env {
-    // TODO implement Env methods for yash_env::Env
+    fn get_variable(&self, name: &str) -> Option<&Variable> {
+        self.variables.get(name)
+    }
 }
 
 /// Origin of a character produced in the initial expansion.
@@ -423,9 +430,13 @@ mod tests {
     use super::*;
 
     #[derive(Debug)]
-    struct NullEnv;
+    pub(crate) struct NullEnv;
 
-    impl Env for NullEnv {}
+    impl Env for NullEnv {
+        fn get_variable(&self, _: &str) -> Option<&Variable> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+    }
 
     #[test]
     fn expansion_push_str() {

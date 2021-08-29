@@ -78,13 +78,9 @@ impl Expand for Text {
 mod tests {
     use super::super::AttrChar;
     use super::*;
+    use crate::expansion::tests::NullEnv;
     use futures_executor::block_on;
     use yash_syntax::syntax::TextUnit;
-
-    #[derive(Debug)]
-    struct NullEnv;
-
-    impl Env for NullEnv {}
 
     #[test]
     fn literal_expand_unquoted() {

@@ -110,7 +110,7 @@ impl VariableSet {
         Default::default()
     }
 
-    /// Get a reference to the variable with the specified name.
+    /// Gets a reference to the variable with the specified name.
     #[must_use]
     pub fn get<N: ?Sized>(&self, name: &N) -> Option<&Variable>
     where
