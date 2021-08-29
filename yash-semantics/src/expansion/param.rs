@@ -25,6 +25,7 @@ use super::Result;
 use async_trait::async_trait;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Param;
 
 /// Reference to a `RawParam` or `BracedParam`.
 pub struct ParamRef<'a> {
@@ -36,6 +37,15 @@ pub struct ParamRef<'a> {
 impl<'a> ParamRef<'a> {
     pub fn from_name_and_location(name: &'a str, location: &'a Location) -> Self {
         ParamRef { name, location }
+    }
+}
+
+impl<'a> From<&'a Param> for ParamRef<'a> {
+    fn from(param: &'a Param) -> Self {
+        ParamRef {
+            name: &param.name,
+            location: &param.location,
+        }
     }
 }
 

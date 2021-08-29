@@ -61,11 +61,10 @@ impl Expand for TextUnit {
                 Ok(())
             }
             RawParam { name, location } => {
-                ParamRef::from_name_and_location(name, location)
-                    .expand(env, output)
-                    .await
+                let param = ParamRef::from_name_and_location(name, location);
+                param.expand(env, output).await
             }
-            // TODO Expand BracedParam correctly
+            BracedParam(param) => ParamRef::from(param).expand(env, output).await,
             // TODO Expand CommandSubst correctly
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
