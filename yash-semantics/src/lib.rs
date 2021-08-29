@@ -58,7 +58,7 @@ pub trait Handle<E> {
 #[cfg(test)]
 pub(crate) mod tests {
     use futures_executor::LocalSpawner;
-    // use itertools::Itertools;
+    use itertools::Itertools;
     use std::future::ready;
     use std::future::Future;
     use std::pin::Pin;
@@ -111,7 +111,6 @@ pub(crate) mod tests {
         }
     }
 
-    /*
     fn echo_builtin_main(
         env: &mut Env,
         args: Vec<Field>,
@@ -134,7 +133,6 @@ pub(crate) mod tests {
             execute: echo_builtin_main,
         }
     }
-    */
 
     fn cat_builtin_main(
         env: &mut Env,
