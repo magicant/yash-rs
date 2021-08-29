@@ -32,7 +32,7 @@ impl Expand for TextUnit {
     /// Expands the text unit.
     ///
     /// TODO Elaborate
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+    async fn expand<E: Env>(&self, _env: &mut E, e: &mut Expander<'_>) -> Result {
         use TextUnit::*;
         match self {
             Literal(c) => e.push_char(AttrChar {
@@ -69,8 +69,8 @@ impl Expand for TextUnit {
 #[async_trait(?Send)]
 impl Expand for Text {
     /// Expands the text.
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
-        self.0.expand(e).await
+    async fn expand<E: Env>(&self, env: &mut E, e: &mut Expander<'_>) -> Result {
+        self.0.expand(env, e).await
     }
 }
 
@@ -90,9 +90,9 @@ mod tests {
     fn literal_expand_unquoted() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let l = TextUnit::Literal('&');
-        block_on(l.expand(&mut e)).unwrap();
+        block_on(l.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [AttrChar {
@@ -108,9 +108,9 @@ mod tests {
     fn backslashed_expand_unquoted() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let b = TextUnit::Backslashed('$');
-        block_on(b.expand(&mut e)).unwrap();
+        block_on(b.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [
@@ -134,9 +134,9 @@ mod tests {
     fn text_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let text: Text = "<->".parse().unwrap();
-        block_on(text.expand(&mut e)).unwrap();
+        block_on(text.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [

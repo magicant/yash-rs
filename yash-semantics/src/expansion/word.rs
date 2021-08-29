@@ -34,10 +34,10 @@ impl Expand for WordUnit {
     /// Expands the word unit.
     ///
     /// TODO Elaborate
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+    async fn expand<E: Env>(&self, env: &mut E, e: &mut Expander<'_>) -> Result {
         use WordUnit::*;
         match self {
-            Unquoted(text_unit) => text_unit.expand(e).await,
+            Unquoted(text_unit) => text_unit.expand(env, e).await,
             SingleQuote(string) => {
                 let quote = AttrChar {
                     value: '\'',
@@ -60,7 +60,7 @@ impl Expand for WordUnit {
                 e.push_char(quote);
                 {
                     let mut e = e.begin_quote();
-                    text.expand(&mut e).await?;
+                    text.expand(env, &mut e).await?;
                     Expander::end_quote(e);
                 }
                 e.push_char(quote);
@@ -78,8 +78,8 @@ impl Expand for WordUnit {
 #[async_trait(?Send)]
 impl Expand for Word {
     /// Expands the word.
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
-        self.units.expand(e).await
+    async fn expand<E: Env>(&self, env: &mut E, e: &mut Expander<'_>) -> Result {
+        self.units.expand(env, e).await
     }
 }
 
@@ -88,7 +88,7 @@ impl ExpandToField for Word {
     async fn expand_to_field<E: Env>(&self, env: &mut E) -> Result<AttrField> {
         let mut chars = Vec::new();
         self.units
-            .expand(&mut Expander::new(env, &mut chars))
+            .expand(env, &mut Expander::new(&mut chars))
             .await?;
         let origin = self.location.clone();
         Ok(AttrField { chars, origin })
@@ -101,7 +101,7 @@ impl ExpandToField for Word {
     ) -> Result {
         let mut fields_without_origin = Vec::new();
         self.units
-            .expand(&mut Expander::new(env, &mut fields_without_origin))
+            .expand(env, &mut Expander::new(&mut fields_without_origin))
             .await?;
         fields.extend(fields_without_origin.into_iter().map(|chars| AttrField {
             chars,
@@ -125,9 +125,9 @@ mod tests {
     fn unquoted_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let u: WordUnit = "x".parse().unwrap();
-        block_on(u.expand(&mut e)).unwrap();
+        block_on(u.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [AttrChar {
@@ -143,9 +143,9 @@ mod tests {
     fn single_quote_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let u = WordUnit::SingleQuote("ex".to_string());
-        block_on(u.expand(&mut e)).unwrap();
+        block_on(u.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [
@@ -181,9 +181,9 @@ mod tests {
     fn double_quote_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let u: WordUnit = r#""\a\$""#.parse().unwrap();
-        block_on(u.expand(&mut e)).unwrap();
+        block_on(u.expand(&mut env, &mut e)).unwrap();
 
         let quote = AttrChar {
             value: '"',
@@ -228,9 +228,9 @@ mod tests {
     fn word_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut e = Expander::new(&mut field);
         let w: Word = "xyz".parse().unwrap();
-        block_on(w.expand(&mut e)).unwrap();
+        block_on(w.expand(&mut env, &mut e)).unwrap();
         assert_eq!(
             field,
             [
