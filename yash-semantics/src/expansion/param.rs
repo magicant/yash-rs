@@ -29,6 +29,7 @@ use yash_syntax::source::Location;
 /// Reference to a `RawParam` or `BracedParam`.
 pub struct ParamRef<'a> {
     name: &'a str,
+    #[allow(unused)] // TODO Use this
     location: &'a Location,
 }
 
@@ -41,6 +42,12 @@ impl<'a> ParamRef<'a> {
 #[async_trait(?Send)]
 impl Expand for ParamRef<'_> {
     async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
+        if let Some(v) = env.get_variable(self.name) {
+            match &v.value {
+                Value::Scalar(value) => output.push_str(value, Origin::SoftExpansion, false, false),
+                Value::Array(values) => todo!("expand array values: {:?}", values),
+            }
+        }
         Ok(())
     }
 }
@@ -85,5 +92,39 @@ mod tests {
         let p = ParamRef::from_name_and_location("bar", &location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
+    }
+
+    #[test]
+    fn name_only_param_existing_variable() {
+        let name = "foo".to_string();
+        let value = Variable {
+            value: Value::Scalar("ok".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        };
+        let mut env = Singleton { name, value };
+        let mut field = Vec::<AttrChar>::default();
+        let mut output = Output::new(&mut field);
+        let location = Location::dummy("");
+        let p = ParamRef::from_name_and_location("foo", &location);
+        block_on(p.expand(&mut env, &mut output)).unwrap();
+        assert_eq!(
+            field,
+            [
+                AttrChar {
+                    value: 'o',
+                    origin: Origin::SoftExpansion,
+                    is_quoted: false,
+                    is_quoting: false,
+                },
+                AttrChar {
+                    value: 'k',
+                    origin: Origin::SoftExpansion,
+                    is_quoted: false,
+                    is_quoting: false,
+                }
+            ]
+        );
     }
 }
