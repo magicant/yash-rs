@@ -18,9 +18,9 @@
 
 use super::Env;
 use super::Expand;
-use super::Expander;
 use super::Expansion;
 use super::Origin;
+use super::Output;
 use super::Result;
 use async_trait::async_trait;
 use yash_env::variable::Value;
@@ -40,7 +40,7 @@ impl<'a> ParamRef<'a> {
 
 #[async_trait(?Send)]
 impl Expand for ParamRef<'_> {
-    async fn expand<E: Env>(&self, _e: &mut Expander<'_, E>) -> Result {
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
         Ok(())
     }
 }
@@ -80,10 +80,10 @@ mod tests {
         };
         let mut env = Singleton { name, value };
         let mut field = Vec::<AttrChar>::default();
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut output = Output::new(&mut field);
         let location = Location::dummy("");
         let p = ParamRef::from_name_and_location("bar", &location);
-        block_on(p.expand(&mut e)).unwrap();
+        block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
     }
 }

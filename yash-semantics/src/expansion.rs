@@ -33,10 +33,10 @@
 //! any number of fields.
 //!
 //! To perform the initial expansion on a text/word fragment that implements
-//! `Expand`, you first create an [`Expander`] by providing an [`Env`] and
-//! [`Expansion`] implementors and then call [`expand`](Expand::expand) on the
-//! text/word. If successful, the `Expansion` implementor will contain the
-//! result.
+//! `Expand`, you call [`expand`](Expand::expand) on the text/word instance by
+//! providing an [`Env`] and [`Output`]. You can create the `Output` from an
+//! [`Expansion`] implementor. If successful, the `Expansion` implementor will
+//! contain the result.
 //!
 //! To expand a whole [word](Word), you can instead call a method of
 //! [`ExpandToField`]. It produces [`AttrField`]s instead of `AttrChar` vectors.
@@ -90,7 +90,7 @@ pub struct Error {
 
 /// Result of word expansion.
 ///
-/// Because fields resulting from the expansion are stored in the [`Expander`],
+/// Because fields resulting from the expansion are stored in an [`Output`],
 /// the OK value of the result is usually `()`.
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
@@ -156,7 +156,7 @@ pub struct AttrField {
 /// Interface to accumulate results of the initial expansion.
 ///
 /// `Expansion` is implemented by types that can accumulate [`AttrChar`]s or
-/// vectors of them. You construct an [`Expander`] using an `Expansion`
+/// vectors of them. You construct an [`Output`] using an `Expansion`
 /// implementor and then use it to carry out the initial expansion.
 pub trait Expansion: std::fmt::Debug {
     /// Appends a character to the current field.
@@ -197,34 +197,26 @@ impl Expansion for Vec<Vec<AttrChar>> {
     }
 }
 
-/// Shell execution environment for performing the initial expansion in.
+/// Wrapper of [`Expansion`] with quotation tracking.
 ///
-/// An expander is a collection of data used in the initial expansion.
-/// It contains a reference to implementors of [`Env`] and [`Expansion`].
+/// An output tracks whether the currently expanded part is inside a quotation
+/// or not and sets the `is_quoted` flag when results are inserted into it.
 #[derive(Debug)]
-pub struct Expander<'e, E: Env> {
-    /// Environment used in the word expansion.
-    env: &'e mut E,
+pub struct Output<'e> {
     /// Fields resulting from the initial expansion.
-    result: &'e mut dyn Expansion,
+    inner: &'e mut dyn Expansion,
     /// Whether the currently expanded part is double-quoted.
     is_quoted: bool,
 }
 
-impl<'e, E: Env> Expander<'e, E> {
-    /// Creates a new expander.
+impl<'e> Output<'e> {
+    /// Creates a new output.
     ///
-    /// This function requires two parameters:
-    ///
-    /// - `env`: An environment in which the expansion is performed.
-    /// - `result`: An implementor of `Expansion` into which the expansion
-    ///   results are inserted.
-    pub fn new(env: &'e mut E, result: &'e mut dyn Expansion) -> Self {
-        Expander {
-            env,
-            result,
-            is_quoted: false,
-        }
+    /// This function requires a reference to an [`Expansion`] into which the
+    /// expansion results are inserted.
+    pub fn new(inner: &'e mut dyn Expansion) -> Self {
+        let is_quoted = false;
+        Output { inner, is_quoted }
     }
 
     /// Whether the currently expanded part is quoted.
@@ -237,104 +229,89 @@ impl<'e, E: Env> Expander<'e, E> {
     }
 }
 
-impl<E: Env> Deref for Expander<'_, E> {
-    type Target = E;
-    fn deref(&self) -> &E {
-        self.env
-    }
-}
-
-impl<E: Env> DerefMut for Expander<'_, E> {
-    fn deref_mut(&mut self) -> &mut E {
-        self.env
-    }
-}
-
-/// The `Expansion` implementation for `Expander` delegates to the `Expansion`
-/// implementor contained in the `Expander`.
+/// The `Expansion` implementation for `Output` delegates to the `Expansion`
+/// implementor contained in the `Output`.
 ///
-/// However, if `self.is_quoted()` is `true`, `is_quoted` of resulting
-/// `AttrChar`s will also be `true`.
-impl<E: Env> Expansion for Expander<'_, E> {
+/// However, if [`self.is_quoted()`](Output::is_quoted) is `true`, the
+/// `is_quoted` flag of resulting `AttrChar`s will also be `true`.
+impl Expansion for Output<'_> {
     fn push_char(&mut self, mut c: AttrChar) {
         c.is_quoted |= self.is_quoted;
-        self.result.push_char(c)
+        self.inner.push_char(c)
     }
     fn push_str(&mut self, s: &str, origin: Origin, is_quoted: bool, is_quoting: bool) {
-        self.result
+        self.inner
             .push_str(s, origin, is_quoted | self.is_quoted, is_quoting);
     }
 }
 
-/// RAII-style guard for temporarily setting [`Expander::is_quoted`] to `true`.
+/// RAII-style guard for temporarily setting [`Output::is_quoted`] to `true`.
 ///
-/// When the instance of `QuotedExpander` is dropped, `is_quoted` is reset to
+/// When the instance of `QuotedOutput` is dropped, `is_quoted` is reset to
 /// the previous value.
 #[derive(Debug)]
-#[must_use = "You must retain QuotedExpander to keep is_quoted true"]
-pub struct QuotedExpander<'q, 'e, E: Env> {
-    /// The expander
-    expander: &'q mut Expander<'e, E>,
+#[must_use = "You must retain QuotedOutput to keep is_quoted true"]
+pub struct QuotedOutput<'q, 'e> {
+    /// The output
+    output: &'q mut Output<'e>,
     /// Previous value of `is_quoted`.
     was_quoted: bool,
 }
 
-impl<'q, 'e, E: Env> Drop for QuotedExpander<'q, 'e, E> {
-    /// Resets `is_quoted` of the expander to the previous value.
+impl<'q, 'e> Drop for QuotedOutput<'q, 'e> {
+    /// Resets `is_quoted` of the output to the previous value.
     fn drop(&mut self) {
-        self.expander.is_quoted = self.was_quoted;
+        self.output.is_quoted = self.was_quoted;
     }
 }
 
-impl<'q, 'e, E: Env> Deref for QuotedExpander<'q, 'e, E> {
-    type Target = Expander<'e, E>;
-    fn deref(&self) -> &Expander<'e, E> {
-        self.expander
+impl<'q, 'e> Deref for QuotedOutput<'q, 'e> {
+    type Target = Output<'e>;
+    fn deref(&self) -> &Output<'e> {
+        self.output
     }
 }
 
-impl<'q, 'e, E: Env> DerefMut for QuotedExpander<'q, 'e, E> {
-    fn deref_mut(&mut self) -> &mut Expander<'e, E> {
-        self.expander
+impl<'q, 'e> DerefMut for QuotedOutput<'q, 'e> {
+    fn deref_mut(&mut self) -> &mut Output<'e> {
+        self.output
     }
 }
 
-impl<'e, E: Env> Expander<'e, E> {
+impl<'e> Output<'e> {
     /// Sets `is_quoted` to true.
     ///
-    /// This function returns an instance of `QuotedExpander` that borrows
-    /// `self`. As an implementor of `Deref` and `DerefMut`, it allows you to
-    /// access the original expander. When the `QuotedExpander` is dropped or
-    /// passed to [`end_quote`](Self::end_quote), `is_quoted` is reset to the
-    /// previous value.
+    /// This function returns an instance of `QuotedOutput` that borrows `self`.
+    /// As an implementor of `Deref` and `DerefMut`, it allows you to access the
+    /// original output. When the `QuotedOutput` is dropped or passed to
+    /// [`end_quote`](Self::end_quote), `is_quoted` is reset to the previous
+    /// value.
     ///
-    /// While `is_quoted` is `true`, all characters pushed to the expander are
+    /// While `is_quoted` is `true`, all characters pushed to the output are
     /// considered quoted; that is, `is_quoted` of [`AttrChar`]s will be `true`.
-    pub fn begin_quote(&mut self) -> QuotedExpander<'_, 'e, E> {
+    pub fn begin_quote(&mut self) -> QuotedOutput<'_, 'e> {
         let was_quoted = std::mem::replace(&mut self.is_quoted, true);
-        QuotedExpander {
-            expander: self,
-            was_quoted,
-        }
+        let output = self;
+        QuotedOutput { output, was_quoted }
     }
 
     /// Resets `is_quoted` to the previous value.
     ///
-    /// This function is equivalent to dropping the `QuotedExpander` instance
-    /// but allows more descriptive code.
-    pub fn end_quote(_: QuotedExpander<'_, 'e, E>) {}
+    /// This function is equivalent to dropping the `QuotedOutput` instance but
+    /// allows more descriptive code.
+    pub fn end_quote(_: QuotedOutput<'_, 'e>) {}
 }
 
 /// Syntactic construct that can be subjected to the word expansion.
 ///
-/// Implementors of this trait expand themselves to an [`Expander`].
+/// Implementors of this trait expand themselves to an [`Output`].
 /// See also [`ExpandToField`].
 #[async_trait(?Send)]
 pub trait Expand {
     /// Performs the initial expansion.
     ///
-    /// The results should be pushed to the expander.
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result;
+    /// The results should be pushed to the output.
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result;
 }
 
 #[async_trait(?Send)]
@@ -342,9 +319,9 @@ impl<T: Expand> Expand for [T] {
     /// Expands a slice.
     ///
     /// This function expands each item of the slice in sequence.
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
         for item in self {
-            item.expand(e).await?;
+            item.expand(env, output).await?;
         }
         Ok(())
     }
@@ -513,30 +490,28 @@ mod tests {
 
     #[allow(clippy::bool_assert_comparison)]
     #[test]
-    fn quoted_expander() {
+    fn quoted_output() {
         let mut field = Vec::<AttrChar>::default();
-        let mut env = NullEnv;
-        let mut expander = Expander::new(&mut env, &mut field);
-        assert_eq!(expander.is_quoted(), false);
+        let mut output = Output::new(&mut field);
+        assert_eq!(output.is_quoted(), false);
         {
-            let mut expander = expander.begin_quote();
-            assert_eq!(expander.is_quoted(), true);
+            let mut output = output.begin_quote();
+            assert_eq!(output.is_quoted(), true);
             {
-                let expander = expander.begin_quote();
-                assert_eq!(expander.is_quoted(), true);
-                Expander::end_quote(expander);
+                let output = output.begin_quote();
+                assert_eq!(output.is_quoted(), true);
+                Output::end_quote(output);
             }
-            assert_eq!(expander.is_quoted(), true);
-            Expander::end_quote(expander);
+            assert_eq!(output.is_quoted(), true);
+            Output::end_quote(output);
         }
-        assert_eq!(expander.is_quoted(), false);
+        assert_eq!(output.is_quoted(), false);
     }
 
     #[test]
-    fn expander_put_char_quoted() {
+    fn output_put_char_quoted() {
         let mut field = Vec::<AttrChar>::default();
-        let mut env = NullEnv;
-        let mut expander = Expander::new(&mut env, &mut field);
+        let mut output = Output::new(&mut field);
         let not_quoted = AttrChar {
             value: 'X',
             origin: Origin::Literal,
@@ -547,26 +522,25 @@ mod tests {
             is_quoted: true,
             ..not_quoted
         };
-        expander.push_char(not_quoted);
-        expander.push_char(quoted);
-        let mut expander = expander.begin_quote();
-        expander.push_char(not_quoted);
-        expander.push_char(quoted);
-        Expander::end_quote(expander);
+        output.push_char(not_quoted);
+        output.push_char(quoted);
+        let mut output = output.begin_quote();
+        output.push_char(not_quoted);
+        output.push_char(quoted);
+        Output::end_quote(output);
         assert_eq!(field, [not_quoted, quoted, quoted, quoted]);
     }
 
     #[test]
-    fn expander_put_str_quoted() {
+    fn output_put_str_quoted() {
         let mut field = Vec::<AttrChar>::default();
-        let mut env = NullEnv;
-        let mut expander = Expander::new(&mut env, &mut field);
-        expander.push_str("X", Origin::Literal, false, false);
-        expander.push_str("X", Origin::Literal, true, false);
-        let mut expander = expander.begin_quote();
-        expander.push_str("X", Origin::Literal, false, false);
-        expander.push_str("X", Origin::Literal, true, false);
-        Expander::end_quote(expander);
+        let mut output = Output::new(&mut field);
+        output.push_str("X", Origin::Literal, false, false);
+        output.push_str("X", Origin::Literal, true, false);
+        let mut output = output.begin_quote();
+        output.push_str("X", Origin::Literal, false, false);
+        output.push_str("X", Origin::Literal, true, false);
+        Output::end_quote(output);
 
         let not_quoted = AttrChar {
             value: 'X',

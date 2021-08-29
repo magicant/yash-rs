@@ -20,9 +20,9 @@ use super::param::ParamRef;
 use super::AttrChar;
 use super::Env;
 use super::Expand;
-use super::Expander;
 use super::Expansion;
 use super::Origin;
+use super::Output;
 use super::Result;
 use async_trait::async_trait;
 use yash_syntax::syntax::Text;
@@ -33,11 +33,11 @@ impl Expand for TextUnit {
     /// Expands the text unit.
     ///
     /// TODO Elaborate
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
         use TextUnit::*;
         match self {
             Literal(c) => {
-                e.push_char(AttrChar {
+                output.push_char(AttrChar {
                     value: *c,
                     origin: Origin::Literal,
                     is_quoted: false,
@@ -46,13 +46,13 @@ impl Expand for TextUnit {
                 Ok(())
             }
             Backslashed(c) => {
-                e.push_char(AttrChar {
+                output.push_char(AttrChar {
                     value: '\\',
                     origin: Origin::Literal,
                     is_quoted: false,
                     is_quoting: true,
                 });
-                e.push_char(AttrChar {
+                output.push_char(AttrChar {
                     value: *c,
                     origin: Origin::Literal,
                     is_quoted: true,
@@ -62,7 +62,7 @@ impl Expand for TextUnit {
             }
             RawParam { name, location } => {
                 ParamRef::from_name_and_location(name, location)
-                    .expand(e)
+                    .expand(env, output)
                     .await
             }
             // TODO Expand BracedParam correctly
@@ -70,7 +70,7 @@ impl Expand for TextUnit {
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
             _ => {
-                e.push_str(&self.to_string(), Origin::Literal, false, false);
+                output.push_str(&self.to_string(), Origin::Literal, false, false);
                 Ok(())
             }
         }
@@ -80,8 +80,8 @@ impl Expand for TextUnit {
 #[async_trait(?Send)]
 impl Expand for Text {
     /// Expands the text.
-    async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
-        self.0.expand(e).await
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
+        self.0.expand(env, output).await
     }
 }
 
@@ -97,9 +97,9 @@ mod tests {
     fn literal_expand_unquoted() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut output = Output::new(&mut field);
         let l = TextUnit::Literal('&');
-        block_on(l.expand(&mut e)).unwrap();
+        block_on(l.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
             [AttrChar {
@@ -115,9 +115,9 @@ mod tests {
     fn backslashed_expand_unquoted() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut output = Output::new(&mut field);
         let b = TextUnit::Backslashed('$');
-        block_on(b.expand(&mut e)).unwrap();
+        block_on(b.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
             [
@@ -141,9 +141,9 @@ mod tests {
     fn text_expand() {
         let mut field = Vec::<AttrChar>::default();
         let mut env = NullEnv;
-        let mut e = Expander::new(&mut env, &mut field);
+        let mut output = Output::new(&mut field);
         let text: Text = "<->".parse().unwrap();
-        block_on(text.expand(&mut e)).unwrap();
+        block_on(text.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
             [
