@@ -16,6 +16,7 @@
 
 //! Initial expansion of text.
 
+use super::param::ParamRef;
 use super::AttrChar;
 use super::Env;
 use super::Expand;
@@ -35,12 +36,15 @@ impl Expand for TextUnit {
     async fn expand<E: Env>(&self, e: &mut Expander<'_, E>) -> Result {
         use TextUnit::*;
         match self {
-            Literal(c) => e.push_char(AttrChar {
-                value: *c,
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: false,
-            }),
+            Literal(c) => {
+                e.push_char(AttrChar {
+                    value: *c,
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false,
+                });
+                Ok(())
+            }
             Backslashed(c) => {
                 e.push_char(AttrChar {
                     value: '\\',
@@ -54,15 +58,22 @@ impl Expand for TextUnit {
                     is_quoted: true,
                     is_quoting: false,
                 });
+                Ok(())
             }
-            // TODO Expand RawParam correctly
+            RawParam { name, location } => {
+                ParamRef::from_name_and_location(name, location)
+                    .expand(e)
+                    .await
+            }
             // TODO Expand BracedParam correctly
             // TODO Expand CommandSubst correctly
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
-            _ => e.push_str(&self.to_string(), Origin::Literal, false, false),
+            _ => {
+                e.push_str(&self.to_string(), Origin::Literal, false, false);
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 
