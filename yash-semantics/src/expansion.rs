@@ -57,6 +57,7 @@
 //! that removes quotes from the field. It takes an [`AttrField`] input and
 //! returns a [`Field`].
 
+mod param;
 mod quote_removal;
 mod text;
 mod word;
