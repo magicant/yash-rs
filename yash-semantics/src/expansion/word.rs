@@ -112,12 +112,8 @@ impl ExpandToField for Word {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expansion::tests::NullEnv;
     use futures_executor::block_on;
-
-    #[derive(Debug)]
-    struct NullEnv;
-
-    impl Env for NullEnv {}
 
     #[test]
     fn unquoted_expand() {

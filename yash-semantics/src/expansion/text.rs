@@ -16,6 +16,7 @@
 
 //! Initial expansion of text.
 
+use super::param::ParamRef;
 use super::AttrChar;
 use super::Env;
 use super::Expand;
@@ -32,15 +33,18 @@ impl Expand for TextUnit {
     /// Expands the text unit.
     ///
     /// TODO Elaborate
-    async fn expand<E: Env>(&self, _env: &mut E, output: &mut Output<'_>) -> Result {
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
         use TextUnit::*;
         match self {
-            Literal(c) => output.push_char(AttrChar {
-                value: *c,
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: false,
-            }),
+            Literal(c) => {
+                output.push_char(AttrChar {
+                    value: *c,
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: false,
+                });
+                Ok(())
+            }
             Backslashed(c) => {
                 output.push_char(AttrChar {
                     value: '\\',
@@ -54,15 +58,21 @@ impl Expand for TextUnit {
                     is_quoted: true,
                     is_quoting: false,
                 });
+                Ok(())
             }
-            // TODO Expand RawParam correctly
-            // TODO Expand BracedParam correctly
+            RawParam { name, location } => {
+                let param = ParamRef::from_name_and_location(name, location);
+                param.expand(env, output).await
+            }
+            BracedParam(param) => ParamRef::from(param).expand(env, output).await,
             // TODO Expand CommandSubst correctly
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
-            _ => output.push_str(&self.to_string(), Origin::Literal, false, false),
+            _ => {
+                output.push_str(&self.to_string(), Origin::Literal, false, false);
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 
@@ -78,13 +88,9 @@ impl Expand for Text {
 mod tests {
     use super::super::AttrChar;
     use super::*;
+    use crate::expansion::tests::NullEnv;
     use futures_executor::block_on;
     use yash_syntax::syntax::TextUnit;
-
-    #[derive(Debug)]
-    struct NullEnv;
-
-    impl Env for NullEnv {}
 
     #[test]
     fn literal_expand_unquoted() {
