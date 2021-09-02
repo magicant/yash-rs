@@ -172,7 +172,7 @@ impl Command for syntax::SimpleCommand {
                     }
                 }
                 Some(Function(function)) => {
-                    // TODO Allocate local variable scope
+                    // TODO Allocate a local variable context
                     // TODO Apply positional parameters
                     function.body.execute(env).await?;
                     // TODO Consume Divert::Return

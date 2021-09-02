@@ -101,7 +101,7 @@ impl Variable {
 /// Collection of variables.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct VariableSet(HashMap<String, Variable>);
-// TODO Support local scopes
+// TODO Support local and temporary contexts
 
 impl VariableSet {
     /// Creates an empty variable set.
@@ -122,7 +122,7 @@ impl VariableSet {
 
     // TODO Reject if the existing variable is read-only
     // TODO Export if the existing variable has been exported
-    // TODO Specifying a scope to assign in
+    // TODO Specifying the scope of assignment
     /// Assigns a variable.
     ///
     /// Returns the old value, if any.
