@@ -43,11 +43,116 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 impl Command for syntax::SimpleCommand {
     /// Executes the simple command.
     ///
-    /// TODO Elaborate
+    /// # Outline
+    ///
+    /// The execution starts with the [expansion](crate::expansion) of the
+    /// command words. Next, the [command search](crate::command_search) is
+    /// performed to find an execution [target](crate::command_search::Target)
+    /// named by the first [field](Field) of the expansion results. The
+    /// remainder of the execution differs depending on the target.
+    ///
+    /// # Target types and their semantics
+    ///
+    /// ## Absent target
+    ///
+    /// If no fields resulted from the expansion, there is no target.
+    ///
+    /// If the simple command has redirections and assignments, they are
+    /// performed in a new subshell and the current shell environment,
+    /// respectively.
+    ///
+    /// If the redirections or assignments contain command substitutions, the
+    /// [exit status](ExitStatus) of the simple command is taken from that of
+    /// the last executed command substitution. Otherwise, the exit status will
+    /// be zero.
+    ///
+    /// ## Built-in
+    ///
+    /// If the target is a built-in, the following steps are performed in the
+    /// current shell environment.
+    ///
+    /// First, if there are redirections, they are performed.
+    ///
+    /// Next, if there are assignments, a temporary context is created to
+    /// contain the assignment results. The context, as well as the assigned
+    /// variables, are discarded when the execution finishes. If the target is a
+    /// regular built-in, the variables are exported.
+    ///
+    /// Lastly, the built-in is executed by calling its body with the remaining
+    /// fields passed as arguments.
+    ///
+    /// ## Function
+    ///
+    /// If the target is a function, redirections and assignments are performed
+    /// in the same way as a regular built-in. Then, a new variable context sits
+    /// on top of the existing context and bears the remaining fields as
+    /// positional parameters. The function body is performed in the new
+    /// context.
+    ///
+    /// ## External utility
+    ///
+    /// If the target is an external utility, a subshell is created.
+    /// Redirections and assignments, if any, are performed in the subshell. The
+    /// assigned variables are exported. The subshell calls the
+    /// [`execve`](yash_env::System::execve) function to invoke the external
+    /// utility with all the fields passed as arguments.
+    ///
+    /// If `execve` fails with an `ENOEXEC` error, the behavior is TODO TBD.
+    ///
+    /// ## Target not found
+    ///
+    /// If the command search could not find a valid target, the execution
+    /// proceeds in the same manner as an external utility except that it does
+    /// not call `execve` and performs error handling as if it failed with
+    /// `ENOENT`.
+    ///
+    /// # Redirections
+    ///
+    /// Redirections are performed in the order of appearance. The file
+    /// descriptors modified by the redirections are restored after the target
+    /// has finished except for external utilities executed in a subshell.
+    ///
+    /// # Assignments
+    ///
+    /// Assignments are performed in the order of appearance. For each
+    /// assignment, the value is expanded and assigned to the variable.
+    ///
+    /// # Errors
+    ///
+    /// ## Expansion errors
+    ///
+    /// If there is an error during the expansion, the execution aborts with a
+    /// non-zero [exit status](ExitStatus) after printing an error message to
+    /// the standard error.
+    ///
+    /// Expansion errors may also occur when expanding an assignment value or a
+    /// redirection operand.
+    ///
+    /// ## Redirection errors
+    ///
+    /// Any error happening in redirections causes the execution to abort with a
+    /// non-zero exit status after printing an error message to the standard
+    /// error.
+    ///
+    /// ## Assignment errors
+    ///
+    /// If an assignment tries to overwrite a read-only variable, the execution
+    /// aborts with a non-zero exit status after printing an error message to
+    /// the standard error.
+    ///
+    /// ## External utility invocation failure
+    ///
+    /// If the external utility could not be called, the subshell exits after
+    /// printing an error message to the standard error.
+    ///
+    /// # Portability
     ///
     /// POSIX does not define the exit status when the `execve` system call
     /// fails for a reason other than `ENOEXEC`. In this implementation, the
     /// exit status is 127 for `ENOENT` and `ENOTDIR` and 126 for others.
+    ///
+    /// POSIX leaves many aspects of the simple command execution unspecified.
+    /// The detail semantics may differ in other shell implementations.
     async fn execute(&self, env: &mut Env) -> Result {
         let fields = match expand_words(env, &self.words).await {
             Ok(fields) => fields,
