@@ -17,27 +17,21 @@
 //! Implementation of simple command semantics.
 
 use crate::command_search::search;
-use crate::command_search::Target::{Builtin, External, Function};
 use crate::expansion::expand_words;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
+use std::rc::Rc;
+use yash_env::builtin::Builtin;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
+use yash_env::function::Function;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
-
-/// Converts fields to C strings.
-fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
-    // TODO return something rather than dropping null-containing strings
-    s.into_iter()
-        .filter_map(|f| CString::new(f.value).ok())
-        .collect()
-}
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
@@ -159,77 +153,106 @@ impl Command for syntax::SimpleCommand {
             Err(error) => return env.handle(error).await,
         };
 
-        // TODO open redirections
-        // TODO expand and perform assignments
-
+        use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
-                Some(Builtin(builtin)) => {
-                    let (exit_status, abort) = (builtin.execute)(env, fields).await;
-                    env.exit_status = exit_status;
-                    if let Some(abort) = abort {
-                        return Err(abort);
-                    }
-                }
-                Some(Function(function)) => {
-                    // TODO Allocate a local variable context
-                    // TODO Apply positional parameters
-                    function.body.execute(env).await?;
-                    // TODO Consume Divert::Return
-                }
-                Some(External { path }) => {
-                    let args = to_c_strings(fields);
-                    let envs = env.variables.env_c_strings();
-                    let result = env
-                        .run_in_subshell(move |env| {
-                            Box::pin(async move {
-                                // TODO Remove signal handlers not set by current traps
-
-                                let result = env.system.execve(path.as_c_str(), &args, &envs);
-                                // TODO Prefer into_err to unwrap_err
-                                let errno = result.unwrap_err();
-                                // TODO Reopen as shell script on ENOEXEC
-                                match errno {
-                                    Errno::ENOENT | Errno::ENOTDIR => {
-                                        env.exit_status = ExitStatus::NOT_FOUND;
-                                    }
-                                    _ => {
-                                        env.exit_status = ExitStatus::NOEXEC;
-                                    }
-                                }
-                                env.print_system_error(
-                                    errno,
-                                    &format_args!("cannot execute external command {:?}", path),
-                                )
-                                .await
-                            })
-                        })
-                        .await;
-
-                    match result {
-                        Ok(exit_status) => {
-                            env.exit_status = exit_status;
-                        }
-                        Err(errno) => {
-                            env.print_system_error(
-                                errno,
-                                &format_args!("cannot execute external command"),
-                            )
-                            .await;
-                            env.exit_status = ExitStatus::NOEXEC;
-                        }
-                    }
-                }
+                Some(Builtin(builtin)) => execute_builtin(env, builtin, fields).await,
+                Some(Function(function)) => execute_function(env, function).await,
+                Some(External { path }) => execute_external_utility(env, path, fields).await,
                 None => {
+                    // TODO open redirections
+                    // TODO expand and perform assignments
                     env.print_error(&format_args!("{}: command not found", name.value))
                         .await;
                     env.exit_status = ExitStatus::NOT_FOUND;
+                    Ok(())
                 }
             }
+        } else {
+            execute_absent_target().await
         }
-
-        Ok(())
     }
+}
+
+async fn execute_absent_target() -> Result {
+    // TODO open redirections
+    // TODO expand and perform assignments
+    Ok(())
+}
+
+async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) -> Result {
+    // TODO open redirections
+    // TODO expand and perform assignments
+    let (exit_status, abort) = (builtin.execute)(env, fields).await;
+    env.exit_status = exit_status;
+    if let Some(abort) = abort {
+        return Err(abort);
+    }
+    Ok(())
+}
+
+async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
+    // TODO open redirections
+    // TODO expand and perform assignments
+    // TODO Allocate a local variable context
+    // TODO Apply positional parameters
+    function.body.execute(env).await?;
+    // TODO Consume Divert::Return
+    Ok(())
+}
+
+async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Field>) -> Result {
+    let args = to_c_strings(fields);
+    let envs = env.variables.env_c_strings();
+    let result = env
+        .run_in_subshell(move |env| {
+            Box::pin(async move {
+                // TODO open redirections
+                // TODO expand and perform assignments
+
+                // TODO Remove signal handlers not set by current traps
+
+                let result = env.system.execve(path.as_c_str(), &args, &envs);
+                // TODO Prefer into_err to unwrap_err
+                let errno = result.unwrap_err();
+                // TODO Reopen as shell script on ENOEXEC
+                match errno {
+                    Errno::ENOENT | Errno::ENOTDIR => {
+                        env.exit_status = ExitStatus::NOT_FOUND;
+                    }
+                    _ => {
+                        env.exit_status = ExitStatus::NOEXEC;
+                    }
+                }
+                env.print_system_error(
+                    errno,
+                    &format_args!("cannot execute external command {:?}", path),
+                )
+                .await
+            })
+        })
+        .await;
+
+    match result {
+        Ok(exit_status) => {
+            env.exit_status = exit_status;
+        }
+        Err(errno) => {
+            env.print_system_error(errno, &format_args!("cannot execute external command"))
+                .await;
+            env.exit_status = ExitStatus::NOEXEC;
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts fields to C strings.
+fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
+    // TODO return something rather than dropping null-containing strings
+    s.into_iter()
+        .filter_map(|f| CString::new(f.value).ok())
+        .collect()
 }
 
 #[cfg(test)]
