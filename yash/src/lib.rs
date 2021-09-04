@@ -19,7 +19,8 @@
 pub use yash_builtin as builtin;
 pub use yash_env as env;
 pub use yash_semantics as semantics;
-pub use yash_syntax::*;
+#[doc(no_inline)]
+pub use yash_syntax::{alias, input, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print() -> i32 {
