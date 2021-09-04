@@ -87,8 +87,15 @@ pub async fn perform_assignment(env: &mut Env, assign: &Assign) -> Result {
         is_exported: false,
         read_only_location: None,
     };
-    env.variables.assign(name, value).unwrap();
-    Ok(())
+    match env.variables.assign(name, value) {
+        Ok(_old_value) => Ok(()),
+        Err(value) => {
+            let name = assign.name.clone();
+            let cause = ErrorCause::ReadOnly { name };
+            let location = value.last_assigned_location.unwrap();
+            Err(Error { cause, location })
+        }
+    }
 }
 
 /// Performs assignments.
@@ -140,5 +147,24 @@ mod tests {
                 read_only_location: None,
             }
         );
+    }
+
+    #[test]
+    fn perform_assignment_read_only() {
+        let mut env = Env::new_virtual();
+        let v = Variable {
+            value: Value::Scalar("read-only".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("")),
+        };
+        env.variables.assign("v".to_string(), v).unwrap();
+        let a: Assign = "v=new".parse().unwrap();
+        let e = block_on(perform_assignment(&mut env, &a)).unwrap_err();
+        let name = assert_matches!(e.cause, ErrorCause::ReadOnly{name} => name);
+        assert_eq!(name, "v");
+        assert_eq!(e.location.line.value, "v=new");
+        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.column.get(), 1);
     }
 }

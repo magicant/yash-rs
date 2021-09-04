@@ -292,6 +292,32 @@ mod tests {
     }
 
     #[test]
+    fn simple_command_handles_assignment_error_with_absent_target() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.variables
+            .assign(
+                "a".to_string(),
+                Variable {
+                    value: Value::Scalar("".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: Some(Location::dummy("")),
+                },
+            )
+            .unwrap();
+        let command: syntax::SimpleCommand = "a=b".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+
+        let state = state.borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert!(!stderr.content.is_empty());
+    }
+
+    #[test]
     fn simple_command_returns_exit_status_from_builtin_without_divert() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());

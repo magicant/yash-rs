@@ -130,8 +130,12 @@ impl VariableSet {
     /// existing read-only value, the assignment fails and returns the argument
     /// value intact.
     pub fn assign(&mut self, name: String, value: Variable) -> Result<Option<Variable>, Variable> {
-        // TODO Fail if read-only
         // TODO Use HashMap::try_insert
+        if let Some(variable) = self.0.get(&name) {
+            if variable.is_read_only() {
+                return Err(value);
+            }
+        }
         Ok(self.0.insert(name, value))
     }
 
@@ -198,6 +202,28 @@ mod tests {
         let result = variables.assign("foo".to_string(), v2.clone()).unwrap();
         assert_eq!(result, Some(v1));
         assert_eq!(variables.get("foo"), Some(&v2));
+    }
+
+    #[test]
+    fn assign_to_read_only_variable() {
+        let mut variables = VariableSet::new();
+        let v1 = Variable {
+            value: Scalar("my value".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("")),
+        };
+        variables.assign("x".to_string(), v1.clone()).unwrap();
+
+        let v2 = Variable {
+            value: Scalar("your value".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("something")),
+        };
+        let error = variables.assign("x".to_string(), v2.clone()).unwrap_err();
+        assert_eq!(error, v2);
+        assert_eq!(variables.get("x"), Some(&v1));
     }
 
     #[test]
