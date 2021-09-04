@@ -36,6 +36,8 @@ pub enum Value {
     Array(Vec<String>),
 }
 
+pub use Value::*;
+
 impl Value {
     /// Splits the value by colons.
     ///
@@ -58,8 +60,8 @@ impl Value {
     /// ```
     pub fn split(&self) -> impl Iterator<Item = &str> {
         match self {
-            Value::Scalar(value) => Left(value.split(':')),
-            Value::Array(values) => Right(values.iter().map(String::as_str)),
+            Scalar(value) => Left(value.split(':')),
+            Array(values) => Right(values.iter().map(String::as_str)),
         }
     }
 }
@@ -140,8 +142,8 @@ impl VariableSet {
                     let mut s = name.clone();
                     s.push('=');
                     match &var.value {
-                        Value::Scalar(value) => s.push_str(value),
-                        Value::Array(values) => write!(s, "{}", values.iter().format(":")).ok()?,
+                        Scalar(value) => s.push_str(value),
+                        Array(values) => write!(s, "{}", values.iter().format(":")).ok()?,
                     }
                     // TODO return something rather than dropping null-containing strings
                     CString::new(s).ok()
@@ -161,7 +163,7 @@ mod tests {
     fn assign_new_variable_and_get() {
         let mut variables = VariableSet::new();
         let variable = Variable {
-            value: Value::Scalar("my value".to_string()),
+            value: Scalar("my value".to_string()),
             last_assigned_location: None,
             is_exported: false,
             read_only_location: Some(Location::dummy("dummy")),
@@ -178,7 +180,7 @@ mod tests {
         variables.assign(
             "foo".to_string(),
             Variable {
-                value: Value::Scalar("FOO".to_string()),
+                value: Scalar("FOO".to_string()),
                 last_assigned_location: None,
                 is_exported: true,
                 read_only_location: None,
@@ -187,7 +189,7 @@ mod tests {
         variables.assign(
             "bar".to_string(),
             Variable {
-                value: Value::Array(vec!["BAR".to_string()]),
+                value: Array(vec!["BAR".to_string()]),
                 last_assigned_location: None,
                 is_exported: true,
                 read_only_location: None,
@@ -196,7 +198,7 @@ mod tests {
         variables.assign(
             "baz".to_string(),
             Variable {
-                value: Value::Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
+                value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
                 last_assigned_location: None,
                 is_exported: true,
                 read_only_location: None,
@@ -205,7 +207,7 @@ mod tests {
         variables.assign(
             "null".to_string(),
             Variable {
-                value: Value::Scalar("not exported".to_string()),
+                value: Scalar("not exported".to_string()),
                 last_assigned_location: None,
                 is_exported: false,
                 read_only_location: None,
