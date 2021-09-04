@@ -343,24 +343,28 @@ mod tests {
         system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
-        env.variables.assign(
-            "env".to_string(),
-            Variable {
-                value: Value::Scalar("scalar".to_string()),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
-        );
-        env.variables.assign(
-            "local".to_string(),
-            Variable {
-                value: Value::Scalar("ignored".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        );
+        env.variables
+            .assign(
+                "env".to_string(),
+                Variable {
+                    value: Value::Scalar("scalar".to_string()),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                "local".to_string(),
+                Variable {
+                    value: Value::Scalar("ignored".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
         assert_eq!(result, Ok(()));

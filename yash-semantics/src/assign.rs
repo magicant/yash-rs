@@ -87,7 +87,7 @@ pub async fn perform_assignment(env: &mut Env, assign: &Assign) -> Result {
         is_exported: false,
         read_only_location: None,
     };
-    env.variables.assign(name, value);
+    env.variables.assign(name, value).unwrap();
     Ok(())
 }
 
