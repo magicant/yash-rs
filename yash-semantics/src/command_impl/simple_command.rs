@@ -16,6 +16,7 @@
 
 //! Implementation of simple command semantics.
 
+use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::Command;
@@ -32,6 +33,7 @@ use yash_env::function::Function;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
+use yash_syntax::syntax::Assign;
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
@@ -169,15 +171,19 @@ impl Command for syntax::SimpleCommand {
                 }
             }
         } else {
-            execute_absent_target().await
+            execute_absent_target(env, &self.assigns).await
         }
     }
 }
 
-async fn execute_absent_target() -> Result {
+async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
     // TODO open redirections
-    // TODO expand and perform assignments
-    Ok(())
+
+    // TODO Apply last command substitution exit status
+    match perform_assignments(env, assigns).await {
+        Ok(()) => Ok(()),
+        Err(error) => env.handle(error).await,
+    }
 }
 
 async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) -> Result {
@@ -271,6 +277,19 @@ mod tests {
     use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
+
+    #[test]
+    fn simple_command_performs_assignment_with_absent_target() {
+        let mut env = Env::new_virtual();
+        let command: syntax::SimpleCommand = "a=b".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(
+            env.variables.get("a").unwrap().value,
+            Value::Scalar("b".to_string())
+        );
+    }
 
     #[test]
     fn simple_command_returns_exit_status_from_builtin_without_divert() {

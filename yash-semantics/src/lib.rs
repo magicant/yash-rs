@@ -22,6 +22,7 @@
 //! A word can be expanded by using functions and traits defined in
 //! [`expansion`].
 
+pub mod assign;
 mod command_impl;
 pub mod command_search;
 pub mod expansion;

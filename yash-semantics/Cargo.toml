@@ -21,6 +21,7 @@ yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
 
 [dev-dependencies]
+assert_matches = "1.5.0"
 futures-executor = "0.3.15"
 futures-util = "0.3.15"
 itertools = "0.10.1"
