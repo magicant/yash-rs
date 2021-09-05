@@ -18,6 +18,7 @@
 
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
+use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Value;
 use yash_env::variable::Variable;
 use yash_env::Env;
@@ -30,7 +31,12 @@ pub use yash_syntax::syntax::Assign;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
     /// Assignment to a read-only variable.
-    ReadOnly { name: String },
+    ReadOnly {
+        /// Variable name.
+        name: String,
+        /// Location where the existing variable was made read-only.
+        read_only_location: Location,
+    },
     /// Expansion error.
     Expansion(crate::expansion::ErrorCause),
 }
@@ -89,10 +95,16 @@ pub async fn perform_assignment(env: &mut Env, assign: &Assign) -> Result {
     };
     match env.variables.assign(name, value) {
         Ok(_old_value) => Ok(()),
-        Err(value) => {
-            let name = assign.name.clone();
-            let cause = ErrorCause::ReadOnly { name };
-            let location = value.last_assigned_location.unwrap();
+        Err(ReadOnlyError {
+            name,
+            read_only_location,
+            new_value,
+        }) => {
+            let cause = ErrorCause::ReadOnly {
+                name,
+                read_only_location,
+            };
+            let location = new_value.last_assigned_location.unwrap();
             Err(Error { cause, location })
         }
     }
@@ -152,17 +164,20 @@ mod tests {
     #[test]
     fn perform_assignment_read_only() {
         let mut env = Env::new_virtual();
+        let location = Location::dummy("read-only location");
         let v = Variable {
             value: Value::Scalar("read-only".to_string()),
             last_assigned_location: None,
             is_exported: false,
-            read_only_location: Some(Location::dummy("")),
+            read_only_location: Some(location.clone()),
         };
         env.variables.assign("v".to_string(), v).unwrap();
         let a: Assign = "v=new".parse().unwrap();
         let e = block_on(perform_assignment(&mut env, &a)).unwrap_err();
-        let name = assert_matches!(e.cause, ErrorCause::ReadOnly{name} => name);
-        assert_eq!(name, "v");
+        assert_matches!(e.cause, ErrorCause::ReadOnly{name, read_only_location} => {
+            assert_eq!(name, "v");
+            assert_eq!(read_only_location, location);
+        });
         assert_eq!(e.location.line.value, "v=new");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.column.get(), 1);

@@ -57,7 +57,8 @@ impl Handle<crate::assign::Error> for Env {
         // TODO Localize the message
         // TODO Pretty-print the error location
         match error.cause {
-            ReadOnly { name } => {
+            // TODO Print read-only location
+            ReadOnly { name, .. } => {
                 self.print_error(&format_args!(
                     "cannot assign to read-only variable {}",
                     name
@@ -90,6 +91,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let cause = crate::assign::ErrorCause::ReadOnly {
             name: "foo".to_string(),
+            read_only_location: Location::dummy(""),
         };
         let location = Location::dummy("location");
         let error = crate::assign::Error { cause, location };

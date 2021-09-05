@@ -105,6 +105,17 @@ impl Variable {
 pub struct VariableSet(HashMap<String, Variable>);
 // TODO Support local and temporary contexts
 
+/// Error that occurs when assigning to an existing read-only variable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReadOnlyError {
+    /// Variable name.
+    pub name: String,
+    /// Location where the existing variable was made read-only.
+    pub read_only_location: Location,
+    /// New variable that was tried to assign.
+    pub new_value: Variable,
+}
+
 impl VariableSet {
     /// Creates an empty variable set.
     #[must_use]
@@ -127,13 +138,20 @@ impl VariableSet {
     /// Assigns a variable.
     ///
     /// If successful, the return value is the previous value. If there is an
-    /// existing read-only value, the assignment fails and returns the argument
-    /// value intact.
-    pub fn assign(&mut self, name: String, value: Variable) -> Result<Option<Variable>, Variable> {
+    /// existing read-only value, the assignment fails.
+    pub fn assign(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> Result<Option<Variable>, ReadOnlyError> {
         // TODO Use HashMap::try_insert
-        if let Some(variable) = self.0.get(&name) {
-            if variable.is_read_only() {
-                return Err(value);
+        if let Some(existing) = self.0.get(&name) {
+            if let Some(location) = &existing.read_only_location {
+                return Err(ReadOnlyError {
+                    name,
+                    read_only_location: location.clone(),
+                    new_value: value,
+                });
             }
         }
         Ok(self.0.insert(name, value))
@@ -207,11 +225,12 @@ mod tests {
     #[test]
     fn assign_to_read_only_variable() {
         let mut variables = VariableSet::new();
+        let read_only_location = Location::dummy("read-only");
         let v1 = Variable {
             value: Scalar("my value".to_string()),
             last_assigned_location: None,
             is_exported: false,
-            read_only_location: Some(Location::dummy("")),
+            read_only_location: Some(read_only_location.clone()),
         };
         variables.assign("x".to_string(), v1.clone()).unwrap();
 
@@ -222,7 +241,9 @@ mod tests {
             read_only_location: Some(Location::dummy("something")),
         };
         let error = variables.assign("x".to_string(), v2.clone()).unwrap_err();
-        assert_eq!(error, v2);
+        assert_eq!(error.name, "x");
+        assert_eq!(error.read_only_location, read_only_location);
+        assert_eq!(error.new_value, v2);
         assert_eq!(variables.get("x"), Some(&v1));
     }
 
