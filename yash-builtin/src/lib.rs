@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 pub mod alias;
+pub mod readonly;
 pub mod r#return;
 
 #[doc(no_inline)]
@@ -33,6 +34,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Intrinsic,
             execute: alias::builtin_main,
+        },
+    ),
+    (
+        "readonly",
+        Builtin {
+            r#type: Special,
+            execute: readonly::builtin_main,
         },
     ),
     (

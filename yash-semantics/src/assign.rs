@@ -62,6 +62,22 @@ impl From<crate::expansion::Error> for Error {
     }
 }
 
+impl From<ReadOnlyError> for Error {
+    fn from(error: ReadOnlyError) -> Self {
+        let ReadOnlyError {
+            name,
+            read_only_location,
+            new_value,
+        } = error;
+        let cause = ErrorCause::ReadOnly {
+            name,
+            read_only_location,
+        };
+        let location = new_value.last_assigned_location.unwrap();
+        Error { cause, location }
+    }
+}
+
 /// Result of assignment.
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
@@ -80,21 +96,8 @@ pub async fn perform_assignment<E: Env>(env: &mut E, assign: &Assign) -> Result 
         is_exported: false,
         read_only_location: None,
     };
-    match env.assign_variable(name, value) {
-        Ok(_old_value) => Ok(()),
-        Err(ReadOnlyError {
-            name,
-            read_only_location,
-            new_value,
-        }) => {
-            let cause = ErrorCause::ReadOnly {
-                name,
-                read_only_location,
-            };
-            let location = new_value.last_assigned_location.unwrap();
-            Err(Error { cause, location })
-        }
-    }
+    env.assign_variable(name, value)?;
+    Ok(())
 }
 
 /// Performs assignments.
