@@ -65,6 +65,7 @@ mod word;
 use async_trait::async_trait;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Variable;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
@@ -100,6 +101,13 @@ pub trait Env: std::fmt::Debug {
     #[must_use]
     fn get_variable(&self, name: &str) -> Option<&Variable>;
 
+    /// Assigns a variable.
+    fn assign_variable(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
+
     // TODO define Env methods
 }
 // TODO Should we split Env for the initial expansion and multi-field expansion?
@@ -107,6 +115,13 @@ pub trait Env: std::fmt::Debug {
 impl Env for yash_env::Env {
     fn get_variable(&self, name: &str) -> Option<&Variable> {
         self.variables.get(name)
+    }
+    fn assign_variable(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+        self.variables.assign(name, value)
     }
 }
 
@@ -403,15 +418,46 @@ where
         .collect())
 }
 
+/// Expands an assignment value.
+///
+/// This function expands a [`yash_syntax::syntax::Value`] to a
+/// [`yash_env::variable::Value`]. A scalar value is expanded by [`expand_word`]
+/// and an array by [`expand_words`].
+pub async fn expand_value<E: Env>(
+    env: &mut E,
+    value: &yash_syntax::syntax::Value,
+) -> Result<yash_env::variable::Value> {
+    match value {
+        yash_syntax::syntax::Scalar(word) => {
+            let field = expand_word(env, word).await?;
+            Ok(yash_env::variable::Scalar(field.value))
+        }
+        yash_syntax::syntax::Array(words) => {
+            let fields = expand_words(env, words).await?;
+            let fields = fields.into_iter().map(|f| f.value).collect();
+            Ok(yash_env::variable::Array(fields))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+    use futures_executor::block_on;
 
     #[derive(Debug)]
     pub(crate) struct NullEnv;
 
     impl Env for NullEnv {
         fn get_variable(&self, _: &str) -> Option<&Variable> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn assign_variable(
+            &mut self,
+            _: String,
+            _: Variable,
+        ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
             unimplemented!("NullEnv's method must not be called")
         }
     }
@@ -553,5 +599,21 @@ mod tests {
             ..not_quoted
         };
         assert_eq!(field, [not_quoted, quoted, quoted, quoted]);
+    }
+
+    #[test]
+    fn expand_value_scalar() {
+        let v = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
+        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let content = assert_matches!(result, yash_env::variable::Scalar(content) => content);
+        assert_eq!(content, r"1\");
+    }
+
+    #[test]
+    fn expand_value_array() {
+        let v = yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
+        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let content = assert_matches!(result, yash_env::variable::Array(content) => content);
+        assert_eq!(content, ["".to_string(), r"2\".to_string()]);
     }
 }

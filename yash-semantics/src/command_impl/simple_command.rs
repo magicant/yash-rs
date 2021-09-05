@@ -16,6 +16,7 @@
 
 //! Implementation of simple command semantics.
 
+use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::Command;
@@ -32,6 +33,7 @@ use yash_env::function::Function;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
+use yash_syntax::syntax::Assign;
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
@@ -169,15 +171,19 @@ impl Command for syntax::SimpleCommand {
                 }
             }
         } else {
-            execute_absent_target().await
+            execute_absent_target(env, &self.assigns).await
         }
     }
 }
 
-async fn execute_absent_target() -> Result {
+async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
     // TODO open redirections
-    // TODO expand and perform assignments
-    Ok(())
+
+    // TODO Apply last command substitution exit status
+    match perform_assignments(env, assigns).await {
+        Ok(()) => Ok(()),
+        Err(error) => env.handle(error).await,
+    }
 }
 
 async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) -> Result {
@@ -273,6 +279,45 @@ mod tests {
     use yash_syntax::source::Location;
 
     #[test]
+    fn simple_command_performs_assignment_with_absent_target() {
+        let mut env = Env::new_virtual();
+        let command: syntax::SimpleCommand = "a=b".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(
+            env.variables.get("a").unwrap().value,
+            Value::Scalar("b".to_string())
+        );
+    }
+
+    #[test]
+    fn simple_command_handles_assignment_error_with_absent_target() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.variables
+            .assign(
+                "a".to_string(),
+                Variable {
+                    value: Value::Scalar("".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: Some(Location::dummy("")),
+                },
+            )
+            .unwrap();
+        let command: syntax::SimpleCommand = "a=b".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Ok(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+
+        let state = state.borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert!(!stderr.content.is_empty());
+    }
+
+    #[test]
     fn simple_command_returns_exit_status_from_builtin_without_divert() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
@@ -324,24 +369,28 @@ mod tests {
         system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let mut env = Env::with_system(Box::new(system));
-        env.variables.assign(
-            "env".to_string(),
-            Variable {
-                value: Value::Scalar("scalar".to_string()),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
-        );
-        env.variables.assign(
-            "local".to_string(),
-            Variable {
-                value: Value::Scalar("ignored".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        );
+        env.variables
+            .assign(
+                "env".to_string(),
+                Variable {
+                    value: Value::Scalar("scalar".to_string()),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                "local".to_string(),
+                Variable {
+                    value: Value::Scalar("ignored".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
         assert_eq!(result, Ok(()));

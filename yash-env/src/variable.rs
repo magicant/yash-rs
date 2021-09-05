@@ -105,6 +105,17 @@ impl Variable {
 pub struct VariableSet(HashMap<String, Variable>);
 // TODO Support local and temporary contexts
 
+/// Error that occurs when assigning to an existing read-only variable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReadOnlyError {
+    /// Variable name.
+    pub name: String,
+    /// Location where the existing variable was made read-only.
+    pub read_only_location: Location,
+    /// New variable that was tried to assign.
+    pub new_value: Variable,
+}
+
 impl VariableSet {
     /// Creates an empty variable set.
     #[must_use]
@@ -122,14 +133,28 @@ impl VariableSet {
         self.0.get(name)
     }
 
-    // TODO Reject if the existing variable is read-only
     // TODO Export if the existing variable has been exported
     // TODO Specifying the scope of assignment
     /// Assigns a variable.
     ///
-    /// Returns the old value, if any.
-    pub fn assign(&mut self, name: String, value: Variable) -> Option<Variable> {
-        self.0.insert(name, value)
+    /// If successful, the return value is the previous value. If there is an
+    /// existing read-only value, the assignment fails.
+    pub fn assign(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> Result<Option<Variable>, ReadOnlyError> {
+        // TODO Use HashMap::try_insert
+        if let Some(existing) = self.0.get(&name) {
+            if let Some(location) = &existing.read_only_location {
+                return Err(ReadOnlyError {
+                    name,
+                    read_only_location: location.clone(),
+                    new_value: value,
+                });
+            }
+        }
+        Ok(self.0.insert(name, value))
     }
 
     /// Returns environment variables in a new vector of C string.
@@ -168,8 +193,58 @@ mod tests {
             is_exported: false,
             read_only_location: Some(Location::dummy("dummy")),
         };
-        variables.assign("foo".to_string(), variable.clone());
+        let result = variables
+            .assign("foo".to_string(), variable.clone())
+            .unwrap();
+        assert_eq!(result, None);
         assert_eq!(variables.get("foo"), Some(&variable));
+    }
+
+    #[test]
+    fn reassign_variable_and_get() {
+        let mut variables = VariableSet::new();
+        let v1 = Variable {
+            value: Scalar("my value".to_string()),
+            last_assigned_location: Some(Location::dummy("dummy")),
+            is_exported: false,
+            read_only_location: None,
+        };
+        variables.assign("foo".to_string(), v1.clone()).unwrap();
+
+        let v2 = Variable {
+            value: Scalar("your value".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("something")),
+        };
+        let result = variables.assign("foo".to_string(), v2.clone()).unwrap();
+        assert_eq!(result, Some(v1));
+        assert_eq!(variables.get("foo"), Some(&v2));
+    }
+
+    #[test]
+    fn assign_to_read_only_variable() {
+        let mut variables = VariableSet::new();
+        let read_only_location = Location::dummy("read-only");
+        let v1 = Variable {
+            value: Scalar("my value".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(read_only_location.clone()),
+        };
+        variables.assign("x".to_string(), v1.clone()).unwrap();
+
+        let v2 = Variable {
+            value: Scalar("your value".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("something")),
+        };
+        let error = variables.assign("x".to_string(), v2.clone()).unwrap_err();
+        assert_eq!(error.name, "x");
+        assert_eq!(error.read_only_location, read_only_location);
+        assert_eq!(error.new_value, v2);
+        assert_eq!(variables.get("x"), Some(&v1));
     }
 
     #[test]
@@ -177,42 +252,50 @@ mod tests {
         let mut variables = VariableSet::new();
         assert_eq!(&variables.env_c_strings(), &[]);
 
-        variables.assign(
-            "foo".to_string(),
-            Variable {
-                value: Scalar("FOO".to_string()),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
-        );
-        variables.assign(
-            "bar".to_string(),
-            Variable {
-                value: Array(vec!["BAR".to_string()]),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
-        );
-        variables.assign(
-            "baz".to_string(),
-            Variable {
-                value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
-        );
-        variables.assign(
-            "null".to_string(),
-            Variable {
-                value: Scalar("not exported".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        );
+        variables
+            .assign(
+                "foo".to_string(),
+                Variable {
+                    value: Scalar("FOO".to_string()),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        variables
+            .assign(
+                "bar".to_string(),
+                Variable {
+                    value: Array(vec!["BAR".to_string()]),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        variables
+            .assign(
+                "baz".to_string(),
+                Variable {
+                    value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        variables
+            .assign(
+                "null".to_string(),
+                Variable {
+                    value: Scalar("not exported".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
         let mut ss = variables.env_c_strings();
         ss.sort_unstable();
         assert_eq!(

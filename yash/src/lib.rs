@@ -63,7 +63,7 @@ async fn parse_and_print() -> i32 {
             is_exported: true,
             read_only_location: None,
         };
-        env.variables.assign(name, value);
+        env.variables.assign(name, value).unwrap();
     }
 
     loop {
