@@ -67,6 +67,7 @@ mod tests {
     use super::super::AttrChar;
     use super::*;
     use futures_executor::block_on;
+    use yash_env::variable::ReadOnlyError;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
 
@@ -82,6 +83,25 @@ mod tests {
                 Some(&self.value)
             } else {
                 None
+            }
+        }
+        fn assign_variable(
+            &mut self,
+            name: String,
+            value: Variable,
+        ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+            if self.name == name {
+                if let Some(location) = &self.value.read_only_location {
+                    return Err(ReadOnlyError {
+                        name,
+                        read_only_location: location.clone(),
+                        new_value: value,
+                    });
+                }
+                Ok(Some(std::mem::replace(&mut self.value, value)))
+            } else {
+                self.name = name;
+                Ok(None)
             }
         }
     }

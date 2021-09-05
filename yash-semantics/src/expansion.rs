@@ -65,6 +65,7 @@ mod word;
 use async_trait::async_trait;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Variable;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
@@ -100,6 +101,13 @@ pub trait Env: std::fmt::Debug {
     #[must_use]
     fn get_variable(&self, name: &str) -> Option<&Variable>;
 
+    /// Assigns a variable.
+    fn assign_variable(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
+
     // TODO define Env methods
 }
 // TODO Should we split Env for the initial expansion and multi-field expansion?
@@ -107,6 +115,13 @@ pub trait Env: std::fmt::Debug {
 impl Env for yash_env::Env {
     fn get_variable(&self, name: &str) -> Option<&Variable> {
         self.variables.get(name)
+    }
+    fn assign_variable(
+        &mut self,
+        name: String,
+        value: Variable,
+    ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+        self.variables.assign(name, value)
     }
 }
 
@@ -436,6 +451,13 @@ mod tests {
 
     impl Env for NullEnv {
         fn get_variable(&self, _: &str) -> Option<&Variable> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn assign_variable(
+            &mut self,
+            _: String,
+            _: Variable,
+        ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
             unimplemented!("NullEnv's method must not be called")
         }
     }
