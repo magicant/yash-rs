@@ -361,7 +361,7 @@ pub trait ExpandToField {
     /// on the result.
     ///
     /// This function inserts the results into `fields`.
-    async fn expand_to_fields_into<E: Env, F: Extend<AttrField>>(
+    async fn expand_to_fields<E: Env, F: Extend<AttrField>>(
         &self,
         env: &mut E,
         fields: &mut F,
@@ -394,7 +394,7 @@ where
 
     let mut fields = Vec::new();
     for word in words {
-        word.expand_to_fields_into(env, &mut fields).await?;
+        word.expand_to_fields(env, &mut fields).await?;
     }
     // TODO multi-field expansion
     Ok(fields

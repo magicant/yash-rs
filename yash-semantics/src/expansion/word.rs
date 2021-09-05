@@ -92,7 +92,7 @@ impl ExpandToField for Word {
         Ok(AttrField { chars, origin })
     }
 
-    async fn expand_to_fields_into<E: Env, F: Extend<AttrField>>(
+    async fn expand_to_fields<E: Env, F: Extend<AttrField>>(
         &self,
         env: &mut E,
         fields: &mut F,
@@ -286,7 +286,7 @@ mod tests {
         let mut env = NullEnv;
         let w: Word = "abc".parse().unwrap();
         let mut result = Vec::new();
-        block_on(w.expand_to_fields_into(&mut env, &mut result)).unwrap();
+        block_on(w.expand_to_fields(&mut env, &mut result)).unwrap();
         assert_eq!(result.len(), 1, "{:?}", result);
         assert_eq!(
             result[0].chars,
