@@ -16,10 +16,8 @@
 
 //! Assignment.
 
-use crate::expansion::expand_word;
-use crate::expansion::expand_words;
+use crate::expansion::expand_value;
 use yash_env::variable::ReadOnlyError;
-use yash_env::variable::Value;
 use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_syntax::source::Location;
@@ -65,25 +63,6 @@ impl From<crate::expansion::Error> for Error {
 
 /// Result of assignment.
 pub type Result<T = ()> = std::result::Result<T, Error>;
-
-/// Expands the value.
-///
-/// This function expands a [`yash_syntax::syntax::Value`] to a
-/// [`yash_semantics::assign::Value`](Value). A scalar value is expanded by
-/// [`expand_word`] and an array by [`expand_words`].
-pub async fn expand_value(env: &mut Env, value: &yash_syntax::syntax::Value) -> Result<Value> {
-    match value {
-        yash_syntax::syntax::Scalar(word) => {
-            let field = expand_word(env, word).await.map_err(Error::from)?;
-            Ok(Value::Scalar(field.value))
-        }
-        yash_syntax::syntax::Array(words) => {
-            let fields = expand_words(env, words).await.map_err(Error::from)?;
-            let fields = fields.into_iter().map(|f| f.value).collect();
-            Ok(Value::Array(fields))
-        }
-    }
-}
 
 // TODO Export or not?
 // TODO Specifying the scope of assignment
@@ -133,24 +112,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use yash_env::variable::Value;
-
-    #[test]
-    fn expand_value_scalar() {
-        let mut env = Env::new_virtual();
-        let v = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
-        let result = block_on(expand_value(&mut env, &v)).unwrap();
-        let content = assert_matches!(result, Value::Scalar(content) => content);
-        assert_eq!(content, r"1\");
-    }
-
-    #[test]
-    fn expand_value_array() {
-        let mut env = Env::new_virtual();
-        let v = yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
-        let result = block_on(expand_value(&mut env, &v)).unwrap();
-        let content = assert_matches!(result, Value::Array(content) => content);
-        assert_eq!(content, ["".to_string(), r"2\".to_string()]);
-    }
 
     #[test]
     fn perform_assignment_new_value() {

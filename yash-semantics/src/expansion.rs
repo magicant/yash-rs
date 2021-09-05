@@ -403,9 +403,33 @@ where
         .collect())
 }
 
+/// Expands an assignment value.
+///
+/// This function expands a [`yash_syntax::syntax::Value`] to a
+/// [`yash_env::variable::Value`]. A scalar value is expanded by [`expand_word`]
+/// and an array by [`expand_words`].
+pub async fn expand_value<E: Env>(
+    env: &mut E,
+    value: &yash_syntax::syntax::Value,
+) -> Result<yash_env::variable::Value> {
+    match value {
+        yash_syntax::syntax::Scalar(word) => {
+            let field = expand_word(env, word).await?;
+            Ok(yash_env::variable::Scalar(field.value))
+        }
+        yash_syntax::syntax::Array(words) => {
+            let fields = expand_words(env, words).await?;
+            let fields = fields.into_iter().map(|f| f.value).collect();
+            Ok(yash_env::variable::Array(fields))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+    use futures_executor::block_on;
 
     #[derive(Debug)]
     pub(crate) struct NullEnv;
@@ -553,5 +577,21 @@ mod tests {
             ..not_quoted
         };
         assert_eq!(field, [not_quoted, quoted, quoted, quoted]);
+    }
+
+    #[test]
+    fn expand_value_scalar() {
+        let v = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
+        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let content = assert_matches!(result, yash_env::variable::Scalar(content) => content);
+        assert_eq!(content, r"1\");
+    }
+
+    #[test]
+    fn expand_value_array() {
+        let v = yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
+        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let content = assert_matches!(result, yash_env::variable::Array(content) => content);
+        assert_eq!(content, ["".to_string(), r"2\".to_string()]);
     }
 }
