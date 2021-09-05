@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Assignment semantics.
+//! Assignment.
 
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
@@ -67,6 +67,10 @@ impl From<crate::expansion::Error> for Error {
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
 /// Expands the value.
+///
+/// This function expands a [`yash_syntax::syntax::Value`] to a
+/// [`yash_semantics::assign::Value`](Value). A scalar value is expanded by
+/// [`expand_word`] and an array by [`expand_words`].
 pub async fn expand_value(env: &mut Env, value: &yash_syntax::syntax::Value) -> Result<Value> {
     match value {
         yash_syntax::syntax::Scalar(word) => {
@@ -84,6 +88,9 @@ pub async fn expand_value(env: &mut Env, value: &yash_syntax::syntax::Value) -> 
 // TODO Export or not?
 // TODO Specifying the scope of assignment
 /// Performs an assignment.
+///
+/// This function [expands the value](expand_value) and then
+/// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
 pub async fn perform_assignment(env: &mut Env, assign: &Assign) -> Result {
     let name = assign.name.clone();
     let value = expand_value(env, &assign.value).await?;
