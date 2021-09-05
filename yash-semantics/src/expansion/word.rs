@@ -285,7 +285,8 @@ mod tests {
     fn word_expand_to_fields() {
         let mut env = NullEnv;
         let w: Word = "abc".parse().unwrap();
-        let result = block_on(w.expand_to_fields(&mut env)).unwrap();
+        let mut result = Vec::new();
+        block_on(w.expand_to_fields_into(&mut env, &mut result)).unwrap();
         assert_eq!(result.len(), 1, "{:?}", result);
         assert_eq!(
             result[0].chars,
