@@ -16,10 +16,10 @@
 
 //! Syntax parser for grouping and subshell
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Keyword::{CloseBrace, OpenBrace};
 use super::lex::Operator::{CloseParen, OpenParen};
@@ -92,7 +92,7 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
