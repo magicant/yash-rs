@@ -16,11 +16,11 @@
 
 //! Syntax parser for list and compound list
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Rec;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::Fill;
 use super::fill::MissingHereDoc;
 use super::lex::Operator::{And, Newline, Semicolon};
@@ -167,7 +167,7 @@ impl Parser<'_> {
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::*;
     use crate::source::Source;

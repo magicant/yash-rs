@@ -16,11 +16,11 @@
 
 //! Syntax parser for case command
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Rec;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Case, Esac, In};
 use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
@@ -176,7 +176,7 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;

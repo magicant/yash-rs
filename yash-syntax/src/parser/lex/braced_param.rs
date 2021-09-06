@@ -19,9 +19,9 @@
 use super::core::WordLexer;
 use super::raw_param::is_portable_name_char;
 use super::raw_param::is_special_parameter_char;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
-use crate::parser::core::SyntaxError;
+use crate::parser::error::Error;
+use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::syntax::Modifier;
 use crate::syntax::Param;
@@ -155,7 +155,7 @@ impl WordLexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
+    use crate::parser::error::ErrorCause;
     use crate::parser::lex::Lexer;
     use crate::parser::lex::WordContext;
     use crate::source::Source;

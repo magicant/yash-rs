@@ -67,6 +67,7 @@
 //! See the [`syntax`](crate::syntax) module for an example of this.
 
 mod core;
+mod error;
 mod fill;
 mod from_str;
 
@@ -86,11 +87,11 @@ mod while_loop;
 
 pub mod lex;
 
-pub use self::core::Error;
-pub use self::core::ErrorCause;
 pub use self::core::Parser;
 pub use self::core::Rec;
 pub use self::core::Result;
-pub use self::core::SyntaxError;
+pub use self::error::Error;
+pub use self::error::ErrorCause;
+pub use self::error::SyntaxError;
 pub use self::fill::Fill;
 pub use self::fill::MissingHereDoc;

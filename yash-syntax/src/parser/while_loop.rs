@@ -16,10 +16,10 @@
 
 //! Syntax parser for while and until loops
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Until, While};
 use super::lex::TokenId::Token;
@@ -95,7 +95,7 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
