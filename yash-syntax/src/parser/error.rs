@@ -18,6 +18,7 @@
 
 use crate::source::Location;
 use crate::syntax::AndOr;
+use std::borrow::Cow;
 use std::fmt;
 use std::rc::Rc;
 
@@ -138,82 +139,77 @@ pub enum SyntaxError {
     MissingCommandAfterBar,
 }
 
-impl fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl SyntaxError {
+    /// Returns an error message describing the error.
+    #[must_use]
+    pub fn message(&self) -> &'static str {
         use SyntaxError::*;
         match self {
-            UnclosedParen { .. } => f.write_str("The parenthesis is not closed"),
-            InvalidModifier => f.write_str("The parameter expansion contains a malformed modifier"),
-            MultipleModifier => {
-                f.write_str("A suffix modifier cannot be used together with a prefix modifier")
-            }
-            UnclosedSingleQuote { .. } => f.write_str("The single quote is not closed"),
-            UnclosedDoubleQuote { .. } => f.write_str("The double quote is not closed"),
-            UnclosedParam { .. } => f.write_str("The parameter expansion is not closed"),
-            EmptyParam => f.write_str("The parameter name is missing"),
-            UnclosedCommandSubstitution { .. } => {
-                f.write_str("The command substitution is not closed")
-            }
-            UnclosedBackquote { .. } => f.write_str("The backquote is not closed"),
-            UnclosedArith { .. } => f.write_str("The arithmetic expansion is not closed"),
-            UnexpectedToken => f.write_str("Unexpected token"),
-            FdOutOfRange => f.write_str("The file descriptor is too large"),
-            MissingRedirOperand => f.write_str("The redirection operator is missing its operand"),
-            MissingHereDocDelimiter => {
-                f.write_str("The here-document operator is missing its delimiter")
-            }
-            MissingHereDocContent => f.write_str("Content of the here-document is missing"),
+            UnclosedParen { .. } => "The parenthesis is not closed",
+            InvalidModifier => "The parameter expansion contains a malformed modifier",
+            MultipleModifier => "A suffix modifier cannot be used together with a prefix modifier",
+            UnclosedSingleQuote { .. } => "The single quote is not closed",
+            UnclosedDoubleQuote { .. } => "The double quote is not closed",
+            UnclosedParam { .. } => "The parameter expansion is not closed",
+            EmptyParam => "The parameter name is missing",
+            UnclosedCommandSubstitution { .. } => "The command substitution is not closed",
+            UnclosedBackquote { .. } => "The backquote is not closed",
+            UnclosedArith { .. } => "The arithmetic expansion is not closed",
+            UnexpectedToken => "Unexpected token",
+            FdOutOfRange => "The file descriptor is too large",
+            MissingRedirOperand => "The redirection operator is missing its operand",
+            MissingHereDocDelimiter => "The here-document operator is missing its delimiter",
+            MissingHereDocContent => "Content of the here-document is missing",
             UnclosedHereDocContent { .. } => {
-                f.write_str("The delimiter to close the here-document content is missing")
+                "The delimiter to close the here-document content is missing"
             }
-            UnclosedArrayValue { .. } => f.write_str("The array assignment value is not closed"),
-            UnclosedGrouping { .. } => f.write_str("The grouping is not closed"),
-            EmptyGrouping => f.write_str("The grouping is missing its content"),
-            UnclosedSubshell { .. } => f.write_str("The subshell is not closed"),
-            EmptySubshell => f.write_str("The subshell is missing its content"),
-            UnclosedDoClause { .. } => f.write_str("The `do` clause is missing its closing `done`"),
-            EmptyDoClause => f.write_str("The `do` clause is missing its content"),
-            MissingForName => f.write_str("The variable name is missing in the `for` loop"),
-            InvalidForName => f.write_str("The variable name is invalid"),
-            InvalidForValue => {
-                f.write_str("The operator token is invalid in the word list of the `for` loop")
-            }
-            MissingForBody { .. } => f.write_str("The `for` loop is missing its `do` clause"),
-            UnclosedWhileClause { .. } => {
-                f.write_str("The `while` loop is missing its `do` clause")
-            }
-            EmptyWhileCondition => f.write_str("The `while` loop is missing its condition"),
-            UnclosedUntilClause { .. } => {
-                f.write_str("The `until` loop is missing its `do` clause")
-            }
-            EmptyUntilCondition => f.write_str("The `until` loop is missing its condition"),
-            IfMissingThen { .. } => f.write_str("The `if` command is missing the `then` clause"),
-            EmptyIfCondition => f.write_str("The `if` command is missing its condition"),
-            EmptyIfBody => f.write_str("The `if` command is missing its body"),
-            ElifMissingThen { .. } => f.write_str("The `elif` clause is missing the `then` clause"),
-            EmptyElifCondition => f.write_str("The `elif` clause is missing its condition"),
-            EmptyElifBody => f.write_str("The `elif` clause is missing its body"),
-            EmptyElse => f.write_str("The `else` clause is missing its content"),
-            UnclosedIf { .. } => f.write_str("The `if` command is missing its closing `fi`"),
-            MissingCaseSubject => f.write_str("The subject is missing after `case`"),
-            InvalidCaseSubject => f.write_str("The `case` command subject is not a valid word"),
-            MissingIn { .. } => f.write_str("`in` is missing in the `case` command"),
-            UnclosedPatternList => f.write_str("The pattern list is not properly closed by a `)`"),
-            MissingPattern => f.write_str("A pattern is missing in the `case` command"),
-            InvalidPattern => f.write_str("The pattern is not a valid word token"),
-            EsacAsPattern => f.write_str("`esac` cannot be the first of a pattern list"),
-            UnclosedCase { .. } => f.write_str("The `case` command is missing its closing `esac`"),
-            UnmatchedParenthesis => f.write_str("`)` is missing after `(`"),
-            MissingFunctionBody => f.write_str("The function body is missing"),
-            InvalidFunctionBody => f.write_str("The function body must be a compound command"),
-            MissingPipeline(and_or) => {
-                write!(f, "A command is missing after `{}`", and_or)
-            }
-            DoubleNegation => f.write_str("`!` cannot be used twice in a row"),
-            BangAfterBar => f.write_str("`!` cannot be used in the middle of a pipeline"),
-            MissingCommandAfterBang => f.write_str("A command is missing after `!`"),
-            MissingCommandAfterBar => f.write_str("A command is missing after `|`"),
+            UnclosedArrayValue { .. } => "The array assignment value is not closed",
+            UnclosedGrouping { .. } => "The grouping is not closed",
+            EmptyGrouping => "The grouping is missing its content",
+            UnclosedSubshell { .. } => "The subshell is not closed",
+            EmptySubshell => "The subshell is missing its content",
+            UnclosedDoClause { .. } => "The `do` clause is missing its closing `done`",
+            EmptyDoClause => "The `do` clause is missing its content",
+            MissingForName => "The variable name is missing in the `for` loop",
+            InvalidForName => "The variable name is invalid",
+            InvalidForValue => "The operator token is invalid in the word list of the `for` loop",
+            MissingForBody { .. } => "The `for` loop is missing its `do` clause",
+            UnclosedWhileClause { .. } => "The `while` loop is missing its `do` clause",
+            EmptyWhileCondition => "The `while` loop is missing its condition",
+            UnclosedUntilClause { .. } => "The `until` loop is missing its `do` clause",
+            EmptyUntilCondition => "The `until` loop is missing its condition",
+            IfMissingThen { .. } => "The `if` command is missing the `then` clause",
+            EmptyIfCondition => "The `if` command is missing its condition",
+            EmptyIfBody => "The `if` command is missing its body",
+            ElifMissingThen { .. } => "The `elif` clause is missing the `then` clause",
+            EmptyElifCondition => "The `elif` clause is missing its condition",
+            EmptyElifBody => "The `elif` clause is missing its body",
+            EmptyElse => "The `else` clause is missing its content",
+            UnclosedIf { .. } => "The `if` command is missing its closing `fi`",
+            MissingCaseSubject => "The subject is missing after `case`",
+            InvalidCaseSubject => "The `case` command subject is not a valid word",
+            MissingIn { .. } => "`in` is missing in the `case` command",
+            UnclosedPatternList => "The pattern list is not properly closed by a `)`",
+            MissingPattern => "A pattern is missing in the `case` command",
+            InvalidPattern => "The pattern is not a valid word token",
+            EsacAsPattern => "`esac` cannot be the first of a pattern list",
+            UnclosedCase { .. } => "The `case` command is missing its closing `esac`",
+            UnmatchedParenthesis => "`)` is missing after `(`",
+            MissingFunctionBody => "The function body is missing",
+            InvalidFunctionBody => "The function body must be a compound command",
+            MissingPipeline(AndOr::AndThen) => "A command is missing after `&&`",
+            MissingPipeline(AndOr::OrElse) => "A command is missing after `||`",
+            DoubleNegation => "`!` cannot be used twice in a row",
+            BangAfterBar => "`!` cannot be used in the middle of a pipeline",
+            MissingCommandAfterBang => "A command is missing after `!`",
+            MissingCommandAfterBar => "A command is missing after `|`",
         }
+    }
+}
+
+impl fmt::Display for SyntaxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message())
     }
 }
 
@@ -235,12 +231,21 @@ impl PartialEq for ErrorCause {
     }
 }
 
+impl ErrorCause {
+    /// Returns an error message describing the error cause.
+    #[must_use]
+    pub fn message(&self) -> Cow<'static, str> {
+        use ErrorCause::*;
+        match self {
+            Io(e) => format!("cannot read commands: {}", e).into(),
+            Syntax(e) => e.message().into(),
+        }
+    }
+}
+
 impl fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ErrorCause::Io(e) => write!(f, "Error while reading commands: {}", e),
-            ErrorCause::Syntax(e) => e.fmt(f),
-        }
+        self.message().fmt(f)
     }
 }
 
