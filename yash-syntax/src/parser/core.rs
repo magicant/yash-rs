@@ -290,6 +290,47 @@ impl fmt::Display for Error {
 
 // TODO Consider implementing std::error::Error for self::Error
 
+/// Converts an `Error` to an annotated snippet.
+///
+/// This implementation is available only when the `"annotate-snippets"` feature
+/// is enabled.
+#[cfg(feature = "annotate-snippets")]
+impl<'a> From<&'a Error> for annotate_snippets::snippet::Snippet<'a> {
+    fn from(error: &'a Error) -> Self {
+        use annotate_snippets::snippet::*;
+        use std::convert::TryInto;
+
+        let index = error.location.column.get().try_into().unwrap_or(usize::MAX);
+
+        Snippet {
+            title: Some(Annotation {
+                label: Some("parser error"), // TODO correct message
+                id: None,
+                annotation_type: AnnotationType::Error,
+            }),
+            footer: vec![],
+            slices: vec![Slice {
+                source: &error.location.line.value,
+                line_start: error
+                    .location
+                    .line
+                    .number
+                    .get()
+                    .try_into()
+                    .unwrap_or(usize::MAX),
+                origin: Some("<origin>"), // TODO correct origin
+                fold: false,
+                annotations: vec![SourceAnnotation {
+                    label: "",
+                    annotation_type: AnnotationType::Error,
+                    range: (index - 1, index),
+                }],
+            }],
+            opt: Default::default(),
+        }
+    }
+}
+
 /// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
 
