@@ -301,11 +301,12 @@ impl Error {
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
 
+        let message = &self.cause.message();
         let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
 
         let snippet = Snippet {
             title: Some(Annotation {
-                label: Some("parser error"),
+                label: Some(message),
                 id: None,
                 annotation_type: AnnotationType::Error,
             }),
