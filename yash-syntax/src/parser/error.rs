@@ -300,11 +300,14 @@ impl Error {
     {
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
+        use ErrorCause::Syntax;
+        use SyntaxError::*;
 
         let message = &self.cause.message();
         let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
 
-        let snippet = Snippet {
+        // Initialize the snippet with the main slice
+        let mut snippet = Snippet {
             title: Some(Annotation {
                 label: Some(message),
                 id: None,
@@ -330,6 +333,78 @@ impl Error {
             }],
             opt: Default::default(),
         };
+
+        // Add an additional note if applicable
+        let note = match &self.cause {
+            Syntax(
+                UnclosedParen { opening_location }
+                | UnclosedSubshell { opening_location }
+                | UnclosedArrayValue { opening_location },
+            ) => Some(("the opening parenthesis was here", opening_location)),
+            Syntax(
+                UnclosedSingleQuote { opening_location } | UnclosedDoubleQuote { opening_location },
+            ) => Some(("the opening quote was here", opening_location)),
+            Syntax(UnclosedParam { opening_location }) => {
+                Some(("the parameter started here", opening_location))
+            }
+            Syntax(UnclosedCommandSubstitution { opening_location }) => {
+                Some(("the command substitution started here", opening_location))
+            }
+            Syntax(UnclosedBackquote { opening_location }) => {
+                Some(("the opening backquote was here", opening_location))
+            }
+            Syntax(UnclosedArith { opening_location }) => {
+                Some(("the arithmetic expansion started here", opening_location))
+            }
+            Syntax(UnclosedHereDocContent { redir_op_location }) => {
+                Some(("the redirection operator was here", redir_op_location))
+            }
+            Syntax(UnclosedGrouping { opening_location }) => {
+                Some(("the opening brace was here", opening_location))
+            }
+            Syntax(UnclosedDoClause { opening_location }) => {
+                Some(("the `do` clause started here", opening_location))
+            }
+            Syntax(MissingForBody { opening_location }) => {
+                Some(("the `for` loop started here", opening_location))
+            }
+            Syntax(UnclosedWhileClause { opening_location }) => {
+                Some(("the `while` loop started here", opening_location))
+            }
+            Syntax(UnclosedUntilClause { opening_location }) => {
+                Some(("the `until` loop started here", opening_location))
+            }
+            Syntax(
+                IfMissingThen { if_location }
+                | UnclosedIf {
+                    opening_location: if_location,
+                },
+            ) => Some(("the `if` command started here", if_location)),
+            Syntax(ElifMissingThen { elif_location }) => {
+                Some(("the `elif` clause started here", elif_location))
+            }
+            Syntax(MissingIn { opening_location } | UnclosedCase { opening_location }) => {
+                Some(("the `case` command started here", opening_location))
+            }
+            _ => None,
+        };
+        if let Some((message, location)) = note {
+            let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            snippet.slices.push(Slice {
+                source: &location.line.value,
+                line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                origin: Some("<origin>"), // TODO correct origin
+                annotations: vec![SourceAnnotation {
+                    label: message,
+                    annotation_type: AnnotationType::Note,
+                    range: (index - 1, index),
+                }],
+                fold: false,
+            });
+        }
+
+        // TODO Merge the second slice into the main slice if they are the same line
+        // TODO Don't specify out-of-bounds range
 
         f(snippet)
     }
