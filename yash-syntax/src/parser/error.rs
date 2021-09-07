@@ -390,20 +390,25 @@ impl Error {
         };
         if let Some((message, location)) = note {
             let index = location.column.get().try_into().unwrap_or(usize::MAX);
-            snippet.slices.push(Slice {
-                source: &location.line.value,
-                line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
-                origin: Some("<origin>"), // TODO correct origin
-                annotations: vec![SourceAnnotation {
-                    label: message,
-                    annotation_type: AnnotationType::Note,
-                    range: (index - 1, index),
-                }],
-                fold: false,
-            });
+            let annotation = SourceAnnotation {
+                label: message,
+                annotation_type: AnnotationType::Info,
+                range: (index - 1, index),
+            };
+            // TODO Share a multi-line slice among nearby lines
+            if location.line == self.location.line {
+                snippet.slices[0].annotations.push(annotation);
+            } else {
+                snippet.slices.push(Slice {
+                    source: &location.line.value,
+                    line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                    origin: Some("<origin>"), // TODO correct origin
+                    annotations: vec![annotation],
+                    fold: false,
+                });
+            }
         }
 
-        // TODO Merge the second slice into the main slice if they are the same line
         // TODO Don't specify out-of-bounds range
 
         f(snippet)
