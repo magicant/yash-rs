@@ -283,28 +283,36 @@ impl fmt::Display for Error {
 
 // TODO Consider implementing std::error::Error for self::Error
 
-/// Converts an `Error` to an annotated snippet.
-///
-/// This implementation is available only when the `"annotate-snippets"` feature
-/// is enabled.
-#[cfg(feature = "annotate-snippets")]
-impl<'a> From<&'a Error> for annotate_snippets::snippet::Snippet<'a> {
-    fn from(error: &'a Error) -> Self {
+impl Error {
+    /// Passes a snippet to the function.
+    ///
+    /// This method creates a snippet describing the error and passes it to the
+    /// argument function. The function can use the snippet to create a
+    /// printable string, for example. Note that the snippet cannot escape from
+    /// the function.
+    ///
+    /// This method is available only when the `"annotate-snippets"` feature is
+    /// enabled.
+    #[cfg(feature = "annotate-snippets")]
+    pub fn with_snippet<F, T>(&self, f: F) -> T
+    where
+        F: FnOnce(annotate_snippets::snippet::Snippet) -> T,
+    {
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
 
-        let index = error.location.column.get().try_into().unwrap_or(usize::MAX);
+        let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
 
-        Snippet {
+        let snippet = Snippet {
             title: Some(Annotation {
-                label: Some("parser error"), // TODO correct message
+                label: Some("parser error"),
                 id: None,
                 annotation_type: AnnotationType::Error,
             }),
             footer: vec![],
             slices: vec![Slice {
-                source: &error.location.line.value,
-                line_start: error
+                source: &self.location.line.value,
+                line_start: self
                     .location
                     .line
                     .number
@@ -320,7 +328,9 @@ impl<'a> From<&'a Error> for annotate_snippets::snippet::Snippet<'a> {
                 }],
             }],
             opt: Default::default(),
-        }
+        };
+
+        f(snippet)
     }
 }
 
