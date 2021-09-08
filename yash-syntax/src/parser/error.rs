@@ -305,6 +305,7 @@ impl Error {
 
         let message = &self.cause.message();
         let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
+        let index = index.min(self.location.line.value.chars().count());
 
         // Initialize the snippet with the main slice
         let mut snippet = Snippet {
@@ -390,6 +391,7 @@ impl Error {
         };
         if let Some((message, location)) = note {
             let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            let index = index.min(location.line.value.chars().count());
             let annotation = SourceAnnotation {
                 label: message,
                 annotation_type: AnnotationType::Info,
@@ -408,8 +410,6 @@ impl Error {
                 });
             }
         }
-
-        // TODO Don't specify out-of-bounds range
 
         f(snippet)
     }
