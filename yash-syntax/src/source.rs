@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 use crate::alias::Alias;
+use std::borrow::Cow;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
@@ -97,6 +98,15 @@ impl Source {
             alias.name == name || original.line.source.is_alias_for(name)
         } else {
             false
+        }
+    }
+
+    #[cfg(feature = "annotate-snippets")]
+    pub(crate) fn to_message(&self) -> Cow<'_, str> {
+        use Source::*;
+        match self {
+            Unknown => "<?>".into(),
+            Alias { alias, .. } => format!("in alias substitution for `{}`", alias.name).into(),
         }
     }
 }

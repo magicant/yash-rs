@@ -306,6 +306,7 @@ impl Error {
         let message = &self.cause.message();
         let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
         let index = index.min(self.location.line.value.chars().count());
+        let origin = self.location.line.source.to_message();
 
         // Initialize the snippet with the main slice
         let mut snippet = Snippet {
@@ -324,7 +325,7 @@ impl Error {
                     .get()
                     .try_into()
                     .unwrap_or(usize::MAX),
-                origin: Some("<origin>"), // TODO correct origin
+                origin: Some(&origin),
                 fold: false,
                 annotations: vec![SourceAnnotation {
                     label: "",
@@ -389,6 +390,11 @@ impl Error {
             }
             _ => None,
         };
+        let origin = if let Some((_message, location)) = &note {
+            location.line.source.to_message()
+        } else {
+            "".into()
+        };
         if let Some((message, location)) = note {
             let index = location.column.get().try_into().unwrap_or(usize::MAX);
             let index = index.min(location.line.value.chars().count());
@@ -404,7 +410,7 @@ impl Error {
                 snippet.slices.push(Slice {
                     source: &location.line.value,
                     line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
-                    origin: Some("<origin>"), // TODO correct origin
+                    origin: Some(&origin),
                     annotations: vec![annotation],
                     fold: false,
                 });
