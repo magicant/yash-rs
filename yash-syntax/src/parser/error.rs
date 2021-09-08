@@ -298,6 +298,7 @@ impl Error {
     where
         F: FnOnce(annotate_snippets::snippet::Snippet) -> T,
     {
+        use crate::source::Source::*;
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
         use ErrorCause::Syntax;
@@ -336,7 +337,7 @@ impl Error {
             opt: Default::default(),
         };
 
-        // Add an additional note if applicable
+        // Add an additional note for `self.cause` if applicable
         let note = match &self.cause {
             Syntax(
                 UnclosedParen { opening_location }
@@ -389,6 +390,70 @@ impl Error {
                 Some(("the `case` command started here", opening_location))
             }
             _ => None,
+        };
+        let origin = if let Some((_message, location)) = &note {
+            location.line.source.to_message()
+        } else {
+            "".into()
+        };
+        if let Some((message, location)) = note {
+            let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            let index = index.min(location.line.value.chars().count());
+            let annotation = SourceAnnotation {
+                label: message,
+                annotation_type: AnnotationType::Info,
+                range: (index - 1, index),
+            };
+            // TODO Share a multi-line slice among nearby lines
+            if location.line == self.location.line {
+                snippet.slices[0].annotations.push(annotation);
+            } else {
+                snippet.slices.push(Slice {
+                    source: &location.line.value,
+                    line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                    origin: Some(&origin),
+                    annotations: vec![annotation],
+                    fold: false,
+                });
+            }
+        }
+
+        // Add an additional note for `self.location.line.source` if applicable
+        let note = match &self.location.line.source {
+            Unknown => None,
+            Alias { original, .. } => Some(("alias substitution occurred here", original)),
+        };
+        let origin = if let Some((_message, location)) = &note {
+            location.line.source.to_message()
+        } else {
+            "".into()
+        };
+        if let Some((message, location)) = note {
+            let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            let index = index.min(location.line.value.chars().count());
+            let annotation = SourceAnnotation {
+                label: message,
+                annotation_type: AnnotationType::Info,
+                range: (index - 1, index),
+            };
+            // TODO Share a multi-line slice among nearby lines
+            if location.line == self.location.line {
+                snippet.slices[0].annotations.push(annotation);
+            } else {
+                snippet.slices.push(Slice {
+                    source: &location.line.value,
+                    line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                    origin: Some(&origin),
+                    annotations: vec![annotation],
+                    fold: false,
+                });
+            }
+        }
+
+        // Add more note for `self.location.line.source` if applicable
+        let note = match &self.location.line.source {
+            Unknown => None,
+            Alias { alias, .. } => Some(("the alias was defined here", &alias.origin)),
         };
         let origin = if let Some((_message, location)) = &note {
             location.line.source.to_message()
