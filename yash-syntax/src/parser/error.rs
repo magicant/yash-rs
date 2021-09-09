@@ -205,6 +205,64 @@ impl SyntaxError {
             MissingCommandAfterBar => "A command is missing after `|`",
         }
     }
+
+    /// Returns a location related with the error cause and a message describing
+    /// the location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use SyntaxError::*;
+        match self {
+            UnclosedParen { opening_location }
+            | UnclosedSubshell { opening_location }
+            | UnclosedArrayValue { opening_location } => {
+                Some((opening_location, "the opening parenthesis was here"))
+            }
+            UnclosedSingleQuote { opening_location } | UnclosedDoubleQuote { opening_location } => {
+                Some((opening_location, "the opening quote was here"))
+            }
+            UnclosedParam { opening_location } => {
+                Some((opening_location, "the parameter started here"))
+            }
+            UnclosedCommandSubstitution { opening_location } => {
+                Some((opening_location, "the command substitution started here"))
+            }
+            UnclosedBackquote { opening_location } => {
+                Some((opening_location, "the opening backquote was here"))
+            }
+            UnclosedArith { opening_location } => {
+                Some((opening_location, "the arithmetic expansion started here"))
+            }
+            UnclosedHereDocContent { redir_op_location } => {
+                Some((redir_op_location, "the redirection operator was here"))
+            }
+            UnclosedGrouping { opening_location } => {
+                Some((opening_location, "the opening brace was here"))
+            }
+            UnclosedDoClause { opening_location } => {
+                Some((opening_location, "the `do` clause started here"))
+            }
+            MissingForBody { opening_location } => {
+                Some((opening_location, "the `for` loop started here"))
+            }
+            UnclosedWhileClause { opening_location } => {
+                Some((opening_location, "the `while` loop started here"))
+            }
+            UnclosedUntilClause { opening_location } => {
+                Some((opening_location, "the `until` loop started here"))
+            }
+            IfMissingThen { if_location }
+            | UnclosedIf {
+                opening_location: if_location,
+            } => Some((if_location, "the `if` command started here")),
+            ElifMissingThen { elif_location } => {
+                Some((elif_location, "the `elif` clause started here"))
+            }
+            MissingIn { opening_location } | UnclosedCase { opening_location } => {
+                Some((opening_location, "the `case` command started here"))
+            }
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for SyntaxError {
@@ -239,6 +297,17 @@ impl ErrorCause {
         match self {
             Io(e) => format!("cannot read commands: {}", e).into(),
             Syntax(e) => e.message().into(),
+        }
+    }
+
+    /// Returns a location related with the error cause and a message describing
+    /// the location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use ErrorCause::*;
+        match self {
+            Io(_) => None,
+            Syntax(e) => e.related_location(),
         }
     }
 }
@@ -300,8 +369,6 @@ impl Error {
     {
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
-        use ErrorCause::Syntax;
-        use SyntaxError::*;
 
         let message = &self.cause.message();
         let index = self.location.column.get().try_into().unwrap_or(usize::MAX);
@@ -337,65 +404,13 @@ impl Error {
         };
 
         // Add an additional note for `self.cause` if applicable
-        let note = match &self.cause {
-            Syntax(
-                UnclosedParen { opening_location }
-                | UnclosedSubshell { opening_location }
-                | UnclosedArrayValue { opening_location },
-            ) => Some(("the opening parenthesis was here", opening_location)),
-            Syntax(
-                UnclosedSingleQuote { opening_location } | UnclosedDoubleQuote { opening_location },
-            ) => Some(("the opening quote was here", opening_location)),
-            Syntax(UnclosedParam { opening_location }) => {
-                Some(("the parameter started here", opening_location))
-            }
-            Syntax(UnclosedCommandSubstitution { opening_location }) => {
-                Some(("the command substitution started here", opening_location))
-            }
-            Syntax(UnclosedBackquote { opening_location }) => {
-                Some(("the opening backquote was here", opening_location))
-            }
-            Syntax(UnclosedArith { opening_location }) => {
-                Some(("the arithmetic expansion started here", opening_location))
-            }
-            Syntax(UnclosedHereDocContent { redir_op_location }) => {
-                Some(("the redirection operator was here", redir_op_location))
-            }
-            Syntax(UnclosedGrouping { opening_location }) => {
-                Some(("the opening brace was here", opening_location))
-            }
-            Syntax(UnclosedDoClause { opening_location }) => {
-                Some(("the `do` clause started here", opening_location))
-            }
-            Syntax(MissingForBody { opening_location }) => {
-                Some(("the `for` loop started here", opening_location))
-            }
-            Syntax(UnclosedWhileClause { opening_location }) => {
-                Some(("the `while` loop started here", opening_location))
-            }
-            Syntax(UnclosedUntilClause { opening_location }) => {
-                Some(("the `until` loop started here", opening_location))
-            }
-            Syntax(
-                IfMissingThen { if_location }
-                | UnclosedIf {
-                    opening_location: if_location,
-                },
-            ) => Some(("the `if` command started here", if_location)),
-            Syntax(ElifMissingThen { elif_location }) => {
-                Some(("the `elif` clause started here", elif_location))
-            }
-            Syntax(MissingIn { opening_location } | UnclosedCase { opening_location }) => {
-                Some(("the `case` command started here", opening_location))
-            }
-            _ => None,
-        };
-        let origin = if let Some((_message, location)) = &note {
+        let note = self.cause.related_location();
+        let origin = if let Some((location, _message)) = &note {
             location.line.source.to_message()
         } else {
             "".into()
         };
-        if let Some((message, location)) = note {
+        if let Some((location, message)) = note {
             let index = location.column.get().try_into().unwrap_or(usize::MAX);
             let index = index.min(location.line.value.chars().count());
             let annotation = SourceAnnotation {
