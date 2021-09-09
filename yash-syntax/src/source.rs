@@ -101,13 +101,90 @@ impl Source {
         }
     }
 
-    #[cfg(feature = "annotate-snippets")]
-    pub(crate) fn to_message(&self) -> Cow<'_, str> {
+    /// Returns a string describing the source.
+    pub fn to_message(&self) -> Cow<'_, str> {
         use Source::*;
         match self {
             Unknown => "<?>".into(),
             Alias { alias, .. } => format!("in alias substitution for `{}`", alias.name).into(),
         }
+    }
+
+    /// Provides an annotation for this source.
+    ///
+    /// This function takes a snippet, adds an annotation describing this source
+    /// to the snippet, and passes it to the argument function.
+    ///
+    /// This method is available only when the `"annotate-snippets"` feature is
+    /// enabled.
+    #[cfg(feature = "annotate-snippets")]
+    pub fn with_annotation<F, T>(&self, snippet: annotate_snippets::snippet::Snippet, f: F) -> T
+    where
+        F: for<'a> FnOnce(annotate_snippets::snippet::Snippet<'a>) -> T,
+    {
+        use annotate_snippets::snippet::*;
+        use std::convert::TryInto;
+        use Source::*;
+
+        let mut snippet = snippet;
+
+        let note = match &self {
+            Unknown => None,
+            Alias { original, .. } => Some(("alias substitution occurred here", original)),
+        };
+        let origin = if let Some((_message, location)) = &note {
+            location.line.source.to_message()
+        } else {
+            "".into()
+        };
+        if let Some((message, location)) = note {
+            let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            let index = index.min(location.line.value.chars().count());
+            let annotation = SourceAnnotation {
+                label: message,
+                annotation_type: AnnotationType::Info,
+                range: (index - 1, index),
+            };
+            // TODO Avoid adding a slice if the same as an existing one
+            // TODO Share a multi-line slice among nearby lines
+            snippet.slices.push(Slice {
+                source: &location.line.value,
+                line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                origin: Some(&origin),
+                annotations: vec![annotation],
+                fold: false,
+            });
+        }
+
+        let note = match &self {
+            Unknown => None,
+            Alias { alias, .. } => Some(("the alias was defined here", &alias.origin)),
+        };
+        let origin = if let Some((_message, location)) = &note {
+            location.line.source.to_message()
+        } else {
+            "".into()
+        };
+        if let Some((message, location)) = note {
+            let index = location.column.get().try_into().unwrap_or(usize::MAX);
+            let index = index.min(location.line.value.chars().count());
+            let annotation = SourceAnnotation {
+                label: message,
+                annotation_type: AnnotationType::Info,
+                range: (index - 1, index),
+            };
+            // TODO Avoid adding a slice if the same as an existing one
+            // TODO Share a multi-line slice among nearby lines
+            snippet.slices.push(Slice {
+                source: &location.line.value,
+                line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
+                origin: Some(&origin),
+                annotations: vec![annotation],
+                fold: false,
+            });
+        }
+
+        f(snippet)
     }
 }
 

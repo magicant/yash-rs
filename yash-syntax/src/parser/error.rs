@@ -296,9 +296,8 @@ impl Error {
     #[cfg(feature = "annotate-snippets")]
     pub fn with_snippet<F, T>(&self, f: F) -> T
     where
-        F: FnOnce(annotate_snippets::snippet::Snippet) -> T,
+        F: for<'a> FnOnce(annotate_snippets::snippet::Snippet<'a>) -> T,
     {
-        use crate::source::Source::*;
         use annotate_snippets::snippet::*;
         use std::convert::TryInto;
         use ErrorCause::Syntax;
@@ -418,71 +417,8 @@ impl Error {
             }
         }
 
-        // Add an additional note for `self.location.line.source` if applicable
-        let note = match &self.location.line.source {
-            Unknown => None,
-            Alias { original, .. } => Some(("alias substitution occurred here", original)),
-        };
-        let origin = if let Some((_message, location)) = &note {
-            location.line.source.to_message()
-        } else {
-            "".into()
-        };
-        if let Some((message, location)) = note {
-            let index = location.column.get().try_into().unwrap_or(usize::MAX);
-            let index = index.min(location.line.value.chars().count());
-            let annotation = SourceAnnotation {
-                label: message,
-                annotation_type: AnnotationType::Info,
-                range: (index - 1, index),
-            };
-            // TODO Share a multi-line slice among nearby lines
-            if location.line == self.location.line {
-                snippet.slices[0].annotations.push(annotation);
-            } else {
-                snippet.slices.push(Slice {
-                    source: &location.line.value,
-                    line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
-                    origin: Some(&origin),
-                    annotations: vec![annotation],
-                    fold: false,
-                });
-            }
-        }
-
-        // Add more note for `self.location.line.source` if applicable
-        let note = match &self.location.line.source {
-            Unknown => None,
-            Alias { alias, .. } => Some(("the alias was defined here", &alias.origin)),
-        };
-        let origin = if let Some((_message, location)) = &note {
-            location.line.source.to_message()
-        } else {
-            "".into()
-        };
-        if let Some((message, location)) = note {
-            let index = location.column.get().try_into().unwrap_or(usize::MAX);
-            let index = index.min(location.line.value.chars().count());
-            let annotation = SourceAnnotation {
-                label: message,
-                annotation_type: AnnotationType::Info,
-                range: (index - 1, index),
-            };
-            // TODO Share a multi-line slice among nearby lines
-            if location.line == self.location.line {
-                snippet.slices[0].annotations.push(annotation);
-            } else {
-                snippet.slices.push(Slice {
-                    source: &location.line.value,
-                    line_start: location.line.number.get().try_into().unwrap_or(usize::MAX),
-                    origin: Some(&origin),
-                    annotations: vec![annotation],
-                    fold: false,
-                });
-            }
-        }
-
-        f(snippet)
+        // Add additional notes for `self.location.line.source` if applicable
+        self.location.line.source.with_annotation(snippet, f)
     }
 }
 
