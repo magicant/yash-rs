@@ -18,6 +18,8 @@
 //!
 //! TODO Elaborate
 
+pub mod pretty;
+
 use crate::alias::Alias;
 use std::num::NonZeroU64;
 use std::rc::Rc;
