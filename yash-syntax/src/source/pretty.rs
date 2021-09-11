@@ -107,13 +107,16 @@ mod annotate_snippets_support {
             if let Some(annotation) = message.annotations.first() {
                 let line = &annotation.location.line;
                 let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
+                let column = &annotation.location.column;
+                let column = column.get().try_into().unwrap_or(usize::MAX);
+                let column = column.min(line.value.chars().count()).max(1);
                 snippet.slices.push(snippet::Slice {
                     source: &line.value,
                     line_start,
                     origin: Some("<?>"), // TODO correct origin
                     fold: true,
                     annotations: vec![snippet::SourceAnnotation {
-                        range: (0, 1), // TODO correct range
+                        range: (column - 1, column),
                         label: &annotation.label,
                         annotation_type: annotation.r#type.into(),
                     }],
@@ -194,5 +197,43 @@ mod annotate_snippets_support {
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].line_start, 128);
+    }
+
+    #[test]
+    fn from_message_non_default_range() {
+        use std::num::NonZeroU64;
+
+        let mut location = Location::dummy("my location");
+        location.column = NonZeroU64::new(7).unwrap();
+        let message = Message {
+            r#type: AnnotationType::Warning,
+            title: "".into(),
+            annotations: vec![Annotation {
+                r#type: AnnotationType::Info,
+                label: "".into(),
+                location,
+            }],
+        };
+        let snippet = Snippet::from(&message);
+        assert_eq!(snippet.slices[0].annotations[0].range, (6, 7));
+    }
+
+    #[test]
+    fn from_message_range_overflow() {
+        use std::num::NonZeroU64;
+
+        let mut location = Location::dummy("my location");
+        location.column = NonZeroU64::new(12).unwrap();
+        let message = Message {
+            r#type: AnnotationType::Warning,
+            title: "".into(),
+            annotations: vec![Annotation {
+                r#type: AnnotationType::Info,
+                label: "".into(),
+                location,
+            }],
+        };
+        let snippet = Snippet::from(&message);
+        assert_eq!(snippet.slices[0].annotations[0].range, (10, 11));
     }
 }
