@@ -266,6 +266,64 @@ impl SyntaxError {
             BangAfterBar => "remove this `!`",
         }
     }
+
+    /// Returns a location related with the error cause and a message describing
+    /// the location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use SyntaxError::*;
+        match self {
+            UnclosedParen { opening_location }
+            | UnclosedSubshell { opening_location }
+            | UnclosedArrayValue { opening_location } => {
+                Some((opening_location, "the opening parenthesis was here"))
+            }
+            UnclosedSingleQuote { opening_location } | UnclosedDoubleQuote { opening_location } => {
+                Some((opening_location, "the opening quote was here"))
+            }
+            UnclosedParam { opening_location } => {
+                Some((opening_location, "the parameter started here"))
+            }
+            UnclosedCommandSubstitution { opening_location } => {
+                Some((opening_location, "the command substitution started here"))
+            }
+            UnclosedBackquote { opening_location } => {
+                Some((opening_location, "the opening backquote was here"))
+            }
+            UnclosedArith { opening_location } => {
+                Some((opening_location, "the arithmetic expansion started here"))
+            }
+            UnclosedHereDocContent { redir_op_location } => {
+                Some((redir_op_location, "the redirection operator was here"))
+            }
+            UnclosedGrouping { opening_location } => {
+                Some((opening_location, "the opening brace was here"))
+            }
+            UnclosedDoClause { opening_location } => {
+                Some((opening_location, "the `do` clause started here"))
+            }
+            MissingForBody { opening_location } => {
+                Some((opening_location, "the `for` loop started here"))
+            }
+            UnclosedWhileClause { opening_location } => {
+                Some((opening_location, "the `while` loop started here"))
+            }
+            UnclosedUntilClause { opening_location } => {
+                Some((opening_location, "the `until` loop started here"))
+            }
+            IfMissingThen { if_location }
+            | UnclosedIf {
+                opening_location: if_location,
+            } => Some((if_location, "the `if` command started here")),
+            ElifMissingThen { elif_location } => {
+                Some((elif_location, "the `elif` clause started here"))
+            }
+            MissingIn { opening_location } | UnclosedCase { opening_location } => {
+                Some((opening_location, "the `case` command started here"))
+            }
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for SyntaxError {
@@ -310,6 +368,17 @@ impl ErrorCause {
         match self {
             Io(_) => "the command could be read up to here",
             Syntax(e) => e.label(),
+        }
+    }
+
+    /// Returns a location related with the error cause and a message describing
+    /// the location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use ErrorCause::*;
+        match self {
+            Io(_) => None,
+            Syntax(e) => e.related_location(),
         }
     }
 }
@@ -361,8 +430,17 @@ impl<'a> From<&'a Error> for Message<'a> {
             label: e.cause.label().into(),
             location: e.location.clone(),
         }];
+
         e.location.line.source.complement_annotations(&mut a);
-        // TODO more annotations describing the error cause
+
+        if let Some((location, label)) = e.cause.related_location() {
+            a.push(Annotation {
+                r#type: AnnotationType::Info,
+                label: label.into(),
+                location: location.clone(),
+            });
+        }
+
         Message {
             r#type: AnnotationType::Error,
             title: e.cause.message(),
