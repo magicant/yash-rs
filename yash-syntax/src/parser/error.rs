@@ -356,15 +356,17 @@ impl fmt::Display for Error {
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
+        let mut a = vec![Annotation {
+            r#type: AnnotationType::Error,
+            label: e.cause.label().into(),
+            location: e.location.clone(),
+        }];
+        e.location.line.source.complement_annotations(&mut a);
+        // TODO more annotations describing the error cause
         Message {
             r#type: AnnotationType::Error,
             title: e.cause.message(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Error,
-                label: e.cause.label().into(),
-                location: e.location.clone(),
-            }],
-            // TODO Fill annotations
+            annotations: a,
         }
     }
 }

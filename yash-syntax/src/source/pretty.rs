@@ -67,6 +67,31 @@ pub struct Message<'a> {
     pub annotations: Vec<Annotation<'a>>,
 }
 
+impl super::Source {
+    /// Appends complementary annotations describing this source.
+    pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
+        use super::Source::*;
+        match self {
+            Unknown => (),
+            Alias { original, alias } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation {
+                    r#type: AnnotationType::Info,
+                    label: format!("alias `{}` was substituted here", alias.name).into(),
+                    location: original.clone(),
+                }));
+                original.line.source.complement_annotations(result);
+                result.extend(std::iter::once(Annotation {
+                    r#type: AnnotationType::Info,
+                    label: format!("alias `{}` was defined here", alias.name).into(),
+                    location: alias.origin.clone(),
+                }));
+                alias.origin.line.source.complement_annotations(result);
+            }
+        }
+    }
+}
+
 #[cfg(feature = "annotate-snippets")]
 mod annotate_snippets_support {
     use super::*;
