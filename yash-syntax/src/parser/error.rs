@@ -16,6 +16,7 @@
 
 //! Definition of errors that happen in the parser.
 
+use crate::source::pretty::Annotation;
 use crate::source::pretty::AnnotationType;
 use crate::source::pretty::Message;
 use crate::source::Location;
@@ -290,7 +291,12 @@ impl<'a> From<&'a Error> for Message<'a> {
         Message {
             r#type: AnnotationType::Error,
             title: e.cause.message(),
-            annotations: vec![], // TODO Fill annotations
+            annotations: vec![Annotation {
+                r#type: AnnotationType::Error,
+                label: "".into(), // TODO non-empty label
+                location: e.location.clone(),
+            }],
+            // TODO Fill annotations
         }
     }
 }
@@ -347,6 +353,8 @@ mod tests {
             message.title,
             "The here-document operator is missing its delimiter"
         );
-        // TODO Annotations
+        assert_eq!(message.annotations.len(), 1);
+        assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
+        assert_eq!(message.annotations[0].location, error.location);
     }
 }
