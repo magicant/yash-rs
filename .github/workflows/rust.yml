@@ -18,8 +18,10 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
+    - name: Run tests (with annotate-snippets)
       run: cargo test --verbose
+    - name: Run tests (without annotate-snippets)
+      run: cargo test --verbose --package yash-syntax
     - name: Lint
       run: cargo clippy --all-targets --all-features -- -D warnings
     - name: Check format

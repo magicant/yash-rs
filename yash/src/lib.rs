@@ -24,12 +24,15 @@ pub use yash_syntax::{alias, input, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print() -> i32 {
+    use annotate_snippets::display_list::DisplayList;
+    use annotate_snippets::snippet::Snippet;
     use env::Env;
     use env::RealSystem;
     use semantics::Command;
     use std::num::NonZeroU64;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
+    use yash_syntax::source::pretty::Message;
 
     struct Stdin;
 
@@ -75,7 +78,13 @@ async fn parse_and_print() -> i32 {
                 .execute(&mut env)
                 .await
                 .unwrap_or_else(|a| eprintln!("{:?}", a)),
-            Err(e) => println!("{}", e),
+            Err(e) => {
+                let m = Message::from(&e);
+                let mut s = Snippet::from(&m);
+                s.opt.color = true;
+                let d = DisplayList::from(s);
+                eprintln!("{}", d); // TODO print using env
+            }
         }
         // TODO If the lexer still has unconsumed input, it should be parsed
         // before the lexer is dropped.
