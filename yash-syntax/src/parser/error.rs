@@ -208,6 +208,64 @@ impl SyntaxError {
             MissingCommandAfterBar => "A command is missing after `|`",
         }
     }
+
+    /// Returns a label for annotating the error location.
+    #[must_use]
+    pub fn label(&self) -> &'static str {
+        use SyntaxError::*;
+        match self {
+            UnclosedParen { .. }
+            | UnclosedCommandSubstitution { .. }
+            | UnclosedArrayValue { .. }
+            | UnclosedSubshell { .. }
+            | UnclosedPatternList
+            | UnmatchedParenthesis => "expected `)`",
+            EmptyGrouping
+            | EmptySubshell
+            | EmptyDoClause
+            | EmptyWhileCondition
+            | EmptyUntilCondition
+            | EmptyIfCondition
+            | EmptyIfBody
+            | EmptyElifCondition
+            | EmptyElifBody
+            | EmptyElse
+            | MissingPipeline(_)
+            | MissingCommandAfterBang
+            | MissingCommandAfterBar => "expected a command",
+            InvalidForValue | MissingCaseSubject | InvalidCaseSubject | MissingPattern
+            | InvalidPattern => "expected a word",
+            InvalidModifier => "unexpected character",
+            MultipleModifier => "conflicting modifier",
+            UnclosedSingleQuote { .. } => "expected `'`",
+            UnclosedDoubleQuote { .. } => "expected `\"`",
+            UnclosedParam { .. } => "expected `}`",
+            EmptyParam => "expected a parameter name",
+            UnclosedBackquote { .. } => "expected '`'",
+            UnclosedArith { .. } => "expected `))`",
+            UnexpectedToken => "unexpected token",
+            FdOutOfRange => "unsupported file descriptor",
+            MissingRedirOperand => "expected a redirection operand",
+            MissingHereDocDelimiter => "expected a delimiter word",
+            MissingHereDocContent => "content not found",
+            UnclosedHereDocContent { .. } => "missing delimiter",
+            UnclosedGrouping { .. } => "expected `}`",
+            UnclosedDoClause { .. } => "expected `done`",
+            MissingForName => "expected a variable name",
+            InvalidForName => "not a valid variable name",
+            MissingForBody { .. } | UnclosedWhileClause { .. } | UnclosedUntilClause { .. } => {
+                "expected `do ... done`"
+            }
+            IfMissingThen { .. } | ElifMissingThen { .. } => "expected `then ... fi`",
+            UnclosedIf { .. } => "expected `fi`",
+            MissingIn { .. } => "expected `in`",
+            EsacAsPattern => "needs quoting",
+            UnclosedCase { .. } => "expected `esac`",
+            MissingFunctionBody | InvalidFunctionBody => "expected a compound command",
+            DoubleNegation => "only one `!` allowed",
+            BangAfterBar => "remove this `!`",
+        }
+    }
 }
 
 impl fmt::Display for SyntaxError {
@@ -242,6 +300,16 @@ impl ErrorCause {
         match self {
             Io(e) => format!("cannot read commands: {}", e).into(),
             Syntax(e) => e.message().into(),
+        }
+    }
+
+    /// Returns a label for annotating the error location.
+    #[must_use]
+    pub fn label(&self) -> &'static str {
+        use ErrorCause::*;
+        match self {
+            Io(_) => "the command could be read up to here",
+            Syntax(e) => e.label(),
         }
     }
 }
@@ -293,7 +361,7 @@ impl<'a> From<&'a Error> for Message<'a> {
             title: e.cause.message(),
             annotations: vec![Annotation {
                 r#type: AnnotationType::Error,
-                label: "".into(), // TODO non-empty label
+                label: e.cause.label().into(),
                 location: e.location.clone(),
             }],
             // TODO Fill annotations
@@ -355,6 +423,7 @@ mod tests {
         );
         assert_eq!(message.annotations.len(), 1);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
+        assert_eq!(message.annotations[0].label, "expected a delimiter word");
         assert_eq!(message.annotations[0].location, error.location);
     }
 }
