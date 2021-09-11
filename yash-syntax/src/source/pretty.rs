@@ -72,6 +72,7 @@ mod annotate_snippets_support {
     use super::*;
     use annotate_snippets::snippet;
     use annotate_snippets::snippet::Snippet;
+    use std::convert::TryInto;
 
     /// Converts `yash_syntax::source::pretty::AnnotationType` into
     /// `annotate_snippets::snippet::AnnotationType`.
@@ -104,9 +105,11 @@ mod annotate_snippets_support {
                 opt: annotate_snippets::display_list::FormatOptions::default(),
             };
             if let Some(annotation) = message.annotations.first() {
+                let line = &annotation.location.line;
+                let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
                 snippet.slices.push(snippet::Slice {
-                    source: &annotation.location.line.value,
-                    line_start: 1,       // TODO correct line number
+                    source: &line.value,
+                    line_start,
                     origin: Some("<?>"), // TODO correct origin
                     fold: true,
                     annotations: vec![snippet::SourceAnnotation {
@@ -163,5 +166,33 @@ mod annotate_snippets_support {
             snippet.slices[0].annotations[0].annotation_type,
             snippet::AnnotationType::Info
         );
+    }
+
+    #[test]
+    fn from_message_non_default_line_start() {
+        use super::super::*;
+        use std::num::NonZeroU64;
+        use std::rc::Rc;
+
+        let line = Rc::new(Line {
+            value: "".to_string(),
+            number: NonZeroU64::new(128).unwrap(),
+            source: Source::Unknown,
+        });
+        let location = Location {
+            line,
+            column: NonZeroU64::new(42).unwrap(),
+        };
+        let message = Message {
+            r#type: AnnotationType::Warning,
+            title: "".into(),
+            annotations: vec![Annotation {
+                r#type: AnnotationType::Info,
+                label: "".into(),
+                location,
+            }],
+        };
+        let snippet = Snippet::from(&message);
+        assert_eq!(snippet.slices[0].line_start, 128);
     }
 }
