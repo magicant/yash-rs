@@ -104,7 +104,7 @@ mod annotate_snippets_support {
                 slices: vec![],
                 opt: annotate_snippets::display_list::FormatOptions::default(),
             };
-            if let Some(annotation) = message.annotations.first() {
+            for annotation in &message.annotations {
                 let line = &annotation.location.line;
                 let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
                 let column = &annotation.location.column;
@@ -122,7 +122,6 @@ mod annotate_snippets_support {
                     }],
                 });
             }
-            // TODO other annotations
             snippet
         }
     }
@@ -271,5 +270,47 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[0].source, "substitution");
         assert_eq!(snippet.slices[0].line_start, 10);
         assert_eq!(snippet.slices[0].origin, Some("<alias>"));
+    }
+
+    #[test]
+    fn from_message_two_annotations_different_slice() {
+        let message = Message {
+            r#type: AnnotationType::Error,
+            title: "some title".into(),
+            annotations: vec![
+                Annotation {
+                    r#type: AnnotationType::Note,
+                    label: "my label 1".into(),
+                    location: Location::dummy("my location 1"),
+                },
+                Annotation {
+                    r#type: AnnotationType::Info,
+                    label: "my label 2".into(),
+                    location: Location::dummy("my location 2"),
+                },
+            ],
+        };
+        let snippet = Snippet::from(&message);
+        let title = snippet.title.unwrap();
+        assert_eq!(title.id, None);
+        assert_eq!(title.label, Some("some title"));
+        assert_eq!(title.annotation_type, snippet::AnnotationType::Error);
+        assert_eq!(snippet.slices.len(), 2, "{:?}", snippet.slices);
+        assert_eq!(snippet.slices[0].source, "my location 1");
+        assert_eq!(snippet.slices[0].annotations.len(), 1);
+        assert_eq!(snippet.slices[0].annotations[0].range, (0, 1));
+        assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
+        assert_eq!(
+            snippet.slices[0].annotations[0].annotation_type,
+            snippet::AnnotationType::Note
+        );
+        assert_eq!(snippet.slices[1].source, "my location 2");
+        assert_eq!(snippet.slices[1].annotations.len(), 1);
+        assert_eq!(snippet.slices[1].annotations[0].range, (0, 1));
+        assert_eq!(snippet.slices[1].annotations[0].label, "my label 2");
+        assert_eq!(
+            snippet.slices[1].annotations[0].annotation_type,
+            snippet::AnnotationType::Info
+        );
     }
 }
