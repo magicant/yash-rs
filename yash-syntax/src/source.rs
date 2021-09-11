@@ -101,6 +101,15 @@ impl Source {
             false
         }
     }
+
+    /// Returns a label that describes the source.
+    pub fn label(&self) -> &str {
+        use Source::*;
+        match self {
+            Unknown => "<?>",
+            Alias { .. } => "<alias>",
+        }
+    }
 }
 
 /// Line in source code.

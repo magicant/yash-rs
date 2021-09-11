@@ -113,7 +113,7 @@ mod annotate_snippets_support {
                 snippet.slices.push(snippet::Slice {
                     source: &line.value,
                     line_start,
-                    origin: Some("<?>"), // TODO correct origin
+                    origin: Some(line.source.label()),
                     fold: true,
                     annotations: vec![snippet::SourceAnnotation {
                         range: (column - 1, column),
@@ -235,5 +235,41 @@ mod annotate_snippets_support {
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].annotations[0].range, (10, 11));
+    }
+
+    #[test]
+    fn from_message_non_default_origin() {
+        use super::super::*;
+        use std::num::NonZeroU64;
+
+        let original = Location::dummy("my original");
+        let alias = Rc::new(Alias {
+            name: "foo".to_string(),
+            replacement: "bar".to_string(),
+            global: false,
+            origin: Location::dummy("my origin"),
+        });
+        let line = Rc::new(Line {
+            value: "substitution".to_string(),
+            number: NonZeroU64::new(10).unwrap(),
+            source: Source::Alias { original, alias },
+        });
+        let location = Location {
+            line,
+            column: NonZeroU64::new(5).unwrap(),
+        };
+        let message = Message {
+            r#type: AnnotationType::Warning,
+            title: "my title".into(),
+            annotations: vec![Annotation {
+                r#type: AnnotationType::Info,
+                label: "my label".into(),
+                location,
+            }],
+        };
+        let snippet = Snippet::from(&message);
+        assert_eq!(snippet.slices[0].source, "substitution");
+        assert_eq!(snippet.slices[0].line_start, 10);
+        assert_eq!(snippet.slices[0].origin, Some("<alias>"));
     }
 }
