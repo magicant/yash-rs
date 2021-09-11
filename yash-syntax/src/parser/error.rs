@@ -16,6 +16,8 @@
 
 //! Definition of errors that happen in the parser.
 
+use crate::source::pretty::AnnotationType;
+use crate::source::pretty::Message;
 use crate::source::Location;
 use crate::syntax::AndOr;
 use std::borrow::Cow;
@@ -283,6 +285,16 @@ impl fmt::Display for Error {
 
 // TODO Consider implementing std::error::Error for self::Error
 
+impl<'a> From<&'a Error> for Message<'a> {
+    fn from(e: &'a Error) -> Self {
+        Message {
+            r#type: AnnotationType::Error,
+            title: e.cause.message(),
+            annotations: vec![], // TODO Fill annotations
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,5 +323,30 @@ mod tests {
             error.to_string(),
             "The here-document operator is missing its delimiter"
         );
+    }
+
+    #[test]
+    fn from_error_for_message() {
+        let number = NonZeroU64::new(1).unwrap();
+        let line = Rc::new(Line {
+            value: "".to_string(),
+            number,
+            source: Source::Unknown,
+        });
+        let location = Location {
+            line,
+            column: number,
+        };
+        let error = Error {
+            cause: SyntaxError::MissingHereDocDelimiter.into(),
+            location,
+        };
+        let message = Message::from(&error);
+        assert_eq!(message.r#type, AnnotationType::Error);
+        assert_eq!(
+            message.title,
+            "The here-document operator is missing its delimiter"
+        );
+        // TODO Annotations
     }
 }
