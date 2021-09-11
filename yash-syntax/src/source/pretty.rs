@@ -104,24 +104,33 @@ mod annotate_snippets_support {
                 slices: vec![],
                 opt: annotate_snippets::display_list::FormatOptions::default(),
             };
+
+            let mut lines = vec![];
             for annotation in &message.annotations {
                 let line = &annotation.location.line;
                 let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
                 let column = &annotation.location.column;
                 let column = column.get().try_into().unwrap_or(usize::MAX);
                 let column = column.min(line.value.chars().count()).max(1);
-                snippet.slices.push(snippet::Slice {
-                    source: &line.value,
-                    line_start,
-                    origin: Some(line.source.label()),
-                    fold: true,
-                    annotations: vec![snippet::SourceAnnotation {
-                        range: (column - 1, column),
-                        label: &annotation.label,
-                        annotation_type: annotation.r#type.into(),
-                    }],
-                });
+                let annotation = snippet::SourceAnnotation {
+                    range: (column - 1, column),
+                    label: &annotation.label,
+                    annotation_type: annotation.r#type.into(),
+                };
+                if let Some(i) = lines.iter().position(|l| l == line) {
+                    snippet.slices[i].annotations.push(annotation);
+                } else {
+                    snippet.slices.push(snippet::Slice {
+                        source: &line.value,
+                        line_start,
+                        origin: Some(line.source.label()),
+                        fold: true,
+                        annotations: vec![annotation],
+                    });
+                    lines.push(line.clone());
+                }
             }
+
             snippet
         }
     }
@@ -311,6 +320,52 @@ mod annotate_snippets_support {
         assert_eq!(
             snippet.slices[1].annotations[0].annotation_type,
             snippet::AnnotationType::Info
+        );
+    }
+
+    #[test]
+    fn from_message_two_annotations_same_slice() {
+        use std::num::NonZeroU64;
+
+        let location = Location::dummy("my location");
+        let message = Message {
+            r#type: AnnotationType::Error,
+            title: "some title".into(),
+            annotations: vec![
+                Annotation {
+                    r#type: AnnotationType::Info,
+                    label: "my label 1".into(),
+                    location: Location {
+                        column: NonZeroU64::new(3).unwrap(),
+                        ..location.clone()
+                    },
+                },
+                Annotation {
+                    r#type: AnnotationType::Help,
+                    label: "my label 2".into(),
+                    location,
+                },
+            ],
+        };
+        let snippet = Snippet::from(&message);
+        let title = snippet.title.unwrap();
+        assert_eq!(title.id, None);
+        assert_eq!(title.label, Some("some title"));
+        assert_eq!(title.annotation_type, snippet::AnnotationType::Error);
+        assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
+        assert_eq!(snippet.slices[0].source, "my location");
+        assert_eq!(snippet.slices[0].annotations.len(), 2);
+        assert_eq!(snippet.slices[0].annotations[0].range, (2, 3));
+        assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
+        assert_eq!(
+            snippet.slices[0].annotations[0].annotation_type,
+            snippet::AnnotationType::Info
+        );
+        assert_eq!(snippet.slices[0].annotations[1].range, (0, 1));
+        assert_eq!(snippet.slices[0].annotations[1].label, "my label 2");
+        assert_eq!(
+            snippet.slices[0].annotations[1].annotation_type,
+            snippet::AnnotationType::Help
         );
     }
 }
