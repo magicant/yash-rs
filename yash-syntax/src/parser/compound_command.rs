@@ -55,7 +55,7 @@ impl Parser<'_> {
         // TODO allow empty do clause if not POSIXly-correct
         if list.0.is_empty() {
             let cause = SyntaxError::EmptyDoClause.into();
-            let location = open.word.location;
+            let location = close.word.location;
             return Err(Error { cause, location });
         }
 
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(e.location.line.value, "do done");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 4);
     }
 
     #[test]
