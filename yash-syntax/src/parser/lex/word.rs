@@ -19,9 +19,9 @@
 use super::core::Lexer;
 use super::core::WordContext;
 use super::core::WordLexer;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
-use crate::parser::core::SyntaxError;
+use crate::parser::error::Error;
+use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::source::SourceChar;
 use crate::syntax::Word;
@@ -168,7 +168,7 @@ impl WordLexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
+    use crate::parser::error::ErrorCause;
     use crate::parser::lex::WordContext;
     use crate::source::Source;
     use crate::syntax::Modifier;

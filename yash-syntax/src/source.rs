@@ -18,6 +18,8 @@
 //!
 //! TODO Elaborate
 
+pub mod pretty;
+
 use crate::alias::Alias;
 use std::num::NonZeroU64;
 use std::rc::Rc;
@@ -97,6 +99,15 @@ impl Source {
             alias.name == name || original.line.source.is_alias_for(name)
         } else {
             false
+        }
+    }
+
+    /// Returns a label that describes the source.
+    pub fn label(&self) -> &str {
+        use Source::*;
+        match self {
+            Unknown => "<?>",
+            Alias { .. } => "<alias>",
         }
     }
 }

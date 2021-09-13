@@ -19,9 +19,9 @@
 use super::core::Lexer;
 use super::core::WordContext;
 use super::core::WordLexer;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
-use crate::parser::core::SyntaxError;
+use crate::parser::error::Error;
+use crate::parser::error::SyntaxError;
 use crate::syntax::Backslashed;
 use crate::syntax::Literal;
 use crate::syntax::Text;
@@ -216,7 +216,7 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
+    use crate::parser::error::ErrorCause;
     use crate::source::Source;
     use crate::syntax::Backquote;
     use crate::syntax::BackquoteUnit;

@@ -17,9 +17,9 @@
 //! Here-document content parser
 
 use super::Lexer;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
-use crate::parser::core::SyntaxError;
+use crate::parser::error::Error;
+use crate::parser::error::SyntaxError;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
@@ -122,7 +122,7 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
+    use crate::parser::error::ErrorCause;
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use futures_executor::block_on;

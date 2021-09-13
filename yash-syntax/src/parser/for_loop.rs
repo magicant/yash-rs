@@ -16,11 +16,11 @@
 
 //! Syntax parser for for loop
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Rec;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
@@ -157,7 +157,7 @@ impl Parser<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;

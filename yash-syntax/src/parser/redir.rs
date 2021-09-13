@@ -16,10 +16,10 @@
 
 //! Syntax parser for redirection
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Operator::{LessLess, LessLessDash};
 use super::lex::PartialHereDoc;
@@ -135,7 +135,7 @@ impl Parser<'_> {
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::lex::Lexer;
     use super::super::lex::Operator::Newline;
     use super::*;

@@ -17,9 +17,9 @@
 //! Part of the lexer that parses command substitutions.
 
 use super::core::Lexer;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
-use crate::parser::core::SyntaxError;
+use crate::parser::error::Error;
+use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::syntax::TextUnit;
 
@@ -61,7 +61,7 @@ impl Lexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
+    use crate::parser::error::ErrorCause;
     use crate::source::Source;
     use futures_executor::block_on;
 

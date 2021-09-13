@@ -19,10 +19,10 @@
 //! Note that the detail parser for each type of compound commands is in another
 //! dedicated module.
 
-use super::core::Error;
 use super::core::Parser;
 use super::core::Result;
-use super::core::SyntaxError;
+use super::error::Error;
+use super::error::SyntaxError;
 use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Case, Do, Done, For, If, OpenBrace, Until, While};
 use super::lex::Operator::OpenParen;
@@ -94,7 +94,7 @@ impl Parser<'_> {
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
-    use super::super::core::ErrorCause;
+    use super::super::error::ErrorCause;
     use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::Operator::Semicolon;

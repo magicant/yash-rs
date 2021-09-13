@@ -22,8 +22,8 @@ use crate::alias::Alias;
 use crate::input::Context;
 use crate::input::Input;
 use crate::input::Memory;
-use crate::parser::core::Error;
 use crate::parser::core::Result;
+use crate::parser::error::Error;
 use crate::source::lines;
 use crate::source::Location;
 use crate::source::Source;
@@ -644,8 +644,8 @@ impl DerefMut for WordLexer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::core::ErrorCause;
-    use crate::parser::core::SyntaxError;
+    use crate::parser::error::ErrorCause;
+    use crate::parser::error::SyntaxError;
     use futures_executor::block_on;
 
     #[test]
