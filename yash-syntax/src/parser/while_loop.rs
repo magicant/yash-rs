@@ -39,6 +39,13 @@ impl Parser<'_> {
 
         let condition = self.maybe_compound_list_boxed().await?;
 
+        // TODO allow empty condition if not POSIXly-correct
+        if condition.0.is_empty() {
+            let cause = SyntaxError::EmptyWhileCondition.into();
+            let location = self.take_token_raw().await?.word.location;
+            return Err(Error { cause, location });
+        }
+
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
@@ -48,13 +55,6 @@ impl Parser<'_> {
                 return Err(Error { cause, location });
             }
         };
-
-        // TODO allow empty condition if not POSIXly-correct
-        if condition.0.is_empty() {
-            let cause = SyntaxError::EmptyWhileCondition.into();
-            let location = open.word.location;
-            return Err(Error { cause, location });
-        }
 
         Ok(CompoundCommand::While { condition, body })
     }
@@ -72,6 +72,13 @@ impl Parser<'_> {
 
         let condition = self.maybe_compound_list_boxed().await?;
 
+        // TODO allow empty condition if not POSIXly-correct
+        if condition.0.is_empty() {
+            let cause = SyntaxError::EmptyUntilCondition.into();
+            let location = self.take_token_raw().await?.word.location;
+            return Err(Error { cause, location });
+        }
+
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
@@ -81,13 +88,6 @@ impl Parser<'_> {
                 return Err(Error { cause, location });
             }
         };
-
-        // TODO allow empty condition if not POSIXly-correct
-        if condition.0.is_empty() {
-            let cause = SyntaxError::EmptyUntilCondition.into();
-            let location = open.word.location;
-            return Err(Error { cause, location });
-        }
 
         Ok(CompoundCommand::Until { condition, body })
     }
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(e.location.line.value, " while do :; done");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(e.location.column.get(), 8);
     }
 
     #[test]
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(e.location.line.value, "  until do :; done");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        assert_eq!(e.location.column.get(), 9);
     }
 
     #[test]
