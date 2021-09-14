@@ -38,14 +38,14 @@ impl Parser<'_> {
         let elif = self.take_token_raw().await?;
 
         let condition = self.maybe_compound_list_boxed().await?;
+        let then = self.take_token_raw().await?;
+
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyElifCondition.into();
-            let location = elif.word.location;
+            let location = then.word.location;
             return Err(Error { cause, location });
         }
-
-        let then = self.take_token_raw().await?;
         if then.id != Token(Some(Then)) {
             let elif_location = elif.word.location;
             let cause = SyntaxError::ElifMissingThen { elif_location }.into();
@@ -57,7 +57,7 @@ impl Parser<'_> {
         // TODO allow empty body if not POSIXly-correct
         if body.0.is_empty() {
             let cause = SyntaxError::EmptyElifBody.into();
-            let location = then.word.location;
+            let location = self.take_token_raw().await?.word.location;
             return Err(Error { cause, location });
         }
 
@@ -76,14 +76,14 @@ impl Parser<'_> {
         assert_eq!(open.id, Token(Some(If)));
 
         let condition = self.maybe_compound_list_boxed().await?;
+        let then = self.take_token_raw().await?;
+
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyIfCondition.into();
-            let location = open.word.location;
+            let location = then.word.location;
             return Err(Error { cause, location });
         }
-
-        let then = self.take_token_raw().await?;
         if then.id != Token(Some(Then)) {
             let if_location = open.word.location;
             let cause = SyntaxError::IfMissingThen { if_location }.into();
@@ -95,7 +95,7 @@ impl Parser<'_> {
         // TODO allow empty body if not POSIXly-correct
         if body.0.is_empty() {
             let cause = SyntaxError::EmptyIfBody.into();
-            let location = then.word.location;
+            let location = self.take_token_raw().await?.word.location;
             return Err(Error { cause, location });
         }
 
@@ -105,12 +105,12 @@ impl Parser<'_> {
         }
 
         let r#else = if self.peek_token().await?.id == Token(Some(Else)) {
-            let r#else = self.take_token_raw().await?;
+            self.take_token_raw().await?;
             let content = self.maybe_compound_list_boxed().await?;
             // TODO allow empty else if not POSIXly-correct
             if content.0.is_empty() {
                 let cause = SyntaxError::EmptyElse.into();
-                let location = r#else.word.location;
+                let location = self.take_token_raw().await?.word.location;
                 return Err(Error { cause, location });
             }
             Some(content)
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(e.location.line.value, "   if then :; fi");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(e.location.column.get(), 7);
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(e.location.line.value, "if :; then fi");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(e.location.column.get(), 12);
     }
 
     #[test]
@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(e.location.line.value, "if :; then :; elif then :; fi");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 15);
+        assert_eq!(e.location.column.get(), 20);
     }
 
     #[test]
@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(e.location.line.value, "if :; then :; elif :; then fi");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 23);
+        assert_eq!(e.location.column.get(), 28);
     }
 
     #[test]
@@ -403,6 +403,6 @@ mod tests {
         assert_eq!(e.location.line.value, "if :; then :; else fi");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 15);
+        assert_eq!(e.location.column.get(), 20);
     }
 }
