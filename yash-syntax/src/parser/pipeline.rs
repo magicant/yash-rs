@@ -71,7 +71,7 @@ impl Parser<'_> {
         // Parse `|`
         let mut commands = vec![Rc::new(first)];
         while self.peek_token().await?.id == Operator(Bar) {
-            let bar_location = self.take_token_raw().await?.word.location;
+            self.take_token_raw().await?;
 
             while self.newline_and_here_doc_contents().await? {}
 
@@ -83,18 +83,14 @@ impl Parser<'_> {
                     }
 
                     // Error: the command is missing
-                    let next = self.peek_token().await?;
-                    return if next.id == Token(Some(Bang)) {
-                        Err(Error {
-                            cause: SyntaxError::BangAfterBar.into(),
-                            location: next.word.location.clone(),
-                        })
+                    let next = self.take_token_raw().await?;
+                    let cause = if next.id == Token(Some(Bang)) {
+                        SyntaxError::BangAfterBar.into()
                     } else {
-                        Err(Error {
-                            cause: SyntaxError::MissingCommandAfterBar.into(),
-                            location: bar_location,
-                        })
+                        SyntaxError::MissingCommandAfterBar.into()
                     };
+                    let location = next.word.location;
+                    return Err(Error { cause, location });
                 }
             });
         }
@@ -204,7 +200,7 @@ mod tests {
         assert_eq!(e.location.line.value, "foo | ;");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(e.location.column.get(), 7);
     }
 
     #[test]
