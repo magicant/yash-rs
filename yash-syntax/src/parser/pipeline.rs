@@ -41,7 +41,7 @@ impl Parser<'_> {
             Rec::Parsed(None) => {
                 // Parse the `!` reserved word
                 if let Token(Some(Bang)) = self.peek_token().await?.id {
-                    let location = self.take_token_raw().await?.word.location;
+                    self.take_token_raw().await?;
                     // TODO Warn if `!` is immediately followed by `(`, which is
                     // not POSIXly portable.
                     loop {
@@ -52,12 +52,13 @@ impl Parser<'_> {
                             }
 
                             // Error: the command is missing
-                            let next = self.peek_token().await?;
+                            let next = self.take_token_raw().await?;
                             let cause = if next.id == Token(Some(Bang)) {
                                 SyntaxError::DoubleNegation.into()
                             } else {
                                 SyntaxError::MissingCommandAfterBang.into()
                             };
+                            let location = next.word.location;
                             return Err(Error { cause, location });
                         }
                     }
@@ -171,7 +172,7 @@ mod tests {
         assert_eq!(e.location.line.value, " !  !");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
@@ -187,7 +188,7 @@ mod tests {
         assert_eq!(e.location.line.value, "!\n");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 2);
     }
 
     #[test]
