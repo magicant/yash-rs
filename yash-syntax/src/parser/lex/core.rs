@@ -1292,6 +1292,6 @@ mod tests {
         assert_eq!(e.location.line.value, "<< )");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 4);
     }
 }

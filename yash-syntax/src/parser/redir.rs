@@ -24,6 +24,7 @@ use super::fill::MissingHereDoc;
 use super::lex::Operator::{LessLess, LessLessDash};
 use super::lex::PartialHereDoc;
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
+use crate::source::Location;
 use crate::syntax::Fd;
 use crate::syntax::Redir;
 use crate::syntax::RedirBody;
@@ -33,14 +34,14 @@ use std::convert::TryFrom;
 
 impl Parser<'_> {
     /// Parses the operand of a redirection operator.
-    async fn redirection_operand(&mut self) -> Result<Option<Word>> {
+    async fn redirection_operand(&mut self) -> Result<std::result::Result<Word, Location>> {
         let operand = self.take_token_auto(&[]).await?;
         match operand.id {
             Token(_) => (),
-            Operator(_) | EndOfInput => return Ok(None),
+            Operator(_) | EndOfInput => return Ok(Err(operand.word.location)),
             IoNumber => (), // TODO reject if POSIXly-correct
         }
-        Ok(Some(operand.word))
+        Ok(Ok(operand.word))
     }
 
     /// Parses a normal redirection body.
@@ -49,11 +50,14 @@ impl Parser<'_> {
         operator: RedirOp,
     ) -> Result<RedirBody<MissingHereDoc>> {
         // TODO reject >>| and <<< if POSIXly-correct
-        let operator_location = self.take_token_raw().await?.word.location;
-        let operand = self.redirection_operand().await?.ok_or(Error {
-            cause: SyntaxError::MissingRedirOperand.into(),
-            location: operator_location,
-        })?;
+        self.take_token_raw().await?;
+        let operand = self
+            .redirection_operand()
+            .await?
+            .map_err(|location| Error {
+                cause: SyntaxError::MissingRedirOperand.into(),
+                location,
+            })?;
         Ok(RedirBody::Normal { operator, operand })
     }
 
@@ -62,11 +66,14 @@ impl Parser<'_> {
         &mut self,
         remove_tabs: bool,
     ) -> Result<RedirBody<MissingHereDoc>> {
-        let operator_location = self.take_token_raw().await?.word.location;
-        let delimiter = self.redirection_operand().await?.ok_or(Error {
-            cause: SyntaxError::MissingHereDocDelimiter.into(),
-            location: operator_location,
-        })?;
+        self.take_token_raw().await?;
+        let delimiter = self
+            .redirection_operand()
+            .await?
+            .map_err(|location| Error {
+                cause: SyntaxError::MissingHereDocDelimiter.into(),
+                location,
+            })?;
 
         self.memorize_unread_here_doc(PartialHereDoc {
             delimiter,
@@ -372,7 +379,7 @@ mod tests {
         assert_eq!(e.location.line.value, " < >");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(e.location.column.get(), 4);
     }
 
     #[test]
@@ -388,7 +395,7 @@ mod tests {
         assert_eq!(e.location.line.value, "  < ");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        assert_eq!(e.location.column.get(), 5);
     }
 
     #[test]
@@ -404,7 +411,7 @@ mod tests {
         assert_eq!(e.location.line.value, "<< <<");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 4);
     }
 
     #[test]
@@ -420,6 +427,6 @@ mod tests {
         assert_eq!(e.location.line.value, "<<");
         assert_eq!(e.location.line.number.get(), 1);
         assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.column.get(), 3);
     }
 }
