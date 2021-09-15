@@ -262,7 +262,7 @@ impl SyntaxError {
             UnclosedCase { .. } => "expected `esac`",
             MissingFunctionBody | InvalidFunctionBody => "expected a compound command",
             DoubleNegation => "only one `!` allowed",
-            BangAfterBar => "remove this `!`",
+            BangAfterBar => "`!` not allowed here",
         }
     }
 
@@ -438,6 +438,13 @@ impl<'a> From<&'a Error> for Message<'a> {
                 label: label.into(),
                 location: location.clone(),
             });
+        }
+        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &e.cause {
+            a.push(Annotation {
+                r#type: AnnotationType::Help,
+                label: "surround this in a grouping: `{ ! ...; }`".into(),
+                location: e.location.clone(),
+            })
         }
 
         Message {
