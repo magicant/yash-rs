@@ -18,8 +18,11 @@
 
 use crate::ExitStatus;
 use crate::Handle;
+use annotate_snippets::display_list::DisplayList;
+use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
 use yash_env::Env;
+use yash_syntax::source::pretty::Message;
 
 #[async_trait(?Send)]
 impl Handle<crate::expansion::Error> for Env {
@@ -30,15 +33,12 @@ impl Handle<crate::expansion::Error> for Env {
     /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
     /// implementations may use different non-zero exit statuses.
     async fn handle(&mut self, error: crate::expansion::Error) -> super::Result {
-        use crate::expansion::ErrorCause::*;
-        // TODO Localize the message
-        // TODO Pretty-print the error location
-        match error.cause {
-            Dummy(message) => {
-                self.print_error(&format_args!("dummy error: {}", message))
-                    .await
-            }
-        };
+        let m = Message::from(&error);
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let d = DisplayList::from(s);
+        self.print_error(&format_args!("{}", d)).await;
+
         self.exit_status = ExitStatus::ERROR;
         Ok(())
     }

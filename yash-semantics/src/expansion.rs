@@ -67,6 +67,9 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Variable;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
 
@@ -82,11 +85,37 @@ pub enum ErrorCause {
     Dummy(String),
 }
 
+impl ErrorCause {
+    pub fn message(&self) -> &str {
+        // TODO Localize
+        use ErrorCause::*;
+        match self {
+            Dummy(message) => message,
+        }
+    }
+}
+
 /// Explanation of an expansion failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
+}
+
+impl<'a> From<&'a Error> for Message<'a> {
+    fn from(e: &'a Error) -> Self {
+        let a = vec![Annotation {
+            r#type: AnnotationType::Error,
+            label: "".into(),
+            location: e.location.clone(),
+        }];
+
+        Message {
+            r#type: AnnotationType::Error,
+            title: e.cause.message().into(),
+            annotations: a,
+        }
+    }
 }
 
 /// Result of word expansion.
@@ -430,6 +459,10 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use std::num::NonZeroU64;
+    use std::rc::Rc;
+    use yash_syntax::source::Line;
+    use yash_syntax::source::Source;
 
     #[derive(Debug)]
     pub(crate) struct NullEnv;
@@ -445,6 +478,31 @@ mod tests {
         ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
             unimplemented!("NullEnv's method must not be called")
         }
+    }
+
+    #[test]
+    fn from_error_for_message() {
+        let number = NonZeroU64::new(1).unwrap();
+        let line = Rc::new(Line {
+            value: "".to_string(),
+            number,
+            source: Source::Unknown,
+        });
+        let location = Location {
+            line,
+            column: number,
+        };
+        let error = Error {
+            cause: ErrorCause::Dummy("?dummy?".to_string()),
+            location,
+        };
+        let message = Message::from(&error);
+        assert_eq!(message.r#type, AnnotationType::Error);
+        assert_eq!(message.title, "?dummy?");
+        assert_eq!(message.annotations.len(), 1);
+        assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
+        assert_eq!(message.annotations[0].label, "");
+        assert_eq!(message.annotations[0].location, error.location);
     }
 
     #[test]

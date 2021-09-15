@@ -299,6 +299,7 @@ dependencies = [
 name = "yash-semantics"
 version = "0.1.0"
 dependencies = [
+ "annotate-snippets",
  "assert_matches",
  "async-trait",
  "futures-executor",
