@@ -63,6 +63,7 @@ mod text;
 mod word;
 
 use async_trait::async_trait;
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::variable::ReadOnlyError;
@@ -83,14 +84,45 @@ pub use quote_removal::*;
 pub enum ErrorCause {
     // TODO Define error cause types
     Dummy(String),
+    /// Assignment to a read-only variable.
+    AssignReadOnly(ReadOnlyError),
 }
 
 impl ErrorCause {
+    /// Returns an error message describing the error.
+    #[must_use]
     pub fn message(&self) -> &str {
         // TODO Localize
         use ErrorCause::*;
         match self {
             Dummy(message) => message,
+            AssignReadOnly { .. } => "cannot assign to read-only variable",
+        }
+    }
+
+    /// Returns a label for annotating the error location.
+    #[must_use]
+    pub fn label(&self) -> Cow<'_, str> {
+        // TODO Localize
+        use ErrorCause::*;
+        match self {
+            Dummy(_) => "".into(),
+            AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
+        }
+    }
+
+    /// Returns a location related with the error cause and a message describing
+    /// the location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        // TODO Localize
+        use ErrorCause::*;
+        match self {
+            Dummy(_) => None,
+            AssignReadOnly(e) => Some((
+                &e.read_only_location,
+                "the variable was made read-only here",
+            )),
         }
     }
 }
@@ -104,11 +136,21 @@ pub struct Error {
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
-        let a = vec![Annotation {
+        let mut a = vec![Annotation {
             r#type: AnnotationType::Error,
-            label: "".into(),
+            label: e.cause.label(),
             location: e.location.clone(),
         }];
+
+        e.location.line.source.complement_annotations(&mut a);
+
+        if let Some((location, label)) = e.cause.related_location() {
+            a.push(Annotation {
+                r#type: AnnotationType::Info,
+                label: label.into(),
+                location: location.clone(),
+            });
+        }
 
         Message {
             r#type: AnnotationType::Error,
@@ -461,6 +503,7 @@ mod tests {
     use futures_executor::block_on;
     use std::num::NonZeroU64;
     use std::rc::Rc;
+    use yash_env::variable::Value;
     use yash_syntax::source::Line;
     use yash_syntax::source::Source;
 
@@ -492,17 +535,33 @@ mod tests {
             line,
             column: number,
         };
+        let new_value = Variable {
+            value: Value::Scalar("value".into()),
+            last_assigned_location: Some(Location::dummy("assigned")),
+            is_exported: false,
+            read_only_location: None,
+        };
         let error = Error {
-            cause: ErrorCause::Dummy("?dummy?".to_string()),
+            cause: ErrorCause::AssignReadOnly(ReadOnlyError {
+                name: "var".into(),
+                read_only_location: Location::dummy("ROL"),
+                new_value,
+            }),
             location,
         };
         let message = Message::from(&error);
         assert_eq!(message.r#type, AnnotationType::Error);
-        assert_eq!(message.title, "?dummy?");
-        assert_eq!(message.annotations.len(), 1);
+        assert_eq!(message.title, "cannot assign to read-only variable");
+        assert_eq!(message.annotations.len(), 2);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
-        assert_eq!(message.annotations[0].label, "");
+        assert_eq!(message.annotations[0].label, "variable `var` is read-only");
         assert_eq!(message.annotations[0].location, error.location);
+        assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
+        assert_eq!(
+            message.annotations[1].label,
+            "the variable was made read-only here"
+        );
+        assert_eq!(message.annotations[1].location, Location::dummy("ROL"));
     }
 
     #[test]
