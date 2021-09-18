@@ -19,6 +19,7 @@
 use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
+use crate::print_error;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -209,6 +210,8 @@ async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
 }
 
 async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Field>) -> Result {
+    let name = fields[0].clone();
+    let location = name.origin.clone();
     let args = to_c_strings(fields);
     let envs = env.variables.env_c_strings();
     let result = env
@@ -231,10 +234,11 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
                         env.exit_status = ExitStatus::NOEXEC;
                     }
                 }
-                // TODO Use pretty::Message and annotate_snippet
-                env.print_system_error(
-                    errno,
-                    &format_args!("cannot execute external command {:?}", path),
+                print_error(
+                    env,
+                    format!("cannot execute external command {:?}", path).into(),
+                    errno.desc().into(),
+                    &location,
                 )
                 .await
             })
@@ -246,9 +250,13 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
             env.exit_status = exit_status;
         }
         Err(errno) => {
-            // TODO Use pretty::Message and annotate_snippet
-            env.print_system_error(errno, &format_args!("cannot execute external command"))
-                .await;
+            print_error(
+                env,
+                format!("cannot execute external command {:?}", name.value).into(),
+                errno.desc().into(),
+                &name.origin,
+            )
+            .await;
             env.exit_status = ExitStatus::NOEXEC;
         }
     }

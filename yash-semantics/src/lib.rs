@@ -28,8 +28,16 @@ pub mod command_search;
 pub mod expansion;
 mod handle_impl;
 
+use annotate_snippets::display_list::DisplayList;
+use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
+use std::borrow::Cow;
+use yash_env::io::Fd;
 use yash_env::Env;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use yash_env::exec::*;
@@ -52,6 +60,30 @@ pub trait Command {
 pub trait Handle<E> {
     /// Handles the argument error.
     async fn handle(&mut self, error: E) -> Result;
+}
+
+/// Convenience function for printing an error message.
+pub async fn print_error(
+    env: &mut Env,
+    title: Cow<'_, str>,
+    label: Cow<'_, str>,
+    location: &Location,
+) {
+    let mut a = vec![Annotation {
+        r#type: AnnotationType::Error,
+        label,
+        location: location.clone(),
+    }];
+    location.line.source.complement_annotations(&mut a);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title,
+        annotations: a,
+    };
+    let mut snippet = Snippet::from(&message);
+    snippet.opt.color = true;
+    let s = format!("{}\n", DisplayList::from(snippet));
+    let _ = env.system.write_all(Fd::STDERR, s.as_bytes()).await;
 }
 
 // TODO Probably we should implement a read-execute loop in here
