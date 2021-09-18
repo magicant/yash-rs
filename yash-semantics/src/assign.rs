@@ -17,69 +17,12 @@
 //! Assignment.
 
 use crate::expansion::expand_value;
-use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Variable;
-use yash_syntax::source::Location;
 
 #[doc(no_inline)]
-pub use crate::expansion::Env;
+pub use crate::expansion::{Env, Error, ErrorCause, Result};
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Assign;
-
-/// Types of errors that may occur in assignments.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ErrorCause {
-    /// Assignment to a read-only variable.
-    ReadOnly {
-        /// Variable name.
-        name: String,
-        /// Location where the existing variable was made read-only.
-        read_only_location: Location,
-    },
-    /// Expansion error.
-    Expansion(crate::expansion::ErrorCause),
-}
-
-impl From<crate::expansion::ErrorCause> for ErrorCause {
-    fn from(cause: crate::expansion::ErrorCause) -> Self {
-        ErrorCause::Expansion(cause)
-    }
-}
-
-/// Explanation of an assignment error.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Error {
-    pub cause: ErrorCause,
-    pub location: Location,
-}
-
-impl From<crate::expansion::Error> for Error {
-    fn from(error: crate::expansion::Error) -> Self {
-        Error {
-            cause: error.cause.into(),
-            location: error.location,
-        }
-    }
-}
-
-impl From<ReadOnlyError> for Error {
-    fn from(error: ReadOnlyError) -> Self {
-        let ReadOnlyError {
-            name,
-            read_only_location,
-            new_value,
-        } = error;
-        let cause = ErrorCause::ReadOnly {
-            name,
-            read_only_location,
-        };
-        let location = new_value.last_assigned_location.unwrap();
-        Error { cause, location }
-    }
-}
-
-/// Result of assignment.
-pub type Result<T = ()> = std::result::Result<T, Error>;
 
 // TODO Export or not?
 // TODO Specifying the scope of assignment
@@ -96,7 +39,10 @@ pub async fn perform_assignment<E: Env>(env: &mut E, assign: &Assign) -> Result 
         is_exported: false,
         read_only_location: None,
     };
-    env.assign_variable(name, value)?;
+    env.assign_variable(name, value).map_err(|e| Error {
+        cause: ErrorCause::AssignReadOnly(e),
+        location: assign.location.clone(),
+    })?;
     Ok(())
 }
 
@@ -117,6 +63,7 @@ mod tests {
     use futures_executor::block_on;
     use yash_env::variable::Value;
     use yash_env::Env;
+    use yash_syntax::source::Location;
 
     #[test]
     fn perform_assignment_new_value() {
@@ -147,9 +94,10 @@ mod tests {
         env.variables.assign("v".to_string(), v).unwrap();
         let a: Assign = "v=new".parse().unwrap();
         let e = block_on(perform_assignment(&mut env, &a)).unwrap_err();
-        assert_matches!(e.cause, ErrorCause::ReadOnly{name, read_only_location} => {
-            assert_eq!(name, "v");
-            assert_eq!(read_only_location, location);
+        assert_matches!(e.cause, ErrorCause::AssignReadOnly(roe) => {
+            assert_eq!(roe.name, "v");
+            assert_eq!(roe.read_only_location, location);
+            assert_eq!(roe.new_value.value, Value::Scalar("new".into()));
         });
         assert_eq!(e.location.line.value, "v=new");
         assert_eq!(e.location.line.number.get(), 1);

@@ -303,7 +303,7 @@ mod tests {
                     value: Value::Scalar("".to_string()),
                     last_assigned_location: None,
                     is_exported: false,
-                    read_only_location: Some(Location::dummy("")),
+                    read_only_location: Some(Location::dummy("ROL")),
                 },
             )
             .unwrap();
