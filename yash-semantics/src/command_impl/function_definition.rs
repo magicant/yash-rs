@@ -52,6 +52,7 @@ impl Command for syntax::FunctionDefinition {
         // Avoid overwriting a read-only function
         if let Some(function) = env.functions.get(name.as_str()) {
             if function.0.is_read_only {
+                // TODO Use pretty::Message and annotate_snippet
                 env.print_error(&format_args!(
                     "cannot re-define read-only function {:?}",
                     name

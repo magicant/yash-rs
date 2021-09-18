@@ -164,6 +164,7 @@ impl Command for syntax::SimpleCommand {
                 None => {
                     // TODO open redirections
                     // TODO expand and perform assignments
+                    // TODO Use pretty::Message and annotate_snippet
                     env.print_error(&format_args!("{}: command not found", name.value))
                         .await;
                     env.exit_status = ExitStatus::NOT_FOUND;
@@ -230,6 +231,7 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
                         env.exit_status = ExitStatus::NOEXEC;
                     }
                 }
+                // TODO Use pretty::Message and annotate_snippet
                 env.print_system_error(
                     errno,
                     &format_args!("cannot execute external command {:?}", path),
@@ -244,6 +246,7 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
             env.exit_status = exit_status;
         }
         Err(errno) => {
+            // TODO Use pretty::Message and annotate_snippet
             env.print_system_error(errno, &format_args!("cannot execute external command"))
                 .await;
             env.exit_status = ExitStatus::NOEXEC;
