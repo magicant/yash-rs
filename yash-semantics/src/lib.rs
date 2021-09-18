@@ -51,17 +51,6 @@ pub trait Command {
     async fn execute(&self, env: &mut Env) -> Result;
 }
 
-/// Error handler.
-///
-/// Most errors in the shell are handled by printing an error message to the
-/// standard error and returning a non-zero exit status. This trait provides a
-/// standard interface for implementing that behavior.
-#[async_trait(?Send)]
-pub trait Handle<E> {
-    /// Handles the argument error.
-    async fn handle(&mut self, error: E) -> Result;
-}
-
 /// Convenience function for printing an error message.
 pub async fn print_error(
     env: &mut Env,

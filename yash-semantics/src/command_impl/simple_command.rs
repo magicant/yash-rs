@@ -21,7 +21,6 @@ use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::print_error;
 use crate::Command;
-use crate::Handle;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
@@ -153,7 +152,7 @@ impl Command for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let fields = match expand_words(env, &self.words).await {
             Ok(fields) => fields,
-            Err(error) => return env.handle(error).await,
+            Err(error) => return error.handle(env).await,
         };
 
         use crate::command_search::Target::{Builtin, External, Function};
@@ -184,7 +183,7 @@ async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
     // TODO Apply last command substitution exit status
     match perform_assignments(env, assigns).await {
         Ok(()) => Ok(()),
-        Err(error) => env.handle(error).await,
+        Err(error) => error.handle(env).await,
     }
 }
 

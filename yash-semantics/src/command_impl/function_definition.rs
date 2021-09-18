@@ -19,7 +19,6 @@
 use crate::expansion::expand_word;
 use crate::expansion::Field;
 use crate::Command;
-use crate::Handle;
 use async_trait::async_trait;
 use std::rc::Rc;
 use yash_env::exec::ExitStatus;
@@ -46,7 +45,7 @@ impl Command for syntax::FunctionDefinition {
             origin,
         } = match expand_word(env, &self.name).await {
             Ok(field) => field,
-            Err(error) => return env.handle(error).await,
+            Err(error) => return error.handle(env).await,
         };
 
         // Avoid overwriting a read-only function

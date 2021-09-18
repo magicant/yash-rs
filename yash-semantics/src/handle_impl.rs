@@ -14,32 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementations of [`Handle`].
+//! Error handlers.
 
 use crate::ExitStatus;
-use crate::Handle;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
-use async_trait::async_trait;
+use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
 
-#[async_trait(?Send)]
-impl Handle<crate::expansion::Error> for Env {
+impl crate::expansion::Error {
     /// Prints an error message and sets the exit status to non-zero.
     ///
     /// This function handles an expansion error by printing an error message
     /// that describes the error to the standard error and setting the exit
     /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
     /// implementations may use different non-zero exit statuses.
-    async fn handle(&mut self, error: crate::expansion::Error) -> super::Result {
-        let m = Message::from(&error);
+    pub async fn handle(&self, env: &mut Env) -> super::Result {
+        let m = Message::from(self);
         let mut s = Snippet::from(&m);
         s.opt.color = true;
-        let d = DisplayList::from(s);
-        self.print_error(&format_args!("{}", d)).await;
+        let f = format!("{}\n", DisplayList::from(s));
+        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
 
-        self.exit_status = ExitStatus::ERROR;
+        env.exit_status = ExitStatus::ERROR;
         Ok(())
     }
 }
