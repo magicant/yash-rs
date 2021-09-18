@@ -18,6 +18,7 @@
 
 use nix::sys::signal::Signal;
 use std::convert::TryFrom;
+use std::ops::ControlFlow;
 use std::os::raw::c_int;
 
 /// Number that summarizes the result of command execution.
@@ -132,8 +133,9 @@ pub enum Divert {
 /// Result of command execution.
 ///
 /// If the command was interrupted in the middle of execution, the result value
-/// will be a [`Divert`] which specifies what to execute next.
-pub type Result<T = ()> = std::result::Result<T, Divert>;
+/// will be a `Break` having a [`Divert`] value which specifies what to execute
+/// next.
+pub type Result<T = ()> = ControlFlow<Divert, T>;
 
 #[cfg(test)]
 mod tests {

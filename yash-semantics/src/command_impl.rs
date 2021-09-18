@@ -24,6 +24,7 @@ mod simple_command;
 
 use super::Command;
 use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
 use yash_env::exec::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
@@ -60,7 +61,7 @@ impl Command for syntax::List {
         for item in &self.0 {
             item.execute(env).await?
         }
-        Ok(())
+        Continue(())
     }
 }
 
@@ -69,6 +70,7 @@ mod tests {
     use super::*;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
+    use std::ops::ControlFlow::Break;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
 
@@ -78,7 +80,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: syntax::List = "return -n 1; return -n 2; return -n 4".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(4));
     }
 
@@ -88,7 +90,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: syntax::List = "return -n 1; return 2; return -n 4".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(2));
     }
 }

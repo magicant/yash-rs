@@ -18,6 +18,7 @@
 
 use super::Command;
 use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
 use yash_env::exec::Result;
 use yash_env::Env;
 use yash_syntax::syntax::AndOrList;
@@ -47,7 +48,7 @@ impl Command for AndOrList {
                 pipeline.execute(env).await?;
             }
         }
-        Ok(())
+        Continue(())
     }
 }
 
@@ -57,6 +58,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
@@ -68,7 +70,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 36".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(36));
     }
 
@@ -81,7 +83,7 @@ mod tests {
         let list: AndOrList = "echo one && echo two".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -95,7 +97,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 && return -n 5".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(5));
     }
 
@@ -109,7 +111,7 @@ mod tests {
         let list: AndOrList = "return -n 1 && echo !".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
 
         let state = state.borrow();
@@ -126,7 +128,7 @@ mod tests {
         let list: AndOrList = "echo 1 && echo 2 && echo 3".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -144,7 +146,7 @@ mod tests {
         let list: AndOrList = "return -n 0 && return -n 2 && echo !".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
 
         let state = state.borrow();
@@ -158,7 +160,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 8 && X || return -n 0".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
 
@@ -172,7 +174,7 @@ mod tests {
         let list: AndOrList = "echo + || return -n 100".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -192,7 +194,7 @@ mod tests {
             .unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -212,7 +214,7 @@ mod tests {
             .unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
 
         let state = state.borrow();
@@ -227,7 +229,7 @@ mod tests {
         let list: AndOrList = "return -n 1 || return -n 2 || return -n 3".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(3));
     }
 
@@ -241,7 +243,7 @@ mod tests {
         let list: AndOrList = "return -n 3 || echo + || return -n 4".parse().unwrap();
 
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -255,7 +257,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 || X && return -n 9".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(9));
     }
 
@@ -265,7 +267,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return 97".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(97));
     }
 
@@ -275,7 +277,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 7 || return 0 && X".parse().unwrap();
         let result = block_on(list.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
 }

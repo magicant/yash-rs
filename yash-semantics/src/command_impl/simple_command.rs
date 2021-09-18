@@ -24,6 +24,7 @@ use crate::Command;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
+use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::exec::ExitStatus;
@@ -168,7 +169,7 @@ impl Command for syntax::SimpleCommand {
                     env.print_error(&format_args!("{}: command not found", name.value))
                         .await;
                     env.exit_status = ExitStatus::NOT_FOUND;
-                    Ok(())
+                    Continue(())
                 }
             }
         } else {
@@ -182,7 +183,7 @@ async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
 
     // TODO Apply last command substitution exit status
     match perform_assignments(env, assigns).await {
-        Ok(()) => Ok(()),
+        Ok(()) => Continue(()),
         Err(error) => error.handle(env).await,
     }
 }
@@ -193,9 +194,9 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
     let (exit_status, abort) = (builtin.execute)(env, fields).await;
     env.exit_status = exit_status;
     if let Some(abort) = abort {
-        return Err(abort);
+        return Break(abort);
     }
-    Ok(())
+    Continue(())
 }
 
 async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
@@ -205,7 +206,7 @@ async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
     // TODO Apply positional parameters
     function.body.execute(env).await?;
     // TODO Consume Divert::Return
-    Ok(())
+    Continue(())
 }
 
 async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Field>) -> Result {
@@ -260,7 +261,7 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
         }
     }
 
-    Ok(())
+    Continue(())
 }
 
 /// Converts fields to C strings.
@@ -293,7 +294,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(
             env.variables.get("a").unwrap().value,
@@ -319,7 +320,7 @@ mod tests {
             .unwrap();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
 
         let state = state.borrow();
@@ -333,7 +334,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "return -n 93".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(93));
     }
 
@@ -343,7 +344,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "return 37".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
 
@@ -360,7 +361,7 @@ mod tests {
         })));
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(13));
     }
 
@@ -403,7 +404,7 @@ mod tests {
             .unwrap();
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
 
         let state = state.borrow();
         let process = state.processes.values().last().unwrap();
@@ -435,7 +436,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         // In VirtualSystem, execve fails with ENOSYS.
         assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
@@ -449,7 +450,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
     }
 
@@ -467,7 +468,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
@@ -476,7 +477,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
 
@@ -485,7 +486,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "no_such_command".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
     }
 }

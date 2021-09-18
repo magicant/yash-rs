@@ -18,6 +18,7 @@
 
 use super::Command;
 use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
 use yash_env::exec::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
@@ -46,7 +47,7 @@ impl Command for syntax::CompoundCommand {
                 // TODO execute if
                 env.print_error(&format_args!("Not implemented: {}", self))
                     .await;
-                Ok(())
+                Continue(())
             }
         }
     }
@@ -65,7 +66,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let command: syntax::CompoundCommand = "{ return -n 42; }".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
 }

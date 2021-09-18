@@ -20,6 +20,7 @@ use crate::expansion::expand_word;
 use crate::expansion::Field;
 use crate::Command;
 use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
@@ -58,7 +59,7 @@ impl Command for syntax::FunctionDefinition {
                 ))
                 .await;
                 env.exit_status = ExitStatus::ERROR;
-                return Ok(());
+                return Continue(());
             }
         }
 
@@ -72,7 +73,7 @@ impl Command for syntax::FunctionDefinition {
         let entry = HashEntry(Rc::new(function));
         env.functions.replace(entry);
         env.exit_status = ExitStatus::SUCCESS;
-        Ok(())
+        Continue(())
     }
 }
 
@@ -95,7 +96,7 @@ mod tests {
         };
 
         let result = block_on(definition.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
         let function = &env.functions.get("foo").unwrap().0;
@@ -123,7 +124,7 @@ mod tests {
         };
 
         let result = block_on(definition.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
         let function = &env.functions.get("foo").unwrap().0;
@@ -153,7 +154,7 @@ mod tests {
         };
 
         let result = block_on(definition.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_eq!(env.functions.len(), 1);
         assert_eq!(env.functions.get("foo").unwrap().0, function);
@@ -178,7 +179,7 @@ mod tests {
         };
 
         let result = block_on(definition.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
         assert_eq!(names, ["a"]);

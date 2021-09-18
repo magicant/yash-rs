@@ -19,6 +19,7 @@
 use crate::ExitStatus;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
+use std::ops::ControlFlow::Continue;
 use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
@@ -38,6 +39,6 @@ impl crate::expansion::Error {
         let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
 
         env.exit_status = ExitStatus::ERROR;
-        Ok(())
+        Continue(())
     }
 }

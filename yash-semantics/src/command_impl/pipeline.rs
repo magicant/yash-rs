@@ -19,6 +19,7 @@
 use super::Command;
 use async_trait::async_trait;
 use nix::unistd::Pid;
+use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
@@ -67,7 +68,7 @@ impl Command for syntax::Pipeline {
         } else {
             ExitStatus::SUCCESS
         };
-        Ok(())
+        Continue(())
     }
 }
 
@@ -75,7 +76,7 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Comm
     match commands.len() {
         0 => {
             env.exit_status = ExitStatus::SUCCESS;
-            Ok(())
+            Continue(())
         }
         1 => commands[0].execute(env).await,
         _ => execute_multi_command_pipeline(env, commands).await,
@@ -110,7 +111,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);
-                    break Ok(());
+                    break Continue(());
                 }
                 // TODO should not ignore other PIDs
             }
@@ -127,11 +128,11 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 
 async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
     match pipes.shift(env, has_next) {
-        Ok(()) => Ok(()),
+        Ok(()) => Continue(()),
         Err(errno) => {
             env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"))
                 .await;
-            Err(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
+            Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
 }
@@ -153,23 +154,23 @@ async fn connect_pipe_and_execute_command(
 
     // TODO This part of code should be the same as subshell executor. Extract a function.
     match command.execute(env).await {
-        Ok(()) => (),
-        Err(Divert::Interrupt(exit_status) | Divert::Exit(exit_status)) => {
+        Continue(()) => (),
+        Break(Divert::Interrupt(exit_status) | Divert::Exit(exit_status)) => {
             if let Some(exit_status) = exit_status {
                 env.exit_status = exit_status;
             }
         }
-        Err(divert) => todo!("subshell finished with {:?}", divert),
+        Break(divert) => todo!("subshell finished with {:?}", divert),
     }
 }
 
 async fn pid_or_fail(env: &mut Env, pid: nix::Result<Pid>) -> Result<Pid> {
     match pid {
-        Ok(pid) => Ok(pid),
+        Ok(pid) => Continue(pid),
         Err(errno) => {
             let message = &format_args!("cannot start a subshell in the pipeline");
             env.print_system_error(errno, message).await;
-            Err(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
+            Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
 }
@@ -259,7 +260,7 @@ mod tests {
             negation: false,
         };
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
 
@@ -269,7 +270,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return -n 93".parse().unwrap();
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(93));
     }
 
@@ -279,7 +280,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return 37".parse().unwrap();
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
 
@@ -295,7 +296,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
         let result = executor.run_until(pipeline.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(20));
     }
 
@@ -330,7 +331,7 @@ mod tests {
             poll
         }));
         drop(task);
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -374,7 +375,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return -n 42".parse().unwrap();
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
 
@@ -384,7 +385,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return -n 0".parse().unwrap();
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Ok(()));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
     }
 
@@ -394,7 +395,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return 15".parse().unwrap();
         let result = block_on(pipeline.execute(&mut env));
-        assert_eq!(result, Err(Divert::Return));
+        assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(15));
     }
 

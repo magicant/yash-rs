@@ -30,6 +30,7 @@ async fn parse_and_print() -> i32 {
     use env::RealSystem;
     use semantics::Command;
     use std::num::NonZeroU64;
+    use std::ops::ControlFlow::{Break, Continue};
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
@@ -74,10 +75,11 @@ async fn parse_and_print() -> i32 {
         let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
         match parser.command_line().await {
             Ok(None) => break env.exit_status.0,
-            Ok(Some(command)) => command
-                .execute(&mut env)
-                .await
-                .unwrap_or_else(|a| eprintln!("{:?}", a)),
+            Ok(Some(command)) => match command.execute(&mut env).await {
+                Continue(()) => (),
+                // TODO Handle divert
+                Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
+            },
             Err(e) => {
                 let m = Message::from(&e);
                 let mut s = Snippet::from(&m);
