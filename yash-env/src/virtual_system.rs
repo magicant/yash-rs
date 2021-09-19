@@ -191,10 +191,7 @@ impl System for VirtualSystem {
     /// The current implementation only checks if the file has any executable
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
-        let path = match path.to_str() {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => return false,
-        };
+        let path = OsStr::from_bytes(path.to_bytes());
         match self.state.borrow().file_system.get(path) {
             None => false,
             Some(inode) => inode.borrow().permissions.0 & 0o111 != 0,
