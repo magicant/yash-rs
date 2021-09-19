@@ -72,6 +72,7 @@
 
 use std::future::ready;
 use std::future::Future;
+use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::exec::ExitStatus;
@@ -95,7 +96,7 @@ pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
         Some(field) => field.value.parse().unwrap_or(2),
         None => 0,
     };
-    (ExitStatus(exit_status), None)
+    (ExitStatus(exit_status), Continue(()))
 }
 
 /// Implementation of the return built-in.
@@ -124,7 +125,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let args = Field::dummies(["return", "-n", "12"]);
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus(12), None));
+        assert_eq!(result, (ExitStatus(12), Continue(())));
     }
 
     #[test]
@@ -132,6 +133,6 @@ mod tests {
         let mut env = DummyEnv::default();
         let args = Field::dummies(["return", "-n", "47"]);
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus(47), None));
+        assert_eq!(result, (ExitStatus(47), Continue(())));
     }
 }

@@ -18,6 +18,7 @@
 
 use std::future::ready;
 use std::future::Future;
+use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_env::builtin::Result;
@@ -51,7 +52,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
-        return (ExitStatus::SUCCESS, None);
+        return (ExitStatus::SUCCESS, Continue(()));
     }
 
     for Field { value, origin } in args {
@@ -66,7 +67,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
         }
     }
 
-    (ExitStatus::SUCCESS, None)
+    (ExitStatus::SUCCESS, Continue(()))
 }
 
 /// Implementation of the alias built-in.
@@ -105,7 +106,7 @@ mod tests {
         let args = vec![arg0, arg1];
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, None));
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 1);
@@ -130,7 +131,7 @@ mod tests {
         let args = vec![arg0, arg1, arg2, arg3];
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, None));
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         let aliases = env.aliases.as_ref();
         assert_eq!(aliases.len(), 3);

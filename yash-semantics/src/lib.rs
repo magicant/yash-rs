@@ -83,6 +83,7 @@ pub(crate) mod tests {
     use itertools::Itertools;
     use std::future::ready;
     use std::future::Future;
+    use std::ops::ControlFlow::{Break, Continue};
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::{Intrinsic, Special};
@@ -114,9 +115,9 @@ pub(crate) mod tests {
         let divert = match args.get(1) {
             Some(field) if field.value == "-n" => {
                 args.remove(1);
-                None
+                Continue(())
             }
-            _ => Some(Divert::Return),
+            _ => Break(Divert::Return),
         };
         let exit_status = match args.get(1) {
             Some(field) => field.value.parse().unwrap_or(2),
@@ -144,7 +145,7 @@ pub(crate) mod tests {
                 Ok(_) => ExitStatus::SUCCESS,
                 Err(_) => ExitStatus::FAILURE,
             };
-            (result, None)
+            (result, Continue(()))
         })
     }
 
@@ -176,7 +177,7 @@ pub(crate) mod tests {
                 Ok(_) => ExitStatus::SUCCESS,
                 Err(_) => ExitStatus::FAILURE,
             };
-            (result, None)
+            (result, Continue(()))
         })
     }
 

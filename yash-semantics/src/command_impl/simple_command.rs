@@ -24,7 +24,7 @@ use crate::Command;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use std::ffi::CString;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::exec::ExitStatus;
@@ -193,10 +193,7 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
     // TODO expand and perform assignments
     let (exit_status, abort) = (builtin.execute)(env, fields).await;
     env.exit_status = exit_status;
-    if let Some(abort) = abort {
-        return Break(abort);
-    }
-    Continue(())
+    abort
 }
 
 async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
@@ -280,6 +277,7 @@ mod tests {
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use std::cell::RefCell;
+    use std::ops::ControlFlow::Break;
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::exec::Divert;
