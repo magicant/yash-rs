@@ -26,6 +26,7 @@ use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::select::FdSet;
 use nix::sys::stat::stat;
+use nix::sys::stat::Mode;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use nix::unistd::Pid;
@@ -95,6 +96,10 @@ impl System for RealSystem {
                 Err(e) => return Err(e),
             }
         }
+    }
+
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
+        nix::fcntl::open(path, option, mode).map(Fd)
     }
 
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
