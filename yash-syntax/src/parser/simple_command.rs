@@ -26,10 +26,35 @@ use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Array;
 use crate::syntax::Assign;
+use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
 use crate::syntax::Word;
 use std::convert::TryFrom;
+
+/// Simple command builder.
+#[derive(Default)]
+struct Builder<H> {
+    assigns: Vec<Assign>,
+    words: Vec<Word>,
+    redirs: Vec<Redir<H>>,
+}
+
+impl<H> Builder<H> {
+    fn is_empty(&self) -> bool {
+        self.assigns.is_empty() && self.words.is_empty() && self.redirs.is_empty()
+    }
+}
+
+impl<H> From<Builder<H>> for SimpleCommand<H> {
+    fn from(builder: Builder<H>) -> Self {
+        SimpleCommand {
+            assigns: builder.assigns,
+            words: builder.words,
+            redirs: builder.redirs.into(),
+        }
+    }
+}
 
 impl Parser<'_> {
     /// Parses the value of an array assignment.
@@ -70,11 +95,7 @@ impl Parser<'_> {
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
     pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
-        let mut result = SimpleCommand {
-            assigns: vec![],
-            words: vec![],
-            redirs: vec![],
-        };
+        let mut result = Builder::default();
 
         loop {
             // Parse redirection
@@ -137,7 +158,7 @@ impl Parser<'_> {
         Ok(Rec::Parsed(if result.is_empty() {
             None
         } else {
-            Some(result)
+            Some(result.into())
         }))
     }
 }
@@ -263,7 +284,7 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.words, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "my");
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
@@ -280,7 +301,7 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.words, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 3);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
@@ -309,7 +330,7 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.words[0].to_string(), "word");
     }
@@ -321,7 +342,7 @@ mod tests {
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 3);
         assert_eq!(sc.words[0].to_string(), ":");
         assert_eq!(sc.words[1].to_string(), "if");
@@ -406,7 +427,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.assigns[0].name, "if");
@@ -494,7 +515,7 @@ mod tests {
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         if let Array(words) = &sc.assigns[0].value {
             assert_eq!(words, &[]);
@@ -514,7 +535,7 @@ mod tests {
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(sc.assigns[0].location.line.value, "a= ()");
@@ -534,7 +555,7 @@ mod tests {
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
-        assert_eq!(sc.redirs, []);
+        assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
         assert_eq!(sc.assigns[0].location.line.value, "a=b()");
