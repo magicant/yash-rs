@@ -41,6 +41,8 @@ use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
 use yash_syntax::syntax::RedirOp;
 
+const MIN_SAVE_FD: Fd = Fd(10);
+
 /// Record of saving an open file description in another file descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct SavedFd {
@@ -268,10 +270,10 @@ async fn open_normal(
 }
 
 /// Performs a redirection.
-async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
+async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
-    let save = match env.system.dup(target_fd, Fd(10), true) {
+    let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {
@@ -315,24 +317,13 @@ async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
     Ok(SavedFd { original, save })
 }
 
-/// Performs redirections.
-pub async fn perform<'e, 'r>(env: &'e mut Env, redirs: &'r [Redir]) -> Result<RedirEnv<'e>, Error> {
-    let saved_fds = Vec::with_capacity(redirs.len());
-    let mut env = RedirEnv { env, saved_fds };
-    for redir in redirs {
-        let saved_fd = perform_one(&mut env, redir).await?;
-        env.saved_fds.push(saved_fd);
-    }
-    Ok(env)
-}
-
 impl RedirEnv<'_> {
     /// Performs a redirection.
     ///
     /// If successful, this function saves internally a backing copy of the file
     /// descriptor affected by the redirection.
     pub async fn perform_redir(&mut self, redir: &Redir) -> Result<(), Error> {
-        let saved_fd = perform_one(self, redir).await?;
+        let saved_fd = perform(self, redir).await?;
         self.saved_fds.push(saved_fd);
         Ok(())
     }
@@ -359,8 +350,9 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
         let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
         let redir = "3< foo".parse().unwrap();
-        let mut env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
 
         let mut buffer = [0; 4];
         let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
@@ -379,8 +371,9 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
         let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
         let redir = "< foo".parse().unwrap();
-        let mut env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
 
         let mut buffer = [0; 4];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
@@ -407,8 +400,9 @@ mod tests {
             .push(17);
         drop(state);
         let mut env = Env::with_system(Box::new(system));
+        let mut redir_env = RedirEnv::new(&mut env);
         let redir = "< file".parse().unwrap();
-        let mut redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        block_on(redir_env.perform_redir(&redir)).unwrap();
         redir_env.undo_redirs();
         drop(redir_env);
 
@@ -427,8 +421,9 @@ mod tests {
             .save(PathBuf::from("input"), Rc::new(RefCell::new(INode::new())));
         drop(state);
         let mut env = Env::with_system(Box::new(system));
+        let mut redir_env = RedirEnv::new(&mut env);
         let redir = "4< input".parse().unwrap();
-        let mut redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        block_on(redir_env.perform_redir(&redir)).unwrap();
         redir_env.undo_redirs();
         drop(redir_env);
 
@@ -440,8 +435,9 @@ mod tests {
     #[test]
     fn unreadable_file() {
         let mut env = Env::new_virtual();
+        let mut env = RedirEnv::new(&mut env);
         let redir = "< no_such_file".parse().unwrap();
-        let e = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap_err();
+        let e = block_on(env.perform_redir(&redir)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::OpenFile(Errno::ENOENT));
         assert_eq!(e.location, redir.body.operand().location);
     }
@@ -465,11 +461,9 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = block_on(perform(
-            &mut env,
-            &["< foo".parse().unwrap(), "3< bar".parse().unwrap()],
-        ))
-        .unwrap();
+        let mut env = RedirEnv::new(&mut env);
+        block_on(env.perform_redir(&"< foo".parse().unwrap())).unwrap();
+        block_on(env.perform_redir(&"3< bar".parse().unwrap())).unwrap();
 
         let mut buffer = [0; 1];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
@@ -499,11 +493,9 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = block_on(perform(
-            &mut env,
-            &["< foo".parse().unwrap(), "< bar".parse().unwrap()],
-        ))
-        .unwrap();
+        let mut env = RedirEnv::new(&mut env);
+        block_on(env.perform_redir(&"< foo".parse().unwrap())).unwrap();
+        block_on(env.perform_redir(&"< bar".parse().unwrap())).unwrap();
 
         let mut buffer = [0; 1];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
@@ -538,52 +530,16 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let redir_env = block_on(perform(
-            &mut env,
-            &["< foo".parse().unwrap(), "10< bar".parse().unwrap()],
-        ))
-        .unwrap();
-
+        let mut redir_env = RedirEnv::new(&mut env);
+        block_on(redir_env.perform_redir(&"< foo".parse().unwrap())).unwrap();
+        block_on(redir_env.perform_redir(&"10< bar".parse().unwrap())).unwrap();
         drop(redir_env);
 
         let mut buffer = [0; 1];
-        let e = env.system.read(Fd(10), &mut buffer).unwrap_err();
+        let e = env.system.read(MIN_SAVE_FD, &mut buffer).unwrap_err();
         assert_eq!(e, Errno::EBADF);
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [30]);
-    }
-
-    #[test]
-    fn first_saved_fd_is_undone_when_second_fails() {
-        let system = VirtualSystem::new();
-        let mut state = system.state.borrow_mut();
-        state
-            .file_system
-            .save(PathBuf::from("file"), Rc::new(RefCell::new(INode::new())));
-        state
-            .file_system
-            .get("/dev/stdin")
-            .unwrap()
-            .borrow_mut()
-            .content
-            .push(23);
-        drop(state);
-        let mut env = Env::with_system(Box::new(system));
-        let e = block_on(perform(
-            &mut env,
-            &[
-                "< file".parse().unwrap(),
-                "5< no_such_file".parse().unwrap(),
-            ],
-        ))
-        .unwrap_err();
-
-        assert_eq!(e.cause, ErrorCause::OpenFile(Errno::ENOENT));
-
-        let mut buffer = [0; 1];
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
-        assert_eq!(read_count, 1);
-        assert_eq!(buffer, [23]);
     }
 }
