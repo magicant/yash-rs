@@ -871,6 +871,16 @@ pub enum RedirBody<H = HereDoc> {
     // TODO process redirection
 }
 
+impl RedirBody<HereDoc> {
+    /// Returns the operand word of the redirection.
+    pub fn operand(&self) -> &Word {
+        match self {
+            RedirBody::Normal { operand, .. } => operand,
+            RedirBody::HereDoc(here_doc) => &here_doc.delimiter,
+        }
+    }
+}
+
 impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

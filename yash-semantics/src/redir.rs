@@ -79,7 +79,15 @@ impl DerefMut for RedirEnv<'_> {
 
 impl std::ops::Drop for RedirEnv<'_> {
     fn drop(&mut self) {
-        // TODO undo redirections
+        for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
+            if let Some(save) = save {
+                assert_ne!(save, original);
+                let _: Result<_, _> = self.env.system.dup2(save, original);
+                let _: Result<_, _> = self.env.system.close(save);
+            } else {
+                let _: Result<_, _> = self.env.system.close(original);
+            }
+        }
     }
 }
 
@@ -96,6 +104,12 @@ impl RedirEnv<'_> {
     pub fn preserve_redirs(self) {
         todo!()
     }
+    // TODO Just closing save FDs in `preserve_redirs` would render incorrect
+    // behavior in some situations. Assume `perform` is called twice, the
+    // second redirection's target FD is the first's save FD, and the inner
+    // `RedirEnv` is dropped by `preserve_redirs`. When the outer `RedirEnv` is
+    // dropped by `undo_redirs`, the undoing will move and close the FD that has
+    // been made permanent by `preserve_redirs`, which is not expected.
 }
 
 /// Types of errors that may occur in the redirection.
@@ -184,6 +198,20 @@ async fn open_normal(
 
 /// Performs a redirection.
 async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
+    // Save the current open file description at `target_fd`
+    let target_fd = redir.fd_or_default();
+    let save = match env.system.dup(target_fd, Fd(10), true) {
+        Ok(save_fd) => Some(save_fd),
+        Err(Errno::EBADF) => None,
+        Err(errno) => {
+            return Err(Error {
+                cause: ErrorCause::FdNotOverwritten(target_fd, errno),
+                location: redir.body.operand().location.clone(),
+            })
+        }
+    };
+
+    // Prepare an FD from the redirection body
     let (fd, location) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
@@ -193,11 +221,8 @@ async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
         RedirBody::HereDoc(_) => todo!(),
     }?;
 
-    let target_fd = redir.fd_or_default();
     if fd != target_fd {
-        // TODO Save original FD
-
-        // Copy `fd` to `target_fd`
+        // Copy the new open file description from `fd` to `target_fd`
         match env.system.dup2(fd, target_fd) {
             Ok(new_fd) => assert_eq!(new_fd, target_fd),
             Err(errno) => {
@@ -215,10 +240,8 @@ async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
         let _: Result<_, _> = env.system.close(fd);
     }
 
-    Ok(SavedFd {
-        original: fd,
-        save: None,
-    })
+    let original = target_fd;
+    Ok(SavedFd { original, save })
 }
 
 /// Performs redirections.
@@ -287,7 +310,46 @@ mod tests {
 
     #[test]
     fn saving_and_undoing_fd() {
-        // TODO implement test case
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save(PathBuf::from("file"), Rc::new(RefCell::new(INode::new())));
+        state
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .content
+            .push(17);
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let redir = "< file".parse().unwrap();
+        let redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        RedirEnv::undo_redirs(redir_env);
+
+        let mut buffer = [0; 2];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer[0], 17);
+    }
+
+    #[test]
+    fn undoing_without_initial_fd() {
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save(PathBuf::from("input"), Rc::new(RefCell::new(INode::new())));
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let redir = "4< input".parse().unwrap();
+        let redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        RedirEnv::undo_redirs(redir_env);
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd(4), &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
     }
 
     #[test]
