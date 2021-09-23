@@ -21,6 +21,7 @@
 use crate::expansion::expand_word;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
+use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
 use std::ops::Deref;
@@ -29,6 +30,9 @@ use yash_env::expansion::Field;
 use yash_env::io::Fd;
 use yash_env::Env;
 use yash_env::System;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
@@ -125,6 +129,33 @@ pub enum ErrorCause {
     OpenFile(Errno),
 }
 
+impl ErrorCause {
+    /// Returns an error message describing the error.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        // TODO Localize
+        use ErrorCause::*;
+        match self {
+            Expansion(e) => e.message(),
+            NulByte(_) => "nul byte found in the pathname",
+            FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
+            OpenFile(_) => "cannot open the file",
+        }
+    }
+
+    /// Returns a label for annotating the error location.
+    #[must_use]
+    pub fn label(&self) -> Cow<'_, str> {
+        // TODO Localize
+        use ErrorCause::*;
+        match self {
+            Expansion(e) => e.label(),
+            NulByte(_) => "pathname should not contain a nul byte".into(),
+            FdNotOverwritten(_, errno) | OpenFile(errno) => errno.desc().into(),
+        }
+    }
+}
+
 impl From<crate::expansion::ErrorCause> for ErrorCause {
     fn from(cause: crate::expansion::ErrorCause) -> Self {
         ErrorCause::Expansion(cause)
@@ -149,6 +180,24 @@ impl From<crate::expansion::Error> for Error {
         Error {
             cause: e.cause.into(),
             location: e.location,
+        }
+    }
+}
+
+impl<'a> From<&'a Error> for Message<'a> {
+    fn from(e: &'a Error) -> Self {
+        let mut a = vec![Annotation {
+            r#type: AnnotationType::Error,
+            label: e.cause.label(),
+            location: e.location.clone(),
+        }];
+
+        e.location.line.source.complement_annotations(&mut a);
+
+        Message {
+            r#type: AnnotationType::Error,
+            title: e.cause.message().into(),
+            annotations: a,
         }
     }
 }
