@@ -42,3 +42,22 @@ impl crate::expansion::Error {
         Continue(())
     }
 }
+
+impl crate::redir::Error {
+    /// Prints an error message and sets the exit status to non-zero.
+    ///
+    /// This function handles a redirection error by printing an error message
+    /// that describes the error to the standard error and setting the exit
+    /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
+    /// implementations may use different non-zero exit statuses.
+    pub async fn handle(&self, env: &mut Env) -> super::Result {
+        let m = Message::from(self);
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let f = format!("{}\n", DisplayList::from(s));
+        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
+
+        env.exit_status = ExitStatus::ERROR;
+        Continue(())
+    }
+}

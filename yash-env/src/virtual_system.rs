@@ -238,6 +238,49 @@ impl System for VirtualSystem {
         Ok(to)
     }
 
+    fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
+        let path = OsStr::from_bytes(path.to_bytes());
+        let mut state = self.state.borrow_mut();
+        let file = if let Some(inode) = state.file_system.get(path) {
+            if option.contains(OFlag::O_EXCL) {
+                return Err(Errno::EEXIST);
+            }
+            Rc::clone(inode)
+        } else {
+            if !option.contains(OFlag::O_CREAT) {
+                return Err(Errno::ENOENT);
+            }
+
+            let mut inode = INode::new();
+            // TODO Apply umask
+            inode.permissions = Mode(mode.bits());
+            let inode = Rc::new(RefCell::new(inode));
+            state
+                .file_system
+                .save(PathBuf::from(path), Rc::clone(&inode));
+            inode
+        };
+
+        let (is_readable, is_writable) = match option & OFlag::O_ACCMODE {
+            OFlag::O_RDONLY => (true, false),
+            OFlag::O_WRONLY => (false, true),
+            OFlag::O_RDWR => (true, true),
+            _ => (false, false),
+        };
+        let open_file_description = Rc::new(RefCell::new(OpenFile {
+            file,
+            offset: 0,
+            is_readable,
+            is_writable,
+        }));
+        let body = FdBody {
+            open_file_description,
+            cloexec: option.contains(OFlag::O_CLOEXEC),
+        };
+        let process = state.processes.get_mut(&self.process_id).unwrap();
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
+    }
+
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
@@ -628,6 +671,78 @@ mod tests {
         let process = system.current_process();
         let fd6 = process.fds.get(&Fd(6)).unwrap();
         assert!(!fd6.cloexec);
+    }
+
+    #[test]
+    fn open_non_existing_file_no_creation() {
+        let mut system = VirtualSystem::new();
+        let result = system.open(
+            &CString::new("/no/such/file").unwrap(),
+            OFlag::O_RDONLY,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn open_creating_non_existing_file() {
+        let mut system = VirtualSystem::new();
+        let result = system.open(
+            &CString::new("new_file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Ok(Fd(3)));
+
+        system.write(Fd(3), &[42, 123]).unwrap();
+        let state = system.state.borrow();
+        let file = state.file_system.get("new_file").unwrap().borrow();
+        assert_eq!(file.content, [42, 123]);
+    }
+
+    #[test]
+    fn open_existing_file() {
+        let mut system = VirtualSystem::new();
+        let fd = system
+            .open(
+                &CString::new("file").unwrap(),
+                OFlag::O_WRONLY | OFlag::O_CREAT,
+                nix::sys::stat::Mode::all(),
+            )
+            .unwrap();
+        system.write(fd, &[75, 96, 133]).unwrap();
+
+        let result = system.open(
+            &CString::new("file").unwrap(),
+            OFlag::O_RDONLY,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Ok(Fd(4)));
+
+        let mut buffer = [0; 5];
+        let count = system.read(Fd(4), &mut buffer).unwrap();
+        assert_eq!(count, 3);
+        assert_eq!(buffer, [75, 96, 133, 0, 0]);
+        let count = system.read(Fd(4), &mut buffer).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn open_existing_file_excl() {
+        let mut system = VirtualSystem::new();
+        let first = system.open(
+            &CString::new("my_file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(first, Ok(Fd(3)));
+
+        let second = system.open(
+            &CString::new("my_file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(second, Err(Errno::EEXIST));
     }
 
     #[test]

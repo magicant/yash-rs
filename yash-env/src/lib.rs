@@ -53,6 +53,7 @@ use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::stat::Mode;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -137,6 +138,11 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `dup2` system call. If successful,
     /// returns `Ok(to)`. On error, returns `Err(_)`.
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
+
+    /// Opens a file descriptor.
+    ///
+    /// This is a thin wrapper around the `open` system call.
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
 
     /// Closes a file descriptor.
     ///

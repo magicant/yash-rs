@@ -109,7 +109,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
@@ -131,7 +131,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
@@ -150,7 +150,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
@@ -171,7 +171,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
@@ -192,7 +192,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();
@@ -313,7 +313,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["f".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let e = block_on(parser.short_function_definition(c)).unwrap_err();

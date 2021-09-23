@@ -114,15 +114,15 @@ impl Fill for Redir<MissingHereDoc> {
 
 impl Fill for SimpleCommand<MissingHereDoc> {
     type Full = SimpleCommand;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
+    fn fill(mut self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
         Ok(SimpleCommand {
             assigns: self.assigns,
             words: self.words,
-            redirs: self
-                .redirs
-                .into_iter()
+            redirs: Rc::make_mut(&mut self.redirs)
+                .drain(..)
                 .map(|redir| redir.fill(i))
-                .collect::<Result<Vec<_>>>()?,
+                .collect::<Result<Vec<_>>>()?
+                .into(),
         })
     }
 }

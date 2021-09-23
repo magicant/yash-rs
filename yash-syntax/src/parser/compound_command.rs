@@ -260,7 +260,7 @@ mod tests {
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();

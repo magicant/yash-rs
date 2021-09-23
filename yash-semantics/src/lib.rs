@@ -27,6 +27,7 @@ mod command_impl;
 pub mod command_search;
 pub mod expansion;
 mod handle_impl;
+pub mod redir;
 
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;

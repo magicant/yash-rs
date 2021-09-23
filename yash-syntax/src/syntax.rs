@@ -871,6 +871,16 @@ pub enum RedirBody<H = HereDoc> {
     // TODO process redirection
 }
 
+impl RedirBody<HereDoc> {
+    /// Returns the operand word of the redirection.
+    pub fn operand(&self) -> &Word {
+        match self {
+            RedirBody::Normal { operand, .. } => operand,
+            RedirBody::HereDoc(here_doc) => &here_doc.delimiter,
+        }
+    }
+}
+
 impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -929,7 +939,7 @@ impl<H: fmt::Display> fmt::Display for Redir<H> {
 pub struct SimpleCommand<H = HereDoc> {
     pub assigns: Vec<Assign>,
     pub words: Vec<Word>,
-    pub redirs: Vec<Redir<H>>,
+    pub redirs: Rc<Vec<Redir<H>>>,
 }
 
 impl<H> SimpleCommand<H> {
@@ -1858,7 +1868,7 @@ mod tests {
         let mut command = SimpleCommand {
             assigns: vec![],
             words: vec![],
-            redirs: vec![],
+            redirs: vec![].into(),
         };
         assert_eq!(command.to_string(), "");
 
@@ -1878,7 +1888,7 @@ mod tests {
         command.words.push(Word::from_str("foo").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world echo foo");
 
-        command.redirs.push(Redir {
+        Rc::make_mut(&mut command.redirs).push(Redir {
             fd: None,
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("END").unwrap(),
@@ -1894,7 +1904,7 @@ mod tests {
         command.words.clear();
         assert_eq!(command.to_string(), "<<END");
 
-        command.redirs.push(Redir {
+        Rc::make_mut(&mut command.redirs).push(Redir {
             fd: Some(Fd(1)),
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),

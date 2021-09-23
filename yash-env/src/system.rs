@@ -24,6 +24,7 @@ use futures_util::task::Poll;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::stat::Mode;
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -208,6 +209,9 @@ impl System for SharedSystem {
     }
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         self.0.borrow_mut().dup2(from, to)
+    }
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
+        self.0.borrow_mut().open(path, option, mode)
     }
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.0.borrow_mut().close(fd)

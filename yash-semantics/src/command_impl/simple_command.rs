@@ -20,6 +20,7 @@ use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::print_error;
+use crate::redir::RedirEnv;
 use crate::Command;
 use async_trait::async_trait;
 use nix::errno::Errno;
@@ -35,6 +36,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Assign;
+use yash_syntax::syntax::Redir;
 
 #[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
@@ -161,7 +163,9 @@ impl Command for syntax::SimpleCommand {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => execute_builtin(env, builtin, fields).await,
                 Some(Function(function)) => execute_function(env, function).await,
-                Some(External { path }) => execute_external_utility(env, path, fields).await,
+                Some(External { path }) => {
+                    execute_external_utility(env, path, fields, Rc::clone(&self.redirs)).await
+                }
                 None => {
                     // TODO open redirections
                     // TODO expand and perform assignments
@@ -206,7 +210,12 @@ async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
     Continue(())
 }
 
-async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Field>) -> Result {
+async fn execute_external_utility(
+    env: &mut Env,
+    path: CString,
+    fields: Vec<Field>,
+    redirs: Rc<Vec<Redir>>,
+) -> Result {
     let name = fields[0].clone();
     let location = name.origin.clone();
     let args = to_c_strings(fields);
@@ -214,7 +223,14 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
     let result = env
         .run_in_subshell(move |env| {
             Box::pin(async move {
-                // TODO open redirections
+                let mut env = RedirEnv::new(env);
+                for redir in &*redirs {
+                    if let Err(e) = env.perform_redir(redir).await {
+                        e.handle(&mut env).await;
+                        return;
+                    }
+                }
+
                 // TODO expand and perform assignments
 
                 // TODO Remove signal handlers not set by current traps
@@ -232,7 +248,7 @@ async fn execute_external_utility(env: &mut Env, path: CString, fields: Vec<Fiel
                     }
                 }
                 print_error(
-                    env,
+                    &mut env,
                     format!("cannot execute external command {:?}", path).into(),
                     errno.desc().into(),
                     &location,
