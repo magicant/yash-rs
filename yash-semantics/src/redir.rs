@@ -54,88 +54,6 @@ struct SavedFd {
     save: Option<Fd>,
 }
 
-/// Environment (temporarily) modified by redirections.
-///
-/// This is an RAII-style wrapper of [`Env`] in which redirections are
-/// performed. A `RedirEnv` keeps track of file descriptors affected by
-/// redirections so that we can restore the file descriptors to the state before
-/// performing the redirections.
-///
-/// There are two ways to clear file descriptors saved in the `RedirEnv`.
-/// One is [`undo_redirs`](Self::undo_redirs), which restores the file
-/// descriptors to the original state, and the other is
-/// [`preserve_redirs`](Self::preserve_redirs), which removes the saved file
-/// descriptors without restoring the state and thus makes the effect of the
-/// redirections permanent.
-///
-/// When an instance of `RedirEnv` is dropped, `undo_redirs` is implicitly
-/// called. That means you need to call `preserve_redirs` explicitly to preserve
-/// the redirections' effect.
-#[derive(Debug)]
-pub struct RedirEnv<'e> {
-    /// Environment in which redirections are performed.
-    env: &'e mut Env,
-    /// Records of file descriptors that have been modified by redirections.
-    saved_fds: Vec<SavedFd>,
-}
-
-impl Deref for RedirEnv<'_> {
-    type Target = Env;
-    fn deref(&self) -> &Env {
-        self.env
-    }
-}
-
-impl DerefMut for RedirEnv<'_> {
-    fn deref_mut(&mut self) -> &mut Env {
-        self.env
-    }
-}
-
-impl std::ops::Drop for RedirEnv<'_> {
-    fn drop(&mut self) {
-        self.undo_redirs()
-    }
-}
-
-impl RedirEnv<'_> {
-    pub fn new(env: &mut Env) -> RedirEnv<'_> {
-        let saved_fds = Vec::new();
-        RedirEnv { env, saved_fds }
-    }
-
-    /// Undoes the effect of the redirections.
-    ///
-    /// This function restores the file descriptors affected by redirections to
-    /// the original state and closes internal backing file descriptors, which
-    /// were used for restoration but are no longer needed.
-    pub fn undo_redirs(&mut self) {
-        for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
-            if let Some(save) = save {
-                assert_ne!(save, original);
-                let _: Result<_, _> = self.env.system.dup2(save, original);
-                let _: Result<_, _> = self.env.system.close(save);
-            } else {
-                let _: Result<_, _> = self.env.system.close(original);
-            }
-        }
-    }
-
-    /// Makes the redirections permanent.
-    ///
-    /// This function closes internal backing file descriptors without restoring
-    /// the original file descriptor state.
-    pub fn preserve_redirs(&mut self) {
-        todo!()
-    }
-    // TODO Just closing save FDs in `preserve_redirs` would render incorrect
-    // behavior in some situations. Assume `perform` is called twice, the
-    // second redirection's target FD is the first's save FD, and the inner
-    // `RedirEnv` is dropped by `preserve_redirs`. When the outer `RedirEnv` is
-    // dropped by `undo_redirs`, the undoing will move and close the FD that has
-    // been made permanent by `preserve_redirs`, which is not expected.
-}
-
 /// Types of errors that may occur in the redirection.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
@@ -317,7 +235,57 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
     Ok(SavedFd { original, save })
 }
 
+/// `Env` wrapper for performing redirections.
+///
+/// This is an RAII-style wrapper of [`Env`] in which redirections are
+/// performed. A `RedirEnv` keeps track of file descriptors affected by
+/// redirections so that we can restore the file descriptors to the state before
+/// performing the redirections.
+///
+/// There are two ways to clear file descriptors saved in the `RedirEnv`.
+/// One is [`undo_redirs`](Self::undo_redirs), which restores the file
+/// descriptors to the original state, and the other is
+/// [`preserve_redirs`](Self::preserve_redirs), which removes the saved file
+/// descriptors without restoring the state and thus makes the effect of the
+/// redirections permanent.
+///
+/// When an instance of `RedirEnv` is dropped, `undo_redirs` is implicitly
+/// called. That means you need to call `preserve_redirs` explicitly to preserve
+/// the redirections' effect.
+#[derive(Debug)]
+pub struct RedirEnv<'e> {
+    /// Environment in which redirections are performed.
+    env: &'e mut Env,
+    /// Records of file descriptors that have been modified by redirections.
+    saved_fds: Vec<SavedFd>,
+}
+
+impl Deref for RedirEnv<'_> {
+    type Target = Env;
+    fn deref(&self) -> &Env {
+        self.env
+    }
+}
+
+impl DerefMut for RedirEnv<'_> {
+    fn deref_mut(&mut self) -> &mut Env {
+        self.env
+    }
+}
+
+impl std::ops::Drop for RedirEnv<'_> {
+    fn drop(&mut self) {
+        self.undo_redirs()
+    }
+}
+
 impl RedirEnv<'_> {
+    /// Creates a new `RedirEnv`.
+    pub fn new(env: &mut Env) -> RedirEnv<'_> {
+        let saved_fds = Vec::new();
+        RedirEnv { env, saved_fds }
+    }
+
     /// Performs a redirection.
     ///
     /// If successful, this function saves internally a backing copy of the file
@@ -327,6 +295,37 @@ impl RedirEnv<'_> {
         self.saved_fds.push(saved_fd);
         Ok(())
     }
+
+    /// Undoes the effect of the redirections.
+    ///
+    /// This function restores the file descriptors affected by redirections to
+    /// the original state and closes internal backing file descriptors, which
+    /// were used for restoration and are no longer needed.
+    pub fn undo_redirs(&mut self) {
+        for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
+            if let Some(save) = save {
+                assert_ne!(save, original);
+                let _: Result<_, _> = self.env.system.dup2(save, original);
+                let _: Result<_, _> = self.env.system.close(save);
+            } else {
+                let _: Result<_, _> = self.env.system.close(original);
+            }
+        }
+    }
+
+    /// Makes the redirections permanent.
+    ///
+    /// This function closes internal backing file descriptors without restoring
+    /// the original file descriptor state.
+    pub fn preserve_redirs(&mut self) {
+        todo!()
+    }
+    // TODO Just closing save FDs in `preserve_redirs` would render incorrect
+    // behavior in some situations. Assume `perform` is called twice, the
+    // second redirection's target FD is the first's save FD, and the inner
+    // `RedirEnv` is dropped by `preserve_redirs`. When the outer `RedirEnv` is
+    // dropped by `undo_redirs`, the undoing will move and close the FD that has
+    // been made permanent by `preserve_redirs`, which is not expected.
 }
 
 #[cfg(test)]
