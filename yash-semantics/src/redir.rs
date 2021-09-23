@@ -367,16 +367,142 @@ mod tests {
 
     #[test]
     fn multiple_redirections() {
-        // TODO implement test case
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+
+        let mut file = INode::new();
+        file.content = vec![100];
+        state
+            .file_system
+            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+
+        let mut file = INode::new();
+        file.content = vec![200];
+        state
+            .file_system
+            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
+
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = block_on(perform(
+            &mut env,
+            &["< foo".parse().unwrap(), "3< bar".parse().unwrap()],
+        ))
+        .unwrap();
+
+        let mut buffer = [0; 1];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer, [100]);
+        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer, [200]);
     }
 
     #[test]
     fn later_redirection_wins() {
-        // TODO implement test case
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+
+        let mut file = INode::new();
+        file.content = vec![100];
+        state
+            .file_system
+            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+
+        let mut file = INode::new();
+        file.content = vec![200];
+        state
+            .file_system
+            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
+
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = block_on(perform(
+            &mut env,
+            &["< foo".parse().unwrap(), "< bar".parse().unwrap()],
+        ))
+        .unwrap();
+
+        let mut buffer = [0; 1];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer, [200]);
+    }
+
+    #[test]
+    fn undo_save_conflict() {
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+
+        let mut file = INode::new();
+        file.content = vec![10];
+        state
+            .file_system
+            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+
+        let mut file = INode::new();
+        file.content = vec![20];
+        state
+            .file_system
+            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
+
+        state
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .content
+            .push(30);
+
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let redir_env = block_on(perform(
+            &mut env,
+            &["< foo".parse().unwrap(), "10< bar".parse().unwrap()],
+        ))
+        .unwrap();
+
+        RedirEnv::undo_redirs(redir_env);
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd(10), &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer, [30]);
     }
 
     #[test]
     fn first_saved_fd_is_undone_when_second_fails() {
-        // TODO implement test case
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save(PathBuf::from("file"), Rc::new(RefCell::new(INode::new())));
+        state
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .content
+            .push(23);
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let e = block_on(perform(
+            &mut env,
+            &[
+                "< file".parse().unwrap(),
+                "5< no_such_file".parse().unwrap(),
+            ],
+        ))
+        .unwrap_err();
+
+        assert_eq!(e.cause, ErrorCause::OpenFile(Errno::ENOENT));
+
+        let mut buffer = [0; 1];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 1);
+        assert_eq!(buffer, [23]);
     }
 }
