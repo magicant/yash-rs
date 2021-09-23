@@ -121,7 +121,8 @@ pub enum ErrorCause {
     NulByte(NulError),
     /// The target file descriptor could not be modified for the redirection.
     FdNotOverwritten(Fd, Errno),
-    // TODO Other errors
+    /// Error while opening a file.
+    OpenFile(Errno),
 }
 
 impl From<crate::expansion::ErrorCause> for ErrorCause {
@@ -179,7 +180,10 @@ fn open_file<S: System>(
 
     match system.open(&path, option, mode) {
         Ok(fd) => Ok((fd, origin)),
-        Err(e) => todo!("error handling not implemented: {:?}", e),
+        Err(errno) => Err(Error {
+            cause: ErrorCause::OpenFile(errno),
+            location: origin,
+        }),
     }
 }
 
@@ -354,7 +358,11 @@ mod tests {
 
     #[test]
     fn unreadable_file() {
-        // TODO implement test case
+        let mut env = Env::new_virtual();
+        let redir = "< no_such_file".parse().unwrap();
+        let e = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap_err();
+        assert_eq!(e.cause, ErrorCause::OpenFile(Errno::ENOENT));
+        assert_eq!(e.location, redir.body.operand().location);
     }
 
     #[test]
