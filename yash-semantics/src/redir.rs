@@ -186,6 +186,11 @@ async fn open_normal(
     use RedirOp::*;
     match operator {
         FileIn => open_file(&mut env.system, OFlag::O_RDONLY, operand),
+        FileOut | FileClobber => open_file(
+            &mut env.system,
+            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC,
+            operand,
+        ),
         _ => todo!(),
     }
 }
@@ -547,4 +552,72 @@ mod tests {
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [30]);
     }
+
+    #[test]
+    fn file_out_creates_empty_file() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+
+        let state = state.borrow();
+        let file = state.file_system.get("foo").unwrap().borrow();
+        assert_eq!(file.content, [42, 123, 57]);
+    }
+
+    #[test]
+    fn file_out_truncates_existing_file() {
+        let mut file = INode::new();
+        file.content = vec![42, 123, 254];
+        let file = Rc::new(RefCell::new(file));
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        assert_eq!(file.borrow().content, []);
+    }
+
+    #[test]
+    fn file_clobber_creates_empty_file() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3>| foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+
+        let state = state.borrow();
+        let file = state.file_system.get("foo").unwrap().borrow();
+        assert_eq!(file.content, [42, 123, 57]);
+    }
+
+    #[test]
+    fn file_clobber_by_default_truncates_existing_file() {
+        let mut file = INode::new();
+        file.content = vec![42, 123, 254];
+        let file = Rc::new(RefCell::new(file));
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3>| foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        assert_eq!(file.borrow().content, []);
+    }
+
+    // TODO file_clobber_with_noclobber_fails_with_existing_file
 }

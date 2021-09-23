@@ -245,6 +245,9 @@ impl System for VirtualSystem {
             if option.contains(OFlag::O_EXCL) {
                 return Err(Errno::EEXIST);
             }
+            if option.contains(OFlag::O_TRUNC) {
+                inode.borrow_mut().content.clear();
+            }
             Rc::clone(inode)
         } else {
             if !option.contains(OFlag::O_CREAT) {
