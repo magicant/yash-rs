@@ -64,7 +64,9 @@ pub enum ErrorCause {
     /// The target file descriptor could not be modified for the redirection.
     FdNotOverwritten(Fd, Errno),
     /// Error while opening a file.
-    OpenFile(Errno),
+    ///
+    /// The `CString` is the pathname of the file that could not be opened.
+    OpenFile(CString, Errno),
 }
 
 impl ErrorCause {
@@ -77,7 +79,7 @@ impl ErrorCause {
             Expansion(e) => e.message(),
             NulByte(_) => "nul byte found in the pathname",
             FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
-            OpenFile(_) => "cannot open the file",
+            OpenFile(_, _) => "cannot open the file",
         }
     }
 
@@ -89,7 +91,8 @@ impl ErrorCause {
         match self {
             Expansion(e) => e.label(),
             NulByte(_) => "pathname should not contain a nul byte".into(),
-            FdNotOverwritten(_, errno) | OpenFile(errno) => errno.desc().into(),
+            FdNotOverwritten(_, errno) => errno.desc().into(),
+            OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
         }
     }
 }
@@ -168,7 +171,7 @@ fn open_file<S: System>(
     match system.open(&path, option, mode) {
         Ok(fd) => Ok((fd, origin)),
         Err(errno) => Err(Error {
-            cause: ErrorCause::OpenFile(errno),
+            cause: ErrorCause::OpenFile(path, errno),
             location: origin,
         }),
     }
@@ -437,7 +440,10 @@ mod tests {
         let mut env = RedirEnv::new(&mut env);
         let redir = "< no_such_file".parse().unwrap();
         let e = block_on(env.perform_redir(&redir)).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::OpenFile(Errno::ENOENT));
+        assert_eq!(
+            e.cause,
+            ErrorCause::OpenFile(CString::new("no_such_file").unwrap(), Errno::ENOENT)
+        );
         assert_eq!(e.location, redir.body.operand().location);
     }
 
