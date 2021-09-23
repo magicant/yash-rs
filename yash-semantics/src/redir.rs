@@ -16,7 +16,10 @@
 
 //! Redirection semantics.
 //!
-//! TODO Elaborate
+//! To perform redirections, you need to wrap an [`Env`] in a [`RedirEnv`]
+//! first. Then, you call [`RedirEnv::perform_redir`] to affect the target file
+//! descriptor. When you drop the `RedirEnv`, it undoes the effect to the file
+//! descriptor. See the documentation for [`RedirEnv`] for details.
 
 use crate::expansion::expand_word;
 use nix::errno::Errno;
@@ -51,16 +54,22 @@ struct SavedFd {
 
 /// Environment (temporarily) modified by redirections.
 ///
-/// This is an RAII-style guard that cancels the effect of redirections when the
-/// instance is dropped. The [`perform`] function returns an instance of
-/// `RedirEnv`. When you drop the instance, the file descriptors modified by the
-/// redirections are restored to the original state.
+/// This is an RAII-style wrapper of [`Env`] in which redirections are
+/// performed. A `RedirEnv` keeps track of file descriptors affected by
+/// redirections so that we can restore the file descriptors to the state before
+/// performing the redirections.
 ///
-/// Instead of restoring the state, you can optionally preserve the effect of
-/// redirections permanently even after the instance is dropped. To do so, call
-/// the [`preserve_redirs`](Self::preserve_redirs) function.
+/// There are two ways to clear file descriptors saved in the `RedirEnv`.
+/// One is [`undo_redirs`](Self::undo_redirs), which restores the file
+/// descriptors to the original state, and the other is
+/// [`preserve_redirs`](Self::preserve_redirs), which removes the saved file
+/// descriptors without restoring the state and thus makes the effect of the
+/// redirections permanent.
+///
+/// When an instance of `RedirEnv` is dropped, `undo_redirs` is implicitly
+/// called. That means you need to call `preserve_redirs` explicitly to preserve
+/// the redirections' effect.
 #[derive(Debug)]
-#[must_use = "Redirections are cancelled when you drop RedirEnv"]
 pub struct RedirEnv<'e> {
     /// Environment in which redirections are performed.
     env: &'e mut Env,
@@ -83,6 +92,22 @@ impl DerefMut for RedirEnv<'_> {
 
 impl std::ops::Drop for RedirEnv<'_> {
     fn drop(&mut self) {
+        self.undo_redirs()
+    }
+}
+
+impl RedirEnv<'_> {
+    pub fn new(env: &mut Env) -> RedirEnv<'_> {
+        let saved_fds = Vec::new();
+        RedirEnv { env, saved_fds }
+    }
+
+    /// Undoes the effect of the redirections.
+    ///
+    /// This function restores the file descriptors affected by redirections to
+    /// the original state and closes internal backing file descriptors, which
+    /// were used for restoration but are no longer needed.
+    pub fn undo_redirs(&mut self) {
         for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
             if let Some(save) = save {
                 assert_ne!(save, original);
@@ -93,19 +118,12 @@ impl std::ops::Drop for RedirEnv<'_> {
             }
         }
     }
-}
 
-impl RedirEnv<'_> {
-    /// Undo the effect of the redirections.
-    pub fn undo_redirs(self) {
-        drop(self)
-    }
-
-    /// Make the redirections permanent.
+    /// Makes the redirections permanent.
     ///
-    /// This function drops the `RedirEnv` without undoing the effect of the
-    /// redirections.
-    pub fn preserve_redirs(self) {
+    /// This function closes internal backing file descriptors without restoring
+    /// the original file descriptor state.
+    pub fn preserve_redirs(&mut self) {
         todo!()
     }
     // TODO Just closing save FDs in `preserve_redirs` would render incorrect
@@ -308,6 +326,18 @@ pub async fn perform<'e, 'r>(env: &'e mut Env, redirs: &'r [Redir]) -> Result<Re
     Ok(env)
 }
 
+impl RedirEnv<'_> {
+    /// Performs a redirection.
+    ///
+    /// If successful, this function saves internally a backing copy of the file
+    /// descriptor affected by the redirection.
+    pub async fn perform_redir(&mut self, redir: &Redir) -> Result<(), Error> {
+        let saved_fd = perform_one(self, redir).await?;
+        self.saved_fds.push(saved_fd);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,8 +408,9 @@ mod tests {
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let redir = "< file".parse().unwrap();
-        let redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
-        RedirEnv::undo_redirs(redir_env);
+        let mut redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        redir_env.undo_redirs();
+        drop(redir_env);
 
         let mut buffer = [0; 2];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
@@ -397,8 +428,9 @@ mod tests {
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let redir = "4< input".parse().unwrap();
-        let redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
-        RedirEnv::undo_redirs(redir_env);
+        let mut redir_env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+        redir_env.undo_redirs();
+        drop(redir_env);
 
         let mut buffer = [0; 1];
         let e = env.system.read(Fd(4), &mut buffer).unwrap_err();
@@ -512,7 +544,7 @@ mod tests {
         ))
         .unwrap();
 
-        RedirEnv::undo_redirs(redir_env);
+        drop(redir_env);
 
         let mut buffer = [0; 1];
         let e = env.system.read(Fd(10), &mut buffer).unwrap_err();

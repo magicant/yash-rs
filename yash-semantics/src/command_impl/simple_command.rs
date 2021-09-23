@@ -20,7 +20,7 @@ use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::print_error;
-use crate::redir;
+use crate::redir::RedirEnv;
 use crate::Command;
 use async_trait::async_trait;
 use nix::errno::Errno;
@@ -223,10 +223,13 @@ async fn execute_external_utility(
     let result = env
         .run_in_subshell(move |env| {
             Box::pin(async move {
-                let mut env = match redir::perform(env, &redirs).await {
-                    Ok(env) => env,
-                    Err(_) => return, // TODO drop(e.handle(env).await),
-                };
+                let mut env = RedirEnv::new(env);
+                for redir in &*redirs {
+                    if let Err(e) = env.perform_redir(redir).await {
+                        e.handle(&mut env).await;
+                        return;
+                    }
+                }
 
                 // TODO expand and perform assignments
 
