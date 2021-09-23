@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 use crate::expansion::expand_word;
+use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -104,6 +105,8 @@ pub enum ErrorCause {
     Expansion(crate::expansion::ErrorCause),
     /// Pathname containing a nul byte.
     NulByte(NulError),
+    /// The target file descriptor could not be modified for the redirection.
+    FdNotOverwritten(Fd, Errno),
     // TODO Other errors
 }
 
@@ -181,7 +184,7 @@ async fn open_normal(
 
 /// Performs a redirection.
 async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
-    let (fd, _location) = match &redir.body {
+    let (fd, location) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
             let expansion = expand_word(env, operand).await?;
@@ -190,13 +193,27 @@ async fn perform_one(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
         RedirBody::HereDoc(_) => todo!(),
     }?;
 
-    assert_eq!(
-        fd,
-        redir.fd_or_default(),
-        "moving the FD is not yet supported"
-    );
-    // TODO Save original FD
-    // TODO Move FD (dup2)
+    let target_fd = redir.fd_or_default();
+    if fd != target_fd {
+        // TODO Save original FD
+
+        // Copy `fd` to `target_fd`
+        match env.system.dup2(fd, target_fd) {
+            Ok(new_fd) => assert_eq!(new_fd, target_fd),
+            Err(errno) => {
+                // TODO Is it ok to unconditionally close fd?
+                let _: Result<_, _> = env.system.close(fd);
+
+                return Err(Error {
+                    cause: ErrorCause::FdNotOverwritten(target_fd, errno),
+                    location,
+                });
+            }
+        }
+
+        // Close `fd`
+        let _: Result<_, _> = env.system.close(fd);
+    }
 
     Ok(SavedFd {
         original: fd,
@@ -243,6 +260,49 @@ mod tests {
         let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [42, 123, 254, 0]);
+    }
+
+    #[test]
+    fn moving_fd() {
+        let mut file = INode::new();
+        file.content = vec![42, 123, 254];
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+        let mut env = Env::with_system(Box::new(system));
+        let redir = "< foo".parse().unwrap();
+        let mut env = block_on(perform(&mut env, std::slice::from_ref(&redir))).unwrap();
+
+        let mut buffer = [0; 4];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 3);
+        assert_eq!(buffer, [42, 123, 254, 0]);
+
+        let e = env.system.read(Fd(3), &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
+    fn saving_and_undoing_fd() {
+        // TODO implement test case
+    }
+
+    #[test]
+    fn unreadable_file() {
+        // TODO implement test case
+    }
+
+    #[test]
+    fn multiple_redirections() {
+        // TODO implement test case
+    }
+
+    #[test]
+    fn later_redirection_wins() {
+        // TODO implement test case
     }
 
     #[test]
