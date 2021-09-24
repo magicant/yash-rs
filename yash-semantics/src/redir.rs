@@ -16,6 +16,41 @@
 
 //! Redirection semantics.
 //!
+//! # Effect of redirections
+//!
+//! A [redirection](Redir) modifies its [target file
+//! descriptor](Redir::fd_or_default) on the basis of its [body](RedirBody).
+//!
+//! If the body is `Normal`, the operand word is [expanded](crate::expansion)
+//! first. Then, the [operator](RedirOp) defines the next behavior:
+//!
+//! - `FileIn`: Opens a file for reading, regarding the expanded field as a
+//!   pathname.
+//! - `FileInOut`: Likewise, opens a file for reading and writing.
+//! - `FileOut`, `FileClobber`: Likewise, opens a file for writing and clears
+//!   the file content.  Creates an empty regular file if the file does not
+//!   exist.
+//! - `FileAppend`: Likewise, opens a file for appending.
+//!   Creates an empty regular file if the file does not exist.
+//! - `FdIn`: Copies a file descriptor, regarding the expanded field as a
+//!   non-negative decimal integer denoting a readable file descriptor to copy
+//!   from. Closes the target file descriptor if the field is a single hyphen
+//!   (`-`) instead.
+//! - `FdOut`: Likewise, copies or closes a file descriptor, but the source file
+//!   descriptor must be writable instead of readable.
+//! - `Pipe`: Opens a pipe, regarding the expanded field as a
+//!   non-negative decimal integer denoting a file descriptor to become the
+//!   reading end of the pipe. The target file descriptor will be the writing
+//!   end.
+//! - `String`: Opens a readable file descriptor from which you can read the
+//!   expanded field followed by a newline character.
+//!
+//! TODO `noclobber` option
+//!
+//! If the body is `HereDoc`, (TODO Elaborate).
+//!
+//! # Performing redirections
+//!
 //! To perform redirections, you need to wrap an [`Env`] in a [`RedirEnv`]
 //! first. Then, you call [`RedirEnv::perform_redir`] to affect the target file
 //! descriptor. When you drop the `RedirEnv`, it undoes the effect to the file
