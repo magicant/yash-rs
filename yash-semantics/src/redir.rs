@@ -196,6 +196,7 @@ async fn open_normal(
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_APPEND,
             operand,
         ),
+        FileInOut => open_file(&mut env.system, OFlag::O_RDWR | OFlag::O_CREAT, operand),
         _ => todo!(),
     }
 }
@@ -659,5 +660,41 @@ mod tests {
         env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
 
         assert_eq!(file.borrow().content, "one\ntwo\n".as_bytes());
+    }
+
+    #[test]
+    fn file_in_out_creates_empty_file() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3<> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        env.system.write(Fd(3), &[230, 175, 26]).unwrap();
+
+        let state = state.borrow();
+        let file = state.file_system.get("foo").unwrap().borrow();
+        assert_eq!(file.content, [230, 175, 26]);
+    }
+
+    #[test]
+    fn file_in_out_leaves_existing_file_content() {
+        let mut file = INode::new();
+        file.content = vec![132, 79, 210];
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3<> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+
+        let mut buffer = [0; 4];
+        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        assert_eq!(read_count, 3);
+        assert_eq!(buffer, [132, 79, 210, 0]);
     }
 }
