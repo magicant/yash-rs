@@ -191,6 +191,11 @@ async fn open_normal(
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC,
             operand,
         ),
+        FileAppend => open_file(
+            &mut env.system,
+            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_APPEND,
+            operand,
+        ),
         _ => todo!(),
     }
 }
@@ -620,4 +625,39 @@ mod tests {
     }
 
     // TODO file_clobber_with_noclobber_fails_with_existing_file
+
+    #[test]
+    fn file_append_creates_empty_file() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = "3>> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        env.system.write(Fd(3), &[42, 123, 57]).unwrap();
+
+        let state = state.borrow();
+        let file = state.file_system.get("foo").unwrap().borrow();
+        assert_eq!(file.content, [42, 123, 57]);
+    }
+
+    #[test]
+    fn file_append_appends_to_existing_file() {
+        let mut file = INode::new();
+        file.content.extend("one\n".as_bytes());
+        let file = Rc::new(RefCell::new(file));
+        let system = VirtualSystem::new();
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirEnv::new(&mut env);
+        let redir = ">> foo".parse().unwrap();
+        block_on(env.perform_redir(&redir)).unwrap();
+        env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
+
+        assert_eq!(file.borrow().content, "one\ntwo\n".as_bytes());
+    }
 }

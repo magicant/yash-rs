@@ -67,6 +67,8 @@ pub struct OpenFile {
     pub is_readable: bool,
     /// Whether this file is opened for writing.
     pub is_writable: bool,
+    /// Whether this file is opened for appending.
+    pub is_appending: bool,
 }
 
 impl PartialEq for OpenFile {
@@ -125,6 +127,9 @@ impl OpenFileDescription for OpenFile {
         let mut file = self.file.borrow_mut();
         let len = file.content.len();
         let count = buffer.len();
+        if self.is_appending {
+            self.offset = len;
+        }
         if self.offset > len {
             let zeroes = self.offset - len;
             file.content.reserve(zeroes + count);
@@ -327,6 +332,7 @@ mod tests {
             offset: 0,
             is_readable: false,
             is_writable: false,
+            is_appending: false,
         };
 
         let mut buffer = [0];
@@ -343,6 +349,7 @@ mod tests {
             offset: 1,
             is_readable: true,
             is_writable: false,
+            is_appending: false,
         };
 
         let mut buffer = [0];
@@ -365,6 +372,7 @@ mod tests {
             offset: 1,
             is_readable: true,
             is_writable: false,
+            is_appending: false,
         };
 
         let mut buffer = [0; 3];
@@ -383,6 +391,7 @@ mod tests {
             offset: 1,
             is_readable: true,
             is_writable: false,
+            is_appending: false,
         };
 
         let mut buffer = [0; 3];
@@ -399,6 +408,7 @@ mod tests {
             offset: 0,
             is_readable: false,
             is_writable: false,
+            is_appending: false,
         };
 
         let result = open_file.write(&[0]);
@@ -414,6 +424,7 @@ mod tests {
             offset: 1,
             is_readable: false,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.write(&[9, 8, 7]);
@@ -431,6 +442,7 @@ mod tests {
             offset: 1,
             is_readable: false,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.write(&[9, 8, 7, 6]);
@@ -448,6 +460,7 @@ mod tests {
             offset: 3,
             is_readable: false,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.write(&[2, 3]);
@@ -457,12 +470,31 @@ mod tests {
     }
 
     #[test]
+    fn open_file_write_appending() {
+        let mut inode = INode::new();
+        inode.content = vec![1, 2, 3];
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(inode)),
+            offset: 1,
+            is_readable: false,
+            is_writable: true,
+            is_appending: true,
+        };
+
+        let result = open_file.write(&[4, 5]);
+        assert_eq!(result, Ok(2));
+        assert_eq!(open_file.offset, 5);
+        assert_eq!(open_file.file.borrow().content, [1, 2, 3, 4, 5]);
+    }
+
+    #[test]
     fn open_file_seek_set() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new())),
             offset: 3,
             is_readable: true,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.seek(10, Whence::SeekSet);
@@ -489,6 +521,7 @@ mod tests {
             offset: 5,
             is_readable: true,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.seek(10, Whence::SeekCur);
@@ -517,6 +550,7 @@ mod tests {
             offset: 2,
             is_readable: true,
             is_writable: true,
+            is_appending: false,
         };
 
         let result = open_file.seek(7, Whence::SeekEnd);
