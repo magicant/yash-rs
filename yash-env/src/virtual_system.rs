@@ -333,7 +333,13 @@ impl System for VirtualSystem {
     ///
     /// The `VirtualSystem` implementation for this method does not actually
     /// block the calling thread. The method returns immediately in any case.
-    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        _signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int> {
+        // TODO apply the signal mask and handle pending signals
         let process = self.current_process();
 
         for fd in 0..(nix::sys::select::FD_SETSIZE as c_int) {
@@ -854,7 +860,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(3));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -871,7 +877,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -888,7 +894,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -902,7 +908,7 @@ mod tests {
         let mut writers = FdSet::new();
         readers.insert(reader.0);
 
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(0));
         assert_eq!(readers, FdSet::new());
         assert_eq!(writers, FdSet::new());
@@ -918,7 +924,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -930,7 +936,7 @@ mod tests {
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(writer.0);
-        let result = system.select(&mut fds, &mut FdSet::new());
+        let result = system.select(&mut fds, &mut FdSet::new(), None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -940,7 +946,7 @@ mod tests {
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(reader.0);
-        let result = system.select(&mut FdSet::new(), &mut fds);
+        let result = system.select(&mut FdSet::new(), &mut fds, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -949,10 +955,10 @@ mod tests {
         let mut system = VirtualSystem::new();
         let mut fds = FdSet::new();
         fds.insert(17);
-        let result = system.select(&mut fds, &mut FdSet::new());
+        let result = system.select(&mut fds, &mut FdSet::new(), None);
         assert_eq!(result, Err(Errno::EBADF));
 
-        let result = system.select(&mut FdSet::new(), &mut fds);
+        let result = system.select(&mut FdSet::new(), &mut fds, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 

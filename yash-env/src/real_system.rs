@@ -149,8 +149,13 @@ impl System for RealSystem {
         nix::sys::signal::sigprocmask(how, set, oldset)
     }
 
-    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        nix::sys::select::pselect(None, readers, writers, None, None, None)
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int> {
+        nix::sys::select::pselect(None, readers, writers, None, None, signal_mask)
     }
 
     /// Creates a new child process.

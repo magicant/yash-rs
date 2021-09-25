@@ -238,8 +238,13 @@ impl System for SharedSystem {
     ) -> nix::Result<()> {
         self.0.borrow_mut().sigmask(how, set, oldset)
     }
-    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        (**self.0.borrow_mut()).select(readers, writers)
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int> {
+        (**self.0.borrow_mut()).select(readers, writers, signal_mask)
     }
     unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -303,7 +308,7 @@ impl SelectSystem {
     pub fn select(&mut self) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
-        match self.system.select(&mut readers, &mut writers) {
+        match self.system.select(&mut readers, &mut writers, None) {
             Ok(_) => {
                 self.io.wake(readers, writers);
                 Ok(())
