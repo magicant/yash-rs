@@ -124,6 +124,7 @@ impl VirtualSystem {
                     offset: 0,
                     is_readable: true,
                     is_writable: true,
+                    is_appending: true,
                 })),
                 cloexec: false,
             };
@@ -245,6 +246,9 @@ impl System for VirtualSystem {
             if option.contains(OFlag::O_EXCL) {
                 return Err(Errno::EEXIST);
             }
+            if option.contains(OFlag::O_TRUNC) {
+                inode.borrow_mut().content.clear();
+            }
             Rc::clone(inode)
         } else {
             if !option.contains(OFlag::O_CREAT) {
@@ -272,6 +276,7 @@ impl System for VirtualSystem {
             offset: 0,
             is_readable,
             is_writable,
+            is_appending: option.contains(OFlag::O_APPEND),
         }));
         let body = FdBody {
             open_file_description,
@@ -743,6 +748,69 @@ mod tests {
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(second, Err(Errno::EEXIST));
+    }
+
+    #[test]
+    fn open_truncating() {
+        let mut system = VirtualSystem::new();
+        let fd = system
+            .open(
+                &CString::new("file").unwrap(),
+                OFlag::O_WRONLY | OFlag::O_CREAT,
+                nix::sys::stat::Mode::all(),
+            )
+            .unwrap();
+        system.write(fd, &[1, 2, 3]).unwrap();
+
+        let result = system.open(
+            &CString::new("file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_TRUNC,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Ok(Fd(4)));
+
+        let reader = system
+            .open(
+                &CString::new("file").unwrap(),
+                OFlag::O_RDONLY,
+                nix::sys::stat::Mode::empty(),
+            )
+            .unwrap();
+        let count = system.read(reader, &mut [0; 1]).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn open_appending() {
+        let mut system = VirtualSystem::new();
+        let fd = system
+            .open(
+                &CString::new("file").unwrap(),
+                OFlag::O_WRONLY | OFlag::O_CREAT,
+                nix::sys::stat::Mode::all(),
+            )
+            .unwrap();
+        system.write(fd, &[1, 2, 3]).unwrap();
+
+        let result = system.open(
+            &CString::new("file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_APPEND,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Ok(Fd(4)));
+        system.write(Fd(4), &[4, 5, 6]).unwrap();
+
+        let reader = system
+            .open(
+                &CString::new("file").unwrap(),
+                OFlag::O_RDONLY,
+                nix::sys::stat::Mode::empty(),
+            )
+            .unwrap();
+        let mut buffer = [0; 7];
+        let count = system.read(reader, &mut buffer).unwrap();
+        assert_eq!(count, 6);
+        assert_eq!(buffer, [1, 2, 3, 4, 5, 6, 0]);
     }
 
     #[test]
