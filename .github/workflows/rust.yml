@@ -25,4 +25,4 @@ jobs:
     - name: Lint
       run: cargo clippy --all-targets --all-features -- -D warnings
     - name: Check format
-      run: cargo fmt && git diff --exit-code
+      run: cargo fmt -- --check
