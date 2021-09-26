@@ -25,6 +25,8 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::stat;
 use nix::sys::stat::Mode;
 use nix::unistd::access;
@@ -136,6 +138,15 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()> {
+        nix::sys::signal::sigprocmask(how, set, oldset)
     }
 
     fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {

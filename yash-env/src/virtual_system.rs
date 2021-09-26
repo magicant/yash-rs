@@ -55,6 +55,8 @@ use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
@@ -309,6 +311,22 @@ impl System for VirtualSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.with_open_file_description(fd, |ofd| ofd.write(buffer))
+    }
+
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()> {
+        let mut process = self.current_process_mut();
+        if let Some(oldset) = oldset {
+            *oldset = *process.blocked_signals();
+        }
+        if let Some(set) = set {
+            process.block_signals(how, set)
+        }
+        Ok(())
     }
 
     /// Waits for a next event.

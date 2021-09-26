@@ -24,6 +24,8 @@ use futures_util::task::Poll;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::Mode;
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
@@ -227,6 +229,14 @@ impl System for SharedSystem {
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
+    }
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()> {
+        self.0.borrow_mut().sigmask(how, set, oldset)
     }
     fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers)

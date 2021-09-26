@@ -53,6 +53,8 @@ use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
 use nix::sys::stat::Mode;
 use nix::unistd::Pid;
 use std::collections::HashMap;
@@ -177,6 +179,16 @@ pub trait System: Debug {
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Gets and/or sets the signal blocking mask.
+    ///
+    /// This is a thin wrapper around the `sigprocmask` system call.
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()>;
 
     // TODO timespec
     // TODO sigmask
