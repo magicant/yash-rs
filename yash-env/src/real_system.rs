@@ -38,11 +38,15 @@ use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use nix::unistd::Pid;
 use std::convert::Infallible;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::future::Future;
 use std::os::raw::c_int;
 use std::pin::Pin;
+use std::sync::atomic::compiler_fence;
+use std::sync::atomic::AtomicIsize;
+use std::sync::atomic::Ordering;
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -57,14 +61,32 @@ fn is_regular_file(path: &CStr) -> bool {
     }
 }
 
+static CAUGHT_SIGNALS: [AtomicIsize; 8] = {
+    // In the array creation, the repeat operand must be const.
+    #[allow(clippy::declare_interior_mutable_const)]
+    const SIGNAL_SLOT: AtomicIsize = AtomicIsize::new(0);
+    [SIGNAL_SLOT; 8]
+};
+
 /// Signal catching function.
 ///
 /// TODO Elaborate
-extern "C" fn catch_signal(_signal: c_int) {
+extern "C" fn catch_signal(signal: c_int) {
     // This function can only perform async-signal-safe operations.
     // Performing unsafe operations is undefined behavior!
 
-    // TODO remember the signal caught
+    // Find an unused slot (having a value of 0) in CAUGHT_SIGNALS and write the
+    // signal number into it.
+    // If there is a slot having a value of the signal already, do nothing.
+    // If there is no available slot, the signal will be lost!
+    let signal = signal as isize;
+    for slot in &CAUGHT_SIGNALS {
+        match slot.compare_exchange(0, signal, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(slot_value) if slot_value == signal => break,
+            _ => continue,
+        }
+    }
 }
 
 /// Implementation of `System` that actually interacts with the system.
@@ -185,6 +207,29 @@ impl System for RealSystem {
         Ok(old_handling)
     }
 
+    fn caught_signals(&mut self) -> Vec<Signal> {
+        let mut signals = Vec::new();
+        for slot in &CAUGHT_SIGNALS {
+            // Need a fence to ensure we examine the slots in order.
+            compiler_fence(Ordering::Acquire);
+
+            let signal = slot.swap(0, Ordering::Relaxed);
+            if signal == 0 {
+                // The `catch_signal` function always fills the first unused
+                // slot, so there is no more slot filled with a signal.
+                break;
+            }
+
+            let signal = signal as c_int;
+            if let Ok(signal) = signal.try_into() {
+                signals.push(signal)
+            } else {
+                // ignore unknown signal
+            }
+        }
+        signals
+    }
+
     fn select(
         &mut self,
         readers: &mut FdSet,
@@ -275,5 +320,30 @@ impl ChildProcess for RealChildProcess {
     ) -> Pid {
         task(env).await;
         std::process::exit(env.exit_status.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // This test depends on static variables.
+    #[test]
+    fn real_system_caught_signals() {
+        unsafe {
+            let mut system = RealSystem::new();
+            let result = system.caught_signals();
+            assert_eq!(result, []);
+
+            catch_signal(Signal::SIGINT as c_int);
+            catch_signal(Signal::SIGTERM as c_int);
+            catch_signal(Signal::SIGTERM as c_int);
+            catch_signal(Signal::SIGCHLD as c_int);
+
+            let result = system.caught_signals();
+            assert_eq!(result, [Signal::SIGINT, Signal::SIGTERM, Signal::SIGCHLD]);
+            let result = system.caught_signals();
+            assert_eq!(result, []);
+        }
     }
 }

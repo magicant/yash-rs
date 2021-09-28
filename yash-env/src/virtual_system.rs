@@ -336,6 +336,10 @@ impl System for VirtualSystem {
         Ok(process.set_signal_handling(signal, action))
     }
 
+    fn caught_signals(&mut self) -> Vec<Signal> {
+        std::mem::take(&mut self.current_process_mut().caught_signals)
+    }
+
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually

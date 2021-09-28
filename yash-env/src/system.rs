@@ -243,6 +243,9 @@ impl System for SharedSystem {
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
     }
+    fn caught_signals(&mut self) -> Vec<Signal> {
+        self.0.borrow_mut().caught_signals()
+    }
     fn select(
         &mut self,
         readers: &mut FdSet,

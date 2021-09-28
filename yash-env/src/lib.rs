@@ -195,7 +195,30 @@ pub trait System: Debug {
     ///
     /// This is an abstract wrapper around the `sigaction` system call. It
     /// returns the previous handler if successful.
+    ///
+    /// When you set the handler to `SignalHandling::Catch`, signals sent to
+    /// this process are accumulated in the `System` instance and made available
+    /// from [`caught_signals`](Self::caught_signals).
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
+
+    /// Returns signals this process has caught, if any.
+    ///
+    /// To catch a signal, you must set the signal handler to
+    /// [`SignalHandling::Catch`] by calling [`sigaction`](Self::sigaction)
+    /// first. Once the handler is ready, signals sent to the process are
+    /// accumulated in the `System`. You call `caught_signals` to obtain a list
+    /// of caught signals thus far.
+    ///
+    /// This function clears the internal list of caught signals, so a next call
+    /// will return an empty list unless another signal is caught since the
+    /// first call. Because the list size is limited, you should call this
+    /// function periodically before the list gets full, in which case further
+    /// caught signals are silently ignored.
+    ///
+    /// Note that signals become pending if sent while blocked by
+    /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
+    /// caught and made available from this function.
+    fn caught_signals(&mut self) -> Vec<Signal>;
 
     // TODO timespec
     /// Waits for a next event.

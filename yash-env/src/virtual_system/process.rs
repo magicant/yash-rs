@@ -64,6 +64,9 @@ pub struct Process {
     /// Set of blocked signals.
     blocked_signals: SigSet,
 
+    /// List of signals that have been delivered and caught.
+    pub(crate) caught_signals: Vec<Signal>,
+
     /// Weak reference to the `SelectSystem` for this process.
     ///
     /// This weak reference is empty for the initial process of a
@@ -104,6 +107,7 @@ impl Process {
             state_awaiters: Some(Vec::new()),
             signal_handlings: HashMap::new(),
             blocked_signals: SigSet::empty(),
+            caught_signals: Vec::new(),
             selector: Weak::new(),
             last_exec: None,
         }
