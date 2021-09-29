@@ -55,6 +55,7 @@ use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
 use nix::unistd::Pid;
 use std::collections::HashMap;
@@ -190,6 +191,12 @@ pub trait System: Debug {
         oldset: Option<&mut SigSet>,
     ) -> nix::Result<()>;
 
+    /// Gets and sets the handler for a signal.
+    ///
+    /// This is an abstract wrapper around the `sigaction` system call. It
+    /// returns the previous handler if successful.
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
+
     // TODO timespec
     /// Waits for a next event.
     ///
@@ -285,6 +292,23 @@ pub trait System: Debug {
         args: &[CString],
         envs: &[CString],
     ) -> nix::Result<Infallible>;
+}
+
+/// How to handle a signal.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SignalHandling {
+    /// Perform the default action for the signal.
+    Default,
+    /// Ignore the signal.
+    Ignore,
+    /// Catch the signal.
+    Catch,
+}
+
+impl Default for SignalHandling {
+    fn default() -> Self {
+        SignalHandling::Default
+    }
 }
 
 /// Type of an argument to [`ChildProcess::run`].

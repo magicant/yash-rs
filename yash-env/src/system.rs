@@ -18,6 +18,7 @@
 
 use crate::io::Fd;
 use crate::ChildProcess;
+use crate::SignalHandling;
 use crate::System;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
@@ -26,6 +27,7 @@ use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
@@ -237,6 +239,9 @@ impl System for SharedSystem {
         oldset: Option<&mut SigSet>,
     ) -> nix::Result<()> {
         self.0.borrow_mut().sigmask(how, set, oldset)
+    }
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
+        self.0.borrow_mut().sigaction(signal, action)
     }
     fn select(
         &mut self,

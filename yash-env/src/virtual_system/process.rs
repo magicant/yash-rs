@@ -20,6 +20,7 @@ use super::io::FdBody;
 use crate::exec::ExitStatus;
 use crate::io::Fd;
 use crate::system::SelectSystem;
+use crate::SignalHandling;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
@@ -27,6 +28,7 @@ use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::rc::Weak;
@@ -52,6 +54,12 @@ pub struct Process {
     /// since the last `wait` call. The next `wait` call should leave a waker
     /// so that the caller is woken when the state changes later.
     pub(crate) state_awaiters: Option<Vec<Waker>>,
+
+    /// Currently set signal handlers.
+    ///
+    /// For signals not contained in this hash map, the default handler is
+    /// assumed.
+    signal_handlings: HashMap<Signal, SignalHandling>,
 
     /// Set of blocked signals.
     blocked_signals: SigSet,
@@ -94,6 +102,7 @@ impl Process {
             fds: BTreeMap::new(),
             state: ProcessState::Running,
             state_awaiters: Some(Vec::new()),
+            signal_handlings: HashMap::new(),
             blocked_signals: SigSet::empty(),
             selector: Weak::new(),
             last_exec: None,
@@ -226,6 +235,27 @@ impl Process {
             }
         }
         // TODO Call the signal handler if a signal is pending
+    }
+
+    /// Returns the current handler for a signal.
+    pub fn signal_handling(&self, signal: Signal) -> SignalHandling {
+        self.signal_handlings
+            .get(&signal)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Gets and sets the handler for a signal.
+    ///
+    /// This function sets the handler to `handling` and returns the previous
+    /// handler.
+    pub fn set_signal_handling(
+        &mut self,
+        signal: Signal,
+        handling: SignalHandling,
+    ) -> SignalHandling {
+        let old_handling = self.signal_handlings.insert(signal, handling);
+        old_handling.unwrap_or_default()
     }
 
     /// Performs [`SharedSystem::select`](crate::SharedSystem::select) for this
@@ -420,5 +450,26 @@ mod tests {
         assert!(!result_set.contains(Signal::SIGINT));
         assert!(!result_set.contains(Signal::SIGQUIT));
         assert!(result_set.contains(Signal::SIGCHLD));
+    }
+
+    #[test]
+    fn process_set_signal_handling() {
+        let mut process = Process::with_parent(Pid::from_raw(100));
+        let old_handling = process.set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
+        assert_eq!(old_handling, SignalHandling::Default);
+        let old_handling = process.set_signal_handling(Signal::SIGTERM, SignalHandling::Catch);
+        assert_eq!(old_handling, SignalHandling::Default);
+
+        let old_handling = process.set_signal_handling(Signal::SIGINT, SignalHandling::Default);
+        assert_eq!(old_handling, SignalHandling::Ignore);
+        let old_handling = process.set_signal_handling(Signal::SIGTERM, SignalHandling::Ignore);
+        assert_eq!(old_handling, SignalHandling::Catch);
+
+        let handling = process.signal_handling(Signal::SIGINT);
+        assert_eq!(handling, SignalHandling::Default);
+        let handling = process.signal_handling(Signal::SIGTERM);
+        assert_eq!(handling, SignalHandling::Ignore);
+        let handling = process.signal_handling(Signal::SIGQUIT);
+        assert_eq!(handling, SignalHandling::Default);
     }
 }

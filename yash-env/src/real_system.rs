@@ -20,13 +20,18 @@ use super::ChildProcess;
 use super::Env;
 use super::System;
 use crate::io::Fd;
+use crate::SignalHandling;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::select::FdSet;
+use nix::sys::signal::SaFlags;
+use nix::sys::signal::SigAction;
+use nix::sys::signal::SigHandler;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::stat::stat;
 use nix::sys::stat::Mode;
 use nix::unistd::access;
@@ -50,6 +55,16 @@ fn is_regular_file(path: &CStr) -> bool {
         Ok(stat) => stat.st_mode & S_IFMT == S_IFREG,
         Err(_) => false,
     }
+}
+
+/// Signal catching function.
+///
+/// TODO Elaborate
+extern "C" fn catch_signal(_signal: c_int) {
+    // This function can only perform async-signal-safe operations.
+    // Performing unsafe operations is undefined behavior!
+
+    // TODO remember the signal caught
 }
 
 /// Implementation of `System` that actually interacts with the system.
@@ -147,6 +162,27 @@ impl System for RealSystem {
         oldset: Option<&mut SigSet>,
     ) -> nix::Result<()> {
         nix::sys::signal::sigprocmask(how, set, oldset)
+    }
+
+    fn sigaction(
+        &mut self,
+        signal: Signal,
+        handling: SignalHandling,
+    ) -> nix::Result<SignalHandling> {
+        let handler = match handling {
+            SignalHandling::Default => SigHandler::SigDfl,
+            SignalHandling::Ignore => SigHandler::SigIgn,
+            SignalHandling::Catch => SigHandler::Handler(catch_signal),
+        };
+        let new_action = SigAction::new(handler, SaFlags::empty(), SigSet::empty());
+        // SAFETY: The `catch_signal` function only accesses atomic variables.
+        let old_action = unsafe { nix::sys::signal::sigaction(signal, &new_action) }?;
+        let old_handling = match old_action.handler() {
+            SigHandler::SigDfl => SignalHandling::Default,
+            SigHandler::SigIgn => SignalHandling::Ignore,
+            SigHandler::Handler(_) | SigHandler::SigAction(_) => SignalHandling::Catch,
+        };
+        Ok(old_handling)
     }
 
     fn select(

@@ -50,6 +50,7 @@ pub use self::process::*;
 use crate::io::Fd;
 use crate::ChildProcess;
 use crate::Env;
+use crate::SignalHandling;
 use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
@@ -57,6 +58,7 @@ use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
@@ -327,6 +329,11 @@ impl System for VirtualSystem {
             process.block_signals(how, set)
         }
         Ok(())
+    }
+
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
+        let mut process = self.current_process_mut();
+        Ok(process.set_signal_handling(signal, action))
     }
 
     /// Waits for a next event.
