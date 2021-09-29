@@ -262,6 +262,26 @@ impl Process {
         old_handling.unwrap_or_default()
     }
 
+    /// Delivers a signal to this process.
+    fn deliver_signal(&mut self, signal: Signal) {
+        let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
+            SignalHandling::Default
+        } else {
+            self.signal_handling(signal)
+        };
+        match handling {
+            SignalHandling::Default => (), // TODO Do something depending on the signal
+            SignalHandling::Ignore => (),
+            SignalHandling::Catch => self.caught_signals.push(signal),
+        }
+    }
+
+    /// Sends a signal to this process.
+    pub fn raise_signal(&mut self, signal: Signal) {
+        // TODO don't deliver now if blocked
+        self.deliver_signal(signal)
+    }
+
     /// Performs [`SharedSystem::select`](crate::SharedSystem::select) for this
     /// process.
     ///
@@ -476,4 +496,44 @@ mod tests {
         let handling = process.signal_handling(Signal::SIGQUIT);
         assert_eq!(handling, SignalHandling::Default);
     }
+
+    #[test]
+    fn process_raise_signal_default_nop() {
+        let mut process = Process::with_parent(Pid::from_raw(42));
+        process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(process.state(), ProcessState::Running);
+    }
+
+    #[test]
+    #[ignore] // TODO enable this test case
+    fn process_raise_signal_default_terminating() {
+        let mut process = Process::with_parent(Pid::from_raw(42));
+        process.raise_signal(Signal::SIGTERM);
+        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGTERM));
+        assert_eq!(process.caught_signals, []);
+    }
+
+    // TODO process_raise_signal_default_aborting
+    // TODO process_raise_signal_default_stopping
+    // TODO process_raise_signal_default_continuing
+
+    #[test]
+    fn process_raise_signal_ignored() {
+        let mut process = Process::with_parent(Pid::from_raw(42));
+        process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Ignore);
+        process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+    }
+
+    #[test]
+    fn process_raise_signal_caught() {
+        let mut process = Process::with_parent(Pid::from_raw(42));
+        process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
+        process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
+    }
+
+    // TODO process_raise_signal_blocked
 }
