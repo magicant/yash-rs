@@ -542,8 +542,16 @@ impl ChildProcess for DummyChildProcess {
                 .get_mut(&process_id)
                 .expect("the child process is missing");
             let wakers = process.set_state(ProcessState::Exited(child_env.exit_status));
+            if wakers.is_some() {
+                let ppid = process.ppid;
+                if let Some(parent) = state.processes.get_mut(&ppid) {
+                    parent.raise_signal(Signal::SIGCHLD);
+                }
+            }
             drop(state);
-            wakers.into_iter().for_each(Waker::wake);
+            if let Some(wakers) = wakers {
+                wakers.into_iter().for_each(Waker::wake);
+            }
         });
 
         self.executor
@@ -1034,6 +1042,27 @@ mod tests {
         #[allow(deprecated)]
         let result = block_on(system.wait_sync());
         assert_eq!(result, Err(Errno::ECHILD));
+    }
+
+    #[test]
+    fn exiting_child_sends_sigchld_to_parent() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+        system
+            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+
+        let mut child_process = unsafe { system.new_child_process() }.unwrap();
+
+        let mut env = Env::with_system(Box::new(system));
+        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
+        executor.run_until(future);
+        executor.run_until_stalled();
+
+        assert_eq!(env.system.caught_signals(), [Signal::SIGCHLD]);
     }
 
     #[test]

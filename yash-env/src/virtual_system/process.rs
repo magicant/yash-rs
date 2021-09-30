@@ -205,23 +205,30 @@ impl Process {
     /// If the new state is `Exited` or `Signaled`, all file descriptors in this
     /// process are closed.
     ///
-    /// This function returns wakers that must be woken. The caller must first
-    /// drop the `RefMut` borrowing the [`SystemState`](super::SystemState)
-    /// containing this process and then wake the wakers returned from this
-    /// function. This is to prevent a possible second borrow by another task.
-    #[must_use = "You must wake up the returned waker"]
-    pub fn set_state(&mut self, state: ProcessState) -> Vec<Waker> {
+    /// This function returns an optional list of wakers you must wake. If it is
+    /// `None`, the state did not change in this function. Otherwise, the caller
+    /// must notify the status update by:
+    ///
+    /// 1. sending `SIGCHLD` to the parent process,
+    /// 1. dropping the `RefMut` borrowing the [`SystemState`](super::SystemState)
+    /// containing this process, and then
+    /// 1. waking the wakers returned from this function.
+    ///
+    /// The order of these actions is important to prevent a possible second
+    /// borrow by another task.
+    #[must_use = "You must send SIGCHLD to the parent and wake up the returned waker"]
+    pub fn set_state(&mut self, state: ProcessState) -> Option<Vec<Waker>> {
         let old_state = std::mem::replace(&mut self.state, state);
 
         if old_state == state {
-            Vec::new()
+            None
         } else {
             match state {
                 ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
                 _ => (),
             }
 
-            self.state_awaiters.take().unwrap_or_else(Vec::new)
+            Some(self.state_awaiters.take().unwrap_or_else(Vec::new))
         }
     }
 
@@ -290,6 +297,8 @@ impl Process {
             SignalHandling::Ignore => (),
             SignalHandling::Catch => self.caught_signals.push(signal),
         }
+        // TODO If the Default action changes the process state, the parent
+        // should receive a SIGCHLD.
     }
 
     /// Sends a signal to this process.
