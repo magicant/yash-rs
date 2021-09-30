@@ -64,6 +64,9 @@ pub struct Process {
     /// Set of blocked signals.
     blocked_signals: SigSet,
 
+    /// Set of pending signals.
+    pending_signals: SigSet,
+
     /// List of signals that have been delivered and caught.
     pub(crate) caught_signals: Vec<Signal>,
 
@@ -107,6 +110,7 @@ impl Process {
             state_awaiters: Some(Vec::new()),
             signal_handlings: HashMap::new(),
             blocked_signals: SigSet::empty(),
+            pending_signals: SigSet::empty(),
             caught_signals: Vec::new(),
             selector: Weak::new(),
             last_exec: None,
@@ -119,6 +123,9 @@ impl Process {
     pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
         let mut child = Self::with_parent(ppid);
         child.fds = parent.fds.clone();
+        child.signal_handlings = parent.signal_handlings.clone();
+        child.blocked_signals = parent.blocked_signals;
+        child.pending_signals = parent.pending_signals;
         child
     }
 
@@ -238,7 +245,13 @@ impl Process {
                 }
             }
         }
-        // TODO Call the signal handler if a signal is pending
+
+        for signal in Signal::iterator() {
+            if self.pending_signals.contains(signal) && !self.blocked_signals.contains(signal) {
+                self.pending_signals.remove(signal);
+                self.deliver_signal(signal);
+            }
+        }
     }
 
     /// Returns the current handler for a signal.
@@ -263,6 +276,9 @@ impl Process {
     }
 
     /// Delivers a signal to this process.
+    ///
+    /// The action taken on the delivery depends on the current signal handling
+    /// for the signal.
     fn deliver_signal(&mut self, signal: Signal) {
         let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
             SignalHandling::Default
@@ -277,9 +293,18 @@ impl Process {
     }
 
     /// Sends a signal to this process.
+    ///
+    /// If the signal is being blocked, it will remain pending. Otherwise, it is
+    /// immediately delivered.
     pub fn raise_signal(&mut self, signal: Signal) {
-        // TODO don't deliver now if blocked
-        self.deliver_signal(signal)
+        if signal != Signal::SIGKILL
+            && signal != Signal::SIGSTOP
+            && self.blocked_signals().contains(signal)
+        {
+            self.pending_signals.add(signal)
+        } else {
+            self.deliver_signal(signal)
+        }
     }
 
     /// Performs [`SharedSystem::select`](crate::SharedSystem::select) for this
@@ -535,5 +560,26 @@ mod tests {
         assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
     }
 
-    // TODO process_raise_signal_blocked
+    fn to_set<I: IntoIterator<Item = Signal>>(signals: I) -> SigSet {
+        let mut set = SigSet::empty();
+        // TODO set.extend(signals)
+        for signal in signals {
+            set.add(signal);
+        }
+        set
+    }
+
+    #[test]
+    fn process_raise_signal_blocked() {
+        let mut process = Process::with_parent(Pid::from_raw(42));
+        process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
+        process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCHLD]));
+        process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+
+        process.block_signals(SigmaskHow::SIG_SETMASK, &SigSet::empty());
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
+    }
 }
