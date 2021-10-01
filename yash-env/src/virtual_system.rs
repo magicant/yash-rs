@@ -422,9 +422,24 @@ impl System for VirtualSystem {
         }))
     }
 
-    /// This function is currently not implemented.
     fn wait(&mut self) -> nix::Result<WaitStatus> {
-        todo!()
+        let parent_pid = self.process_id;
+        let mut state = self.state.borrow_mut();
+        let mut found_child = false;
+        for (pid, process) in &mut state.processes {
+            if process.ppid == parent_pid {
+                found_child = true;
+                if process.state_awaiters.is_none() {
+                    process.state_awaiters = Some(Vec::new());
+                    return Ok(process.state.to_wait_status(*pid));
+                }
+            }
+        }
+        if found_child {
+            Ok(WaitStatus::StillAlive)
+        } else {
+            Err(Errno::ECHILD)
+        }
     }
 
     /// Reports updated status of a child process.
@@ -1007,6 +1022,59 @@ mod tests {
         let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
         let pid = executor.run_until(future);
         assert_eq!(pid, Pid::from_raw(3));
+    }
+
+    #[test]
+    fn wait_for_running_child() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let child_process = unsafe { system.new_child_process() };
+
+        let mut env = Env::with_system(Box::new(system));
+        let mut child_process = child_process.unwrap();
+        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async move {})));
+        executor.run_until(future);
+
+        let result = env.system.wait();
+        assert_eq!(result, Ok(WaitStatus::StillAlive))
+    }
+
+    #[test]
+    fn wait_for_exited_child() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let child_process = unsafe { system.new_child_process() };
+
+        let mut env = Env::with_system(Box::new(system));
+        let mut child_process = child_process.unwrap();
+        let future = child_process.run(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(5);
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        let result = env.system.wait();
+        assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
+    }
+
+    #[test]
+    fn wait_without_child() {
+        let mut system = VirtualSystem::new();
+        let result = system.wait();
+        assert_eq!(result, Err(Errno::ECHILD));
     }
 
     #[test]
