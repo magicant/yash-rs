@@ -342,12 +342,12 @@ impl SelectSystem {
 /// TODO Elaborate
 #[derive(Clone, Debug, Default)]
 struct AsyncIo {
-    readers: Vec<Awaiter>,
-    writers: Vec<Awaiter>,
+    readers: Vec<FdAwaiter>,
+    writers: Vec<FdAwaiter>,
 }
 
 #[derive(Clone, Debug)]
-struct Awaiter {
+struct FdAwaiter {
     fd: Fd,
     waker: Waker,
 }
@@ -384,12 +384,12 @@ impl AsyncIo {
 
     /// Adds an awaiter for reading.
     pub fn wait_for_reading(&mut self, fd: Fd, waker: Waker) {
-        self.readers.push(Awaiter { fd, waker });
+        self.readers.push(FdAwaiter { fd, waker });
     }
 
     /// Adds an awaiter for writing.
     pub fn wait_for_writing(&mut self, fd: Fd, waker: Waker) {
-        self.writers.push(Awaiter { fd, waker });
+        self.writers.push(FdAwaiter { fd, waker });
     }
 
     /// Wakes awaiters that are ready for reading/writing.
