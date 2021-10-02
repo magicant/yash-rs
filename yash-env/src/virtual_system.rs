@@ -594,12 +594,24 @@ pub struct SystemState {
 }
 
 impl SystemState {
-    /// Performs [`select`](Process::select) on all processes in the system.
+    /// Performs [`select`](crate::system::SharedSystem::select) on all
+    /// processes in the system.
     ///
     /// Any errors are ignored.
-    pub fn select_all(&self) {
-        for process in self.processes.values() {
-            let _: nix::Result<()> = process.select();
+    ///
+    /// The `RefCell` must not have been borrowed, or this function will panic
+    /// with a double borrow.
+    pub fn select_all(this: &RefCell<Self>) {
+        let mut selectors = Vec::new();
+        for process in this.borrow().processes.values() {
+            if let Some(selector) = process.selector.upgrade() {
+                selectors.push(selector);
+            }
+        }
+        // To avoid double borrowing, SelectSystem::select must be called after
+        // dropping the borrow for `this`
+        for selector in selectors {
+            selector.borrow_mut().select().ok();
         }
     }
 }

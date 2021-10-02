@@ -250,6 +250,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
+    use yash_env::virtual_system::SystemState;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -326,7 +327,7 @@ mod tests {
             let poll = task.as_mut().poll(context);
             if poll.is_pending() {
                 shared_system.select().unwrap();
-                state.borrow().select_all();
+                SystemState::select_all(&state);
             }
             poll
         }));
@@ -356,7 +357,7 @@ mod tests {
             let poll = task.as_mut().poll(context);
             if poll.is_pending() {
                 shared_system.select().unwrap();
-                state.borrow().select_all();
+                SystemState::select_all(&state);
             }
             poll
         }));
