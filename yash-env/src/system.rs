@@ -188,10 +188,25 @@ impl SharedSystem {
         result
     }
 
+    /// Sets how a signal is handled.
+    ///
+    /// This function updates the signal blocking mask and the signal action for
+    /// the specified signal and remembers the previous configuration for
+    /// restoration.
+    ///
+    /// Returns the previous handler.
+    pub fn set_signal_handling(
+        &mut self,
+        signal: Signal,
+        handling: SignalHandling,
+    ) -> nix::Result<SignalHandling> {
+        self.0.borrow_mut().set_signal_handling(signal, handling)
+    }
+
     /// Waits for a signal to be delivered to this process.
     ///
-    /// Before calling this function, you need to [block](System::sigmask) the
-    /// target signal and [set signal handling](System::sigaction) to `Catch`.
+    /// Before calling this function, you need to [set signal
+    /// handling](Self::set_signal_handling) to `Catch`.
     /// Without doing so, this function cannot detect the receipt of the signal.
     pub async fn wait_for_signal(&self, signal: Signal) {
         let awaiter = self.0.borrow_mut().signal.wait_for_signal(signal);
@@ -331,6 +346,37 @@ impl SelectSystem {
             system,
             io: AsyncIo::new(),
             signal: AsyncSignal::new(),
+        }
+    }
+
+    /// Implements signal handler update.
+    ///
+    /// See [`SharedSystem::set_signal_handling`].
+    pub fn set_signal_handling(
+        &mut self,
+        signal: Signal,
+        handling: SignalHandling,
+    ) -> nix::Result<SignalHandling> {
+        let mut set = SigSet::empty();
+        set.add(signal);
+
+        // The order of sigmask and sigaction is important to prevent the signal
+        // from being caught. The signal must be caught only when the select
+        // function temporarily unblocks the signal. This is to avoid race
+        // condition.
+        // TODO Remember the previous settings for restoration
+        match handling {
+            SignalHandling::Default | SignalHandling::Ignore => {
+                let old_handling = self.system.sigaction(signal, handling)?;
+                self.system
+                    .sigmask(SigmaskHow::SIG_UNBLOCK, Some(&set), None)?;
+                Ok(old_handling)
+            }
+            SignalHandling::Catch => {
+                self.system
+                    .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)?;
+                self.system.sigaction(signal, handling)
+            }
         }
     }
 
@@ -703,10 +749,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut system = SharedSystem::new(Box::new(system));
         system
-            .sigmask(SigmaskHow::SIG_BLOCK, Some(&SigSet::all()), None)
-            .unwrap();
-        system
-            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());

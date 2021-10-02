@@ -183,7 +183,16 @@ pub trait System: Debug {
 
     /// Gets and/or sets the signal blocking mask.
     ///
-    /// This is a thin wrapper around the `sigprocmask` system call.
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is a thin wrapper around the `sigprocmask` system call. If `set` is
+    /// `Some`, this function updates the signal blocking mask according to
+    /// `how`. If `oldset` is `Some`, this function sets the previous mask to
+    /// it.
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -193,8 +202,14 @@ pub trait System: Debug {
 
     /// Gets and sets the handler for a signal.
     ///
-    /// This is an abstract wrapper around the `sigaction` system call. It
-    /// returns the previous handler if successful.
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is an abstract wrapper around the `sigaction` system call. This
+    /// function returns the previous handler if successful.
     ///
     /// When you set the handler to `SignalHandling::Catch`, signals sent to
     /// this process are accumulated in the `System` instance and made available
@@ -202,6 +217,12 @@ pub trait System: Debug {
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
 
     /// Returns signals this process has caught, if any.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
     ///
     /// To catch a signal, you must set the signal handler to
     /// [`SignalHandling::Catch`] by calling [`sigaction`](Self::sigaction)
@@ -222,6 +243,12 @@ pub trait System: Debug {
 
     // TODO timespec
     /// Waits for a next event.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
     ///
     /// This function blocks the calling thread until one of the following
     /// condition is met:
