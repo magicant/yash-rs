@@ -286,6 +286,7 @@ dependencies = [
 name = "yash-env"
 version = "0.1.0"
 dependencies = [
+ "assert_matches",
  "async-trait",
  "either",
  "futures-executor",

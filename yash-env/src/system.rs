@@ -40,6 +40,7 @@ use std::ops::DerefMut;
 use std::os::raw::c_int;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::rc::Weak;
 use std::task::Waker;
 
 /// System shared by a reference counter.
@@ -416,11 +417,98 @@ impl AsyncIo {
     }
 }
 
+/// Helper for `select`ing on signals.
+///
+/// An `AsyncSignal` is a set of [Waker]s that are waiting for a signal to be
+/// caught by the current process.
+///
+/// TODO Elaborate
+#[derive(Clone, Debug, Default)]
+struct AsyncSignal {
+    awaiters: Vec<Weak<RefCell<SignalAwaiter>>>,
+}
+
+#[derive(Clone, Debug)]
+struct SignalAwaiter {
+    signal: Signal,
+    status: SignalStatus,
+}
+
+#[derive(Clone, Debug)]
+enum SignalStatus {
+    Expected(Option<Waker>),
+    Caught,
+}
+
+impl AsyncSignal {
+    /// Returns a new empty `AsyncSignal`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the set of signals being waited for.
+    pub fn expected_signals(&self) -> SigSet {
+        let mut signals = SigSet::empty();
+        for awaiter in &self.awaiters {
+            if let Some(awaiter) = awaiter.upgrade() {
+                signals.add(awaiter.borrow().signal);
+            }
+        }
+        signals
+    }
+
+    /// Adds an awaiter for a signal.
+    ///
+    /// This function returns a reference-counted `SignalAwaiter`.
+    /// The caller must set a waker to the returned `SignalAwaiter`. When the
+    /// signal is caught, the waker is woken and removed from the
+    /// `SignalAwaiter`. The caller can replace the waker in the `SignalAwaiter`
+    /// with another if the previous waker gets expired.
+    pub fn wait_for_signal(&mut self, signal: Signal) -> Rc<RefCell<SignalAwaiter>> {
+        let status = SignalStatus::Expected(None);
+        let awaiter = Rc::new(RefCell::new(SignalAwaiter { signal, status }));
+        self.awaiters.push(Rc::downgrade(&awaiter));
+        awaiter
+    }
+
+    /// Wakes awaiters for caught signals.
+    ///
+    /// This function wakes up awaiters for the signals contained in the
+    /// argument. Once woken, the awaiters are removed from `self`.
+    ///
+    /// This function borrows `SignalAwaiter`s returned from `wait_for_signal`
+    /// so you must not have conflicting borrows.
+    pub fn wake(&mut self, signals: &SigSet) {
+        // TODO use Vec::drain_filter
+        for i in (0..self.awaiters.len()).rev() {
+            let remove = if let Some(awaiter) = self.awaiters[i].upgrade() {
+                let mut awaiter = awaiter.borrow_mut();
+                if signals.contains(awaiter.signal) {
+                    if let SignalStatus::Expected(Some(waker)) =
+                        std::mem::replace(&mut awaiter.status, SignalStatus::Caught)
+                    {
+                        waker.wake()
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
+            };
+            if remove {
+                self.awaiters.remove(i);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::virtual_system::Pipe;
     use crate::virtual_system::VirtualSystem;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_util::task::noop_waker;
     use futures_util::task::noop_waker_ref;
@@ -616,5 +704,47 @@ mod tests {
         async_io.wake_all();
         assert_eq!(async_io.readers(), FdSet::new());
         assert_eq!(async_io.writers(), FdSet::new());
+    }
+
+    #[test]
+    fn async_signal_has_no_default_expected_signals() {
+        let async_signal = AsyncSignal::new();
+        let signals = async_signal.expected_signals();
+        for signal in Signal::iterator() {
+            assert!(!signals.contains(signal), "signal={}", signal);
+        }
+    }
+
+    #[test]
+    fn async_signal_with_some_expected_signals() {
+        let mut async_signal = AsyncSignal::new();
+        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
+        let awaiter_2 = async_signal.wait_for_signal(Signal::SIGINT);
+        let awaiter_1 = awaiter_1.borrow();
+        assert_eq!(awaiter_1.signal, Signal::SIGCHLD);
+        assert_matches!(awaiter_1.status, SignalStatus::Expected(None));
+        let awaiter_2 = awaiter_2.borrow();
+        assert_eq!(awaiter_2.signal, Signal::SIGINT);
+        assert_matches!(awaiter_2.status, SignalStatus::Expected(None));
+
+        let signals = async_signal.expected_signals();
+        assert!(signals.contains(Signal::SIGCHLD));
+        assert!(signals.contains(Signal::SIGINT));
+        assert!(!signals.contains(Signal::SIGTERM));
+    }
+
+    #[test]
+    fn async_signal_wake() {
+        let mut async_signal = AsyncSignal::new();
+        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
+        awaiter_1.borrow_mut().status = SignalStatus::Expected(Some(noop_waker()));
+
+        async_signal.wake(&SigSet::empty());
+        assert_matches!(awaiter_1.borrow().status, SignalStatus::Expected(Some(_)));
+        assert!(async_signal.expected_signals().contains(Signal::SIGCHLD));
+
+        async_signal.wake(&SigSet::all());
+        assert_matches!(awaiter_1.borrow().status, SignalStatus::Caught);
+        assert!(!async_signal.expected_signals().contains(Signal::SIGCHLD));
     }
 }
