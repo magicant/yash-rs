@@ -188,12 +188,33 @@ impl SharedSystem {
         result
     }
 
-    /// Wait for a next event to occur.
+    /// Waits for a signal to be delivered to this process.
+    ///
+    /// Before calling this function, you need to [block](System::sigmask) the
+    /// target signal and [set signal handling](System::sigaction) to `Catch`.
+    /// Without doing so, this function cannot detect the receipt of the signal.
+    pub async fn wait_for_signal(&self, signal: Signal) {
+        let awaiter = self.0.borrow_mut().signal.wait_for_signal(signal);
+        poll_fn(|context| {
+            let mut awaiter = awaiter.borrow_mut();
+            match awaiter.status {
+                SignalStatus::Caught => Poll::Ready(()),
+                SignalStatus::Expected(ref mut waker) => {
+                    *waker = Some(context.waker().clone());
+                    Poll::Pending
+                }
+            }
+        })
+        .await
+    }
+
+    /// Waits for a next event to occur.
     ///
     /// This function calls [`System::select`] with arguments computed from the
     /// current internal state of the `SharedSystem`. It will wake up tasks
     /// waiting for the file descriptor to be ready in
-    /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all).
+    /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
+    /// for a signal to be caught in [`wait_for_signal`](Self::wait_for_signal).
     ///
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
@@ -287,6 +308,7 @@ impl System for SharedSystem {
 pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
+    signal: AsyncSignal,
 }
 
 impl Deref for SelectSystem {
@@ -308,6 +330,7 @@ impl SelectSystem {
         SelectSystem {
             system,
             io: AsyncIo::new(),
+            signal: AsyncSignal::new(),
         }
     }
 
@@ -317,9 +340,14 @@ impl SelectSystem {
     pub fn select(&mut self) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
-        match self.system.select(&mut readers, &mut writers, None) {
+        // TODO Unblock expected signals only
+        match self
+            .system
+            .select(&mut readers, &mut writers, Some(&SigSet::empty()))
+        {
             Ok(_) => {
                 self.io.wake(readers, writers);
+                self.signal.wake(&to_sig_set(self.system.caught_signals()));
                 Ok(())
             }
             Err(Errno::EBADF) => {
@@ -328,10 +356,13 @@ impl SelectSystem {
                 self.io.wake_all();
                 Err(Errno::EBADF)
             }
+            Err(Errno::EINTR) => {
+                self.signal.wake(&to_sig_set(self.system.caught_signals()));
+                Ok(())
+            }
             Err(error) => Err(error),
         }
         // TODO Support timers
-        // TODO Support signal catchers
     }
 }
 
@@ -503,6 +534,15 @@ impl AsyncSignal {
     }
 }
 
+/// Converts a signal collection into a `SigSet`.
+fn to_sig_set<I: IntoIterator<Item = Signal>>(i: I) -> SigSet {
+    let mut signals = SigSet::empty();
+    for signal in i {
+        signals.add(signal);
+    }
+    signals
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -655,6 +695,38 @@ mod tests {
     }
 
     // TODO Test SharedSystem::write_all where second write returns EINTR
+
+    #[test]
+    fn shared_system_wait_for_signal() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = SharedSystem::new(Box::new(system));
+        system
+            .sigmask(SigmaskHow::SIG_BLOCK, Some(&SigSet::all()), None)
+            .unwrap();
+        system
+            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+
+        let mut context = Context::from_waker(noop_waker_ref());
+        let mut future = Box::pin(system.wait_for_signal(Signal::SIGCHLD));
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        {
+            let mut state = state.borrow_mut();
+            let process = state.processes.get_mut(&process_id).unwrap();
+            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            process.raise_signal(Signal::SIGCHLD);
+        }
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        system.select().unwrap();
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Ready(()));
+    }
 
     #[test]
     fn async_io_has_no_default_readers_or_writers() {
