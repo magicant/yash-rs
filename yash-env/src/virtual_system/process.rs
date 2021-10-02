@@ -237,6 +237,14 @@ impl Process {
         &self.blocked_signals
     }
 
+    /// Returns the currently pending signals.
+    ///
+    /// A signal is pending when it has been raised but not yet delivered
+    /// because it is being blocked.
+    pub fn pending_signals(&self) -> &SigSet {
+        &self.pending_signals
+    }
+
     /// Updates the signal blocking mask for this process.
     ///
     /// If this function unblocks a signal, any pending signal is delivered.
