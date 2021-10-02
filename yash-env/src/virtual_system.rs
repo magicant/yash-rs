@@ -326,7 +326,7 @@ impl System for VirtualSystem {
             *oldset = *process.blocked_signals();
         }
         if let Some(set) = set {
-            process.block_signals(how, set)
+            process.block_signals(how, set);
         }
         Ok(())
     }
@@ -348,10 +348,19 @@ impl System for VirtualSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        _signal_mask: Option<&SigSet>,
+        signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
-        // TODO apply the signal mask and handle pending signals
-        let process = self.current_process();
+        let mut process = self.current_process_mut();
+
+        if let Some(signal_mask) = signal_mask {
+            let save_mask = *process.blocked_signals();
+            let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
+            let delivered_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
+            assert!(!delivered_2);
+            if delivered {
+                return Err(Errno::EINTR);
+            }
+        }
 
         for fd in 0..(nix::sys::select::FD_SETSIZE as c_int) {
             if readers.contains(fd) {
@@ -1006,6 +1015,36 @@ mod tests {
 
         let result = system.select(&mut FdSet::new(), &mut fds, None);
         assert_eq!(result, Err(Errno::EBADF));
+    }
+
+    fn system_for_catching_sigchld() -> VirtualSystem {
+        let mut system = VirtualSystem::new();
+        let mut set = SigSet::empty();
+        set.add(Signal::SIGCHLD);
+        system
+            .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)
+            .unwrap();
+        system
+            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+        system
+    }
+
+    #[test]
+    fn select_on_non_pending_signal() {
+        let mut system = system_for_catching_sigchld();
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        assert_eq!(result, Ok(0));
+        assert_eq!(system.caught_signals(), []);
+    }
+
+    #[test]
+    fn select_on_pending_signal() {
+        let mut system = system_for_catching_sigchld();
+        system.current_process_mut().raise_signal(Signal::SIGCHLD);
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        assert_eq!(result, Err(Errno::EINTR));
+        assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
     }
 
     #[test]

@@ -240,7 +240,9 @@ impl Process {
     /// Updates the signal blocking mask for this process.
     ///
     /// If this function unblocks a signal, any pending signal is delivered.
-    pub fn block_signals(&mut self, how: SigmaskHow, signals: &SigSet) {
+    ///
+    /// Returns true if any signal was delivered.
+    pub fn block_signals(&mut self, how: SigmaskHow, signals: &SigSet) -> bool {
         match how {
             SigmaskHow::SIG_SETMASK => self.blocked_signals = *signals,
             SigmaskHow::SIG_BLOCK => self.blocked_signals.extend(signals),
@@ -253,12 +255,15 @@ impl Process {
             }
         }
 
+        let mut delivered = false;
         for signal in Signal::iterator() {
             if self.pending_signals.contains(signal) && !self.blocked_signals.contains(signal) {
                 self.pending_signals.remove(signal);
                 self.deliver_signal(signal);
+                delivered = true;
             }
         }
+        delivered
     }
 
     /// Returns the current handler for a signal.
@@ -430,7 +435,8 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        assert!(!delivered);
 
         let result_set = process.blocked_signals();
         // TODO assert_eq!(result_set, some_set);
@@ -440,7 +446,8 @@ mod tests {
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        assert!(!delivered);
 
         let result_set = process.blocked_signals();
         assert!(result_set.contains(Signal::SIGINT));
@@ -454,7 +461,8 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert!(!delivered);
 
         let result_set = process.blocked_signals();
         // TODO assert_eq!(result_set, some_set);
@@ -464,7 +472,8 @@ mod tests {
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert!(!delivered);
 
         let result_set = process.blocked_signals();
         assert!(result_set.contains(Signal::SIGINT));
@@ -478,12 +487,14 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert!(!delivered);
 
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        process.block_signals(SigmaskHow::SIG_UNBLOCK, &some_set);
+        let delivered = process.block_signals(SigmaskHow::SIG_UNBLOCK, &some_set);
+        assert!(!delivered);
 
         let result_set = process.blocked_signals();
         assert!(!result_set.contains(Signal::SIGINT));
@@ -568,7 +579,8 @@ mod tests {
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
 
-        process.block_signals(SigmaskHow::SIG_SETMASK, &SigSet::empty());
+        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &SigSet::empty());
+        assert!(delivered);
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
     }
