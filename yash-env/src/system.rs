@@ -523,15 +523,11 @@ impl AsyncSignal {
         Self::default()
     }
 
-    /// Returns the set of signals being waited for.
-    pub fn expected_signals(&self) -> SigSet {
-        let mut signals = SigSet::empty();
-        for awaiter in &self.awaiters {
-            if let Some(awaiter) = awaiter.upgrade() {
-                signals.add(awaiter.borrow().signal);
-            }
-        }
-        signals
+    /// Returns an iterator of signals being waited for.
+    pub fn expected_signals(&self) -> impl Iterator<Item = Signal> + '_ {
+        self.awaiters
+            .iter()
+            .filter_map(|awaiter| awaiter.upgrade().map(|awaiter| awaiter.borrow().signal))
     }
 
     /// Adds an awaiter for a signal.
@@ -824,10 +820,8 @@ mod tests {
     #[test]
     fn async_signal_has_no_default_expected_signals() {
         let async_signal = AsyncSignal::new();
-        let signals = async_signal.expected_signals();
-        for signal in Signal::iterator() {
-            assert!(!signals.contains(signal), "signal={}", signal);
-        }
+        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
+        assert_eq!(signals, []);
     }
 
     #[test]
@@ -842,10 +836,8 @@ mod tests {
         assert_eq!(awaiter_2.signal, Signal::SIGINT);
         assert_matches!(awaiter_2.status, SignalStatus::Expected(None));
 
-        let signals = async_signal.expected_signals();
-        assert!(signals.contains(Signal::SIGCHLD));
-        assert!(signals.contains(Signal::SIGINT));
-        assert!(!signals.contains(Signal::SIGTERM));
+        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
+        assert_eq!(signals, [Signal::SIGCHLD, Signal::SIGINT]);
     }
 
     #[test]
@@ -856,10 +848,12 @@ mod tests {
 
         async_signal.wake(&SigSet::empty());
         assert_matches!(awaiter_1.borrow().status, SignalStatus::Expected(Some(_)));
-        assert!(async_signal.expected_signals().contains(Signal::SIGCHLD));
+        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
+        assert_eq!(signals, [Signal::SIGCHLD]);
 
         async_signal.wake(&SigSet::all());
         assert_matches!(awaiter_1.borrow().status, SignalStatus::Caught);
-        assert!(!async_signal.expected_signals().contains(Signal::SIGCHLD));
+        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
+        assert_eq!(signals, []);
     }
 }
