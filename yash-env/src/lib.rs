@@ -526,16 +526,22 @@ impl Env {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and
         // `wait_for_signal`.
-        self.system
+        let old_handling = self
+            .system
             .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
 
-        loop {
+        let result = loop {
             match self.system.wait()? {
                 WaitStatus::StillAlive => {}
-                new_status => return Ok(new_status),
+                new_status => break Ok(new_status),
             }
             self.system.wait_for_signal(Signal::SIGCHLD).await;
-        }
+        };
+
+        self.system
+            .set_signal_handling(Signal::SIGCHLD, old_handling)?;
+
+        result
     }
 }
 
