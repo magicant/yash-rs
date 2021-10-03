@@ -57,6 +57,7 @@ use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -311,10 +312,15 @@ pub trait System: Debug {
 
     /// Reports updated status of a child process.
     ///
-    /// This is a thin wrapper around the `waitpid` system call. It calls
-    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`. Users of `Env`
-    /// should not call it directly. Use dedicated job-managing functions
-    /// instead.
+    /// This is a low-level function used internally by
+    /// [`Env::wait_for_subshell`]. You should not call this function directly,
+    /// or you will disrupt the behavior of `Env`. The description below applies
+    /// if you want to do everything yourself without depending on `Env`.
+    ///
+    /// This function performs
+    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
+    /// Despite the name, this function does not block: it returns the result
+    /// immediately.
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 
     /// Reports updated status of a child process.
@@ -525,13 +531,37 @@ impl Env {
             _ => todo!(),
         }
     }
+
+    // TODO Allow specifying which subshell to wait for
+    /// Waits for a subshell to terminate, suspend, or resume.
+    ///
+    /// This function waits for a subshell to change its execution status.
+    /// If the current environment has no subshell, it returns
+    /// `Err(Errno::ECHILD)`.
+    pub async fn wait_for_subshell(&mut self) -> nix::Result<WaitStatus> {
+        // We need to set the signal handling before calling `wait` so we don't
+        // miss any `SIGCHLD` that may arrive between `wait` and
+        // `wait_for_signal`.
+        self.system
+            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
+
+        loop {
+            match self.system.wait()? {
+                WaitStatus::StillAlive => {}
+                new_status => return Ok(new_status),
+            }
+            self.system.wait_for_signal(Signal::SIGCHLD).await;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_system::SystemState;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
+    use futures_util::task::LocalSpawnExt;
 
     #[test]
     fn print_system_error_einval() {
@@ -575,5 +605,47 @@ mod tests {
             })
         }));
         assert_eq!(result, Err(Errno::ENOSYS));
+    }
+
+    #[test]
+    fn start_and_wait_for_subshell() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut executor = LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let mut env = Env::with_system(Box::new(system));
+        let shared_system = env.system.clone();
+        let task = executor
+            .spawner()
+            .spawn_local_with_handle(async move {
+                let pid = env
+                    .start_subshell(|env| {
+                        Box::pin(async move {
+                            env.exit_status = ExitStatus(42);
+                        })
+                    })
+                    .await
+                    .unwrap();
+                let result = env.wait_for_subshell().await;
+                assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+            })
+            .unwrap();
+        executor.run_until_stalled();
+        shared_system.select().unwrap();
+        SystemState::select_all(&state);
+        executor.run_until(task);
+    }
+
+    #[test]
+    fn wait_for_subshell_no_subshell() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        let mut env = Env::with_system(Box::new(system));
+        executor.run_until(async move {
+            let result = env.wait_for_subshell().await;
+            assert_eq!(result, Err(Errno::ECHILD));
+        });
     }
 }
