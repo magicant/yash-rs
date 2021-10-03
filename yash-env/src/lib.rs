@@ -514,8 +514,7 @@ impl Env {
         let child_pid = self.start_subshell(f).await?;
 
         use nix::sys::wait::WaitStatus::*;
-        #[allow(deprecated)]
-        match self.system.wait_sync().await? {
+        match self.wait_for_subshell().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
@@ -562,6 +561,41 @@ mod tests {
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
+    use std::cell::Cell;
+    use std::cell::RefCell;
+
+    /// Helper function to perform a test in a virtual system with an executor.
+    pub fn in_virtual_system<F, Fut>(f: F)
+    where
+        F: FnOnce(Env, Pid, Rc<RefCell<SystemState>>) -> Fut,
+        Fut: Future<Output = ()> + 'static,
+    {
+        let system = VirtualSystem::new();
+        let pid = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut executor = futures_executor::LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let env = Env::with_system(Box::new(system));
+        let shared_system = env.system.clone();
+        let task = f(env, pid, Rc::clone(&state));
+        let done = Rc::new(Cell::new(false));
+        let done_2 = Rc::clone(&done);
+
+        executor
+            .spawner()
+            .spawn_local(async move {
+                task.await;
+                done.set(true);
+            })
+            .unwrap();
+
+        while !done_2.get() {
+            executor.run_until_stalled();
+            shared_system.select().unwrap();
+            SystemState::select_all(&state);
+        }
+    }
 
     #[test]
     fn print_system_error_einval() {
@@ -578,18 +612,17 @@ mod tests {
 
     #[test]
     fn run_in_subshell_with_child_normally_exiting() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-
-        let status = ExitStatus(97);
-        let mut env = Env::with_system(Box::new(system));
-        let result = executor.run_until(env.run_in_subshell(move |env| {
-            Box::pin(async move {
-                env.exit_status = status;
-            })
-        }));
-        assert_eq!(result, Ok(status));
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let status = ExitStatus(97);
+            let result = env
+                .run_in_subshell(move |env| {
+                    Box::pin(async move {
+                        env.exit_status = status;
+                    })
+                })
+                .await;
+            assert_eq!(result, Ok(status));
+        });
     }
 
     // TODO Test case for parent with signaled child
@@ -609,32 +642,18 @@ mod tests {
 
     #[test]
     fn start_and_wait_for_subshell() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut executor = LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-
-        let mut env = Env::with_system(Box::new(system));
-        let shared_system = env.system.clone();
-        let task = executor
-            .spawner()
-            .spawn_local_with_handle(async move {
-                let pid = env
-                    .start_subshell(|env| {
-                        Box::pin(async move {
-                            env.exit_status = ExitStatus(42);
-                        })
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let pid = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(42);
                     })
-                    .await
-                    .unwrap();
-                let result = env.wait_for_subshell().await;
-                assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
-            })
-            .unwrap();
-        executor.run_until_stalled();
-        shared_system.select().unwrap();
-        SystemState::select_all(&state);
-        executor.run_until(task);
+                })
+                .await
+                .unwrap();
+            let result = env.wait_for_subshell().await;
+            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+        });
     }
 
     #[test]

@@ -106,8 +106,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     // Await the last command
     loop {
         use nix::sys::wait::WaitStatus::*;
-        #[allow(deprecated)]
-        match env.system.wait_sync().await {
+        match env.wait_for_subshell().await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);
@@ -243,14 +242,12 @@ impl PipeSet {
 mod tests {
     use super::*;
     use crate::tests::cat_builtin;
+    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::tests::LocalExecutor;
     use futures_executor::block_on;
-    use futures_executor::LocalPool;
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
-    use yash_env::virtual_system::SystemState;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -287,87 +284,53 @@ mod tests {
 
     #[test]
     fn multi_command_pipeline_returns_last_command_exit_status() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        let mut state = system.state.borrow_mut();
-        state.executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-        drop(state);
-
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("return", return_builtin());
-        let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
-        let result = executor.run_until(pipeline.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus(20));
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(20));
+        });
     }
 
     #[test]
     fn pipe_connects_commands_in_pipeline() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        let state = Rc::clone(&system.state);
-        {
-            let mut state = state.borrow_mut();
-            state.executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        in_virtual_system(|mut env, _pid, state| async move {
             state
+                .borrow_mut()
                 .file_system
                 .get("/dev/stdin")
                 .unwrap()
                 .borrow_mut()
                 .content
                 .extend("ok\n".as_bytes());
-        }
 
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("cat", cat_builtin());
-        let shared_system = env.system.clone();
-        let pipeline: syntax::Pipeline = "cat | cat | cat".parse().unwrap();
-        let mut task = pipeline.execute(&mut env);
-        let result = executor.run_until(futures_util::future::poll_fn(|context| {
-            let poll = task.as_mut().poll(context);
-            if poll.is_pending() {
-                shared_system.select().unwrap();
-                SystemState::select_all(&state);
-            }
-            poll
-        }));
-        drop(task);
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            env.builtins.insert("cat", cat_builtin());
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "ok\n".as_bytes());
+            let pipeline: syntax::Pipeline = "cat | cat | cat".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+            let state = state.borrow();
+            let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+            assert_eq!(stdout.content, "ok\n".as_bytes());
+        });
     }
 
     #[test]
     fn pipeline_leaves_no_pipe_fds_leftover() {
-        let system = VirtualSystem::new();
-        let process_id = system.process_id;
-        let state = Rc::clone(&system.state);
-        let mut executor = LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        in_virtual_system(|mut env, process_id, state| async move {
+            env.builtins.insert("cat", cat_builtin());
+            let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
+            let _ = pipeline.execute(&mut env).await;
 
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("cat", cat_builtin());
-        let shared_system = env.system.clone();
-        let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
-        let mut task = pipeline.execute(&mut env);
-        let _ = executor.run_until(futures_util::future::poll_fn(|context| {
-            let poll = task.as_mut().poll(context);
-            if poll.is_pending() {
-                shared_system.select().unwrap();
-                SystemState::select_all(&state);
+            let state = state.borrow();
+            let fds = state.processes[&process_id].fds();
+            for fd in 3..10 {
+                assert!(!fds.contains_key(&Fd(fd)), "fd={}", fd);
             }
-            poll
-        }));
-        drop(task);
-
-        let state = state.borrow();
-        let fds = state.processes[&process_id].fds();
-        for fd in 3..10 {
-            assert!(!fds.contains_key(&Fd(fd)), "fd={}", fd);
-        }
+        });
     }
 
     #[test]

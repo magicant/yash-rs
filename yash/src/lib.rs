@@ -23,11 +23,9 @@ pub use yash_semantics as semantics;
 pub use yash_syntax::{alias, input, parser, source, syntax};
 
 // TODO Allow user to select input source
-async fn parse_and_print() -> i32 {
+async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use annotate_snippets::display_list::DisplayList;
     use annotate_snippets::snippet::Snippet;
-    use env::Env;
-    use env::RealSystem;
     use semantics::Command;
     use std::num::NonZeroU64;
     use std::ops::ControlFlow::{Break, Continue};
@@ -53,10 +51,6 @@ async fn parse_and_print() -> i32 {
         }
     }
 
-    // SAFETY: This is the only instance of RealSystem we create in the whole
-    // process.
-    let system = unsafe { RealSystem::new() };
-    let mut env = Env::with_system(Box::new(system));
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.
@@ -94,6 +88,35 @@ async fn parse_and_print() -> i32 {
 }
 
 pub fn bin_main() -> i32 {
+    use env::Env;
+    use env::RealSystem;
+    use futures_util::task::LocalSpawnExt;
+    use std::cell::Cell;
+    use std::rc::Rc;
+    use std::task::Poll;
+
+    // SAFETY: This is the only instance of RealSystem we create in the whole
+    // process.
+    let system = unsafe { RealSystem::new() };
+    let env = Env::with_system(Box::new(system));
+    let system = env.system.clone();
     let mut pool = futures_executor::LocalPool::new();
-    pool.run_until(parse_and_print())
+    let task = parse_and_print(env);
+    let result = Rc::new(Cell::new(Poll::Pending));
+    let result_2 = Rc::clone(&result);
+    pool.spawner()
+        .spawn_local(async move {
+            let result = task.await;
+            result_2.set(Poll::Ready(result));
+        })
+        .unwrap();
+
+    loop {
+        pool.run_until_stalled();
+        match result.get() {
+            Poll::Ready(result) => return result,
+            Poll::Pending => (),
+        }
+        system.select().ok();
+    }
 }
