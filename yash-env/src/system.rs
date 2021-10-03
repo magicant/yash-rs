@@ -34,11 +34,9 @@ use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
@@ -296,10 +294,6 @@ impl System for SharedSystem {
     }
     fn wait(&mut self) -> nix::Result<WaitStatus> {
         self.0.borrow_mut().wait()
-    }
-    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
-        #[allow(deprecated)]
-        self.0.borrow_mut().wait_sync()
     }
     fn execve(
         &mut self,

@@ -323,21 +323,6 @@ pub trait System: Debug {
     /// immediately.
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
 
-    /// Reports updated status of a child process.
-    ///
-    /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
-    /// should not call it directly. Use dedicated job-managing functions
-    /// instead.
-    ///
-    /// This function is a temporary API that performs synchronous wait by
-    /// blocking in the function or by returning a future you need to await.
-    /// Eventually, a new function that only polls the state of children will
-    /// substitute this function.
-    #[deprecated]
-    fn wait_sync(
-        &mut self,
-    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>>>>;
-
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
     ///

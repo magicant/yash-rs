@@ -77,7 +77,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Poll;
 use std::task::Waker;
 
 /// Simulated system.
@@ -451,47 +450,6 @@ impl System for VirtualSystem {
         }
     }
 
-    /// Reports updated status of a child process.
-    ///
-    /// This function does not block, but the caller must await the returned
-    /// future to obtain the result.
-    ///
-    /// This function does not remove terminated processes from the system state
-    /// so you can examine them later.
-    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
-        let parent_pid = self.process_id;
-        let state = Rc::clone(&self.state);
-        Box::pin(futures_util::future::poll_fn(move |context| {
-            let mut state = state.borrow_mut();
-
-            // If any child's state has changed, return it
-            let mut found_child = false;
-            for (pid, process) in &mut state.processes {
-                if process.ppid == parent_pid {
-                    found_child = true;
-                    if process.state_awaiters.is_none() {
-                        process.state_awaiters = Some(Vec::new());
-                        return Poll::Ready(Ok(process.state.to_wait_status(*pid)));
-                    }
-                }
-            }
-
-            if !found_child {
-                return Poll::Ready(Err(Errno::ECHILD));
-            }
-
-            // Save a waker so the future is polled again when the state has changed
-            for process in state.processes.values_mut() {
-                if process.ppid == parent_pid {
-                    if let Some(awaiters) = &mut process.state_awaiters {
-                        awaiters.push(context.waker().clone());
-                    }
-                }
-            }
-            Poll::Pending
-        }))
-    }
-
     /// Stub for the `execve` system call.
     ///
     /// The `execve` system call cannot be simulated in the userland. This
@@ -647,7 +605,6 @@ pub trait Executor: Debug {
 mod tests {
     use super::*;
     use crate::exec::ExitStatus;
-    use futures_executor::block_on;
     use futures_executor::LocalPool;
     use std::ffi::CString;
 
@@ -1125,41 +1082,6 @@ mod tests {
     fn wait_without_child() {
         let mut system = VirtualSystem::new();
         let result = system.wait();
-        assert_eq!(result, Err(Errno::ECHILD));
-    }
-
-    #[test]
-    fn wait_sync_for_exited_process() {
-        let mut system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        let mut state = system.state.borrow_mut();
-        state.executor = Some(Rc::new(executor.spawner()));
-        drop(state);
-
-        let child_process = unsafe { system.new_child_process() };
-
-        let mut env = Env::with_system(Box::new(system));
-        let mut child_process = child_process.unwrap();
-        let future = child_process.run(
-            &mut env,
-            Box::new(|env| {
-                Box::pin(async move {
-                    env.exit_status = ExitStatus(5);
-                })
-            }),
-        );
-        let pid = executor.run_until(future);
-
-        #[allow(deprecated)]
-        let result = executor.run_until(env.system.wait_sync());
-        assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
-    }
-
-    #[test]
-    fn wait_sync_without_child() {
-        let mut system = VirtualSystem::new();
-        #[allow(deprecated)]
-        let result = block_on(system.wait_sync());
         assert_eq!(result, Err(Errno::ECHILD));
     }
 
