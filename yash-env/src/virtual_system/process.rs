@@ -32,7 +32,6 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::rc::Weak;
-use std::task::Waker;
 
 /// Process in a virtual system.
 #[derive(Clone, Debug)]
@@ -46,14 +45,12 @@ pub struct Process {
     /// Execution state of the process.
     pub(crate) state: ProcessState,
 
-    /// References to tasks that are waiting for the process state to change.
+    /// True when `state` has changed but not yet reported to the parent
+    /// process.
     ///
-    /// If this is `None`, the `state` has changed but not yet been reported by
-    /// the `wait` system call. The next `wait` call should immediately notify
-    /// the current state. If this is `Some(_)`, the `state` has not changed
-    /// since the last `wait` call. The next `wait` call should leave a waker
-    /// so that the caller is woken when the state changes later.
-    pub(crate) state_awaiters: Option<Vec<Waker>>,
+    /// The change of `state` is reported when the parent `wait`s for this
+    /// process.
+    pub(crate) state_has_changed: bool,
 
     /// Currently set signal handlers.
     ///
@@ -107,7 +104,7 @@ impl Process {
             ppid,
             fds: BTreeMap::new(),
             state: ProcessState::Running,
-            state_awaiters: Some(Vec::new()),
+            state_has_changed: false,
             signal_handlings: HashMap::new(),
             blocked_signals: SigSet::empty(),
             pending_signals: SigSet::empty(),
@@ -205,30 +202,22 @@ impl Process {
     /// If the new state is `Exited` or `Signaled`, all file descriptors in this
     /// process are closed.
     ///
-    /// This function returns an optional list of wakers you must wake. If it is
-    /// `None`, the state did not change in this function. Otherwise, the caller
-    /// must notify the status update by:
-    ///
-    /// 1. sending `SIGCHLD` to the parent process,
-    /// 1. dropping the `RefMut` borrowing the [`SystemState`](super::SystemState)
-    /// containing this process, and then
-    /// 1. waking the wakers returned from this function.
-    ///
-    /// The order of these actions is important to prevent a possible second
-    /// borrow by another task.
-    #[must_use = "You must send SIGCHLD to the parent and wake up the returned waker"]
-    pub fn set_state(&mut self, state: ProcessState) -> Option<Vec<Waker>> {
+    /// This function returns whether the state did change. If true, the caller
+    /// must notify the status update by sending `SIGCHLD` to the parent
+    /// process.
+    #[must_use = "You must send SIGCHLD to the parent"]
+    pub fn set_state(&mut self, state: ProcessState) -> bool {
         let old_state = std::mem::replace(&mut self.state, state);
 
         if old_state == state {
-            None
+            false
         } else {
             match state {
                 ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
                 _ => (),
             }
-
-            Some(self.state_awaiters.take().unwrap_or_else(Vec::new))
+            self.state_has_changed = true;
+            true
         }
     }
 
@@ -417,14 +406,14 @@ mod tests {
     #[test]
     fn process_set_state_closes_all_fds_on_exit() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        drop(process.set_state(ProcessState::Exited(ExitStatus(3))));
+        assert!(process.set_state(ProcessState::Exited(ExitStatus(3))));
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 
     #[test]
     fn process_set_state_closes_all_fds_on_signaled() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        drop(process.set_state(ProcessState::Signaled(Signal::SIGINT)));
+        assert!(process.set_state(ProcessState::Signaled(Signal::SIGINT)));
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 

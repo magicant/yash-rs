@@ -77,7 +77,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Waker;
 
 /// Simulated system.
 ///
@@ -437,8 +436,8 @@ impl System for VirtualSystem {
         for (pid, process) in &mut state.processes {
             if process.ppid == parent_pid {
                 found_child = true;
-                if process.state_awaiters.is_none() {
-                    process.state_awaiters = Some(Vec::new());
+                if process.state_has_changed {
+                    process.state_has_changed = false;
                     return Ok(process.state.to_wait_status(*pid));
                 }
             }
@@ -523,16 +522,11 @@ impl ChildProcess for DummyChildProcess {
                 .processes
                 .get_mut(&process_id)
                 .expect("the child process is missing");
-            let wakers = process.set_state(ProcessState::Exited(child_env.exit_status));
-            if wakers.is_some() {
+            if process.set_state(ProcessState::Exited(child_env.exit_status)) {
                 let ppid = process.ppid;
                 if let Some(parent) = state.processes.get_mut(&ppid) {
                     parent.raise_signal(Signal::SIGCHLD);
                 }
-            }
-            drop(state);
-            if let Some(wakers) = wakers {
-                wakers.into_iter().for_each(Waker::wake);
             }
         });
 
