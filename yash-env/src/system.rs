@@ -17,9 +17,8 @@
 //! [System] and related types.
 
 use crate::io::Fd;
-use crate::ChildProcess;
-use crate::SignalHandling;
-use crate::System;
+use crate::Env;
+use async_trait::async_trait;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
 use nix::errno::Errno;
@@ -30,16 +29,266 @@ use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
 use nix::sys::wait::WaitStatus;
+use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::fmt::Debug;
+use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
+
+/// API to the system-managed parts of the environment.
+///
+/// The `System` trait defines a collection of methods to access the underlying
+/// operating system from the shell as an application program. There are two
+/// substantial implementors for this trait:
+/// [`RealSystem`](crate::real_system::RealSystem) and
+/// [`VirtualSystem`](crate::virtual_system::VirtualSystem). Another implementor
+/// is [`SharedSystem`], which wraps a `System` instance to extend the interface
+/// with asynchronous methods.
+pub trait System: Debug {
+    /// Whether there is an executable file at the specified path.
+    fn is_executable_file(&self, path: &CStr) -> bool;
+
+    /// Creates an unnamed pipe.
+    ///
+    /// This is a thin wrapper around the `pipe` system call.
+    /// If successful, returns the reading and writing ends of the pipe.
+    fn pipe(&mut self) -> nix::Result<(Fd, Fd)>;
+
+    /// Duplicates a file descriptor.
+    ///
+    /// This is a thin wrapper around the `fcntl` system call that opens a new
+    /// FD that shares the open file description with `from`. The new FD will be
+    /// the minimum unused FD not less than `to_min`.  The `cloexec` parameter
+    /// specifies whether the new FD should have the `CLOEXEC` flag set. If
+    /// successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd>;
+
+    /// Duplicates a file descriptor.
+    ///
+    /// This is a thin wrapper around the `dup2` system call. If successful,
+    /// returns `Ok(to)`. On error, returns `Err(_)`.
+    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
+
+    /// Opens a file descriptor.
+    ///
+    /// This is a thin wrapper around the `open` system call.
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
+
+    /// Closes a file descriptor.
+    ///
+    /// This is a thin wrapper around the `close` system call.
+    ///
+    /// This function returns `Ok(())` when the FD is already closed.
+    fn close(&mut self, fd: Fd) -> nix::Result<()>;
+
+    /// Returns the file status flags for the file descriptor.
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag>;
+
+    /// Sets the file status flags for the file descriptor.
+    fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
+
+    /// Reads from the file descriptor.
+    ///
+    /// This is a thin wrapper around the `read` system call.
+    /// If successful, returns the number of bytes read.
+    ///
+    /// This function may perform blocking I/O, especially if the `O_NONBLOCK`
+    /// flag is not set for the FD. Use [`SharedSystem::read_async`] to support
+    /// concurrent I/O in an `async` function context.
+    fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize>;
+
+    /// Writes to the file descriptor.
+    ///
+    /// This is a thin wrapper around the `write` system call.
+    /// If successful, returns the number of bytes written.
+    ///
+    /// This function may write only part of the `buffer` and block if the
+    /// `O_NONBLOCK` flag is not set for the FD. Use [`SharedSystem::write_all`]
+    /// to support concurrent I/O in an `async` function context and ensure the
+    /// whole `buffer` is written.
+    fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Gets and/or sets the signal blocking mask.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is a thin wrapper around the `sigprocmask` system call. If `set` is
+    /// `Some`, this function updates the signal blocking mask according to
+    /// `how`. If `oldset` is `Some`, this function sets the previous mask to
+    /// it.
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()>;
+
+    /// Gets and sets the handler for a signal.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is an abstract wrapper around the `sigaction` system call. This
+    /// function returns the previous handler if successful.
+    ///
+    /// When you set the handler to `SignalHandling::Catch`, signals sent to
+    /// this process are accumulated in the `System` instance and made available
+    /// from [`caught_signals`](Self::caught_signals).
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
+
+    /// Returns signals this process has caught, if any.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// To catch a signal, you must set the signal handler to
+    /// [`SignalHandling::Catch`] by calling [`sigaction`](Self::sigaction)
+    /// first. Once the handler is ready, signals sent to the process are
+    /// accumulated in the `System`. You call `caught_signals` to obtain a list
+    /// of caught signals thus far.
+    ///
+    /// This function clears the internal list of caught signals, so a next call
+    /// will return an empty list unless another signal is caught since the
+    /// first call. Because the list size is limited, you should call this
+    /// function periodically before the list gets full, in which case further
+    /// caught signals are silently ignored.
+    ///
+    /// Note that signals become pending if sent while blocked by
+    /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
+    /// caught and made available from this function.
+    fn caught_signals(&mut self) -> Vec<Signal>;
+
+    // TODO timespec
+    /// Waits for a next event.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// This function blocks the calling thread until one of the following
+    /// condition is met:
+    ///
+    /// - An FD in `readers` becomes ready for reading.
+    /// - An FD in `writers` becomes ready for writing.
+    /// - A signal handler catches a signal.
+    ///
+    /// When this function returns an `Ok`, FDs that are not ready for reading
+    /// and writing are removed from `readers` and `writers`, respectively. The
+    /// return value will be the number of FDs left in `readers` and `writers`.
+    ///
+    /// If `readers` and `writers` contain an FD that is not open for reading
+    /// and writing, respectively, this function will fail with `EBADF`. In this
+    /// case, you should remove the FD from `readers` and `writers` and try
+    /// again.
+    ///
+    /// If `signal_mask` is `Some` signal set, the signal blocking mask is set
+    /// to it while waiting and restored when the function returns.
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int>;
+
+    /// Creates a new child process.
+    ///
+    /// This is a thin wrapper around the `fork` system call. Users of `Env`
+    /// should not call it directly. Instead, use [`Env::run_in_subshell`] so
+    /// that the environment can manage the created child process as a job
+    /// member.
+    ///
+    /// If successful, this function returns a [`ChildProcess`] object. The
+    /// caller must call [`ChildProcess::run`] exactly once so that the child
+    /// process performs its task and finally exit.
+    ///
+    /// This function does not return any information about whether the current
+    /// process is the original (parent) process or the new (child) process. The
+    /// caller does not have to (and should not) care that because
+    /// `ChildProcess::run` takes care of it.
+    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
+
+    /// Reports updated status of a child process.
+    ///
+    /// This is a low-level function used internally by
+    /// [`Env::wait_for_subshell`]. You should not call this function directly,
+    /// or you will disrupt the behavior of `Env`. The description below applies
+    /// if you want to do everything yourself without depending on `Env`.
+    ///
+    /// This function performs
+    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
+    /// Despite the name, this function does not block: it returns the result
+    /// immediately.
+    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
+
+    // TODO Consider passing raw pointers for optimization
+    /// Replaces the current process with an external utility.
+    ///
+    /// This is a thin wrapper around the `execve` system call.
+    fn execve(
+        &mut self,
+        path: &CStr,
+        args: &[CString],
+        envs: &[CString],
+    ) -> nix::Result<Infallible>;
+}
+
+/// How to handle a signal.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SignalHandling {
+    /// Perform the default action for the signal.
+    Default,
+    /// Ignore the signal.
+    Ignore,
+    /// Catch the signal.
+    Catch,
+}
+
+impl Default for SignalHandling {
+    fn default() -> Self {
+        SignalHandling::Default
+    }
+}
+
+/// Type of an argument to [`ChildProcess::run`].
+pub type ChildProcessTask =
+    Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+
+/// Abstraction of a child process that can run a task.
+///
+/// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
+/// must call [`run`](Self::run) exactly once.
+#[async_trait(?Send)]
+pub trait ChildProcess: Debug {
+    /// Runs a task in the child process.
+    ///
+    /// When called in the parent process, this function returns the process ID
+    /// of the child. When in the child, this function never returns.
+    async fn run(&mut self, env: &mut Env, task: ChildProcessTask) -> Pid;
+    // TODO When unsized_fn_params is stabilized,
+    // 1. `&mut self` should be `self`
+    // 2. `task` should be `FnOnce` rather than `FnMut`
+}
 
 /// System shared by a reference counter.
 ///

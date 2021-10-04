@@ -48,7 +48,7 @@ pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 use crate::io::Fd;
-use crate::ChildProcess;
+use crate::system::ChildProcess;
 use crate::Env;
 use crate::SignalHandling;
 use crate::System;
