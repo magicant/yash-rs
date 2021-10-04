@@ -291,24 +291,7 @@ pub trait System: Debug {
     /// process is the original (parent) process or the new (child) process. The
     /// caller does not have to (and should not) care that because
     /// `ChildProcess::run` takes care of it.
-    ///
-    /// # Safety
-    ///
-    /// This function can never be safely called in a multi-threaded process.
-    /// [POSIX](https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html#tag_16_156_03)
-    /// says:
-    ///
-    /// > If a multi-threaded process calls fork(), the new process shall
-    /// contain a replica of the calling thread and its entire address space,
-    /// possibly including the states of mutexes and other resources.
-    /// Consequently, to avoid errors, the child process may only execute
-    /// async-signal-safe operations until such time as one of the exec
-    /// functions is called.
-    ///
-    /// Since this function needs to allocate memory for the returned `Box`,
-    /// which is not async-signal-safe, this function must be called in a
-    /// single-threaded program.
-    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
+    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
 
     /// Reports updated status of a child process.
     ///
@@ -459,7 +442,7 @@ impl Env {
                 Box::pin(ready(()))
             }
         });
-        let mut child = unsafe { self.system.new_child_process()? };
+        let mut child = self.system.new_child_process()?;
         let child_pid = child.run(self, task).await;
         Ok(child_pid)
     }

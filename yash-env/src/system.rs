@@ -289,7 +289,7 @@ impl System for SharedSystem {
     ) -> nix::Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, signal_mask)
     }
-    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
     }
     fn wait(&mut self) -> nix::Result<WaitStatus> {

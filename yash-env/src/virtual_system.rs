@@ -409,7 +409,7 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         let mut state = self.state.borrow_mut();
         let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
@@ -1001,7 +1001,7 @@ mod tests {
     #[test]
     fn new_child_process_without_executor() {
         let mut system = VirtualSystem::new();
-        let result = unsafe { system.new_child_process() };
+        let result = system.new_child_process();
         assert_eq!(result.unwrap_err(), Errno::ENOSYS);
     }
 
@@ -1013,7 +1013,7 @@ mod tests {
         state.executor = Some(Rc::new(executor.spawner()));
         drop(state);
 
-        let result = unsafe { system.new_child_process() };
+        let result = system.new_child_process();
 
         let state = system.state.borrow();
         assert_eq!(state.processes.len(), 2);
@@ -1034,7 +1034,7 @@ mod tests {
         state.executor = Some(Rc::new(executor.spawner()));
         drop(state);
 
-        let child_process = unsafe { system.new_child_process() };
+        let child_process = system.new_child_process();
 
         let mut env = Env::with_system(Box::new(system));
         let mut child_process = child_process.unwrap();
@@ -1053,7 +1053,7 @@ mod tests {
         state.executor = Some(Rc::new(executor.spawner()));
         drop(state);
 
-        let child_process = unsafe { system.new_child_process() };
+        let child_process = system.new_child_process();
 
         let mut env = Env::with_system(Box::new(system));
         let mut child_process = child_process.unwrap();
@@ -1090,7 +1090,7 @@ mod tests {
             .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
-        let mut child_process = unsafe { system.new_child_process() }.unwrap();
+        let mut child_process = system.new_child_process().unwrap();
 
         let mut env = Env::with_system(Box::new(system));
         let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));

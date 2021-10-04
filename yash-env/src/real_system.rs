@@ -246,9 +246,11 @@ impl System for RealSystem {
     /// returned `ChildProcess` ignores arguments and returns the child process
     /// ID. In the child, the `run` function runs the task and exits the
     /// process.
-    unsafe fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         use nix::unistd::ForkResult::*;
-        match nix::unistd::fork()? {
+        // SAFETY: As stated on RealSystem::new, the caller is responsible for
+        // making only one instance of RealSystem in the process.
+        match unsafe { nix::unistd::fork()? } {
             Parent { child } => Ok(Box::new(DummyChildProcess {
                 child_process_id: child,
             })),
