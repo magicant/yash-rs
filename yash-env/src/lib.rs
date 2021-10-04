@@ -39,14 +39,13 @@ pub mod io;
 pub mod job;
 pub mod system;
 pub mod variable;
-pub mod r#virtual;
 
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
-pub use self::r#virtual::VirtualSystem;
+pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
 pub use self::system::SharedSystem;
@@ -277,7 +276,7 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::r#virtual::SystemState;
+    use crate::system::r#virtual::SystemState;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;

@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! [System] and related types.
+//! [System] and its implementors.
 
 pub mod real;
+pub mod r#virtual;
 
 use crate::io::Fd;
 use crate::Env;
@@ -52,7 +53,7 @@ use std::task::Waker;
 /// operating system from the shell as an application program. There are two
 /// substantial implementors for this trait:
 /// [`RealSystem`](self::real::RealSystem) and
-/// [`VirtualSystem`](crate::virtual::VirtualSystem). Another implementor
+/// [`VirtualSystem`](self::virtual::VirtualSystem). Another implementor
 /// is [`SharedSystem`], which wraps a `System` instance to extend the interface
 /// with asynchronous methods.
 pub trait System: Debug {
@@ -346,9 +347,9 @@ pub trait ChildProcess: Debug {
 ///
 /// If there is a child process in the [`VirtualSystem`](crate::VirtualSystem),
 /// you should call
-/// [`SystemState::select_all`](crate::virtual::SystemState) in addition
-/// to [`SharedSystem::select`](crate::SharedSystem) so that the child process
-/// task is woken up when needed.
+/// [`SystemState::select_all`](self::virtual::SystemState::select_all) in
+/// addition to [`SharedSystem::select`] so that the child process task is woken
+/// up when needed.
 /// (TBD code example)
 #[derive(Clone, Debug)]
 pub struct SharedSystem(pub(crate) Rc<RefCell<SelectSystem>>);
@@ -846,8 +847,8 @@ fn to_sig_set<I: IntoIterator<Item = Signal>>(i: I) -> SigSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::r#virtual::Pipe;
-    use crate::r#virtual::VirtualSystem;
+    use crate::system::r#virtual::Pipe;
+    use crate::system::r#virtual::VirtualSystem;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_util::task::noop_waker;

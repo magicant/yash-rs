@@ -352,9 +352,7 @@ impl ProcessState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::r#virtual::io::Pipe;
-    use crate::r#virtual::io::PipeReader;
-    use crate::r#virtual::io::PipeWriter;
+    use crate::system::r#virtual::io::{Pipe, PipeReader, PipeWriter};
     use std::cell::RefCell;
     use std::rc::Rc;
 

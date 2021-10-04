@@ -97,14 +97,14 @@ pub(crate) mod tests {
     use yash_env::exec::ExitStatus;
     use yash_env::expansion::Field;
     use yash_env::io::Fd;
-    use yash_env::r#virtual::SystemState;
+    use yash_env::system::r#virtual::SystemState;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
     #[derive(Clone, Debug)]
     pub struct LocalExecutor(pub LocalSpawner);
 
-    impl yash_env::r#virtual::Executor for LocalExecutor {
+    impl yash_env::system::r#virtual::Executor for LocalExecutor {
         fn spawn(
             &self,
             task: Pin<Box<dyn Future<Output = ()>>>,
