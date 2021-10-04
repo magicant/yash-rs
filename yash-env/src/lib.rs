@@ -53,7 +53,11 @@ use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -178,25 +182,99 @@ pub trait System: Debug {
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
 
+    /// Gets and/or sets the signal blocking mask.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is a thin wrapper around the `sigprocmask` system call. If `set` is
+    /// `Some`, this function updates the signal blocking mask according to
+    /// `how`. If `oldset` is `Some`, this function sets the previous mask to
+    /// it.
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()>;
+
+    /// Gets and sets the handler for a signal.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::set_signal_handling`]. You should not call this function
+    /// directly, or you will disrupt the behavior of `SharedSystem`. The
+    /// description below applies if you want to do everything yourself without
+    /// depending on `SharedSystem`.
+    ///
+    /// This is an abstract wrapper around the `sigaction` system call. This
+    /// function returns the previous handler if successful.
+    ///
+    /// When you set the handler to `SignalHandling::Catch`, signals sent to
+    /// this process are accumulated in the `System` instance and made available
+    /// from [`caught_signals`](Self::caught_signals).
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling>;
+
+    /// Returns signals this process has caught, if any.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
+    ///
+    /// To catch a signal, you must set the signal handler to
+    /// [`SignalHandling::Catch`] by calling [`sigaction`](Self::sigaction)
+    /// first. Once the handler is ready, signals sent to the process are
+    /// accumulated in the `System`. You call `caught_signals` to obtain a list
+    /// of caught signals thus far.
+    ///
+    /// This function clears the internal list of caught signals, so a next call
+    /// will return an empty list unless another signal is caught since the
+    /// first call. Because the list size is limited, you should call this
+    /// function periodically before the list gets full, in which case further
+    /// caught signals are silently ignored.
+    ///
+    /// Note that signals become pending if sent while blocked by
+    /// [`sigmask`](Self::sigmask). They must be unblocked so that they are
+    /// caught and made available from this function.
+    fn caught_signals(&mut self) -> Vec<Signal>;
+
     // TODO timespec
-    // TODO sigmask
     /// Waits for a next event.
+    ///
+    /// This is a low-level function used internally by
+    /// [`SharedSystem::select`]. You should not call this function directly, or
+    /// you will disrupt the behavior of `SharedSystem`. The description below
+    /// applies if you want to do everything yourself without depending on
+    /// `SharedSystem`.
     ///
     /// This function blocks the calling thread until one of the following
     /// condition is met:
     ///
     /// - An FD in `readers` becomes ready for reading.
     /// - An FD in `writers` becomes ready for writing.
+    /// - A signal handler catches a signal.
     ///
-    /// When this function returns, FDs that are not ready for reading and
-    /// writing are removed from `readers` and `writers`, respectively. The
+    /// When this function returns an `Ok`, FDs that are not ready for reading
+    /// and writing are removed from `readers` and `writers`, respectively. The
     /// return value will be the number of FDs left in `readers` and `writers`.
     ///
     /// If `readers` and `writers` contain an FD that is not open for reading
     /// and writing, respectively, this function will fail with `EBADF`. In this
     /// case, you should remove the FD from `readers` and `writers` and try
     /// again.
-    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int>;
+    ///
+    /// If `signal_mask` is `Some` signal set, the signal blocking mask is set
+    /// to it while waiting and restored when the function returns.
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int>;
 
     /// Creates a new child process.
     ///
@@ -234,26 +312,16 @@ pub trait System: Debug {
 
     /// Reports updated status of a child process.
     ///
-    /// This is a thin wrapper around the `waitpid` system call. It calls
-    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`. Users of `Env`
-    /// should not call it directly. Use dedicated job-managing functions
-    /// instead.
+    /// This is a low-level function used internally by
+    /// [`Env::wait_for_subshell`]. You should not call this function directly,
+    /// or you will disrupt the behavior of `Env`. The description below applies
+    /// if you want to do everything yourself without depending on `Env`.
+    ///
+    /// This function performs
+    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
+    /// Despite the name, this function does not block: it returns the result
+    /// immediately.
     fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
-
-    /// Reports updated status of a child process.
-    ///
-    /// This is a thin wrapper around the `waitpid` system call. Users of `Env`
-    /// should not call it directly. Use dedicated job-managing functions
-    /// instead.
-    ///
-    /// This function is a temporary API that performs synchronous wait by
-    /// blocking in the function or by returning a future you need to await.
-    /// Eventually, a new function that only polls the state of children will
-    /// substitute this function.
-    #[deprecated]
-    fn wait_sync(
-        &mut self,
-    ) -> Pin<Box<dyn Future<Output = nix::Result<nix::sys::wait::WaitStatus>>>>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
@@ -265,6 +333,23 @@ pub trait System: Debug {
         args: &[CString],
         envs: &[CString],
     ) -> nix::Result<Infallible>;
+}
+
+/// How to handle a signal.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SignalHandling {
+    /// Perform the default action for the signal.
+    Default,
+    /// Ignore the signal.
+    Ignore,
+    /// Catch the signal.
+    Catch,
+}
+
+impl Default for SignalHandling {
+    fn default() -> Self {
+        SignalHandling::Default
+    }
 }
 
 /// Type of an argument to [`ChildProcess::run`].
@@ -414,8 +499,7 @@ impl Env {
         let child_pid = self.start_subshell(f).await?;
 
         use nix::sys::wait::WaitStatus::*;
-        #[allow(deprecated)]
-        match self.system.wait_sync().await? {
+        match self.wait_for_subshell().await? {
             Exited(pid, exit_status) => {
                 // TODO This assertion is not correct. We need to handle
                 // other possibly existing child processes.
@@ -431,13 +515,78 @@ impl Env {
             _ => todo!(),
         }
     }
+
+    // TODO Allow specifying which subshell to wait for
+    /// Waits for a subshell to terminate, suspend, or resume.
+    ///
+    /// This function waits for a subshell to change its execution status.
+    /// If the current environment has no subshell, it returns
+    /// `Err(Errno::ECHILD)`.
+    pub async fn wait_for_subshell(&mut self) -> nix::Result<WaitStatus> {
+        // We need to set the signal handling before calling `wait` so we don't
+        // miss any `SIGCHLD` that may arrive between `wait` and
+        // `wait_for_signal`.
+        let old_handling = self
+            .system
+            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
+
+        let result = loop {
+            match self.system.wait()? {
+                WaitStatus::StillAlive => {}
+                new_status => break Ok(new_status),
+            }
+            self.system.wait_for_signal(Signal::SIGCHLD).await;
+        };
+
+        self.system
+            .set_signal_handling(Signal::SIGCHLD, old_handling)?;
+
+        result
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_system::SystemState;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
+    use futures_util::task::LocalSpawnExt;
+    use std::cell::Cell;
+    use std::cell::RefCell;
+
+    /// Helper function to perform a test in a virtual system with an executor.
+    pub fn in_virtual_system<F, Fut>(f: F)
+    where
+        F: FnOnce(Env, Pid, Rc<RefCell<SystemState>>) -> Fut,
+        Fut: Future<Output = ()> + 'static,
+    {
+        let system = VirtualSystem::new();
+        let pid = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut executor = futures_executor::LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let env = Env::with_system(Box::new(system));
+        let shared_system = env.system.clone();
+        let task = f(env, pid, Rc::clone(&state));
+        let done = Rc::new(Cell::new(false));
+        let done_2 = Rc::clone(&done);
+
+        executor
+            .spawner()
+            .spawn_local(async move {
+                task.await;
+                done.set(true);
+            })
+            .unwrap();
+
+        while !done_2.get() {
+            executor.run_until_stalled();
+            shared_system.select().unwrap();
+            SystemState::select_all(&state);
+        }
+    }
 
     #[test]
     fn print_system_error_einval() {
@@ -454,18 +603,17 @@ mod tests {
 
     #[test]
     fn run_in_subshell_with_child_normally_exiting() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
-
-        let status = ExitStatus(97);
-        let mut env = Env::with_system(Box::new(system));
-        let result = executor.run_until(env.run_in_subshell(move |env| {
-            Box::pin(async move {
-                env.exit_status = status;
-            })
-        }));
-        assert_eq!(result, Ok(status));
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let status = ExitStatus(97);
+            let result = env
+                .run_in_subshell(move |env| {
+                    Box::pin(async move {
+                        env.exit_status = status;
+                    })
+                })
+                .await;
+            assert_eq!(result, Ok(status));
+        });
     }
 
     // TODO Test case for parent with signaled child
@@ -481,5 +629,33 @@ mod tests {
             })
         }));
         assert_eq!(result, Err(Errno::ENOSYS));
+    }
+
+    #[test]
+    fn start_and_wait_for_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let pid = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(42);
+                    })
+                })
+                .await
+                .unwrap();
+            let result = env.wait_for_subshell().await;
+            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+        });
+    }
+
+    #[test]
+    fn wait_for_subshell_no_subshell() {
+        let system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+        let mut env = Env::with_system(Box::new(system));
+        executor.run_until(async move {
+            let result = env.wait_for_subshell().await;
+            assert_eq!(result, Err(Errno::ECHILD));
+        });
     }
 }

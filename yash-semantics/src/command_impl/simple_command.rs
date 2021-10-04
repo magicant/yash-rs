@@ -288,10 +288,9 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::tests::LocalExecutor;
     use futures_executor::block_on;
-    use futures_executor::LocalPool;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::path::PathBuf;
@@ -381,109 +380,99 @@ mod tests {
 
     #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
+        in_virtual_system(|mut env, _pid, state| async move {
+            let path = PathBuf::from("/some/file");
+            let mut content = INode::default();
+            content.permissions.0 |= 0o100;
+            content.is_native_executable = true;
+            let content = Rc::new(RefCell::new(content));
+            state.borrow_mut().file_system.save(path, content);
 
-        let path = PathBuf::from("/some/file");
-        let mut content = INode::default();
-        let mut executor = LocalPool::new();
-        content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
-        let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+            env.variables
+                .assign(
+                    "env".to_string(),
+                    Variable {
+                        value: Value::Scalar("scalar".to_string()),
+                        last_assigned_location: None,
+                        is_exported: true,
+                        read_only_location: None,
+                    },
+                )
+                .unwrap();
+            env.variables
+                .assign(
+                    "local".to_string(),
+                    Variable {
+                        value: Value::Scalar("ignored".to_string()),
+                        last_assigned_location: None,
+                        is_exported: false,
+                        read_only_location: None,
+                    },
+                )
+                .unwrap();
 
-        let mut env = Env::with_system(Box::new(system));
-        env.variables
-            .assign(
-                "env".to_string(),
-                Variable {
-                    value: Value::Scalar("scalar".to_string()),
-                    last_assigned_location: None,
-                    is_exported: true,
-                    read_only_location: None,
-                },
-            )
-            .unwrap();
-        env.variables
-            .assign(
-                "local".to_string(),
-                Variable {
-                    value: Value::Scalar("ignored".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
-            .unwrap();
-        let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
-        let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
+            let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
 
-        let state = state.borrow();
-        let process = state.processes.values().last().unwrap();
-        let arguments = process.last_exec().as_ref().unwrap();
-        assert_eq!(arguments.0, CString::new("/some/file").unwrap());
-        assert_eq!(
-            arguments.1,
-            [
-                CString::new("/some/file").unwrap(),
-                CString::new("foo").unwrap(),
-                CString::new("bar").unwrap()
-            ]
-        );
-        assert_eq!(arguments.2, [CString::new("env=scalar").unwrap()]);
+            let state = state.borrow();
+            let process = state.processes.values().last().unwrap();
+            let arguments = process.last_exec().as_ref().unwrap();
+            assert_eq!(arguments.0, CString::new("/some/file").unwrap());
+            assert_eq!(
+                arguments.1,
+                [
+                    CString::new("/some/file").unwrap(),
+                    CString::new("foo").unwrap(),
+                    CString::new("bar").unwrap()
+                ]
+            );
+            assert_eq!(arguments.2, [CString::new("env=scalar").unwrap()]);
+        });
     }
 
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
-        let system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
-        let mut content = INode::default();
-        let mut executor = LocalPool::new();
-        content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
-        let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        in_virtual_system(|mut env, _pid, state| async move {
+            let path = PathBuf::from("/some/file");
+            let mut content = INode::default();
+            content.permissions.0 |= 0o100;
+            content.is_native_executable = true;
+            let content = Rc::new(RefCell::new(content));
+            state.borrow_mut().file_system.save(path, content);
 
-        let mut env = Env::with_system(Box::new(system));
-        let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
-        let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        // In VirtualSystem, execve fails with ENOSYS.
-        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+            let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            // In VirtualSystem, execve fails with ENOSYS.
+            assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+        });
     }
 
     #[test]
     fn simple_command_returns_127_for_non_existing_file() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-
-        let mut env = Env::with_system(Box::new(system));
-        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
+        });
     }
 
     #[test]
     fn simple_command_returns_126_on_exec_failure() {
-        let system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
-        let mut content = INode::default();
-        let mut executor = LocalPool::new();
-        content.permissions.0 |= 0o100;
-        let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
-        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        in_virtual_system(|mut env, _pid, state| async move {
+            let path = PathBuf::from("/some/file");
+            let mut content = INode::default();
+            content.permissions.0 |= 0o100;
+            let content = Rc::new(RefCell::new(content));
+            state.borrow_mut().file_system.save(path, content);
 
-        let mut env = Env::with_system(Box::new(system));
-        let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = executor.run_until(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+            let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+        });
     }
 
     #[test]

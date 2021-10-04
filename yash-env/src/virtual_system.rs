@@ -50,11 +50,15 @@ pub use self::process::*;
 use crate::io::Fd;
 use crate::ChildProcess;
 use crate::Env;
+use crate::SignalHandling;
 use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::sys::select::FdSet;
+use nix::sys::signal::SigSet;
+use nix::sys::signal::SigmaskHow;
+use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Ref;
@@ -73,8 +77,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Poll;
-use std::task::Waker;
 
 /// Simulated system.
 ///
@@ -311,12 +313,52 @@ impl System for VirtualSystem {
         self.with_open_file_description(fd, |ofd| ofd.write(buffer))
     }
 
+    fn sigmask(
+        &mut self,
+        how: SigmaskHow,
+        set: Option<&SigSet>,
+        oldset: Option<&mut SigSet>,
+    ) -> nix::Result<()> {
+        let mut process = self.current_process_mut();
+        if let Some(oldset) = oldset {
+            *oldset = *process.blocked_signals();
+        }
+        if let Some(set) = set {
+            process.block_signals(how, set);
+        }
+        Ok(())
+    }
+
+    fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
+        let mut process = self.current_process_mut();
+        Ok(process.set_signal_handling(signal, action))
+    }
+
+    fn caught_signals(&mut self) -> Vec<Signal> {
+        std::mem::take(&mut self.current_process_mut().caught_signals)
+    }
+
     /// Waits for a next event.
     ///
     /// The `VirtualSystem` implementation for this method does not actually
     /// block the calling thread. The method returns immediately in any case.
-    fn select(&mut self, readers: &mut FdSet, writers: &mut FdSet) -> nix::Result<c_int> {
-        let process = self.current_process();
+    fn select(
+        &mut self,
+        readers: &mut FdSet,
+        writers: &mut FdSet,
+        signal_mask: Option<&SigSet>,
+    ) -> nix::Result<c_int> {
+        let mut process = self.current_process_mut();
+
+        if let Some(signal_mask) = signal_mask {
+            let save_mask = *process.blocked_signals();
+            let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
+            let delivered_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
+            assert!(!delivered_2);
+            if delivered {
+                return Err(Errno::EINTR);
+            }
+        }
 
         for fd in 0..(nix::sys::select::FD_SETSIZE as c_int) {
             if readers.contains(fd) {
@@ -387,50 +429,24 @@ impl System for VirtualSystem {
         }))
     }
 
-    /// This function is currently not implemented.
     fn wait(&mut self) -> nix::Result<WaitStatus> {
-        todo!()
-    }
-
-    /// Reports updated status of a child process.
-    ///
-    /// This function does not block, but the caller must await the returned
-    /// future to obtain the result.
-    ///
-    /// This function does not remove terminated processes from the system state
-    /// so you can examine them later.
-    fn wait_sync(&mut self) -> Pin<Box<dyn Future<Output = nix::Result<WaitStatus>>>> {
         let parent_pid = self.process_id;
-        let state = Rc::clone(&self.state);
-        Box::pin(futures_util::future::poll_fn(move |context| {
-            let mut state = state.borrow_mut();
-
-            // If any child's state has changed, return it
-            let mut found_child = false;
-            for (pid, process) in &mut state.processes {
-                if process.ppid == parent_pid {
-                    found_child = true;
-                    if process.state_awaiters.is_none() {
-                        process.state_awaiters = Some(Vec::new());
-                        return Poll::Ready(Ok(process.state.to_wait_status(*pid)));
-                    }
+        let mut state = self.state.borrow_mut();
+        let mut found_child = false;
+        for (pid, process) in &mut state.processes {
+            if process.ppid == parent_pid {
+                found_child = true;
+                if process.state_has_changed {
+                    process.state_has_changed = false;
+                    return Ok(process.state.to_wait_status(*pid));
                 }
             }
-
-            if !found_child {
-                return Poll::Ready(Err(Errno::ECHILD));
-            }
-
-            // Save a waker so the future is polled again when the state has changed
-            for process in state.processes.values_mut() {
-                if process.ppid == parent_pid {
-                    if let Some(awaiters) = &mut process.state_awaiters {
-                        awaiters.push(context.waker().clone());
-                    }
-                }
-            }
-            Poll::Pending
-        }))
+        }
+        if found_child {
+            Ok(WaitStatus::StillAlive)
+        } else {
+            Err(Errno::ECHILD)
+        }
     }
 
     /// Stub for the `execve` system call.
@@ -506,9 +522,12 @@ impl ChildProcess for DummyChildProcess {
                 .processes
                 .get_mut(&process_id)
                 .expect("the child process is missing");
-            let wakers = process.set_state(ProcessState::Exited(child_env.exit_status));
-            drop(state);
-            wakers.into_iter().for_each(Waker::wake);
+            if process.set_state(ProcessState::Exited(child_env.exit_status)) {
+                let ppid = process.ppid;
+                if let Some(parent) = state.processes.get_mut(&ppid) {
+                    parent.raise_signal(Signal::SIGCHLD);
+                }
+            }
         });
 
         self.executor
@@ -536,12 +555,24 @@ pub struct SystemState {
 }
 
 impl SystemState {
-    /// Performs [`select`](Process::select) on all processes in the system.
+    /// Performs [`select`](crate::system::SharedSystem::select) on all
+    /// processes in the system.
     ///
     /// Any errors are ignored.
-    pub fn select_all(&self) {
-        for process in self.processes.values() {
-            let _: nix::Result<()> = process.select();
+    ///
+    /// The `RefCell` must not have been borrowed, or this function will panic
+    /// with a double borrow.
+    pub fn select_all(this: &RefCell<Self>) {
+        let mut selectors = Vec::new();
+        for process in this.borrow().processes.values() {
+            if let Some(selector) = process.selector.upgrade() {
+                selectors.push(selector);
+            }
+        }
+        // To avoid double borrowing, SelectSystem::select must be called after
+        // dropping the borrow for `this`
+        for selector in selectors {
+            selector.borrow_mut().select().ok();
         }
     }
 }
@@ -568,7 +599,6 @@ pub trait Executor: Debug {
 mod tests {
     use super::*;
     use crate::exec::ExitStatus;
-    use futures_executor::block_on;
     use futures_executor::LocalPool;
     use std::ffi::CString;
 
@@ -836,7 +866,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(3));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -853,7 +883,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -870,7 +900,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -884,7 +914,7 @@ mod tests {
         let mut writers = FdSet::new();
         readers.insert(reader.0);
 
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(0));
         assert_eq!(readers, FdSet::new());
         assert_eq!(writers, FdSet::new());
@@ -900,7 +930,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers);
+        let result = system.select(&mut readers, &mut writers, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -912,7 +942,7 @@ mod tests {
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(writer.0);
-        let result = system.select(&mut fds, &mut FdSet::new());
+        let result = system.select(&mut fds, &mut FdSet::new(), None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -922,7 +952,7 @@ mod tests {
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(reader.0);
-        let result = system.select(&mut FdSet::new(), &mut fds);
+        let result = system.select(&mut FdSet::new(), &mut fds, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -931,11 +961,41 @@ mod tests {
         let mut system = VirtualSystem::new();
         let mut fds = FdSet::new();
         fds.insert(17);
-        let result = system.select(&mut fds, &mut FdSet::new());
+        let result = system.select(&mut fds, &mut FdSet::new(), None);
         assert_eq!(result, Err(Errno::EBADF));
 
-        let result = system.select(&mut FdSet::new(), &mut fds);
+        let result = system.select(&mut FdSet::new(), &mut fds, None);
         assert_eq!(result, Err(Errno::EBADF));
+    }
+
+    fn system_for_catching_sigchld() -> VirtualSystem {
+        let mut system = VirtualSystem::new();
+        let mut set = SigSet::empty();
+        set.add(Signal::SIGCHLD);
+        system
+            .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), None)
+            .unwrap();
+        system
+            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+        system
+    }
+
+    #[test]
+    fn select_on_non_pending_signal() {
+        let mut system = system_for_catching_sigchld();
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        assert_eq!(result, Ok(0));
+        assert_eq!(system.caught_signals(), []);
+    }
+
+    #[test]
+    fn select_on_pending_signal() {
+        let mut system = system_for_catching_sigchld();
+        system.current_process_mut().raise_signal(Signal::SIGCHLD);
+        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        assert_eq!(result, Err(Errno::EINTR));
+        assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
     }
 
     #[test]
@@ -967,7 +1027,26 @@ mod tests {
     }
 
     #[test]
-    fn wait_sync_for_exited_process() {
+    fn wait_for_running_child() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+
+        let child_process = unsafe { system.new_child_process() };
+
+        let mut env = Env::with_system(Box::new(system));
+        let mut child_process = child_process.unwrap();
+        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async move {})));
+        executor.run_until(future);
+
+        let result = env.system.wait();
+        assert_eq!(result, Ok(WaitStatus::StillAlive))
+    }
+
+    #[test]
+    fn wait_for_exited_child() {
         let mut system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let mut state = system.state.borrow_mut();
@@ -987,18 +1066,38 @@ mod tests {
             }),
         );
         let pid = executor.run_until(future);
+        executor.run_until_stalled();
 
-        #[allow(deprecated)]
-        let result = executor.run_until(env.system.wait_sync());
+        let result = env.system.wait();
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
     }
 
     #[test]
-    fn wait_sync_without_child() {
+    fn wait_without_child() {
         let mut system = VirtualSystem::new();
-        #[allow(deprecated)]
-        let result = block_on(system.wait_sync());
+        let result = system.wait();
         assert_eq!(result, Err(Errno::ECHILD));
+    }
+
+    #[test]
+    fn exiting_child_sends_sigchld_to_parent() {
+        let mut system = VirtualSystem::new();
+        let mut executor = LocalPool::new();
+        let mut state = system.state.borrow_mut();
+        state.executor = Some(Rc::new(executor.spawner()));
+        drop(state);
+        system
+            .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+
+        let mut child_process = unsafe { system.new_child_process() }.unwrap();
+
+        let mut env = Env::with_system(Box::new(system));
+        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
+        executor.run_until(future);
+        executor.run_until_stalled();
+
+        assert_eq!(env.system.caught_signals(), [Signal::SIGCHLD]);
     }
 
     #[test]
