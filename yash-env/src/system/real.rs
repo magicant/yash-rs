@@ -16,7 +16,7 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
-use super::system::ChildProcess;
+use super::ChildProcess;
 use super::Env;
 use super::System;
 use crate::io::Fd;

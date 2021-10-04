@@ -16,6 +16,8 @@
 
 //! [System] and related types.
 
+pub mod real;
+
 use crate::io::Fd;
 use crate::Env;
 use async_trait::async_trait;
@@ -49,7 +51,7 @@ use std::task::Waker;
 /// The `System` trait defines a collection of methods to access the underlying
 /// operating system from the shell as an application program. There are two
 /// substantial implementors for this trait:
-/// [`RealSystem`](crate::real_system::RealSystem) and
+/// [`RealSystem`](self::real::RealSystem) and
 /// [`VirtualSystem`](crate::virtual_system::VirtualSystem). Another implementor
 /// is [`SharedSystem`], which wraps a `System` instance to extend the interface
 /// with asynchronous methods.
