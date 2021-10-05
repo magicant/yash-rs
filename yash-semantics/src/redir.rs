@@ -57,8 +57,6 @@
 //! descriptor. See the documentation for [`RedirEnv`] for details.
 
 use crate::expansion::expand_word;
-use nix::errno::Errno;
-use nix::fcntl::OFlag;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -66,6 +64,8 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::expansion::Field;
 use yash_env::io::Fd;
+use yash_env::system::Errno;
+use yash_env::system::OFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
@@ -195,7 +195,7 @@ fn open_file<S: System>(
         }
     };
 
-    use nix::sys::stat::Mode;
+    use yash_env::system::Mode;
     let mode = Mode::S_IRUSR
         | Mode::S_IWUSR
         | Mode::S_IRGRP

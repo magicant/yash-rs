@@ -16,7 +16,10 @@
 
 //! Type definitions for job management.
 
-use nix::unistd::Pid;
+#[doc(no_inline)]
+pub use nix::sys::wait::WaitStatus;
+#[doc(no_inline)]
+pub use nix::unistd::Pid;
 use std::collections::HashMap;
 
 /// Child process of the shell.

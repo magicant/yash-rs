@@ -307,7 +307,6 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "itertools",
- "nix",
  "yash-env",
  "yash-syntax",
 ]

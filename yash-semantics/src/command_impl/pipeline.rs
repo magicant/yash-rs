@@ -18,13 +18,14 @@
 
 use super::Command;
 use async_trait::async_trait;
-use nix::unistd::Pid;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::io::Fd;
+use yash_env::job::Pid;
+use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -105,7 +106,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 
     // Await the last command
     loop {
-        use nix::sys::wait::WaitStatus::*;
+        use yash_env::job::WaitStatus::*;
         match env.wait_for_subshell().await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
@@ -163,7 +164,7 @@ async fn connect_pipe_and_execute_command(
     }
 }
 
-async fn pid_or_fail(env: &mut Env, pid: nix::Result<Pid>) -> Result<Pid> {
+async fn pid_or_fail(env: &mut Env, pid: std::result::Result<Pid, Errno>) -> Result<Pid> {
     match pid {
         Ok(pid) => Continue(pid),
         Err(errno) => {
@@ -191,7 +192,7 @@ impl PipeSet {
     ///
     /// Closes FDs that are no longer necessary and opens a new pipe if there is
     /// a next command.
-    fn shift(&mut self, env: &mut Env, has_next: bool) -> nix::Result<()> {
+    fn shift(&mut self, env: &mut Env, has_next: bool) -> std::result::Result<(), Errno> {
         if let Some(fd) = self.read_previous {
             let _ = env.system.close(fd);
         }
@@ -213,7 +214,7 @@ impl PipeSet {
 
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
-    fn move_to_stdin_stdout(mut self, env: &mut Env) -> nix::Result<()> {
+    fn move_to_stdin_stdout(mut self, env: &mut Env) -> std::result::Result<(), Errno> {
         if let Some((reader, writer)) = self.next {
             assert_ne!(reader, writer);
             assert_ne!(self.read_previous, Some(reader));

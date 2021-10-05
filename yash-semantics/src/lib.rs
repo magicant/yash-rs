@@ -83,7 +83,6 @@ pub(crate) mod tests {
     use futures_executor::LocalSpawner;
     use futures_util::task::LocalSpawnExt;
     use itertools::Itertools;
-    use nix::unistd::Pid;
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::future::ready;
@@ -97,7 +96,9 @@ pub(crate) mod tests {
     use yash_env::exec::ExitStatus;
     use yash_env::expansion::Field;
     use yash_env::io::Fd;
+    use yash_env::job::Pid;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env::system::Errno;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
@@ -201,7 +202,7 @@ pub(crate) mod tests {
         env: &mut Env,
         _args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-        async fn inner(env: &mut Env) -> nix::Result<()> {
+        async fn inner(env: &mut Env) -> std::result::Result<(), Errno> {
             let mut buffer = [0; 1024];
             loop {
                 let count = env.system.read_async(Fd::STDIN, &mut buffer).await?;

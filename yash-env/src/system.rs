@@ -20,19 +20,26 @@ pub mod real;
 pub mod r#virtual;
 
 use crate::io::Fd;
+use crate::job::Pid;
 use crate::Env;
 use async_trait::async_trait;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
-use nix::errno::Errno;
-use nix::fcntl::OFlag;
-use nix::sys::select::FdSet;
-use nix::sys::signal::SigSet;
-use nix::sys::signal::SigmaskHow;
-use nix::sys::signal::Signal;
-use nix::sys::stat::Mode;
+#[doc(no_inline)]
+pub use nix::errno::Errno;
+#[doc(no_inline)]
+pub use nix::fcntl::OFlag;
+#[doc(no_inline)]
+pub use nix::sys::select::FdSet;
+#[doc(no_inline)]
+pub use nix::sys::signal::SigSet;
+#[doc(no_inline)]
+pub use nix::sys::signal::SigmaskHow;
+#[doc(no_inline)]
+pub use nix::sys::signal::Signal;
+#[doc(no_inline)]
+pub use nix::sys::stat::Mode;
 use nix::sys::wait::WaitStatus;
-use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::CStr;
