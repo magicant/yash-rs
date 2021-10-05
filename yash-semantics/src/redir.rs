@@ -384,7 +384,7 @@ mod tests {
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
-    use yash_env::virtual_system::INode;
+    use yash_env::r#virtual::INode;
     use yash_env::VirtualSystem;
 
     #[test]

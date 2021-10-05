@@ -52,7 +52,7 @@ use std::task::Waker;
 /// operating system from the shell as an application program. There are two
 /// substantial implementors for this trait:
 /// [`RealSystem`](self::real::RealSystem) and
-/// [`VirtualSystem`](crate::virtual_system::VirtualSystem). Another implementor
+/// [`VirtualSystem`](crate::virtual::VirtualSystem). Another implementor
 /// is [`SharedSystem`], which wraps a `System` instance to extend the interface
 /// with asynchronous methods.
 pub trait System: Debug {
@@ -346,7 +346,7 @@ pub trait ChildProcess: Debug {
 ///
 /// If there is a child process in the [`VirtualSystem`](crate::VirtualSystem),
 /// you should call
-/// [`SystemState::select_all`](crate::virtual_system::SystemState) in addition
+/// [`SystemState::select_all`](crate::virtual::SystemState) in addition
 /// to [`SharedSystem::select`](crate::SharedSystem) so that the child process
 /// task is woken up when needed.
 /// (TBD code example)
@@ -846,8 +846,8 @@ fn to_sig_set<I: IntoIterator<Item = Signal>>(i: I) -> SigSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::virtual_system::Pipe;
-    use crate::virtual_system::VirtualSystem;
+    use crate::r#virtual::Pipe;
+    use crate::r#virtual::VirtualSystem;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_util::task::noop_waker;

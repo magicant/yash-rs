@@ -296,9 +296,9 @@ mod tests {
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::exec::Divert;
+    use yash_env::r#virtual::INode;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
-    use yash_env::virtual_system::INode;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 

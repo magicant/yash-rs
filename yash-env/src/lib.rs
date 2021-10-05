@@ -39,20 +39,20 @@ pub mod io;
 pub mod job;
 pub mod system;
 pub mod variable;
-pub mod virtual_system;
+pub mod r#virtual;
 
 use self::builtin::Builtin;
 use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
+pub use self::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
 use self::variable::VariableSet;
-pub use self::virtual_system::VirtualSystem;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
@@ -277,7 +277,7 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::virtual_system::SystemState;
+    use crate::r#virtual::SystemState;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
