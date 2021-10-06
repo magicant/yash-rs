@@ -19,6 +19,7 @@
 mod and_or_list;
 mod compound_command;
 mod function_definition;
+mod item;
 mod pipeline;
 mod simple_command;
 
@@ -39,14 +40,6 @@ impl Command for syntax::Command {
             Compound(command) => command.execute(env).await,
             Function(definition) => definition.execute(env).await,
         }
-    }
-}
-
-#[async_trait(?Send)]
-impl Command for syntax::Item {
-    async fn execute(&self, env: &mut Env) -> Result {
-        self.and_or.execute(env).await
-        // TODO async
     }
 }
 
