@@ -27,6 +27,7 @@ use super::lex::Operator::{And, Newline, Semicolon};
 use super::lex::TokenId::Operator;
 use crate::syntax::Item;
 use crate::syntax::List;
+use std::rc::Rc;
 
 use super::lex::TokenId::EndOfInput;
 use std::future::Future;
@@ -61,6 +62,7 @@ impl Parser<'_> {
                 _ => (false, false),
             };
 
+            let and_or = Rc::new(and_or);
             items.push(Item { and_or, is_async });
 
             if !next {
@@ -245,7 +247,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.first().unwrap();
         assert_eq!(item.is_async, false);
-        let AndOrList { first, rest } = &item.and_or;
+        let AndOrList { first, rest } = &*item.and_or;
         assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);

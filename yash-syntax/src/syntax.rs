@@ -1222,7 +1222,10 @@ impl<H: fmt::Display> fmt::Display for AndOrList<H> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Item<H = HereDoc> {
     /// Main part of this item.
-    pub and_or: AndOrList<H>,
+    ///
+    /// The and-or list is contained in `Rc` to allow executing it
+    /// asynchronously without cloning it.
+    pub and_or: Rc<AndOrList<H>>,
     /// True if this item is terminated by `&`.
     pub is_async: bool,
 }
@@ -2135,7 +2138,7 @@ mod tests {
     fn list_display() {
         let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: false,
         };
         let mut list = List(vec![item]);
@@ -2143,7 +2146,7 @@ mod tests {
 
         let and_or = "second".parse().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: true,
         };
         list.0.push(item);
@@ -2151,7 +2154,7 @@ mod tests {
 
         let and_or = "third".parse().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: false,
         };
         list.0.push(item);
@@ -2162,7 +2165,7 @@ mod tests {
     fn list_display_alternate() {
         let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: false,
         };
         let mut list = List(vec![item]);
@@ -2170,7 +2173,7 @@ mod tests {
 
         let and_or = "second".parse().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: true,
         };
         list.0.push(item);
@@ -2178,7 +2181,7 @@ mod tests {
 
         let and_or = "third".parse().unwrap();
         let item = Item {
-            and_or,
+            and_or: Rc::new(and_or),
             is_async: false,
         };
         list.0.push(item);
