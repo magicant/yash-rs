@@ -29,3 +29,27 @@ impl Command for syntax::Item {
         // TODO async
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::return_builtin;
+    use futures_executor::block_on;
+    use std::ops::ControlFlow::Continue;
+    use std::rc::Rc;
+    use yash_env::exec::ExitStatus;
+
+    #[test]
+    fn item_execute_sync() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
+        let item = syntax::Item {
+            and_or: Rc::new(and_or),
+            is_async: false,
+        };
+        let result = block_on(item.execute(&mut env));
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(42));
+    }
+}
