@@ -48,6 +48,8 @@ pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
 use crate::io::Fd;
+use crate::job::Pid;
+use crate::job::WaitStatus;
 use crate::system::ChildProcess;
 use crate::Env;
 use crate::SignalHandling;
@@ -59,8 +61,6 @@ use nix::sys::select::FdSet;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
-use nix::unistd::Pid;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -429,21 +429,19 @@ impl System for VirtualSystem {
         }))
     }
 
-    fn wait(&mut self) -> nix::Result<WaitStatus> {
+    /// Waits for a child.
+    ///
+    /// TODO: Currently, this function only supports `target == -1 || target > 0`.
+    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
-        let mut found_child = false;
-        for (pid, process) in &mut state.processes {
-            if process.ppid == parent_pid {
-                found_child = true;
-                if process.state_has_changed {
-                    process.state_has_changed = false;
-                    return Ok(process.state.to_wait_status(*pid));
-                }
+        if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
+            if process.state_has_changed {
+                process.state_has_changed = false;
+                Ok(process.state.to_wait_status(pid))
+            } else {
+                Ok(WaitStatus::StillAlive)
             }
-        }
-        if found_child {
-            Ok(WaitStatus::StillAlive)
         } else {
             Err(Errno::ECHILD)
         }
@@ -573,6 +571,38 @@ impl SystemState {
         // dropping the borrow for `this`
         for selector in selectors {
             selector.borrow_mut().select().ok();
+        }
+    }
+
+    /// Finds a child process to wait for.
+    ///
+    /// This is a helper function for `VirtualSystem::wait`.
+    fn child_to_wait_for(&mut self, parent_pid: Pid, target: Pid) -> Option<(Pid, &mut Process)> {
+        match target.as_raw() {
+            0 => todo!("wait target {}", target),
+            -1 => {
+                // any child
+                let mut result = None;
+                for (pid, process) in &mut self.processes {
+                    if process.ppid == parent_pid {
+                        let changed = process.state_has_changed;
+                        result = Some((*pid, process));
+                        if changed {
+                            break;
+                        }
+                    }
+                }
+                result
+            }
+            raw if raw >= 0 => {
+                let process = self.processes.get_mut(&target)?;
+                if process.ppid == parent_pid {
+                    Some((target, process))
+                } else {
+                    None
+                }
+            }
+            _target => todo!("wait target {}", target),
         }
     }
 }
@@ -1039,9 +1069,9 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut child_process = child_process.unwrap();
         let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async move {})));
-        executor.run_until(future);
+        let pid = executor.run_until(future);
 
-        let result = env.system.wait();
+        let result = env.system.wait(pid);
         assert_eq!(result, Ok(WaitStatus::StillAlive))
     }
 
@@ -1068,15 +1098,25 @@ mod tests {
         let pid = executor.run_until(future);
         executor.run_until_stalled();
 
-        let result = env.system.wait();
+        let result = env.system.wait(pid);
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
     }
 
     #[test]
     fn wait_without_child() {
         let mut system = VirtualSystem::new();
-        let result = system.wait();
+        let result = system.wait(Pid::from_raw(-1));
         assert_eq!(result, Err(Errno::ECHILD));
+        // TODO
+        // let result = system.wait(Pid::from_raw(0));
+        // assert_eq!(result, Err(Errno::ECHILD));
+        let result = system.wait(system.process_id);
+        assert_eq!(result, Err(Errno::ECHILD));
+        let result = system.wait(Pid::from_raw(1234));
+        assert_eq!(result, Err(Errno::ECHILD));
+        // TODO
+        // let result = system.wait(Pid::from_raw(-1234));
+        // assert_eq!(result, Err(Errno::ECHILD));
     }
 
     #[test]

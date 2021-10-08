@@ -107,7 +107,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     // Await the last command
     loop {
         use yash_env::job::WaitStatus::*;
-        match env.wait_for_subshell().await {
+        match env.wait_for_subshell(Pid::from_raw(-1)).await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);

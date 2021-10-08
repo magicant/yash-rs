@@ -21,6 +21,7 @@ pub mod r#virtual;
 
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::WaitStatus;
 use crate::Env;
 use async_trait::async_trait;
 use futures_util::future::poll_fn;
@@ -39,7 +40,6 @@ pub use nix::sys::signal::SigmaskHow;
 pub use nix::sys::signal::Signal;
 #[doc(no_inline)]
 pub use nix::sys::stat::Mode;
-use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -246,10 +246,10 @@ pub trait System: Debug {
     /// if you want to do everything yourself without depending on `Env`.
     ///
     /// This function performs
-    /// `waitpid(-1, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
+    /// `waitpid(target, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
     /// Despite the name, this function does not block: it returns the result
     /// immediately.
-    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus>;
+    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
@@ -551,8 +551,8 @@ impl System for SharedSystem {
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
     }
-    fn wait(&mut self) -> nix::Result<WaitStatus> {
-        self.0.borrow_mut().wait()
+    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+        self.0.borrow_mut().wait(target)
     }
     fn execve(
         &mut self,

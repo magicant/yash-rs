@@ -45,6 +45,8 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
+use self::job::Pid;
+use self::job::WaitStatus;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
@@ -54,8 +56,6 @@ pub use self::system::System;
 use self::variable::VariableSet;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
-use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
@@ -247,16 +247,12 @@ impl Env {
         let child_pid = self.start_subshell(f).await?;
 
         use nix::sys::wait::WaitStatus::*;
-        match self.wait_for_subshell().await? {
+        match self.wait_for_subshell(child_pid).await? {
             Exited(pid, exit_status) => {
-                // TODO This assertion is not correct. We need to handle
-                // other possibly existing child processes.
                 assert_eq!(pid, child_pid);
                 Ok(ExitStatus(exit_status))
             }
             Signaled(pid, signal, _core_dumped) => {
-                // TODO This assertion is not correct. We need to handle
-                // other possibly existing child processes.
                 assert_eq!(pid, child_pid);
                 Ok(ExitStatus::from(signal))
             }
@@ -264,13 +260,19 @@ impl Env {
         }
     }
 
-    // TODO Allow specifying which subshell to wait for
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
-    /// This function waits for a subshell to change its execution status.
-    /// If the current environment has no subshell, it returns
+    /// This function waits for a subshell to change its execution status. The
+    /// `target` parameter specifies which child to wait for:
+    ///
+    /// - `-1`: any child
+    /// - `0`: any child in the same process group as the current process
+    /// - `pid`: the child whose process ID is `pid`
+    /// - `-pgid`: any child in the process group whose process group ID is `pgid`
+    ///
+    /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
-    pub async fn wait_for_subshell(&mut self) -> nix::Result<WaitStatus> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and
         // `wait_for_signal`.
@@ -279,7 +281,7 @@ impl Env {
             .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
 
         let result = loop {
-            match self.system.wait()? {
+            match self.system.wait(target)? {
                 WaitStatus::StillAlive => {}
                 new_status => break Ok(new_status),
             }
@@ -393,7 +395,7 @@ mod tests {
                 })
                 .await
                 .unwrap();
-            let result = env.wait_for_subshell().await;
+            let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
         });
     }
@@ -405,7 +407,7 @@ mod tests {
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
         let mut env = Env::with_system(Box::new(system));
         executor.run_until(async move {
-            let result = env.wait_for_subshell().await;
+            let result = env.wait_for_subshell(Pid::from_raw(-1)).await;
             assert_eq!(result, Err(Errno::ECHILD));
         });
     }
