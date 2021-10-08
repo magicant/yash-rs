@@ -60,6 +60,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
 use std::future::Future;
+use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -175,14 +176,29 @@ impl Env {
     /// Although this function is `async`, it does not wait for the child to
     /// finish, which means the parent and child processes will run
     /// concurrently.
+    ///
+    /// If function `f` returns an `Err(Divert::...)`, it is handled as follows:
+    ///
+    /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
+    ///   status in `Env`.
+    /// - Other `Divert` values are ignored.
     pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+            + 'static,
     {
         let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
             if let Some(f) = f.take() {
-                Box::pin(f(env))
+                Box::pin(async move {
+                    use self::exec::Divert::{Exit, Interrupt};
+                    match f(env).await {
+                        Break(Exit(Some(exit_status))) | Break(Interrupt(Some(exit_status))) => {
+                            env.exit_status = exit_status
+                        }
+                        _ => (),
+                    }
+                })
             } else {
                 Box::pin(ready(()))
             }
@@ -213,6 +229,9 @@ impl Env {
     /// the current shell continues waiting for the subshell to finish, so it
     /// must be resumed by some other means.
     ///
+    /// See [`start_subshell`](Self::start_subshell) for the behavior of the
+    /// subshell in case function `f` returns an `Err(Divert::...)`.
+    ///
     /// # Return value
     ///
     /// This function usually returns the exit status of the subshell that is
@@ -221,7 +240,8 @@ impl Env {
     /// [`new_child_process`](System::new_child_process), the error is returned.
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+            + 'static,
     {
         // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
@@ -282,6 +302,7 @@ mod tests {
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
     use std::cell::RefCell;
+    use std::ops::ControlFlow::Continue;
 
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut>(f: F)
@@ -337,6 +358,7 @@ mod tests {
                 .run_in_subshell(move |env| {
                     Box::pin(async move {
                         env.exit_status = status;
+                        Continue(())
                     })
                 })
                 .await;
@@ -366,6 +388,7 @@ mod tests {
                 .start_subshell(|env| {
                     Box::pin(async move {
                         env.exit_status = ExitStatus(42);
+                        Continue(())
                     })
                 })
                 .await
