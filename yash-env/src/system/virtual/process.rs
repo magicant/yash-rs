@@ -50,7 +50,7 @@ pub struct Process {
     ///
     /// The change of `state` is reported when the parent `wait`s for this
     /// process.
-    pub(crate) state_has_changed: bool,
+    state_has_changed: bool,
 
     /// Currently set signal handlers.
     ///
@@ -202,8 +202,9 @@ impl Process {
     /// If the new state is `Exited` or `Signaled`, all file descriptors in this
     /// process are closed.
     ///
-    /// This function returns whether the state did change. If true, the caller
-    /// must notify the status update by sending `SIGCHLD` to the parent
+    /// This function returns whether the state did change. If true, the
+    /// [`state_has_changed`](Self::state_has_changed) flag is set and  the
+    /// caller must notify the status update by sending `SIGCHLD` to the parent
     /// process.
     #[must_use = "You must send SIGCHLD to the parent"]
     pub fn set_state(&mut self, state: ProcessState) -> bool {
@@ -219,6 +220,20 @@ impl Process {
             self.state_has_changed = true;
             true
         }
+    }
+
+    /// Returns true if a new state has been [set](Self::set_state) but not yet
+    /// [taken](Self::take_state).
+    #[must_use]
+    pub fn state_has_changed(&self) -> bool {
+        self.state_has_changed
+    }
+
+    /// Returns the process state and clears the
+    /// [`state_has_changed`](Self::state_has_changed) flag.
+    pub fn take_state(&mut self) -> ProcessState {
+        self.state_has_changed = false;
+        self.state
     }
 
     /// Returns the currently blocked signals.

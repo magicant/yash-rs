@@ -436,9 +436,8 @@ impl System for VirtualSystem {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
-            if process.state_has_changed {
-                process.state_has_changed = false;
-                Ok(process.state.to_wait_status(pid))
+            if process.state_has_changed() {
+                Ok(process.take_state().to_wait_status(pid))
             } else {
                 Ok(WaitStatus::StillAlive)
             }
@@ -585,7 +584,7 @@ impl SystemState {
                 let mut result = None;
                 for (pid, process) in &mut self.processes {
                     if process.ppid == parent_pid {
-                        let changed = process.state_has_changed;
+                        let changed = process.state_has_changed();
                         result = Some((*pid, process));
                         if changed {
                             break;
