@@ -19,8 +19,9 @@
 use super::Command;
 use crate::print_error;
 use async_trait::async_trait;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
+use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::Env;
@@ -57,9 +58,7 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
             )
             .await;
 
-            env.exit_status = ExitStatus::NOEXEC;
-            // TODO abort rather than continuing to the next command
-            Continue(())
+            Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
 }
@@ -151,8 +150,7 @@ mod tests {
             async_flag: Some(Location::dummy("X")),
         };
         let result = block_on(item.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::NOEXEC))));
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
