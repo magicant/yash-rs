@@ -235,10 +235,12 @@ mod tests {
     use crate::tests::cat_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
+    use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -281,6 +283,25 @@ mod tests {
             let result = pipeline.execute(&mut env).await;
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus(20));
+        });
+    }
+
+    #[test]
+    fn multi_command_pipeline_waits_for_all_child_commands() {
+        in_virtual_system(|mut env, main_pid, state| async move {
+            env.builtins.insert("return", return_builtin());
+            let pipeline: syntax::Pipeline =
+                "return -n 1 | return -n 2 | return -n 3".parse().unwrap();
+            pipeline.execute(&mut env).await;
+
+            // Only the original process remains.
+            for (pid, process) in &state.borrow().processes {
+                if *pid == main_pid {
+                    assert_eq!(process.state(), ProcessState::Running);
+                } else {
+                    assert_matches!(process.state(), ProcessState::Exited(_));
+                }
+            }
         });
     }
 
