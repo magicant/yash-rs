@@ -105,25 +105,16 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     shift_or_fail(env, &mut pipes, false).await?;
 
     // Await the last command
-    loop {
+    for pid in pids {
         use yash_env::job::WaitStatus::*;
-        match env.wait_for_subshell(Pid::from_raw(-1)).await {
-            Ok(Exited(pid, exit_status)) => {
-                if pid == *pids.last().unwrap() {
-                    env.exit_status = ExitStatus(exit_status);
-                    break Continue(());
-                }
-                // TODO should not ignore other PIDs
-            }
-            Ok(Signaled(pid, signal, _core_dumped)) => {
-                if pid == *pids.last().unwrap() {
-                    env.exit_status = ExitStatus::from(signal);
-                }
-                // TODO should not ignore other PIDs
-            }
+        env.exit_status = match env.wait_for_subshell(pid).await {
+            Ok(Exited(_pid, exit_status)) => ExitStatus(exit_status),
+            // TODO Report signal if interactive
+            Ok(Signaled(_pid, signal, _core_dumped)) => ExitStatus::from(signal),
             _ => todo!(),
         }
     }
+    Continue(())
 }
 
 async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
@@ -302,6 +293,33 @@ mod tests {
                     assert_matches!(process.state(), ProcessState::Exited(_));
                 }
             }
+        });
+    }
+
+    #[test]
+    fn multi_command_pipeline_does_not_wait_for_unrelated_child() {
+        in_virtual_system(|mut env, main_pid, state| async move {
+            env.builtins.insert("return", return_builtin());
+
+            let list: syntax::List = "return -n 7&".parse().unwrap();
+            list.execute(&mut env).await;
+            let async_pid = {
+                let state = state.borrow();
+                let mut iter = state.processes.keys();
+                assert_eq!(iter.next(), Some(&main_pid));
+                let async_pid = *iter.next().unwrap();
+                assert_eq!(iter.next(), None);
+                async_pid
+            };
+
+            let pipeline: syntax::Pipeline =
+                "return -n 1 | return -n 2 | return -n 3".parse().unwrap();
+            pipeline.execute(&mut env).await;
+
+            let state = state.borrow();
+            let process = &state.processes[&async_pid];
+            assert_eq!(process.state(), ProcessState::Exited(ExitStatus(7)));
+            assert!(process.state_has_changed());
         });
     }
 
