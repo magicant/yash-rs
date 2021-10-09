@@ -261,8 +261,8 @@ impl Fill for Item<MissingHereDoc> {
     type Full = Item;
     fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Item> {
         let and_or = self.and_or.fill(i)?;
-        let is_async = self.is_async;
-        Ok(Item { and_or, is_async })
+        let async_flag = self.async_flag;
+        Ok(Item { and_or, async_flag })
     }
 }
 

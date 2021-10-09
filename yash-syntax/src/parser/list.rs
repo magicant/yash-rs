@@ -27,6 +27,7 @@ use super::lex::Operator::{And, Newline, Semicolon};
 use super::lex::TokenId::Operator;
 use crate::syntax::Item;
 use crate::syntax::List;
+use std::rc::Rc;
 
 use super::lex::TokenId::EndOfInput;
 use std::future::Future;
@@ -55,13 +56,15 @@ impl Parser<'_> {
         };
 
         while let Some(and_or) = result {
-            let (is_async, next) = match self.peek_token().await?.id {
-                Operator(Semicolon) => (false, true),
-                Operator(And) => (true, true),
-                _ => (false, false),
+            let token = self.peek_token().await?;
+            let (async_flag, next) = match token.id {
+                Operator(Semicolon) => (None, true),
+                Operator(And) => (Some(token.word.location.clone()), true),
+                _ => (None, false),
             };
 
-            items.push(Item { and_or, is_async });
+            let and_or = Rc::new(and_or);
+            items.push(Item { and_or, async_flag });
 
             if !next {
                 break;
@@ -195,7 +198,7 @@ mod tests {
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 1);
-        assert_eq!(list.0[0].is_async, false);
+        assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
     }
 
@@ -207,7 +210,7 @@ mod tests {
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 1);
-        assert_eq!(list.0[0].is_async, false);
+        assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
     }
 
@@ -219,11 +222,22 @@ mod tests {
         let list = block_on(parser.list()).unwrap().unwrap();
         let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 3);
-        assert_eq!(list.0[0].is_async, true);
+
+        let location = list.0[0].async_flag.as_ref().unwrap();
+        assert_eq!(location.line.value, "foo & bar ; baz&");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 5);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
-        assert_eq!(list.0[1].is_async, false);
+
+        assert_eq!(list.0[1].async_flag, None);
         assert_eq!(list.0[1].and_or.to_string(), "bar");
-        assert_eq!(list.0[2].is_async, true);
+
+        let location = list.0[2].async_flag.as_ref().unwrap();
+        assert_eq!(location.line.value, "foo & bar ; baz&");
+        assert_eq!(location.line.number.get(), 1);
+        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.column.get(), 16);
         assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
 
@@ -244,8 +258,8 @@ mod tests {
         let List(items) = block_on(parser.command_line()).unwrap().unwrap();
         assert_eq!(items.len(), 1);
         let item = items.first().unwrap();
-        assert_eq!(item.is_async, false);
-        let AndOrList { first, rest } = &item.and_or;
+        assert_eq!(item.async_flag, None);
+        let AndOrList { first, rest } = &*item.and_or;
         assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);
