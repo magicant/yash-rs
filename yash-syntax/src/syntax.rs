@@ -1226,8 +1226,8 @@ pub struct Item<H = HereDoc> {
     /// The and-or list is contained in `Rc` to allow executing it
     /// asynchronously without cloning it.
     pub and_or: Rc<AndOrList<H>>,
-    /// True if this item is terminated by `&`.
-    pub is_async: bool,
+    /// Location of the `&` operator for this item, if any.
+    pub async_flag: Option<Location>,
 }
 
 /// Allows conversion from Item to String.
@@ -1238,7 +1238,7 @@ pub struct Item<H = HereDoc> {
 impl<H: fmt::Display> fmt::Display for Item<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.and_or)?;
-        if self.is_async {
+        if self.async_flag.is_some() {
             write!(f, "&")
         } else if f.alternate() {
             write!(f, ";")
@@ -2139,7 +2139,7 @@ mod tests {
         let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: false,
+            async_flag: None,
         };
         let mut list = List(vec![item]);
         assert_eq!(list.to_string(), "first");
@@ -2147,7 +2147,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: true,
+            async_flag: Some(Location::dummy("")),
         };
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
@@ -2155,7 +2155,7 @@ mod tests {
         let and_or = "third".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: false,
+            async_flag: None,
         };
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second& third");
@@ -2166,7 +2166,7 @@ mod tests {
         let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: false,
+            async_flag: None,
         };
         let mut list = List(vec![item]);
         assert_eq!(format!("{:#}", list), "first;");
@@ -2174,7 +2174,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: true,
+            async_flag: Some(Location::dummy("")),
         };
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");
@@ -2182,7 +2182,7 @@ mod tests {
         let and_or = "third".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            is_async: false,
+            async_flag: None,
         };
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second& third;");

@@ -31,9 +31,9 @@ use yash_syntax::syntax::AndOrList;
 #[async_trait(?Send)]
 impl Command for syntax::Item {
     async fn execute(&self, env: &mut Env) -> Result {
-        match self.is_async {
-            false => self.and_or.execute(env).await,
-            true => execute_async(env, &self.and_or).await,
+        match self.async_flag {
+            None => self.and_or.execute(env).await,
+            Some(_) => execute_async(env, &self.and_or).await,
         }
     }
 }
@@ -83,7 +83,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            is_async: false,
+            async_flag: None,
         };
         let result = block_on(item.execute(&mut env));
         assert_eq!(result, Continue(()));
@@ -103,7 +103,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            is_async: true,
+            async_flag: Some(Location::dummy("")),
         };
         let result = executor.run_until(item.execute(&mut env));
         assert_eq!(result, Continue(()));
@@ -122,7 +122,7 @@ mod tests {
         let and_or: syntax::AndOrList = "echo foo".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            is_async: true,
+            async_flag: Some(Location::dummy("")),
         };
 
         executor
@@ -149,7 +149,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            is_async: true,
+            async_flag: Some(Location::dummy("X")),
         };
         let result = block_on(item.execute(&mut env));
         assert_eq!(result, Continue(()));
