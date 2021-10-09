@@ -107,7 +107,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
     // Await the last command
     loop {
         use yash_env::job::WaitStatus::*;
-        match env.wait_for_subshell().await {
+        match env.wait_for_subshell(Pid::from_raw(-1)).await {
             Ok(Exited(pid, exit_status)) => {
                 if pid == *pids.last().unwrap() {
                     env.exit_status = ExitStatus(exit_status);
@@ -141,27 +141,17 @@ async fn connect_pipe_and_execute_command(
     env: &mut Env,
     pipes: PipeSet,
     command: Rc<syntax::Command>,
-) {
+) -> Result {
     match pipes.move_to_stdin_stdout(env) {
         Ok(()) => (),
         Err(errno) => {
             env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"))
                 .await;
-            env.exit_status = ExitStatus::NOEXEC;
-            return;
+            return Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)));
         }
     }
 
-    // TODO This part of code should be the same as subshell executor. Extract a function.
-    match command.execute(env).await {
-        Continue(()) => (),
-        Break(Divert::Interrupt(exit_status) | Divert::Exit(exit_status)) => {
-            if let Some(exit_status) = exit_status {
-                env.exit_status = exit_status;
-            }
-        }
-        Break(divert) => todo!("subshell finished with {:?}", divert),
-    }
+    command.execute(env).await
 }
 
 async fn pid_or_fail(env: &mut Env, pid: std::result::Result<Pid, Errno>) -> Result<Pid> {

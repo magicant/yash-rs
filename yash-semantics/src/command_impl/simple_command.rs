@@ -227,7 +227,7 @@ async fn execute_external_utility(
                 for redir in &*redirs {
                     if let Err(e) = env.perform_redir(redir).await {
                         e.handle(&mut env).await;
-                        return;
+                        return Continue(());
                     }
                 }
 
@@ -253,7 +253,8 @@ async fn execute_external_utility(
                     errno.desc().into(),
                     &location,
                 )
-                .await
+                .await;
+                Continue(())
             })
         })
         .await;

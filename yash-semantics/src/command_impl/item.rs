@@ -41,12 +41,7 @@ impl Command for syntax::Item {
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>) -> Result {
     let and_or = Rc::clone(and_or);
     let result = env
-        .start_subshell(|env| {
-            Box::pin(async move {
-                let _result = and_or.execute(env).await;
-                // TODO handle result
-            })
-        })
+        .start_subshell(|env| Box::pin(async move { and_or.execute(env).await }))
         .await;
     match result {
         Ok(_pid) => {

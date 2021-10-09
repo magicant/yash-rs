@@ -45,6 +45,8 @@ use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
+use self::job::Pid;
+use self::job::WaitStatus;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
@@ -54,12 +56,11 @@ pub use self::system::System;
 use self::variable::VariableSet;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
-use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
 use std::future::Future;
+use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -175,14 +176,29 @@ impl Env {
     /// Although this function is `async`, it does not wait for the child to
     /// finish, which means the parent and child processes will run
     /// concurrently.
+    ///
+    /// If function `f` returns an `Err(Divert::...)`, it is handled as follows:
+    ///
+    /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
+    ///   status in `Env`.
+    /// - Other `Divert` values are ignored.
     pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+            + 'static,
     {
         let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
             if let Some(f) = f.take() {
-                Box::pin(f(env))
+                Box::pin(async move {
+                    use self::exec::Divert::{Exit, Interrupt};
+                    match f(env).await {
+                        Break(Exit(Some(exit_status))) | Break(Interrupt(Some(exit_status))) => {
+                            env.exit_status = exit_status
+                        }
+                        _ => (),
+                    }
+                })
             } else {
                 Box::pin(ready(()))
             }
@@ -213,6 +229,9 @@ impl Env {
     /// the current shell continues waiting for the subshell to finish, so it
     /// must be resumed by some other means.
     ///
+    /// See [`start_subshell`](Self::start_subshell) for the behavior of the
+    /// subshell in case function `f` returns an `Err(Divert::...)`.
+    ///
     /// # Return value
     ///
     /// This function usually returns the exit status of the subshell that is
@@ -221,22 +240,19 @@ impl Env {
     /// [`new_child_process`](System::new_child_process), the error is returned.
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>> + 'static,
+        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+            + 'static,
     {
         // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
 
         use nix::sys::wait::WaitStatus::*;
-        match self.wait_for_subshell().await? {
+        match self.wait_for_subshell(child_pid).await? {
             Exited(pid, exit_status) => {
-                // TODO This assertion is not correct. We need to handle
-                // other possibly existing child processes.
                 assert_eq!(pid, child_pid);
                 Ok(ExitStatus(exit_status))
             }
             Signaled(pid, signal, _core_dumped) => {
-                // TODO This assertion is not correct. We need to handle
-                // other possibly existing child processes.
                 assert_eq!(pid, child_pid);
                 Ok(ExitStatus::from(signal))
             }
@@ -244,13 +260,19 @@ impl Env {
         }
     }
 
-    // TODO Allow specifying which subshell to wait for
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
-    /// This function waits for a subshell to change its execution status.
-    /// If the current environment has no subshell, it returns
+    /// This function waits for a subshell to change its execution status. The
+    /// `target` parameter specifies which child to wait for:
+    ///
+    /// - `-1`: any child
+    /// - `0`: any child in the same process group as the current process
+    /// - `pid`: the child whose process ID is `pid`
+    /// - `-pgid`: any child in the process group whose process group ID is `pgid`
+    ///
+    /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
-    pub async fn wait_for_subshell(&mut self) -> nix::Result<WaitStatus> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and
         // `wait_for_signal`.
@@ -259,7 +281,7 @@ impl Env {
             .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
 
         let result = loop {
-            match self.system.wait()? {
+            match self.system.wait(target)? {
                 WaitStatus::StillAlive => {}
                 new_status => break Ok(new_status),
             }
@@ -282,6 +304,7 @@ mod tests {
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
     use std::cell::RefCell;
+    use std::ops::ControlFlow::Continue;
 
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut>(f: F)
@@ -337,6 +360,7 @@ mod tests {
                 .run_in_subshell(move |env| {
                     Box::pin(async move {
                         env.exit_status = status;
+                        Continue(())
                     })
                 })
                 .await;
@@ -366,11 +390,12 @@ mod tests {
                 .start_subshell(|env| {
                     Box::pin(async move {
                         env.exit_status = ExitStatus(42);
+                        Continue(())
                     })
                 })
                 .await
                 .unwrap();
-            let result = env.wait_for_subshell().await;
+            let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
         });
     }
@@ -382,7 +407,7 @@ mod tests {
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
         let mut env = Env::with_system(Box::new(system));
         executor.run_until(async move {
-            let result = env.wait_for_subshell().await;
+            let result = env.wait_for_subshell(Pid::from_raw(-1)).await;
             assert_eq!(result, Err(Errno::ECHILD));
         });
     }

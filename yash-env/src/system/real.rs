@@ -20,6 +20,7 @@ use super::ChildProcess;
 use super::Env;
 use super::System;
 use crate::io::Fd;
+use crate::job::Pid;
 use crate::SignalHandling;
 use async_trait::async_trait;
 use nix::errno::Errno;
@@ -36,7 +37,6 @@ use nix::sys::stat::stat;
 use nix::sys::stat::Mode;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
-use nix::unistd::Pid;
 use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::CStr;
@@ -258,10 +258,10 @@ impl System for RealSystem {
         }
     }
 
-    fn wait(&mut self) -> nix::Result<nix::sys::wait::WaitStatus> {
+    fn wait(&mut self, target: Pid) -> nix::Result<super::WaitStatus> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        nix::sys::wait::waitpid(None, options.into())
+        nix::sys::wait::waitpid(target, options.into())
     }
 
     fn execve(
