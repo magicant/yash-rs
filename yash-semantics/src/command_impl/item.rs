@@ -31,14 +31,14 @@ use yash_syntax::syntax::AndOrList;
 #[async_trait(?Send)]
 impl Command for syntax::Item {
     async fn execute(&self, env: &mut Env) -> Result {
-        match self.async_flag {
+        match &self.async_flag {
             None => self.and_or.execute(env).await,
-            Some(_) => execute_async(env, &self.and_or).await,
+            Some(async_flag) => execute_async(env, &self.and_or, async_flag).await,
         }
     }
 }
 
-async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>) -> Result {
+async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
     let and_or = Rc::clone(and_or);
     let result = env
         .start_subshell(|env| Box::pin(async move { and_or.execute(env).await }))
@@ -53,10 +53,9 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>) -> Result {
                 env,
                 "cannot start a subshell to run an asynchronous command".into(),
                 errno.desc().into(),
-                &Location::dummy("X"),
+                async_flag,
             )
             .await;
-            // TODO Print the correct location
 
             env.exit_status = ExitStatus::NOEXEC;
             // TODO abort rather than continuing to the next command
