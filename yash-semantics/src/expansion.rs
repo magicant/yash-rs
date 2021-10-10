@@ -188,7 +188,7 @@ pub trait Env: std::fmt::Debug {
     ///
     /// This function marks the process ID as known by the user so that the
     /// shell does not disown the process too soon. See
-    /// [`JobSet::expand_last_async_pid`] for details.
+    /// [`yash_env::job::JobSet::expand_last_async_pid`] for details.
     fn last_async_pid(&mut self) -> Pid;
 
     // TODO define Env methods
