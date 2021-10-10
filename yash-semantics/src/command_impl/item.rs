@@ -31,6 +31,25 @@ use yash_syntax::syntax::AndOrList;
 
 #[async_trait(?Send)]
 impl Command for syntax::Item {
+    /// Executes the item.
+    ///
+    /// # Synchronous command
+    ///
+    /// If the item's `async_flag` is `None`, this function executes the and-or
+    /// list in the item.
+    ///
+    /// # Asynchronous command
+    ///
+    /// If the item has an `async_flag` set, the and-or list is executed
+    /// asynchronously in a subshell, whose process ID is [set to the job
+    /// set](yash_env::job::JobSet::set_last_async_pid) in the environment.
+    ///
+    /// Since this function finishes before the asynchronous execution finishes,
+    /// the exit status does not reflect the results of the and-or list; the
+    /// exit status is always 0.
+    ///
+    /// TODO: If the `monitor` option is off, the standard input of the
+    /// asynchronous and-or list is implicitly redirected to `/dev/null`.
     async fn execute(&self, env: &mut Env) -> Result {
         match &self.async_flag {
             None => self.and_or.execute(env).await,
@@ -45,7 +64,8 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
         .start_subshell(|env| Box::pin(async move { and_or.execute(env).await }))
         .await;
     match result {
-        Ok(_pid) => {
+        Ok(pid) => {
+            env.jobs.set_last_async_pid(pid);
             env.exit_status = ExitStatus::SUCCESS;
             Continue(())
         }
@@ -135,6 +155,27 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "foo\n".as_bytes());
+    }
+
+    #[test]
+    fn item_execute_async_pid() {
+        let system = VirtualSystem::new();
+        let main_pid = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut executor = futures_executor::LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("return", return_builtin());
+
+        let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
+        let item = syntax::Item {
+            and_or: Rc::new(and_or),
+            async_flag: Some(Location::dummy("")),
+        };
+        executor.run_until(item.execute(&mut env));
+
+        let pids = state.borrow().processes.keys().copied().collect::<Vec<_>>();
+        assert_eq!(pids, [main_pid, env.jobs.last_async_pid()]);
     }
 
     #[test]
