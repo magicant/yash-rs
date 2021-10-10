@@ -57,6 +57,8 @@ impl JobSet {
     /// This function is similar to [`last_async_pid`](Self::last_async_pid),
     /// but also updates an internal flag so that the asynchronous command is
     /// not disowned too soon.
+    ///
+    /// TODO Elaborate on automatic disowning
     pub fn expand_last_async_pid(&mut self) -> Pid {
         // TODO Keep the async process from being disowned.
         self.last_async_pid

@@ -104,6 +104,12 @@ mod tests {
                 Ok(None)
             }
         }
+        fn exit_status(&self) -> yash_env::exec::ExitStatus {
+            unimplemented!("not available for Singleton");
+        }
+        fn last_async_pid(&mut self) -> yash_env::job::Pid {
+            unimplemented!("not available for Singleton");
+        }
     }
 
     #[test]
