@@ -66,6 +66,8 @@ use async_trait::async_trait;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use yash_env::exec::ExitStatus;
+use yash_env::job::Pid;
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
@@ -179,6 +181,16 @@ pub trait Env: std::fmt::Debug {
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
 
+    /// Gets the exit status of the last command.
+    fn exit_status(&self) -> ExitStatus;
+
+    /// Gets the process ID of the last executed asynchronous command.
+    ///
+    /// This function marks the process ID as known by the user so that the
+    /// shell does not disown the process too soon. See
+    /// [`yash_env::job::JobSet::expand_last_async_pid`] for details.
+    fn last_async_pid(&mut self) -> Pid;
+
     // TODO define Env methods
 }
 // TODO Should we split Env for the initial expansion and multi-field expansion?
@@ -193,6 +205,12 @@ impl Env for yash_env::Env {
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
         self.variables.assign(name, value)
+    }
+    fn exit_status(&self) -> ExitStatus {
+        self.exit_status
+    }
+    fn last_async_pid(&mut self) -> Pid {
+        self.jobs.expand_last_async_pid()
     }
 }
 
@@ -519,6 +537,12 @@ mod tests {
             _: String,
             _: Variable,
         ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn exit_status(&self) -> yash_env::exec::ExitStatus {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn last_async_pid(&mut self) -> yash_env::job::Pid {
             unimplemented!("NullEnv's method must not be called")
         }
     }
