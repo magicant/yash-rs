@@ -100,10 +100,21 @@ impl Variable {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct VariableInContext {
+    variable: Variable,
+    // TODO context_index: usize,
+}
+
 /// Collection of variables.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct VariableSet(HashMap<String, Variable>);
-// TODO Support local and temporary contexts
+pub struct VariableSet {
+    /// Hash map containing all variables.
+    ///
+    /// The value of a hash map entry is a stack of variables defined in
+    /// contexts, sorted in the ascending order of the context index.
+    all_variables: HashMap<String, Vec<VariableInContext>>,
+}
 
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,7 +141,7 @@ impl VariableSet {
         String: Borrow<N>,
         N: Hash + Eq,
     {
-        self.0.get(name)
+        Some(&self.all_variables.get(name)?.last()?.variable)
     }
 
     // TODO Export if the existing variable has been exported
@@ -145,24 +156,35 @@ impl VariableSet {
         value: Variable,
     ) -> Result<Option<Variable>, ReadOnlyError> {
         // TODO Use HashMap::try_insert
-        if let Some(existing) = self.0.get(&name) {
-            if let Some(location) = &existing.read_only_location {
+        if let Some(existing) = self
+            .all_variables
+            .get_mut(&name)
+            .map(|v| v.last_mut())
+            .flatten()
+        {
+            if let Some(location) = &existing.variable.read_only_location {
                 return Err(ReadOnlyError {
                     name,
                     read_only_location: location.clone(),
                     new_value: value,
                 });
             }
+
+            Ok(Some(std::mem::replace(&mut existing.variable, value)))
+        } else {
+            let variable = VariableInContext { variable: value };
+            self.all_variables.insert(name, vec![variable]);
+            Ok(None)
         }
-        Ok(self.0.insert(name, value))
     }
 
     /// Returns environment variables in a new vector of C string.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
-        self.0
+        self.all_variables
             .iter()
-            .filter_map(|(name, var)| {
+            .filter_map(|(name, vars)| {
+                let var = &vars.last()?.variable;
                 if var.is_exported {
                     let mut s = name.clone();
                     s.push('=');
