@@ -116,6 +116,27 @@ pub struct VariableSet {
     all_variables: HashMap<String, Vec<VariableInContext>>,
 }
 
+/// Choice of a context to which a variable is assigned.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Scope {
+    /// Assigns to as lower a context as possible.
+    ///
+    /// The variable is assigned to the base context if there are no other
+    /// variables having the same name in any context. Otherwise, the assignment
+    /// will overwrite the topmost existing variable.
+    Global,
+
+    /// Assigns to the topmost context.
+    ///
+    /// Any existing variables in the contexts below the topmost do not affect
+    /// this type of assignment.
+    ///
+    /// If the `VariableSet` only has the base context, the variable is assigned
+    /// to it anyway.
+    Local,
+    // TODO Volatile
+}
+
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReadOnlyError {
@@ -145,13 +166,13 @@ impl VariableSet {
     }
 
     // TODO Export if the existing variable has been exported
-    // TODO Specifying the scope of assignment
     /// Assigns a variable.
     ///
     /// If successful, the return value is the previous value. If there is an
     /// existing read-only value, the assignment fails.
     pub fn assign(
         &mut self,
+        _scope: Scope,
         name: String,
         value: Variable,
     ) -> Result<Option<Variable>, ReadOnlyError> {
@@ -216,7 +237,7 @@ mod tests {
             read_only_location: Some(Location::dummy("dummy")),
         };
         let result = variables
-            .assign("foo".to_string(), variable.clone())
+            .assign(Scope::Global, "foo".to_string(), variable.clone())
             .unwrap();
         assert_eq!(result, None);
         assert_eq!(variables.get("foo"), Some(&variable));
@@ -231,7 +252,9 @@ mod tests {
             is_exported: false,
             read_only_location: None,
         };
-        variables.assign("foo".to_string(), v1.clone()).unwrap();
+        variables
+            .assign(Scope::Global, "foo".to_string(), v1.clone())
+            .unwrap();
 
         let v2 = Variable {
             value: Scalar("your value".to_string()),
@@ -239,7 +262,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(Location::dummy("something")),
         };
-        let result = variables.assign("foo".to_string(), v2.clone()).unwrap();
+        let result = variables
+            .assign(Scope::Global, "foo".to_string(), v2.clone())
+            .unwrap();
         assert_eq!(result, Some(v1));
         assert_eq!(variables.get("foo"), Some(&v2));
     }
@@ -254,7 +279,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(read_only_location.clone()),
         };
-        variables.assign("x".to_string(), v1.clone()).unwrap();
+        variables
+            .assign(Scope::Global, "x".to_string(), v1.clone())
+            .unwrap();
 
         let v2 = Variable {
             value: Scalar("your value".to_string()),
@@ -262,7 +289,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(Location::dummy("something")),
         };
-        let error = variables.assign("x".to_string(), v2.clone()).unwrap_err();
+        let error = variables
+            .assign(Scope::Global, "x".to_string(), v2.clone())
+            .unwrap_err();
         assert_eq!(error.name, "x");
         assert_eq!(error.read_only_location, read_only_location);
         assert_eq!(error.new_value, v2);
@@ -276,6 +305,7 @@ mod tests {
 
         variables
             .assign(
+                Scope::Global,
                 "foo".to_string(),
                 Variable {
                     value: Scalar("FOO".to_string()),
@@ -287,6 +317,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "bar".to_string(),
                 Variable {
                     value: Array(vec!["BAR".to_string()]),
@@ -298,6 +329,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "baz".to_string(),
                 Variable {
                     value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
@@ -309,6 +341,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "null".to_string(),
                 Variable {
                     value: Scalar("not exported".to_string()),

@@ -17,6 +17,7 @@
 //! Assignment.
 
 use crate::expansion::expand_value;
+use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 
 #[doc(no_inline)]
@@ -39,10 +40,11 @@ pub async fn perform_assignment<E: Env>(env: &mut E, assign: &Assign) -> Result 
         is_exported: false,
         read_only_location: None,
     };
-    env.assign_variable(name, value).map_err(|e| Error {
-        cause: ErrorCause::AssignReadOnly(e),
-        location: assign.location.clone(),
-    })?;
+    env.assign_variable(Scope::Global, name, value)
+        .map_err(|e| Error {
+            cause: ErrorCause::AssignReadOnly(e),
+            location: assign.location.clone(),
+        })?;
     Ok(())
 }
 
@@ -61,6 +63,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::Env;
     use yash_syntax::source::Location;
@@ -91,7 +94,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(location.clone()),
         };
-        env.variables.assign("v".to_string(), v).unwrap();
+        env.variables
+            .assign(Scope::Global, "v".to_string(), v)
+            .unwrap();
         let a: Assign = "v=new".parse().unwrap();
         let e = block_on(perform_assignment(&mut env, &a)).unwrap_err();
         assert_matches!(e.cause, ErrorCause::AssignReadOnly(roe) => {

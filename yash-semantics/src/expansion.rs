@@ -69,6 +69,7 @@ use std::ops::DerefMut;
 use yash_env::exec::ExitStatus;
 use yash_env::job::Pid;
 use yash_env::variable::ReadOnlyError;
+use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -177,6 +178,7 @@ pub trait Env: std::fmt::Debug {
     /// Assigns a variable.
     fn assign_variable(
         &mut self,
+        scope: Scope,
         name: String,
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
@@ -201,10 +203,11 @@ impl Env for yash_env::Env {
     }
     fn assign_variable(
         &mut self,
+        scope: Scope,
         name: String,
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
-        self.variables.assign(name, value)
+        self.variables.assign(scope, name, value)
     }
     fn exit_status(&self) -> ExitStatus {
         self.exit_status
@@ -534,6 +537,7 @@ mod tests {
         }
         fn assign_variable(
             &mut self,
+            _: Scope,
             _: String,
             _: Variable,
         ) -> std::result::Result<Option<Variable>, ReadOnlyError> {

@@ -92,6 +92,7 @@ mod tests {
     use yash_env::exec::ExitStatus;
     use yash_env::job::Pid;
     use yash_env::variable::ReadOnlyError;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
@@ -112,6 +113,7 @@ mod tests {
         }
         fn assign_variable(
             &mut self,
+            _scope: Scope,
             name: String,
             value: Variable,
         ) -> std::result::Result<Option<Variable>, ReadOnlyError> {

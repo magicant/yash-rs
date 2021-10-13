@@ -298,6 +298,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::system::r#virtual::INode;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
@@ -323,6 +324,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.variables
             .assign(
+                Scope::Global,
                 "a".to_string(),
                 Variable {
                     value: Value::Scalar("".to_string()),
@@ -391,6 +393,7 @@ mod tests {
 
             env.variables
                 .assign(
+                    Scope::Global,
                     "env".to_string(),
                     Variable {
                         value: Value::Scalar("scalar".to_string()),
@@ -402,6 +405,7 @@ mod tests {
                 .unwrap();
             env.variables
                 .assign(
+                    Scope::Global,
                     "local".to_string(),
                     Variable {
                         value: Value::Scalar("ignored".to_string()),
