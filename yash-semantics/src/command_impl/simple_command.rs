@@ -32,6 +32,8 @@ use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::function::Function;
 use yash_env::system::Errno;
+#[cfg(doc)]
+use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -82,11 +84,13 @@ impl Command for syntax::SimpleCommand {
     ///
     /// ## Function
     ///
-    /// If the target is a function, redirections and assignments are performed
-    /// in the same way as a regular built-in. Then, a new variable context sits
-    /// on top of the existing context and bears the remaining fields as
-    /// positional parameters. The function body is performed in the new
-    /// context.
+    /// If the target is a function, redirections are performed in the same way
+    /// as a regular built-in. Then, a new variable context is
+    /// [pushed](Env::push_variable_context) on top of the existing context, and
+    /// the assignments are performed [locally](Scope::Local) and exported. The
+    /// remaining fields that were not used in the command search become
+    /// positional parameters in the new context. After executing the function
+    /// body, the context is [popped](Env::pop_variable_context).
     ///
     /// ## External utility
     ///
@@ -202,10 +206,11 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
 
 async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
     // TODO open redirections
+    let mut scope = env.push_variable_context();
     // TODO expand and perform assignments
-    // TODO Allocate a local variable context
     // TODO Apply positional parameters
-    function.body.execute(env).await?;
+    // TODO Update control flow stack
+    function.body.execute(&mut scope).await?;
     // TODO Consume Divert::Return
     Continue(())
 }
@@ -289,7 +294,9 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
+    use crate::tests::local_builtin;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
     use std::cell::RefCell;
@@ -298,6 +305,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::system::r#virtual::INode;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
@@ -323,6 +331,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.variables
             .assign(
+                Scope::Global,
                 "a".to_string(),
                 Variable {
                     value: Value::Scalar("".to_string()),
@@ -364,7 +373,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_exit_status_from_function() {
-        use yash_env::function::{Function, HashEntry};
+        use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         env.functions.insert(HashEntry(Rc::new(Function {
@@ -380,6 +389,29 @@ mod tests {
     }
 
     #[test]
+    fn simple_command_creates_temporary_context_executing_function() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("local", local_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ local x=42; echo $x; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        block_on(command.execute(&mut env));
+        assert_eq!(env.variables.get("x"), None);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "42\n".as_bytes());
+    }
+
+    #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
         in_virtual_system(|mut env, _pid, state| async move {
             let path = PathBuf::from("/some/file");
@@ -391,6 +423,7 @@ mod tests {
 
             env.variables
                 .assign(
+                    Scope::Global,
                     "env".to_string(),
                     Variable {
                         value: Value::Scalar("scalar".to_string()),
@@ -402,6 +435,7 @@ mod tests {
                 .unwrap();
             env.variables
                 .assign(
+                    Scope::Global,
                     "local".to_string(),
                     Variable {
                         value: Value::Scalar("ignored".to_string()),

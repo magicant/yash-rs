@@ -29,6 +29,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use semantics::Command;
     use std::num::NonZeroU64;
     use std::ops::ControlFlow::{Break, Continue};
+    use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
@@ -61,7 +62,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
             is_exported: true,
             read_only_location: None,
         };
-        env.variables.assign(name, value).unwrap();
+        env.variables.assign(Scope::Global, name, value).unwrap();
     }
 
     loop {

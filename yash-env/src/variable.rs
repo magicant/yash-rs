@@ -18,6 +18,7 @@
 //!
 //! This module provides data types for defining shell variables.
 
+use crate::Env;
 use either::{Left, Right};
 use itertools::Itertools;
 use std::borrow::Borrow;
@@ -100,10 +101,58 @@ impl Variable {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct VariableInContext {
+    variable: Variable,
+    context_index: usize,
+}
+
 /// Collection of variables.
+///
+/// A `VariableSet` is a stack of contexts, and a _context_ is a map of
+/// name-variable pairs. The `VariableSet` has a _base context_ that has the
+/// same lifetime as the `VariableSet` itself. Additional contexts can be pushed
+/// and popped on a last-in-first-out basis.
+///
+/// You can define any number of variables in a context. A new context is empty
+/// when pushed. You can pop a context regardless of whether it is empty or not;
+/// all the variables in the context are removed together.
+///
+/// Variables in a context hide those with the same name in lower contexts. You
+/// cannot access such hidden variables until you remove the hiding variable
+/// from the upper context.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct VariableSet(HashMap<String, Variable>);
-// TODO Support local and temporary contexts
+pub struct VariableSet {
+    /// Hash map containing all variables.
+    ///
+    /// The value of a hash map entry is a stack of variables defined in
+    /// contexts, sorted in the ascending order of the context index.
+    all_variables: HashMap<String, Vec<VariableInContext>>,
+
+    /// Number of non-base contexts.
+    contexts: usize,
+}
+
+/// Choice of a context to which a variable is assigned.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Scope {
+    /// Assigns to as lower a context as possible.
+    ///
+    /// The variable is assigned to the base context if there are no other
+    /// variables having the same name in any context. Otherwise, the assignment
+    /// will overwrite the topmost existing variable.
+    Global,
+
+    /// Assigns to the topmost context.
+    ///
+    /// Any existing variables in the contexts below the topmost do not affect
+    /// this type of assignment.
+    ///
+    /// If the `VariableSet` only has the base context, the variable is assigned
+    /// to it anyway.
+    Local,
+    // TODO Volatile
+}
 
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,22 +179,41 @@ impl VariableSet {
         String: Borrow<N>,
         N: Hash + Eq,
     {
-        self.0.get(name)
+        Some(&self.all_variables.get(name)?.last()?.variable)
     }
 
-    // TODO Export if the existing variable has been exported
-    // TODO Specifying the scope of assignment
     /// Assigns a variable.
     ///
     /// If successful, the return value is the previous value. If there is an
     /// existing read-only value, the assignment fails.
     pub fn assign(
         &mut self,
+        scope: Scope,
         name: String,
         value: Variable,
     ) -> Result<Option<Variable>, ReadOnlyError> {
-        // TODO Use HashMap::try_insert
-        if let Some(existing) = self.0.get(&name) {
+        use std::collections::hash_map::Entry;
+        // TODO Can we avoid cloning the name here?
+        let stack = match self.all_variables.entry(name.clone()) {
+            Entry::Vacant(vacant) => vacant.insert(Vec::new()),
+            Entry::Occupied(occupied) => occupied.into_mut(),
+        };
+        let context_count = self.contexts;
+        let existing = stack
+            .last_mut()
+            .map(|vic| match scope {
+                Scope::Global => Some(&mut vic.variable),
+                Scope::Local => {
+                    if vic.context_index == context_count {
+                        Some(&mut vic.variable)
+                    } else {
+                        None
+                    }
+                }
+            })
+            .flatten();
+
+        if let Some(existing) = existing {
             if let Some(location) = &existing.read_only_location {
                 return Err(ReadOnlyError {
                     name,
@@ -153,16 +221,61 @@ impl VariableSet {
                     new_value: value,
                 });
             }
+
+            // TODO Export if the existing variable has been exported
+            Ok(Some(std::mem::replace(existing, value)))
+        } else {
+            let context_index = match scope {
+                Scope::Global => 0,
+                Scope::Local => self.contexts,
+            };
+            let variable = VariableInContext {
+                variable: value,
+                context_index,
+            };
+            stack.push(variable);
+            Ok(None)
         }
-        Ok(self.0.insert(name, value))
+    }
+
+    // TODO is_volatile
+    /// Pushes a new empty context.
+    pub fn push_context(&mut self) {
+        self.contexts += 1;
+    }
+
+    /// Pops the last-pushed context.
+    ///
+    /// This function removes the topmost context from the internal stack of
+    /// contexts in the `VariableSet`, thereby removing all the variables in the
+    /// context.
+    ///
+    /// You cannot pop the base context. This function would __panic__ if you
+    /// tried to do so.
+    pub fn pop_context(&mut self) {
+        if self.contexts == 0 {
+            panic!("cannot pop the base context");
+        }
+        self.contexts -= 1;
+        // TODO Use HashMap::drain_filter to remove empty values
+        // TODO Use complementary stack of hash tables to avoid scanning the
+        // whole `self.all_variables`
+        for stack in self.all_variables.values_mut() {
+            if let Some(vic) = stack.last() {
+                if vic.context_index > self.contexts {
+                    stack.pop();
+                }
+            }
+        }
     }
 
     /// Returns environment variables in a new vector of C string.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
-        self.0
+        self.all_variables
             .iter()
-            .filter_map(|(name, var)| {
+            .filter_map(|(name, vars)| {
+                let var = &vars.last()?.variable;
                 if var.is_exported {
                     let mut s = name.clone();
                     s.push('=');
@@ -180,6 +293,47 @@ impl VariableSet {
     }
 }
 
+/// RAII-style guard for temporarily retaining a variable context.
+///
+/// The [`Env::push_variable_context`] function returns a `ScopeGuard` that
+/// keeps a reference to the environment. When you drop the `ScopeGuard`, it
+/// pops the context.
+#[derive(Debug)]
+#[must_use = "You must retain ScopeGuard to keep the context alive"]
+pub struct ScopeGuard<'a> {
+    env: &'a mut Env,
+}
+
+impl<'a> ScopeGuard<'a> {
+    pub(crate) fn new(env: &'a mut Env) -> Self {
+        env.variables.push_context();
+        ScopeGuard { env }
+    }
+}
+
+impl std::ops::Drop for ScopeGuard<'_> {
+    /// Drops the `ScopeGuard`.
+    ///
+    /// This function [pops](VariableSet::pop_context) the context that was
+    /// pushed when creating this `ScopeGuard`.
+    fn drop(&mut self) {
+        self.env.variables.pop_context();
+    }
+}
+
+impl std::ops::Deref for ScopeGuard<'_> {
+    type Target = Env;
+    fn deref(&self) -> &Env {
+        self.env
+    }
+}
+
+impl std::ops::DerefMut for ScopeGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Env {
+        self.env
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,7 +348,7 @@ mod tests {
             read_only_location: Some(Location::dummy("dummy")),
         };
         let result = variables
-            .assign("foo".to_string(), variable.clone())
+            .assign(Scope::Global, "foo".to_string(), variable.clone())
             .unwrap();
         assert_eq!(result, None);
         assert_eq!(variables.get("foo"), Some(&variable));
@@ -209,7 +363,9 @@ mod tests {
             is_exported: false,
             read_only_location: None,
         };
-        variables.assign("foo".to_string(), v1.clone()).unwrap();
+        variables
+            .assign(Scope::Global, "foo".to_string(), v1.clone())
+            .unwrap();
 
         let v2 = Variable {
             value: Scalar("your value".to_string()),
@@ -217,7 +373,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(Location::dummy("something")),
         };
-        let result = variables.assign("foo".to_string(), v2.clone()).unwrap();
+        let result = variables
+            .assign(Scope::Global, "foo".to_string(), v2.clone())
+            .unwrap();
         assert_eq!(result, Some(v1));
         assert_eq!(variables.get("foo"), Some(&v2));
     }
@@ -232,7 +390,9 @@ mod tests {
             is_exported: false,
             read_only_location: Some(read_only_location.clone()),
         };
-        variables.assign("x".to_string(), v1.clone()).unwrap();
+        variables
+            .assign(Scope::Global, "x".to_string(), v1.clone())
+            .unwrap();
 
         let v2 = Variable {
             value: Scalar("your value".to_string()),
@@ -240,11 +400,110 @@ mod tests {
             is_exported: false,
             read_only_location: Some(Location::dummy("something")),
         };
-        let error = variables.assign("x".to_string(), v2.clone()).unwrap_err();
+        let error = variables
+            .assign(Scope::Global, "x".to_string(), v2.clone())
+            .unwrap_err();
         assert_eq!(error.name, "x");
         assert_eq!(error.read_only_location, read_only_location);
         assert_eq!(error.new_value, v2);
         assert_eq!(variables.get("x"), Some(&v1));
+    }
+
+    fn dummy_variable<V: Into<String>>(value: V) -> Variable {
+        Variable {
+            value: Scalar(value.into()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        }
+    }
+
+    #[test]
+    fn assign_global() {
+        let mut variables = VariableSet::new();
+        variables.push_context();
+        variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("".to_string()));
+    }
+
+    #[test]
+    fn assign_local() {
+        let mut variables = VariableSet::new();
+        variables.push_context();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("".to_string()));
+    }
+
+    #[test]
+    fn popping_context_removes_variables() {
+        let mut variables = VariableSet::new();
+        variables.push_context();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        variables.pop_context();
+        assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn reassign_global_non_base_context() {
+        let mut variables = VariableSet::new();
+        variables.push_context();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("a"))
+            .unwrap();
+        variables.push_context();
+        variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable("b"))
+            .unwrap();
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("b".to_string()));
+        variables.pop_context();
+        assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn variable_in_upper_context_hides_lower_variables() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        variables.push_context();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("1".to_string()));
+    }
+
+    #[test]
+    fn variable_is_visible_again_after_popping_upper_variables() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        variables.push_context();
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
+            .unwrap();
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("0".to_string()));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot pop the base context")]
+    fn cannot_pop_base_context() {
+        let mut variables = VariableSet::new();
+        variables.pop_context();
     }
 
     #[test]
@@ -254,6 +513,7 @@ mod tests {
 
         variables
             .assign(
+                Scope::Global,
                 "foo".to_string(),
                 Variable {
                     value: Scalar("FOO".to_string()),
@@ -265,6 +525,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "bar".to_string(),
                 Variable {
                     value: Array(vec!["BAR".to_string()]),
@@ -276,6 +537,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "baz".to_string(),
                 Variable {
                     value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
@@ -287,6 +549,7 @@ mod tests {
             .unwrap();
         variables
             .assign(
+                Scope::Global,
                 "null".to_string(),
                 Variable {
                     value: Scalar("not exported".to_string()),
@@ -306,5 +569,24 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn scope_guard() {
+        let mut env = Env::new_virtual();
+        let mut guard = env.push_variable_context();
+        guard
+            .variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        guard
+            .variables
+            .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
+            .unwrap();
+        Env::pop_variable_context(guard);
+
+        let variable = env.variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(env.variables.get("bar"), None);
     }
 }
