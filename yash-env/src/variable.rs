@@ -190,7 +190,7 @@ impl VariableSet {
         &mut self,
         scope: Scope,
         name: String,
-        value: Variable,
+        mut value: Variable,
     ) -> Result<Option<Variable>, ReadOnlyError> {
         use std::collections::hash_map::Entry;
         // TODO Can we avoid cloning the name here?
@@ -222,7 +222,7 @@ impl VariableSet {
                 });
             }
 
-            // TODO Export if the existing variable has been exported
+            value.is_exported |= existing.is_exported;
             Ok(Some(std::mem::replace(existing, value)))
         } else {
             let context_index = match scope {
@@ -504,6 +504,64 @@ mod tests {
     fn cannot_pop_base_context() {
         let mut variables = VariableSet::new();
         variables.pop_context();
+    }
+
+    #[test]
+    fn exporting() {
+        let mut variables = VariableSet::new();
+        let variable = Variable {
+            value: Scalar("first".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        };
+        variables
+            .assign(Scope::Local, "foo".to_string(), variable)
+            .unwrap();
+        let variable = Variable {
+            value: Scalar("second".to_string()),
+            last_assigned_location: None,
+            is_exported: true,
+            read_only_location: None,
+        };
+        let old_value = variables
+            .assign(Scope::Local, "foo".to_string(), variable)
+            .unwrap()
+            .unwrap();
+        assert_eq!(old_value.value, Scalar("first".to_string()));
+        assert!(!old_value.is_exported);
+        let new_value = variables.get("foo").unwrap();
+        assert_eq!(new_value.value, Scalar("second".to_string()));
+        assert!(new_value.is_exported);
+    }
+
+    #[test]
+    fn reexport_on_reassigning_exported_variable() {
+        let mut variables = VariableSet::new();
+        let variable = Variable {
+            value: Scalar("first".to_string()),
+            last_assigned_location: None,
+            is_exported: true,
+            read_only_location: None,
+        };
+        variables
+            .assign(Scope::Local, "foo".to_string(), variable)
+            .unwrap();
+        let variable = Variable {
+            value: Scalar("second".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        };
+        let old_value = variables
+            .assign(Scope::Local, "foo".to_string(), variable)
+            .unwrap()
+            .unwrap();
+        assert_eq!(old_value.value, Scalar("first".to_string()));
+        assert!(old_value.is_exported);
+        let new_value = variables.get("foo").unwrap();
+        assert_eq!(new_value.value, Scalar("second".to_string()));
+        assert!(new_value.is_exported);
     }
 
     #[test]
