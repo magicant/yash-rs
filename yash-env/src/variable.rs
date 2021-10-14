@@ -18,6 +18,7 @@
 //!
 //! This module provides data types for defining shell variables.
 
+use crate::Env;
 use either::{Left, Right};
 use itertools::Itertools;
 use std::borrow::Borrow;
@@ -292,6 +293,47 @@ impl VariableSet {
     }
 }
 
+/// RAII-style guard for temporarily retaining a variable context.
+///
+/// The [`Env::push_variable_context`] function returns a `ScopeGuard` that
+/// keeps a reference to the environment. When you drop the `ScopeGuard`, it
+/// pops the context.
+#[derive(Debug)]
+#[must_use = "You must retain ScopeGuard to keep the context alive"]
+pub struct ScopeGuard<'a> {
+    env: &'a mut Env,
+}
+
+impl<'a> ScopeGuard<'a> {
+    pub(crate) fn new(env: &'a mut Env) -> Self {
+        env.variables.push_context();
+        ScopeGuard { env }
+    }
+}
+
+impl std::ops::Drop for ScopeGuard<'_> {
+    /// Drops the `ScopeGuard`.
+    ///
+    /// This function [pops](VariableSet::pop_context) the context that was
+    /// pushed when creating this `ScopeGuard`.
+    fn drop(&mut self) {
+        self.env.variables.pop_context();
+    }
+}
+
+impl std::ops::Deref for ScopeGuard<'_> {
+    type Target = Env;
+    fn deref(&self) -> &Env {
+        self.env
+    }
+}
+
+impl std::ops::DerefMut for ScopeGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Env {
+        self.env
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -527,5 +569,24 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn scope_guard() {
+        let mut env = Env::new_virtual();
+        let mut guard = env.push_variable_context();
+        guard
+            .variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        guard
+            .variables
+            .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
+            .unwrap();
+        Env::pop_variable_context(guard);
+
+        let variable = env.variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(env.variables.get("bar"), None);
     }
 }

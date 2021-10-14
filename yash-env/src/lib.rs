@@ -53,6 +53,7 @@ use self::system::ChildProcessTask;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
+use self::variable::ScopeGuard;
 use self::variable::VariableSet;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
@@ -293,6 +294,21 @@ impl Env {
 
         result
     }
+    /// Pushes a variable context.
+    ///
+    /// This function calls [`VariableSet::push_context`] and returns a
+    /// [`ScopeGuard`].
+    pub fn push_variable_context(&mut self) -> ScopeGuard<'_> {
+        ScopeGuard::new(self)
+    }
+
+    /// Pops a variable context.
+    ///
+    /// This function calls [`VariableSet::pop_context`].
+    ///
+    /// You can call this function explicitly to drop the `ScopeGuard` and
+    /// thereby pop the topmost context instead of dropping it implicitly.
+    pub fn pop_variable_context(_: ScopeGuard<'_>) {}
 }
 
 #[cfg(test)]
