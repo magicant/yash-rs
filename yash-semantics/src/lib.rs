@@ -99,6 +99,9 @@ pub(crate) mod tests {
     use yash_env::job::Pid;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
+    use yash_env::variable::Scalar;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Variable;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
@@ -172,6 +175,40 @@ pub(crate) mod tests {
         Builtin {
             r#type: Special,
             execute: return_builtin_main,
+        }
+    }
+
+    fn local_builtin_main(
+        env: &mut Env,
+        args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+        Box::pin(async move {
+            for Field { value, origin } in args.into_iter().skip(1) {
+                if let Some(eq_index) = value.find('=') {
+                    let name = value[..eq_index].to_owned();
+                    // TODO reject invalid name
+                    let value = value[eq_index + 1..].to_owned();
+                    let value = Variable {
+                        value: Scalar(value),
+                        last_assigned_location: Some(origin),
+                        is_exported: false,
+                        read_only_location: None,
+                    };
+                    if let Err(error) = env.variables.assign(Scope::Local, name, value) {
+                        unimplemented!("assignment error: {:?}", error);
+                    }
+                } else {
+                    // TODO print variable definition
+                }
+            }
+            (ExitStatus::SUCCESS, Continue(()))
+        })
+    }
+
+    pub fn local_builtin() -> Builtin {
+        Builtin {
+            r#type: Intrinsic,
+            execute: local_builtin_main,
         }
     }
 
