@@ -25,6 +25,7 @@ use crate::Command;
 use async_trait::async_trait;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
+use std::ops::DerefMut;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::exec::ExitStatus;
@@ -165,7 +166,7 @@ impl Command for syntax::SimpleCommand {
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => execute_builtin(env, builtin, fields).await,
-                Some(Function(function)) => execute_function(env, function).await,
+                Some(Function(function)) => execute_function(env, function, &self.assigns).await,
                 Some(External { path }) => {
                     execute_external_utility(env, path, fields, Rc::clone(&self.redirs)).await
                 }
@@ -203,10 +204,13 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
     abort
 }
 
-async fn execute_function(env: &mut Env, function: Rc<Function>) -> Result {
+async fn execute_function(env: &mut Env, function: Rc<Function>, assigns: &[Assign]) -> Result {
     // TODO open redirections
     let mut scope = env.push_variable_context();
-    // TODO expand and perform assignments
+    match perform_assignments(scope.deref_mut(), assigns, Scope::Local, true).await {
+        Ok(()) => (),
+        Err(error) => return error.handle(&mut scope).await,
+    }
     // TODO Apply positional parameters
     // TODO Update control flow stack
     function.body.execute(&mut scope).await?;
@@ -408,6 +412,28 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "42\n".as_bytes());
+    }
+
+    #[test]
+    fn simple_command_performs_assignment_locally() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ echo $x; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
+        block_on(command.execute(&mut env));
+        assert_eq!(env.variables.get("x"), None);
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, "hello\n".as_bytes());
     }
 
     #[test]
