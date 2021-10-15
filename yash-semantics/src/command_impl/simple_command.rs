@@ -232,11 +232,8 @@ async fn execute_external_utility(
         .run_in_subshell(move |env| {
             Box::pin(async move {
                 let mut env = RedirEnv::new(env);
-                for redir in &*redirs {
-                    if let Err(e) = env.perform_redir(redir).await {
-                        e.handle(&mut env).await;
-                        return Continue(());
-                    }
+                if let Err(e) = env.perform_redirs(&*redirs).await {
+                    return e.handle(&mut env).await;
                 }
 
                 // TODO expand and perform assignments

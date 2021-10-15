@@ -345,6 +345,23 @@ impl RedirEnv<'_> {
         Ok(())
     }
 
+    /// Performs redirections.
+    ///
+    /// This is a convenience function for [performing
+    /// redirection](Self::perform_redir) for each iterator item.
+    ///
+    /// If the redirection fails for an item, the remainders are ignored, but
+    /// the effects of the preceding items are not canceled.
+    pub async fn perform_redirs<'a, I>(&mut self, redirs: I) -> Result<(), Error>
+    where
+        I: IntoIterator<Item = &'a Redir>,
+    {
+        for redir in redirs {
+            self.perform_redir(redir).await?;
+        }
+        Ok(())
+    }
+
     /// Undoes the effect of the redirections.
     ///
     /// This function restores the file descriptors affected by redirections to
