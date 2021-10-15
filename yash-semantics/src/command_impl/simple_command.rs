@@ -32,7 +32,6 @@ use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::function::Function;
 use yash_env::system::Errno;
-#[cfg(doc)]
 use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_env::System;
@@ -190,7 +189,7 @@ async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
     // TODO open redirections
 
     // TODO Apply last command substitution exit status
-    match perform_assignments(env, assigns).await {
+    match perform_assignments(env, assigns, Scope::Global, false).await {
         Ok(()) => Continue(()),
         Err(error) => error.handle(env).await,
     }
