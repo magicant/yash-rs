@@ -937,7 +937,7 @@ impl<H: fmt::Display> fmt::Display for Redir<H> {
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimpleCommand<H = HereDoc> {
-    pub assigns: Vec<Assign>,
+    pub assigns: Rc<Vec<Assign>>,
     pub words: Vec<Word>,
     pub redirs: Rc<Vec<Redir<H>>>,
 }
@@ -1869,20 +1869,16 @@ mod tests {
     #[test]
     fn simple_command_display() {
         let mut command = SimpleCommand {
-            assigns: vec![],
+            assigns: vec![].into(),
             words: vec![],
             redirs: vec![].into(),
         };
         assert_eq!(command.to_string(), "");
 
-        command
-            .assigns
-            .push(Assign::from_str("name=value").unwrap());
+        Rc::make_mut(&mut command.assigns).push(Assign::from_str("name=value").unwrap());
         assert_eq!(command.to_string(), "name=value");
 
-        command
-            .assigns
-            .push(Assign::from_str("hello=world").unwrap());
+        Rc::make_mut(&mut command.assigns).push(Assign::from_str("hello=world").unwrap());
         assert_eq!(command.to_string(), "name=value hello=world");
 
         command.words.push(Word::from_str("echo").unwrap());
@@ -1901,7 +1897,7 @@ mod tests {
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
 
-        command.assigns.clear();
+        Rc::make_mut(&mut command.assigns).clear();
         assert_eq!(command.to_string(), "echo foo <<END");
 
         command.words.clear();
@@ -1917,7 +1913,7 @@ mod tests {
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
 
-        command.assigns.push(Assign::from_str("foo=bar").unwrap());
+        Rc::make_mut(&mut command.assigns).push(Assign::from_str("foo=bar").unwrap());
         assert_eq!(command.to_string(), "foo=bar <<END 1<<-here");
     }
 

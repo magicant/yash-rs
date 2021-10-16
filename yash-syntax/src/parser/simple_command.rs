@@ -49,7 +49,7 @@ impl<H> Builder<H> {
 impl<H> From<Builder<H>> for SimpleCommand<H> {
     fn from(builder: Builder<H>) -> Self {
         SimpleCommand {
-            assigns: builder.assigns,
+            assigns: builder.assigns.into(),
             words: builder.words,
             redirs: builder.redirs.into(),
         }
@@ -329,7 +329,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.assigns, []);
+        assert_eq!(*sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.words[0].to_string(), "word");
@@ -341,7 +341,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.assigns, []);
+        assert_eq!(*sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 3);
         assert_eq!(sc.words[0].to_string(), ":");
@@ -355,7 +355,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.assigns, []);
+        assert_eq!(*sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.redirs[0].fd, None);
@@ -380,7 +380,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.assigns, []);
+        assert_eq!(*sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 3);
         assert_eq!(sc.redirs[0].fd, None);
@@ -441,7 +441,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
-        assert_eq!(sc.assigns, []);
+        assert_eq!(*sc.assigns, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.words[0].to_string(), "word");

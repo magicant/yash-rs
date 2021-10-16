@@ -258,7 +258,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, " ( ) ( : ) > /dev/null ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![],
+            assigns: vec![].into(),
             words: vec!["foo".parse().unwrap()],
             redirs: vec![].into(),
         };
