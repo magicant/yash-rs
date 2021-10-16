@@ -173,7 +173,14 @@ impl Command for syntax::SimpleCommand {
                     execute_function(env, function, &self.assigns, &self.redirs).await
                 }
                 Some(External { path }) => {
-                    execute_external_utility(env, path, fields, Rc::clone(&self.redirs)).await
+                    execute_external_utility(
+                        env,
+                        path,
+                        Rc::clone(&self.assigns),
+                        fields,
+                        Rc::clone(&self.redirs),
+                    )
+                    .await
                 }
                 None => {
                     // TODO open redirections
@@ -237,13 +244,13 @@ async fn execute_function(
 async fn execute_external_utility(
     env: &mut Env,
     path: CString,
+    assigns: Rc<Vec<Assign>>,
     fields: Vec<Field>,
     redirs: Rc<Vec<Redir>>,
 ) -> Result {
     let name = fields[0].clone();
     let location = name.origin.clone();
     let args = to_c_strings(fields);
-    let envs = env.variables.env_c_strings();
     let result = env
         .run_in_subshell(move |env| {
             Box::pin(async move {
@@ -252,10 +259,14 @@ async fn execute_external_utility(
                     return e.handle(&mut env).await;
                 }
 
-                // TODO expand and perform assignments
+                match perform_assignments(env.deref_mut(), &assigns, Scope::Global, true).await {
+                    Ok(()) => (),
+                    Err(error) => return error.handle(&mut env).await,
+                }
 
                 // TODO Remove signal handlers not set by current traps
 
+                let envs = env.variables.env_c_strings();
                 let result = env.system.execve(path.as_c_str(), &args, &envs);
                 // TODO Prefer into_err to unwrap_err
                 let errno = result.unwrap_err();
@@ -530,7 +541,7 @@ mod tests {
                 )
                 .unwrap();
 
-            let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
+            let command: syntax::SimpleCommand = "var=123 /some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
 
@@ -546,7 +557,15 @@ mod tests {
                     CString::new("bar").unwrap()
                 ]
             );
-            assert_eq!(arguments.2, [CString::new("env=scalar").unwrap()]);
+            let mut envs = arguments.2.clone();
+            envs.sort();
+            assert_eq!(
+                envs,
+                [
+                    CString::new("env=scalar").unwrap(),
+                    CString::new("var=123").unwrap()
+                ]
+            );
         });
     }
 
