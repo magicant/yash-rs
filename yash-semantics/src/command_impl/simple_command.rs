@@ -33,6 +33,7 @@ use yash_env::exec::Result;
 use yash_env::expansion::Field;
 use yash_env::function::Function;
 use yash_env::system::Errno;
+use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_env::System;
@@ -206,7 +207,7 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
 
 async fn execute_function(env: &mut Env, function: Rc<Function>, assigns: &[Assign]) -> Result {
     // TODO open redirections
-    let mut scope = env.push_variable_context();
+    let mut scope = env.push_variable_context(ContextType::Regular);
     match perform_assignments(scope.deref_mut(), assigns, Scope::Local, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut scope).await,

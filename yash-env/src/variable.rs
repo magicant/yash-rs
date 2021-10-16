@@ -266,10 +266,9 @@ impl VariableSet {
         }
     }
 
-    // TODO is_volatile
     /// Pushes a new empty context.
-    pub fn push_context(&mut self) {
-        self.contexts.push(ContextType::Regular);
+    pub fn push_context(&mut self, context_type: ContextType) {
+        self.contexts.push(context_type);
     }
 
     /// Pops the last-pushed context.
@@ -334,8 +333,8 @@ pub struct ScopeGuard<'a> {
 }
 
 impl<'a> ScopeGuard<'a> {
-    pub(crate) fn new(env: &'a mut Env) -> Self {
-        env.variables.push_context();
+    pub(crate) fn new(env: &'a mut Env, context_type: ContextType) -> Self {
+        env.variables.push_context(context_type);
         ScopeGuard { env }
     }
 }
@@ -450,7 +449,7 @@ mod tests {
     #[test]
     fn assign_global() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -462,7 +461,7 @@ mod tests {
     #[test]
     fn assign_local() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -473,7 +472,7 @@ mod tests {
     #[test]
     fn popping_context_removes_variables() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -484,11 +483,11 @@ mod tests {
     #[test]
     fn reassign_global_non_base_context() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("a"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("b"))
             .unwrap();
@@ -505,7 +504,7 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
@@ -519,7 +518,7 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
@@ -661,7 +660,7 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.push_variable_context();
+        let mut guard = env.push_variable_context(ContextType::Regular);
         guard
             .variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
