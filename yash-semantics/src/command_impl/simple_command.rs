@@ -169,7 +169,9 @@ impl Command for syntax::SimpleCommand {
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => execute_builtin(env, builtin, fields).await,
-                Some(Function(function)) => execute_function(env, function, &self.assigns).await,
+                Some(Function(function)) => {
+                    execute_function(env, function, &self.assigns, &self.redirs).await
+                }
                 Some(External { path }) => {
                     execute_external_utility(env, path, fields, Rc::clone(&self.redirs)).await
                 }
@@ -207,13 +209,23 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
     abort
 }
 
-async fn execute_function(env: &mut Env, function: Rc<Function>, assigns: &[Assign]) -> Result {
-    // TODO open redirections
+async fn execute_function(
+    env: &mut Env,
+    function: Rc<Function>,
+    assigns: &[Assign],
+    redirs: &[Redir],
+) -> Result {
+    let mut env = RedirEnv::new(env);
+    if let Err(e) = env.perform_redirs(redirs).await {
+        return e.handle(&mut env).await;
+    }
+
     let mut outer = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(outer.deref_mut(), assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut outer).await,
     }
+
     let mut inner = outer.push_variable_context(ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
@@ -390,6 +402,27 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(13));
+    }
+
+    #[test]
+    fn simple_command_applies_redirections_to_function() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ echo ok; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "foo >/tmp/file".parse().unwrap();
+        block_on(command.execute(&mut env));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/tmp/file").unwrap().borrow();
+        assert_eq!(file.content, "ok\n".as_bytes());
     }
 
     #[test]
