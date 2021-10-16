@@ -86,12 +86,14 @@ impl Command for syntax::SimpleCommand {
     /// ## Function
     ///
     /// If the target is a function, redirections are performed in the same way
-    /// as a regular built-in. Then, a new variable context is
-    /// [pushed](Env::push_variable_context) on top of the existing context, and
-    /// the assignments are performed [locally](Scope::Local) and exported. The
-    /// remaining fields that were not used in the command search become
-    /// positional parameters in the new context. After executing the function
-    /// body, the context is [popped](Env::pop_variable_context).
+    /// as a regular built-in. Then, assignments are performed in a
+    /// [volatile](ContextType::Volatile) variable context and exported. Next, a
+    /// [regular](ContextType::Regular) context is
+    /// [pushed](Env::push_variable_context) to allow local variable assignment
+    /// during the function execution. The remaining fields not used in the
+    /// command search become positional parameters in the new context.  After
+    /// executing the function body, the contexts are
+    /// [popped](Env::pop_variable_context).
     ///
     /// ## External utility
     ///
@@ -207,14 +209,15 @@ async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) ->
 
 async fn execute_function(env: &mut Env, function: Rc<Function>, assigns: &[Assign]) -> Result {
     // TODO open redirections
-    let mut scope = env.push_variable_context(ContextType::Regular);
-    match perform_assignments(scope.deref_mut(), assigns, Scope::Local, true).await {
+    let mut outer = env.push_variable_context(ContextType::Volatile);
+    match perform_assignments(outer.deref_mut(), assigns, Scope::Volatile, true).await {
         Ok(()) => (),
-        Err(error) => return error.handle(&mut scope).await,
+        Err(error) => return error.handle(&mut outer).await,
     }
+    let mut inner = outer.push_variable_context(ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
-    function.body.execute(&mut scope).await?;
+    function.body.execute(&mut inner).await?;
     // TODO Consume Divert::Return
     Continue(())
 }
@@ -413,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_command_performs_assignment_locally() {
+    fn simple_command_performs_function_assignment_in_temporary_context() {
         use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -432,6 +435,31 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "hello\n".as_bytes());
+    }
+
+    #[test]
+    fn function_fails_on_reassigning_to_read_only_variable() {
+        use yash_env::function::HashEntry;
+        let mut env = Env::new_virtual();
+        env.builtins.insert("echo", echo_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ echo; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let variable = Variable {
+            value: Value::Scalar("".to_string()),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: Some(Location::dummy("readonly")),
+        };
+        env.variables
+            .assign(Scope::Global, "x".to_string(), variable)
+            .unwrap();
+        let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
+        block_on(command.execute(&mut env));
+        assert_ne!(env.exit_status, ExitStatus::SUCCESS);
     }
 
     #[test]
