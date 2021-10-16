@@ -107,6 +107,25 @@ struct VariableInContext {
     context_index: usize,
 }
 
+/// Type of a context.
+///
+/// The context type affects the behavior of variable
+/// [assignment](VariableSet::assign).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ContextType {
+    /// Context for normal assignments.
+    ///
+    /// The base context is a regular context. The context for a function's
+    /// local assignment is also regular.
+    Regular,
+
+    /// Context for temporary assignments.
+    ///
+    /// A volatile context is used for holding temporary variables when
+    /// executing a built-in or function.
+    Volatile,
+}
+
 /// Collection of variables.
 ///
 /// A `VariableSet` is a stack of contexts, and a _context_ is a map of
