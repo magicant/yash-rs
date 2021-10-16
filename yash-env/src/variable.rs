@@ -140,7 +140,7 @@ pub enum ContextType {
 /// Variables in a context hide those with the same name in lower contexts. You
 /// cannot access such hidden variables until you remove the hiding variable
 /// from the upper context.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VariableSet {
     /// Hash map containing all variables.
     ///
@@ -148,8 +148,17 @@ pub struct VariableSet {
     /// contexts, sorted in the ascending order of the context index.
     all_variables: HashMap<String, Vec<VariableInContext>>,
 
-    /// Number of non-base contexts.
-    contexts: usize,
+    /// Stack of contexts.
+    contexts: Vec<ContextType>,
+}
+
+impl Default for VariableSet {
+    fn default() -> Self {
+        VariableSet {
+            all_variables: Default::default(),
+            contexts: vec![ContextType::Regular],
+        }
+    }
 }
 
 /// Choice of a context to which a variable is assigned.
@@ -217,13 +226,13 @@ impl VariableSet {
             Entry::Vacant(vacant) => vacant.insert(Vec::new()),
             Entry::Occupied(occupied) => occupied.into_mut(),
         };
-        let context_count = self.contexts;
+        let context_count = self.contexts.len();
         let existing = stack
             .last_mut()
             .map(|vic| match scope {
                 Scope::Global => Some(&mut vic.variable),
                 Scope::Local => {
-                    if vic.context_index == context_count {
+                    if vic.context_index == context_count - 1 {
                         Some(&mut vic.variable)
                     } else {
                         None
@@ -246,7 +255,7 @@ impl VariableSet {
         } else {
             let context_index = match scope {
                 Scope::Global => 0,
-                Scope::Local => self.contexts,
+                Scope::Local => self.contexts.len() - 1,
             };
             let variable = VariableInContext {
                 variable: value,
@@ -260,7 +269,7 @@ impl VariableSet {
     // TODO is_volatile
     /// Pushes a new empty context.
     pub fn push_context(&mut self) {
-        self.contexts += 1;
+        self.contexts.push(ContextType::Regular);
     }
 
     /// Pops the last-pushed context.
@@ -272,16 +281,17 @@ impl VariableSet {
     /// You cannot pop the base context. This function would __panic__ if you
     /// tried to do so.
     pub fn pop_context(&mut self) {
-        if self.contexts == 0 {
+        debug_assert!(!self.contexts.is_empty());
+        if self.contexts.len() == 1 {
             panic!("cannot pop the base context");
         }
-        self.contexts -= 1;
+        self.contexts.pop();
         // TODO Use HashMap::drain_filter to remove empty values
         // TODO Use complementary stack of hash tables to avoid scanning the
         // whole `self.all_variables`
         for stack in self.all_variables.values_mut() {
             if let Some(vic) = stack.last() {
-                if vic.context_index > self.contexts {
+                if vic.context_index >= self.contexts.len() {
                     stack.pop();
                 }
             }
