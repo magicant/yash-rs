@@ -251,47 +251,45 @@ async fn execute_external_utility(
     let name = fields[0].clone();
     let location = name.origin.clone();
     let args = to_c_strings(fields);
-    let result = env
-        .run_in_subshell(move |env| {
-            Box::pin(async move {
-                let mut env = RedirEnv::new(env);
-                if let Err(e) = env.perform_redirs(&*redirs).await {
-                    return e.handle(&mut env).await;
-                }
+    let subshell = env.run_in_subshell(move |env| {
+        Box::pin(async move {
+            let mut env = RedirEnv::new(env);
+            if let Err(e) = env.perform_redirs(&*redirs).await {
+                return e.handle(&mut env).await;
+            }
 
-                match perform_assignments(env.deref_mut(), &assigns, Scope::Global, true).await {
-                    Ok(()) => (),
-                    Err(error) => return error.handle(&mut env).await,
-                }
+            match perform_assignments(env.deref_mut(), &assigns, Scope::Global, true).await {
+                Ok(()) => (),
+                Err(error) => return error.handle(&mut env).await,
+            }
 
-                // TODO Remove signal handlers not set by current traps
+            // TODO Remove signal handlers not set by current traps
 
-                let envs = env.variables.env_c_strings();
-                let result = env.system.execve(path.as_c_str(), &args, &envs);
-                // TODO Prefer into_err to unwrap_err
-                let errno = result.unwrap_err();
-                // TODO Reopen as shell script on ENOEXEC
-                match errno {
-                    Errno::ENOENT | Errno::ENOTDIR => {
-                        env.exit_status = ExitStatus::NOT_FOUND;
-                    }
-                    _ => {
-                        env.exit_status = ExitStatus::NOEXEC;
-                    }
+            let envs = env.variables.env_c_strings();
+            let result = env.system.execve(path.as_c_str(), &args, &envs);
+            // TODO Prefer into_err to unwrap_err
+            let errno = result.unwrap_err();
+            // TODO Reopen as shell script on ENOEXEC
+            match errno {
+                Errno::ENOENT | Errno::ENOTDIR => {
+                    env.exit_status = ExitStatus::NOT_FOUND;
                 }
-                print_error(
-                    &mut env,
-                    format!("cannot execute external command {:?}", path).into(),
-                    errno.desc().into(),
-                    &location,
-                )
-                .await;
-                Continue(())
-            })
+                _ => {
+                    env.exit_status = ExitStatus::NOEXEC;
+                }
+            }
+            print_error(
+                &mut env,
+                format!("cannot execute external command {:?}", path).into(),
+                errno.desc().into(),
+                &location,
+            )
+            .await;
+            Continue(())
         })
-        .await;
+    });
 
-    match result {
+    match subshell.await {
         Ok(exit_status) => {
             env.exit_status = exit_status;
         }
