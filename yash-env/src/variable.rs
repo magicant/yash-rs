@@ -107,6 +107,25 @@ struct VariableInContext {
     context_index: usize,
 }
 
+/// Type of a context.
+///
+/// The context type affects the behavior of variable
+/// [assignment](VariableSet::assign).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ContextType {
+    /// Context for normal assignments.
+    ///
+    /// The base context is a regular context. The context for a function's
+    /// local assignment is also regular.
+    Regular,
+
+    /// Context for temporary assignments.
+    ///
+    /// A volatile context is used for holding temporary variables when
+    /// executing a built-in or function.
+    Volatile,
+}
+
 /// Collection of variables.
 ///
 /// A `VariableSet` is a stack of contexts, and a _context_ is a map of
@@ -121,7 +140,7 @@ struct VariableInContext {
 /// Variables in a context hide those with the same name in lower contexts. You
 /// cannot access such hidden variables until you remove the hiding variable
 /// from the upper context.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VariableSet {
     /// Hash map containing all variables.
     ///
@@ -129,8 +148,17 @@ pub struct VariableSet {
     /// contexts, sorted in the ascending order of the context index.
     all_variables: HashMap<String, Vec<VariableInContext>>,
 
-    /// Number of non-base contexts.
-    contexts: usize,
+    /// Stack of contexts.
+    contexts: Vec<ContextType>,
+}
+
+impl Default for VariableSet {
+    fn default() -> Self {
+        VariableSet {
+            all_variables: Default::default(),
+            contexts: vec![ContextType::Regular],
+        }
+    }
 }
 
 /// Choice of a context to which a variable is assigned.
@@ -138,20 +166,33 @@ pub struct VariableSet {
 pub enum Scope {
     /// Assigns to as lower a context as possible.
     ///
-    /// The variable is assigned to the base context if there are no other
-    /// variables having the same name in any context. Otherwise, the assignment
-    /// will overwrite the topmost existing variable.
+    /// If there is an existing variable in a [regular](ContextType::Regular)
+    /// context, the variable is overwritten by the assignment. Existing
+    /// [volatile](ContextType::Volatile) variables are removed to make the
+    /// target variable visible.
+    ///
+    /// If there is no variable to overwrite, the assignment adds a new variable
+    /// to the base context.
     Global,
 
-    /// Assigns to the topmost context.
+    /// Assigns to the topmost regular context.
     ///
-    /// Any existing variables in the contexts below the topmost do not affect
-    /// this type of assignment.
+    /// Any existing variables below the topmost regular context do not affect
+    /// this type of assignment. Existing variables above the topmost regular
+    /// context are removed.
     ///
     /// If the `VariableSet` only has the base context, the variable is assigned
     /// to it anyway.
     Local,
-    // TODO Volatile
+
+    /// Assigns to the topmost volatile context.
+    ///
+    /// This type of assignment requires the topmost context to be
+    /// [volatile](ContextType::Volatile), or the assignment would **panic!**
+    ///
+    /// If an existing read-only variable would fail a `Global` assignment, the
+    /// `Volatile` assignment fails for the same reason.
+    Volatile,
 }
 
 /// Error that occurs when assigning to an existing read-only variable.
@@ -185,7 +226,14 @@ impl VariableSet {
     /// Assigns a variable.
     ///
     /// If successful, the return value is the previous value. If there is an
-    /// existing read-only value, the assignment fails.
+    /// existing read-only value, the assignment fails unless the new variable
+    /// is a local variable that hides the read-only.
+    ///
+    /// Note that this function does not return variables that were removed from
+    /// volatile contexts.
+    ///
+    /// The current implementation assumes that variables in volatile contexts
+    /// are not read-only.
     pub fn assign(
         &mut self,
         scope: Scope,
@@ -198,21 +246,56 @@ impl VariableSet {
             Entry::Vacant(vacant) => vacant.insert(Vec::new()),
             Entry::Occupied(occupied) => occupied.into_mut(),
         };
-        let context_count = self.contexts;
+
+        // Volatile assignment cannot hide a read-only variable.
+        if scope == Scope::Volatile {
+            if let Some(vic) = stack.last() {
+                if let Some(location) = &vic.variable.read_only_location {
+                    return Err(ReadOnlyError {
+                        name,
+                        read_only_location: location.clone(),
+                        new_value: value,
+                    });
+                }
+            }
+        }
+
+        // To which context should we assign?
+        let contexts = &self.contexts;
+        let context_index = match scope {
+            Scope::Global => stack
+                .iter()
+                .filter(|vic| contexts[vic.context_index] != ContextType::Volatile)
+                .next_back()
+                .map_or(0, |vic| vic.context_index),
+            Scope::Local => contexts
+                .iter()
+                .rposition(|c| *c == ContextType::Regular)
+                .expect("base context has gone"),
+            Scope::Volatile => {
+                assert_eq!(
+                    contexts.last(),
+                    Some(&ContextType::Volatile),
+                    "volatile scope assignment requires volatile context"
+                );
+                contexts.len() - 1
+            }
+        };
+
+        // Remove volatile variables.
+        while stack
+            .last()
+            .filter(|vic| vic.context_index > context_index)
+            .is_some()
+        {
+            stack.pop();
+        }
+
+        // Do the assignment.
         let existing = stack
             .last_mut()
-            .map(|vic| match scope {
-                Scope::Global => Some(&mut vic.variable),
-                Scope::Local => {
-                    if vic.context_index == context_count {
-                        Some(&mut vic.variable)
-                    } else {
-                        None
-                    }
-                }
-            })
-            .flatten();
-
+            .filter(|vic| vic.context_index == context_index)
+            .map(|vic| &mut vic.variable);
         if let Some(existing) = existing {
             if let Some(location) = &existing.read_only_location {
                 return Err(ReadOnlyError {
@@ -225,23 +308,17 @@ impl VariableSet {
             value.is_exported |= existing.is_exported;
             Ok(Some(std::mem::replace(existing, value)))
         } else {
-            let context_index = match scope {
-                Scope::Global => 0,
-                Scope::Local => self.contexts,
-            };
-            let variable = VariableInContext {
+            stack.push(VariableInContext {
                 variable: value,
                 context_index,
-            };
-            stack.push(variable);
+            });
             Ok(None)
         }
     }
 
-    // TODO is_volatile
     /// Pushes a new empty context.
-    pub fn push_context(&mut self) {
-        self.contexts += 1;
+    pub fn push_context(&mut self, context_type: ContextType) {
+        self.contexts.push(context_type);
     }
 
     /// Pops the last-pushed context.
@@ -253,16 +330,17 @@ impl VariableSet {
     /// You cannot pop the base context. This function would __panic__ if you
     /// tried to do so.
     pub fn pop_context(&mut self) {
-        if self.contexts == 0 {
+        debug_assert!(!self.contexts.is_empty());
+        if self.contexts.len() == 1 {
             panic!("cannot pop the base context");
         }
-        self.contexts -= 1;
+        self.contexts.pop();
         // TODO Use HashMap::drain_filter to remove empty values
         // TODO Use complementary stack of hash tables to avoid scanning the
         // whole `self.all_variables`
         for stack in self.all_variables.values_mut() {
             if let Some(vic) = stack.last() {
-                if vic.context_index > self.contexts {
+                if vic.context_index >= self.contexts.len() {
                     stack.pop();
                 }
             }
@@ -305,8 +383,8 @@ pub struct ScopeGuard<'a> {
 }
 
 impl<'a> ScopeGuard<'a> {
-    pub(crate) fn new(env: &'a mut Env) -> Self {
-        env.variables.push_context();
+    pub(crate) fn new(env: &'a mut Env, context_type: ContextType) -> Self {
+        env.variables.push_context(context_type);
         ScopeGuard { env }
     }
 }
@@ -421,7 +499,7 @@ mod tests {
     #[test]
     fn assign_global() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -433,7 +511,7 @@ mod tests {
     #[test]
     fn assign_local() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -444,7 +522,7 @@ mod tests {
     #[test]
     fn popping_context_removes_variables() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -455,11 +533,11 @@ mod tests {
     #[test]
     fn reassign_global_non_base_context() {
         let mut variables = VariableSet::new();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("a"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("b"))
             .unwrap();
@@ -476,7 +554,7 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
@@ -490,13 +568,131 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context();
+        variables.push_context(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
         variables.pop_context();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("0".to_string()));
+    }
+
+    #[test]
+    fn volatile_assignment_new() {
+        let mut variables = VariableSet::new();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("0".to_string()));
+    }
+
+    #[test]
+    fn volatile_assignment_hides_existing_variable() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("1".to_string()));
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("0".to_string()));
+    }
+
+    #[test]
+    fn volatile_assignment_fails_with_existing_read_only_variable() {
+        let mut variables = VariableSet::new();
+        let read_only_location = Location::dummy("ROL");
+        let mut read_only = dummy_variable("0");
+        read_only.read_only_location = Some(read_only_location.clone());
+        variables
+            .assign(Scope::Global, "foo".to_string(), read_only)
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        let error = variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .unwrap_err();
+        assert_eq!(error.name, "foo");
+        assert_eq!(error.read_only_location, read_only_location);
+        assert_eq!(error.new_value.value, Value::Scalar("1".to_string()));
+    }
+
+    #[test]
+    #[should_panic(expected = "volatile scope assignment requires volatile context")]
+    fn volatile_assignment_panics_without_volatile_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+    }
+
+    #[test]
+    fn global_assignment_pops_existing_volatile_variables() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        variables.push_context(ContextType::Regular);
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Global, "foo".to_string(), dummy_variable("9"))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("9".to_string()));
+        variables.pop_context();
+        variables.pop_context();
+        variables.pop_context();
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("9".to_string()));
+    }
+
+    #[test]
+    fn local_assignment_pops_existing_volatile_variables() {
+        let mut variables = VariableSet::new();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .unwrap();
+        variables.push_context(ContextType::Regular);
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
+            .unwrap();
+        variables.push_context(ContextType::Volatile);
+        variables
+            .assign(Scope::Local, "foo".to_string(), dummy_variable("9"))
+            .unwrap();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("9".to_string()));
+        variables.pop_context();
+        variables.pop_context();
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("9".to_string()));
+        variables.pop_context();
+        let variable = variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("0".to_string()));
+        variables.pop_context();
+        assert_eq!(variables.get("foo"), None);
     }
 
     #[test]
@@ -632,7 +828,7 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.push_variable_context();
+        let mut guard = env.push_variable_context(ContextType::Regular);
         guard
             .variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
