@@ -21,6 +21,7 @@
 pub mod pretty;
 
 use crate::alias::Alias;
+use std::iter::FusedIterator;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
@@ -168,6 +169,8 @@ impl<'a> Iterator for Lines<'a> {
     }
 }
 
+impl FusedIterator for Lines<'_> {}
+
 /// Converts a source code string into an iterator of [Line]s.
 pub fn lines(source: Source, code: &str) -> Lines<'_> {
     Lines {
@@ -306,6 +309,8 @@ mod tests {
         assert_eq!(line.source, Source::Unknown);
 
         // No more lines
+        assert_eq!(l.next(), None);
+        // Lines is fused
         assert_eq!(l.next(), None);
     }
 
