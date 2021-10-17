@@ -176,14 +176,7 @@ impl Command for syntax::SimpleCommand {
                     execute_function(env, function, &self.assigns, &self.redirs).await
                 }
                 Some(External { path }) => {
-                    execute_external_utility(
-                        env,
-                        path,
-                        Rc::clone(&self.assigns),
-                        fields,
-                        Rc::clone(&self.redirs),
-                    )
-                    .await
+                    execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
                 }
                 None => {
                     // TODO open redirections
@@ -308,23 +301,25 @@ async fn execute_function(
 async fn execute_external_utility(
     env: &mut Env,
     path: CString,
-    assigns: Rc<Vec<Assign>>,
+    assigns: &[Assign],
     fields: Vec<Field>,
-    redirs: Rc<Vec<Redir>>,
+    redirs: &[Redir],
 ) -> Result {
     let name = fields[0].clone();
     let location = name.origin.clone();
     let args = to_c_strings(fields);
-    let subshell = env.run_in_subshell(move |env| {
+
+    let mut env = RedirEnv::new(env);
+    perform_redirs(&mut env, redirs).await?;
+
+    let mut env = env.push_variable_context(ContextType::Volatile);
+    match perform_assignments(env.deref_mut(), assigns, Scope::Volatile, true).await {
+        Ok(()) => (),
+        Err(error) => return error.handle(&mut env).await,
+    }
+
+    let subshell = env.run_in_subshell(move |mut env| {
         Box::pin(async move {
-            let mut env = RedirEnv::new(env);
-            perform_redirs(&mut env, &*redirs).await?;
-
-            match perform_assignments(env.deref_mut(), &assigns, Scope::Global, true).await {
-                Ok(()) => (),
-                Err(error) => return error.handle(&mut env).await,
-            }
-
             // TODO Remove signal handlers not set by current traps
 
             let envs = env.variables.env_c_strings();
@@ -357,7 +352,7 @@ async fn execute_external_utility(
         }
         Err(errno) => {
             print_error(
-                env,
+                &mut env,
                 format!("cannot execute external command {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,
@@ -754,5 +749,14 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
+    }
+
+    #[test]
+    fn simple_command_assigns_variables_in_volatile_context_for_external_command() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let command: syntax::SimpleCommand = "a=123 /foo/bar".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.variables.get("a"), None);
+        });
     }
 }
