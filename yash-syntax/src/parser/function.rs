@@ -107,7 +107,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "(");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec![],
             redirs: vec![].into(),
         };
@@ -129,7 +129,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec!["foo".parse().unwrap()],
             redirs: vec![].into(),
         };
@@ -148,7 +148,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "( ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec!["foo".parse().unwrap()],
             redirs: vec![].into(),
         };
@@ -169,7 +169,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "( ) ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec!["foo".parse().unwrap()],
             redirs: vec![].into(),
         };
@@ -190,7 +190,7 @@ mod tests {
         let mut lexer = Lexer::with_source(Source::Unknown, "() foo ; ");
         let mut parser = Parser::new(&mut lexer);
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec!["foo".parse().unwrap()],
             redirs: vec![].into(),
         };
@@ -311,7 +311,7 @@ mod tests {
         ));
         let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
         let c = SimpleCommand {
-            assigns: vec![].into(),
+            assigns: vec![],
             words: vec!["f".parse().unwrap()],
             redirs: vec![].into(),
         };

@@ -29,7 +29,6 @@ use crate::syntax::*;
 use std::convert::TryInto;
 use std::future::Future;
 use std::iter::empty;
-use std::rc::Rc;
 use std::str::FromStr;
 
 // TODO Most FromStr implementations in this file ignore trailing redundant
@@ -138,11 +137,7 @@ impl FromStr for Assign {
     /// Returns `Err(None)` if the string is not an assignment word.
     fn from_str(s: &str) -> Result<Assign, Option<Error>> {
         let c: SimpleCommand<MissingHereDoc> = s.parse()?;
-        let assign = match Rc::try_unwrap(c.assigns) {
-            Ok(assigns) => assigns.into_iter().next(),
-            Err(assigns) => assigns.first().cloned(),
-        };
-        Ok(assign).shift()
+        Ok(c.assigns.into_iter().next()).shift()
     }
 }
 
