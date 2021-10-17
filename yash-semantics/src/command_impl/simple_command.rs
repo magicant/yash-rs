@@ -169,7 +169,7 @@ impl Command for syntax::SimpleCommand {
         use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
-                Some(Builtin(builtin)) => execute_builtin(env, builtin, fields).await,
+                Some(Builtin(builtin)) => execute_builtin(env, builtin, fields, &self.redirs).await,
                 Some(Function(function)) => {
                     execute_function(env, function, &self.assigns, &self.redirs).await
                 }
@@ -243,10 +243,17 @@ async fn execute_absent_target(
     }
 }
 
-async fn execute_builtin(env: &mut Env, builtin: Builtin, fields: Vec<Field>) -> Result {
-    // TODO open redirections
+async fn execute_builtin(
+    env: &mut Env,
+    builtin: Builtin,
+    fields: Vec<Field>,
+    redirs: &[Redir],
+) -> Result {
+    let mut env = RedirEnv::new(env);
+    perform_redirs(&mut env, redirs).await?;
+
     // TODO expand and perform assignments
-    let (exit_status, abort) = (builtin.execute)(env, fields).await;
+    let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
     env.exit_status = exit_status;
     abort
 }
@@ -450,6 +457,20 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
+    }
+
+    #[test]
+    fn simple_command_applies_redirections_to_builtin() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
+        block_on(command.execute(&mut env));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/tmp/file").unwrap().borrow();
+        assert_eq!(file.content, "hello\n".as_bytes());
     }
 
     #[test]
