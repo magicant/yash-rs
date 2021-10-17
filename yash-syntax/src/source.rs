@@ -172,7 +172,7 @@ impl<'a> Iterator for Lines<'a> {
 impl FusedIterator for Lines<'_> {}
 
 /// Converts a source code string into an iterator of [Line]s.
-pub fn lines(source: Source, code: &str) -> Lines<'_> {
+pub fn lines(code: &str, source: Source) -> Lines<'_> {
     Lines {
         source,
         code,
@@ -255,12 +255,12 @@ mod tests {
 
     #[test]
     fn lines_empty() {
-        assert_eq!(lines(Source::Unknown, "").next(), None);
+        assert_eq!(lines("", Source::Unknown,).next(), None);
     }
 
     #[test]
     fn lines_one_line() {
-        let mut l = lines(Source::Unknown, "foo\n");
+        let mut l = lines("foo\n", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "foo\n");
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn lines_three_lines() {
-        let mut l = lines(Source::Unknown, "foo\nbar\n\n");
+        let mut l = lines("foo\nbar\n\n", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "foo\n");
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn lines_without_trailing_newline() {
-        let mut l = lines(Source::Unknown, "one\ntwo");
+        let mut l = lines("one\ntwo", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "one\n");
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn location_advance() {
-        let line = Rc::new(lines(Source::Unknown, "line\n").next().unwrap());
+        let line = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
         let column = NonZeroU64::new(1).unwrap();
         let mut location = Location {
             line: line.clone(),

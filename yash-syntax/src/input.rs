@@ -69,7 +69,7 @@ pub struct Memory {
 impl Memory {
     /// Creates a new `Memory` that reads the given string.
     pub fn new(source: Source, code: &str) -> Memory {
-        let lines = lines(source.clone(), code).collect::<VecDeque<Line>>();
+        let lines = lines(code, source.clone()).collect::<VecDeque<Line>>();
 
         let end = Line {
             value: "".to_string(),

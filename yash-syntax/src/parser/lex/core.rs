@@ -251,7 +251,7 @@ impl LexerCore {
             alias: alias.clone(),
         };
         let mut repl = vec![];
-        for line in lines(source, &alias.replacement) {
+        for line in lines(&alias.replacement, source) {
             repl.extend(Rc::new(line).enumerate());
         }
 

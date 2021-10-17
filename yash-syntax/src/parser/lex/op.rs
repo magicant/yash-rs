@@ -485,7 +485,7 @@ mod tests {
             }
         }
 
-        let line = lines(Source::Unknown, "\n").next().unwrap();
+        let line = lines("\n", Source::Unknown).next().unwrap();
         let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
