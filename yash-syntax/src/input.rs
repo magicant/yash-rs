@@ -68,7 +68,7 @@ pub struct Memory {
 
 impl Memory {
     /// Creates a new `Memory` that reads the given string.
-    pub fn new(source: Source, code: &str) -> Memory {
+    pub fn new(code: &str, source: Source) -> Memory {
         let lines = lines(code, source.clone()).collect::<VecDeque<Line>>();
 
         let end = Line {
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn memory_empty_source() {
-        let mut input = Memory::new(Source::Unknown, "");
+        let mut input = Memory::new("", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn memory_one_line() {
-        let mut input = Memory::new(Source::Unknown, "one\n");
+        let mut input = Memory::new("one\n", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn memory_three_lines() {
-        let mut input = Memory::new(Source::Unknown, "one\ntwo\nthree");
+        let mut input = Memory::new("one\ntwo\nthree", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");

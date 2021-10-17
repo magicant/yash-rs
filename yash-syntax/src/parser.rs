@@ -35,7 +35,7 @@
 //! use yash_syntax::input::Memory;
 //! use yash_syntax::source::Source;
 //! # // TODO demonstrate with a Source other than Unknown
-//! let input = Box::new(Memory::new(Source::Unknown, "echo $?"));
+//! let input = Box::new(Memory::new("echo $?", Source::Unknown));
 //!
 //! // Next, create a lexer.
 //! # use yash_syntax::parser::lex::Lexer;

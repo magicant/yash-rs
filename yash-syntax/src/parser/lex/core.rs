@@ -340,7 +340,7 @@ impl Lexer {
     /// Creates a new lexer with a fixed source code.
     #[must_use]
     pub fn with_source(source: Source, code: &str) -> Lexer {
-        Lexer::new(Box::new(Memory::new(source, code)))
+        Lexer::new(Box::new(Memory::new(code, source)))
     }
 
     /// Disables line continuation recognition onward.
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn lexer_core_peek_char_empty_source() {
-        let input = Memory::new(Source::Unknown, "");
+        let input = Memory::new("", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn lexer_core_consume_char_success() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         let result = block_on(lexer.peek_char());
@@ -759,14 +759,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "A character must have been peeked before being consumed: index=0")]
     fn lexer_core_consume_char_panic() {
-        let input = Memory::new(Source::Unknown, "a");
+        let input = Memory::new("a", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.consume_char();
     }
 
     #[test]
     fn lexer_core_peek_char_at() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         let c0 = match block_on(lexer.peek_char()) {
@@ -793,7 +793,7 @@ mod tests {
 
     #[test]
     fn lexer_core_index() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         assert_eq!(lexer.index(), 0);
@@ -814,7 +814,7 @@ mod tests {
 
     #[test]
     fn lexer_core_rewind_success() {
-        let input = Memory::new(Source::Unknown, "abc");
+        let input = Memory::new("abc", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(0);
         assert_eq!(lexer.index(), 0);
@@ -842,14 +842,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "The new index 1 must not be larger than the current index 0")]
     fn lexer_core_rewind_invalid_index() {
-        let input = Memory::new(Source::Unknown, "abc");
+        let input = Memory::new("abc", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(1);
     }
 
     #[test]
     fn lexer_core_source_string() {
-        let input = Memory::new(Source::Unknown, "ab\ncd");
+        let input = Memory::new("ab\ncd", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         block_on(async {
             for _ in 0..4 {
@@ -865,7 +865,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "begin index 0 should be less than end index 0")]
     fn lexer_core_substitute_alias_with_invalid_index() {
-        let input = Memory::new(Source::Unknown, "a b");
+        let input = Memory::new("a b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "a".to_string(),
@@ -878,7 +878,7 @@ mod tests {
 
     #[test]
     fn lexer_core_substitute_alias_single_line_replacement() {
-        let input = Memory::new(Source::Unknown, "a b");
+        let input = Memory::new("a b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "a".to_string(),
@@ -977,7 +977,7 @@ mod tests {
 
     #[test]
     fn lexer_core_substitute_alias_multi_line_replacement() {
-        let input = Memory::new(Source::Unknown, " foo b");
+        let input = Memory::new(" foo b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "foo".to_string(),
@@ -1079,7 +1079,7 @@ mod tests {
     #[test]
     fn lexer_core_substitute_alias_empty_replacement() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "x ");
+            let input = Memory::new("x ", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "x".to_string(),
@@ -1114,7 +1114,7 @@ mod tests {
             global: false,
             origin: Location::dummy("origin"),
         });
-        let input = Memory::new(Source::Alias { original, alias }, "a");
+        let input = Memory::new("a", Source::Alias { original, alias });
         let lexer = LexerCore::new(Box::new(input));
         assert!(!lexer.is_after_blank_ending_alias(0));
     }
@@ -1122,7 +1122,7 @@ mod tests {
     #[test]
     fn lexer_core_is_after_blank_ending_alias_not_blank_ending() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "a x");
+            let input = Memory::new("a x", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
@@ -1146,7 +1146,7 @@ mod tests {
     #[test]
     fn lexer_core_is_after_blank_ending_alias_blank_ending() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "a x");
+            let input = Memory::new("a x", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
