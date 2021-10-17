@@ -255,14 +255,31 @@ async fn execute_builtin(
     let mut env = RedirEnv::new(env);
     perform_redirs(&mut env, redirs).await?;
 
-    match perform_assignments(env.deref_mut(), assigns, Scope::Global, false).await {
-        Ok(()) => (),
-        Err(error) => return error.handle(&mut env).await,
-    }
+    use yash_env::builtin::Type::*;
+    match builtin.r#type {
+        Special => {
+            match perform_assignments(env.deref_mut(), assigns, Scope::Global, false).await {
+                Ok(()) => (),
+                Err(error) => return error.handle(&mut env).await,
+            }
 
-    let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
-    env.exit_status = exit_status;
-    abort
+            let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
+            env.exit_status = exit_status;
+            abort
+        }
+
+        Intrinsic | NonIntrinsic => {
+            let mut env = env.push_variable_context(ContextType::Volatile);
+            match perform_assignments(env.deref_mut(), assigns, Scope::Volatile, true).await {
+                Ok(()) => (),
+                Err(error) => return error.handle(&mut env).await,
+            }
+
+            let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
+            env.exit_status = exit_status;
+            abort
+        }
+    }
 }
 
 async fn execute_function(
@@ -489,6 +506,21 @@ mod tests {
         let v = env.variables.get("v").unwrap();
         assert_eq!(v.value, Value::Scalar("42".to_string()));
         assert!(!v.is_exported);
+    }
+
+    #[test]
+    fn simple_command_assigns_temporarily_for_regular_builtin() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("local", local_builtin());
+        let command: syntax::SimpleCommand = "v=42 local v".parse().unwrap();
+        block_on(command.execute(&mut env));
+        assert_eq!(env.variables.get("v"), None);
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(file.content, "v=42\n".as_bytes());
     }
 
     #[test]

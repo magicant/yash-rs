@@ -198,7 +198,17 @@ pub(crate) mod tests {
                         unimplemented!("assignment error: {:?}", error);
                     }
                 } else {
-                    // TODO print variable definition
+                    let name = value;
+                    if let Some(var) = env.variables.get(&name) {
+                        if let Scalar(value) = &var.value {
+                            let line = format!("{}={}\n", name, value);
+                            if let Err(errno) =
+                                env.system.write_all(Fd::STDOUT, line.as_bytes()).await
+                            {
+                                unimplemented!("write error: {:?}", errno);
+                            }
+                        }
+                    }
                 }
             }
             (ExitStatus::SUCCESS, Continue(()))
