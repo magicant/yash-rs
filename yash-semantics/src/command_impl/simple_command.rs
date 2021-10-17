@@ -179,13 +179,8 @@ impl Command for syntax::SimpleCommand {
                     execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
                 }
                 None => {
-                    // TODO open redirections
-                    // TODO expand and perform assignments
-                    // TODO Use pretty::Message and annotate_snippet
-                    env.print_error(&format_args!("{}: command not found", name.value))
-                        .await;
-                    env.exit_status = ExitStatus::NOT_FOUND;
-                    Continue(())
+                    let path = CString::default();
+                    execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
                 }
             }
         } else {
@@ -318,6 +313,18 @@ async fn execute_external_utility(
         Err(error) => return error.handle(&mut env).await,
     }
 
+    if path.to_bytes().is_empty() {
+        print_error(
+            &mut env,
+            format!("cannot execute external utility {:?}", name.value).into(),
+            "utility not found".into(),
+            &name.origin,
+        )
+        .await;
+        env.exit_status = ExitStatus::NOT_FOUND;
+        return Continue(());
+    }
+
     let subshell = env.run_in_subshell(move |mut env| {
         Box::pin(async move {
             // TODO Remove signal handlers not set by current traps
@@ -337,7 +344,7 @@ async fn execute_external_utility(
             }
             print_error(
                 &mut env,
-                format!("cannot execute external command {:?}", path).into(),
+                format!("cannot execute external utility {:?}", path).into(),
                 errno.desc().into(),
                 &location,
             )
@@ -353,7 +360,7 @@ async fn execute_external_utility(
         Err(errno) => {
             print_error(
                 &mut env,
-                format!("cannot execute external command {:?}", name.value).into(),
+                format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,
             )
@@ -757,6 +764,21 @@ mod tests {
             let command: syntax::SimpleCommand = "a=123 /foo/bar".parse().unwrap();
             command.execute(&mut env).await;
             assert_eq!(env.variables.get("a"), None);
+        });
+    }
+
+    #[test]
+    fn simple_command_performs_redirections_and_assignments_for_target_not_found() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            // TODO Test with assignment with side-effect: foo=${bar=baz}
+            let command: syntax::SimpleCommand =
+                "foo=bar no_such_utility >/tmp/file".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.variables.get("foo"), None);
+
+            let state = state.borrow();
+            let stdout = state.file_system.get("/tmp/file").unwrap().borrow();
+            assert_eq!(stdout.content, []);
         });
     }
 }
