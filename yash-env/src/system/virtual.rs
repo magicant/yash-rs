@@ -177,8 +177,7 @@ impl VirtualSystem {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         let mut ofd = body.open_file_description.borrow_mut();
-        use std::ops::DerefMut;
-        f(ofd.deref_mut())
+        f(&mut *ofd)
     }
 }
 

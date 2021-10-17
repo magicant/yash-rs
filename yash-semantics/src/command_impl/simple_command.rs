@@ -25,7 +25,6 @@ use crate::Command;
 use async_trait::async_trait;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};
-use std::ops::DerefMut;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::exec::Divert;
@@ -246,7 +245,7 @@ async fn execute_builtin(
     use yash_env::builtin::Type::*;
     match builtin.r#type {
         Special => {
-            match perform_assignments(env.deref_mut(), assigns, Scope::Global, false).await {
+            match perform_assignments(&mut *env, assigns, Scope::Global, false).await {
                 Ok(()) => (),
                 Err(error) => return error.handle(&mut env).await,
             }
@@ -258,7 +257,7 @@ async fn execute_builtin(
 
         Intrinsic | NonIntrinsic => {
             let mut env = env.push_variable_context(ContextType::Volatile);
-            match perform_assignments(env.deref_mut(), assigns, Scope::Volatile, true).await {
+            match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
                 Ok(()) => (),
                 Err(error) => return error.handle(&mut env).await,
             }
@@ -280,7 +279,7 @@ async fn execute_function(
     perform_redirs(&mut env, redirs).await?;
 
     let mut outer = env.push_variable_context(ContextType::Volatile);
-    match perform_assignments(outer.deref_mut(), assigns, Scope::Volatile, true).await {
+    match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut outer).await,
     }
@@ -308,7 +307,7 @@ async fn execute_external_utility(
     perform_redirs(&mut env, redirs).await?;
 
     let mut env = env.push_variable_context(ContextType::Volatile);
-    match perform_assignments(env.deref_mut(), assigns, Scope::Volatile, true).await {
+    match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut env).await,
     }
