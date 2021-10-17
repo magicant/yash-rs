@@ -169,7 +169,9 @@ impl Command for syntax::SimpleCommand {
         use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
-                Some(Builtin(builtin)) => execute_builtin(env, builtin, fields, &self.redirs).await,
+                Some(Builtin(builtin)) => {
+                    execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
+                }
                 Some(Function(function)) => {
                     execute_function(env, function, &self.assigns, &self.redirs).await
                 }
@@ -246,13 +248,18 @@ async fn execute_absent_target(
 async fn execute_builtin(
     env: &mut Env,
     builtin: Builtin,
+    assigns: &[Assign],
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
     let mut env = RedirEnv::new(env);
     perform_redirs(&mut env, redirs).await?;
 
-    // TODO expand and perform assignments
+    match perform_assignments(env.deref_mut(), assigns, Scope::Global, false).await {
+        Ok(()) => (),
+        Err(error) => return error.handle(&mut env).await,
+    }
+
     let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
     env.exit_status = exit_status;
     abort
@@ -471,6 +478,17 @@ mod tests {
         let state = state.borrow();
         let file = state.file_system.get("/tmp/file").unwrap().borrow();
         assert_eq!(file.content, "hello\n".as_bytes());
+    }
+
+    #[test]
+    fn simple_command_assigns_permanently_for_special_builtin() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        let command: syntax::SimpleCommand = "v=42 return -n 0".parse().unwrap();
+        block_on(command.execute(&mut env));
+        let v = env.variables.get("v").unwrap();
+        assert_eq!(v.value, Value::Scalar("42".to_string()));
+        assert!(!v.is_exported);
     }
 
     #[test]
