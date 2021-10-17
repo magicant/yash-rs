@@ -24,10 +24,11 @@ use crate::redir::RedirEnv;
 use crate::Command;
 use async_trait::async_trait;
 use std::ffi::CString;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::ops::DerefMut;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
+use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::expansion::Field;
@@ -193,15 +194,49 @@ impl Command for syntax::SimpleCommand {
                 }
             }
         } else {
-            execute_absent_target(env, &self.assigns).await
+            execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs)).await
         }
     }
 }
 
-async fn execute_absent_target(env: &mut Env, assigns: &[Assign]) -> Result {
-    // TODO open redirections
+async fn perform_redirs(env: &mut RedirEnv<'_>, redirs: &[Redir]) -> Result {
+    match env.perform_redirs(&*redirs).await {
+        Ok(()) => Continue(()),
+        Err(e) => e.handle(env).await,
+    }
+}
 
-    // TODO Apply last command substitution exit status
+async fn execute_absent_target(
+    env: &mut Env,
+    assigns: &[Assign],
+    redirs: Rc<Vec<Redir>>,
+) -> Result {
+    // Perform redirections in a subshell
+    // TODO Apply last command substitution exit status from redirections
+    if let Some(redir) = redirs.first() {
+        let first_redir_location = redir.body.operand().location.clone();
+        let redir_results = env.run_in_subshell(move |env| {
+            Box::pin(async move {
+                let mut env = RedirEnv::new(env);
+                perform_redirs(&mut env, &*redirs).await
+            })
+        });
+        match redir_results.await {
+            Ok(_exit_status) => (),
+            Err(errno) => {
+                print_error(
+                    env,
+                    "cannot start subshell to perform redirection".into(),
+                    errno.desc().into(),
+                    &first_redir_location,
+                )
+                .await;
+                return Break(Divert::Interrupt(Some(ExitStatus::ERROR)));
+            }
+        }
+    }
+
+    // TODO Apply last command substitution exit status from assignments
     match perform_assignments(env, assigns, Scope::Global, false).await {
         Ok(()) => Continue(()),
         Err(error) => error.handle(env).await,
@@ -223,9 +258,7 @@ async fn execute_function(
     redirs: &[Redir],
 ) -> Result {
     let mut env = RedirEnv::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
-        return e.handle(&mut env).await;
-    }
+    perform_redirs(&mut env, redirs).await?;
 
     let mut outer = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(outer.deref_mut(), assigns, Scope::Volatile, true).await {
@@ -254,9 +287,7 @@ async fn execute_external_utility(
     let subshell = env.run_in_subshell(move |env| {
         Box::pin(async move {
             let mut env = RedirEnv::new(env);
-            if let Err(e) = env.perform_redirs(&*redirs).await {
-                return e.handle(&mut env).await;
-            }
+            perform_redirs(&mut env, &*redirs).await?;
 
             match perform_assignments(env.deref_mut(), &assigns, Scope::Global, true).await {
                 Ok(()) => (),
@@ -325,16 +356,41 @@ mod tests {
     use crate::tests::return_builtin;
     use futures_executor::block_on;
     use std::cell::RefCell;
-    use std::ops::ControlFlow::Break;
     use std::path::PathBuf;
     use std::rc::Rc;
-    use yash_env::exec::Divert;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
+
+    #[test]
+    fn simple_command_performs_redirection_with_absent_target() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            let state = state.borrow();
+            let file = state.file_system.get("/tmp/foo").unwrap().borrow();
+            assert_eq!(file.content, []);
+        });
+    }
+
+    #[test]
+    fn simple_command_handles_subshell_error_with_absent_target() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+
+        let state = state.borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert!(!stderr.content.is_empty());
+    }
 
     #[test]
     fn simple_command_performs_assignment_with_absent_target() {
