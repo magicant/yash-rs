@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn parser_array_values_no_open_parenthesis() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ")");
+        let mut lexer = Lexer::from_memory(")", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let result = block_on(parser.array_values()).unwrap();
         assert_eq!(result, None);
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn parser_array_values_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "()");
+        let mut lexer = Lexer::from_memory("()", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let words = block_on(parser.array_values()).unwrap().unwrap();
         assert_eq!(words, []);
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn parser_array_values_many() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(a b c)");
+        let mut lexer = Lexer::from_memory("(a b c)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let words = block_on(parser.array_values()).unwrap().unwrap();
         assert_eq!(words.len(), 3);
@@ -206,12 +206,12 @@ mod tests {
 
     #[test]
     fn parser_array_values_newlines_and_comments() {
-        let mut lexer = Lexer::with_source(
-            Source::Unknown,
+        let mut lexer = Lexer::from_memory(
             "(
             a # b
             c d
         )",
+            Source::Unknown,
         );
         let mut parser = Parser::new(&mut lexer);
         let words = block_on(parser.array_values()).unwrap().unwrap();
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn parser_array_values_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(a b");
+        let mut lexer = Lexer::from_memory("(a b", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let e = block_on(parser.array_values()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn parser_array_values_invalid_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(a;b)");
+        let mut lexer = Lexer::from_memory("(a;b)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let e = block_on(parser.array_values()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.simple_command()).unwrap().unwrap();
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_keyword() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "then");
+        let mut lexer = Lexer::from_memory("then", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.simple_command()).unwrap().unwrap();
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_one_assignment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "my=assignment");
+        let mut lexer = Lexer::from_memory("my=assignment", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_many_assignments() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a= b=! c=X");
+        let mut lexer = Lexer::from_memory("a= b=! c=X", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_one_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "word");
+        let mut lexer = Lexer::from_memory("word", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_many_words() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ": if then");
+        let mut lexer = Lexer::from_memory(": if then", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_one_redirection() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<foo");
+        let mut lexer = Lexer::from_memory("<foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_many_redirections() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<one >two >>three");
+        let mut lexer = Lexer::from_memory("<one >two >>three", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_assignment_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "if=then else");
+        let mut lexer = Lexer::from_memory("if=then else", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_word_redirection() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "word <redirection");
+        let mut lexer = Lexer::from_memory("word <redirection", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_redirection_assignment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<foo a=b");
+        let mut lexer = Lexer::from_memory("<foo a=b", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -484,7 +484,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_assignment_redirection_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "if=then <foo else");
+        let mut lexer = Lexer::from_memory("if=then <foo else", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_array_assignment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a=()");
+        let mut lexer = Lexer::from_memory("a=()", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_empty_assignment_followed_by_blank_and_parenthesis() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a= ()");
+        let mut lexer = Lexer::from_memory("a= ()", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
@@ -549,7 +549,7 @@ mod tests {
 
     #[test]
     fn parser_simple_command_non_empty_assignment_followed_by_parenthesis() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a=b()");
+        let mut lexer = Lexer::from_memory("a=b()", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();

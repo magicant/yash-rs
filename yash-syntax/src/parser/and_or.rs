@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.and_or_list()).unwrap().unwrap();
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_one() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_many() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "first && second || \n\n third;");
+        let mut lexer = Lexer::from_memory("first && second || \n\n third;", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn parser_and_or_list_missing_command_after_and_and() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo &&");
+        let mut lexer = Lexer::from_memory("foo &&", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.and_or_list()).unwrap_err();

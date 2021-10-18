@@ -339,7 +339,7 @@ impl Lexer {
 
     /// Creates a new lexer with a fixed source code.
     #[must_use]
-    pub fn with_source(source: Source, code: &str) -> Lexer {
+    pub fn from_memory(code: &str, source: Source) -> Lexer {
         Lexer::new(Box::new(Memory::new(code, source)))
     }
 
@@ -440,7 +440,7 @@ impl Lexer {
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
     ///     assert_eq!(lexer.index(), 0);
     ///     let _ = lexer.peek_char().await;
     ///     assert_eq!(lexer.index(), 0);
@@ -463,7 +463,7 @@ impl Lexer {
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
     ///     let saved_index = lexer.index();
     ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
     ///     lexer.consume_char();
@@ -1170,27 +1170,27 @@ mod tests {
 
     #[test]
     fn lexer_with_empty_source() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
+        let mut lexer = Lexer::from_memory("\\\n\n\\", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
+        let mut lexer = Lexer::from_memory("\\\n\\\n\\\n\\\\", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_disabled() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
+        let mut lexer = Lexer::from_memory("\\\n\\\n\\\\", Source::Unknown);
         let mut lexer = lexer.disable_line_continuation();
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
@@ -1198,7 +1198,7 @@ mod tests {
 
     #[test]
     fn lexer_consume_char_if() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "word\n");
+        let mut lexer = Lexer::from_memory("word\n", Source::Unknown);
 
         let mut called = 0;
         let c = block_on(lexer.consume_char_if(|c| {
@@ -1276,14 +1276,14 @@ mod tests {
 
     #[test]
     fn lexer_inner_program_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "x y )");
+        let mut lexer = Lexer::from_memory("x y )", Source::Unknown);
         let source = block_on(lexer.inner_program()).unwrap();
         assert_eq!(source, "x y ");
     }
 
     #[test]
     fn lexer_inner_program_failure() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<< )");
+        let mut lexer = Lexer::from_memory("<< )", Source::Unknown);
         let e = block_on(lexer.inner_program()).unwrap_err();
         assert_eq!(
             e.cause,

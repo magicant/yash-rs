@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
+        let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
         let location = Location::dummy("X");
 
         let result = block_on(lexer.command_substitution(location))
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_none() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " foo bar )baz");
+        let mut lexer = Lexer::from_memory(" foo bar )baz", Source::Unknown);
         let location = Location::dummy("Y");
 
         let result = block_on(lexer.command_substitution(location)).unwrap();
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar baz");
+        let mut lexer = Lexer::from_memory("( foo bar baz", Source::Unknown);
         let location = Location::dummy("Z");
 
         let e = block_on(lexer.command_substitution(location)).unwrap_err();

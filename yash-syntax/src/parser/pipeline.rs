@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.pipeline()).unwrap().unwrap();
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_one() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_many() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "one | two | \n\t\n three");
+        let mut lexer = Lexer::from_memory("one | two | \n\t\n three", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_negated() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "! foo");
+        let mut lexer = Lexer::from_memory("! foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_double_negation() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " !  !");
+        let mut lexer = Lexer::from_memory(" !  !", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_missing_command_after_negation() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "!\nfoo");
+        let mut lexer = Lexer::from_memory("!\nfoo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_missing_command_after_bar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo | ;");
+        let mut lexer = Lexer::from_memory("foo | ;", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_bang_after_bar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo | !");
+        let mut lexer = Lexer::from_memory("foo | !", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.pipeline()).unwrap_err();
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn parser_pipeline_no_aliasing_of_bang() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "! ok");
+        let mut lexer = Lexer::from_memory("! ok", Source::Unknown);
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

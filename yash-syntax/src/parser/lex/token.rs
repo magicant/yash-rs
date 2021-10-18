@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn lexer_token_empty() {
         // If there's no word unit that can be parsed, it is the end of input.
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.location.line.value, "");
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn lexer_token_non_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc ");
+        let mut lexer = Lexer::from_memory("abc ", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 3);
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn lexer_token_tilde() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "~a:~");
+        let mut lexer = Lexer::from_memory("~a:~", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn lexer_token_io_number_delimited_by_less() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "12<");
+        let mut lexer = Lexer::from_memory("12<", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn lexer_token_io_number_delimited_by_greater() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "0>>");
+        let mut lexer = Lexer::from_memory("0>>", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 1);
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn lexer_token_after_blank() {
         block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, " a  ");
+            let mut lexer = Lexer::from_memory(" a  ", Source::Unknown);
 
             lexer.skip_blanks().await.unwrap();
             let t = lexer.token().await.unwrap();

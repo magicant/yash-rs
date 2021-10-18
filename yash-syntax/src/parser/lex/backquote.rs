@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_not_backquote() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "X");
+        let mut lexer = Lexer::from_memory("X", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "``");
+        let mut lexer = Lexer::from_memory("``", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_literals() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "`echo`");
+        let mut lexer = Lexer::from_memory("`echo`", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_with_escapes_double_quote_escapable() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let mut lexer = Lexer::from_memory(r#"`a\a\$\`\\\"\'`"#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Text,
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_with_escapes_double_quote_not_escapable() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"`a\a\$\`\\\"\'`"#);
+        let mut lexer = Lexer::from_memory(r#"`a\a\$\`\\\"\'`"#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_line_continuation() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "`\\\na\\\n\\\nb\\\n`");
+        let mut lexer = Lexer::from_memory("`\\\na\\\n\\\nb\\\n`", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_unclosed_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "`");
+        let mut lexer = Lexer::from_memory("`", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn lexer_backquote_unclosed_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "`foo");
+        let mut lexer = Lexer::from_memory("`foo", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,

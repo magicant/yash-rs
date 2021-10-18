@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_short() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "while true; do :; done");
+        let mut lexer = Lexer::from_memory("while true; do :; done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_long() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "while false; true& do foo; bar& done");
+        let mut lexer = Lexer::from_memory("while false; true& do foo; bar& done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "while :");
+        let mut lexer = Lexer::from_memory("while :", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_empty_posix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " while do :; done");
+        let mut lexer = Lexer::from_memory(" while do :; done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn parser_while_loop_aliasing() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " while :; DO :; done");
+        let mut lexer = Lexer::from_memory(" while :; DO :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_short() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "until true; do :; done");
+        let mut lexer = Lexer::from_memory("until true; do :; done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_long() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "until false; true& do foo; bar& done");
+        let mut lexer = Lexer::from_memory("until false; true& do foo; bar& done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "until :");
+        let mut lexer = Lexer::from_memory("until :", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_empty_posix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "  until do :; done");
+        let mut lexer = Lexer::from_memory("  until do :; done", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn parser_until_loop_aliasing() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " until :; DO :; done");
+        let mut lexer = Lexer::from_memory(" until :; DO :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(

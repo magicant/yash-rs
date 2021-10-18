@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_unquoted() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let mut lexer = Lexer::from_memory("$()", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -202,7 +202,7 @@ mod tests {
     fn lexer_word_unit_unquoted_escapes_in_word_context() {
         // Any characters can be escaped in this context.
         block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, r#"\a\$\`\"\\\'\#\{\}"#);
+            let mut lexer = Lexer::from_memory(r#"\a\$\`\"\\\'\#\{\}"#, Source::Unknown);
             let mut lexer = WordLexer {
                 lexer: &mut lexer,
                 context: WordContext::Word,
@@ -253,7 +253,7 @@ mod tests {
     fn lexer_word_unit_unquoted_escapes_in_text_context() {
         // $, `, " and \ can be escaped as well as delimiters
         block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, r#"\a\$\`\"\\\'\#\{\}"#);
+            let mut lexer = Lexer::from_memory(r#"\a\$\`\"\\\'\#\{\}"#, Source::Unknown);
             let mut lexer = WordLexer {
                 lexer: &mut lexer,
                 context: WordContext::Text,
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_single_quote_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "''");
+        let mut lexer = Lexer::from_memory("''", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_single_quote_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\\\n$def\\'");
+        let mut lexer = Lexer::from_memory("'abc\\\n$def\\'", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_single_quote_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "'abc\ndef\\");
+        let mut lexer = Lexer::from_memory("'abc\ndef\\", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_not_single_quote_in_text_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "'");
+        let mut lexer = Lexer::from_memory("'", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Text,
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_double_quote_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\"\"");
+        let mut lexer = Lexer::from_memory("\"\"", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_double_quote_non_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\"abc\"");
+        let mut lexer = Lexer::from_memory("\"abc\"", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -418,7 +418,7 @@ mod tests {
     fn lexer_word_unit_double_quote_escapes() {
         // Only the following can be escaped in this context: $ ` " \
         block_on(async {
-            let mut lexer = Lexer::with_source(Source::Unknown, r#""\a\$\`\"\\\'\#""#);
+            let mut lexer = Lexer::from_memory(r#""\a\$\`\"\\\'\#""#, Source::Unknown);
             let mut lexer = WordLexer {
                 lexer: &mut lexer,
                 context: WordContext::Word,
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn lexer_word_unit_double_quote_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\"abc\ndef");
+        let mut lexer = Lexer::from_memory("\"abc\ndef", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn lexer_word_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"0$(:)X\#");
+        let mut lexer = Lexer::from_memory(r"0$(:)X\#", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn lexer_word_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn lexer_word_with_switch_in_word_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"${x-~}");
+        let mut lexer = Lexer::from_memory(r"${x-~}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn lexer_word_with_switch_in_text_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#""${x-~}""#);
+        let mut lexer = Lexer::from_memory(r#""${x-~}""#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
