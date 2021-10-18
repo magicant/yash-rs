@@ -23,7 +23,7 @@ use super::core::WordLexer;
 use crate::parser::core::Result;
 use crate::syntax::TextUnit;
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a text unit that starts with `$`.
     ///
     /// If the next character is `$`, a parameter expansion, command

@@ -290,7 +290,7 @@ struct OperatorTail {
     pub reversed_key: Vec<char>,
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses an operator that matches a key in the given trie, if any.
     fn operator_tail(
         &mut self,

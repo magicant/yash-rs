@@ -25,7 +25,7 @@ use super::core::Result;
 use super::fill::MissingHereDoc;
 use crate::syntax::Command;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function

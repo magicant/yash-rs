@@ -111,9 +111,9 @@ impl<T> Rec<T> {
 /// Then the [`command_line`](Self::command_line) function is for you.
 /// See also the [module documentation](super).
 #[derive(Debug)]
-pub struct Parser<'l> {
+pub struct Parser<'a: 'b, 'b> {
     /// Lexer that provides tokens.
-    lexer: &'l mut Lexer,
+    lexer: &'b mut Lexer<'a>,
 
     /// Aliases that are used while parsing.
     aliases: Rc<AliasSet>,
@@ -136,17 +136,17 @@ pub struct Parser<'l> {
     read_here_docs: Vec<HereDoc>,
 }
 
-impl Parser<'_> {
+impl<'a, 'b> Parser<'a, 'b> {
     /// Creates a new parser based on the given lexer.
     ///
     /// The parser created by this function does not perform alias substitution. To do it, pass an
     /// alias set to [`with_aliases`](Parser::with_aliases).
-    pub fn new(lexer: &mut Lexer) -> Parser {
+    pub fn new(lexer: &'b mut Lexer<'a>) -> Parser<'a, 'b> {
         Self::with_aliases(lexer, Rc::new(AliasSet::new()))
     }
 
     /// Creates a new parser based on the given lexer and alias set.
-    pub fn with_aliases(lexer: &mut Lexer, aliases: Rc<AliasSet>) -> Parser {
+    pub fn with_aliases(lexer: &'b mut Lexer<'a>, aliases: Rc<AliasSet>) -> Parser<'a, 'b> {
         Parser {
             lexer,
             aliases,

@@ -116,17 +116,17 @@ enum InputState {
 }
 
 /// Core part of the lexical analyzer.
-struct LexerCore {
-    input: Box<dyn Input>,
+struct LexerCore<'a> {
+    input: Box<dyn Input + 'a>,
     state: InputState,
     source: Vec<SourceChar>,
     index: usize,
 }
 
-impl LexerCore {
+impl<'a> LexerCore<'a> {
     /// Creates a new lexer core that reads using the given input function.
     #[must_use]
-    fn new(input: Box<dyn Input>) -> LexerCore {
+    fn new(input: Box<dyn Input + 'a>) -> LexerCore<'a> {
         LexerCore {
             input,
             state: InputState::Alive,
@@ -297,7 +297,7 @@ impl LexerCore {
     }
 }
 
-impl fmt::Debug for LexerCore {
+impl fmt::Debug for LexerCore<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LexerCore")
             .field("state", &self.state)
@@ -319,18 +319,18 @@ impl fmt::Debug for LexerCore {
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
 /// parse more complex structures in the source code.
 #[derive(Debug)]
-pub struct Lexer {
+pub struct Lexer<'a> {
     // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
     // functions to `LexerCore`. `Lexer` adds automatic line-continuation
     // skipping to `LexerCore`.
-    core: LexerCore,
+    core: LexerCore<'a>,
     line_continuation_enabled: bool,
 }
 
-impl Lexer {
+impl<'a> Lexer<'a> {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
-    pub fn new(input: Box<dyn Input>) -> Lexer {
+    pub fn new(input: Box<dyn Input + 'a>) -> Lexer<'a> {
         Lexer {
             core: LexerCore::new(input),
             line_continuation_enabled: true,
@@ -339,7 +339,7 @@ impl Lexer {
 
     /// Creates a new lexer with a fixed source code.
     #[must_use]
-    pub fn from_memory(code: &str, source: Source) -> Lexer {
+    pub fn from_memory(code: &str, source: Source) -> Lexer<'static> {
         Lexer::new(Box::new(Memory::new(code, source)))
     }
 
@@ -353,7 +353,7 @@ impl Lexer {
     /// switch line continuation recognition on.
     ///
     /// This function will panic if line continuation has already been disabled.
-    pub fn disable_line_continuation(&mut self) -> PlainLexer<'_> {
+    pub fn disable_line_continuation<'b>(&'b mut self) -> PlainLexer<'a, 'b> {
         assert!(
             self.line_continuation_enabled,
             "line continuation already disabled"
@@ -368,7 +368,7 @@ impl Lexer {
     /// [`disable_line_continuation`](Self::disable_line_continuation) to this
     /// function to re-enable line continuation. That is equivalent to dropping
     /// the `PlainLexer` instance, but the code will be more descriptive.
-    pub fn enable_line_continuation(_: PlainLexer<'_>) {}
+    pub fn enable_line_continuation<'b>(_: PlainLexer<'a, 'b>) {}
 
     /// Skips line continuation, i.e., a backslash followed by a newline.
     ///
@@ -581,24 +581,24 @@ impl Lexer {
 /// re-enabled.
 #[derive(Debug)]
 #[must_use = "You must retain the PlainLexer to keep line continuation disabled"]
-pub struct PlainLexer<'l> {
-    lexer: &'l mut Lexer,
+pub struct PlainLexer<'a: 'b, 'b> {
+    lexer: &'b mut Lexer<'a>,
 }
 
-impl Deref for PlainLexer<'_> {
-    type Target = Lexer;
-    fn deref(&self) -> &Lexer {
+impl<'a, 'b> Deref for PlainLexer<'a, 'b> {
+    type Target = Lexer<'a>;
+    fn deref(&self) -> &Lexer<'a> {
         self.lexer
     }
 }
 
-impl DerefMut for PlainLexer<'_> {
-    fn deref_mut(&mut self) -> &mut Lexer {
+impl<'a, 'b> DerefMut for PlainLexer<'a, 'b> {
+    fn deref_mut(&mut self) -> &mut Lexer<'a> {
         self.lexer
     }
 }
 
-impl Drop for PlainLexer<'_> {
+impl Drop for PlainLexer<'_, '_> {
     fn drop(&mut self) {
         self.lexer.line_continuation_enabled = true;
     }
@@ -623,20 +623,20 @@ pub enum WordContext {
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
 /// and [words](crate::syntax::Word).
 #[derive(Debug)]
-pub struct WordLexer<'a> {
-    pub lexer: &'a mut Lexer,
+pub struct WordLexer<'a: 'b, 'b> {
+    pub lexer: &'b mut Lexer<'a>,
     pub context: WordContext,
 }
 
-impl Deref for WordLexer<'_> {
-    type Target = Lexer;
-    fn deref(&self) -> &Lexer {
+impl<'a, 'b> Deref for WordLexer<'a, 'b> {
+    type Target = Lexer<'a>;
+    fn deref(&self) -> &Lexer<'a> {
         self.lexer
     }
 }
 
-impl DerefMut for WordLexer<'_> {
-    fn deref_mut(&mut self) -> &mut Lexer {
+impl<'a, 'b> DerefMut for WordLexer<'a, 'b> {
+    fn deref_mut(&mut self) -> &mut Lexer<'a> {
         self.lexer
     }
 }

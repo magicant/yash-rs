@@ -26,7 +26,7 @@ use super::lex::TokenId::Token;
 use crate::syntax::CompoundCommand;
 use crate::syntax::ElifThen;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses an elif-then clause.
     ///
     /// Returns `Ok(None)` if the next token is not `elif`.

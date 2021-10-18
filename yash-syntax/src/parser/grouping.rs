@@ -26,7 +26,7 @@ use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a normal grouping.
     ///
     /// The next token must be a `{`.

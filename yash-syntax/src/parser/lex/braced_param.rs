@@ -35,7 +35,7 @@ pub fn is_name_char(c: char) -> bool {
     is_portable_name_char(c)
 }
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Tests if there is a length prefix (`#`).
     ///
     /// This function may consume many characters, possibly beyond the length

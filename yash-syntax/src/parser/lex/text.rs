@@ -27,7 +27,7 @@ use crate::syntax::Literal;
 use crate::syntax::Text;
 use crate::syntax::TextUnit;
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
@@ -100,7 +100,7 @@ impl WordLexer<'_> {
     }
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a text, i.e., a (possibly empty) sequence of [`TextUnit`]s.
     ///
     /// `is_delimiter` tests if an unquoted character is a delimiter. When

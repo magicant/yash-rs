@@ -20,7 +20,7 @@ use super::core::is_blank;
 use super::core::Lexer;
 use crate::parser::core::Result;
 
-impl Lexer {
+impl Lexer<'_> {
     /// Skips a character if the given function returns true for it.
     ///
     /// Returns `Ok(true)` if the character was skipped, `Ok(false)` if the function returned

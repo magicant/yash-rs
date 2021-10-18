@@ -31,7 +31,7 @@ use crate::syntax::CompoundCommand;
 use crate::syntax::FullCompoundCommand;
 use crate::syntax::List;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a `do` clause, i.e., a compound list surrounded in `do ... done`.
     ///
     /// Returns `Ok(None)` if the first token is not `do`.

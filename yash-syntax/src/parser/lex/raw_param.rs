@@ -48,7 +48,7 @@ pub fn is_single_char_name(c: char) -> bool {
     c.is_ascii_digit() || is_special_parameter_char(c)
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a parameter expansion that is not enclosed in braces.
     ///
     /// The initial `$` must have been consumed before calling this function.

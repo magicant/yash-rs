@@ -28,7 +28,7 @@ use super::lex::TokenId::{self, EndOfInput, Operator, Token};
 use crate::syntax::CaseItem;
 use crate::syntax::CompoundCommand;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a case item.
     ///
     /// Does not parse the optional trailing double semicolon.

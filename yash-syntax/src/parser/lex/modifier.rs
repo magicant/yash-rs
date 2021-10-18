@@ -33,7 +33,7 @@ use crate::syntax::Word;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Lexer {
+impl Lexer<'_> {
     async fn invalid_modifier(&mut self) -> Result<Modifier> {
         let cause = SyntaxError::InvalidModifier.into();
         let location = self.location().await?.clone();
@@ -88,7 +88,7 @@ impl Lexer {
     }
 }
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a [switch](Switch), except the optional initial colon.
     ///
     /// This function blindly consumes the current character, which must be

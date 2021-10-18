@@ -32,7 +32,7 @@ use crate::syntax::RedirOp;
 use crate::syntax::Word;
 use std::convert::TryFrom;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses the operand of a redirection operator.
     async fn redirection_operand(&mut self) -> Result<std::result::Result<Word, Location>> {
         let operand = self.take_token_auto(&[]).await?;

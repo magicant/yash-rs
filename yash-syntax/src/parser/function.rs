@@ -29,7 +29,7 @@ use crate::syntax::FunctionDefinition;
 use crate::syntax::SimpleCommand;
 use std::rc::Rc;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a function definition command that does not start with the
     /// `function` reserved word.
     ///

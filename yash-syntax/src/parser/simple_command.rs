@@ -56,7 +56,7 @@ impl<H> From<Builder<H>> for SimpleCommand<H> {
     }
 }
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses the value of an array assignment.
     ///
     /// This function first consumes a `(` token, then any number of words

@@ -36,7 +36,7 @@ pub fn is_token_delimiter_char(c: char) -> bool {
     is_operator_char(c) || is_blank(c)
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Determines the token ID for the word.
     ///
     /// This is a helper function used by [`Lexer::token`] and does not support

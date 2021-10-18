@@ -51,7 +51,7 @@ fn leading_tabs<'a, I: IntoIterator<Item = &'a TextUnit>>(i: I) -> usize {
         .count()
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Reads a line literally.
     ///
     /// This function recognizes no quotes or expansions. Starting from the

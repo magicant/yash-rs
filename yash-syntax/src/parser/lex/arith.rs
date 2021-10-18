@@ -26,7 +26,7 @@ use crate::syntax::TextUnit;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses an arithmetic expansion.
     ///
     /// The initial `$` must have been consumed before calling this function.

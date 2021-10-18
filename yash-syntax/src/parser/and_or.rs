@@ -27,7 +27,7 @@ use super::lex::TokenId::Operator;
 use crate::syntax::AndOr;
 use crate::syntax::AndOrList;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses an and-or list.
     ///
     /// If there is no valid and-or list at the current position, this function

@@ -23,7 +23,7 @@ use crate::parser::error::SyntaxError;
 use crate::source::Location;
 use crate::syntax::TextUnit;
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a command substitution of the form `$(...)`.
     ///
     /// The initial `$` must have been consumed before calling this function.

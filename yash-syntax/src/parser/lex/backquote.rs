@@ -24,7 +24,7 @@ use crate::parser::error::SyntaxError;
 use crate::syntax::BackquoteUnit;
 use crate::syntax::TextUnit;
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a backquote unit.
     async fn backquote_unit(&mut self) -> Result<Option<BackquoteUnit>> {
         if self.skip_if(|c| c == '\\').await? {

@@ -28,7 +28,7 @@ use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Pipeline;
 use std::rc::Rc;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a pipeline.
     ///
     /// If there is no valid pipeline at the current position, this function

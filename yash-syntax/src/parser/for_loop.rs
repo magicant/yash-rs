@@ -30,7 +30,7 @@ use crate::syntax::CompoundCommand;
 use crate::syntax::List;
 use crate::syntax::Word;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses the name of a for loop.
     async fn for_loop_name(&mut self) -> Result<Word> {
         let name = self.take_token_auto(&[]).await?;

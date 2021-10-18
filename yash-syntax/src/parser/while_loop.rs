@@ -25,7 +25,7 @@ use super::lex::Keyword::{Until, While};
 use super::lex::TokenId::Token;
 use crate::syntax::CompoundCommand;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a while loop.
     ///
     /// The next token must be the `while` reserved word.

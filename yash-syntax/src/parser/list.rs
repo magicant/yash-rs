@@ -33,7 +33,7 @@ use super::lex::TokenId::EndOfInput;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     // There is no function that parses a single item because it would not be
     // very useful for parsing a list. An item requires a separator operator
     // ('&' or ';') for it to be followed by another item. You cannot tell from

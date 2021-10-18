@@ -27,7 +27,7 @@ use crate::source::SourceChar;
 use crate::syntax::Word;
 use crate::syntax::WordUnit::{self, DoubleQuote, SingleQuote, Unquoted};
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a single-quoted string.
     ///
     /// The opening `'` must have been consumed before calling this function.
@@ -82,7 +82,7 @@ impl Lexer {
     }
 }
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a word unit.
     ///
     /// `is_delimiter` is a function that decides a character is a delimiter. An
