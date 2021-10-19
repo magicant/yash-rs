@@ -339,7 +339,7 @@ impl<'a> Lexer<'a> {
 
     /// Creates a new lexer with a fixed source code.
     #[must_use]
-    pub fn from_memory(code: &str, source: Source) -> Lexer<'static> {
+    pub fn from_memory(code: &'a str, source: Source) -> Lexer<'a> {
         Lexer::new(Box::new(Memory::new(code, source)))
     }
 
