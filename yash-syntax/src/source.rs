@@ -131,7 +131,7 @@ pub struct Line {
 pub struct Lines<'a> {
     source: Source,
     code: &'a str,
-    number: u64,
+    number: NonZeroU64,
 }
 
 impl<'a> Iterator for Lines<'a> {
@@ -142,8 +142,7 @@ impl<'a> Iterator for Lines<'a> {
             return None;
         }
 
-        self.number += 1;
-        let number = NonZeroU64::new(self.number).unwrap();
+        let number = self.number;
         let source = self.source.clone();
 
         let value = match self.code.find('\n') {
@@ -154,6 +153,9 @@ impl<'a> Iterator for Lines<'a> {
             }
             Some(mut i) => {
                 i += 1;
+                // TODO self.number = self.number.saturating_add(1);
+                self.number =
+                    unsafe { NonZeroU64::new_unchecked(self.number.get().saturating_add(1)) };
                 let value_range = &self.code[..i];
                 self.code = &self.code[i..];
                 value_range
@@ -171,12 +173,24 @@ impl<'a> Iterator for Lines<'a> {
 
 impl FusedIterator for Lines<'_> {}
 
+impl Lines<'_> {
+    /// Like `next`, but returns an empty line if the end of input has been
+    /// reached.
+    pub fn next_or_empty(&mut self) -> Line {
+        self.next().unwrap_or_else(|| Line {
+            value: String::new(),
+            number: self.number,
+            source: self.source.clone(),
+        })
+    }
+}
+
 /// Converts a source code string into an iterator of [Line]s.
 pub fn lines(code: &str, source: Source) -> Lines<'_> {
     Lines {
         source,
         code,
-        number: 0,
+        number: NonZeroU64::new(1).unwrap(),
     }
 }
 
@@ -255,7 +269,13 @@ mod tests {
 
     #[test]
     fn lines_empty() {
-        assert_eq!(lines("", Source::Unknown,).next(), None);
+        let mut l = lines("", Source::Unknown);
+        assert_eq!(l.next(), None);
+
+        let line = l.next_or_empty();
+        assert_eq!(&line.value, "");
+        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.source, Source::Unknown);
     }
 
     #[test]
@@ -269,6 +289,11 @@ mod tests {
 
         // No second line
         assert_eq!(l.next(), None);
+
+        let line = l.next_or_empty();
+        assert_eq!(&line.value, "");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
     }
 
     #[test]
@@ -292,6 +317,11 @@ mod tests {
 
         // No more lines
         assert_eq!(l.next(), None);
+
+        let line = l.next_or_empty();
+        assert_eq!(&line.value, "");
+        assert_eq!(line.number.get(), 4);
+        assert_eq!(line.source, Source::Unknown);
     }
 
     #[test]
@@ -312,6 +342,11 @@ mod tests {
         assert_eq!(l.next(), None);
         // Lines is fused
         assert_eq!(l.next(), None);
+
+        let line = l.next_or_empty();
+        assert_eq!(&line.value, "");
+        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.source, Source::Unknown);
     }
 
     #[test]
