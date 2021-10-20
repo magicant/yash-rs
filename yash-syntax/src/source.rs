@@ -32,6 +32,10 @@ pub enum Source {
     ///
     /// Normally you should not use this value, but it may be useful for quick debugging.
     Unknown,
+
+    /// Standard input.
+    Stdin,
+
     /// Alias substitution.
     ///
     /// This applies to a code fragment that replaced another as a result of alias substitution.
@@ -108,6 +112,7 @@ impl Source {
         use Source::*;
         match self {
             Unknown => "<?>",
+            Stdin => "<stdin>",
             Alias { .. } => "<alias>",
         }
     }
