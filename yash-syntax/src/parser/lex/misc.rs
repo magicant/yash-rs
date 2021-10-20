@@ -20,7 +20,7 @@ use super::core::is_blank;
 use super::core::Lexer;
 use crate::parser::core::Result;
 
-impl Lexer {
+impl Lexer<'_> {
     /// Skips a character if the given function returns true for it.
     ///
     /// Returns `Ok(true)` if the character was skipped, `Ok(false)` if the function returned
@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_blanks() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " \t w");
+        let mut lexer = Lexer::from_memory(" \t w", Source::Unknown);
 
         let c = block_on(async {
             lexer.skip_blanks().await?;
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_blanks_does_not_skip_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
         block_on(async {
             lexer.skip_blanks().await.unwrap();
             assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
@@ -99,14 +99,14 @@ mod tests {
 
     #[test]
     fn lexer_skip_blanks_skips_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n  \\\n\\\n\\\n \\\nX");
+        let mut lexer = Lexer::from_memory("\\\n  \\\n\\\n\\\n \\\nX", Source::Unknown);
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
         });
         assert_eq!(c, Ok(Some('X')));
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "  \\\n\\\n  \\\n Y");
+        let mut lexer = Lexer::from_memory("  \\\n\\\n  \\\n Y", Source::Unknown);
         let c = block_on(async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_no_comment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
         block_on(async {
             lexer.skip_comment().await.unwrap();
             assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_empty_comment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "#\n");
+        let mut lexer = Lexer::from_memory("#\n", Source::Unknown);
 
         let c = block_on(async {
             lexer.skip_comment().await?;
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_non_empty_comment() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n### foo bar\\\n");
+        let mut lexer = Lexer::from_memory("\\\n### foo bar\\\n", Source::Unknown);
 
         let c = block_on(async {
             lexer.skip_comment().await?;
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn lexer_skip_comment_not_ending_with_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "#comment");
+        let mut lexer = Lexer::from_memory("#comment", Source::Unknown);
 
         let c = block_on(async {
             lexer.skip_comment().await?;

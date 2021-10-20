@@ -51,7 +51,7 @@ fn leading_tabs<'a, I: IntoIterator<Item = &'a TextUnit>>(i: I) -> usize {
         .count()
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Reads a line literally.
     ///
     /// This function recognizes no quotes or expansions. Starting from the
@@ -139,11 +139,11 @@ mod tests {
 
     #[test]
     fn lexer_line() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
         let line = block_on(lexer.line()).unwrap();
         assert_eq!(line, "");
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo\n");
+        let mut lexer = Lexer::from_memory("foo\n", Source::Unknown);
         let line = block_on(lexer.line()).unwrap();
         assert_eq!(line, "foo");
         let next = block_on(lexer.peek_char()).unwrap().unwrap();
@@ -161,7 +161,7 @@ mod tests {
     fn lexer_here_doc_content_empty_content() {
         let heredoc = partial_here_doc("END", false);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "END\nX");
+        let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
@@ -176,7 +176,7 @@ mod tests {
     fn lexer_here_doc_content_one_line_content() {
         let heredoc = partial_here_doc("FOO", false);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "content\nFOO\nX");
+        let mut lexer = Lexer::from_memory("content\nFOO\nX", Source::Unknown);
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
@@ -191,7 +191,7 @@ mod tests {
     fn lexer_here_doc_content_long_content() {
         let heredoc = partial_here_doc("BAR", false);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo\n\tBAR\n\nbaz\nBAR\nX");
+        let mut lexer = Lexer::from_memory("foo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
@@ -206,12 +206,12 @@ mod tests {
     fn lexer_here_doc_content_escapes_with_unquoted_delimiter() {
         let heredoc = partial_here_doc("END", false);
 
-        let mut lexer = Lexer::with_source(
-            Source::Unknown,
+        let mut lexer = Lexer::from_memory(
             r#"\a\$\"\'\`\\\
 X
 END
 "#,
+            Source::Unknown,
         );
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(
@@ -236,12 +236,12 @@ END
     fn lexer_here_doc_content_escapes_with_quoted_delimiter() {
         let heredoc = partial_here_doc(r"\END", false);
 
-        let mut lexer = Lexer::with_source(
-            Source::Unknown,
+        let mut lexer = Lexer::from_memory(
             r#"\a\$\"\'\`\\\
 X
 END
 "#,
+            Source::Unknown,
         );
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(
@@ -271,7 +271,7 @@ END
     fn lexer_here_doc_content_with_tabs_removed() {
         let heredoc = partial_here_doc("BAR", true);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX");
+        let mut lexer = Lexer::from_memory("\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, true);
@@ -286,7 +286,7 @@ END
     fn lexer_here_doc_content_unclosed() {
         let heredoc = partial_here_doc("END", false);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let e = block_on(lexer.here_doc_content(heredoc)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) =
             e.cause

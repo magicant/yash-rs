@@ -116,17 +116,17 @@ enum InputState {
 }
 
 /// Core part of the lexical analyzer.
-struct LexerCore {
-    input: Box<dyn Input>,
+struct LexerCore<'a> {
+    input: Box<dyn Input + 'a>,
     state: InputState,
     source: Vec<SourceChar>,
     index: usize,
 }
 
-impl LexerCore {
+impl<'a> LexerCore<'a> {
     /// Creates a new lexer core that reads using the given input function.
     #[must_use]
-    fn new(input: Box<dyn Input>) -> LexerCore {
+    fn new(input: Box<dyn Input + 'a>) -> LexerCore<'a> {
         LexerCore {
             input,
             state: InputState::Alive,
@@ -251,7 +251,7 @@ impl LexerCore {
             alias: alias.clone(),
         };
         let mut repl = vec![];
-        for line in lines(source, &alias.replacement) {
+        for line in lines(&alias.replacement, source) {
             repl.extend(Rc::new(line).enumerate());
         }
 
@@ -297,7 +297,7 @@ impl LexerCore {
     }
 }
 
-impl fmt::Debug for LexerCore {
+impl fmt::Debug for LexerCore<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LexerCore")
             .field("state", &self.state)
@@ -319,18 +319,18 @@ impl fmt::Debug for LexerCore {
 /// [`skip_blanks_and_comment`](Lexer::skip_blanks_and_comment) depend on those primitives to
 /// parse more complex structures in the source code.
 #[derive(Debug)]
-pub struct Lexer {
+pub struct Lexer<'a> {
     // `Lexer` is a thin wrapper around `LexerCore`. `Lexer` delegates most
     // functions to `LexerCore`. `Lexer` adds automatic line-continuation
     // skipping to `LexerCore`.
-    core: LexerCore,
+    core: LexerCore<'a>,
     line_continuation_enabled: bool,
 }
 
-impl Lexer {
+impl<'a> Lexer<'a> {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
-    pub fn new(input: Box<dyn Input>) -> Lexer {
+    pub fn new(input: Box<dyn Input + 'a>) -> Lexer<'a> {
         Lexer {
             core: LexerCore::new(input),
             line_continuation_enabled: true,
@@ -339,8 +339,8 @@ impl Lexer {
 
     /// Creates a new lexer with a fixed source code.
     #[must_use]
-    pub fn with_source(source: Source, code: &str) -> Lexer {
-        Lexer::new(Box::new(Memory::new(source, code)))
+    pub fn from_memory(code: &'a str, source: Source) -> Lexer<'a> {
+        Lexer::new(Box::new(Memory::new(code, source)))
     }
 
     /// Disables line continuation recognition onward.
@@ -353,7 +353,7 @@ impl Lexer {
     /// switch line continuation recognition on.
     ///
     /// This function will panic if line continuation has already been disabled.
-    pub fn disable_line_continuation(&mut self) -> PlainLexer<'_> {
+    pub fn disable_line_continuation<'b>(&'b mut self) -> PlainLexer<'a, 'b> {
         assert!(
             self.line_continuation_enabled,
             "line continuation already disabled"
@@ -368,7 +368,7 @@ impl Lexer {
     /// [`disable_line_continuation`](Self::disable_line_continuation) to this
     /// function to re-enable line continuation. That is equivalent to dropping
     /// the `PlainLexer` instance, but the code will be more descriptive.
-    pub fn enable_line_continuation(_: PlainLexer<'_>) {}
+    pub fn enable_line_continuation<'b>(_: PlainLexer<'a, 'b>) {}
 
     /// Skips line continuation, i.e., a backslash followed by a newline.
     ///
@@ -440,7 +440,7 @@ impl Lexer {
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
     ///     assert_eq!(lexer.index(), 0);
     ///     let _ = lexer.peek_char().await;
     ///     assert_eq!(lexer.index(), 0);
@@ -463,7 +463,7 @@ impl Lexer {
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// futures_executor::block_on(async {
-    ///     let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+    ///     let mut lexer = Lexer::from_memory("abc", Source::Unknown);
     ///     let saved_index = lexer.index();
     ///     assert_eq!(lexer.peek_char().await, Ok(Some('a')));
     ///     lexer.consume_char();
@@ -581,24 +581,24 @@ impl Lexer {
 /// re-enabled.
 #[derive(Debug)]
 #[must_use = "You must retain the PlainLexer to keep line continuation disabled"]
-pub struct PlainLexer<'l> {
-    lexer: &'l mut Lexer,
+pub struct PlainLexer<'a: 'b, 'b> {
+    lexer: &'b mut Lexer<'a>,
 }
 
-impl Deref for PlainLexer<'_> {
-    type Target = Lexer;
-    fn deref(&self) -> &Lexer {
+impl<'a, 'b> Deref for PlainLexer<'a, 'b> {
+    type Target = Lexer<'a>;
+    fn deref(&self) -> &Lexer<'a> {
         self.lexer
     }
 }
 
-impl DerefMut for PlainLexer<'_> {
-    fn deref_mut(&mut self) -> &mut Lexer {
+impl<'a, 'b> DerefMut for PlainLexer<'a, 'b> {
+    fn deref_mut(&mut self) -> &mut Lexer<'a> {
         self.lexer
     }
 }
 
-impl Drop for PlainLexer<'_> {
+impl Drop for PlainLexer<'_, '_> {
     fn drop(&mut self) {
         self.lexer.line_continuation_enabled = true;
     }
@@ -623,20 +623,20 @@ pub enum WordContext {
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
 /// and [words](crate::syntax::Word).
 #[derive(Debug)]
-pub struct WordLexer<'a> {
-    pub lexer: &'a mut Lexer,
+pub struct WordLexer<'a: 'b, 'b> {
+    pub lexer: &'b mut Lexer<'a>,
     pub context: WordContext,
 }
 
-impl Deref for WordLexer<'_> {
-    type Target = Lexer;
-    fn deref(&self) -> &Lexer {
+impl<'a, 'b> Deref for WordLexer<'a, 'b> {
+    type Target = Lexer<'a>;
+    fn deref(&self) -> &Lexer<'a> {
         self.lexer
     }
 }
 
-impl DerefMut for WordLexer<'_> {
-    fn deref_mut(&mut self) -> &mut Lexer {
+impl<'a, 'b> DerefMut for WordLexer<'a, 'b> {
+    fn deref_mut(&mut self) -> &mut Lexer<'a> {
         self.lexer
     }
 }
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn lexer_core_peek_char_empty_source() {
-        let input = Memory::new(Source::Unknown, "");
+        let input = Memory::new("", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn lexer_core_consume_char_success() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         let result = block_on(lexer.peek_char());
@@ -759,14 +759,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "A character must have been peeked before being consumed: index=0")]
     fn lexer_core_consume_char_panic() {
-        let input = Memory::new(Source::Unknown, "a");
+        let input = Memory::new("a", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.consume_char();
     }
 
     #[test]
     fn lexer_core_peek_char_at() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         let c0 = match block_on(lexer.peek_char()) {
@@ -793,7 +793,7 @@ mod tests {
 
     #[test]
     fn lexer_core_index() {
-        let input = Memory::new(Source::Unknown, "a\nb");
+        let input = Memory::new("a\nb", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
 
         assert_eq!(lexer.index(), 0);
@@ -814,7 +814,7 @@ mod tests {
 
     #[test]
     fn lexer_core_rewind_success() {
-        let input = Memory::new(Source::Unknown, "abc");
+        let input = Memory::new("abc", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(0);
         assert_eq!(lexer.index(), 0);
@@ -842,14 +842,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "The new index 1 must not be larger than the current index 0")]
     fn lexer_core_rewind_invalid_index() {
-        let input = Memory::new(Source::Unknown, "abc");
+        let input = Memory::new("abc", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         lexer.rewind(1);
     }
 
     #[test]
     fn lexer_core_source_string() {
-        let input = Memory::new(Source::Unknown, "ab\ncd");
+        let input = Memory::new("ab\ncd", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         block_on(async {
             for _ in 0..4 {
@@ -865,7 +865,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "begin index 0 should be less than end index 0")]
     fn lexer_core_substitute_alias_with_invalid_index() {
-        let input = Memory::new(Source::Unknown, "a b");
+        let input = Memory::new("a b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "a".to_string(),
@@ -878,7 +878,7 @@ mod tests {
 
     #[test]
     fn lexer_core_substitute_alias_single_line_replacement() {
-        let input = Memory::new(Source::Unknown, "a b");
+        let input = Memory::new("a b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "a".to_string(),
@@ -977,7 +977,7 @@ mod tests {
 
     #[test]
     fn lexer_core_substitute_alias_multi_line_replacement() {
-        let input = Memory::new(Source::Unknown, " foo b");
+        let input = Memory::new(" foo b", Source::Unknown);
         let mut lexer = LexerCore::new(Box::new(input));
         let alias = Rc::new(Alias {
             name: "foo".to_string(),
@@ -1079,7 +1079,7 @@ mod tests {
     #[test]
     fn lexer_core_substitute_alias_empty_replacement() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "x ");
+            let input = Memory::new("x ", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "x".to_string(),
@@ -1114,7 +1114,7 @@ mod tests {
             global: false,
             origin: Location::dummy("origin"),
         });
-        let input = Memory::new(Source::Alias { original, alias }, "a");
+        let input = Memory::new("a", Source::Alias { original, alias });
         let lexer = LexerCore::new(Box::new(input));
         assert!(!lexer.is_after_blank_ending_alias(0));
     }
@@ -1122,7 +1122,7 @@ mod tests {
     #[test]
     fn lexer_core_is_after_blank_ending_alias_not_blank_ending() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "a x");
+            let input = Memory::new("a x", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
@@ -1146,7 +1146,7 @@ mod tests {
     #[test]
     fn lexer_core_is_after_blank_ending_alias_blank_ending() {
         block_on(async {
-            let input = Memory::new(Source::Unknown, "a x");
+            let input = Memory::new("a x", Source::Unknown);
             let mut lexer = LexerCore::new(Box::new(input));
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
@@ -1170,27 +1170,27 @@ mod tests {
 
     #[test]
     fn lexer_with_empty_source() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_backslash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\n\\");
+        let mut lexer = Lexer::from_memory("\\\n\n\\", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
         assert_eq!(lexer.index(), 2);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_enabled_stopping_on_non_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\n\\\\");
+        let mut lexer = Lexer::from_memory("\\\n\\\n\\\n\\\\", Source::Unknown);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 6);
     }
 
     #[test]
     fn lexer_peek_char_with_line_continuation_disabled() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n\\\\");
+        let mut lexer = Lexer::from_memory("\\\n\\\n\\\\", Source::Unknown);
         let mut lexer = lexer.disable_line_continuation();
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
@@ -1198,7 +1198,7 @@ mod tests {
 
     #[test]
     fn lexer_consume_char_if() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "word\n");
+        let mut lexer = Lexer::from_memory("word\n", Source::Unknown);
 
         let mut called = 0;
         let c = block_on(lexer.consume_char_if(|c| {
@@ -1276,14 +1276,14 @@ mod tests {
 
     #[test]
     fn lexer_inner_program_success() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "x y )");
+        let mut lexer = Lexer::from_memory("x y )", Source::Unknown);
         let source = block_on(lexer.inner_program()).unwrap();
         assert_eq!(source, "x y ");
     }
 
     #[test]
     fn lexer_inner_program_failure() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<< )");
+        let mut lexer = Lexer::from_memory("<< )", Source::Unknown);
         let e = block_on(lexer.inner_program()).unwrap_err();
         assert_eq!(
             e.cause,

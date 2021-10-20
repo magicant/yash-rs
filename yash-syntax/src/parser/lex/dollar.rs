@@ -23,7 +23,7 @@ use super::core::WordLexer;
 use crate::parser::core::Result;
 use crate::syntax::TextUnit;
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a text unit that starts with `$`.
     ///
     /// If the next character is `$`, a parameter expansion, command
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_no_dollar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -81,7 +81,7 @@ mod tests {
         let result = block_on(lexer.dollar_unit()).unwrap();
         assert_eq!(result, None);
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "()");
+        let mut lexer = Lexer::from_memory("()", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -90,7 +90,7 @@ mod tests {
         assert_eq!(result, None);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_dollar_followed_by_non_special() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$;");
+        let mut lexer = Lexer::from_memory("$;", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(result, None);
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('$')));
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "$&");
+        let mut lexer = Lexer::from_memory("$&", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_raw_special_parameter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$0");
+        let mut lexer = Lexer::from_memory("$0", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_command_substitution() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let mut lexer = Lexer::from_memory("$()", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -158,7 +158,7 @@ mod tests {
         }
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
 
-        let mut lexer = Lexer::with_source(Source::Unknown, "$( foo bar )");
+        let mut lexer = Lexer::from_memory("$( foo bar )", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_arithmetic_expansion() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$((1))");
+        let mut lexer = Lexer::from_memory("$((1))", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn lexer_dollar_unit_line_continuation() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$\\\n\\\n0");
+        let mut lexer = Lexer::from_memory("$\\\n\\\n0", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,

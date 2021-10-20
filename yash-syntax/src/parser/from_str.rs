@@ -73,7 +73,7 @@ impl FromStr for TextUnit {
     type Err = Error;
     /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<TextUnit, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -86,7 +86,7 @@ impl FromStr for Text {
     type Err = Error;
     // Parses a text by `lexer.text(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<Text, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         unwrap_ready(lexer.text(|_| false, |_| true))
     }
 }
@@ -94,7 +94,7 @@ impl FromStr for Text {
 impl FromStr for WordUnit {
     type Err = Error;
     fn from_str(s: &str) -> Result<WordUnit, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -112,7 +112,7 @@ impl FromStr for Word {
     /// To parse them, you need to call [`Word::parse_tilde_front`] or
     /// [`Word::parse_tilde_everywhere`] on the resultant word.
     fn from_str(s: &str) -> Result<Word, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -144,7 +144,7 @@ impl FromStr for Assign {
 impl FromStr for Operator {
     type Err = ();
     fn from_str(s: &str) -> Result<Operator, ()> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let token = unwrap_ready(lexer.operator()).map_err(drop)?.ok_or(())?;
         if let TokenId::Operator(op) = token.id {
             Ok(op)
@@ -167,7 +167,7 @@ impl FromStr for Redir<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token is not a redirection operator.
     fn from_str(s: &str) -> Result<Redir<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.redirection()).shift()
     }
@@ -181,7 +181,7 @@ impl FromStr for Redir {
     ///
     /// This function does not support parsing a here-document.
     fn from_str(s: &str) -> Result<Redir, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let redir = unwrap_ready(parser.redirection()).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -198,7 +198,7 @@ impl FromStr for SimpleCommand<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a simple command.
     fn from_str(s: &str) -> Result<SimpleCommand<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.simple_command())
             .map(Rec::unwrap)
@@ -215,7 +215,7 @@ impl FromStr for SimpleCommand {
     /// This function does not support parsing a command that contains a
     /// here-document.
     fn from_str(s: &str) -> Result<SimpleCommand, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let command = unwrap_ready(parser.simple_command())
             .map(Rec::unwrap)
@@ -234,7 +234,7 @@ impl FromStr for CaseItem<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token is `esac`.
     fn from_str(s: &str) -> Result<CaseItem<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.case_item()).shift()
     }
@@ -246,7 +246,7 @@ impl FromStr for CaseItem {
     ///
     /// Returns `Err(None)` if the first token is `esac`.
     fn from_str(s: &str) -> Result<CaseItem, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let item = unwrap_ready(parser.case_item()).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -261,7 +261,7 @@ impl FromStr for CompoundCommand<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a compound command.
     fn from_str(s: &str) -> Result<CompoundCommand<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.compound_command()).shift()
     }
@@ -273,7 +273,7 @@ impl FromStr for CompoundCommand {
     ///
     /// Returns `Err(None)` if the first token does not start a compound command.
     fn from_str(s: &str) -> Result<CompoundCommand, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let command = unwrap_ready(parser.compound_command()).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -288,7 +288,7 @@ impl FromStr for FullCompoundCommand<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a compound command.
     fn from_str(s: &str) -> Result<FullCompoundCommand<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.full_compound_command()).shift()
     }
@@ -300,7 +300,7 @@ impl FromStr for FullCompoundCommand {
     ///
     /// Returns `Err(None)` if the first token does not start a compound command.
     fn from_str(s: &str) -> Result<FullCompoundCommand, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let command = unwrap_ready(parser.full_compound_command()).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -315,7 +315,7 @@ impl FromStr for Command<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a command.
     fn from_str(s: &str) -> Result<Command<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.command()).map(Rec::unwrap).shift()
     }
@@ -327,7 +327,7 @@ impl FromStr for Command {
     ///
     /// Returns `Err(None)` if the first token does not start a command.
     fn from_str(s: &str) -> Result<Command, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let command = unwrap_ready(parser.command()).map(Rec::unwrap).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -342,7 +342,7 @@ impl FromStr for Pipeline<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a pipeline.
     fn from_str(s: &str) -> Result<Pipeline<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()
     }
@@ -354,7 +354,7 @@ impl FromStr for Pipeline {
     ///
     /// Returns `Err(None)` if the first token does not start a pipeline.
     fn from_str(s: &str) -> Result<Pipeline, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let pipeline = unwrap_ready(parser.pipeline()).map(Rec::unwrap).shift()?;
         parser.ensure_no_unread_here_doc()?;
@@ -376,7 +376,7 @@ impl FromStr for AndOrList<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start an and-or list.
     fn from_str(s: &str) -> Result<AndOrList<MissingHereDoc>, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.and_or_list()).map(Rec::unwrap).shift()
     }
@@ -388,7 +388,7 @@ impl FromStr for AndOrList {
     ///
     /// Returns `Err(None)` if the first token does not start an and-or list.
     fn from_str(s: &str) -> Result<AndOrList, Option<Error>> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let list = unwrap_ready(parser.and_or_list())
             .map(Rec::unwrap)
@@ -405,7 +405,7 @@ impl FromStr for List<MissingHereDoc> {
     ///
     /// Returns `Err(None)` if the first token does not start a list.
     fn from_str(s: &str) -> Result<List<MissingHereDoc>, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         unwrap_ready(parser.list()).map(Rec::unwrap)
     }
@@ -417,7 +417,7 @@ impl FromStr for List {
     ///
     /// Returns `Err(None)` if the first token does not start a list.
     fn from_str(s: &str) -> Result<List, Error> {
-        let mut lexer = Lexer::with_source(Source::Unknown, s);
+        let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
         let list = unwrap_ready(parser.maybe_compound_list())?;
         parser.ensure_no_unread_here_doc()?;

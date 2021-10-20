@@ -33,7 +33,7 @@ use crate::syntax::Word;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Lexer {
+impl Lexer<'_> {
     async fn invalid_modifier(&mut self) -> Result<Modifier> {
         let cause = SyntaxError::InvalidModifier.into();
         let location = self.location().await?.clone();
@@ -88,7 +88,7 @@ impl Lexer {
     }
 }
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a [switch](Switch), except the optional initial colon.
     ///
     /// This function blindly consumes the current character, which must be
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_none() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "}");
+        let mut lexer = Lexer::from_memory("}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_alter_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "+}");
+        let mut lexer = Lexer::from_memory("+}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_alter_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"+a  z}");
+        let mut lexer = Lexer::from_memory(r"+a  z}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_colon_alter_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ":+}");
+        let mut lexer = Lexer::from_memory(":+}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_default_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "-}");
+        let mut lexer = Lexer::from_memory("-}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_colon_default_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r":-cool}");
+        let mut lexer = Lexer::from_memory(r":-cool}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_colon_assign_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ":=}");
+        let mut lexer = Lexer::from_memory(":=}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_assign_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"=Yes}");
+        let mut lexer = Lexer::from_memory(r"=Yes}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_error_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "?}");
+        let mut lexer = Lexer::from_memory("?}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_colon_error_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r":?No}");
+        let mut lexer = Lexer::from_memory(r":?No}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_word_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = Lexer::from_memory(r"-~}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_tilde_expansion_in_switch_word_in_text_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"-~}");
+        let mut lexer = Lexer::from_memory(r"-~}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Text,
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_trim_shortest_prefix_in_word_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "#'*'}");
+        let mut lexer = Lexer::from_memory("#'*'}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_trim_shortest_prefix_in_text_context() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "#'*'}");
+        let mut lexer = Lexer::from_memory("#'*'}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Text,
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_trim_longest_prefix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"##"?"}"#);
+        let mut lexer = Lexer::from_memory(r#"##"?"}"#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_trim_shortest_suffix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"%\%}");
+        let mut lexer = Lexer::from_memory(r"%\%}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -543,7 +543,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_trim_longest_suffix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "%%%}");
+        let mut lexer = Lexer::from_memory("%%%}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_tilde_expansion_in_trim_word() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"#~}");
+        let mut lexer = Lexer::from_memory(r"#~}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_orphan_colon_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r":");
+        let mut lexer = Lexer::from_memory(r":", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_orphan_colon_followed_by_letter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r":x}");
+        let mut lexer = Lexer::from_memory(r":x}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn lexer_suffix_modifier_orphan_colon_followed_by_symbol() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r":#}");
+        let mut lexer = Lexer::from_memory(r":#}", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,

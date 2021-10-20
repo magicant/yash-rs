@@ -26,7 +26,7 @@ use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a normal grouping.
     ///
     /// The next token must be a `{`.
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_short() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{ :; }");
+        let mut lexer = Lexer::from_memory("{ :; }", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_long() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{ foo; bar& }");
+        let mut lexer = Lexer::from_memory("{ foo; bar& }", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " { oh no ");
+        let mut lexer = Lexer::from_memory(" { oh no ", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_empty_posix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{ }");
+        let mut lexer = Lexer::from_memory("{ }", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn parser_grouping_aliasing() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " { :; end ");
+        let mut lexer = Lexer::from_memory(" { :; end ", Source::Unknown);
         let mut aliases = AliasSet::new();
         let origin = Location::dummy("");
         aliases.insert(HashEntry::new(
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_short() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(:)");
+        let mut lexer = Lexer::from_memory("(:)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_long() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "( foo& bar; )");
+        let mut lexer = Lexer::from_memory("( foo& bar; )", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " ( oh no");
+        let mut lexer = Lexer::from_memory(" ( oh no", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn parser_subshell_empty_posix() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "( )");
+        let mut lexer = Lexer::from_memory("( )", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.compound_command()).unwrap_err();

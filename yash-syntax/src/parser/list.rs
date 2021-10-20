@@ -33,7 +33,7 @@ use super::lex::TokenId::EndOfInput;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     // There is no function that parses a single item because it would not be
     // very useful for parsing a list. An item requires a separator operator
     // ('&' or ';') for it to be followed by another item. You cannot tell from
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn parser_list_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.list()).unwrap().unwrap();
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn parser_list_one_item_without_last_semicolon() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.list()).unwrap().unwrap();
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn parser_list_one_item_with_last_semicolon() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo;");
+        let mut lexer = Lexer::from_memory("foo;", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.list()).unwrap().unwrap();
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn parser_list_many_items() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo & bar ; baz&");
+        let mut lexer = Lexer::from_memory("foo & bar ; baz&", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.list()).unwrap().unwrap();
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.command_line()).unwrap();
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_command_and_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<END\nfoo\nEND\n");
+        let mut lexer = Lexer::from_memory("<<END\nfoo\nEND\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let List(items) = block_on(parser.command_line()).unwrap().unwrap();
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_command_without_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo");
+        let mut lexer = Lexer::from_memory("foo", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let cmd = block_on(parser.command_line()).unwrap().unwrap();
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_newline_only() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\n");
+        let mut lexer = Lexer::from_memory("\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let list = block_on(parser.command_line()).unwrap().unwrap();
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_here_doc_without_newline() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<END");
+        let mut lexer = Lexer::from_memory("<<END", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.command_line()).unwrap_err();
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn parser_command_line_wrong_delimiter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo)");
+        let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.command_line()).unwrap_err();

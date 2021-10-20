@@ -26,7 +26,7 @@ use crate::syntax::TextUnit;
 use std::future::Future;
 use std::pin::Pin;
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses an arithmetic expansion.
     ///
     /// The initial `$` must have been consumed before calling this function.
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(());");
+        let mut lexer = Lexer::from_memory("(());", Source::Unknown);
         let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_none() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "( foo bar )baz");
+        let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
         let location = Location::dummy("Y");
 
         let location = block_on(lexer.arithmetic_expansion(location))
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(\\\n\\\n(\\\n)\\\n\\\n);");
+        let mut lexer = Lexer::from_memory("(\\\n\\\n(\\\n)\\\n\\\n);", Source::Unknown);
         let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_escapes() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"((\\\"\`\$));"#);
+        let mut lexer = Lexer::from_memory(r#"((\\\"\`\$));"#, Source::Unknown);
         let location = Location::dummy("X");
 
         let result = block_on(lexer.arithmetic_expansion(location))
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_first() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "((1");
+        let mut lexer = Lexer::from_memory("((1", Source::Unknown);
         let location = Location::dummy("Z");
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_second() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "((1)");
+        let mut lexer = Lexer::from_memory("((1)", Source::Unknown);
         let location = Location::dummy("Z");
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "((1) ");
+        let mut lexer = Lexer::from_memory("((1) ", Source::Unknown);
         let location = Location::dummy("Z");
 
         let location = block_on(lexer.arithmetic_expansion(location))

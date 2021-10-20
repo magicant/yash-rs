@@ -25,7 +25,7 @@ use super::core::Result;
 use super::fill::MissingHereDoc;
 use crate::syntax::Command;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses a command.
     ///
     /// If there is no valid command at the current position, this function
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn parser_command_simple() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "foo < bar");
+        let mut lexer = Lexer::from_memory("foo < bar", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn parser_command_compound() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "(foo) < bar");
+        let mut lexer = Lexer::from_memory("(foo) < bar", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn parser_command_function() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "fun () ( echo )");
+        let mut lexer = Lexer::from_memory("fun () ( echo )", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn parser_command_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let option = block_on(parser.command()).unwrap().unwrap();

@@ -27,7 +27,7 @@ use crate::syntax::Literal;
 use crate::syntax::Text;
 use crate::syntax::TextUnit;
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Parses a [`TextUnit`].
     ///
     /// This function parses a literal character, backslash-escaped character,
@@ -100,7 +100,7 @@ impl WordLexer<'_> {
     }
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a text, i.e., a (possibly empty) sequence of [`TextUnit`]s.
     ///
     /// `is_delimiter` tests if an unquoted character is a delimiter. When
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_literal_accepted() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "X");
+        let mut lexer = Lexer::from_memory("X", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_literal_rejected() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ";");
+        let mut lexer = Lexer::from_memory(";", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_backslash_accepted() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"\#");
+        let mut lexer = Lexer::from_memory(r"\#", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_backslash_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"\");
+        let mut lexer = Lexer::from_memory(r"\", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_backslash_line_continuation_not_recognized() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\\\n");
+        let mut lexer = Lexer::from_memory("\\\\\n", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_dollar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "$()");
+        let mut lexer = Lexer::from_memory("$()", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_backquote_double_quote_escapable() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let mut lexer = Lexer::from_memory(r#"`\"`"#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Text,
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_backquote_double_quote_not_escapable() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r#"`\"`"#);
+        let mut lexer = Lexer::from_memory(r#"`\"`"#, Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn lexer_text_unit_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\nX");
+        let mut lexer = Lexer::from_memory("\\\n\\\nX", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn lexer_text_empty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "");
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         let Text(units) = block_on(lexer.text(
             |c| panic!("unexpected call to is_delimiter({:?})", c),
             |c| panic!("unexpected call to is_escapable({:?})", c),
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn lexer_text_nonempty() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let mut lexer = Lexer::from_memory("abc", Source::Unknown);
         let mut called = 0;
         let Text(units) = block_on(lexer.text(
             |c| {
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn lexer_text_delimiter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let mut lexer = Lexer::from_memory("abc", Source::Unknown);
         let mut called = 0;
         let Text(units) = block_on(lexer.text(
             |c| {
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn lexer_text_escaping() {
-        let mut lexer = Lexer::with_source(Source::Unknown, r"a\b\c");
+        let mut lexer = Lexer::from_memory(r"a\b\c", Source::Unknown);
         let mut tested_chars = String::new();
         let Text(units) = block_on(lexer.text(
             |_| false,
@@ -516,7 +516,7 @@ mod tests {
 
     #[test]
     fn lexer_text_with_parentheses_no_parentheses() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "abc");
+        let mut lexer = Lexer::from_memory("abc", Source::Unknown);
         let Text(units) = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
 
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn lexer_text_with_parentheses_nest_1() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a(b)c)");
+        let mut lexer = Lexer::from_memory("a(b)c)", Source::Unknown);
         let Text(units) =
             block_on(lexer.text_with_parentheses(|c| c == 'b' || c == ')', |_| false)).unwrap();
         assert_eq!(
@@ -544,7 +544,7 @@ mod tests {
 
     #[test]
     fn lexer_text_with_parentheses_nest_1_1() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "ab(CD)ef(GH)ij;");
+        let mut lexer = Lexer::from_memory("ab(CD)ef(GH)ij;", Source::Unknown);
         let Text(units) = block_on(
             lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
         )
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn lexer_text_with_parentheses_nest_3() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a(B((C)D))e;");
+        let mut lexer = Lexer::from_memory("a(B((C)D))e;", Source::Unknown);
         let Text(units) = block_on(
             lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
         )
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn lexer_text_with_parentheses_unclosed() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "x(()");
+        let mut lexer = Lexer::from_memory("x(()", Source::Unknown);
         let e = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) = e.cause {
             assert_eq!(opening_location.line.value, "x(()");

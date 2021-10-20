@@ -48,7 +48,7 @@ pub fn is_single_char_name(c: char) -> bool {
     c.is_ascii_digit() || is_special_parameter_char(c)
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses a parameter expansion that is not enclosed in braces.
     ///
     /// The initial `$` must have been consumed before calling this function.
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_special_parameter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "@;");
+        let mut lexer = Lexer::from_memory("@;", Source::Unknown);
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_digit() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "12");
+        let mut lexer = Lexer::from_memory("12", Source::Unknown);
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_posix_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "az_AZ_019<");
+        let mut lexer = Lexer::from_memory("az_AZ_019<", Source::Unknown);
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "a\\\n\\\nb\\\n\\\nc\\\n>");
+        let mut lexer = Lexer::from_memory("a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_not_parameter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ";");
+        let mut lexer = Lexer::from_memory(";", Source::Unknown);
         let location = Location::dummy("X");
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();

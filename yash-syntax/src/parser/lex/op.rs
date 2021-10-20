@@ -290,7 +290,7 @@ struct OperatorTail {
     pub reversed_key: Vec<char>,
 }
 
-impl Lexer {
+impl Lexer<'_> {
     /// Parses an operator that matches a key in the given trie, if any.
     fn operator_tail(
         &mut self,
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_longest_match() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<-");
+        let mut lexer = Lexer::from_memory("<<-", Source::Unknown);
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_another_operator() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<>");
+        let mut lexer = Lexer::from_memory("<<>", Source::Unknown);
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_delimited_by_eof() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<");
+        let mut lexer = Lexer::from_memory("<<", Source::Unknown);
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_containing_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n\\\n<\\\n<\\\n>");
+        let mut lexer = Lexer::from_memory("\\\n\\\n<\\\n<\\\n>", Source::Unknown);
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_none() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "\\\n ");
+        let mut lexer = Lexer::from_memory("\\\n ", Source::Unknown);
 
         let r = block_on(lexer.operator()).unwrap();
         assert!(r.is_none(), "Unexpected success: {:?}", r);
@@ -485,7 +485,7 @@ mod tests {
             }
         }
 
-        let line = lines(Source::Unknown, "\n").next().unwrap();
+        let line = lines("\n", Source::Unknown).next().unwrap();
         let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
 
         let t = block_on(lexer.operator()).unwrap().unwrap();

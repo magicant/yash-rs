@@ -35,7 +35,7 @@ pub fn is_name_char(c: char) -> bool {
     is_portable_name_char(c)
 }
 
-impl WordLexer<'_> {
+impl WordLexer<'_, '_> {
     /// Tests if there is a length prefix (`#`).
     ///
     /// This function may consume many characters, possibly beyond the length
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_minimum() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{@};");
+        let mut lexer = Lexer::from_memory("{@};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_alphanumeric_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{foo_123}<");
+        let mut lexer = Lexer::from_memory("{foo_123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_numeric_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{123}<");
+        let mut lexer = Lexer::from_memory("{123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#}<");
+        let mut lexer = Lexer::from_memory("{#}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_missing_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{};");
+        let mut lexer = Lexer::from_memory("{};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_unclosed_without_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{;");
+        let mut lexer = Lexer::from_memory("{;", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_unclosed_with_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{_;");
+        let mut lexer = Lexer::from_memory("{_;", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_length_alphanumeric_name() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#foo_123}<");
+        let mut lexer = Lexer::from_memory("{#foo_123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_length_hash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{##}<");
+        let mut lexer = Lexer::from_memory("{##}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_length_question() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#?}<");
+        let mut lexer = Lexer::from_memory("{#?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_length_hyphen() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#-}<");
+        let mut lexer = Lexer::from_memory("{#-}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_switch_minimum() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{x+})");
+        let mut lexer = Lexer::from_memory("{x+})", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_switch_full() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{foo:?'!'})");
+        let mut lexer = Lexer::from_memory("{foo:?'!'})", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -425,7 +425,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_suffix_alter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#+?}<");
+        let mut lexer = Lexer::from_memory("{#+?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_suffix_default() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#--}<");
+        let mut lexer = Lexer::from_memory("{#--}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_suffix_assign() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#=?}<");
+        let mut lexer = Lexer::from_memory("{#=?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -497,7 +497,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_suffix_error() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#??}<");
+        let mut lexer = Lexer::from_memory("{#??}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_suffix_with_colon() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#:-}<");
+        let mut lexer = Lexer::from_memory("{#:-}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_with_longest_prefix_trim() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{###};");
+        let mut lexer = Lexer::from_memory("{###};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_hash_with_suffix_trim() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#%};");
+        let mut lexer = Lexer::from_memory("{#%};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_multiple_modifier() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#x+};");
+        let mut lexer = Lexer::from_memory("{#x+};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -608,7 +608,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_line_continuations() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{\\\n#\\\n\\\na_\\\n1\\\n\\\n}z");
+        let mut lexer = Lexer::from_memory("{\\\n#\\\n\\\na_\\\n1\\\n\\\n}z", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn lexer_braced_param_line_continuations_hash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "{#\\\n\\\n}z");
+        let mut lexer = Lexer::from_memory("{#\\\n\\\n}z", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,

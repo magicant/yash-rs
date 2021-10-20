@@ -32,7 +32,7 @@ use crate::syntax::RedirOp;
 use crate::syntax::Word;
 use std::convert::TryFrom;
 
-impl Parser<'_> {
+impl Parser<'_, '_> {
     /// Parses the operand of a redirection operator.
     async fn redirection_operand(&mut self) -> Result<std::result::Result<Word, Location>> {
         let operand = self.take_token_auto(&[]).await?;
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "</dev/null\n");
+        let mut lexer = Lexer::from_memory("</dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_greater() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<> /dev/null\n");
+        let mut lexer = Lexer::from_memory("<> /dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ">/dev/null\n");
+        let mut lexer = Lexer::from_memory(">/dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_greater() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " >> /dev/null\n");
+        let mut lexer = Lexer::from_memory(" >> /dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_bar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ">| /dev/null\n");
+        let mut lexer = Lexer::from_memory(">| /dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_and() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<& -\n");
+        let mut lexer = Lexer::from_memory("<& -\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_and() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ">& 3\n");
+        let mut lexer = Lexer::from_memory(">& 3\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_greater_greater_bar() {
-        let mut lexer = Lexer::with_source(Source::Unknown, ">>| 3\n");
+        let mut lexer = Lexer::from_memory(">>| 3\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less_less() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<< foo\n");
+        let mut lexer = Lexer::from_memory("<<< foo\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<end \nend\n");
+        let mut lexer = Lexer::from_memory("<<end \nend\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_less_less_dash() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<-end \nend\n");
+        let mut lexer = Lexer::from_memory("<<-end \nend\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_with_io_number() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "12< /dev/null\n");
+        let mut lexer = Lexer::from_memory("12< /dev/null\n", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
@@ -341,9 +341,9 @@ mod tests {
 
     #[test]
     fn parser_redirection_fd_out_of_range() {
-        let mut lexer = Lexer::with_source(
-            Source::Unknown,
+        let mut lexer = Lexer::from_memory(
             "9999999999999999999999999999999999999999< x",
+            Source::Unknown,
         );
         let mut parser = Parser::new(&mut lexer);
 
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_not_operator() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "x");
+        let mut lexer = Lexer::from_memory("x", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         assert!(block_on(parser.redirection()).unwrap().is_none());
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_non_word_operand() {
-        let mut lexer = Lexer::with_source(Source::Unknown, " < >");
+        let mut lexer = Lexer::from_memory(" < >", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_eof_operand() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "  < ");
+        let mut lexer = Lexer::from_memory("  < ", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_not_heredoc_delimiter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<< <<");
+        let mut lexer = Lexer::from_memory("<< <<", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn parser_redirection_eof_heredoc_delimiter() {
-        let mut lexer = Lexer::with_source(Source::Unknown, "<<");
+        let mut lexer = Lexer::from_memory("<<", Source::Unknown);
         let mut parser = Parser::new(&mut lexer);
 
         let e = block_on(parser.redirection()).unwrap_err();

@@ -18,11 +18,10 @@
 
 use crate::source::lines;
 use crate::source::Line;
+use crate::source::Lines;
 use crate::source::Location;
 use crate::source::Source;
 use async_trait::async_trait;
-use std::collections::VecDeque;
-use std::num::NonZeroU64;
 
 /// Current state in which source code is read.
 ///
@@ -61,37 +60,24 @@ pub trait Input {
 }
 
 /// Input function that reads from a string in memory.
-pub struct Memory {
-    lines: VecDeque<Line>,
-    end: Line,
+pub struct Memory<'a> {
+    lines: Lines<'a>,
 }
 
-impl Memory {
+impl Memory<'_> {
     /// Creates a new `Memory` that reads the given string.
-    pub fn new(source: Source, code: &str) -> Memory {
-        let lines = lines(source.clone(), code).collect::<VecDeque<Line>>();
-
-        let end = Line {
-            value: "".to_string(),
-            number: if let Some(last_line) = lines.back() {
-                // TODO Not correct if the last line does not end with a newline
-                NonZeroU64::new(last_line.number.get() + 1).expect("too long source code line")
-            } else {
-                NonZeroU64::new(1).unwrap()
-            },
-            source,
-        };
-
-        Memory { lines, end }
+    pub fn new(code: &str, source: Source) -> Memory {
+        let lines = lines(code, source);
+        Memory { lines }
     }
 
     fn next_line_sync(&mut self, _: &Context) -> Line {
-        self.lines.pop_front().unwrap_or_else(|| self.end.clone())
+        self.lines.next_or_empty()
     }
 }
 
 #[async_trait(?Send)]
-impl Input for Memory {
+impl Input for Memory<'_> {
     async fn next_line(&mut self, context: &Context) -> Result {
         Ok(self.next_line_sync(context))
     }
@@ -105,7 +91,7 @@ mod tests {
 
     #[test]
     fn memory_empty_source() {
-        let mut input = Memory::new(Source::Unknown, "");
+        let mut input = Memory::new("", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
@@ -115,7 +101,7 @@ mod tests {
 
     #[test]
     fn memory_one_line() {
-        let mut input = Memory::new(Source::Unknown, "one\n");
+        let mut input = Memory::new("one\n", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");
@@ -130,7 +116,7 @@ mod tests {
 
     #[test]
     fn memory_three_lines() {
-        let mut input = Memory::new(Source::Unknown, "one\ntwo\nthree");
+        let mut input = Memory::new("one\ntwo\nthree", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");
@@ -149,7 +135,7 @@ mod tests {
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 4);
+        assert_eq!(line.number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
     }
 }
