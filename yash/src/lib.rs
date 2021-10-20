@@ -20,7 +20,7 @@ pub use yash_builtin as builtin;
 pub use yash_env as env;
 pub use yash_semantics as semantics;
 #[doc(no_inline)]
-pub use yash_syntax::{alias, input, parser, source, syntax};
+pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
@@ -37,8 +37,8 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     struct Stdin;
 
     #[async_trait::async_trait(?Send)]
-    impl input::Input for Stdin {
-        async fn next_line(&mut self, _: &input::Context) -> input::Result {
+    impl env::input::Input for Stdin {
+        async fn next_line(&mut self, _: &env::input::Context) -> env::input::Result {
             let mut code = String::new();
             std::io::stdin()
                 .read_line(&mut code)
