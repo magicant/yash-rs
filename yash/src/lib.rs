@@ -27,30 +27,12 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use annotate_snippets::display_list::DisplayList;
     use annotate_snippets::snippet::Snippet;
     use semantics::Command;
-    use std::num::NonZeroU64;
     use std::ops::ControlFlow::{Break, Continue};
+    use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
-
-    struct Stdin;
-
-    #[async_trait::async_trait(?Send)]
-    impl env::input::Input for Stdin {
-        async fn next_line(&mut self, _: &env::input::Context) -> env::input::Result {
-            let mut code = String::new();
-            std::io::stdin()
-                .read_line(&mut code)
-                .map(|_| source::Line {
-                    value: code,
-                    // TODO correct line number
-                    number: NonZeroU64::new(1).unwrap(),
-                    source: source::Source::Unknown,
-                })
-                .map_err(|e| (source::Location::dummy(""), e))
-        }
-    }
 
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
@@ -65,8 +47,8 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
 
+    let mut lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
     loop {
-        let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
         let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
         match parser.command_line().await {
             Ok(None) => break env.exit_status.0,
@@ -80,7 +62,10 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
                 let mut s = Snippet::from(&m);
                 s.opt.color = true;
                 let d = DisplayList::from(s);
-                eprintln!("{}", d); // TODO print using env
+                env.print_error(&format_args!("{}", d)).await;
+
+                // recreate lexer to reset the error state
+                lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
             }
         }
         // TODO If the lexer still has unconsumed input, it should be parsed
