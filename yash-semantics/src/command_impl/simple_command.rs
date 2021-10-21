@@ -22,6 +22,7 @@ use crate::expansion::expand_words;
 use crate::print_error;
 use crate::redir::RedirEnv;
 use crate::Command;
+use crate::Handle;
 use async_trait::async_trait;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};

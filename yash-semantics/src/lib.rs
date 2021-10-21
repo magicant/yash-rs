@@ -28,6 +28,7 @@ pub mod command_search;
 pub mod expansion;
 mod handle_impl;
 pub mod redir;
+mod runner;
 
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
@@ -50,6 +51,17 @@ pub trait Command {
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
     async fn execute(&self, env: &mut Env) -> Result;
+}
+
+/// Error handler.
+///
+/// Most errors in the shell are handled by printing an error message to the
+/// standard error and returning a non-zero exit status. This trait provides a
+/// standard interface for implementing that behavior.
+#[async_trait(?Send)]
+pub trait Handle {
+    /// Handles the argument error.
+    async fn handle(&self, env: &mut Env) -> Result;
 }
 
 /// Convenience function for printing an error message.
@@ -76,7 +88,7 @@ pub async fn print_error(
     let _ = env.system.write_all(Fd::STDERR, s.as_bytes()).await;
 }
 
-// TODO Probably we should implement a read-execute loop in here
+pub use runner::read_eval_loop;
 
 #[cfg(test)]
 pub(crate) mod tests {

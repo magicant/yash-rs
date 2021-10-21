@@ -17,21 +17,43 @@
 //! Error handlers.
 
 use crate::ExitStatus;
+use crate::Handle;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
-use std::ops::ControlFlow::Continue;
+use async_trait::async_trait;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::exec::Divert;
 use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
 
-impl crate::expansion::Error {
+#[async_trait(?Send)]
+impl Handle for yash_syntax::parser::Error {
+    /// Prints an error message.
+    ///
+    /// This function handles the error by printing an error message to the
+    /// standard error and returning
+    /// `Divert::Interrupt(Some(ExitStatus::ERROR))`.
+    async fn handle(&self, env: &mut Env) -> super::Result {
+        let m = Message::from(self);
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let f = format!("{}\n", DisplayList::from(s));
+        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
+
+        Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+    }
+}
+
+#[async_trait(?Send)]
+impl Handle for crate::expansion::Error {
     /// Prints an error message and sets the exit status to non-zero.
     ///
     /// This function handles an expansion error by printing an error message
     /// that describes the error to the standard error and setting the exit
     /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
     /// implementations may use different non-zero exit statuses.
-    pub async fn handle(&self, env: &mut Env) -> super::Result {
+    async fn handle(&self, env: &mut Env) -> super::Result {
         let m = Message::from(self);
         let mut s = Snippet::from(&m);
         s.opt.color = true;
@@ -43,14 +65,15 @@ impl crate::expansion::Error {
     }
 }
 
-impl crate::redir::Error {
+#[async_trait(?Send)]
+impl Handle for crate::redir::Error {
     /// Prints an error message and sets the exit status to non-zero.
     ///
     /// This function handles a redirection error by printing an error message
     /// that describes the error to the standard error and setting the exit
     /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
     /// implementations may use different non-zero exit statuses.
-    pub async fn handle(&self, env: &mut Env) -> super::Result {
+    async fn handle(&self, env: &mut Env) -> super::Result {
         let m = Message::from(self);
         let mut s = Snippet::from(&m);
         s.opt.color = true;

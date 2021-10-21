@@ -19,6 +19,7 @@
 use crate::expansion::expand_word;
 use crate::expansion::Field;
 use crate::Command;
+use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;

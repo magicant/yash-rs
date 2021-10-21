@@ -72,7 +72,7 @@ impl super::Source {
     pub fn complement_annotations<'a, 's: 'a, T: Extend<Annotation<'a>>>(&'s self, result: &mut T) {
         use super::Source::*;
         match self {
-            Unknown => (),
+            Unknown | Stdin => (),
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation {

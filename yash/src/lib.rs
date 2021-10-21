@@ -20,37 +20,14 @@ pub use yash_builtin as builtin;
 pub use yash_env as env;
 pub use yash_semantics as semantics;
 #[doc(no_inline)]
-pub use yash_syntax::{alias, input, parser, source, syntax};
+pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
-    use annotate_snippets::display_list::DisplayList;
-    use annotate_snippets::snippet::Snippet;
-    use semantics::Command;
-    use std::num::NonZeroU64;
-    use std::ops::ControlFlow::{Break, Continue};
+    use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
-    use yash_syntax::source::pretty::Message;
-
-    struct Stdin;
-
-    #[async_trait::async_trait(?Send)]
-    impl input::Input for Stdin {
-        async fn next_line(&mut self, _: &input::Context) -> input::Result {
-            let mut code = String::new();
-            std::io::stdin()
-                .read_line(&mut code)
-                .map(|_| source::Line {
-                    value: code,
-                    // TODO correct line number
-                    number: NonZeroU64::new(1).unwrap(),
-                    source: source::Source::Unknown,
-                })
-                .map_err(|e| (source::Location::dummy(""), e))
-        }
-    }
 
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
@@ -65,27 +42,9 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
 
-    loop {
-        let mut lexer = parser::lex::Lexer::new(Box::new(Stdin));
-        let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
-        match parser.command_line().await {
-            Ok(None) => break env.exit_status.0,
-            Ok(Some(command)) => match command.execute(&mut env).await {
-                Continue(()) => (),
-                // TODO Handle divert
-                Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
-            },
-            Err(e) => {
-                let m = Message::from(&e);
-                let mut s = Snippet::from(&m);
-                s.opt.color = true;
-                let d = DisplayList::from(s);
-                eprintln!("{}", d); // TODO print using env
-            }
-        }
-        // TODO If the lexer still has unconsumed input, it should be parsed
-        // before the lexer is dropped.
-    }
+    let mut lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
+    semantics::read_eval_loop(&mut env, &mut lexer).await;
+    env.exit_status.0
 }
 
 pub fn bin_main() -> i32 {

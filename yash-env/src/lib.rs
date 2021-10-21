@@ -35,6 +35,7 @@ pub mod builtin;
 pub mod exec;
 pub mod expansion;
 pub mod function;
+pub mod input;
 pub mod io;
 pub mod job;
 pub mod system;
