@@ -24,9 +24,6 @@ pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
-    use semantics::Command;
-    use semantics::Handle;
-    use std::ops::ControlFlow::{Break, Continue};
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
@@ -46,28 +43,8 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     }
 
     let mut lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
-    loop {
-        let mut parser = parser::Parser::with_aliases(&mut lexer, env.aliases.clone());
-        match parser.command_line().await {
-            Ok(None) => break env.exit_status.0,
-            Ok(Some(command)) => match command.execute(&mut env).await {
-                Continue(()) => (),
-                // TODO Handle divert
-                Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
-            },
-            Err(e) => {
-                match e.handle(&mut env).await {
-                    Continue(()) => (),
-                    // TODO Handle divert
-                    Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
-                }
-
-                lexer.reset();
-            }
-        }
-        // TODO If the lexer still has unconsumed input, it should be parsed
-        // before the lexer is dropped.
-    }
+    semantics::read_eval_loop(&mut env, &mut lexer).await;
+    env.exit_status.0
 }
 
 pub fn bin_main() -> i32 {
