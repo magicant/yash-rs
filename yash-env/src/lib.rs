@@ -63,7 +63,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
 use std::future::Future;
-use std::ops::ControlFlow::Break;
+use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
 use std::rc::Rc;
 use yash_syntax::alias::AliasSet;
@@ -194,12 +194,13 @@ impl Env {
         let task: ChildProcessTask = Box::new(move |env| {
             if let Some(f) = f.take() {
                 Box::pin(async move {
-                    use self::exec::Divert::{Exit, Interrupt};
                     match f(env).await {
-                        Break(Exit(Some(exit_status))) | Break(Interrupt(Some(exit_status))) => {
-                            env.exit_status = exit_status
+                        Continue(()) => (),
+                        Break(divert) => {
+                            if let Some(exit_status) = divert.exit_status() {
+                                env.exit_status = exit_status
+                            }
                         }
-                        _ => (),
                     }
                 })
             } else {
