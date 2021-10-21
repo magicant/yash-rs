@@ -28,6 +28,7 @@ pub mod command_search;
 pub mod expansion;
 mod handle_impl;
 pub mod redir;
+mod runner;
 
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
@@ -87,7 +88,7 @@ pub async fn print_error(
     let _ = env.system.write_all(Fd::STDERR, s.as_bytes()).await;
 }
 
-// TODO Probably we should implement a read-execute loop in here
+pub use runner::read_eval_loop;
 
 #[cfg(test)]
 pub(crate) mod tests {

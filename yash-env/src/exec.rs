@@ -130,6 +130,20 @@ pub enum Divert {
     Exit(Option<ExitStatus>),
 }
 
+impl Divert {
+    /// Returns the exit status associated with the `Divert`.
+    ///
+    /// Returns the variant's value if `self` is `Exit` or `Interrupt`;
+    /// otherwise, `None`.
+    pub fn exit_status(&self) -> Option<ExitStatus> {
+        use Divert::*;
+        match self {
+            Break { .. } | Continue { .. } | Return => None,
+            Interrupt(exit_status) | Exit(exit_status) => *exit_status,
+        }
+    }
+}
+
 /// Result of command execution.
 ///
 /// If the command was interrupted in the middle of execution, the result value
