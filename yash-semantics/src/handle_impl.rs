@@ -21,10 +21,29 @@ use crate::Handle;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::exec::Divert;
 use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
+
+#[async_trait(?Send)]
+impl Handle for yash_syntax::parser::Error {
+    /// Prints an error message.
+    ///
+    /// This function handles the error by printing an error message to the
+    /// standard error and returning
+    /// `Divert::Interrupt(Some(ExitStatus::ERROR))`.
+    async fn handle(&self, env: &mut Env) -> super::Result {
+        let m = Message::from(self);
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let f = format!("{}\n", DisplayList::from(s));
+        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
+
+        Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+    }
+}
 
 #[async_trait(?Send)]
 impl Handle for crate::expansion::Error {

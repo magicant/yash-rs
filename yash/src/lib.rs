@@ -24,15 +24,13 @@ pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
-    use annotate_snippets::display_list::DisplayList;
-    use annotate_snippets::snippet::Snippet;
     use semantics::Command;
+    use semantics::Handle;
     use std::ops::ControlFlow::{Break, Continue};
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
-    use yash_syntax::source::pretty::Message;
 
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
@@ -58,11 +56,11 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
                 Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
             },
             Err(e) => {
-                let m = Message::from(&e);
-                let mut s = Snippet::from(&m);
-                s.opt.color = true;
-                let d = DisplayList::from(s);
-                env.print_error(&format_args!("{}", d)).await;
+                match e.handle(&mut env).await {
+                    Continue(()) => (),
+                    // TODO Handle divert
+                    Break(divert) => env.print_error(&format_args!("{:?}", divert)).await,
+                }
 
                 lexer.reset();
             }
