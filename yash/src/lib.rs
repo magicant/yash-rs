@@ -64,8 +64,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
                 let d = DisplayList::from(s);
                 env.print_error(&format_args!("{}", d)).await;
 
-                // recreate lexer to reset the error state
-                lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
+                lexer.reset();
             }
         }
         // TODO If the lexer still has unconsumed input, it should be parsed

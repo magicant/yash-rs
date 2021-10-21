@@ -227,6 +227,14 @@ impl<'a> LexerCore<'a> {
         self.index = index;
     }
 
+    /// Clears an end-of-input or error status so that the lexer can resume
+    /// parsing.
+    fn reset(&mut self) {
+        self.state = InputState::Alive;
+        self.source.clear();
+        self.index = 0;
+    }
+
     /// Extracts a string from the source code.
     fn source_string<I>(&self, i: I) -> String
     where
@@ -474,6 +482,16 @@ impl<'a> Lexer<'a> {
     /// ```
     pub fn rewind(&mut self, index: usize) {
         self.core.rewind(index)
+    }
+
+    /// Clears an end-of-input or error status so that the lexer can resume
+    /// parsing.
+    ///
+    /// This function will be useful only in an interactive shell where the user
+    /// can continue entering commands even after (s)he sends an end-of-input or
+    /// is interrupted by a syntax error.
+    pub fn reset(&mut self) {
+        self.core.reset()
     }
 
     /// Peeks the next character and, if the given decider function returns true for it,
