@@ -68,6 +68,7 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::exec::ExitStatus;
 use yash_env::job::Pid;
+use yash_env::system::Errno;
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
@@ -87,6 +88,8 @@ pub use quote_removal::*;
 pub enum ErrorCause {
     // TODO Define error cause types
     Dummy(String),
+    /// System error while performing a command substitution.
+    CommandSubstError(Errno),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }
@@ -99,7 +102,8 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             Dummy(message) => message,
-            AssignReadOnly { .. } => "cannot assign to read-only variable",
+            CommandSubstError(_) => "error performing the command substitution",
+            AssignReadOnly(_) => "cannot assign to read-only variable",
         }
     }
 
@@ -110,6 +114,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             Dummy(_) => "".into(),
+            CommandSubstError(e) => e.desc().into(),
             AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
         }
     }
@@ -121,7 +126,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            Dummy(_) => None,
+            Dummy(_) | CommandSubstError(_) => None,
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
