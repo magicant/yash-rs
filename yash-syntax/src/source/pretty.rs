@@ -73,6 +73,14 @@ impl super::Source {
         use super::Source::*;
         match self {
             Unknown | Stdin => (),
+            CommandSubst { original } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation {
+                    r#type: AnnotationType::Info,
+                    label: "command substitution appeared here".into(),
+                    location: original.clone(),
+                }));
+            }
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation {

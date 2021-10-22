@@ -45,6 +45,9 @@ pub enum Source {
         original: Location,
         alias: Rc<Alias>,
     },
+
+    /// Command substitution.
+    CommandSubst { original: Location },
     // TODO More Source types
 }
 
@@ -113,6 +116,7 @@ impl Source {
         match self {
             Unknown => "<?>",
             Stdin => "<stdin>",
+            CommandSubst { .. } => "<command_substitution>",
             Alias { .. } => "<alias>",
         }
     }
