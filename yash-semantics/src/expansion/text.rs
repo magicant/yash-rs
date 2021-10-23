@@ -16,6 +16,7 @@
 
 //! Initial expansion of text.
 
+use super::command_subst::expand_command_substitution;
 use super::param::ParamRef;
 use super::AttrChar;
 use super::Env;
@@ -65,7 +66,13 @@ impl Expand for TextUnit {
                 param.expand(env, output).await
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
-            // TODO Expand CommandSubst correctly
+            CommandSubst { content, location } => {
+                // TODO return exit_status
+                let (result, _exit_status) =
+                    expand_command_substitution(env, content, location).await?;
+                output.push_str(&result, Origin::SoftExpansion, false, false);
+                Ok(())
+            }
             // TODO Expand Backquote correctly
             // TODO Expand Arith correctly
             _ => {
@@ -89,7 +96,10 @@ mod tests {
     use super::super::AttrChar;
     use super::*;
     use crate::expansion::tests::NullEnv;
+    use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
     use futures_executor::block_on;
+    use yash_syntax::source::Location;
     use yash_syntax::syntax::TextUnit;
 
     #[test]
@@ -134,6 +144,29 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn command_subst_expand_unquoted() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let mut field = Vec::<AttrChar>::default();
+            let mut output = Output::new(&mut field);
+            let subst = TextUnit::CommandSubst {
+                content: "echo .".to_string(),
+                location: Location::dummy(""),
+            };
+            env.builtins.insert("echo", echo_builtin());
+            subst.expand(&mut env, &mut output).await.unwrap();
+            assert_eq!(
+                field,
+                [AttrChar {
+                    value: '.',
+                    origin: Origin::SoftExpansion,
+                    is_quoted: false,
+                    is_quoting: false
+                }]
+            );
+        })
     }
 
     #[test]
