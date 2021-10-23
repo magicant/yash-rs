@@ -19,9 +19,14 @@
 use super::Env;
 use super::Error;
 use super::ErrorCause;
+use super::Expand;
+use super::Expansion;
+use super::Origin;
+use super::Output;
 use super::Result;
 use crate::read_eval_loop;
 use crate::Handle;
+use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::exec::ExitStatus;
 use yash_env::io::Fd;
@@ -30,6 +35,29 @@ use yash_env::System;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
+
+/// Reference to a `CommandSubst` or `Backquote`.
+pub struct CommandSubstRef<'a> {
+    content: &'a str,
+    location: &'a Location,
+}
+
+impl<'a> CommandSubstRef<'a> {
+    pub fn new(content: &'a str, location: &'a Location) -> Self {
+        CommandSubstRef { content, location }
+    }
+}
+
+#[async_trait(?Send)]
+impl Expand for CommandSubstRef<'_> {
+    async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
+        // TODO return exit_status
+        let (result, _exit_status) =
+            expand_command_substitution(env, self.content, self.location).await?;
+        output.push_str(&result, Origin::SoftExpansion, false, false);
+        Ok(())
+    }
+}
 
 /// Expands a command substitution to a string.
 ///

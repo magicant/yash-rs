@@ -16,7 +16,7 @@
 
 //! Initial expansion of text.
 
-use super::command_subst::expand_command_substitution;
+use super::command_subst::CommandSubstRef;
 use super::param::ParamRef;
 use super::AttrChar;
 use super::Env;
@@ -26,7 +26,6 @@ use super::Origin;
 use super::Output;
 use super::Result;
 use async_trait::async_trait;
-use yash_syntax::source::Location;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit;
 use yash_syntax::syntax::Unquote;
@@ -84,20 +83,6 @@ impl Expand for TextUnit {
     ///
     /// TODO Elaborate on index and modifiers
     async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
-        /// Common part for command substitutions.
-        async fn command_subst<E: Env>(
-            env: &mut E,
-            content: &str,
-            location: &Location,
-            output: &mut Output<'_>,
-        ) -> Result {
-            // TODO return exit_status
-            let (result, _exit_status) =
-                expand_command_substitution(env, content, location).await?;
-            output.push_str(&result, Origin::SoftExpansion, false, false);
-            Ok(())
-        }
-
         use TextUnit::*;
         match self {
             Literal(c) => {
@@ -130,11 +115,15 @@ impl Expand for TextUnit {
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
             CommandSubst { content, location } => {
-                command_subst(env, content, location, output).await
+                CommandSubstRef::new(content, location)
+                    .expand(env, output)
+                    .await
             }
             Backquote { content, location } => {
                 let content = content.unquote().0;
-                command_subst(env, &content, location, output).await
+                CommandSubstRef::new(&content, location)
+                    .expand(env, output)
+                    .await
             }
             // TODO Expand Arith correctly
             _ => {
