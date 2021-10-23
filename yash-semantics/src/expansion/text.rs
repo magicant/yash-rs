@@ -35,7 +35,54 @@ use yash_syntax::syntax::Unquote;
 impl Expand for TextUnit {
     /// Expands the text unit.
     ///
-    /// TODO Elaborate
+    /// - `Literal` expands to its character value.
+    /// - `Backslashed` expands to two characters: a quoting backslash (`\`)
+    ///   followed by its quoted character value.
+    /// - `RawParam` and `BracedParam` perform parameter expansion, detailed
+    ///   below.
+    /// - `CommandSubst` and `Backquote` perform command substitution: The
+    ///   `content` string is [parsed and executed](crate::read_eval_loop) in a
+    ///   subshell where its standard output is redirected to a pipe read by the
+    ///   shell. The substitution expands to the output with trailing newlines
+    ///   removed.
+    /// - `Arith` performs arithmetic expansion: The content text is expanded,
+    ///   parsing the result as an arithmetic expression. The evaluated value of
+    ///   the expression will be the final result of the expansion.
+    ///
+    /// # Parameter expansion
+    ///
+    /// A parameter expansion expands to the value of a parameter, optionally
+    /// modified by a modifier.
+    ///
+    /// The parameter name selects a parameter to expand. If the name is a
+    /// positive decimal integer, it is regarded as a positional parameter. If
+    /// the name matches one of the following special parameter symbols, that
+    /// special parameter is expanded. Otherwise, the name [selects a
+    /// variable](yash_env::variable::VariableSet::get) from the environment. A
+    /// non-existent variable expands to an empty string by default.
+    ///
+    /// - `?` expands to the [last exit status](yash_env::Env::exit_status).
+    /// - `!` expands to the [process ID of the last asynchronous
+    ///   command](yash_env::job::JobSet::expand_last_async_pid).
+    /// - `@` expands to all positional parameters. When expanded in
+    ///   double-quotes as in `"${@}"`, it produces the correct number of fields
+    ///   exactly matching the current positional parameters. Especially if
+    ///   there are zero positional parameters, it expands to zero fields.
+    ///   (TODO: Elaborate on how that works in this function)
+    /// - `*` expands to all positional parameters. When expanded in
+    ///   double-quotes as in `"${*}"`, the result is a concatenation of all the
+    ///   positional parameters, each separated by the first character of the
+    ///   `IFS` variable (or by a space if the variable is unset, or by nothing
+    ///   if it is an empty string). When expanded outside double-quotes, `*`
+    ///   expands the same as `@`.
+    ///   (TODO: Elaborate on how that works in this function)
+    /// - `#` expands to the number of positional parameters.
+    /// - `-` TODO Elaborate
+    /// - `$` expands to the process ID of the main shell process. Note that
+    ///   this value does _not_ change in subshells.
+    /// - `0` TODO Elaborate
+    ///
+    /// TODO Elaborate on index and modifiers
     async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
         /// Common part for command substitutions.
         async fn command_subst<E: Env>(
