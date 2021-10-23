@@ -198,6 +198,15 @@ pub trait Env: std::fmt::Debug {
     /// Gets the exit status of the last command.
     fn exit_status(&self) -> ExitStatus;
 
+    /// Sets the exit status of a command substitution.
+    ///
+    /// This method is called when a command substitution is performed so that
+    /// the environment can remember its exit status.
+    ///
+    /// This method does _not_ affect the value returned from
+    /// [`exit_status`](Self::exit_status).
+    fn save_command_subst_exit_status(&mut self, exit_status: ExitStatus);
+
     /// Gets the process ID of the last executed asynchronous command.
     ///
     /// This function marks the process ID as known by the user so that the
@@ -250,6 +259,8 @@ impl Env for yash_env::Env {
     fn exit_status(&self) -> ExitStatus {
         self.exit_status
     }
+    /// This method is no-op for `yash_env::Env`.
+    fn save_command_subst_exit_status(&mut self, _: ExitStatus) {}
     fn last_async_pid(&mut self) -> Pid {
         self.jobs.expand_last_async_pid()
     }
@@ -608,6 +619,9 @@ mod tests {
             unimplemented!("NullEnv's method must not be called")
         }
         fn exit_status(&self) -> yash_env::exec::ExitStatus {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
             unimplemented!("NullEnv's method must not be called")
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
