@@ -89,8 +89,13 @@ mod tests {
     use super::super::AttrChar;
     use super::*;
     use futures_executor::block_on;
+    use std::future::Future;
+    use std::pin::Pin;
     use yash_env::exec::ExitStatus;
+    use yash_env::io::Fd;
     use yash_env::job::Pid;
+    use yash_env::job::WaitStatus;
+    use yash_env::system::Errno;
     use yash_env::variable::ReadOnlyError;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
@@ -103,6 +108,7 @@ mod tests {
         value: Variable,
     }
 
+    #[async_trait(?Send)]
     impl Env for Singleton {
         fn get_variable(&self, name: &str) -> Option<&Variable> {
             if name == self.name {
@@ -135,6 +141,38 @@ mod tests {
             unimplemented!("not available for Singleton");
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
+            unimplemented!("not available for Singleton");
+        }
+        fn pipe(&mut self) -> std::result::Result<(Fd, Fd), Errno> {
+            unimplemented!("not available for Singleton");
+        }
+        fn dup2(&mut self, _from: Fd, _to: Fd) -> std::result::Result<Fd, Errno> {
+            unimplemented!("not available for Singleton");
+        }
+        fn close(&mut self, _fd: Fd) -> std::result::Result<(), Errno> {
+            unimplemented!("not available for Singleton");
+        }
+        async fn read_async(
+            &mut self,
+            _fd: Fd,
+            _buffer: &mut [u8],
+        ) -> std::result::Result<usize, Errno> {
+            unimplemented!("not available for Singleton");
+        }
+        async fn start_subshell<F>(&mut self, _f: F) -> std::result::Result<Pid, Errno>
+        where
+            F: for<'a> FnOnce(
+                    &'a mut yash_env::Env,
+                )
+                    -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                + 'static,
+        {
+            unimplemented!("not available for Singleton");
+        }
+        async fn wait_for_subshell(
+            &mut self,
+            _target: Pid,
+        ) -> std::result::Result<WaitStatus, Errno> {
             unimplemented!("not available for Singleton");
         }
     }

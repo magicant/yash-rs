@@ -57,6 +57,7 @@
 //! that removes quotes from the field. It takes an [`AttrField`] input and
 //! returns a [`Field`].
 
+mod command_subst;
 mod param;
 mod quote_removal;
 mod text;
@@ -64,13 +65,19 @@ mod word;
 
 use async_trait::async_trait;
 use std::borrow::Cow;
+use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::pin::Pin;
 use yash_env::exec::ExitStatus;
+use yash_env::io::Fd;
 use yash_env::job::Pid;
+use yash_env::job::WaitStatus;
+use yash_env::system::Errno;
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
+use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -87,6 +94,8 @@ pub use quote_removal::*;
 pub enum ErrorCause {
     // TODO Define error cause types
     Dummy(String),
+    /// System error while performing a command substitution.
+    CommandSubstError(Errno),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }
@@ -99,7 +108,8 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             Dummy(message) => message,
-            AssignReadOnly { .. } => "cannot assign to read-only variable",
+            CommandSubstError(_) => "error performing the command substitution",
+            AssignReadOnly(_) => "cannot assign to read-only variable",
         }
     }
 
@@ -110,6 +120,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             Dummy(_) => "".into(),
+            CommandSubstError(e) => e.desc().into(),
             AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
         }
     }
@@ -121,7 +132,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            Dummy(_) => None,
+            Dummy(_) | CommandSubstError(_) => None,
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
@@ -170,6 +181,7 @@ impl<'a> From<&'a Error> for Message<'a> {
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
 /// Part of the shell execution environment the word expansion depends on.
+#[async_trait(?Send)]
 pub trait Env: std::fmt::Debug {
     /// Gets a reference to the variable with the specified name.
     #[must_use]
@@ -193,10 +205,36 @@ pub trait Env: std::fmt::Debug {
     /// [`yash_env::job::JobSet::expand_last_async_pid`] for details.
     fn last_async_pid(&mut self) -> Pid;
 
+    /// Opens a pipe.
+    fn pipe(&mut self) -> std::result::Result<(Fd, Fd), Errno>;
+
+    /// Duplicates a file descriptor.
+    fn dup2(&mut self, from: Fd, to: Fd) -> std::result::Result<Fd, Errno>;
+
+    /// Closes a file descriptor.
+    fn close(&mut self, fd: Fd) -> std::result::Result<(), Errno>;
+
+    /// Reads from the file descriptor.
+    async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> std::result::Result<usize, Errno>;
+
+    /// Runs the given function asynchronously in a subshell and returns its
+    /// process ID.
+    async fn start_subshell<F>(&mut self, f: F) -> std::result::Result<Pid, Errno>
+    where
+        F: for<'a> FnOnce(
+                &'a mut yash_env::Env,
+            )
+                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+            + 'static;
+
+    // Waits for a subshell to terminate.
+    async fn wait_for_subshell(&mut self, target: Pid) -> std::result::Result<WaitStatus, Errno>;
+
     // TODO define Env methods
 }
 // TODO Should we split Env for the initial expansion and multi-field expansion?
 
+#[async_trait(?Send)]
 impl Env for yash_env::Env {
     fn get_variable(&self, name: &str) -> Option<&Variable> {
         self.variables.get(name)
@@ -214,6 +252,31 @@ impl Env for yash_env::Env {
     }
     fn last_async_pid(&mut self) -> Pid {
         self.jobs.expand_last_async_pid()
+    }
+    fn pipe(&mut self) -> std::result::Result<(Fd, Fd), Errno> {
+        self.system.pipe()
+    }
+    fn dup2(&mut self, from: Fd, to: Fd) -> std::result::Result<Fd, Errno> {
+        self.system.dup2(from, to)
+    }
+    fn close(&mut self, fd: Fd) -> std::result::Result<(), Errno> {
+        self.system.close(fd)
+    }
+    async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> std::result::Result<usize, Errno> {
+        self.system.read_async(fd, buffer).await
+    }
+    async fn start_subshell<F>(&mut self, f: F) -> std::result::Result<Pid, Errno>
+    where
+        F: for<'a> FnOnce(
+                &'a mut yash_env::Env,
+            )
+                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+            + 'static,
+    {
+        self.start_subshell(f).await
+    }
+    async fn wait_for_subshell(&mut self, target: Pid) -> std::result::Result<WaitStatus, Errno> {
+        self.wait_for_subshell(target).await
     }
 }
 
@@ -531,6 +594,7 @@ mod tests {
     #[derive(Debug)]
     pub(crate) struct NullEnv;
 
+    #[async_trait(?Send)]
     impl Env for NullEnv {
         fn get_variable(&self, _: &str) -> Option<&Variable> {
             unimplemented!("NullEnv's method must not be called")
@@ -547,6 +611,38 @@ mod tests {
             unimplemented!("NullEnv's method must not be called")
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn pipe(&mut self) -> std::result::Result<(Fd, Fd), Errno> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn dup2(&mut self, _from: Fd, _to: Fd) -> std::result::Result<Fd, Errno> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn close(&mut self, _fd: Fd) -> std::result::Result<(), Errno> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        async fn read_async(
+            &mut self,
+            _fd: Fd,
+            _buffer: &mut [u8],
+        ) -> std::result::Result<usize, Errno> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        async fn start_subshell<F>(&mut self, _f: F) -> std::result::Result<Pid, Errno>
+        where
+            F: for<'a> FnOnce(
+                    &'a mut yash_env::Env,
+                )
+                    -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                + 'static,
+        {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        async fn wait_for_subshell(
+            &mut self,
+            _target: Pid,
+        ) -> std::result::Result<WaitStatus, Errno> {
             unimplemented!("NullEnv's method must not be called")
         }
     }
