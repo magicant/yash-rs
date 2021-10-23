@@ -51,9 +51,7 @@ impl<'a> CommandSubstRef<'a> {
 #[async_trait(?Send)]
 impl Expand for CommandSubstRef<'_> {
     async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
-        // TODO return exit_status
-        let (result, _exit_status) =
-            expand_command_substitution(env, self.content, self.location).await?;
+        let result = expand_command_substitution(env, self.content, self.location).await?;
         output.push_str(&result, Origin::SoftExpansion, false, false);
         Ok(())
     }
@@ -69,7 +67,7 @@ pub async fn expand_command_substitution<E: Env>(
     env: &mut E,
     code: &str,
     location: &Location,
-) -> Result<(String, ExitStatus)> {
+) -> Result<String> {
     expand_command_substitution_inner(env, code.to_owned(), location)
         .await
         .map_err(|errno| Error {
@@ -82,7 +80,7 @@ async fn expand_command_substitution_inner<E: Env>(
     env: &mut E,
     code: String,
     location: &Location,
-) -> std::result::Result<(String, ExitStatus), Errno> {
+) -> std::result::Result<String, Errno> {
     let original = location.clone();
     let (reader, writer) = env.pipe()?;
 
@@ -138,6 +136,7 @@ async fn expand_command_substitution_inner<E: Env>(
         Signaled(_pid, signal, _core_dumped) => ExitStatus::from(signal),
         status => todo!("unhandled wait status {:?}", status),
     };
+    env.save_command_subst_exit_status(exit_status);
 
     let mut result = String::from_utf8(result)
         .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
@@ -146,12 +145,13 @@ async fn expand_command_substitution_inner<E: Env>(
     let len = result.trim_end_matches('\n').len();
     result.truncate(len);
 
-    Ok((result, exit_status))
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expansion::ExitStatusAdapter;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
@@ -162,7 +162,7 @@ mod tests {
     fn empty_substitution() {
         in_virtual_system(|mut env, _pid, _state| async move {
             let result = expand_command_substitution(&mut env, "", &Location::dummy("")).await;
-            assert_eq!(result, Ok(("".to_string(), ExitStatus::SUCCESS)));
+            assert_eq!(result, Ok("".to_string()));
         })
     }
 
@@ -172,7 +172,7 @@ mod tests {
             env.builtins.insert("echo", echo_builtin());
             let result =
                 expand_command_substitution(&mut env, "echo ok", &Location::dummy("")).await;
-            assert_eq!(result, Ok(("ok".to_string(), ExitStatus::SUCCESS)));
+            assert_eq!(result, Ok("ok".to_string()));
         })
     }
 
@@ -186,17 +186,19 @@ mod tests {
                 &Location::dummy(""),
             )
             .await;
-            assert_eq!(result, Ok(("1\n2\n\n3".to_string(), ExitStatus::SUCCESS)));
+            assert_eq!(result, Ok("1\n2\n\n3".to_string()));
         })
     }
 
     #[test]
     fn exit_status_of_substitution() {
         in_virtual_system(|mut env, _pid, _state| async move {
+            let mut env = ExitStatusAdapter::new(&mut env);
             env.builtins.insert("return", return_builtin());
             let result =
                 expand_command_substitution(&mut env, "return -n 100", &Location::dummy("")).await;
-            assert_eq!(result, Ok(("".to_string(), ExitStatus(100))));
+            assert_eq!(result, Ok("".to_string()));
+            assert_eq!(env.last_command_subst_exit_status(), Some(ExitStatus(100)));
         })
     }
 
