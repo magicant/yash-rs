@@ -21,7 +21,7 @@ use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::expansion::ExitStatusAdapter;
 use crate::print_error;
-use crate::redir::RedirEnv;
+use crate::redir::RedirGuard;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -191,7 +191,7 @@ impl Command for syntax::SimpleCommand {
 }
 
 async fn perform_redirs(
-    env: &mut RedirEnv<'_, ExitStatusAdapter<'_, Env>>,
+    env: &mut RedirGuard<'_, ExitStatusAdapter<'_, Env>>,
     redirs: &[Redir],
 ) -> Result {
     match env.perform_redirs(&*redirs).await {
@@ -211,7 +211,7 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut ExitStatusAdapter::new(env);
-                let env = &mut RedirEnv::new(env);
+                let env = &mut RedirGuard::new(env);
                 perform_redirs(env, &*redirs).await?;
                 env.exit_status = env.last_command_subst_exit_status().unwrap_or_default();
                 Continue(())
@@ -252,7 +252,7 @@ async fn execute_builtin(
     redirs: &[Redir],
 ) -> Result {
     let env = &mut ExitStatusAdapter::new(env);
-    let env = &mut RedirEnv::new(env);
+    let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
     use yash_env::builtin::Type::*;
@@ -289,7 +289,7 @@ async fn execute_function(
     redirs: &[Redir],
 ) -> Result {
     let env = &mut ExitStatusAdapter::new(env);
-    let env = &mut RedirEnv::new(env);
+    let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
     let mut outer = env.push_variable_context(ContextType::Volatile);
@@ -318,7 +318,7 @@ async fn execute_external_utility(
     let args = to_c_strings(fields);
 
     let env = &mut ExitStatusAdapter::new(env);
-    let env = &mut RedirEnv::new(env);
+    let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
     let mut env = env.push_variable_context(ContextType::Volatile);

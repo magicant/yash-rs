@@ -51,10 +51,10 @@
 //!
 //! # Performing redirections
 //!
-//! To perform redirections, you need to wrap an [`Env`] in a [`RedirEnv`]
-//! first. Then, you call [`RedirEnv::perform_redir`] to affect the target file
-//! descriptor. When you drop the `RedirEnv`, it undoes the effect to the file
-//! descriptor. See the documentation for [`RedirEnv`] for details.
+//! To perform redirections, you need to wrap an [`Env`] in a [`RedirGuard`]
+//! first. Then, you call [`RedirGuard::perform_redir`] to affect the target
+//! file descriptor. When you drop the `RedirGuard`, it undoes the effect to the
+//! file descriptor. See the documentation for [`RedirGuard`] for details.
 
 use crate::expansion::expand_word;
 use std::borrow::Cow;
@@ -308,52 +308,52 @@ async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
 /// `Env` wrapper for performing redirections.
 ///
 /// This is an RAII-style wrapper of [`Env`] in which redirections are
-/// performed. A `RedirEnv` keeps track of file descriptors affected by
+/// performed. A `RedirGuard` keeps track of file descriptors affected by
 /// redirections so that we can restore the file descriptors to the state before
 /// performing the redirections.
 ///
-/// There are two ways to clear file descriptors saved in the `RedirEnv`.
-/// One is [`undo_redirs`](Self::undo_redirs), which restores the file
-/// descriptors to the original state, and the other is
+/// There are two ways to clear file descriptors saved in the `RedirGuard`.  One
+/// is [`undo_redirs`](Self::undo_redirs), which restores the file descriptors
+/// to the original state, and the other is
 /// [`preserve_redirs`](Self::preserve_redirs), which removes the saved file
 /// descriptors without restoring the state and thus makes the effect of the
 /// redirections permanent.
 ///
-/// When an instance of `RedirEnv` is dropped, `undo_redirs` is implicitly
+/// When an instance of `RedirGuard` is dropped, `undo_redirs` is implicitly
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirEnv<'e, E: Env> {
+pub struct RedirGuard<'e, E: Env> {
     /// Environment in which redirections are performed.
     env: &'e mut E,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl<E: Env> Deref for RedirEnv<'_, E> {
+impl<E: Env> Deref for RedirGuard<'_, E> {
     type Target = E;
     fn deref(&self) -> &E {
         self.env
     }
 }
 
-impl<E: Env> DerefMut for RedirEnv<'_, E> {
+impl<E: Env> DerefMut for RedirGuard<'_, E> {
     fn deref_mut(&mut self) -> &mut E {
         self.env
     }
 }
 
-impl<E: Env> std::ops::Drop for RedirEnv<'_, E> {
+impl<E: Env> std::ops::Drop for RedirGuard<'_, E> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl<'e, E: Env> RedirEnv<'e, E> {
-    /// Creates a new `RedirEnv`.
+impl<'e, E: Env> RedirGuard<'e, E> {
+    /// Creates a new `RedirGuard`.
     pub fn new(env: &'e mut E) -> Self {
         let saved_fds = Vec::new();
-        RedirEnv { env, saved_fds }
+        RedirGuard { env, saved_fds }
     }
 
     /// Performs a redirection.
@@ -410,9 +410,9 @@ impl<'e, E: Env> RedirEnv<'e, E> {
     // TODO Just closing save FDs in `preserve_redirs` would render incorrect
     // behavior in some situations. Assume `perform` is called twice, the
     // second redirection's target FD is the first's save FD, and the inner
-    // `RedirEnv` is dropped by `preserve_redirs`. When the outer `RedirEnv` is
-    // dropped by `undo_redirs`, the undoing will move and close the FD that has
-    // been made permanent by `preserve_redirs`, which is not expected.
+    // `RedirGuard` is dropped by `preserve_redirs`. When the outer `RedirGuard`
+    // is dropped by `undo_redirs`, the undoing will move and close the FD that
+    // has been made permanent by `preserve_redirs`, which is not expected.
 }
 
 #[cfg(test)]
@@ -437,7 +437,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3< foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
 
@@ -458,7 +458,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "< foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
 
@@ -487,7 +487,7 @@ mod tests {
             .push(17);
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut redir_env = RedirEnv::new(&mut env);
+        let mut redir_env = RedirGuard::new(&mut env);
         let redir = "< file".parse().unwrap();
         block_on(redir_env.perform_redir(&redir)).unwrap();
         redir_env.undo_redirs();
@@ -508,7 +508,7 @@ mod tests {
             .save(PathBuf::from("input"), Rc::new(RefCell::new(INode::new())));
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut redir_env = RedirEnv::new(&mut env);
+        let mut redir_env = RedirGuard::new(&mut env);
         let redir = "4< input".parse().unwrap();
         block_on(redir_env.perform_redir(&redir)).unwrap();
         redir_env.undo_redirs();
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn unreadable_file() {
         let mut env = Env::new_virtual();
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "< no_such_file".parse().unwrap();
         let e = block_on(env.perform_redir(&redir)).unwrap_err();
         assert_eq!(
@@ -551,7 +551,7 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         block_on(env.perform_redir(&"< foo".parse().unwrap())).unwrap();
         block_on(env.perform_redir(&"3< bar".parse().unwrap())).unwrap();
 
@@ -583,7 +583,7 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         block_on(env.perform_redir(&"< foo".parse().unwrap())).unwrap();
         block_on(env.perform_redir(&"< bar".parse().unwrap())).unwrap();
 
@@ -620,7 +620,7 @@ mod tests {
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
-        let mut redir_env = RedirEnv::new(&mut env);
+        let mut redir_env = RedirGuard::new(&mut env);
         block_on(redir_env.perform_redir(&"< foo".parse().unwrap())).unwrap();
         block_on(redir_env.perform_redir(&"10< bar".parse().unwrap())).unwrap();
         drop(redir_env);
@@ -638,7 +638,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
@@ -660,7 +660,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::clone(&file));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         assert_eq!(file.borrow().content, []);
@@ -671,7 +671,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3>| foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
@@ -693,7 +693,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::clone(&file));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3>| foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         assert_eq!(file.borrow().content, []);
@@ -706,7 +706,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3>> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
@@ -728,7 +728,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::clone(&file));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = ">> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
@@ -741,7 +741,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3<> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[230, 175, 26]).unwrap();
@@ -762,7 +762,7 @@ mod tests {
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
         let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirEnv::new(&mut env);
+        let mut env = RedirGuard::new(&mut env);
         let redir = "3<> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
 
