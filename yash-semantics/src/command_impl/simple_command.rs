@@ -190,7 +190,7 @@ impl Command for syntax::SimpleCommand {
     }
 }
 
-async fn perform_redirs(env: &mut RedirEnv<'_>, redirs: &[Redir]) -> Result {
+async fn perform_redirs(env: &mut RedirEnv<'_, Env>, redirs: &[Redir]) -> Result {
     match env.perform_redirs(&*redirs).await {
         Ok(()) => Continue(()),
         Err(e) => e.handle(env).await,
