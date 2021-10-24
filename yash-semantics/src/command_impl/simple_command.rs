@@ -19,6 +19,7 @@
 use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
+use crate::expansion::ExitStatusAdapter;
 use crate::print_error;
 use crate::redir::RedirEnv;
 use crate::Command;
@@ -226,9 +227,14 @@ async fn execute_absent_target(
         }
     }
 
-    // TODO Apply last command substitution exit status from assignments
+    let env = &mut ExitStatusAdapter::new(env);
     match perform_assignments(env, assigns, Scope::Global, false).await {
-        Ok(()) => Continue(()),
+        Ok(()) => {
+            env.exit_status = env
+                .last_command_subst_exit_status()
+                .unwrap_or(ExitStatus::SUCCESS);
+            Continue(())
+        }
         Err(error) => error.handle(env).await,
     }
 }
@@ -436,6 +442,16 @@ mod tests {
             env.variables.get("a").unwrap().value,
             Value::Scalar("b".to_string())
         );
+    }
+
+    #[test]
+    fn simple_command_returns_command_substitution_exit_status_from_assignment() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let command: syntax::SimpleCommand = "a=$(return -n 12)".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.exit_status, ExitStatus(12));
+        })
     }
 
     #[test]
