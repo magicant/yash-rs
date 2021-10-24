@@ -316,37 +316,6 @@ impl VariableSet {
         }
     }
 
-    /// Pushes a new empty context.
-    pub fn push_context(&mut self, context_type: ContextType) {
-        self.contexts.push(context_type);
-    }
-
-    /// Pops the last-pushed context.
-    ///
-    /// This function removes the topmost context from the internal stack of
-    /// contexts in the `VariableSet`, thereby removing all the variables in the
-    /// context.
-    ///
-    /// You cannot pop the base context. This function would __panic__ if you
-    /// tried to do so.
-    pub fn pop_context(&mut self) {
-        debug_assert!(!self.contexts.is_empty());
-        if self.contexts.len() == 1 {
-            panic!("cannot pop the base context");
-        }
-        self.contexts.pop();
-        // TODO Use HashMap::drain_filter to remove empty values
-        // TODO Use complementary stack of hash tables to avoid scanning the
-        // whole `self.all_variables`
-        for stack in self.all_variables.values_mut() {
-            if let Some(vic) = stack.last() {
-                if vic.context_index >= self.contexts.len() {
-                    stack.pop();
-                }
-            }
-        }
-    }
-
     /// Returns environment variables in a new vector of C string.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
@@ -368,6 +337,63 @@ impl VariableSet {
                 }
             })
             .collect()
+    }
+}
+
+/// Stack for pushing and popping contexts.
+///
+/// Instead of calling methods of `ContextStack` directly, you should use
+/// [`ScopeGuard`] which calls the methods when appropriate for you.
+pub trait ContextStack {
+    /// Pushes a new empty context.
+    fn push_context(&mut self, context_type: ContextType);
+
+    /// Pops the last-pushed context.
+    ///
+    /// This function may panic if there is no context that can be popped.
+    fn pop_context(&mut self);
+}
+
+impl ContextStack for VariableSet {
+    fn push_context(&mut self, context_type: ContextType) {
+        self.contexts.push(context_type);
+    }
+
+    /// Pops the last-pushed context.
+    ///
+    /// This function removes the topmost context from the internal stack of
+    /// contexts in the `VariableSet`, thereby removing all the variables in the
+    /// context.
+    ///
+    /// You cannot pop the base context. This function would __panic__ if you
+    /// tried to do so.
+    fn pop_context(&mut self) {
+        debug_assert!(!self.contexts.is_empty());
+        if self.contexts.len() == 1 {
+            panic!("cannot pop the base context");
+        }
+        self.contexts.pop();
+        // TODO Use HashMap::drain_filter to remove empty values
+        // TODO Use complementary stack of hash tables to avoid scanning the
+        // whole `self.all_variables`
+        for stack in self.all_variables.values_mut() {
+            if let Some(vic) = stack.last() {
+                if vic.context_index >= self.contexts.len() {
+                    stack.pop();
+                }
+            }
+        }
+    }
+}
+
+/// This implementation delegates to that for `VariableSet` contained in the
+/// `Env`.
+impl ContextStack for Env {
+    fn push_context(&mut self, context_type: ContextType) {
+        self.variables.push_context(context_type)
+    }
+    fn pop_context(&mut self) {
+        self.variables.pop_context()
     }
 }
 
