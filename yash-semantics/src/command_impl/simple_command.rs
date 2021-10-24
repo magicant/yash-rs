@@ -206,18 +206,19 @@ async fn execute_absent_target(
     redirs: Rc<Vec<Redir>>,
 ) -> Result {
     // Perform redirections in a subshell
-    // TODO Apply last command substitution exit status from redirections
-    if let Some(redir) = redirs.first() {
+    let exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut ExitStatusAdapter::new(env);
                 let env = &mut RedirEnv::new(env);
-                perform_redirs(env, &*redirs).await
+                perform_redirs(env, &*redirs).await?;
+                env.exit_status = env.last_command_subst_exit_status().unwrap_or_default();
+                Continue(())
             })
         });
         match redir_results.await {
-            Ok(_exit_status) => (),
+            Ok(exit_status) => exit_status,
             Err(errno) => {
                 print_error(
                     env,
@@ -229,14 +230,14 @@ async fn execute_absent_target(
                 return Break(Divert::Interrupt(Some(ExitStatus::ERROR)));
             }
         }
-    }
+    } else {
+        ExitStatus::SUCCESS
+    };
 
     let env = &mut ExitStatusAdapter::new(env);
     match perform_assignments(env, assigns, Scope::Global, false).await {
         Ok(()) => {
-            env.exit_status = env
-                .last_command_subst_exit_status()
-                .unwrap_or(ExitStatus::SUCCESS);
+            env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
             Continue(())
         }
         Err(error) => error.handle(env).await,
@@ -421,6 +422,16 @@ mod tests {
             let state = state.borrow();
             let file = state.file_system.get("/tmp/foo").unwrap().borrow();
             assert_eq!(file.content, []);
+        });
+    }
+
+    #[test]
+    fn simple_command_returns_command_substitution_exit_status_from_redirection() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let command: syntax::SimpleCommand = ">/tmp/foo$(return -n 42)".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.exit_status, ExitStatus(42));
         });
     }
 
