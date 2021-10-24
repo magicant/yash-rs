@@ -140,6 +140,9 @@ pub enum ContextType {
 /// Variables in a context hide those with the same name in lower contexts. You
 /// cannot access such hidden variables until you remove the hiding variable
 /// from the upper context.
+///
+/// You should use [`ScopeGuard`] for pushing and popping contexts. See its
+/// documentation for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VariableSet {
     /// Hash map containing all variables.
@@ -399,9 +402,9 @@ impl ContextStack for Env {
 
 /// RAII-style guard for temporarily retaining a variable context.
 ///
-/// The [`Env::push_variable_context`] function returns a `ScopeGuard` that
-/// keeps a reference to the environment. When you drop the `ScopeGuard`, it
-/// pops the context.
+/// A `ScopeGuard` ensures that a variable context is pushed to and popped from
+/// a stack appropriately. The `ScopeGuard` calls [`VariableSet::push_context`]
+/// when created, and [`VariableSet::pop_context`] when dropped.
 #[derive(Debug)]
 #[must_use = "You must retain ScopeGuard to keep the context alive"]
 pub struct ScopeGuard<'a> {
@@ -409,10 +412,21 @@ pub struct ScopeGuard<'a> {
 }
 
 impl<'a> ScopeGuard<'a> {
-    pub(crate) fn new(env: &'a mut Env, context_type: ContextType) -> Self {
+    /// Creates a `ScopeGuard`, pushing a new context to `env`.
+    ///
+    /// This function pushes a new context with the specified type and returns a
+    /// `ScopeGuard` wrapping `env`. The context will be popped when the
+    /// `ScopeGuard` is dropped.
+    pub fn push_context(env: &'a mut Env, context_type: ContextType) -> Self {
         env.variables.push_context(context_type);
         ScopeGuard { env }
     }
+
+    /// Pops the topmost context.
+    ///
+    /// This function is equivalent to dropping the `ScopeGuard`, but provides a
+    /// more informative name describing the effect.
+    pub fn pop_context(self) {}
 }
 
 impl std::ops::Drop for ScopeGuard<'_> {
@@ -854,7 +868,7 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.push_variable_context(ContextType::Regular);
+        let mut guard = ScopeGuard::push_context(&mut env, ContextType::Regular);
         guard
             .variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
@@ -863,7 +877,7 @@ mod tests {
             .variables
             .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
             .unwrap();
-        Env::pop_variable_context(guard);
+        guard.pop_context();
 
         let variable = env.variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("".to_string()));

@@ -37,6 +37,7 @@ use yash_env::function::Function;
 use yash_env::system::Errno;
 use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
+use yash_env::variable::ScopeGuard;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -91,11 +92,11 @@ impl Command for syntax::SimpleCommand {
     /// as a regular built-in. Then, assignments are performed in a
     /// [volatile](ContextType::Volatile) variable context and exported. Next, a
     /// [regular](ContextType::Regular) context is
-    /// [pushed](Env::push_variable_context) to allow local variable assignment
-    /// during the function execution. The remaining fields not used in the
-    /// command search become positional parameters in the new context.  After
-    /// executing the function body, the contexts are
-    /// [popped](Env::pop_variable_context).
+    /// [pushed](yash_env::variable::ContextStack::push_context) to allow local
+    /// variable assignment during the function execution. The remaining fields
+    /// not used in the command search become positional parameters in the new
+    /// context. After executing the function body, the contexts are
+    /// [popped](yash_env::variable::ContextStack::pop_context).
     ///
     /// ## External utility
     ///
@@ -269,7 +270,7 @@ async fn execute_builtin(
         }
 
         Intrinsic | NonIntrinsic => {
-            let mut env = env.push_variable_context(ContextType::Volatile);
+            let mut env = ScopeGuard::push_context(env, ContextType::Volatile);
             match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
                 Ok(()) => (),
                 Err(error) => return error.handle(&mut env).await,
@@ -292,13 +293,13 @@ async fn execute_function(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut outer = env.push_variable_context(ContextType::Volatile);
+    let mut outer = ScopeGuard::push_context(env, ContextType::Volatile);
     match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut outer).await,
     }
 
-    let mut inner = outer.push_variable_context(ContextType::Regular);
+    let mut inner = ScopeGuard::push_context(&mut outer, ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
     function.body.execute(&mut inner).await?;
@@ -321,7 +322,7 @@ async fn execute_external_utility(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut env = env.push_variable_context(ContextType::Volatile);
+    let mut env = ScopeGuard::push_context(env, ContextType::Volatile);
     match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut env).await,
