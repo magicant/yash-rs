@@ -58,6 +58,7 @@
 
 use crate::expansion::expand_word;
 use std::borrow::Cow;
+use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::NulError;
 use std::ops::Deref;
@@ -65,8 +66,8 @@ use std::ops::DerefMut;
 use yash_env::expansion::Field;
 use yash_env::io::Fd;
 use yash_env::system::Errno;
+use yash_env::system::Mode;
 use yash_env::system::OFlag;
-use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -178,12 +179,33 @@ impl<'a> From<&'a Error> for Message<'a> {
     }
 }
 
+/// Part of the shell execution environment that provides functionalities for
+/// performing redirections.
+pub trait Env: crate::expansion::Env {
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno>;
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno>;
+}
+
+impl Env for yash_env::Env {
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno> {
+        self.system.dup(from, to_min, cloexec)
+    }
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno> {
+        self.system.open(path, option, mode)
+    }
+}
+
+impl<E: Env> Env for crate::expansion::ExitStatusAdapter<'_, E> {
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno> {
+        (**self).dup(from, to_min, cloexec)
+    }
+    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno> {
+        (**self).open(path, option, mode)
+    }
+}
+
 /// Opens a file for redirection.
-fn open_file<S: System>(
-    system: &mut S,
-    option: OFlag,
-    path: Field,
-) -> Result<(Fd, Location), Error> {
+fn open_file<E: Env>(env: &mut E, option: OFlag, path: Field) -> Result<(Fd, Location), Error> {
     let Field { value, origin } = path;
     let path = match CString::new(value) {
         Ok(path) => path,
@@ -195,7 +217,6 @@ fn open_file<S: System>(
         }
     };
 
-    use yash_env::system::Mode;
     let mode = Mode::S_IRUSR
         | Mode::S_IWUSR
         | Mode::S_IRGRP
@@ -203,7 +224,7 @@ fn open_file<S: System>(
         | Mode::S_IROTH
         | Mode::S_IWOTH;
 
-    match system.open(&path, option, mode) {
+    match env.open(&path, option, mode) {
         Ok(fd) => Ok((fd, origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -213,34 +234,34 @@ fn open_file<S: System>(
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal(
-    env: &mut Env,
+async fn open_normal<E: Env>(
+    env: &mut E,
     operator: RedirOp,
     operand: Field,
 ) -> Result<(Fd, Location), Error> {
     use RedirOp::*;
     match operator {
-        FileIn => open_file(&mut env.system, OFlag::O_RDONLY, operand),
+        FileIn => open_file(env, OFlag::O_RDONLY, operand),
         FileOut | FileClobber => open_file(
-            &mut env.system,
+            env,
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC,
             operand,
         ),
         FileAppend => open_file(
-            &mut env.system,
+            env,
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_APPEND,
             operand,
         ),
-        FileInOut => open_file(&mut env.system, OFlag::O_RDWR | OFlag::O_CREAT, operand),
+        FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
         _ => todo!(),
     }
 }
 
 /// Performs a redirection.
-async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
+async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
-    let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
+    let save = match env.dup(target_fd, MIN_SAVE_FD, true) {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {
@@ -263,11 +284,11 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
 
     if fd != target_fd {
         // Copy the new open file description from `fd` to `target_fd`
-        match env.system.dup2(fd, target_fd) {
+        match env.dup2(fd, target_fd) {
             Ok(new_fd) => assert_eq!(new_fd, target_fd),
             Err(errno) => {
                 // TODO Is it ok to unconditionally close fd?
-                let _: Result<_, _> = env.system.close(fd);
+                let _: Result<_, _> = env.close(fd);
 
                 return Err(Error {
                     cause: ErrorCause::FdNotOverwritten(target_fd, errno),
@@ -277,7 +298,7 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
         }
 
         // Close `fd`
-        let _: Result<_, _> = env.system.close(fd);
+        let _: Result<_, _> = env.close(fd);
     }
 
     let original = target_fd;
@@ -302,35 +323,35 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<SavedFd, Error> {
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirEnv<'e> {
+pub struct RedirEnv<'e, E: Env> {
     /// Environment in which redirections are performed.
-    env: &'e mut Env,
+    env: &'e mut E,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl Deref for RedirEnv<'_> {
-    type Target = Env;
-    fn deref(&self) -> &Env {
+impl<E: Env> Deref for RedirEnv<'_, E> {
+    type Target = E;
+    fn deref(&self) -> &E {
         self.env
     }
 }
 
-impl DerefMut for RedirEnv<'_> {
-    fn deref_mut(&mut self) -> &mut Env {
+impl<E: Env> DerefMut for RedirEnv<'_, E> {
+    fn deref_mut(&mut self) -> &mut E {
         self.env
     }
 }
 
-impl std::ops::Drop for RedirEnv<'_> {
+impl<E: Env> std::ops::Drop for RedirEnv<'_, E> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl RedirEnv<'_> {
+impl<'e, E: Env> RedirEnv<'e, E> {
     /// Creates a new `RedirEnv`.
-    pub fn new(env: &mut Env) -> RedirEnv<'_> {
+    pub fn new(env: &'e mut E) -> Self {
         let saved_fds = Vec::new();
         RedirEnv { env, saved_fds }
     }
@@ -340,7 +361,7 @@ impl RedirEnv<'_> {
     /// If successful, this function saves internally a backing copy of the file
     /// descriptor affected by the redirection.
     pub async fn perform_redir(&mut self, redir: &Redir) -> Result<(), Error> {
-        let saved_fd = perform(self, redir).await?;
+        let saved_fd = perform(&mut **self, redir).await?;
         self.saved_fds.push(saved_fd);
         Ok(())
     }
@@ -371,10 +392,10 @@ impl RedirEnv<'_> {
         for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
             if let Some(save) = save {
                 assert_ne!(save, original);
-                let _: Result<_, _> = self.env.system.dup2(save, original);
-                let _: Result<_, _> = self.env.system.close(save);
+                let _: Result<_, _> = self.env.dup2(save, original);
+                let _: Result<_, _> = self.env.close(save);
             } else {
-                let _: Result<_, _> = self.env.system.close(original);
+                let _: Result<_, _> = self.env.close(original);
             }
         }
     }
@@ -402,6 +423,7 @@ mod tests {
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::system::r#virtual::INode;
+    use yash_env::Env;
     use yash_env::VirtualSystem;
 
     #[test]

@@ -198,6 +198,15 @@ pub trait Env: std::fmt::Debug {
     /// Gets the exit status of the last command.
     fn exit_status(&self) -> ExitStatus;
 
+    /// Sets the exit status of a command substitution.
+    ///
+    /// This method is called when a command substitution is performed so that
+    /// the environment can remember its exit status.
+    ///
+    /// This method does _not_ affect the value returned from
+    /// [`exit_status`](Self::exit_status).
+    fn save_command_subst_exit_status(&mut self, exit_status: ExitStatus);
+
     /// Gets the process ID of the last executed asynchronous command.
     ///
     /// This function marks the process ID as known by the user so that the
@@ -250,6 +259,10 @@ impl Env for yash_env::Env {
     fn exit_status(&self) -> ExitStatus {
         self.exit_status
     }
+    /// This method is no-op for `yash_env::Env`.
+    ///
+    /// See also [`ExitStatusAdapter`].
+    fn save_command_subst_exit_status(&mut self, _: ExitStatus) {}
     fn last_async_pid(&mut self) -> Pid {
         self.jobs.expand_last_async_pid()
     }
@@ -277,6 +290,98 @@ impl Env for yash_env::Env {
     }
     async fn wait_for_subshell(&mut self, target: Pid) -> std::result::Result<WaitStatus, Errno> {
         self.wait_for_subshell(target).await
+    }
+}
+
+/// Adapter for implementing `save_command_subst_exit_status`.
+///
+/// Although [`yash_env::Env`] implements [`Env`], its
+/// `save_command_subst_exit_status` method is a dummy because `yash_env::Env`
+/// does not have any variable for saving such data. You can wrap
+/// `yash_env::Env` with `ExitStatusAdapter` to add a working implementation of
+/// the method.
+#[derive(Debug)]
+pub struct ExitStatusAdapter<'a, E> {
+    command_subst_exit_status: Option<ExitStatus>,
+    env: &'a mut E,
+}
+
+impl<'a, E> ExitStatusAdapter<'a, E> {
+    /// Creates a new `ExitStatusAdapter` wrapping the specified environment.
+    pub fn new(env: &'a mut E) -> Self {
+        ExitStatusAdapter {
+            command_subst_exit_status: None,
+            env,
+        }
+    }
+
+    /// Returns the exit status that was passed in the last call to
+    /// `save_command_subst_exit_status`, or `None` if the method has not been
+    /// called at all.
+    pub fn last_command_subst_exit_status(&self) -> Option<ExitStatus> {
+        self.command_subst_exit_status
+    }
+}
+
+impl<E> Deref for ExitStatusAdapter<'_, E> {
+    type Target = E;
+    fn deref(&self) -> &E {
+        self.env
+    }
+}
+
+impl<E> DerefMut for ExitStatusAdapter<'_, E> {
+    fn deref_mut(&mut self) -> &mut E {
+        self.env
+    }
+}
+
+#[async_trait(?Send)]
+impl<E: Env> Env for ExitStatusAdapter<'_, E> {
+    fn get_variable(&self, name: &str) -> Option<&Variable> {
+        self.env.get_variable(name)
+    }
+    fn assign_variable(
+        &mut self,
+        scope: Scope,
+        name: String,
+        value: Variable,
+    ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+        self.env.assign_variable(scope, name, value)
+    }
+    fn exit_status(&self) -> ExitStatus {
+        self.env.exit_status()
+    }
+    fn save_command_subst_exit_status(&mut self, exit_status: ExitStatus) {
+        self.command_subst_exit_status = Some(exit_status);
+    }
+    fn last_async_pid(&mut self) -> Pid {
+        self.env.last_async_pid()
+    }
+    fn pipe(&mut self) -> std::result::Result<(Fd, Fd), Errno> {
+        self.env.pipe()
+    }
+    fn dup2(&mut self, from: Fd, to: Fd) -> std::result::Result<Fd, Errno> {
+        self.env.dup2(from, to)
+    }
+    fn close(&mut self, fd: Fd) -> std::result::Result<(), Errno> {
+        self.env.close(fd)
+    }
+    async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> std::result::Result<usize, Errno> {
+        self.env.read_async(fd, buffer).await
+    }
+    async fn start_subshell<F>(&mut self, f: F) -> std::result::Result<Pid, Errno>
+    where
+        F: for<'a> FnOnce(
+                &'a mut yash_env::Env,
+            )
+                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+            + 'static,
+    {
+        self.env.start_subshell(f).await
+    }
+    async fn wait_for_subshell(&mut self, target: Pid) -> std::result::Result<WaitStatus, Errno> {
+        self.env.wait_for_subshell(target).await
     }
 }
 
@@ -608,6 +713,9 @@ mod tests {
             unimplemented!("NullEnv's method must not be called")
         }
         fn exit_status(&self) -> yash_env::exec::ExitStatus {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
             unimplemented!("NullEnv's method must not be called")
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {

@@ -19,6 +19,7 @@
 use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
+use crate::expansion::ExitStatusAdapter;
 use crate::print_error;
 use crate::redir::RedirEnv;
 use crate::Command;
@@ -189,7 +190,10 @@ impl Command for syntax::SimpleCommand {
     }
 }
 
-async fn perform_redirs(env: &mut RedirEnv<'_>, redirs: &[Redir]) -> Result {
+async fn perform_redirs(
+    env: &mut RedirEnv<'_, ExitStatusAdapter<'_, Env>>,
+    redirs: &[Redir],
+) -> Result {
     match env.perform_redirs(&*redirs).await {
         Ok(()) => Continue(()),
         Err(e) => e.handle(env).await,
@@ -202,17 +206,19 @@ async fn execute_absent_target(
     redirs: Rc<Vec<Redir>>,
 ) -> Result {
     // Perform redirections in a subshell
-    // TODO Apply last command substitution exit status from redirections
-    if let Some(redir) = redirs.first() {
+    let exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
-                let mut env = RedirEnv::new(env);
-                perform_redirs(&mut env, &*redirs).await
+                let env = &mut ExitStatusAdapter::new(env);
+                let env = &mut RedirEnv::new(env);
+                perform_redirs(env, &*redirs).await?;
+                env.exit_status = env.last_command_subst_exit_status().unwrap_or_default();
+                Continue(())
             })
         });
         match redir_results.await {
-            Ok(_exit_status) => (),
+            Ok(exit_status) => exit_status,
             Err(errno) => {
                 print_error(
                     env,
@@ -224,11 +230,16 @@ async fn execute_absent_target(
                 return Break(Divert::Interrupt(Some(ExitStatus::ERROR)));
             }
         }
-    }
+    } else {
+        ExitStatus::SUCCESS
+    };
 
-    // TODO Apply last command substitution exit status from assignments
+    let env = &mut ExitStatusAdapter::new(env);
     match perform_assignments(env, assigns, Scope::Global, false).await {
-        Ok(()) => Continue(()),
+        Ok(()) => {
+            env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
+            Continue(())
+        }
         Err(error) => error.handle(env).await,
     }
 }
@@ -240,18 +251,19 @@ async fn execute_builtin(
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     use yash_env::builtin::Type::*;
     match builtin.r#type {
         Special => {
-            match perform_assignments(&mut *env, assigns, Scope::Global, false).await {
+            match perform_assignments(&mut **env, assigns, Scope::Global, false).await {
                 Ok(()) => (),
-                Err(error) => return error.handle(&mut env).await,
+                Err(error) => return error.handle(env).await,
             }
 
-            let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
+            let (exit_status, abort) = (builtin.execute)(env, fields).await;
             env.exit_status = exit_status;
             abort
         }
@@ -276,8 +288,9 @@ async fn execute_function(
     assigns: &[Assign],
     redirs: &[Redir],
 ) -> Result {
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     let mut outer = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
@@ -304,8 +317,9 @@ async fn execute_external_utility(
     let location = name.origin.clone();
     let args = to_c_strings(fields);
 
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     let mut env = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
@@ -412,6 +426,16 @@ mod tests {
     }
 
     #[test]
+    fn simple_command_returns_command_substitution_exit_status_from_redirection() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let command: syntax::SimpleCommand = ">/tmp/foo$(return -n 42)".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.exit_status, ExitStatus(42));
+        });
+    }
+
+    #[test]
     fn simple_command_handles_subshell_error_with_absent_target() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -436,6 +460,16 @@ mod tests {
             env.variables.get("a").unwrap().value,
             Value::Scalar("b".to_string())
         );
+    }
+
+    #[test]
+    fn simple_command_returns_command_substitution_exit_status_from_assignment() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let command: syntax::SimpleCommand = "a=$(return -n 12)".parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.exit_status, ExitStatus(12));
+        })
     }
 
     #[test]
