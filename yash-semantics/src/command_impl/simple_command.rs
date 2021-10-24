@@ -190,7 +190,10 @@ impl Command for syntax::SimpleCommand {
     }
 }
 
-async fn perform_redirs(env: &mut RedirEnv<'_, Env>, redirs: &[Redir]) -> Result {
+async fn perform_redirs(
+    env: &mut RedirEnv<'_, ExitStatusAdapter<'_, Env>>,
+    redirs: &[Redir],
+) -> Result {
     match env.perform_redirs(&*redirs).await {
         Ok(()) => Continue(()),
         Err(e) => e.handle(env).await,
@@ -208,8 +211,9 @@ async fn execute_absent_target(
         let first_redir_location = redir.body.operand().location.clone();
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
-                let mut env = RedirEnv::new(env);
-                perform_redirs(&mut env, &*redirs).await
+                let env = &mut ExitStatusAdapter::new(env);
+                let env = &mut RedirEnv::new(env);
+                perform_redirs(env, &*redirs).await
             })
         });
         match redir_results.await {
@@ -246,18 +250,19 @@ async fn execute_builtin(
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     use yash_env::builtin::Type::*;
     match builtin.r#type {
         Special => {
-            match perform_assignments(&mut *env, assigns, Scope::Global, false).await {
+            match perform_assignments(&mut **env, assigns, Scope::Global, false).await {
                 Ok(()) => (),
-                Err(error) => return error.handle(&mut env).await,
+                Err(error) => return error.handle(env).await,
             }
 
-            let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
+            let (exit_status, abort) = (builtin.execute)(env, fields).await;
             env.exit_status = exit_status;
             abort
         }
@@ -282,8 +287,9 @@ async fn execute_function(
     assigns: &[Assign],
     redirs: &[Redir],
 ) -> Result {
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     let mut outer = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
@@ -310,8 +316,9 @@ async fn execute_external_utility(
     let location = name.origin.clone();
     let args = to_c_strings(fields);
 
-    let mut env = RedirEnv::new(env);
-    perform_redirs(&mut env, redirs).await?;
+    let env = &mut ExitStatusAdapter::new(env);
+    let env = &mut RedirEnv::new(env);
+    perform_redirs(env, redirs).await?;
 
     let mut env = env.push_variable_context(ContextType::Volatile);
     match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
