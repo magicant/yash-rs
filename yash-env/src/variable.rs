@@ -140,6 +140,9 @@ pub enum ContextType {
 /// Variables in a context hide those with the same name in lower contexts. You
 /// cannot access such hidden variables until you remove the hiding variable
 /// from the upper context.
+///
+/// You should use [`ScopeGuard`] for pushing and popping contexts. See its
+/// documentation for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VariableSet {
     /// Hash map containing all variables.
@@ -316,37 +319,6 @@ impl VariableSet {
         }
     }
 
-    /// Pushes a new empty context.
-    pub fn push_context(&mut self, context_type: ContextType) {
-        self.contexts.push(context_type);
-    }
-
-    /// Pops the last-pushed context.
-    ///
-    /// This function removes the topmost context from the internal stack of
-    /// contexts in the `VariableSet`, thereby removing all the variables in the
-    /// context.
-    ///
-    /// You cannot pop the base context. This function would __panic__ if you
-    /// tried to do so.
-    pub fn pop_context(&mut self) {
-        debug_assert!(!self.contexts.is_empty());
-        if self.contexts.len() == 1 {
-            panic!("cannot pop the base context");
-        }
-        self.contexts.pop();
-        // TODO Use HashMap::drain_filter to remove empty values
-        // TODO Use complementary stack of hash tables to avoid scanning the
-        // whole `self.all_variables`
-        for stack in self.all_variables.values_mut() {
-            if let Some(vic) = stack.last() {
-                if vic.context_index >= self.contexts.len() {
-                    stack.pop();
-                }
-            }
-        }
-    }
-
     /// Returns environment variables in a new vector of C string.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
@@ -371,44 +343,112 @@ impl VariableSet {
     }
 }
 
-/// RAII-style guard for temporarily retaining a variable context.
+/// Stack for pushing and popping contexts.
 ///
-/// The [`Env::push_variable_context`] function returns a `ScopeGuard` that
-/// keeps a reference to the environment. When you drop the `ScopeGuard`, it
-/// pops the context.
-#[derive(Debug)]
-#[must_use = "You must retain ScopeGuard to keep the context alive"]
-pub struct ScopeGuard<'a> {
-    env: &'a mut Env,
+/// Instead of calling methods of `ContextStack` directly, you should use
+/// [`ScopeGuard`] which calls the methods when appropriate for you.
+pub trait ContextStack {
+    /// Pushes a new empty context.
+    fn push_context(&mut self, context_type: ContextType);
+
+    /// Pops the last-pushed context.
+    ///
+    /// This function may panic if there is no context that can be popped.
+    fn pop_context(&mut self);
 }
 
-impl<'a> ScopeGuard<'a> {
-    pub(crate) fn new(env: &'a mut Env, context_type: ContextType) -> Self {
-        env.variables.push_context(context_type);
-        ScopeGuard { env }
+impl ContextStack for VariableSet {
+    fn push_context(&mut self, context_type: ContextType) {
+        self.contexts.push(context_type);
+    }
+
+    /// Pops the last-pushed context.
+    ///
+    /// This function removes the topmost context from the internal stack of
+    /// contexts in the `VariableSet`, thereby removing all the variables in the
+    /// context.
+    ///
+    /// You cannot pop the base context. This function would __panic__ if you
+    /// tried to do so.
+    fn pop_context(&mut self) {
+        debug_assert!(!self.contexts.is_empty());
+        if self.contexts.len() == 1 {
+            panic!("cannot pop the base context");
+        }
+        self.contexts.pop();
+        // TODO Use HashMap::drain_filter to remove empty values
+        // TODO Use complementary stack of hash tables to avoid scanning the
+        // whole `self.all_variables`
+        for stack in self.all_variables.values_mut() {
+            if let Some(vic) = stack.last() {
+                if vic.context_index >= self.contexts.len() {
+                    stack.pop();
+                }
+            }
+        }
     }
 }
 
-impl std::ops::Drop for ScopeGuard<'_> {
+/// This implementation delegates to that for `VariableSet` contained in the
+/// `Env`.
+impl ContextStack for Env {
+    fn push_context(&mut self, context_type: ContextType) {
+        self.variables.push_context(context_type)
+    }
+    fn pop_context(&mut self) {
+        self.variables.pop_context()
+    }
+}
+
+/// RAII-style guard for temporarily retaining a variable context.
+///
+/// A `ScopeGuard` ensures that a variable context is pushed to and popped from
+/// a stack appropriately. The `ScopeGuard` calls [`VariableSet::push_context`]
+/// when created, and [`VariableSet::pop_context`] when dropped.
+#[derive(Debug)]
+#[must_use = "You must retain ScopeGuard to keep the context alive"]
+pub struct ScopeGuard<'a, S: ContextStack> {
+    stack: &'a mut S,
+}
+
+impl<'a, S: ContextStack> ScopeGuard<'a, S> {
+    /// Creates a `ScopeGuard`, pushing a new context to `stack`.
+    ///
+    /// This function pushes a new context with the specified type and returns a
+    /// `ScopeGuard` wrapping `stack`. The context will be popped from the stack
+    /// when the `ScopeGuard` is dropped.
+    pub fn push_context(stack: &'a mut S, context_type: ContextType) -> Self {
+        stack.push_context(context_type);
+        ScopeGuard { stack }
+    }
+
+    /// Pops the topmost context.
+    ///
+    /// This function is equivalent to dropping the `ScopeGuard`, but provides a
+    /// more informative name describing the effect.
+    pub fn pop_context(self) {}
+}
+
+impl<S: ContextStack> std::ops::Drop for ScopeGuard<'_, S> {
     /// Drops the `ScopeGuard`.
     ///
     /// This function [pops](VariableSet::pop_context) the context that was
     /// pushed when creating this `ScopeGuard`.
     fn drop(&mut self) {
-        self.env.variables.pop_context();
+        self.stack.pop_context();
     }
 }
 
-impl std::ops::Deref for ScopeGuard<'_> {
-    type Target = Env;
-    fn deref(&self) -> &Env {
-        self.env
+impl<S: ContextStack> std::ops::Deref for ScopeGuard<'_, S> {
+    type Target = S;
+    fn deref(&self) -> &S {
+        self.stack
     }
 }
 
-impl std::ops::DerefMut for ScopeGuard<'_> {
-    fn deref_mut(&mut self) -> &mut Env {
-        self.env
+impl<S: ContextStack> std::ops::DerefMut for ScopeGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut S {
+        self.stack
     }
 }
 
@@ -828,7 +868,7 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.push_variable_context(ContextType::Regular);
+        let mut guard = ScopeGuard::push_context(&mut env, ContextType::Regular);
         guard
             .variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
@@ -837,7 +877,7 @@ mod tests {
             .variables
             .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
             .unwrap();
-        Env::pop_variable_context(guard);
+        guard.pop_context();
 
         let variable = env.variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("".to_string()));

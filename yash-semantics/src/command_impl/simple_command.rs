@@ -16,7 +16,6 @@
 
 //! Implementation of simple command semantics.
 
-use crate::assign::perform_assignments;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::expansion::ExitStatusAdapter;
@@ -37,6 +36,7 @@ use yash_env::function::Function;
 use yash_env::system::Errno;
 use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
+use yash_env::variable::ScopeGuard;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -91,11 +91,11 @@ impl Command for syntax::SimpleCommand {
     /// as a regular built-in. Then, assignments are performed in a
     /// [volatile](ContextType::Volatile) variable context and exported. Next, a
     /// [regular](ContextType::Regular) context is
-    /// [pushed](Env::push_variable_context) to allow local variable assignment
-    /// during the function execution. The remaining fields not used in the
-    /// command search become positional parameters in the new context.  After
-    /// executing the function body, the contexts are
-    /// [popped](Env::pop_variable_context).
+    /// [pushed](yash_env::variable::ContextStack::push_context) to allow local
+    /// variable assignment during the function execution. The remaining fields
+    /// not used in the command search become positional parameters in the new
+    /// context. After executing the function body, the contexts are
+    /// [popped](yash_env::variable::ContextStack::pop_context).
     ///
     /// ## External utility
     ///
@@ -200,6 +200,22 @@ async fn perform_redirs(
     }
 }
 
+async fn perform_assignments(
+    env: &mut ExitStatusAdapter<'_, Env>,
+    assigns: &[Assign],
+    export: bool,
+) -> Result {
+    let scope = if export {
+        Scope::Volatile
+    } else {
+        Scope::Global
+    };
+    match crate::assign::perform_assignments(env, assigns, scope, export).await {
+        Ok(()) => Continue(()),
+        Err(error) => error.handle(env).await,
+    }
+}
+
 async fn execute_absent_target(
     env: &mut Env,
     assigns: &[Assign],
@@ -235,13 +251,9 @@ async fn execute_absent_target(
     };
 
     let env = &mut ExitStatusAdapter::new(env);
-    match perform_assignments(env, assigns, Scope::Global, false).await {
-        Ok(()) => {
-            env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
-            Continue(())
-        }
-        Err(error) => error.handle(env).await,
-    }
+    perform_assignments(env, assigns, false).await?;
+    env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
+    Continue(())
 }
 
 async fn execute_builtin(
@@ -258,10 +270,7 @@ async fn execute_builtin(
     use yash_env::builtin::Type::*;
     match builtin.r#type {
         Special => {
-            match perform_assignments(&mut **env, assigns, Scope::Global, false).await {
-                Ok(()) => (),
-                Err(error) => return error.handle(env).await,
-            }
+            perform_assignments(&mut **env, assigns, false).await?;
 
             let (exit_status, abort) = (builtin.execute)(env, fields).await;
             env.exit_status = exit_status;
@@ -269,11 +278,8 @@ async fn execute_builtin(
         }
 
         Intrinsic | NonIntrinsic => {
-            let mut env = env.push_variable_context(ContextType::Volatile);
-            match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
-                Ok(()) => (),
-                Err(error) => return error.handle(&mut env).await,
-            }
+            let mut env = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+            perform_assignments(&mut *env, assigns, true).await?;
 
             let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
             env.exit_status = exit_status;
@@ -292,13 +298,10 @@ async fn execute_function(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut outer = env.push_variable_context(ContextType::Volatile);
-    match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
-        Ok(()) => (),
-        Err(error) => return error.handle(&mut outer).await,
-    }
+    let mut outer = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+    perform_assignments(&mut *outer, assigns, true).await?;
 
-    let mut inner = outer.push_variable_context(ContextType::Regular);
+    let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
     function.body.execute(&mut inner).await?;
@@ -321,11 +324,8 @@ async fn execute_external_utility(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut env = env.push_variable_context(ContextType::Volatile);
-    match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
-        Ok(()) => (),
-        Err(error) => return error.handle(&mut env).await,
-    }
+    let mut env = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+    perform_assignments(&mut *env, assigns, true).await?;
 
     if path.to_bytes().is_empty() {
         print_error(
@@ -401,6 +401,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::cell::RefCell;
     use std::path::PathBuf;
@@ -491,8 +492,7 @@ mod tests {
             .unwrap();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
@@ -663,8 +663,10 @@ mod tests {
             .assign(Scope::Global, "x".to_string(), variable)
             .unwrap();
         let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
-        block_on(command.execute(&mut env));
-        assert_ne!(env.exit_status, ExitStatus::SUCCESS);
+        let result = block_on(command.execute(&mut env));
+        assert_matches!(result, Break(Divert::Interrupt(Some(exit_status))) => {
+            assert_ne!(exit_status, ExitStatus::SUCCESS);
+        });
     }
 
     #[test]
