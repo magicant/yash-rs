@@ -60,8 +60,7 @@ impl Handle for crate::expansion::Error {
         let f = format!("{}\n", DisplayList::from(s));
         let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
 
-        env.exit_status = ExitStatus::ERROR;
-        Continue(())
+        Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
     }
 }
 
