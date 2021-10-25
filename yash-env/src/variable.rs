@@ -407,19 +407,19 @@ impl ContextStack for Env {
 /// when created, and [`VariableSet::pop_context`] when dropped.
 #[derive(Debug)]
 #[must_use = "You must retain ScopeGuard to keep the context alive"]
-pub struct ScopeGuard<'a> {
-    env: &'a mut Env,
+pub struct ScopeGuard<'a, S: ContextStack> {
+    stack: &'a mut S,
 }
 
-impl<'a> ScopeGuard<'a> {
-    /// Creates a `ScopeGuard`, pushing a new context to `env`.
+impl<'a, S: ContextStack> ScopeGuard<'a, S> {
+    /// Creates a `ScopeGuard`, pushing a new context to `stack`.
     ///
     /// This function pushes a new context with the specified type and returns a
-    /// `ScopeGuard` wrapping `env`. The context will be popped when the
-    /// `ScopeGuard` is dropped.
-    pub fn push_context(env: &'a mut Env, context_type: ContextType) -> Self {
-        env.variables.push_context(context_type);
-        ScopeGuard { env }
+    /// `ScopeGuard` wrapping `stack`. The context will be popped from the stack
+    /// when the `ScopeGuard` is dropped.
+    pub fn push_context(stack: &'a mut S, context_type: ContextType) -> Self {
+        stack.push_context(context_type);
+        ScopeGuard { stack }
     }
 
     /// Pops the topmost context.
@@ -429,26 +429,26 @@ impl<'a> ScopeGuard<'a> {
     pub fn pop_context(self) {}
 }
 
-impl std::ops::Drop for ScopeGuard<'_> {
+impl<S: ContextStack> std::ops::Drop for ScopeGuard<'_, S> {
     /// Drops the `ScopeGuard`.
     ///
     /// This function [pops](VariableSet::pop_context) the context that was
     /// pushed when creating this `ScopeGuard`.
     fn drop(&mut self) {
-        self.env.variables.pop_context();
+        self.stack.pop_context();
     }
 }
 
-impl std::ops::Deref for ScopeGuard<'_> {
-    type Target = Env;
-    fn deref(&self) -> &Env {
-        self.env
+impl<S: ContextStack> std::ops::Deref for ScopeGuard<'_, S> {
+    type Target = S;
+    fn deref(&self) -> &S {
+        self.stack
     }
 }
 
-impl std::ops::DerefMut for ScopeGuard<'_> {
-    fn deref_mut(&mut self) -> &mut Env {
-        self.env
+impl<S: ContextStack> std::ops::DerefMut for ScopeGuard<'_, S> {
+    fn deref_mut(&mut self) -> &mut S {
+        self.stack
     }
 }
 

@@ -270,8 +270,8 @@ async fn execute_builtin(
         }
 
         Intrinsic | NonIntrinsic => {
-            let mut env = ScopeGuard::push_context(env, ContextType::Volatile);
-            match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
+            let mut env = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+            match perform_assignments(&mut **env, assigns, Scope::Volatile, true).await {
                 Ok(()) => (),
                 Err(error) => return error.handle(&mut env).await,
             }
@@ -293,13 +293,13 @@ async fn execute_function(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut outer = ScopeGuard::push_context(env, ContextType::Volatile);
-    match perform_assignments(&mut *outer, assigns, Scope::Volatile, true).await {
+    let mut outer = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+    match perform_assignments(&mut **outer, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut outer).await,
     }
 
-    let mut inner = ScopeGuard::push_context(&mut outer, ContextType::Regular);
+    let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
     function.body.execute(&mut inner).await?;
@@ -322,8 +322,8 @@ async fn execute_external_utility(
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
-    let mut env = ScopeGuard::push_context(env, ContextType::Volatile);
-    match perform_assignments(&mut *env, assigns, Scope::Volatile, true).await {
+    let mut env = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
+    match perform_assignments(&mut **env, assigns, Scope::Volatile, true).await {
         Ok(()) => (),
         Err(error) => return error.handle(&mut env).await,
     }

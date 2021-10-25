@@ -74,6 +74,8 @@ use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::job::WaitStatus;
 use yash_env::system::Errno;
+use yash_env::variable::ContextStack;
+use yash_env::variable::ContextType;
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
@@ -382,6 +384,15 @@ impl<E: Env> Env for ExitStatusAdapter<'_, E> {
     }
     async fn wait_for_subshell(&mut self, target: Pid) -> std::result::Result<WaitStatus, Errno> {
         self.env.wait_for_subshell(target).await
+    }
+}
+
+impl<E: ContextStack> ContextStack for ExitStatusAdapter<'_, E> {
+    fn push_context(&mut self, context_type: ContextType) {
+        self.env.push_context(context_type)
+    }
+    fn pop_context(&mut self) {
+        self.env.pop_context()
     }
 }
 
