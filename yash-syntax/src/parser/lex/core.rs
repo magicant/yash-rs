@@ -361,7 +361,7 @@ impl<'a> Lexer<'a> {
     /// switch line continuation recognition on.
     ///
     /// This function will panic if line continuation has already been disabled.
-    pub fn disable_line_continuation<'b>(&'b mut self) -> PlainLexer<'a, 'b> {
+    pub fn disable_line_continuation<'b>(&'b mut self) -> PlainLexer<'b, 'a> {
         assert!(
             self.line_continuation_enabled,
             "line continuation already disabled"
@@ -600,19 +600,19 @@ impl<'a> Lexer<'a> {
 /// re-enabled.
 #[derive(Debug)]
 #[must_use = "You must retain the PlainLexer to keep line continuation disabled"]
-pub struct PlainLexer<'a: 'b, 'b> {
-    lexer: &'b mut Lexer<'a>,
+pub struct PlainLexer<'a, 'b: 'a> {
+    lexer: &'a mut Lexer<'b>,
 }
 
 impl<'a, 'b> Deref for PlainLexer<'a, 'b> {
-    type Target = Lexer<'a>;
-    fn deref(&self) -> &Lexer<'a> {
+    type Target = Lexer<'b>;
+    fn deref(&self) -> &Lexer<'b> {
         self.lexer
     }
 }
 
 impl<'a, 'b> DerefMut for PlainLexer<'a, 'b> {
-    fn deref_mut(&mut self) -> &mut Lexer<'a> {
+    fn deref_mut(&mut self) -> &mut Lexer<'b> {
         self.lexer
     }
 }
@@ -642,20 +642,20 @@ pub enum WordContext {
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
 /// and [words](crate::syntax::Word).
 #[derive(Debug)]
-pub struct WordLexer<'a: 'b, 'b> {
-    pub lexer: &'b mut Lexer<'a>,
+pub struct WordLexer<'a, 'b: 'a> {
+    pub lexer: &'a mut Lexer<'b>,
     pub context: WordContext,
 }
 
 impl<'a, 'b> Deref for WordLexer<'a, 'b> {
-    type Target = Lexer<'a>;
-    fn deref(&self) -> &Lexer<'a> {
+    type Target = Lexer<'b>;
+    fn deref(&self) -> &Lexer<'b> {
         self.lexer
     }
 }
 
 impl<'a, 'b> DerefMut for WordLexer<'a, 'b> {
-    fn deref_mut(&mut self) -> &mut Lexer<'a> {
+    fn deref_mut(&mut self) -> &mut Lexer<'b> {
         self.lexer
     }
 }

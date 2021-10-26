@@ -110,12 +110,12 @@ impl<T> Rec<T> {
 /// Then the [`command_line`](Self::command_line) function is for you.
 /// See also the [module documentation](super).
 #[derive(Debug)]
-pub struct Parser<'a: 'b, 'b> {
+pub struct Parser<'a, 'b: 'a> {
     /// Lexer that provides tokens.
-    lexer: &'b mut Lexer<'a>,
+    lexer: &'a mut Lexer<'b>,
 
     /// Aliases that are used while parsing.
-    aliases: &'b AliasSet,
+    aliases: &'a AliasSet,
 
     /// Token to parse next.
     ///
@@ -137,7 +137,7 @@ pub struct Parser<'a: 'b, 'b> {
 
 impl<'a, 'b> Parser<'a, 'b> {
     /// Creates a new parser based on the given lexer and alias set.
-    pub fn new(lexer: &'b mut Lexer<'a>, aliases: &'b AliasSet) -> Parser<'a, 'b> {
+    pub fn new(lexer: &'a mut Lexer<'b>, aliases: &'a AliasSet) -> Parser<'a, 'b> {
         Parser {
             lexer,
             aliases,
