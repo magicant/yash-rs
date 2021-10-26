@@ -72,9 +72,10 @@
 
 use std::future::ready;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
 use yash_env::builtin::Result;
+use yash_env::exec::Divert;
 use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
 
@@ -92,11 +93,22 @@ impl Env for yash_env::Env {}
 /// See the [module-level documentation](self) for details.
 pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
-    let exit_status = match args.get(2) {
+    // TODO Reject returning from an interactive session
+    let mut i = args.iter().skip(1).peekable();
+    let no_return = matches!(i.peek(), Some(Field { value, .. }) if value == "-n");
+    if no_return {
+        i.next();
+    }
+    let exit_status = match i.next() {
         Some(field) => field.value.parse().unwrap_or(2),
         None => 0,
     };
-    (ExitStatus(exit_status), Continue(()))
+    let flow = if no_return {
+        Continue(())
+    } else {
+        Break(Divert::Return)
+    };
+    (ExitStatus(exit_status), flow)
 }
 
 /// Implementation of the return built-in.
@@ -119,6 +131,14 @@ mod tests {
     struct DummyEnv;
 
     impl Env for DummyEnv {}
+
+    #[test]
+    fn returns_exit_status_specified_without_n_option() {
+        let mut env = DummyEnv::default();
+        let args = Field::dummies(["return", "42"]);
+        let result = builtin_main_sync(&mut env, args);
+        assert_eq!(result, (ExitStatus(42), Break(Divert::Return)));
+    }
 
     #[test]
     fn returns_exit_status_12_with_n_option() {
