@@ -304,9 +304,12 @@ async fn execute_function(
     let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
     // TODO Apply positional parameters
     // TODO Update control flow stack
-    function.body.execute(&mut inner).await?;
-    // TODO Consume Divert::Return
-    Continue(())
+    let result = function.body.execute(&mut inner).await;
+    if result == Break(Divert::Return) {
+        Continue(())
+    } else {
+        result
+    }
 }
 
 async fn execute_external_utility(
@@ -595,6 +598,23 @@ mod tests {
         let state = state.borrow();
         let file = state.file_system.get("/tmp/file").unwrap().borrow();
         assert_eq!(file.content, "ok\n".as_bytes());
+    }
+
+    #[test]
+    fn function_call_consumes_return() {
+        use yash_env::function::HashEntry;
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ return 26; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(26));
     }
 
     #[test]
