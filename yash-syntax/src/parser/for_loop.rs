@@ -168,7 +168,8 @@ mod tests {
     #[test]
     fn parser_for_loop_short() {
         let mut lexer = Lexer::from_memory("for A do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -187,7 +188,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_semicolon_before_do() {
         let mut lexer = Lexer::from_memory("for B ; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -206,7 +208,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_semicolon_and_newlines_before_do() {
         let mut lexer = Lexer::from_memory("for B ; \n\t\n do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -225,7 +228,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_newlines_before_do() {
         let mut lexer = Lexer::from_memory("for B \n \\\n \n do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -244,7 +248,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_zero_values_delimited_by_semicolon() {
         let mut lexer = Lexer::from_memory("for foo in; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -263,7 +268,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_one_value_delimited_by_semicolon_and_newlines() {
         let mut lexer = Lexer::from_memory("for foo in bar; \n \n do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -287,7 +293,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_many_values_delimited_by_one_newline() {
         let mut lexer = Lexer::from_memory("for in in in a b c\ndo :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -311,7 +318,8 @@ mod tests {
     #[test]
     fn parser_for_loop_with_zero_values_delimited_by_many_newlines() {
         let mut lexer = Lexer::from_memory("for foo in \n \n \n do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -330,7 +338,8 @@ mod tests {
     #[test]
     fn parser_for_loop_newlines_before_in() {
         let mut lexer = Lexer::from_memory("for foo\n \n\nin\ndo :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -363,7 +372,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let first_pass = block_on(parser.take_token_manual(true)).unwrap();
         assert!(first_pass.is_alias_substituted());
@@ -393,7 +402,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let first_pass = block_on(parser.take_token_manual(true)).unwrap();
         assert!(first_pass.is_alias_substituted());
@@ -409,7 +418,8 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_eof() {
         let mut lexer = Lexer::from_memory(" for ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
@@ -422,7 +432,8 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_newline() {
         let mut lexer = Lexer::from_memory(" for\ndo :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
@@ -435,7 +446,8 @@ mod tests {
     #[test]
     fn parser_for_loop_missing_name_semicolon() {
         let mut lexer = Lexer::from_memory("for; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
@@ -463,7 +475,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let first_pass = block_on(parser.take_token_manual(true)).unwrap();
         assert!(first_pass.is_alias_substituted());
@@ -487,7 +499,8 @@ mod tests {
     #[test]
     fn parser_for_loop_semicolon_after_newline() {
         let mut lexer = Lexer::from_memory("for X\n; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
@@ -522,7 +535,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let first_pass = block_on(parser.take_token_manual(true)).unwrap();
         assert!(first_pass.is_alias_substituted());
@@ -546,7 +559,8 @@ mod tests {
     #[test]
     fn parser_for_loop_invalid_token_after_semicolon() {
         let mut lexer = Lexer::from_memory(" for X; ! do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {

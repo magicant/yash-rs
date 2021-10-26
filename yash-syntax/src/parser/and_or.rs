@@ -83,7 +83,8 @@ mod tests {
     #[test]
     fn parser_and_or_list_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let option = block_on(parser.and_or_list()).unwrap().unwrap();
         assert_eq!(option, None);
@@ -92,7 +93,8 @@ mod tests {
     #[test]
     fn parser_and_or_list_one() {
         let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
         let aol = aol.fill(&mut std::iter::empty()).unwrap();
@@ -103,7 +105,8 @@ mod tests {
     #[test]
     fn parser_and_or_list_many() {
         let mut lexer = Lexer::from_memory("first && second || \n\n third;", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
         let aol = aol.fill(&mut std::iter::empty()).unwrap();
@@ -118,7 +121,8 @@ mod tests {
     #[test]
     fn parser_and_or_list_missing_command_after_and_and() {
         let mut lexer = Lexer::from_memory("foo &&", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.and_or_list()).unwrap_err();
         assert_eq!(

@@ -575,7 +575,8 @@ impl<'a> Lexer<'a> {
     pub async fn inner_program(&mut self) -> Result<String> {
         let begin = self.index();
 
-        let mut parser = super::super::Parser::new(self);
+        let aliases = Default::default();
+        let mut parser = super::super::Parser::new(self, &aliases);
         parser.maybe_compound_list().await?;
 
         let end = parser.peek_token().await?.index;

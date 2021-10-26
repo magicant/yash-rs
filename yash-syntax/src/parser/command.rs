@@ -57,7 +57,8 @@ mod tests {
     #[test]
     fn parser_command_simple() {
         let mut lexer = Lexer::from_memory("foo < bar", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -74,7 +75,8 @@ mod tests {
     #[test]
     fn parser_command_compound() {
         let mut lexer = Lexer::from_memory("(foo) < bar", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -91,7 +93,8 @@ mod tests {
     #[test]
     fn parser_command_function() {
         let mut lexer = Lexer::from_memory("fun () ( echo )", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -108,7 +111,8 @@ mod tests {
     #[test]
     fn parser_command_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let option = block_on(parser.command()).unwrap().unwrap();
         assert_eq!(option, None);

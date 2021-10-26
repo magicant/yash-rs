@@ -19,7 +19,6 @@
 use crate::Command;
 use crate::Handle;
 use std::ops::ControlFlow::{Break, Continue};
-use std::rc::Rc;
 use yash_env::exec::ExitStatus;
 use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
@@ -44,7 +43,7 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) {
     let mut executed = false;
 
     loop {
-        let mut parser = Parser::with_aliases(lexer, Rc::clone(&env.aliases));
+        let mut parser = Parser::new(lexer, &env.aliases);
         let result = match parser.command_line().await {
             Ok(None) => break,
             Ok(Some(command)) => command.execute(env).await,
@@ -72,6 +71,7 @@ mod tests {
     use super::*;
     use crate::tests::{echo_builtin, return_builtin};
     use futures_executor::block_on;
+    use std::rc::Rc;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;

@@ -147,7 +147,8 @@ mod tests {
     #[test]
     fn parser_if_command_minimum() {
         let mut lexer = Lexer::from_memory("if a; then b; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         if let CompoundCommand::If {
@@ -175,7 +176,8 @@ mod tests {
             "if\ntrue\nthen\nfalse\n\nelif x; then y& fi",
             Source::Unknown,
         );
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         if let CompoundCommand::If {
@@ -204,7 +206,8 @@ mod tests {
             "if a; then b; elif c; then d; elif e 1; e 2& then f 1; f 2& elif g; then h; fi",
             Source::Unknown,
         );
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         if let CompoundCommand::If {
@@ -232,7 +235,8 @@ mod tests {
     #[test]
     fn parser_if_command_else() {
         let mut lexer = Lexer::from_memory("if a; then b; else c; d; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         if let CompoundCommand::If {
@@ -258,7 +262,8 @@ mod tests {
     fn parser_if_command_elif_and_else() {
         let mut lexer =
             Lexer::from_memory("if 1; then 2; elif 3; then 4; else 5; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         if let CompoundCommand::If {
@@ -284,7 +289,8 @@ mod tests {
     #[test]
     fn parser_if_command_without_then_after_if() {
         let mut lexer = Lexer::from_memory(" if :; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::IfMissingThen { if_location }) = e.cause {
@@ -304,7 +310,8 @@ mod tests {
     #[test]
     fn parser_if_command_without_then_after_elif() {
         let mut lexer = Lexer::from_memory("if a; then b; elif c; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::ElifMissingThen { elif_location }) = e.cause {
@@ -324,7 +331,8 @@ mod tests {
     #[test]
     fn parser_if_command_without_fi() {
         let mut lexer = Lexer::from_memory("  if :; then :; }", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedIf { opening_location }) = e.cause {
@@ -344,7 +352,8 @@ mod tests {
     #[test]
     fn parser_if_command_empty_condition() {
         let mut lexer = Lexer::from_memory("   if then :; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfCondition));
@@ -357,7 +366,8 @@ mod tests {
     #[test]
     fn parser_if_command_empty_body() {
         let mut lexer = Lexer::from_memory("if :; then fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfBody));
@@ -370,7 +380,8 @@ mod tests {
     #[test]
     fn parser_if_command_empty_elif_condition() {
         let mut lexer = Lexer::from_memory("if :; then :; elif then :; fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifCondition));
@@ -383,7 +394,8 @@ mod tests {
     #[test]
     fn parser_if_command_empty_elif_body() {
         let mut lexer = Lexer::from_memory("if :; then :; elif :; then fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifBody));
@@ -396,7 +408,8 @@ mod tests {
     #[test]
     fn parser_if_command_empty_else() {
         let mut lexer = Lexer::from_memory("if :; then :; else fi", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElse));

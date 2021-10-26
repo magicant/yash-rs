@@ -110,7 +110,8 @@ mod tests {
     #[test]
     fn parser_do_clause_none() {
         let mut lexer = Lexer::from_memory("done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap();
         assert!(result.is_none(), "result should be none: {:?}", result);
@@ -119,7 +120,8 @@ mod tests {
     #[test]
     fn parser_do_clause_short() {
         let mut lexer = Lexer::from_memory("do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -132,7 +134,8 @@ mod tests {
     #[test]
     fn parser_do_clause_long() {
         let mut lexer = Lexer::from_memory("do foo; bar& done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -145,7 +148,8 @@ mod tests {
     #[test]
     fn parser_do_clause_unclosed() {
         let mut lexer = Lexer::from_memory(" do not close ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.do_clause()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) = e.cause {
@@ -165,7 +169,8 @@ mod tests {
     #[test]
     fn parser_do_clause_empty_posix() {
         let mut lexer = Lexer::from_memory("do done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.do_clause()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
@@ -198,7 +203,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -211,7 +216,8 @@ mod tests {
     #[test]
     fn parser_compound_command_none() {
         let mut lexer = Lexer::from_memory("}", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let option = block_on(parser.compound_command()).unwrap();
         assert_eq!(option, None);
@@ -220,7 +226,8 @@ mod tests {
     #[test]
     fn parser_full_compound_command_without_redirections() {
         let mut lexer = Lexer::from_memory("(:)", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.full_compound_command()).unwrap().unwrap();
         let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
@@ -231,7 +238,8 @@ mod tests {
     #[test]
     fn parser_full_compound_command_with_redirections() {
         let mut lexer = Lexer::from_memory("(command) <foo >bar ;", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.full_compound_command()).unwrap().unwrap();
         let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
@@ -247,7 +255,8 @@ mod tests {
     #[test]
     fn parser_full_compound_command_none() {
         let mut lexer = Lexer::from_memory("}", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let option = block_on(parser.full_compound_command()).unwrap();
         assert_eq!(option, None);
@@ -256,7 +265,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_ok() {
         let mut lexer = Lexer::from_memory(" ( ) ( : ) > /dev/null ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],

@@ -108,7 +108,8 @@ mod tests {
     #[test]
     fn parser_while_loop_short() {
         let mut lexer = Lexer::from_memory("while true; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -126,7 +127,8 @@ mod tests {
     #[test]
     fn parser_while_loop_long() {
         let mut lexer = Lexer::from_memory("while false; true& do foo; bar& done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -144,7 +146,8 @@ mod tests {
     #[test]
     fn parser_while_loop_unclosed() {
         let mut lexer = Lexer::from_memory("while :", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedWhileClause { opening_location }) = e.cause {
@@ -164,7 +167,8 @@ mod tests {
     #[test]
     fn parser_while_loop_empty_posix() {
         let mut lexer = Lexer::from_memory(" while do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(
@@ -194,7 +198,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -207,7 +211,8 @@ mod tests {
     #[test]
     fn parser_until_loop_short() {
         let mut lexer = Lexer::from_memory("until true; do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -225,7 +230,8 @@ mod tests {
     #[test]
     fn parser_until_loop_long() {
         let mut lexer = Lexer::from_memory("until false; true& do foo; bar& done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
@@ -243,7 +249,8 @@ mod tests {
     #[test]
     fn parser_until_loop_unclosed() {
         let mut lexer = Lexer::from_memory("until :", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedUntilClause { opening_location }) = e.cause {
@@ -263,7 +270,8 @@ mod tests {
     #[test]
     fn parser_until_loop_empty_posix() {
         let mut lexer = Lexer::from_memory("  until do :; done", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(
@@ -293,7 +301,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();

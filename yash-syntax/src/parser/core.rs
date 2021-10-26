@@ -30,7 +30,6 @@ use crate::alias::AliasSet;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
-use std::rc::Rc;
 
 /// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -116,7 +115,7 @@ pub struct Parser<'a: 'b, 'b> {
     lexer: &'b mut Lexer<'a>,
 
     /// Aliases that are used while parsing.
-    aliases: Rc<AliasSet>,
+    aliases: &'b AliasSet,
 
     /// Token to parse next.
     ///
@@ -137,16 +136,8 @@ pub struct Parser<'a: 'b, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    /// Creates a new parser based on the given lexer.
-    ///
-    /// The parser created by this function does not perform alias substitution. To do it, pass an
-    /// alias set to [`with_aliases`](Parser::with_aliases).
-    pub fn new(lexer: &'b mut Lexer<'a>) -> Parser<'a, 'b> {
-        Self::with_aliases(lexer, Rc::new(AliasSet::new()))
-    }
-
     /// Creates a new parser based on the given lexer and alias set.
-    pub fn with_aliases(lexer: &'b mut Lexer<'a>, aliases: Rc<AliasSet>) -> Parser<'a, 'b> {
+    pub fn new(lexer: &'b mut Lexer<'a>, aliases: &'b AliasSet) -> Parser<'a, 'b> {
         Parser {
             lexer,
             aliases,
@@ -347,7 +338,6 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use futures_executor::block_on;
-    use std::rc::Rc;
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
@@ -360,7 +350,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap();
             assert!(
@@ -385,7 +375,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(false).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
@@ -409,7 +399,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), r"\X");
@@ -427,7 +417,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.id, Operator(super::super::lex::Operator::Semicolon));
@@ -440,7 +430,7 @@ mod tests {
         block_on(async {
             let mut lexer = Lexer::from_memory("X", Source::Unknown);
             let aliases = AliasSet::new();
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap().unwrap();
             assert_eq!(token.to_string(), "X");
@@ -464,7 +454,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap();
             assert!(
@@ -508,7 +498,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap();
             assert!(
@@ -549,7 +539,7 @@ mod tests {
                 false,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(true).await.unwrap();
             assert!(
@@ -577,7 +567,7 @@ mod tests {
                 true,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_manual(false).await.unwrap();
             assert!(
@@ -602,7 +592,7 @@ mod tests {
                 true,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_auto(&[]).await.unwrap();
             assert_eq!(token.to_string(), "x");
@@ -620,7 +610,7 @@ mod tests {
                 true,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_auto(&[Keyword::If]).await.unwrap();
             assert_eq!(token.to_string(), "if");
@@ -638,7 +628,7 @@ mod tests {
                 true,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_auto(&[]).await.unwrap();
             assert_eq!(token.to_string(), "x");
@@ -662,7 +652,7 @@ mod tests {
                 true,
                 Location::dummy("?"),
             ));
-            let mut parser = Parser::with_aliases(&mut lexer, Rc::new(aliases));
+            let mut parser = Parser::new(&mut lexer, &aliases);
 
             let token = parser.take_token_auto(&[Keyword::If]).await.unwrap();
             assert_eq!(token.to_string(), "if");
@@ -673,7 +663,8 @@ mod tests {
     fn parser_has_blank_true() {
         block_on(async {
             let mut lexer = Lexer::from_memory(" ", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let result = parser.has_blank().await;
             assert_eq!(result, Ok(true));
         });
@@ -683,7 +674,8 @@ mod tests {
     fn parser_has_blank_false() {
         block_on(async {
             let mut lexer = Lexer::from_memory("(", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let result = parser.has_blank().await;
             assert_eq!(result, Ok(false));
         });
@@ -693,7 +685,8 @@ mod tests {
     fn parser_has_blank_eof() {
         block_on(async {
             let mut lexer = Lexer::from_memory("", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let result = parser.has_blank().await;
             assert_eq!(result, Ok(false));
         });
@@ -703,7 +696,8 @@ mod tests {
     fn parser_has_blank_true_with_line_continuations() {
         block_on(async {
             let mut lexer = Lexer::from_memory("\\\n\\\n ", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let result = parser.has_blank().await;
             assert_eq!(result, Ok(true));
         });
@@ -713,7 +707,8 @@ mod tests {
     fn parser_has_blank_false_with_line_continuations() {
         block_on(async {
             let mut lexer = Lexer::from_memory("\\\n\\\n\\\n(", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let result = parser.has_blank().await;
             assert_eq!(result, Ok(false));
         });
@@ -724,7 +719,8 @@ mod tests {
     fn parser_has_blank_with_pending_token() {
         block_on(async {
             let mut lexer = Lexer::from_memory("foo", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             parser.peek_token().await.unwrap();
             let _ = parser.has_blank().await;
         });
@@ -734,7 +730,8 @@ mod tests {
     fn parser_reading_no_here_doc_contents() {
         block_on(async {
             let mut lexer = Lexer::from_memory("X", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             parser.here_doc_contents().await.unwrap();
             assert!(parser.take_read_here_docs().is_empty());
 
@@ -750,7 +747,8 @@ mod tests {
 
         block_on(async {
             let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             let remove_tabs = false;
             parser.memorize_unread_here_doc(PartialHereDoc {
                 delimiter,
@@ -779,7 +777,8 @@ mod tests {
 
         block_on(async {
             let mut lexer = Lexer::from_memory("1\nONE\nTWO\n3\nTHREE\nX", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             parser.memorize_unread_here_doc(PartialHereDoc {
                 delimiter: delimiter1,
                 remove_tabs: false,
@@ -814,7 +813,8 @@ mod tests {
 
         block_on(async {
             let mut lexer = Lexer::from_memory("1\nONE\n2\nTWO\n", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             parser.memorize_unread_here_doc(PartialHereDoc {
                 delimiter: delimiter1,
                 remove_tabs: false,
@@ -844,7 +844,8 @@ mod tests {
     fn parser_here_doc_contents_must_be_called_without_pending_token() {
         block_on(async {
             let mut lexer = Lexer::from_memory("X", Source::Unknown);
-            let mut parser = Parser::new(&mut lexer);
+            let aliases = AliasSet::new();
+            let mut parser = Parser::new(&mut lexer, &aliases);
             parser.peek_token().await.unwrap();
             parser.here_doc_contents().await.unwrap();
         })

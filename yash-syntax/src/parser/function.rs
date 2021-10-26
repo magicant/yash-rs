@@ -105,7 +105,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_not_one_word_name() {
         let mut lexer = Lexer::from_memory("(", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec![],
@@ -127,7 +128,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_eof() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
@@ -146,7 +148,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_unmatched_parenthesis() {
         let mut lexer = Lexer::from_memory("( ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
@@ -167,7 +170,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_missing_function_body() {
         let mut lexer = Lexer::from_memory("( ) ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
@@ -188,7 +192,8 @@ mod tests {
     #[test]
     fn parser_short_function_definition_invalid_function_body() {
         let mut lexer = Lexer::from_memory("() foo ; ", Source::Unknown);
-        let mut parser = Parser::new(&mut lexer);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["foo".parse().unwrap()],
@@ -229,7 +234,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(async {
             parser.simple_command().await.unwrap(); // alias
@@ -272,7 +277,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(async {
             parser.simple_command().await.unwrap(); // alias
@@ -309,7 +314,7 @@ mod tests {
             false,
             origin,
         ));
-        let mut parser = Parser::with_aliases(&mut lexer, std::rc::Rc::new(aliases));
+        let mut parser = Parser::new(&mut lexer, &aliases);
         let c = SimpleCommand {
             assigns: vec![],
             words: vec!["f".parse().unwrap()],
