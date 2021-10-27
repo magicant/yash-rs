@@ -137,6 +137,12 @@ mod tests {
                 Ok(None)
             }
         }
+        fn positional_params(&self) -> &Variable {
+            unimplemented!("not available for Singleton");
+        }
+        fn positional_params_mut(&mut self) -> &mut Variable {
+            unimplemented!("not available for Singleton");
+        }
         fn exit_status(&self) -> yash_env::exec::ExitStatus {
             unimplemented!("not available for Singleton");
         }

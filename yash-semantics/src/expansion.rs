@@ -197,6 +197,12 @@ pub trait Env: std::fmt::Debug {
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
 
+    /// Returns a reference to the positional parameters.
+    fn positional_params(&self) -> &Variable;
+
+    /// Returns a mutable reference to the positional parameters.
+    fn positional_params_mut(&mut self) -> &mut Variable;
+
     /// Gets the exit status of the last command.
     fn exit_status(&self) -> ExitStatus;
 
@@ -257,6 +263,12 @@ impl Env for yash_env::Env {
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
         self.variables.assign(scope, name, value)
+    }
+    fn positional_params(&self) -> &Variable {
+        self.variables.positional_params()
+    }
+    fn positional_params_mut(&mut self) -> &mut Variable {
+        self.variables.positional_params_mut()
     }
     fn exit_status(&self) -> ExitStatus {
         self.exit_status
@@ -350,6 +362,12 @@ impl<E: Env> Env for ExitStatusAdapter<'_, E> {
         value: Variable,
     ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
         self.env.assign_variable(scope, name, value)
+    }
+    fn positional_params(&self) -> &Variable {
+        self.env.positional_params()
+    }
+    fn positional_params_mut(&mut self) -> &mut Variable {
+        self.env.positional_params_mut()
     }
     fn exit_status(&self) -> ExitStatus {
         self.env.exit_status()
@@ -721,6 +739,12 @@ mod tests {
             _: String,
             _: Variable,
         ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn positional_params(&self) -> &Variable {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn positional_params_mut(&mut self) -> &mut Variable {
             unimplemented!("NullEnv's method must not be called")
         }
         fn exit_status(&self) -> yash_env::exec::ExitStatus {
