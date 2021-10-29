@@ -37,6 +37,7 @@ use yash_env::system::Errno;
 use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
 use yash_env::variable::ScopeGuard;
+use yash_env::variable::Value;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -174,7 +175,7 @@ impl Command for syntax::SimpleCommand {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
                 }
                 Some(Function(function)) => {
-                    execute_function(env, function, &self.assigns, &self.redirs).await
+                    execute_function(env, function, &self.assigns, fields, &self.redirs).await
                 }
                 Some(External { path }) => {
                     execute_external_utility(env, path, &self.assigns, fields, &self.redirs).await
@@ -292,6 +293,7 @@ async fn execute_function(
     env: &mut Env,
     function: Rc<Function>,
     assigns: &[Assign],
+    fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
     let env = &mut ExitStatusAdapter::new(env);
@@ -302,7 +304,14 @@ async fn execute_function(
     perform_assignments(&mut *outer, assigns, true).await?;
 
     let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
-    // TODO Apply positional parameters
+
+    // Apply positional parameters
+    let mut params = inner.variables.positional_params_mut();
+    let mut i = fields.into_iter();
+    let field = i.next().unwrap();
+    params.last_assigned_location = Some(field.origin);
+    params.value = Value::Array(i.map(|f| f.value).collect());
+
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;
     if result == Break(Divert::Return) {
@@ -411,7 +420,6 @@ mod tests {
     use std::rc::Rc;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -615,6 +623,28 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(26));
+    }
+
+    #[test]
+    fn simple_command_passes_arguments_to_function() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ echo $1-$2-$3; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "foo bar baz".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Continue(()));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(file.content, "bar-baz-\n".as_bytes());
     }
 
     #[test]
