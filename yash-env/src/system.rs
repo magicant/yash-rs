@@ -620,7 +620,6 @@ impl SelectSystem {
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
         // condition.
-        // TODO Remember the previous settings for restoration
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
                 let old_handling = self.system.sigaction(signal, handling)?;
