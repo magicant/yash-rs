@@ -283,9 +283,9 @@ impl Env {
             .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
 
         let result = loop {
-            match self.system.wait(target)? {
-                WaitStatus::StillAlive => {}
-                new_status => break Ok(new_status),
+            match self.system.wait(target) {
+                Ok(WaitStatus::StillAlive) => {}
+                result => break result,
             }
             self.system.wait_for_signal(Signal::SIGCHLD).await;
         };
