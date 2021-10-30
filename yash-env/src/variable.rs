@@ -126,6 +126,35 @@ pub enum ContextType {
     Volatile,
 }
 
+/// Variable context.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct Context {
+    /// Context type.
+    r#type: ContextType,
+
+    /// Positional parameters.
+    ///
+    /// This variable is very special:
+    ///
+    /// - Its value is always an `Array`.
+    /// - It is never exported nor read-only.
+    positional_params: Variable,
+}
+
+impl Context {
+    fn new(r#type: ContextType) -> Self {
+        Context {
+            r#type,
+            positional_params: Variable {
+                value: Array(Vec::default()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        }
+    }
+}
+
 /// Collection of variables.
 ///
 /// A `VariableSet` is a stack of contexts, and a _context_ is a map of
@@ -141,6 +170,12 @@ pub enum ContextType {
 /// cannot access such hidden variables until you remove the hiding variable
 /// from the upper context.
 ///
+/// Each regular context has a special array variable called positional
+/// parameters. Because it does not have a name as a variable, you need to use
+/// dedicated methods for accessing it.
+/// See [`positional_params`](Self::positional_params) and
+/// [`positional_params_mut`](Self::positional_params_mut).
+///
 /// You should use [`ScopeGuard`] for pushing and popping contexts. See its
 /// documentation for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -152,14 +187,17 @@ pub struct VariableSet {
     all_variables: HashMap<String, Vec<VariableInContext>>,
 
     /// Stack of contexts.
-    contexts: Vec<ContextType>,
+    ///
+    /// The stack can never be empty since the base context is always the first
+    /// item.
+    contexts: Vec<Context>,
 }
 
 impl Default for VariableSet {
     fn default() -> Self {
         VariableSet {
             all_variables: Default::default(),
-            contexts: vec![ContextType::Regular],
+            contexts: vec![Context::new(ContextType::Regular)],
         }
     }
 }
@@ -217,6 +255,9 @@ impl VariableSet {
     }
 
     /// Gets a reference to the variable with the specified name.
+    ///
+    /// You cannot retrieve positional parameters using this function.
+    /// See [`positional_params`](Self::positional_params).
     #[must_use]
     pub fn get<N: ?Sized>(&self, name: &N) -> Option<&Variable>
     where
@@ -232,11 +273,15 @@ impl VariableSet {
     /// existing read-only value, the assignment fails unless the new variable
     /// is a local variable that hides the read-only.
     ///
-    /// Note that this function does not return variables that were removed from
-    /// volatile contexts.
+    /// Note that this function does not return variables that it removed from
+    /// volatile contexts. (See [`Scope`] for the conditions in which volatile
+    /// variables are removed.)
     ///
     /// The current implementation assumes that variables in volatile contexts
     /// are not read-only.
+    ///
+    /// You cannot modify positional parameters using this function.
+    /// See [`positional_params_mut`](Self::positional_params_mut).
     pub fn assign(
         &mut self,
         scope: Scope,
@@ -268,17 +313,18 @@ impl VariableSet {
         let context_index = match scope {
             Scope::Global => stack
                 .iter()
-                .filter(|vic| contexts[vic.context_index] != ContextType::Volatile)
+                .filter(|vic| contexts[vic.context_index].r#type != ContextType::Volatile)
                 .next_back()
                 .map_or(0, |vic| vic.context_index),
             Scope::Local => contexts
                 .iter()
-                .rposition(|c| *c == ContextType::Regular)
+                .rposition(|c| c.r#type == ContextType::Regular)
                 .expect("base context has gone"),
             Scope::Volatile => {
+                let top_context = contexts.last().expect("base context has gone");
                 assert_eq!(
-                    contexts.last(),
-                    Some(&ContextType::Volatile),
+                    top_context.r#type,
+                    ContextType::Volatile,
                     "volatile scope assignment requires volatile context"
                 );
                 contexts.len() - 1
@@ -341,6 +387,51 @@ impl VariableSet {
             })
             .collect()
     }
+
+    /// Returns a reference to the positional parameters.
+    ///
+    /// Every regular context starts with an empty array of positional
+    /// parameters, and volatile contexts cannot have positional parameters.
+    /// This function returns a reference to the positional parameters of the
+    /// topmost regular context.
+    ///
+    /// See also [`positional_params_mut`](Self::positional_params_mut).
+    #[must_use]
+    pub fn positional_params(&self) -> &Variable {
+        &self
+            .contexts
+            .iter()
+            .filter(|c| c.r#type == ContextType::Regular)
+            .last()
+            .expect("base context has gone")
+            .positional_params
+    }
+
+    /// Returns a mutable reference to the positional parameters.
+    ///
+    /// Although positional parameters are not considered a variable in the
+    /// POSIX standard, we implement them as an anonymous array variable. It is
+    /// the caller's responsibility to keep the variable in a correct state:
+    ///
+    /// - The variable value should be an array. Not a scalar.
+    /// - The variable should not be exported nor made read-only.
+    ///
+    /// The `VariableSet` does not check if these rules are maintained.
+    ///
+    /// Every regular context starts with an empty array of positional
+    /// parameters, and volatile contexts cannot have positional parameters.
+    /// This function returns a reference to the positional parameters of the
+    /// topmost regular context.
+    #[must_use]
+    pub fn positional_params_mut(&mut self) -> &mut Variable {
+        &mut self
+            .contexts
+            .iter_mut()
+            .filter(|c| c.r#type == ContextType::Regular)
+            .last()
+            .expect("base context has gone")
+            .positional_params
+    }
 }
 
 /// Stack for pushing and popping contexts.
@@ -359,7 +450,7 @@ pub trait ContextStack {
 
 impl ContextStack for VariableSet {
     fn push_context(&mut self, context_type: ContextType) {
-        self.contexts.push(context_type);
+        self.contexts.push(Context::new(context_type));
     }
 
     /// Pops the last-pushed context.
@@ -455,6 +546,7 @@ impl<S: ContextStack> std::ops::DerefMut for ScopeGuard<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn assign_new_variable_and_get() {
@@ -863,6 +955,71 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn positional_params_in_base_context() {
+        let mut variables = VariableSet::new();
+        assert_eq!(variables.positional_params().value, Array(vec![]));
+
+        let v = variables.positional_params_mut();
+        assert_matches!(&mut v.value, Array(values) => {
+            values.push("foo".to_string());
+            values.push("bar".to_string());
+        });
+
+        assert_matches!(&variables.positional_params().value, Array(values) => {
+            assert_eq!(values.as_ref(), ["foo".to_string(), "bar".to_string()]);
+        });
+    }
+
+    #[test]
+    fn positional_params_in_second_regular_context() {
+        let mut variables = VariableSet::new();
+        variables.push_context(ContextType::Regular);
+        assert_eq!(variables.positional_params().value, Array(vec![]));
+
+        let v = variables.positional_params_mut();
+        assert_matches!(&mut v.value, Array(values) => {
+            values.push("1".to_string());
+        });
+
+        assert_matches!(&variables.positional_params().value, Array(values) => {
+            assert_eq!(values.as_ref(), ["1".to_string()]);
+        });
+    }
+
+    #[test]
+    fn getting_positional_params_in_volatile_context() {
+        let mut variables = VariableSet::new();
+
+        let v = variables.positional_params_mut();
+        assert_matches!(&mut v.value, Array(values) => {
+            values.push("a".to_string());
+            values.push("b".to_string());
+            values.push("c".to_string());
+        });
+
+        variables.push_context(ContextType::Volatile);
+        assert_matches!(&variables.positional_params().value, Array(values) => {
+            assert_eq!(values.as_ref(), ["a".to_string(), "b".to_string(), "c".to_string()]);
+        });
+    }
+
+    #[test]
+    fn setting_positional_params_in_volatile_context() {
+        let mut variables = VariableSet::new();
+        variables.push_context(ContextType::Volatile);
+
+        let v = variables.positional_params_mut();
+        assert_matches!(&mut v.value, Array(values) => {
+            values.push("x".to_string());
+        });
+
+        variables.pop_context();
+        assert_matches!(&variables.positional_params().value, Array(values) => {
+            assert_eq!(values.as_ref(), ["x".to_string()]);
+        });
     }
 
     #[test]
