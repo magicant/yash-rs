@@ -56,6 +56,7 @@ pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
 use self::variable::VariableSet;
+use crate::trap::TrapSet;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use std::collections::HashMap;
@@ -100,6 +101,9 @@ pub struct Env {
     /// Jobs managed in the environment.
     pub jobs: JobSet,
 
+    /// Traps defined in the environment.
+    pub traps: TrapSet,
+
     /// Variables and positional parameters defined in the environment.
     pub variables: VariableSet,
 
@@ -116,6 +120,7 @@ impl Env {
             exit_status: Default::default(),
             functions: Default::default(),
             jobs: Default::default(),
+            traps: Default::default(),
             variables: Default::default(),
             system: SharedSystem::new(system),
         }
@@ -138,6 +143,7 @@ impl Env {
             exit_status: self.exit_status,
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
+            traps: self.traps.clone(),
             variables: self.variables.clone(),
             system: SharedSystem::new(system),
         }
@@ -276,27 +282,17 @@ impl Env {
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
-        use crate::trap::SignalSystem;
-
         // We need to set the signal handling before calling `wait` so we don't
-        // miss any `SIGCHLD` that may arrive between `wait` and
-        // `wait_for_signal`.
-        let old_handling = self
-            .system
-            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
+        // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
+        self.traps.enable_sigchld_handler(&mut self.system)?;
 
-        let result = loop {
+        loop {
             match self.system.wait(target) {
                 Ok(WaitStatus::StillAlive) => {}
-                result => break result,
+                result => return result,
             }
             self.system.wait_for_signal(Signal::SIGCHLD).await;
-        };
-
-        self.system
-            .set_signal_handling(Signal::SIGCHLD, old_handling)?;
-
-        result
+        }
     }
 }
 
