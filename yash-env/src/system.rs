@@ -23,6 +23,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
 use crate::trap::Signal;
+use crate::trap::SignalSystem;
 use crate::Env;
 use async_trait::async_trait;
 use futures_util::future::poll_fn;
@@ -444,21 +445,6 @@ impl SharedSystem {
         result
     }
 
-    /// Sets how a signal is handled.
-    ///
-    /// This function updates the signal blocking mask and the signal action for
-    /// the specified signal and remembers the previous configuration for
-    /// restoration.
-    ///
-    /// Returns the previous handler.
-    pub fn set_signal_handling(
-        &mut self,
-        signal: Signal,
-        handling: SignalHandling,
-    ) -> nix::Result<SignalHandling> {
-        self.0.borrow_mut().set_signal_handling(signal, handling)
-    }
-
     /// Waits for a signal to be delivered to this process.
     ///
     /// Before calling this function, you need to [set signal
@@ -560,6 +546,16 @@ impl System for SharedSystem {
         envs: &[CString],
     ) -> nix::Result<Infallible> {
         self.0.borrow_mut().execve(path, args, envs)
+    }
+}
+
+impl SignalSystem for SharedSystem {
+    fn set_signal_handling(
+        &mut self,
+        signal: nix::sys::signal::Signal,
+        handling: SignalHandling,
+    ) -> Result<SignalHandling, Errno> {
+        self.0.borrow_mut().set_signal_handling(signal, handling)
     }
 }
 

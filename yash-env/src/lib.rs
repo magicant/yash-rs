@@ -276,6 +276,8 @@ impl Env {
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+        use crate::trap::SignalSystem;
+
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and
         // `wait_for_signal`.
