@@ -39,6 +39,7 @@ pub mod input;
 pub mod io;
 pub mod job;
 pub mod system;
+pub mod trap;
 pub mod variable;
 
 use self::builtin::Builtin;

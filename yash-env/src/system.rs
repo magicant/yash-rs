@@ -22,6 +22,7 @@ pub mod r#virtual;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
+use crate::trap::Signal;
 use crate::Env;
 use async_trait::async_trait;
 use futures_util::future::poll_fn;
@@ -36,8 +37,6 @@ pub use nix::sys::select::FdSet;
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
-#[doc(no_inline)]
-pub use nix::sys::signal::Signal;
 #[doc(no_inline)]
 pub use nix::sys::stat::Mode;
 use std::cell::RefCell;
