@@ -16,13 +16,12 @@
 
 //! Type definitions for signal handling settings.
 
+use crate::system::Errno;
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
-#[doc(no_inline)]
-pub use nix::Result;
 
 /// System interface for signal handling configuration.
 pub trait SignalSystem {
@@ -37,7 +36,7 @@ pub trait SignalSystem {
         &mut self,
         signal: Signal,
         handling: crate::system::SignalHandling,
-    ) -> Result<crate::system::SignalHandling>;
+    ) -> Result<crate::system::SignalHandling, Errno>;
 }
 
 /// Collection of signal handling settings.
@@ -71,7 +70,7 @@ impl TrapSet {
     ///
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
-    pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<()> {
+    pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
         let previous_handler =
             system.set_signal_handling(Signal::SIGCHLD, crate::system::SignalHandling::Catch)?;
         self.initial_sigchld.get_or_insert(previous_handler);
@@ -83,7 +82,10 @@ impl TrapSet {
     /// This function removes all internal handlers that have been previously
     /// installed by `self`. It leaves handlers for any existing user-defined
     /// traps.
-    pub fn disable_internal_handlers<S: SignalSystem>(&mut self, system: &mut S) -> Result<()> {
+    pub fn disable_internal_handlers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
         if let Some(initial_handler) = self.initial_sigchld {
             system
                 .set_signal_handling(Signal::SIGCHLD, initial_handler)
@@ -107,7 +109,7 @@ mod tests {
             &mut self,
             signal: Signal,
             handling: crate::system::SignalHandling,
-        ) -> Result<crate::system::SignalHandling> {
+        ) -> Result<crate::system::SignalHandling, Errno> {
             Ok(self
                 .0
                 .insert(signal, handling)
