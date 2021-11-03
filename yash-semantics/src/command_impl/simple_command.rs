@@ -353,7 +353,7 @@ async fn execute_external_utility(
 
     let subshell = env.run_in_subshell(move |mut env| {
         Box::pin(async move {
-            // TODO Remove signal handlers not set by current traps
+            env.traps.disable_internal_handlers(&mut env.system).ok();
 
             let envs = env.variables.env_c_strings();
             let result = env.system.execve(path.as_c_str(), &args, &envs);
