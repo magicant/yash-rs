@@ -21,6 +21,7 @@
 pub mod alias;
 pub mod readonly;
 pub mod r#return;
+pub mod trap;
 
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
@@ -48,6 +49,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: r#return::builtin_main,
+        },
+    ),
+    (
+        "trap",
+        Builtin {
+            r#type: Special,
+            execute: trap::builtin_main,
         },
     ),
 ];
