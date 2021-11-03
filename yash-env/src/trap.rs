@@ -16,7 +16,7 @@
 
 //! Type definitions for signal handling settings.
 
-use crate::system::Errno;
+use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
 
@@ -35,8 +35,8 @@ pub trait SignalSystem {
     fn set_signal_handling(
         &mut self,
         signal: Signal,
-        handling: crate::system::SignalHandling,
-    ) -> Result<crate::system::SignalHandling, Errno>;
+        handling: SignalHandling,
+    ) -> Result<SignalHandling, Errno>;
 }
 
 /// Collection of signal handling settings.
@@ -52,11 +52,11 @@ pub trait SignalSystem {
 /// shell to implement additional actions the shell is required to perform.
 ///
 /// `TrapSet` merges the two configurations into a single
-/// [`system::SignalHandling`](crate::system::SignalHandling) for each signal
-/// and sets it to the system.
+/// [`system::SignalHandling`](SignalHandling) for each signal and sets it to
+/// the system.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TrapSet {
-    initial_sigchld: Option<crate::system::SignalHandling>,
+    initial_sigchld: Option<SignalHandling>,
 }
 
 // TODO Support user-defined traps
@@ -72,7 +72,7 @@ impl TrapSet {
     /// call to the function will be a no-op.
     pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
         let previous_handler =
-            system.set_signal_handling(Signal::SIGCHLD, crate::system::SignalHandling::Catch)?;
+            system.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
         self.initial_sigchld.get_or_insert(previous_handler);
         Ok(())
     }
@@ -102,18 +102,18 @@ mod tests {
     use std::collections::HashMap;
 
     #[derive(Default)]
-    struct DummySystem(HashMap<Signal, crate::system::SignalHandling>);
+    struct DummySystem(HashMap<Signal, SignalHandling>);
 
     impl SignalSystem for DummySystem {
         fn set_signal_handling(
             &mut self,
             signal: Signal,
-            handling: crate::system::SignalHandling,
-        ) -> Result<crate::system::SignalHandling, Errno> {
+            handling: SignalHandling,
+        ) -> Result<SignalHandling, Errno> {
             Ok(self
                 .0
                 .insert(signal, handling)
-                .unwrap_or(crate::system::SignalHandling::Default))
+                .unwrap_or(SignalHandling::Default))
         }
     }
 
@@ -122,10 +122,7 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
-        assert_eq!(
-            system.0[&Signal::SIGCHLD],
-            crate::system::SignalHandling::Catch
-        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
     }
 
     #[test]
@@ -134,42 +131,36 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(
-            system.0[&Signal::SIGCHLD],
-            crate::system::SignalHandling::Default
-        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
     }
 
     #[test]
     fn disabling_internal_handler_for_initially_ignored_sigchld() {
-        use crate::system::SignalHandling::*;
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, Ignore);
+        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&Signal::SIGCHLD], Ignore);
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn disabling_internal_handler_after_enabling_twice() {
-        use crate::system::SignalHandling::*;
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, Ignore);
+        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&Signal::SIGCHLD], Ignore);
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
     }
 
     #[test]
     fn disabling_internal_handler_without_enabling() {
-        use crate::system::SignalHandling::*;
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, Ignore);
+        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&Signal::SIGCHLD], Ignore);
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
     }
 }
