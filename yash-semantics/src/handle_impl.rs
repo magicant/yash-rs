@@ -27,6 +27,18 @@ use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
 
+async fn print_message<'a, E>(env: &mut Env, error: E)
+where
+    E: 'a,
+    Message<'a>: From<E>,
+{
+    let m = Message::from(error);
+    let mut s = Snippet::from(&m);
+    s.opt.color = true;
+    let f = format!("{}\n", DisplayList::from(s));
+    let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
+}
+
 #[async_trait(?Send)]
 impl Handle for yash_syntax::parser::Error {
     /// Prints an error message.
@@ -37,12 +49,7 @@ impl Handle for yash_syntax::parser::Error {
     /// POSIX-compliant implementations may use different non-zero exit
     /// statuses.
     async fn handle(&self, env: &mut Env) -> super::Result {
-        let m = Message::from(self);
-        let mut s = Snippet::from(&m);
-        s.opt.color = true;
-        let f = format!("{}\n", DisplayList::from(s));
-        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
-
+        print_message(env, self).await;
         Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
     }
 }
@@ -57,12 +64,7 @@ impl Handle for crate::expansion::Error {
     /// POSIX-compliant implementations may use different non-zero exit
     /// statuses.
     async fn handle(&self, env: &mut Env) -> super::Result {
-        let m = Message::from(self);
-        let mut s = Snippet::from(&m);
-        s.opt.color = true;
-        let f = format!("{}\n", DisplayList::from(s));
-        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
-
+        print_message(env, self).await;
         Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
     }
 }
@@ -82,12 +84,7 @@ impl Handle for crate::redir::Error {
     /// built-in. The caller is responsible for checking the condition and
     /// interrupting accordingly.
     async fn handle(&self, env: &mut Env) -> super::Result {
-        let m = Message::from(self);
-        let mut s = Snippet::from(&m);
-        s.opt.color = true;
-        let f = format!("{}\n", DisplayList::from(s));
-        let _ = env.system.write_all(Fd::STDERR, f.as_bytes()).await;
-
+        print_message(env, self).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())
     }
