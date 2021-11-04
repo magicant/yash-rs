@@ -33,7 +33,9 @@ impl Handle for yash_syntax::parser::Error {
     ///
     /// This function handles the error by printing an error message to the
     /// standard error and returning
-    /// `Divert::Interrupt(Some(ExitStatus::ERROR))`.
+    /// `Divert::Interrupt(Some(ExitStatus::ERROR))`. Note that other
+    /// POSIX-compliant implementations may use different non-zero exit
+    /// statuses.
     async fn handle(&self, env: &mut Env) -> super::Result {
         let m = Message::from(self);
         let mut s = Snippet::from(&m);
@@ -49,10 +51,11 @@ impl Handle for yash_syntax::parser::Error {
 impl Handle for crate::expansion::Error {
     /// Prints an error message and sets the exit status to non-zero.
     ///
-    /// This function handles an expansion error by printing an error message
-    /// that describes the error to the standard error and setting the exit
-    /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
-    /// implementations may use different non-zero exit statuses.
+    /// This function handles the error by printing an error message to the
+    /// standard error and returning
+    /// `Divert::Interrupt(Some(ExitStatus::ERROR))`. Note that other
+    /// POSIX-compliant implementations may use different non-zero exit
+    /// statuses.
     async fn handle(&self, env: &mut Env) -> super::Result {
         let m = Message::from(self);
         let mut s = Snippet::from(&m);
@@ -72,6 +75,12 @@ impl Handle for crate::redir::Error {
     /// that describes the error to the standard error and setting the exit
     /// status to [`ExitStatus::ERROR`]. Note that other POSIX-compliant
     /// implementations may use different non-zero exit statuses.
+    ///
+    /// This function does not return [`Divert::Interrupt`] because a
+    /// redirection error does not always mean an interrupt. The shell should
+    /// interrupt only on a redirection error during the execution of a special
+    /// built-in. The caller is responsible for checking the condition and
+    /// interrupting accordingly.
     async fn handle(&self, env: &mut Env) -> super::Result {
         let m = Message::from(self);
         let mut s = Snippet::from(&m);
