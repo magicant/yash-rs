@@ -780,13 +780,6 @@ impl AsyncSignal {
         Self::default()
     }
 
-    /// Returns an iterator of signals being waited for.
-    pub fn expected_signals(&self) -> impl Iterator<Item = Signal> + '_ {
-        self.awaiters
-            .iter()
-            .filter_map(|awaiter| awaiter.upgrade().map(|awaiter| awaiter.borrow().signal))
-    }
-
     /// Adds an awaiter for a signal.
     ///
     /// This function returns a reference-counted `SignalAwaiter`.
@@ -1106,42 +1099,15 @@ mod tests {
     }
 
     #[test]
-    fn async_signal_has_no_default_expected_signals() {
-        let async_signal = AsyncSignal::new();
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, []);
-    }
-
-    #[test]
-    fn async_signal_with_some_expected_signals() {
-        let mut async_signal = AsyncSignal::new();
-        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
-        let awaiter_2 = async_signal.wait_for_signal(Signal::SIGINT);
-        let awaiter_1 = awaiter_1.borrow();
-        assert_eq!(awaiter_1.signal, Signal::SIGCHLD);
-        assert_matches!(awaiter_1.status, SignalStatus::Expected(None));
-        let awaiter_2 = awaiter_2.borrow();
-        assert_eq!(awaiter_2.signal, Signal::SIGINT);
-        assert_matches!(awaiter_2.status, SignalStatus::Expected(None));
-
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, [Signal::SIGCHLD, Signal::SIGINT]);
-    }
-
-    #[test]
     fn async_signal_wake() {
         let mut async_signal = AsyncSignal::new();
-        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
-        awaiter_1.borrow_mut().status = SignalStatus::Expected(Some(noop_waker()));
+        let awaiter = async_signal.wait_for_signal(Signal::SIGCHLD);
+        awaiter.borrow_mut().status = SignalStatus::Expected(Some(noop_waker()));
 
         async_signal.wake(&SigSet::empty());
-        assert_matches!(awaiter_1.borrow().status, SignalStatus::Expected(Some(_)));
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, [Signal::SIGCHLD]);
+        assert_matches!(awaiter.borrow().status, SignalStatus::Expected(Some(_)));
 
         async_signal.wake(&SigSet::all());
-        assert_matches!(awaiter_1.borrow().status, SignalStatus::Caught);
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, []);
+        assert_matches!(awaiter.borrow().status, SignalStatus::Caught);
     }
 }
