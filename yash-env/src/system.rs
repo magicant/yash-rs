@@ -515,9 +515,9 @@ impl System for SharedSystem {
         &mut self,
         how: SigmaskHow,
         set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        old_set: Option<&mut SigSet>,
     ) -> nix::Result<()> {
-        self.0.borrow_mut().sigmask(how, set, oldset)
+        (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
@@ -572,7 +572,7 @@ pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
     signal: AsyncSignal,
-    current_mask: Option<SigSet>,
+    wait_mask: Option<SigSet>,
 }
 
 impl Deref for SelectSystem {
@@ -595,8 +595,21 @@ impl SelectSystem {
             system,
             io: AsyncIo::new(),
             signal: AsyncSignal::new(),
-            current_mask: None,
+            wait_mask: None,
         }
+    }
+
+    /// Calls `sigmask` and updates `self.wait_mask`.
+    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> nix::Result<()> {
+        let mut set = SigSet::empty();
+        let mut old_set = SigSet::empty();
+        set.add(signal);
+
+        self.system.sigmask(how, Some(&set), Some(&mut old_set))?;
+
+        self.wait_mask.get_or_insert(old_set).remove(signal);
+
+        Ok(())
     }
 
     /// Implements signal handler update.
@@ -607,10 +620,6 @@ impl SelectSystem {
         signal: Signal,
         handling: SignalHandling,
     ) -> nix::Result<SignalHandling> {
-        let mut set = SigSet::empty();
-        let mut old_set = SigSet::empty();
-        set.add(signal);
-
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
@@ -618,17 +627,11 @@ impl SelectSystem {
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
                 let old_handling = self.system.sigaction(signal, handling)?;
-                self.system
-                    .sigmask(SigmaskHow::SIG_UNBLOCK, Some(&set), Some(&mut old_set))?;
-                old_set.remove(signal);
-                self.current_mask = Some(old_set);
+                self.sigmask(SigmaskHow::SIG_UNBLOCK, signal)?;
                 Ok(old_handling)
             }
             SignalHandling::Catch => {
-                self.system
-                    .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), Some(&mut old_set))?;
-                old_set.add(signal);
-                self.current_mask = Some(old_set);
+                self.sigmask(SigmaskHow::SIG_BLOCK, signal)?;
                 self.system.sigaction(signal, handling)
             }
         }
@@ -640,16 +643,10 @@ impl SelectSystem {
     pub fn select(&mut self) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
-        let mut mask = self.current_mask;
-        if let Some(mask) = &mut mask {
-            for signal in self.signal.expected_signals() {
-                mask.remove(signal);
-            }
-        }
 
         match self
             .system
-            .select(&mut readers, &mut writers, mask.as_ref())
+            .select(&mut readers, &mut writers, self.wait_mask.as_ref())
         {
             Ok(_) => {
                 self.io.wake(readers, writers);
@@ -1028,7 +1025,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_system_select_leaves_irrelevant_signal_pending() {
+    fn shared_system_select_consumes_all_pending_signals() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
@@ -1040,9 +1037,6 @@ mod tests {
             .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
             .unwrap();
 
-        let mut context = Context::from_waker(noop_waker_ref());
-        let mut future = Box::pin(system.wait_for_signal(Signal::SIGINT));
-        let _ = future.as_mut().poll(&mut context);
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
@@ -1058,7 +1052,7 @@ mod tests {
         assert!(blocked.contains(Signal::SIGTERM));
         let pending = process.pending_signals();
         assert!(!pending.contains(Signal::SIGINT));
-        assert!(pending.contains(Signal::SIGTERM));
+        assert!(!pending.contains(Signal::SIGTERM));
     }
 
     #[test]
