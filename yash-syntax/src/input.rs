@@ -66,7 +66,7 @@ pub struct Memory<'a> {
 
 impl Memory<'_> {
     /// Creates a new `Memory` that reads the given string.
-    pub fn new(code: &str, source: Source) -> Memory {
+    pub fn new(code: &str, source: Source) -> Memory<'_> {
         let lines = lines(code, source);
         Memory { lines }
     }

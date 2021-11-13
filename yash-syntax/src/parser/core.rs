@@ -110,7 +110,7 @@ impl<T> Rec<T> {
 /// Then the [`command_line`](Self::command_line) function is for you.
 /// See also the [module documentation](super).
 #[derive(Debug)]
-pub struct Parser<'a, 'b: 'a> {
+pub struct Parser<'a, 'b> {
     /// Lexer that provides tokens.
     lexer: &'a mut Lexer<'b>,
 

@@ -600,7 +600,7 @@ impl<'a> Lexer<'a> {
 /// re-enabled.
 #[derive(Debug)]
 #[must_use = "You must retain the PlainLexer to keep line continuation disabled"]
-pub struct PlainLexer<'a, 'b: 'a> {
+pub struct PlainLexer<'a, 'b> {
     lexer: &'a mut Lexer<'b>,
 }
 
@@ -642,7 +642,7 @@ pub enum WordContext {
 /// Lexer with additional information for parsing [texts](crate::syntax::Text)
 /// and [words](crate::syntax::Word).
 #[derive(Debug)]
-pub struct WordLexer<'a, 'b: 'a> {
+pub struct WordLexer<'a, 'b> {
     pub lexer: &'a mut Lexer<'b>,
     pub context: WordContext,
 }
