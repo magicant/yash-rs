@@ -445,24 +445,37 @@ impl SharedSystem {
         result
     }
 
+    /// Waits for some signals to be delivered to this process.
+    ///
+    /// Before calling this function, you need to [set signal
+    /// handling](Self::set_signal_handling) to `Catch`. Without doing so, this
+    /// function cannot detect the receipt of the signals.
+    ///
+    /// Returns an array of signals that were caught.
+    pub async fn wait_for_signals(&self) -> Rc<[Signal]> {
+        let status = self.0.borrow_mut().signal.wait_for_signals();
+        poll_fn(|context| {
+            let mut status = status.borrow_mut();
+            let dummy_status = SignalStatus::Expected(None);
+            let old_status = std::mem::replace(&mut *status, dummy_status);
+            match old_status {
+                SignalStatus::Caught(signals) => Poll::Ready(signals),
+                SignalStatus::Expected(_) => {
+                    *status = SignalStatus::Expected(Some(context.waker().clone()));
+                    Poll::Pending
+                }
+            }
+        })
+        .await
+    }
+
     /// Waits for a signal to be delivered to this process.
     ///
     /// Before calling this function, you need to [set signal
     /// handling](Self::set_signal_handling) to `Catch`.
     /// Without doing so, this function cannot detect the receipt of the signal.
     pub async fn wait_for_signal(&self, signal: Signal) {
-        let awaiter = self.0.borrow_mut().signal.wait_for_signal(signal);
-        poll_fn(|context| {
-            let mut awaiter = awaiter.borrow_mut();
-            match awaiter.status {
-                SignalStatus::Caught => Poll::Ready(()),
-                SignalStatus::Expected(ref mut waker) => {
-                    *waker = Some(context.waker().clone());
-                    Poll::Pending
-                }
-            }
-        })
-        .await
+        while !self.wait_for_signals().await.contains(&signal) {}
     }
 
     /// Waits for a next event to occur.
@@ -515,9 +528,9 @@ impl System for SharedSystem {
         &mut self,
         how: SigmaskHow,
         set: Option<&SigSet>,
-        oldset: Option<&mut SigSet>,
+        old_set: Option<&mut SigSet>,
     ) -> nix::Result<()> {
-        self.0.borrow_mut().sigmask(how, set, oldset)
+        (**self.0.borrow_mut()).sigmask(how, set, old_set)
     }
     fn sigaction(&mut self, signal: Signal, action: SignalHandling) -> nix::Result<SignalHandling> {
         self.0.borrow_mut().sigaction(signal, action)
@@ -572,7 +585,7 @@ pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
     signal: AsyncSignal,
-    current_mask: Option<SigSet>,
+    wait_mask: Option<SigSet>,
 }
 
 impl Deref for SelectSystem {
@@ -595,8 +608,21 @@ impl SelectSystem {
             system,
             io: AsyncIo::new(),
             signal: AsyncSignal::new(),
-            current_mask: None,
+            wait_mask: None,
         }
+    }
+
+    /// Calls `sigmask` and updates `self.wait_mask`.
+    fn sigmask(&mut self, how: SigmaskHow, signal: Signal) -> nix::Result<()> {
+        let mut set = SigSet::empty();
+        let mut old_set = SigSet::empty();
+        set.add(signal);
+
+        self.system.sigmask(how, Some(&set), Some(&mut old_set))?;
+
+        self.wait_mask.get_or_insert(old_set).remove(signal);
+
+        Ok(())
     }
 
     /// Implements signal handler update.
@@ -607,10 +633,6 @@ impl SelectSystem {
         signal: Signal,
         handling: SignalHandling,
     ) -> nix::Result<SignalHandling> {
-        let mut set = SigSet::empty();
-        let mut old_set = SigSet::empty();
-        set.add(signal);
-
         // The order of sigmask and sigaction is important to prevent the signal
         // from being caught. The signal must be caught only when the select
         // function temporarily unblocks the signal. This is to avoid race
@@ -618,17 +640,11 @@ impl SelectSystem {
         match handling {
             SignalHandling::Default | SignalHandling::Ignore => {
                 let old_handling = self.system.sigaction(signal, handling)?;
-                self.system
-                    .sigmask(SigmaskHow::SIG_UNBLOCK, Some(&set), Some(&mut old_set))?;
-                old_set.remove(signal);
-                self.current_mask = Some(old_set);
+                self.sigmask(SigmaskHow::SIG_UNBLOCK, signal)?;
                 Ok(old_handling)
             }
             SignalHandling::Catch => {
-                self.system
-                    .sigmask(SigmaskHow::SIG_BLOCK, Some(&set), Some(&mut old_set))?;
-                old_set.add(signal);
-                self.current_mask = Some(old_set);
+                self.sigmask(SigmaskHow::SIG_BLOCK, signal)?;
                 self.system.sigaction(signal, handling)
             }
         }
@@ -640,20 +656,14 @@ impl SelectSystem {
     pub fn select(&mut self) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
-        let mut mask = self.current_mask;
-        if let Some(mask) = &mut mask {
-            for signal in self.signal.expected_signals() {
-                mask.remove(signal);
-            }
-        }
 
         match self
             .system
-            .select(&mut readers, &mut writers, mask.as_ref())
+            .select(&mut readers, &mut writers, self.wait_mask.as_ref())
         {
             Ok(_) => {
                 self.io.wake(readers, writers);
-                self.signal.wake(&to_sig_set(self.system.caught_signals()));
+                self.signal.wake(self.system.caught_signals().into());
                 Ok(())
             }
             Err(Errno::EBADF) => {
@@ -663,7 +673,7 @@ impl SelectSystem {
                 Err(Errno::EBADF)
             }
             Err(Errno::EINTR) => {
-                self.signal.wake(&to_sig_set(self.system.caught_signals()));
+                self.signal.wake(self.system.caught_signals().into());
                 Ok(())
             }
             Err(error) => Err(error),
@@ -762,19 +772,13 @@ impl AsyncIo {
 /// TODO Elaborate
 #[derive(Clone, Debug, Default)]
 struct AsyncSignal {
-    awaiters: Vec<Weak<RefCell<SignalAwaiter>>>,
-}
-
-#[derive(Clone, Debug)]
-struct SignalAwaiter {
-    signal: Signal,
-    status: SignalStatus,
+    awaiters: Vec<Weak<RefCell<SignalStatus>>>,
 }
 
 #[derive(Clone, Debug)]
 enum SignalStatus {
     Expected(Option<Waker>),
-    Caught,
+    Caught(Rc<[Signal]>),
 }
 
 impl AsyncSignal {
@@ -783,66 +787,40 @@ impl AsyncSignal {
         Self::default()
     }
 
-    /// Returns an iterator of signals being waited for.
-    pub fn expected_signals(&self) -> impl Iterator<Item = Signal> + '_ {
-        self.awaiters
-            .iter()
-            .filter_map(|awaiter| awaiter.upgrade().map(|awaiter| awaiter.borrow().signal))
-    }
-
-    /// Adds an awaiter for a signal.
+    /// Adds an awaiter for signals.
     ///
-    /// This function returns a reference-counted `SignalAwaiter`.
-    /// The caller must set a waker to the returned `SignalAwaiter`. When the
-    /// signal is caught, the waker is woken and removed from the
-    /// `SignalAwaiter`. The caller can replace the waker in the `SignalAwaiter`
-    /// with another if the previous waker gets expired.
-    pub fn wait_for_signal(&mut self, signal: Signal) -> Rc<RefCell<SignalAwaiter>> {
-        let status = SignalStatus::Expected(None);
-        let awaiter = Rc::new(RefCell::new(SignalAwaiter { signal, status }));
-        self.awaiters.push(Rc::downgrade(&awaiter));
-        awaiter
+    /// This function returns a reference-counted
+    /// `SignalStatus::Expected(None)`. The caller must set a waker to the
+    /// returned `SignalStatus::Expected`. When signals are caught, the waker is
+    /// woken and replaced with `SignalStatus::Caught(signals)`. The caller can
+    /// replace the waker in the `SignalStatus::Expected` with another if the
+    /// previous waker gets expired and the caller wants to be woken again.
+    pub fn wait_for_signals(&mut self) -> Rc<RefCell<SignalStatus>> {
+        let status = Rc::new(RefCell::new(SignalStatus::Expected(None)));
+        self.awaiters.push(Rc::downgrade(&status));
+        status
     }
 
     /// Wakes awaiters for caught signals.
     ///
-    /// This function wakes up awaiters for the signals contained in the
-    /// argument. Once woken, the awaiters are removed from `self`.
+    /// This function wakes up all wakers in pending `SignalStatus`es and
+    /// removes them from `self`.
     ///
-    /// This function borrows `SignalAwaiter`s returned from `wait_for_signal`
+    /// This function borrows `SignalStatus`es returned from `wait_for_signals`
     /// so you must not have conflicting borrows.
-    pub fn wake(&mut self, signals: &SigSet) {
-        // TODO use Vec::drain_filter
-        for i in (0..self.awaiters.len()).rev() {
-            let remove = if let Some(awaiter) = self.awaiters[i].upgrade() {
-                let mut awaiter = awaiter.borrow_mut();
-                if signals.contains(awaiter.signal) {
-                    if let SignalStatus::Expected(Some(waker)) =
-                        std::mem::replace(&mut awaiter.status, SignalStatus::Caught)
-                    {
-                        waker.wake()
-                    }
-                    true
-                } else {
-                    false
+    pub fn wake(&mut self, signals: Rc<[Signal]>) {
+        for status in std::mem::take(&mut self.awaiters) {
+            if let Some(status) = status.upgrade() {
+                let mut status_ref = status.borrow_mut();
+                let new_status = SignalStatus::Caught(Rc::clone(&signals));
+                let old_status = std::mem::replace(&mut *status_ref, new_status);
+                drop(status_ref);
+                if let SignalStatus::Expected(Some(waker)) = old_status {
+                    waker.wake();
                 }
-            } else {
-                true
-            };
-            if remove {
-                self.awaiters.remove(i);
             }
         }
     }
-}
-
-/// Converts a signal collection into a `SigSet`.
-fn to_sig_set<I: IntoIterator<Item = Signal>>(i: I) -> SigSet {
-    let mut signals = SigSet::empty();
-    for signal in i {
-        signals.add(signal);
-    }
-    signals
 }
 
 #[cfg(test)]
@@ -999,7 +977,49 @@ mod tests {
     // TODO Test SharedSystem::write_all where second write returns EINTR
 
     #[test]
-    fn shared_system_wait_for_signal() {
+    fn shared_system_wait_for_signals() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = SharedSystem::new(Box::new(system));
+        system
+            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+        system
+            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .unwrap();
+        system
+            .set_signal_handling(Signal::SIGUSR1, SignalHandling::Catch)
+            .unwrap();
+
+        let mut context = Context::from_waker(noop_waker_ref());
+        let mut future = Box::pin(system.wait_for_signals());
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        {
+            let mut state = state.borrow_mut();
+            let process = state.processes.get_mut(&process_id).unwrap();
+            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            assert!(process.blocked_signals().contains(Signal::SIGINT));
+            assert!(process.blocked_signals().contains(Signal::SIGUSR1));
+            process.raise_signal(Signal::SIGCHLD);
+            process.raise_signal(Signal::SIGINT);
+        }
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        system.select().unwrap();
+        let result = future.as_mut().poll(&mut context);
+        assert_matches!(result, Poll::Ready(signals) => {
+            assert_eq!(signals.len(), 2);
+            assert!(signals.contains(&Signal::SIGCHLD));
+            assert!(signals.contains(&Signal::SIGINT));
+        });
+    }
+
+    #[test]
+    fn shared_system_wait_for_signal_returns_on_caught() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
@@ -1028,7 +1048,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_system_select_leaves_irrelevant_signal_pending() {
+    fn shared_system_wait_for_signal_ignores_irrelevant_signals() {
         let system = VirtualSystem::new();
         let process_id = system.process_id;
         let state = Rc::clone(&system.state);
@@ -1042,7 +1062,34 @@ mod tests {
 
         let mut context = Context::from_waker(noop_waker_ref());
         let mut future = Box::pin(system.wait_for_signal(Signal::SIGINT));
-        let _ = future.as_mut().poll(&mut context);
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+
+        {
+            let mut state = state.borrow_mut();
+            let process = state.processes.get_mut(&process_id).unwrap();
+            process.raise_signal(Signal::SIGCHLD);
+            process.raise_signal(Signal::SIGTERM);
+        }
+        system.select().unwrap();
+
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+    }
+
+    #[test]
+    fn shared_system_select_consumes_all_pending_signals() {
+        let system = VirtualSystem::new();
+        let process_id = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut system = SharedSystem::new(Box::new(system));
+        system
+            .set_signal_handling(Signal::SIGINT, SignalHandling::Catch)
+            .unwrap();
+        system
+            .set_signal_handling(Signal::SIGTERM, SignalHandling::Catch)
+            .unwrap();
+
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
@@ -1058,7 +1105,7 @@ mod tests {
         assert!(blocked.contains(Signal::SIGTERM));
         let pending = process.pending_signals();
         assert!(!pending.contains(Signal::SIGINT));
-        assert!(pending.contains(Signal::SIGTERM));
+        assert!(!pending.contains(Signal::SIGTERM));
     }
 
     #[test]
@@ -1112,42 +1159,19 @@ mod tests {
     }
 
     #[test]
-    fn async_signal_has_no_default_expected_signals() {
-        let async_signal = AsyncSignal::new();
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, []);
-    }
-
-    #[test]
-    fn async_signal_with_some_expected_signals() {
-        let mut async_signal = AsyncSignal::new();
-        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
-        let awaiter_2 = async_signal.wait_for_signal(Signal::SIGINT);
-        let awaiter_1 = awaiter_1.borrow();
-        assert_eq!(awaiter_1.signal, Signal::SIGCHLD);
-        assert_matches!(awaiter_1.status, SignalStatus::Expected(None));
-        let awaiter_2 = awaiter_2.borrow();
-        assert_eq!(awaiter_2.signal, Signal::SIGINT);
-        assert_matches!(awaiter_2.status, SignalStatus::Expected(None));
-
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, [Signal::SIGCHLD, Signal::SIGINT]);
-    }
-
-    #[test]
     fn async_signal_wake() {
         let mut async_signal = AsyncSignal::new();
-        let awaiter_1 = async_signal.wait_for_signal(Signal::SIGCHLD);
-        awaiter_1.borrow_mut().status = SignalStatus::Expected(Some(noop_waker()));
+        let status_1 = async_signal.wait_for_signals();
+        let status_2 = async_signal.wait_for_signals();
+        *status_1.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
+        *status_2.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
 
-        async_signal.wake(&SigSet::empty());
-        assert_matches!(awaiter_1.borrow().status, SignalStatus::Expected(Some(_)));
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, [Signal::SIGCHLD]);
-
-        async_signal.wake(&SigSet::all());
-        assert_matches!(awaiter_1.borrow().status, SignalStatus::Caught);
-        let signals = async_signal.expected_signals().collect::<Vec<Signal>>();
-        assert_eq!(signals, []);
+        async_signal.wake(Rc::new([Signal::SIGCHLD, Signal::SIGUSR1]));
+        assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
+            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+        });
+        assert_matches!(&*status_2.borrow(), SignalStatus::Caught(signals) => {
+            assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
+        });
     }
 }
