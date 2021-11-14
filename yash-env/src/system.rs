@@ -400,11 +400,18 @@ impl SharedSystem {
     pub async fn read_async(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         let flags = self.set_nonblocking(fd)?;
 
+        // We need to retain a strong reference to the waker outside the poll_fn
+        // function because SelectSystem only retains a weak reference to it.
+        // This allows SelectSystem to discard defunct wakers if this async task
+        // is aborted.
+        let waker = Rc::new(RefCell::new(None));
+
         let result = poll_fn(|context| {
             let mut inner = self.0.borrow_mut();
             match inner.system.read(fd, buffer) {
                 Err(Errno::EAGAIN) => {
-                    inner.io.wait_for_reading(fd, context.waker().clone());
+                    *waker.borrow_mut() = Some(context.waker().clone());
+                    inner.io.wait_for_reading(fd, &waker);
                     Poll::Pending
                 }
                 result => Poll::Ready(result),
@@ -433,6 +440,12 @@ impl SharedSystem {
         let flags = self.set_nonblocking(fd)?;
         let mut written = 0;
 
+        // We need to retain a strong reference to the waker outside the poll_fn
+        // function because SelectSystem only retains a weak reference to it.
+        // This allows SelectSystem to discard defunct wakers if this async task
+        // is aborted.
+        let waker = Rc::new(RefCell::new(None));
+
         let result = poll_fn(|context| {
             let mut inner = self.0.borrow_mut();
             match inner.system.write(fd, buffer) {
@@ -446,7 +459,9 @@ impl SharedSystem {
                 Err(Errno::EAGAIN | Errno::EINTR) => (),
                 Err(error) => return Poll::Ready(Err(error)),
             }
-            inner.io.wait_for_writing(fd, context.waker().clone());
+
+            *waker.borrow_mut() = Some(context.waker().clone());
+            inner.io.wait_for_writing(fd, &waker);
             Poll::Pending
         })
         .await;
@@ -722,6 +737,7 @@ impl SelectSystem {
             Err(Errno::EINTR) => Ok(()),
             Err(error) => Err(error),
         };
+        self.io.gc();
         self.wake_timeouts();
         self.wake_on_signals();
         final_result
@@ -743,7 +759,18 @@ struct AsyncIo {
 #[derive(Clone, Debug)]
 struct FdAwaiter {
     fd: Fd,
-    waker: Waker,
+    waker: Weak<RefCell<Option<Waker>>>,
+}
+
+impl Drop for FdAwaiter {
+    /// Wakes the waker when `FdAwaiter` is dropped.
+    fn drop(&mut self) {
+        if let Some(waker) = self.waker.upgrade() {
+            if let Some(waker) = waker.borrow_mut().take() {
+                waker.wake();
+            }
+        }
+    }
 }
 
 impl AsyncIo {
@@ -777,12 +804,14 @@ impl AsyncIo {
     }
 
     /// Adds an awaiter for reading.
-    pub fn wait_for_reading(&mut self, fd: Fd, waker: Waker) {
+    pub fn wait_for_reading(&mut self, fd: Fd, waker: &Rc<RefCell<Option<Waker>>>) {
+        let waker = Rc::downgrade(waker);
         self.readers.push(FdAwaiter { fd, waker });
     }
 
     /// Adds an awaiter for writing.
-    pub fn wait_for_writing(&mut self, fd: Fd, waker: Waker) {
+    pub fn wait_for_writing(&mut self, fd: Fd, waker: &Rc<RefCell<Option<Waker>>>) {
+        let waker = Rc::downgrade(waker);
         self.writers.push(FdAwaiter { fd, waker });
     }
 
@@ -790,24 +819,37 @@ impl AsyncIo {
     ///
     /// FDs in `readers` and `writers` are considered ready and corresponding
     /// awaiters are woken. Once woken, awaiters are removed from `self`.
-    pub fn wake(&mut self, mut readers: FdSet, mut writers: FdSet) {
-        // TODO Use Vec::drain_filter
-        for i in (0..self.readers.len()).rev() {
-            if readers.contains(self.readers[i].fd.0) {
-                self.readers.swap_remove(i).waker.wake();
+    pub fn wake(&mut self, readers: FdSet, writers: FdSet) {
+        fn scan(awaiters: &mut Vec<FdAwaiter>, mut fds: FdSet) {
+            // TODO Use Vec::drain_filter
+            for i in (0..awaiters.len()).rev() {
+                if fds.contains(awaiters[i].fd.0) {
+                    awaiters.swap_remove(i);
+                }
             }
         }
-        for i in (0..self.writers.len()).rev() {
-            if writers.contains(self.writers[i].fd.0) {
-                self.writers.swap_remove(i).waker.wake();
-            }
-        }
+        scan(&mut self.readers, readers);
+        scan(&mut self.writers, writers);
     }
 
     /// Wakes and removes all awaiters.
     pub fn wake_all(&mut self) {
-        self.readers.drain(..).for_each(|a| a.waker.wake());
-        self.writers.drain(..).for_each(|a| a.waker.wake());
+        self.readers.clear();
+        self.writers.clear();
+    }
+
+    /// Discards `FdAwaiter`s having a defunct waker.
+    pub fn gc(&mut self) {
+        fn scan(awaiters: &mut Vec<FdAwaiter>) {
+            // TODO Use Vec::drain_filter
+            for i in (0..awaiters.len()).rev() {
+                if awaiters[i].waker.strong_count() == 0 {
+                    awaiters.swap_remove(i);
+                }
+            }
+        }
+        scan(&mut self.readers);
+        scan(&mut self.writers);
     }
 }
 
@@ -1301,9 +1343,10 @@ mod tests {
     #[test]
     fn async_io_non_empty_readers_and_writers() {
         let mut async_io = AsyncIo::new();
-        async_io.wait_for_reading(Fd::STDIN, noop_waker());
-        async_io.wait_for_writing(Fd::STDOUT, noop_waker());
-        async_io.wait_for_writing(Fd::STDERR, noop_waker());
+        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        async_io.wait_for_reading(Fd::STDIN, &waker);
+        async_io.wait_for_writing(Fd::STDOUT, &waker);
+        async_io.wait_for_writing(Fd::STDERR, &waker);
 
         let mut expected_readers = FdSet::new();
         expected_readers.insert(Fd::STDIN.0);
@@ -1317,9 +1360,10 @@ mod tests {
     #[test]
     fn async_io_wake() {
         let mut async_io = AsyncIo::new();
-        async_io.wait_for_reading(Fd(3), noop_waker());
-        async_io.wait_for_reading(Fd(4), noop_waker());
-        async_io.wait_for_writing(Fd(4), noop_waker());
+        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        async_io.wait_for_reading(Fd(3), &waker);
+        async_io.wait_for_reading(Fd(4), &waker);
+        async_io.wait_for_writing(Fd(4), &waker);
         let mut fds = FdSet::new();
         fds.insert(4);
         async_io.wake(fds, fds);
@@ -1333,9 +1377,10 @@ mod tests {
     #[test]
     fn async_io_wake_all() {
         let mut async_io = AsyncIo::new();
-        async_io.wait_for_reading(Fd::STDIN, noop_waker());
-        async_io.wait_for_writing(Fd::STDOUT, noop_waker());
-        async_io.wait_for_writing(Fd::STDERR, noop_waker());
+        let waker = Rc::new(RefCell::new(Some(noop_waker())));
+        async_io.wait_for_reading(Fd::STDIN, &waker);
+        async_io.wait_for_writing(Fd::STDOUT, &waker);
+        async_io.wait_for_writing(Fd::STDERR, &waker);
         async_io.wake_all();
         assert_eq!(async_io.readers(), FdSet::new());
         assert_eq!(async_io.writers(), FdSet::new());
