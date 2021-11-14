@@ -650,6 +650,15 @@ impl SelectSystem {
         }
     }
 
+    fn wake_on_signals(&mut self) {
+        let signals = self.system.caught_signals();
+        if signals.is_empty() {
+            self.signal.gc()
+        } else {
+            self.signal.wake(signals.into())
+        }
+    }
+
     /// Implements the select function for `SharedSystem`.
     ///
     /// See [`SharedSystem::select`].
@@ -657,13 +666,12 @@ impl SelectSystem {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
 
-        match self
+        let inner_result = self
             .system
-            .select(&mut readers, &mut writers, self.wait_mask.as_ref())
-        {
+            .select(&mut readers, &mut writers, self.wait_mask.as_ref());
+        let final_result = match inner_result {
             Ok(_) => {
                 self.io.wake(readers, writers);
-                self.signal.wake(self.system.caught_signals().into());
                 Ok(())
             }
             Err(Errno::EBADF) => {
@@ -672,13 +680,12 @@ impl SelectSystem {
                 self.io.wake_all();
                 Err(Errno::EBADF)
             }
-            Err(Errno::EINTR) => {
-                self.signal.wake(self.system.caught_signals().into());
-                Ok(())
-            }
+            Err(Errno::EINTR) => Ok(()),
             Err(error) => Err(error),
-        }
+        };
         // TODO Support timers
+        self.wake_on_signals();
+        final_result
     }
 }
 
@@ -786,6 +793,16 @@ impl AsyncSignal {
     /// Returns a new empty `AsyncSignal`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Removes internal weak pointers whose `SignalStatus` has gone.
+    pub fn gc(&mut self) {
+        // TODO Use Vec::drain_filter
+        for i in (0..self.awaiters.len()).rev() {
+            if self.awaiters[i].strong_count() == 0 {
+                self.awaiters.swap_remove(i);
+            }
+        }
     }
 
     /// Adds an awaiter for signals.
@@ -1107,6 +1124,34 @@ mod tests {
         let pending = process.pending_signals();
         assert!(!pending.contains(Signal::SIGINT));
         assert!(!pending.contains(Signal::SIGTERM));
+    }
+
+    #[test]
+    fn shared_system_select_does_not_wake_signal_waiters_on_io() {
+        let system = VirtualSystem::new();
+        let mut system_1 = SharedSystem::new(Box::new(system));
+        let mut system_2 = system_1.clone();
+        let mut system_3 = system_1.clone();
+        let (reader, writer) = system_1.pipe().unwrap();
+        system_2
+            .set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)
+            .unwrap();
+
+        let mut buffer = [0];
+        let mut read_future = Box::pin(system_1.read_async(reader, &mut buffer));
+        let mut signal_future = Box::pin(system_2.wait_for_signals());
+        let mut context = Context::from_waker(noop_waker_ref());
+        let result = read_future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+        let result = signal_future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
+        system_3.write(writer, &[42]).unwrap();
+        system_3.select().unwrap();
+
+        let result = read_future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Ready(Ok(1)));
+        let result = signal_future.as_mut().poll(&mut context);
+        assert_eq!(result, Poll::Pending);
     }
 
     #[test]
