@@ -456,6 +456,21 @@ impl SharedSystem {
         result
     }
 
+    /// Waits until the specified time point.
+    pub async fn wait_until(&self, target: Instant) {
+        poll_fn(|context| {
+            let mut system = self.0.borrow_mut();
+            let now = system.now();
+            if now >= target {
+                return Poll::Ready(());
+            }
+            let waker = context.waker().clone();
+            system.time.push(Timeout { target, waker });
+            Poll::Pending
+        })
+        .await
+    }
+
     /// Waits for some signals to be delivered to this process.
     ///
     /// Before calling this function, you need to [set signal
@@ -667,6 +682,13 @@ impl SelectSystem {
         }
     }
 
+    fn wake_timeouts(&mut self) {
+        if !self.time.is_empty() {
+            let now = self.now();
+            self.time.wake_if_passed(now);
+        }
+    }
+
     fn wake_on_signals(&mut self) {
         let signals = self.system.caught_signals();
         if signals.is_empty() {
@@ -700,7 +722,7 @@ impl SelectSystem {
             Err(Errno::EINTR) => Ok(()),
             Err(error) => Err(error),
         };
-        // TODO Support timers
+        self.wake_timeouts();
         self.wake_on_signals();
         final_result
     }
@@ -827,6 +849,10 @@ impl Ord for Timeout {
 impl AsyncTime {
     fn new() -> Self {
         Self::default()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.timeouts.is_empty()
     }
 
     fn push(&mut self, timeout: Timeout) {
@@ -1071,6 +1097,39 @@ mod tests {
     }
 
     // TODO Test SharedSystem::write_all where second write returns EINTR
+
+    #[test]
+    fn shared_system_wait_until() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let system = SharedSystem::new(Box::new(system));
+        let start = Instant::now();
+        state.borrow_mut().now = Some(start);
+
+        let mut future = Box::pin(system.wait_until(start + Duration::from_millis(1_125)));
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(125));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(1_124));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(1_125));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Ready(()));
+    }
 
     #[test]
     fn shared_system_wait_for_signals() {
