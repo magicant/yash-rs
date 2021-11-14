@@ -40,7 +40,13 @@ pub use nix::sys::signal::SigSet;
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
 pub use nix::sys::stat::Mode;
+#[doc(no_inline)]
+pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::cmp::Reverse;
+use std::collections::binary_heap::PeekMut;
+use std::collections::BinaryHeap;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -53,6 +59,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
+use std::time::Instant;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -127,6 +134,9 @@ pub trait System: Debug {
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
 
+    /// Returns the current time.
+    fn now(&self) -> Instant;
+
     /// Gets and/or sets the signal blocking mask.
     ///
     /// This is a low-level function used internally by
@@ -187,7 +197,6 @@ pub trait System: Debug {
     /// caught and made available from this function.
     fn caught_signals(&mut self) -> Vec<Signal>;
 
-    // TODO timespec
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
@@ -201,6 +210,7 @@ pub trait System: Debug {
     ///
     /// - An FD in `readers` becomes ready for reading.
     /// - An FD in `writers` becomes ready for writing.
+    /// - The specified `timeout` duration has passed.
     /// - A signal handler catches a signal.
     ///
     /// When this function returns an `Ok`, FDs that are not ready for reading
@@ -218,6 +228,7 @@ pub trait System: Debug {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int>;
 
@@ -445,6 +456,21 @@ impl SharedSystem {
         result
     }
 
+    /// Waits until the specified time point.
+    pub async fn wait_until(&self, target: Instant) {
+        poll_fn(|context| {
+            let mut system = self.0.borrow_mut();
+            let now = system.now();
+            if now >= target {
+                return Poll::Ready(());
+            }
+            let waker = context.waker().clone();
+            system.time.push(Timeout { target, waker });
+            Poll::Pending
+        })
+        .await
+    }
+
     /// Waits for some signals to be delivered to this process.
     ///
     /// Before calling this function, you need to [set signal
@@ -524,6 +550,9 @@ impl System for SharedSystem {
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
     }
+    fn now(&self) -> Instant {
+        self.0.borrow().now()
+    }
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -542,9 +571,10 @@ impl System for SharedSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
-        (**self.0.borrow_mut()).select(readers, writers, signal_mask)
+        (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -584,6 +614,7 @@ impl SignalSystem for SharedSystem {
 pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
+    time: AsyncTime,
     signal: AsyncSignal,
     wait_mask: Option<SigSet>,
 }
@@ -607,6 +638,7 @@ impl SelectSystem {
         SelectSystem {
             system,
             io: AsyncIo::new(),
+            time: AsyncTime::new(),
             signal: AsyncSignal::new(),
             wait_mask: None,
         }
@@ -650,6 +682,13 @@ impl SelectSystem {
         }
     }
 
+    fn wake_timeouts(&mut self) {
+        if !self.time.is_empty() {
+            let now = self.now();
+            self.time.wake_if_passed(now);
+        }
+    }
+
     fn wake_on_signals(&mut self) {
         let signals = self.system.caught_signals();
         if signals.is_empty() {
@@ -666,9 +705,9 @@ impl SelectSystem {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
 
-        let inner_result = self
-            .system
-            .select(&mut readers, &mut writers, self.wait_mask.as_ref());
+        let inner_result =
+            self.system
+                .select(&mut readers, &mut writers, None, self.wait_mask.as_ref());
         let final_result = match inner_result {
             Ok(_) => {
                 self.io.wake(readers, writers);
@@ -683,7 +722,7 @@ impl SelectSystem {
             Err(Errno::EINTR) => Ok(()),
             Err(error) => Err(error),
         };
-        // TODO Support timers
+        self.wake_timeouts();
         self.wake_on_signals();
         final_result
     }
@@ -772,6 +811,70 @@ impl AsyncIo {
     }
 }
 
+/// Helper for `select`ing on time.
+///
+/// An `AsyncTime` is a set of [Waker]s that are waiting for a specific time to
+/// come.
+#[derive(Clone, Debug, Default)]
+struct AsyncTime {
+    timeouts: BinaryHeap<Reverse<Timeout>>,
+}
+
+#[derive(Clone, Debug)]
+struct Timeout {
+    target: Instant,
+    waker: Waker,
+}
+
+impl PartialEq for Timeout {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.target == rhs.target
+    }
+}
+
+impl Eq for Timeout {}
+
+impl PartialOrd for Timeout {
+    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
+}
+
+impl Ord for Timeout {
+    fn cmp(&self, rhs: &Self) -> Ordering {
+        self.target.cmp(&rhs.target)
+    }
+}
+
+impl AsyncTime {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.timeouts.is_empty()
+    }
+
+    fn push(&mut self, timeout: Timeout) {
+        self.timeouts.push(Reverse(timeout))
+    }
+
+    fn wake_if_passed(&mut self, now: Instant) {
+        while let Some(t) = self.timeouts.peek_mut() {
+            if !t.0.passed(now) {
+                break;
+            }
+            PeekMut::pop(t).0.waker.wake();
+        }
+    }
+}
+
+impl Timeout {
+    fn passed(&self, now: Instant) -> bool {
+        self.target <= now
+    }
+}
+
 /// Helper for `select`ing on signals.
 ///
 /// An `AsyncSignal` is a set of [Waker]s that are waiting for a signal to be
@@ -853,6 +956,7 @@ mod tests {
     use std::future::Future;
     use std::rc::Rc;
     use std::task::Context;
+    use std::time::Duration;
 
     #[test]
     fn shared_system_read_async_ready() {
@@ -993,6 +1097,39 @@ mod tests {
     }
 
     // TODO Test SharedSystem::write_all where second write returns EINTR
+
+    #[test]
+    fn shared_system_wait_until() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let system = SharedSystem::new(Box::new(system));
+        let start = Instant::now();
+        state.borrow_mut().now = Some(start);
+
+        let mut future = Box::pin(system.wait_until(start + Duration::from_millis(1_125)));
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(125));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(1_124));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        state.borrow_mut().now = Some(start + Duration::from_millis(1_125));
+        system.select().unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Ready(()));
+    }
 
     #[test]
     fn shared_system_wait_for_signals() {
@@ -1202,6 +1339,40 @@ mod tests {
         async_io.wake_all();
         assert_eq!(async_io.readers(), FdSet::new());
         assert_eq!(async_io.writers(), FdSet::new());
+    }
+
+    #[test]
+    fn async_time_wake_if_passed() {
+        let mut async_time = AsyncTime::new();
+        let now = Instant::now();
+        async_time.push(Timeout {
+            target: now,
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(1, 0),
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(1, 1),
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(2, 0),
+            waker: noop_waker(),
+        });
+        assert_eq!(async_time.timeouts.len(), 4);
+
+        async_time.wake_if_passed(now + Duration::new(1, 0));
+        assert_eq!(
+            async_time.timeouts.pop().unwrap().0.target,
+            now + Duration::new(1, 1)
+        );
+        assert_eq!(
+            async_time.timeouts.pop().unwrap().0.target,
+            now + Duration::new(2, 0)
+        );
+        assert!(async_time.timeouts.is_empty(), "{:?}", async_time.timeouts);
     }
 
     #[test]

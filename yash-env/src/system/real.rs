@@ -18,7 +18,12 @@
 
 use super::ChildProcess;
 use super::Env;
+use super::FdSet;
+use super::SigSet;
+use super::SigmaskHow;
+use super::Signal;
 use super::System;
+use super::TimeSpec;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::SignalHandling;
@@ -26,13 +31,9 @@ use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use nix::libc::{S_IFMT, S_IFREG};
-use nix::sys::select::FdSet;
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
-use nix::sys::signal::SigSet;
-use nix::sys::signal::SigmaskHow;
-use nix::sys::signal::Signal;
 use nix::sys::stat::stat;
 use nix::sys::stat::Mode;
 use nix::unistd::access;
@@ -47,6 +48,7 @@ use std::pin::Pin;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -177,6 +179,10 @@ impl System for RealSystem {
         }
     }
 
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -234,9 +240,10 @@ impl System for RealSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
-        nix::sys::select::pselect(None, readers, writers, None, None, signal_mask)
+        nix::sys::select::pselect(None, readers, writers, None, timeout, signal_mask)
     }
 
     /// Creates a new child process.
