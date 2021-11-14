@@ -47,6 +47,11 @@ mod process;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+use super::FdSet;
+use super::SigSet;
+use super::SigmaskHow;
+use super::Signal;
+use super::TimeSpec;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
@@ -57,10 +62,6 @@ use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
-use nix::sys::select::FdSet;
-use nix::sys::signal::SigSet;
-use nix::sys::signal::SigmaskHow;
-use nix::sys::signal::Signal;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -341,10 +342,13 @@ impl System for VirtualSystem {
     ///
     /// The `VirtualSystem` implementation for this method does not actually
     /// block the calling thread. The method returns immediately in any case.
+    ///
+    /// Timeout is not yet implemented. Currently, it is silently ignored.
     fn select(
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        _timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
         let mut process = self.current_process_mut();
@@ -894,7 +898,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers, None);
+        let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(3));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -911,7 +915,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers, None);
+        let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -928,7 +932,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers, None);
+        let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -942,7 +946,7 @@ mod tests {
         let mut writers = FdSet::new();
         readers.insert(reader.0);
 
-        let result = system.select(&mut readers, &mut writers, None);
+        let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(0));
         assert_eq!(readers, FdSet::new());
         assert_eq!(writers, FdSet::new());
@@ -958,7 +962,7 @@ mod tests {
 
         let all_readers = readers;
         let all_writers = writers;
-        let result = system.select(&mut readers, &mut writers, None);
+        let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(1));
         assert_eq!(readers, all_readers);
         assert_eq!(writers, all_writers);
@@ -970,7 +974,7 @@ mod tests {
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(writer.0);
-        let result = system.select(&mut fds, &mut FdSet::new(), None);
+        let result = system.select(&mut fds, &mut FdSet::new(), None, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -980,7 +984,7 @@ mod tests {
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
         fds.insert(reader.0);
-        let result = system.select(&mut FdSet::new(), &mut fds, None);
+        let result = system.select(&mut FdSet::new(), &mut fds, None, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -989,10 +993,10 @@ mod tests {
         let mut system = VirtualSystem::new();
         let mut fds = FdSet::new();
         fds.insert(17);
-        let result = system.select(&mut fds, &mut FdSet::new(), None);
+        let result = system.select(&mut fds, &mut FdSet::new(), None, None);
         assert_eq!(result, Err(Errno::EBADF));
 
-        let result = system.select(&mut FdSet::new(), &mut fds, None);
+        let result = system.select(&mut FdSet::new(), &mut fds, None, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
 
@@ -1012,7 +1016,12 @@ mod tests {
     #[test]
     fn select_on_non_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        let result = system.select(
+            &mut FdSet::new(),
+            &mut FdSet::new(),
+            None,
+            Some(&SigSet::empty()),
+        );
         assert_eq!(result, Ok(0));
         assert_eq!(system.caught_signals(), []);
     }
@@ -1021,7 +1030,12 @@ mod tests {
     fn select_on_pending_signal() {
         let mut system = system_for_catching_sigchld();
         system.current_process_mut().raise_signal(Signal::SIGCHLD);
-        let result = system.select(&mut FdSet::new(), &mut FdSet::new(), Some(&SigSet::empty()));
+        let result = system.select(
+            &mut FdSet::new(),
+            &mut FdSet::new(),
+            None,
+            Some(&SigSet::empty()),
+        );
         assert_eq!(result, Err(Errno::EINTR));
         assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
     }

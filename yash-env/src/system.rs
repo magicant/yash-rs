@@ -40,6 +40,8 @@ pub use nix::sys::signal::SigSet;
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
 pub use nix::sys::stat::Mode;
+#[doc(no_inline)]
+pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -187,7 +189,6 @@ pub trait System: Debug {
     /// caught and made available from this function.
     fn caught_signals(&mut self) -> Vec<Signal>;
 
-    // TODO timespec
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
@@ -201,6 +202,7 @@ pub trait System: Debug {
     ///
     /// - An FD in `readers` becomes ready for reading.
     /// - An FD in `writers` becomes ready for writing.
+    /// - The specified `timeout` duration has passed.
     /// - A signal handler catches a signal.
     ///
     /// When this function returns an `Ok`, FDs that are not ready for reading
@@ -218,6 +220,7 @@ pub trait System: Debug {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int>;
 
@@ -542,9 +545,10 @@ impl System for SharedSystem {
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
-        (**self.0.borrow_mut()).select(readers, writers, signal_mask)
+        (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -666,9 +670,9 @@ impl SelectSystem {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
 
-        let inner_result = self
-            .system
-            .select(&mut readers, &mut writers, self.wait_mask.as_ref());
+        let inner_result =
+            self.system
+                .select(&mut readers, &mut writers, None, self.wait_mask.as_ref());
         let final_result = match inner_result {
             Ok(_) => {
                 self.io.wake(readers, writers);
