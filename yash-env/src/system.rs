@@ -43,6 +43,10 @@ pub use nix::sys::stat::Mode;
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::cmp::Reverse;
+use std::collections::binary_heap::PeekMut;
+use std::collections::BinaryHeap;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -595,6 +599,7 @@ impl SignalSystem for SharedSystem {
 pub(crate) struct SelectSystem {
     system: Box<dyn System>,
     io: AsyncIo,
+    time: AsyncTime,
     signal: AsyncSignal,
     wait_mask: Option<SigSet>,
 }
@@ -618,6 +623,7 @@ impl SelectSystem {
         SelectSystem {
             system,
             io: AsyncIo::new(),
+            time: AsyncTime::new(),
             signal: AsyncSignal::new(),
             wait_mask: None,
         }
@@ -783,6 +789,66 @@ impl AsyncIo {
     }
 }
 
+/// Helper for `select`ing on time.
+///
+/// An `AsyncTime` is a set of [Waker]s that are waiting for a specific time to
+/// come.
+#[derive(Clone, Debug, Default)]
+struct AsyncTime {
+    timeouts: BinaryHeap<Reverse<Timeout>>,
+}
+
+#[derive(Clone, Debug)]
+struct Timeout {
+    target: Instant,
+    waker: Waker,
+}
+
+impl PartialEq for Timeout {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.target == rhs.target
+    }
+}
+
+impl Eq for Timeout {}
+
+impl PartialOrd for Timeout {
+    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
+}
+
+impl Ord for Timeout {
+    fn cmp(&self, rhs: &Self) -> Ordering {
+        self.target.cmp(&rhs.target)
+    }
+}
+
+impl AsyncTime {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn push(&mut self, timeout: Timeout) {
+        self.timeouts.push(Reverse(timeout))
+    }
+
+    fn wake_if_passed(&mut self, now: Instant) {
+        while let Some(t) = self.timeouts.peek_mut() {
+            if !t.0.passed(now) {
+                break;
+            }
+            PeekMut::pop(t).0.waker.wake();
+        }
+    }
+}
+
+impl Timeout {
+    fn passed(&self, now: Instant) -> bool {
+        self.target <= now
+    }
+}
+
 /// Helper for `select`ing on signals.
 ///
 /// An `AsyncSignal` is a set of [Waker]s that are waiting for a signal to be
@@ -864,6 +930,7 @@ mod tests {
     use std::future::Future;
     use std::rc::Rc;
     use std::task::Context;
+    use std::time::Duration;
 
     #[test]
     fn shared_system_read_async_ready() {
@@ -1213,6 +1280,40 @@ mod tests {
         async_io.wake_all();
         assert_eq!(async_io.readers(), FdSet::new());
         assert_eq!(async_io.writers(), FdSet::new());
+    }
+
+    #[test]
+    fn async_time_wake_if_passed() {
+        let mut async_time = AsyncTime::new();
+        let now = Instant::now();
+        async_time.push(Timeout {
+            target: now,
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(1, 0),
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(1, 1),
+            waker: noop_waker(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::new(2, 0),
+            waker: noop_waker(),
+        });
+        assert_eq!(async_time.timeouts.len(), 4);
+
+        async_time.wake_if_passed(now + Duration::new(1, 0));
+        assert_eq!(
+            async_time.timeouts.pop().unwrap().0.target,
+            now + Duration::new(1, 1)
+        );
+        assert_eq!(
+            async_time.timeouts.pop().unwrap().0.target,
+            now + Duration::new(2, 0)
+        );
+        assert!(async_time.timeouts.is_empty(), "{:?}", async_time.timeouts);
     }
 
     #[test]
