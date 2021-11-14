@@ -55,6 +55,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
+use std::time::Instant;
 
 /// API to the system-managed parts of the environment.
 ///
@@ -128,6 +129,9 @@ pub trait System: Debug {
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Returns the current time.
+    fn now(&self) -> Instant;
 
     /// Gets and/or sets the signal blocking mask.
     ///
@@ -526,6 +530,9 @@ impl System for SharedSystem {
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
+    }
+    fn now(&self) -> Instant {
+        self.0.borrow().now()
     }
     fn sigmask(
         &mut self,

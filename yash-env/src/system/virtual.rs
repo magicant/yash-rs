@@ -78,6 +78,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::time::Instant;
 
 /// Simulated system.
 ///
@@ -313,6 +314,16 @@ impl System for VirtualSystem {
         self.with_open_file_description(fd, |ofd| ofd.write(buffer))
     }
 
+    /// Returns `now` in [`SystemState`].
+    ///
+    /// Panics if it is `None`.
+    fn now(&self) -> Instant {
+        self.state
+            .borrow()
+            .now
+            .expect("SystemState::now not assigned")
+    }
+
     fn sigmask(
         &mut self,
         how: SigmaskHow,
@@ -541,6 +552,9 @@ impl ChildProcess for DummyChildProcess {
 /// State of the virtual system.
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
+    /// Current time.
+    pub now: Option<Instant>,
+
     /// Task manager that can execute asynchronous tasks.
     ///
     /// The virtual system uses this executor to run (virtual) child processes.

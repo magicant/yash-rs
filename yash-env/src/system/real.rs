@@ -48,6 +48,7 @@ use std::pin::Pin;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 fn is_executable(path: &CStr) -> bool {
     let flags = AccessFlags::X_OK;
@@ -176,6 +177,10 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn now(&self) -> Instant {
+        Instant::now()
     }
 
     fn sigmask(
