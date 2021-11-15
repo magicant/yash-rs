@@ -473,13 +473,20 @@ impl SharedSystem {
 
     /// Waits until the specified time point.
     pub async fn wait_until(&self, target: Instant) {
+        // We need to retain a strong reference to the waker outside the poll_fn
+        // function because SelectSystem only retains a weak reference to it.
+        // This allows SelectSystem to discard defunct wakers if this async task
+        // is aborted.
+        let waker = Rc::new(RefCell::new(None));
+
         poll_fn(|context| {
             let mut system = self.0.borrow_mut();
             let now = system.now();
             if now >= target {
                 return Poll::Ready(());
             }
-            let waker = context.waker().clone();
+            *waker.borrow_mut() = Some(context.waker().clone());
+            let waker = Rc::downgrade(&waker);
             system.time.push(Timeout { target, waker });
             Poll::Pending
         })
@@ -702,6 +709,7 @@ impl SelectSystem {
             let now = self.now();
             self.time.wake_if_passed(now);
         }
+        self.time.gc();
     }
 
     fn wake_on_signals(&mut self) {
@@ -865,7 +873,7 @@ struct AsyncTime {
 #[derive(Clone, Debug)]
 struct Timeout {
     target: Instant,
-    waker: Waker,
+    waker: Weak<RefCell<Option<Waker>>>,
 }
 
 impl PartialEq for Timeout {
@@ -888,6 +896,17 @@ impl Ord for Timeout {
     }
 }
 
+impl Drop for Timeout {
+    /// Wakes the waker when `Timeout` is dropped.
+    fn drop(&mut self) {
+        if let Some(waker) = self.waker.upgrade() {
+            if let Some(waker) = waker.borrow_mut().take() {
+                waker.wake();
+            }
+        }
+    }
+}
+
 impl AsyncTime {
     fn new() -> Self {
         Self::default()
@@ -902,12 +921,17 @@ impl AsyncTime {
     }
 
     fn wake_if_passed(&mut self, now: Instant) {
-        while let Some(t) = self.timeouts.peek_mut() {
-            if !t.0.passed(now) {
+        while let Some(timeout) = self.timeouts.peek_mut() {
+            if !timeout.0.passed(now) {
                 break;
             }
-            PeekMut::pop(t).0.waker.wake();
+            PeekMut::pop(timeout);
         }
+    }
+
+    fn gc(&mut self) {
+        // TODO Need BinaryHeap::retain
+        // self.timeouts.retain(|t| t.waker.strong_count() > 0);
     }
 }
 
@@ -1390,21 +1414,22 @@ mod tests {
     fn async_time_wake_if_passed() {
         let mut async_time = AsyncTime::new();
         let now = Instant::now();
+        let waker = Rc::new(RefCell::new(Some(noop_waker())));
         async_time.push(Timeout {
             target: now,
-            waker: noop_waker(),
+            waker: Rc::downgrade(&waker),
         });
         async_time.push(Timeout {
             target: now + Duration::new(1, 0),
-            waker: noop_waker(),
+            waker: Rc::downgrade(&waker),
         });
         async_time.push(Timeout {
             target: now + Duration::new(1, 1),
-            waker: noop_waker(),
+            waker: Rc::downgrade(&waker),
         });
         async_time.push(Timeout {
             target: now + Duration::new(2, 0),
-            waker: noop_waker(),
+            waker: Rc::downgrade(&waker),
         });
         assert_eq!(async_time.timeouts.len(), 4);
 
