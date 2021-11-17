@@ -250,6 +250,18 @@ impl TrapSet {
         Ok(())
     }
 
+    /// Sets the `pending` flag of the [`TrapState`] for the specified signal.
+    ///
+    /// This function does nothing if no trap action has been
+    /// [set](Self::set_trap) for the signal.
+    pub fn catch_signal(&mut self, signal: Signal) {
+        if let Some(state) = self.signals.get_mut(&signal) {
+            if let UserSignalState::Trap(trap) = &mut state.user_state {
+                trap.pending = true;
+            }
+        }
+    }
+
     /// Installs an internal handler for `SIGCHLD`.
     ///
     /// You should install the `SIGCHLD` handler to the system by using this
@@ -543,6 +555,30 @@ mod tests {
         assert_eq!(result, Err(SetTrapError::SIGSTOP));
         assert_eq!(trap_set.get_trap(Signal::SIGSTOP), None);
         assert_eq!(system.0.get(&Signal::SIGSTOP), None);
+    }
+
+    #[test]
+    fn catching_signal() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let command = Trap::Command("echo INT".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGINT, command, origin, false)
+            .unwrap();
+        let command = Trap::Command("echo TERM".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGTERM, command, origin, false)
+            .unwrap();
+
+        trap_set.catch_signal(Signal::SIGCHLD);
+        trap_set.catch_signal(Signal::SIGINT);
+
+        let trap_state = trap_set.get_trap(Signal::SIGINT).unwrap();
+        assert!(trap_state.pending, "{:?}", trap_state);
+        let trap_state = trap_set.get_trap(Signal::SIGTERM).unwrap();
+        assert!(!trap_state.pending, "{:?}", trap_state);
     }
 
     #[test]
