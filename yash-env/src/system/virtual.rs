@@ -600,7 +600,8 @@ impl SystemState {
         // To avoid double borrowing, SelectSystem::select must be called after
         // dropping the borrow for `this`
         for selector in selectors {
-            selector.borrow_mut().select().ok();
+            // TODO merge advances of `now` performed by each select
+            selector.borrow_mut().select(false).ok();
         }
     }
 

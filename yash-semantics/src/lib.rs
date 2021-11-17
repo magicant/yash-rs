@@ -159,7 +159,7 @@ pub(crate) mod tests {
 
         while !done_2.get() {
             executor.run_until_stalled();
-            shared_system.select().unwrap();
+            shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
     }

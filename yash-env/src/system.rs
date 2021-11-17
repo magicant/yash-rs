@@ -59,6 +59,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::task::Waker;
+use std::time::Duration;
 use std::time::Instant;
 
 /// API to the system-managed parts of the environment.
@@ -356,7 +357,7 @@ pub trait ChildProcess: Debug {
 ///
 /// // The write task has written a byte to the pipe, but the read task is still
 /// // stalled. We need to wake it up by calling `select`.
-/// system3.select().unwrap();
+/// system3.select(false).unwrap();
 ///
 /// // Now the read task can proceed to the end.
 /// let number = executor.run_until(read_task.unwrap());
@@ -533,11 +534,17 @@ impl SharedSystem {
     /// waiting for the file descriptor to be ready in
     /// [`read_async`](Self::read_async) and [`write_all`](Self::write_all) or
     /// for a signal to be caught in [`wait_for_signal`](Self::wait_for_signal).
+    /// If no tasks are woken for FDs or signals and `poll` is false, this
+    /// function will block until the first task waiting for a specific time
+    /// point is woken.
+    ///
+    /// If poll is true, this function does not block, so it may not wake up any
+    /// tasks.
     ///
     /// This function may wake up a task even if the condition it is expecting
     /// has not yet been met.
-    pub fn select(&self) -> nix::Result<()> {
-        self.0.borrow_mut().select()
+    pub fn select(&self, poll: bool) -> nix::Result<()> {
+        self.0.borrow_mut().select(poll)
     }
 }
 
@@ -724,14 +731,18 @@ impl SelectSystem {
     /// Implements the select function for `SharedSystem`.
     ///
     /// See [`SharedSystem::select`].
-    pub fn select(&mut self) -> nix::Result<()> {
+    pub fn select(&mut self, poll: bool) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
-        let timeout = self.time.first_target().map(|t| {
-            let now = self.now();
-            let duration = t.saturating_duration_since(now);
-            TimeSpec::from(duration)
-        });
+        let timeout = if poll {
+            Some(TimeSpec::from(Duration::ZERO))
+        } else {
+            self.time.first_target().map(|t| {
+                let now = self.now();
+                let duration = t.saturating_duration_since(now);
+                TimeSpec::from(duration)
+            })
+        };
 
         let inner_result = self.system.select(
             &mut readers,
@@ -1037,7 +1048,6 @@ mod tests {
     use std::future::Future;
     use std::rc::Rc;
     use std::task::Context;
-    use std::time::Duration;
 
     #[test]
     fn shared_system_read_async_ready() {
@@ -1066,7 +1076,7 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
-        let result = system2.select();
+        let result = system2.select(false);
         assert_eq!(result, Ok(()));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1193,7 +1203,7 @@ mod tests {
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
 
-        system.select().unwrap();
+        system.select(false).unwrap();
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Ready(()));
         assert_eq!(state.borrow().now, Some(target));
@@ -1232,7 +1242,7 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
-        system.select().unwrap();
+        system.select(false).unwrap();
         let result = future.as_mut().poll(&mut context);
         assert_matches!(result, Poll::Ready(signals) => {
             assert_eq!(signals.len(), 2);
@@ -1265,7 +1275,7 @@ mod tests {
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
-        system.select().unwrap();
+        system.select(false).unwrap();
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Ready(()));
     }
@@ -1294,7 +1304,7 @@ mod tests {
             process.raise_signal(Signal::SIGCHLD);
             process.raise_signal(Signal::SIGTERM);
         }
-        system.select().unwrap();
+        system.select(false).unwrap();
 
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1319,7 +1329,7 @@ mod tests {
             process.raise_signal(Signal::SIGINT);
             process.raise_signal(Signal::SIGTERM);
         }
-        system.select().unwrap();
+        system.select(false).unwrap();
 
         let state = state.borrow();
         let process = state.processes.get(&process_id).unwrap();
@@ -1351,12 +1361,32 @@ mod tests {
         let result = signal_future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
         system_3.write(writer, &[42]).unwrap();
-        system_3.select().unwrap();
+        system_3.select(false).unwrap();
 
         let result = read_future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Ready(Ok(1)));
         let result = signal_future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
+    }
+
+    #[test]
+    fn shared_system_select_poll() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let system = SharedSystem::new(Box::new(system));
+        let start = Instant::now();
+        state.borrow_mut().now = Some(start);
+        let target = start + Duration::from_millis(1_125);
+
+        let mut future = Box::pin(system.wait_until(target));
+        let mut context = Context::from_waker(noop_waker_ref());
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+
+        system.select(true).unwrap();
+        let poll = future.as_mut().poll(&mut context);
+        assert_eq!(poll, Poll::Pending);
+        assert_eq!(state.borrow().now, Some(start));
     }
 
     #[test]

@@ -77,6 +77,6 @@ pub fn bin_main() -> i32 {
             Poll::Ready(result) => return result,
             Poll::Pending => (),
         }
-        system.select().ok();
+        system.select(false).ok();
     }
 }
