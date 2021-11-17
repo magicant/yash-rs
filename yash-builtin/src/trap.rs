@@ -28,6 +28,7 @@ use yash_env::expansion::Field;
 use yash_env::trap::SetTrapError;
 use yash_env::trap::Signal;
 use yash_env::trap::Trap;
+use yash_env::trap::TrapState;
 use yash_syntax::source::Location;
 
 /// Part of the shell execution environment the trap built-in depends on.
@@ -40,7 +41,7 @@ pub trait Env {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    fn get_trap(&self, signal: Signal) -> Option<(&Trap, &Location)>;
+    fn get_trap(&self, signal: Signal) -> Option<&TrapState>;
 
     /// Sets a trap action for a signal.
     ///
@@ -66,7 +67,7 @@ pub trait Env {
 }
 
 impl Env for yash_env::Env {
-    fn get_trap(&self, signal: Signal) -> Option<(&Trap, &Location)> {
+    fn get_trap(&self, signal: Signal) -> Option<&TrapState> {
         self.traps.get_trap(signal)
     }
 

@@ -92,11 +92,28 @@ impl From<Errno> for SetTrapError {
     }
 }
 
+/// State of the trap action for a signal.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrapState {
+    /// Action taken when the signal is delivered to the shell process.
+    action: Trap,
+    /// Location of the simple command that invoked the trap built-in that has set this trap.
+    origin: Location,
+    /// True iff the signal has been caught and the trap command has not yet executed.
+    pending: bool,
+}
+
+/// User-visible signal disposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum UserSignalState {
+    /// The user has not yet set a trap for the signal, and the disposition the
+    /// shell has inherited from the pre-exec process is `SIG_DFL`.
     InitiallyDefaulted,
+    /// The user has not yet set a trap for the signal, and the disposition the
+    /// shell has inherited from the pre-exec process is `SIG_IGN`.
     InitiallyIgnored,
-    Trap { action: Trap, origin: Location },
+    /// User-defined trap.
+    Trap(TrapState),
 }
 
 impl From<&UserSignalState> for SignalHandling {
@@ -104,7 +121,7 @@ impl From<&UserSignalState> for SignalHandling {
         match state {
             UserSignalState::InitiallyDefaulted => SignalHandling::Default,
             UserSignalState::InitiallyIgnored => SignalHandling::Ignore,
-            UserSignalState::Trap { action, .. } => action.into(),
+            UserSignalState::Trap(trap) => (&trap.action).into(),
         }
     }
 }
@@ -145,14 +162,14 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_trap(&self, signal: Signal) -> Option<(&Trap, &Location)> {
-        if let Some(state) = self.signals.get(&signal) {
-            if let UserSignalState::Trap { action, origin } = &state.user_state {
-                return Some((action, origin));
+    pub fn get_trap(&self, signal: Signal) -> Option<&TrapState> {
+        self.signals.get(&signal).and_then(|state| {
+            if let UserSignalState::Trap(trap) = &state.user_state {
+                Some(trap)
+            } else {
+                None
             }
-        }
-
-        None
+        })
     }
 
     /// Sets a trap action for a signal.
@@ -183,6 +200,12 @@ impl TrapSet {
             _ => (),
         }
 
+        let state = TrapState {
+            action,
+            origin,
+            pending: false,
+        };
+
         let entry = match self.signals.entry(signal) {
             Entry::Vacant(vacant) => {
                 if !override_ignore {
@@ -205,17 +228,17 @@ impl TrapSet {
                     return Err(SetTrapError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
-                    occupied.get_mut().user_state = UserSignalState::Trap { action, origin };
+                    occupied.get_mut().user_state = UserSignalState::Trap(state);
                     return Ok(());
                 }
                 Entry::Occupied(occupied)
             }
         };
 
-        system.set_signal_handling(signal, (&action).into())?;
+        system.set_signal_handling(signal, (&state.action).into())?;
 
         let state = SignalState {
-            user_state: UserSignalState::Trap { action, origin },
+            user_state: UserSignalState::Trap(state),
             internal_handler_enabled: false,
         };
         #[allow(clippy::drop_ref)]
@@ -328,7 +351,11 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             trap_set.get_trap(Signal::SIGCHLD),
-            Some((&Trap::Ignore, &origin))
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
@@ -350,7 +377,14 @@ mod tests {
             false,
         );
         assert_eq!(result, Ok(()));
-        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), Some((&action, &origin)));
+        assert_eq!(
+            trap_set.get_trap(Signal::SIGCHLD),
+            Some(&TrapState {
+                action,
+                origin,
+                pending: false
+            })
+        );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
             crate::system::SignalHandling::Catch
@@ -377,7 +411,11 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             trap_set.get_trap(Signal::SIGCHLD),
-            Some((&Trap::Default, &origin))
+            Some(&TrapState {
+                action: Trap::Default,
+                origin,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
@@ -422,7 +460,11 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             trap_set.get_trap(Signal::SIGCHLD),
-            Some((&Trap::Ignore, &origin))
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
@@ -457,11 +499,19 @@ mod tests {
 
         assert_eq!(
             trap_set.get_trap(Signal::SIGUSR1),
-            Some((&Trap::Ignore, &origin_1))
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin: origin_1,
+                pending: false
+            })
         );
         assert_eq!(
             trap_set.get_trap(Signal::SIGUSR2),
-            Some((&command, &origin_2))
+            Some(&TrapState {
+                action: command,
+                origin: origin_2,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGUSR1],
@@ -593,7 +643,11 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             trap_set.get_trap(Signal::SIGCHLD),
-            Some((&Trap::Ignore, &origin))
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
@@ -620,7 +674,11 @@ mod tests {
 
         assert_eq!(
             trap_set.get_trap(Signal::SIGCHLD),
-            Some((&Trap::Ignore, &origin))
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin,
+                pending: false
+            })
         );
         assert_eq!(
             system.0[&Signal::SIGCHLD],
