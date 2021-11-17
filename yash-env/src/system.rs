@@ -717,7 +717,7 @@ impl SelectSystem {
         if signals.is_empty() {
             self.signal.gc()
         } else {
-            self.signal.wake(signals.into())
+            self.signal.wake(&signals.into())
         }
     }
 
@@ -1010,11 +1010,11 @@ impl AsyncSignal {
     ///
     /// This function borrows `SignalStatus`es returned from `wait_for_signals`
     /// so you must not have conflicting borrows.
-    pub fn wake(&mut self, signals: Rc<[Signal]>) {
+    pub fn wake(&mut self, signals: &Rc<[Signal]>) {
         for status in std::mem::take(&mut self.awaiters) {
             if let Some(status) = status.upgrade() {
                 let mut status_ref = status.borrow_mut();
-                let new_status = SignalStatus::Caught(Rc::clone(&signals));
+                let new_status = SignalStatus::Caught(Rc::clone(signals));
                 let old_status = std::mem::replace(&mut *status_ref, new_status);
                 drop(status_ref);
                 if let SignalStatus::Expected(Some(waker)) = old_status {
@@ -1479,7 +1479,7 @@ mod tests {
         *status_1.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
         *status_2.borrow_mut() = SignalStatus::Expected(Some(noop_waker()));
 
-        async_signal.wake(Rc::new([Signal::SIGCHLD, Signal::SIGUSR1]));
+        async_signal.wake(&(Rc::new([Signal::SIGCHLD, Signal::SIGUSR1]) as Rc<[Signal]>));
         assert_matches!(&*status_1.borrow(), SignalStatus::Caught(signals) => {
             assert_eq!(**signals, [Signal::SIGCHLD, Signal::SIGUSR1]);
         });
