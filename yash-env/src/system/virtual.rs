@@ -78,6 +78,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::time::Duration;
 use std::time::Instant;
 
 /// Simulated system.
@@ -354,12 +355,14 @@ impl System for VirtualSystem {
     /// The `VirtualSystem` implementation for this method does not actually
     /// block the calling thread. The method returns immediately in any case.
     ///
-    /// Timeout is not yet implemented. Currently, it is silently ignored.
+    /// The `timeout` is ignored if this function returns because of a ready FD
+    /// or a caught signal. Otherwise, the timeout is added to
+    /// [`SystemState::now`], which must not be `None` then.
     fn select(
         &mut self,
         readers: &mut FdSet,
         writers: &mut FdSet,
-        _timeout: Option<&TimeSpec>,
+        timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
         let mut process = self.current_process_mut();
@@ -406,9 +409,20 @@ impl System for VirtualSystem {
             }
         }
 
+        drop(process);
+
         let reader_count = readers.fds(None).count();
         let writer_count = writers.fds(None).count();
-        Ok((reader_count + writer_count).try_into().unwrap())
+        let count = (reader_count + writer_count).try_into().unwrap();
+        if count == 0 {
+            if let Some(timeout) = timeout {
+                let mut state = self.state.borrow_mut();
+                let now = state.now.as_mut();
+                let now = now.expect("now time unspecified; cannot add timeout duration");
+                *now += Duration::from(*timeout);
+            }
+        }
+        Ok(count)
     }
 
     /// Creates a new child process.
@@ -1052,6 +1066,28 @@ mod tests {
         );
         assert_eq!(result, Err(Errno::EINTR));
         assert_eq!(system.caught_signals(), [Signal::SIGCHLD]);
+    }
+
+    #[test]
+    fn select_timeout() {
+        let mut system = VirtualSystem::new();
+        let now = Instant::now();
+        system.state.borrow_mut().now = Some(now);
+
+        let (reader, _writer) = system.pipe().unwrap();
+        let mut readers = FdSet::new();
+        let mut writers = FdSet::new();
+        readers.insert(reader.0);
+        let timeout = Duration::new(42, 195).into();
+
+        let result = system.select(&mut readers, &mut writers, Some(&timeout), None);
+        assert_eq!(result, Ok(0));
+        assert_eq!(readers, FdSet::new());
+        assert_eq!(writers, FdSet::new());
+        assert_eq!(
+            system.state.borrow().now,
+            Some(now + Duration::new(42, 195))
+        );
     }
 
     #[test]

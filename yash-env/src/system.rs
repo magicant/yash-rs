@@ -727,10 +727,18 @@ impl SelectSystem {
     pub fn select(&mut self) -> nix::Result<()> {
         let mut readers = self.io.readers();
         let mut writers = self.io.writers();
+        let timeout = self.time.first_target().map(|t| {
+            let now = self.now();
+            let duration = t.saturating_duration_since(now);
+            TimeSpec::from(duration)
+        });
 
-        let inner_result =
-            self.system
-                .select(&mut readers, &mut writers, None, self.wait_mask.as_ref());
+        let inner_result = self.system.select(
+            &mut readers,
+            &mut writers,
+            timeout.as_ref(),
+            self.wait_mask.as_ref(),
+        );
         let final_result = match inner_result {
             Ok(_) => {
                 self.io.wake(readers, writers);
@@ -908,16 +916,23 @@ impl Drop for Timeout {
 }
 
 impl AsyncTime {
+    #[must_use]
     fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     fn is_empty(&self) -> bool {
         self.timeouts.is_empty()
     }
 
     fn push(&mut self, timeout: Timeout) {
         self.timeouts.push(Reverse(timeout))
+    }
+
+    #[must_use]
+    fn first_target(&self) -> Option<Instant> {
+        self.timeouts.peek().map(|timeout| timeout.0.target)
     }
 
     fn wake_if_passed(&mut self, now: Instant) {
@@ -1171,30 +1186,17 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let start = Instant::now();
         state.borrow_mut().now = Some(start);
+        let target = start + Duration::from_millis(1_125);
 
-        let mut future = Box::pin(system.wait_until(start + Duration::from_millis(1_125)));
+        let mut future = Box::pin(system.wait_until(target));
         let mut context = Context::from_waker(noop_waker_ref());
         let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Pending);
 
         system.select().unwrap();
         let poll = future.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Pending);
-
-        state.borrow_mut().now = Some(start + Duration::from_millis(125));
-        system.select().unwrap();
-        let poll = future.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Pending);
-
-        state.borrow_mut().now = Some(start + Duration::from_millis(1_124));
-        system.select().unwrap();
-        let poll = future.as_mut().poll(&mut context);
-        assert_eq!(poll, Poll::Pending);
-
-        state.borrow_mut().now = Some(start + Duration::from_millis(1_125));
-        system.select().unwrap();
-        let poll = future.as_mut().poll(&mut context);
         assert_eq!(poll, Poll::Ready(()));
+        assert_eq!(state.borrow().now, Some(target));
     }
 
     #[test]
@@ -1408,6 +1410,30 @@ mod tests {
         async_io.wake_all();
         assert_eq!(async_io.readers(), FdSet::new());
         assert_eq!(async_io.writers(), FdSet::new());
+    }
+
+    #[test]
+    fn async_time_first_target() {
+        let mut async_time = AsyncTime::new();
+        let now = Instant::now();
+        assert_eq!(async_time.first_target(), None);
+
+        async_time.push(Timeout {
+            target: now + Duration::from_secs(2),
+            waker: Weak::default(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::from_secs(1),
+            waker: Weak::default(),
+        });
+        async_time.push(Timeout {
+            target: now + Duration::from_secs(3),
+            waker: Weak::default(),
+        });
+        assert_eq!(
+            async_time.first_target(),
+            Some(now + Duration::from_secs(1))
+        );
     }
 
     #[test]
