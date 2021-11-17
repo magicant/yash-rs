@@ -262,6 +262,25 @@ impl TrapSet {
         }
     }
 
+    /// Returns a signal that has been [caught](Self::catch_signal).
+    ///
+    /// This function clears the `pending` flag of the [`TrapState`] for the
+    /// specified signal.
+    ///
+    /// If there is more than one caught signal, it is unspecified which one of
+    /// them is returned. If there is no caught signal, `None` is returned.
+    pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
+        self.signals
+            .iter_mut()
+            .find_map(|(signal, state)| match &mut state.user_state {
+                UserSignalState::Trap(trap) if trap.pending => {
+                    trap.pending = false;
+                    Some((*signal, &*trap))
+                }
+                _ => None,
+            })
+    }
+
     /// Installs an internal handler for `SIGCHLD`.
     ///
     /// You should install the `SIGCHLD` handler to the system by using this
@@ -579,6 +598,59 @@ mod tests {
         assert!(trap_state.pending, "{:?}", trap_state);
         let trap_state = trap_set.get_trap(Signal::SIGTERM).unwrap();
         assert!(!trap_state.pending, "{:?}", trap_state);
+    }
+
+    #[test]
+    fn taking_caught_signal() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        assert_eq!(trap_set.take_caught_signal(), None);
+
+        let command = Trap::Command("echo INT".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGINT, command, origin, false)
+            .unwrap();
+        let command = Trap::Command("echo TERM".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGTERM, command, origin, false)
+            .unwrap();
+        let command = Trap::Command("echo USR1".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR1, command, origin, false)
+            .unwrap();
+        assert_eq!(trap_set.take_caught_signal(), None);
+
+        trap_set.catch_signal(Signal::SIGINT);
+        trap_set.catch_signal(Signal::SIGUSR1);
+        // The order in which take_caught_signal returns the two signals is
+        // unspecified, so we accept both the orders.
+        let result = trap_set.take_caught_signal().unwrap();
+        match result.0 {
+            Signal::SIGINT => {
+                assert_eq!(result.1.action, Trap::Command("echo INT".into()));
+                assert!(!result.1.pending);
+
+                let result = trap_set.take_caught_signal().unwrap();
+                assert_eq!(result.0, Signal::SIGUSR1);
+                assert_eq!(result.1.action, Trap::Command("echo USR1".into()));
+                assert!(!result.1.pending);
+            }
+            Signal::SIGUSR1 => {
+                assert_eq!(result.1.action, Trap::Command("echo USR1".into()));
+                assert!(!result.1.pending);
+
+                let result = trap_set.take_caught_signal().unwrap();
+                assert_eq!(result.0, Signal::SIGINT);
+                assert_eq!(result.1.action, Trap::Command("echo INT".into()));
+                assert!(!result.1.pending);
+            }
+            _ => panic!("wrong signal: {:?}", result),
+        }
+
+        assert_eq!(trap_set.take_caught_signal(), None);
     }
 
     #[test]
