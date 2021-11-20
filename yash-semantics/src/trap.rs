@@ -46,7 +46,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let previous_exit_status = env.exit_status;
         // TODO Update control flow stack
-        read_eval_loop(env, &mut lexer).await;
+        read_eval_loop(env, &mut lexer).await?;
         env.exit_status = previous_exit_status;
     }
 
@@ -57,7 +57,10 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
 mod tests {
     use super::*;
     use crate::tests::echo_builtin;
+    use crate::tests::return_builtin;
     use futures_executor::block_on;
+    use std::ops::ControlFlow::Break;
+    use yash_env::exec::Divert;
     use yash_env::exec::ExitStatus;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
@@ -68,27 +71,36 @@ mod tests {
         let system = VirtualSystem::default();
         let mut env = Env::with_system(Box::new(system.clone()));
         env.builtins.insert("echo", echo_builtin());
-        let origin = Location::dummy("");
+        env.builtins.insert("return", return_builtin());
         env.traps
             .set_trap(
                 &mut env.system,
                 Signal::SIGINT,
                 Trap::Command("echo trapped".to_string()),
-                origin,
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        env.traps
+            .set_trap(
+                &mut env.system,
+                Signal::SIGUSR1,
+                Trap::Command("return 56".to_string()),
+                Location::dummy(""),
                 false,
             )
             .unwrap();
         (env, system)
     }
 
-    fn raise_signal(system: &VirtualSystem) {
+    fn raise_signal(system: &VirtualSystem, signal: Signal) {
         system
             .state
             .borrow_mut()
             .processes
             .get_mut(&system.process_id)
             .unwrap()
-            .raise_signal(Signal::SIGINT);
+            .raise_signal(signal);
     }
 
     #[test]
@@ -112,7 +124,7 @@ mod tests {
     #[test]
     fn running_trap() {
         let (mut env, system) = signal_env();
-        raise_signal(&system);
+        raise_signal(&system, Signal::SIGINT);
         let result = block_on(run_traps_for_caught_signals(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(
@@ -132,12 +144,20 @@ mod tests {
     fn exit_status_is_restored_after_running_trap() {
         let (mut env, system) = signal_env();
         env.exit_status = ExitStatus(42);
-        raise_signal(&system);
+        raise_signal(&system, Signal::SIGINT);
         let _ = block_on(run_traps_for_caught_signals(&mut env));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
 
-    // TODO return/exit from trap
+    #[test]
+    fn exit_from_trap() {
+        let (mut env, system) = signal_env();
+        raise_signal(&system, Signal::SIGUSR1);
+        let result = block_on(run_traps_for_caught_signals(&mut env));
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(56));
+    }
+
     // TODO exit status on return/exit from trap
     // TODO $? inside trap
 }

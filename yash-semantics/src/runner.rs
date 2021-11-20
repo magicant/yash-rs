@@ -18,8 +18,9 @@
 
 use crate::Command;
 use crate::Handle;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::Continue;
 use yash_env::exec::ExitStatus;
+use yash_env::exec::Result;
 use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::parser::Parser;
@@ -39,32 +40,24 @@ use yash_syntax::parser::Parser;
 /// interactive shell
 ///
 /// TODO: Handle traps while reading commands
-pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) {
+pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
     let mut executed = false;
 
     loop {
         let mut parser = Parser::new(lexer, &env.aliases);
-        let result = match parser.command_line().await {
+        match parser.command_line().await {
             Ok(None) => break,
-            Ok(Some(command)) => command.execute(env).await,
-            Err(error) => error.handle(env).await,
+            Ok(Some(command)) => command.execute(env).await?,
+            Err(error) => error.handle(env).await?,
         };
         executed = true;
-        match result {
-            Continue(()) => (),
-            Break(divert) => {
-                // TODO return the divert to the caller rather than consuming it
-                if let Some(exit_status) = divert.exit_status() {
-                    env.exit_status = exit_status;
-                }
-                break;
-            }
-        };
     }
 
     if !executed {
         env.exit_status = ExitStatus::SUCCESS;
     }
+
+    Continue(())
 }
 
 #[cfg(test)]
@@ -72,7 +65,9 @@ mod tests {
     use super::*;
     use crate::tests::{echo_builtin, return_builtin};
     use futures_executor::block_on;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::exec::Divert;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
@@ -82,7 +77,8 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
     }
 
@@ -95,7 +91,8 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(7));
 
         let state = state.borrow();
@@ -110,7 +107,8 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Continue(()));
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
@@ -131,7 +129,8 @@ mod tests {
         })));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = state.borrow();
@@ -145,8 +144,8 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut lexer = Lexer::from_memory(";;", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
-        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
@@ -160,7 +159,8 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
-        block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();

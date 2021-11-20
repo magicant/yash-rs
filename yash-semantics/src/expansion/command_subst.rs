@@ -27,7 +27,6 @@ use super::Result;
 use crate::read_eval_loop;
 use crate::Handle;
 use async_trait::async_trait;
-use std::ops::ControlFlow::Continue;
 use yash_env::exec::ExitStatus;
 use yash_env::io::Fd;
 use yash_env::system::Errno;
@@ -101,8 +100,7 @@ async fn expand_command_substitution_inner<E: Env>(
                 }
 
                 let mut lexer = Lexer::from_memory(&code, Source::CommandSubst { original });
-                read_eval_loop(env, &mut lexer).await;
-                Continue(())
+                read_eval_loop(env, &mut lexer).await
             })
         })
         .await;
