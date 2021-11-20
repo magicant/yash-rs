@@ -53,6 +53,7 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) {
         match result {
             Continue(()) => (),
             Break(divert) => {
+                // TODO return the divert to the caller rather than consuming it
                 if let Some(exit_status) = divert.exit_status() {
                     env.exit_status = exit_status;
                 }

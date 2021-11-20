@@ -416,10 +416,13 @@ impl System for VirtualSystem {
         let count = (reader_count + writer_count).try_into().unwrap();
         if count == 0 {
             if let Some(timeout) = timeout {
-                let mut state = self.state.borrow_mut();
-                let now = state.now.as_mut();
-                let now = now.expect("now time unspecified; cannot add timeout duration");
-                *now += Duration::from(*timeout);
+                let duration = Duration::from(*timeout);
+                if !duration.is_zero() {
+                    let mut state = self.state.borrow_mut();
+                    let now = state.now.as_mut();
+                    let now = now.expect("now time unspecified; cannot add timeout duration");
+                    *now += duration;
+                }
             }
         }
         Ok(count)

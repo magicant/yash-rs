@@ -501,6 +501,10 @@ impl SharedSystem {
     /// function cannot detect the receipt of the signals.
     ///
     /// Returns an array of signals that were caught.
+    ///
+    /// If this `SharedSystem` is part of an [`Env`], you should call
+    /// [`Env::wait_for_signals`] rather than calling this function directly
+    /// so that the trap set can remember the caught signal.
     pub async fn wait_for_signals(&self) -> Rc<[Signal]> {
         let status = self.0.borrow_mut().signal.wait_for_signals();
         poll_fn(|context| {
@@ -523,6 +527,10 @@ impl SharedSystem {
     /// Before calling this function, you need to [set signal
     /// handling](Self::set_signal_handling) to `Catch`.
     /// Without doing so, this function cannot detect the receipt of the signal.
+    ///
+    /// If this `SharedSystem` is part of an [`Env`], you should call
+    /// [`Env::wait_for_signal`] rather than calling this function directly
+    /// so that the trap set can remember the caught signal.
     pub async fn wait_for_signal(&self, signal: Signal) {
         while !self.wait_for_signals().await.contains(&signal) {}
     }

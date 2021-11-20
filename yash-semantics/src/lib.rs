@@ -29,6 +29,7 @@ pub mod expansion;
 mod handle_impl;
 pub mod redir;
 mod runner;
+mod trap;
 
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
@@ -89,6 +90,7 @@ pub async fn print_error(
 }
 
 pub use runner::read_eval_loop;
+pub use trap::run_traps_for_caught_signals;
 
 #[cfg(test)]
 pub(crate) mod tests {
