@@ -48,6 +48,14 @@ pub enum Source {
 
     /// Command substitution.
     CommandSubst { original: Location },
+
+    /// Trap command.
+    Trap {
+        /// Trap condition name, typically the signal name.
+        condition: String,
+        /// Location of the simple command that has set this trap command.
+        origin: Location,
+    },
     // TODO More Source types
 }
 
@@ -116,8 +124,10 @@ impl Source {
         match self {
             Unknown => "<?>",
             Stdin => "<stdin>",
-            CommandSubst { .. } => "<command_substitution>",
             Alias { .. } => "<alias>",
+            CommandSubst { .. } => "<command_substitution>",
+            // TODO Include the signal name
+            Trap { .. } => "<trap>",
         }
     }
 }

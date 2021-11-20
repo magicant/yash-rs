@@ -81,6 +81,14 @@ impl super::Source {
                     location: original.clone(),
                 }));
             }
+            Trap { origin, .. } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation {
+                    r#type: AnnotationType::Info,
+                    label: "trap was set here".into(),
+                    location: origin.clone(),
+                }));
+            }
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation {
