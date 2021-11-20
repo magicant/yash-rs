@@ -175,7 +175,7 @@ impl Command for syntax::SimpleCommand {
         };
 
         use crate::command_search::Target::{Builtin, External, Function};
-        let result = if let Some(name) = fields.get(0) {
+        let main_result = if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
@@ -195,9 +195,13 @@ impl Command for syntax::SimpleCommand {
             execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs)).await
         };
 
-        run_traps_for_caught_signals(env).await?;
+        let trap_result = run_traps_for_caught_signals(env).await;
 
-        result
+        match (main_result, trap_result) {
+            (_, Continue(())) => main_result,
+            (Continue(()), _) => trap_result,
+            (Break(main_divert), Break(trap_divert)) => Break(main_divert.max(trap_divert)),
+        }
     }
 }
 

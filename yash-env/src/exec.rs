@@ -102,15 +102,10 @@ impl ExitStatus {
 }
 
 /// Result of interrupted command execution.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+///
+/// `Divert` implements `Ord`. Values are ordered by severity.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Divert {
-    /// Break the current loop.
-    Break {
-        /// Number of loops to break.
-        ///
-        /// `0` for breaking the innermost loop, `1` for one-level outer, and so on.
-        count: usize,
-    },
     /// Continue the current loop.
     Continue {
         /// Number of loops to break before continuing.
@@ -118,14 +113,25 @@ pub enum Divert {
         /// `0` for continuing the innermost loop, `1` for one-level outer, and so on.
         count: usize,
     },
+
+    /// Break the current loop.
+    Break {
+        /// Number of loops to break.
+        ///
+        /// `0` for breaking the innermost loop, `1` for one-level outer, and so on.
+        count: usize,
+    },
+
     /// Return from the current function or script.
     Return,
+
     /// Interrupt the current shell execution environment.
     ///
     /// This is the same as `Exit` in a non-interactive shell. In an interactive
     /// shell, this will abort the currently executed command and resume
     /// prompting for a next command line.
     Interrupt(Option<ExitStatus>),
+
     /// Exit from the current shell execution environment.
     Exit(Option<ExitStatus>),
 }
@@ -138,7 +144,7 @@ impl Divert {
     pub fn exit_status(&self) -> Option<ExitStatus> {
         use Divert::*;
         match self {
-            Break { .. } | Continue { .. } | Return => None,
+            Continue { .. } | Break { .. } | Return => None,
             Interrupt(exit_status) | Exit(exit_status) => *exit_status,
         }
     }
