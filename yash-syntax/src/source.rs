@@ -126,8 +126,7 @@ impl Source {
             Stdin => "<stdin>",
             Alias { .. } => "<alias>",
             CommandSubst { .. } => "<command_substitution>",
-            // TODO Include the signal name
-            Trap { .. } => "<trap>",
+            Trap { condition, .. } => condition,
         }
     }
 }
