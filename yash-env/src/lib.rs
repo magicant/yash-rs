@@ -175,6 +175,30 @@ impl Env {
             .await
     }
 
+    /// Waits for some signals to be caught in the current process.
+    ///
+    /// Returns an array of signals caught.
+    ///
+    /// This function is a wrapper for [`SharedSystem::wait_for_signals`].
+    /// Before the function returns, it passes the results to
+    /// [`TrapSet::catch_signal`] so the trap set can remember the signals
+    /// caught to be handled later.
+    pub async fn wait_for_signals(&mut self) -> Rc<[Signal]> {
+        let result = self.system.wait_for_signals().await;
+        for signal in result.iter().copied() {
+            self.traps.catch_signal(signal);
+        }
+        result
+    }
+
+    /// Waits for a specific signal to be caught in the current process.
+    ///
+    /// This function calls [`wait_for_signals`](Self::wait_for_signals)
+    /// repeatedly until it returns results containing the specified `signal`.
+    pub async fn wait_for_signal(&mut self, signal: Signal) {
+        while !self.wait_for_signals().await.contains(&signal) {}
+    }
+
     /// Starts a subshell.
     ///
     /// This function creates a new child process in which the argument function
@@ -291,7 +315,7 @@ impl Env {
                 Ok(WaitStatus::StillAlive) => {}
                 result => return result,
             }
-            self.system.wait_for_signal(Signal::SIGCHLD).await;
+            self.wait_for_signal(Signal::SIGCHLD).await;
         }
     }
 }
@@ -300,12 +324,14 @@ impl Env {
 mod tests {
     use super::*;
     use crate::system::r#virtual::SystemState;
+    use crate::trap::Trap;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
+    use yash_syntax::source::Location;
 
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut>(f: F)
@@ -351,6 +377,31 @@ mod tests {
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
         let message = format!("dummy message {}: {}\n", 42, Errno::EINVAL.desc());
         assert_eq!(stderr.content, message.as_bytes());
+    }
+
+    #[test]
+    fn wait_for_signal_remembers_signal_in_trap_set() {
+        in_virtual_system(|mut env, pid, state| async move {
+            env.traps
+                .set_trap(
+                    &mut env.system,
+                    Signal::SIGCHLD,
+                    Trap::Command("".into()),
+                    Location::dummy(""),
+                    false,
+                )
+                .unwrap();
+            {
+                let mut state = state.borrow_mut();
+                let process = state.processes.get_mut(&pid).unwrap();
+                assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+                process.raise_signal(Signal::SIGCHLD);
+            }
+            env.wait_for_signal(Signal::SIGCHLD).await;
+
+            let trap_state = env.traps.get_trap(Signal::SIGCHLD).unwrap();
+            assert!(trap_state.pending);
+        })
     }
 
     #[test]

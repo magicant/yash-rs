@@ -96,11 +96,11 @@ impl From<Errno> for SetTrapError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrapState {
     /// Action taken when the signal is delivered to the shell process.
-    action: Trap,
+    pub action: Trap,
     /// Location of the simple command that invoked the trap built-in that has set this trap.
-    origin: Location,
+    pub origin: Location,
     /// True iff the signal has been caught and the trap command has not yet executed.
-    pending: bool,
+    pub pending: bool,
 }
 
 /// User-visible signal disposition.
