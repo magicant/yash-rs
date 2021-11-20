@@ -57,6 +57,7 @@ use self::system::SignalHandling;
 pub use self::system::System;
 use self::variable::VariableSet;
 use crate::trap::TrapSet;
+use futures_util::task::noop_waker_ref;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use std::collections::HashMap;
@@ -66,6 +67,8 @@ use std::future::Future;
 use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
 use std::rc::Rc;
+use std::task::Context;
+use std::task::Poll;
 use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
@@ -197,6 +200,30 @@ impl Env {
     /// repeatedly until it returns results containing the specified `signal`.
     pub async fn wait_for_signal(&mut self, signal: Signal) {
         while !self.wait_for_signals().await.contains(&signal) {}
+    }
+
+    /// Returns signals that have been caught.
+    ///
+    /// This function is similar to
+    /// [`wait_for_signals`](Self::wait_for_signals) but does not wait for
+    /// signals to be caught. Instead, it only checks if any signals have been
+    /// caught but not yet consumed in the [`SharedSystem`].
+    pub fn poll_signals(&mut self) -> Option<Rc<[Signal]>> {
+        let system = self.system.clone();
+
+        let future = self.wait_for_signals();
+        futures_util::pin_mut!(future);
+
+        let mut context = Context::from_waker(noop_waker_ref());
+        if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
+            return Some(signals);
+        }
+
+        system.select(true).ok();
+        if let Poll::Ready(signals) = future.poll(&mut context) {
+            return Some(signals);
+        }
+        None
     }
 
     /// Starts a subshell.
@@ -402,6 +429,43 @@ mod tests {
             let trap_state = env.traps.get_trap(Signal::SIGCHLD).unwrap();
             assert!(trap_state.pending);
         })
+    }
+
+    fn poll_signals_env() -> (Env, VirtualSystem) {
+        let system = VirtualSystem::new();
+        let shared_system = SharedSystem::new(Box::new(system.clone()));
+        let mut env = Env::with_system(Box::new(shared_system));
+        env.traps
+            .set_trap(
+                &mut env.system,
+                Signal::SIGCHLD,
+                Trap::Command("".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        (env, system)
+    }
+
+    #[test]
+    fn poll_signals_none() {
+        let mut env = poll_signals_env().0;
+        let result = env.poll_signals();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn poll_signals_some() {
+        let (mut env, system) = poll_signals_env();
+        {
+            let mut state = system.state.borrow_mut();
+            let process = state.processes.get_mut(&system.process_id).unwrap();
+            assert!(process.blocked_signals().contains(Signal::SIGCHLD));
+            process.raise_signal(Signal::SIGCHLD);
+        }
+
+        let result = env.poll_signals().unwrap();
+        assert_eq!(*result, [Signal::SIGCHLD]);
     }
 
     #[test]
