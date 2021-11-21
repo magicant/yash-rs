@@ -90,6 +90,7 @@ pub async fn print_error(
 }
 
 pub use runner::read_eval_loop;
+pub use runner::read_eval_loop_boxed;
 pub use trap::run_traps_for_caught_signals;
 
 #[cfg(test)]

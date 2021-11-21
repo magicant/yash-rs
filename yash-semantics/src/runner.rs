@@ -16,9 +16,12 @@
 
 //! Implementation of the read-eval loop
 
+use crate::run_traps_for_caught_signals;
 use crate::Command;
 use crate::Handle;
+use std::future::Future;
 use std::ops::ControlFlow::Continue;
+use std::pin::Pin;
 use yash_env::exec::ExitStatus;
 use yash_env::exec::Result;
 use yash_env::Env;
@@ -36,18 +39,22 @@ use yash_syntax::parser::Parser;
 /// If the input source code contains no commands, the exit status is set to
 /// zero.
 ///
+/// [Pending traps are run](run_traps_for_caught_signals) between parsing input
+/// and running commands.
+///
 /// TODO: `Break(Divert::Interrupt(...))` does not end the loop in an
 /// interactive shell
-///
-/// TODO: Handle traps while reading commands
 pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
     let mut executed = false;
 
     loop {
         let mut parser = Parser::new(lexer, &env.aliases);
         match parser.command_line().await {
+            Ok(Some(command)) => {
+                run_traps_for_caught_signals(env).await?;
+                command.execute(env).await?
+            }
             Ok(None) => break,
-            Ok(Some(command)) => command.execute(env).await?,
             Err(error) => error.handle(env).await?,
         };
         executed = true;
@@ -60,6 +67,14 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
     Continue(())
 }
 
+/// Like [`read_eval_loop`], but returns the future in a pinned box.
+pub fn read_eval_loop_boxed<'a>(
+    env: &'a mut Env,
+    lexer: &'a mut Lexer<'_>,
+) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
+    Box::pin(read_eval_loop(env, lexer))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,6 +84,8 @@ mod tests {
     use std::rc::Rc;
     use yash_env::exec::Divert;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::trap::Signal;
+    use yash_env::trap::Trap;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
 
@@ -165,5 +182,36 @@ mod tests {
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert!(file.content.is_empty(), "stdout={:?}", file.content);
+    }
+
+    #[test]
+    fn running_traps_between_parsing_and_executing() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system.clone()));
+        env.builtins.insert("echo", echo_builtin());
+        env.traps
+            .set_trap(
+                &mut env.system,
+                Signal::SIGUSR1,
+                Trap::Command("echo USR1".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        state
+            .borrow_mut()
+            .processes
+            .get_mut(&system.process_id)
+            .unwrap()
+            .raise_signal(Signal::SIGUSR1);
+        let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
+        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(file.content, b"USR1\n0\n");
     }
 }

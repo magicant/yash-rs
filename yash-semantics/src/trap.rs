@@ -16,7 +16,7 @@
 
 //! Handling traps
 
-use crate::read_eval_loop;
+use crate::read_eval_loop_boxed;
 use std::ops::ControlFlow::Continue;
 use yash_env::exec::Result;
 use yash_env::trap::Trap;
@@ -46,7 +46,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let previous_exit_status = env.exit_status;
         // TODO Update control flow stack
-        read_eval_loop(env, &mut lexer).await?;
+        read_eval_loop_boxed(env, &mut lexer).await?;
         env.exit_status = previous_exit_status;
     }
 
