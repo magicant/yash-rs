@@ -21,7 +21,6 @@ use crate::expansion::expand_words;
 use crate::expansion::ExitStatusAdapter;
 use crate::print_error;
 use crate::redir::RedirGuard;
-use crate::run_traps_for_caught_signals;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -155,11 +154,6 @@ impl Command for syntax::SimpleCommand {
     /// If the external utility could not be called, the subshell exits after
     /// printing an error message to the standard error.
     ///
-    /// # Traps
-    ///
-    /// After executing the target, [trap commands are run for any pending
-    /// signals](run_traps_for_caught_signals).
-    ///
     /// # Portability
     ///
     /// POSIX does not define the exit status when the `execve` system call
@@ -175,7 +169,7 @@ impl Command for syntax::SimpleCommand {
         };
 
         use crate::command_search::Target::{Builtin, External, Function};
-        let main_result = if let Some(name) = fields.get(0) {
+        if let Some(name) = fields.get(0) {
             match search(env, &name.value) {
                 Some(Builtin(builtin)) => {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
@@ -193,14 +187,6 @@ impl Command for syntax::SimpleCommand {
             }
         } else {
             execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs)).await
-        };
-
-        let trap_result = run_traps_for_caught_signals(env).await;
-
-        match (main_result, trap_result) {
-            (_, Continue(())) => main_result,
-            (Continue(()), _) => trap_result,
-            (Break(main_divert), Break(trap_divert)) => Break(main_divert.max(trap_divert)),
         }
     }
 }
@@ -433,7 +419,6 @@ mod tests {
     use std::path::PathBuf;
     use std::rc::Rc;
     use yash_env::system::r#virtual::INode;
-    use yash_env::trap::Trap;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
@@ -881,45 +866,5 @@ mod tests {
             let stdout = state.file_system.get("/tmp/file").unwrap().borrow();
             assert_eq!(stdout.content, []);
         });
-    }
-
-    #[test]
-    fn simple_command_runs_trap_after_running_utility() {
-        use yash_env::trap::Signal;
-
-        let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
-        env.builtins.insert("echo", echo_builtin());
-        env.traps
-            .set_trap(
-                &mut env.system,
-                Signal::SIGUSR1,
-                Trap::Command("echo USR1".into()),
-                Location::dummy(""),
-                false,
-            )
-            .unwrap();
-        system
-            .state
-            .borrow_mut()
-            .processes
-            .get_mut(&system.process_id)
-            .unwrap()
-            .raise_signal(Signal::SIGUSR1);
-        let command: syntax::SimpleCommand = "echo main".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        assert_eq!(
-            system
-                .state
-                .borrow()
-                .file_system
-                .get("/dev/stdout")
-                .unwrap()
-                .borrow()
-                .content,
-            b"main\nUSR1\n"
-        );
     }
 }
