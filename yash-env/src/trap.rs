@@ -250,6 +250,25 @@ impl TrapSet {
         Ok(())
     }
 
+    /// Resets existing `Trap::Command` settings to the default.
+    ///
+    /// POSIX requires that traps other than `Trap::Ignore` be reset when
+    /// entering a subshell. This function achieves that effect.
+    pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
+        for (&signal, state) in &mut self.signals {
+            if let UserSignalState::Trap(trap) = &state.user_state {
+                if let Trap::Command(_) = &trap.action {
+                    state.user_state = UserSignalState::InitiallyDefaulted;
+                    if !state.internal_handler_enabled {
+                        system
+                            .set_signal_handling(signal, crate::system::SignalHandling::Default)
+                            .ok();
+                    }
+                }
+            }
+        }
+    }
+
     /// Sets the `pending` flag of the [`TrapState`] for the specified signal.
     ///
     /// This function does nothing if no trap action has been
@@ -574,6 +593,73 @@ mod tests {
         assert_eq!(result, Err(SetTrapError::SIGSTOP));
         assert_eq!(trap_set.get_trap(Signal::SIGSTOP), None);
         assert_eq!(system.0.get(&Signal::SIGSTOP), None);
+    }
+
+    #[test]
+    fn entering_subshell_resets_command_traps() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Trap::Command(String::new());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGCHLD, action, origin, false)
+            .unwrap();
+
+        trap_set.enter_subshell(&mut system);
+        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), None);
+        assert_eq!(
+            system.0[&Signal::SIGCHLD],
+            crate::system::SignalHandling::Default
+        );
+    }
+
+    #[test]
+    fn entering_subshell_keeps_ignore_traps() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(
+                &mut system,
+                Signal::SIGCHLD,
+                Trap::Ignore,
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+
+        trap_set.enter_subshell(&mut system);
+        assert_eq!(
+            trap_set.get_trap(Signal::SIGCHLD),
+            Some(&TrapState {
+                action: Trap::Ignore,
+                origin,
+                pending: false
+            })
+        );
+        assert_eq!(
+            system.0[&Signal::SIGCHLD],
+            crate::system::SignalHandling::Ignore
+        );
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Trap::Command(String::new());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_trap(&mut system, Signal::SIGCHLD, action, origin, false)
+            .unwrap();
+        trap_set.enable_sigchld_handler(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system);
+        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), None);
+        assert_eq!(
+            system.0[&Signal::SIGCHLD],
+            crate::system::SignalHandling::Catch
+        );
     }
 
     #[test]
