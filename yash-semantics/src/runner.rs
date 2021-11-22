@@ -138,7 +138,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        Rc::make_mut(&mut env.aliases).insert(HashEntry(Rc::new(Alias {
+        env.aliases.insert(HashEntry(Rc::new(Alias {
             name: "echo".to_string(),
             replacement: "echo alias\necho ok".to_string(),
             global: false,

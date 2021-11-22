@@ -87,10 +87,7 @@ use yash_syntax::alias::AliasSet;
 #[derive(Clone, Debug)]
 pub struct Env {
     /// Aliases defined in the environment.
-    ///
-    /// The `AliasSet` is reference-counted so that the shell can execute traps
-    /// while the parser is reading a command line.
-    pub aliases: Rc<AliasSet>,
+    pub aliases: AliasSet,
 
     /// Built-in utilities available in the environment.
     pub builtins: HashMap<&'static str, Builtin>,

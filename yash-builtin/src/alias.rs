@@ -20,7 +20,6 @@ use std::future::ready;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
-use std::rc::Rc;
 use yash_env::builtin::Result;
 use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
@@ -29,12 +28,18 @@ use yash_syntax::alias::{AliasSet, HashEntry};
 /// Part of the shell execution environment the alias built-in depends on.
 pub trait Env {
     /// Accesses the alias set in the environment.
-    fn alias_set(&mut self) -> &mut Rc<AliasSet>;
+    fn alias_set(&self) -> &AliasSet;
+
+    /// Accesses the alias set in the environment.
+    fn alias_set_mut(&mut self) -> &mut AliasSet;
     // TODO stdout, stderr
 }
 
 impl Env for yash_env::Env {
-    fn alias_set(&mut self) -> &mut Rc<AliasSet> {
+    fn alias_set(&self) -> &AliasSet {
+        &self.aliases
+    }
+    fn alias_set_mut(&mut self) -> &mut AliasSet {
         &mut self.aliases
     }
 }
@@ -48,7 +53,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
     args.next(); // ignore the first argument, which is the command name
 
     if args.as_ref().is_empty() {
-        for alias in env.alias_set().as_ref() {
+        for alias in env.alias_set() {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
@@ -61,7 +66,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
             let entry = HashEntry::new(name, replacement, false, origin);
-            Rc::make_mut(&mut env.alias_set()).insert(entry);
+            env.alias_set_mut().insert(entry);
         } else {
             // TODO print alias definition
         }
@@ -89,11 +94,14 @@ mod tests {
 
     #[derive(Default)]
     struct DummyEnv {
-        aliases: Rc<AliasSet>,
+        aliases: AliasSet,
     }
 
     impl Env for DummyEnv {
-        fn alias_set(&mut self) -> &mut Rc<AliasSet> {
+        fn alias_set(&self) -> &AliasSet {
+            &self.aliases
+        }
+        fn alias_set_mut(&mut self) -> &mut AliasSet {
             &mut self.aliases
         }
     }
@@ -108,10 +116,9 @@ mod tests {
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let aliases = env.aliases.as_ref();
-        assert_eq!(aliases.len(), 1);
+        assert_eq!(env.aliases.len(), 1);
 
-        let alias = aliases.get("foo").unwrap().0.as_ref();
+        let alias = env.aliases.get("foo").unwrap().0.as_ref();
         assert_eq!(alias.name, "foo");
         assert_eq!(alias.replacement, "bar baz");
         assert_eq!(alias.global, false);
@@ -133,10 +140,9 @@ mod tests {
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let aliases = env.aliases.as_ref();
-        assert_eq!(aliases.len(), 3);
+        assert_eq!(env.aliases.len(), 3);
 
-        let abc = aliases.get("abc").unwrap().0.as_ref();
+        let abc = env.aliases.get("abc").unwrap().0.as_ref();
         assert_eq!(abc.name, "abc");
         assert_eq!(abc.replacement, "xyz");
         assert_eq!(abc.global, false);
@@ -145,7 +151,7 @@ mod tests {
         assert_eq!(abc.origin.line.source, Source::Unknown);
         assert_eq!(abc.origin.column.get(), 1);
 
-        let yes = aliases.get("yes").unwrap().0.as_ref();
+        let yes = env.aliases.get("yes").unwrap().0.as_ref();
         assert_eq!(yes.name, "yes");
         assert_eq!(yes.replacement, "no");
         assert_eq!(yes.global, false);
@@ -154,7 +160,7 @@ mod tests {
         assert_eq!(yes.origin.line.source, Source::Unknown);
         assert_eq!(yes.origin.column.get(), 1);
 
-        let ls = aliases.get("ls").unwrap().0.as_ref();
+        let ls = env.aliases.get("ls").unwrap().0.as_ref();
         assert_eq!(ls.name, "ls");
         assert_eq!(ls.replacement, "ls --color");
         assert_eq!(ls.global, false);
@@ -167,14 +173,13 @@ mod tests {
     #[test]
     fn builtin_prints_all_aliases() {
         let mut env = DummyEnv::default();
-        let aliases = Rc::make_mut(&mut env.aliases);
-        aliases.insert(HashEntry::new(
+        env.aliases.insert(HashEntry::new(
             "foo".to_string(),
             "bar".to_string(),
             false,
             Location::dummy(""),
         ));
-        aliases.insert(HashEntry::new(
+        env.aliases.insert(HashEntry::new(
             "hello".to_string(),
             "world".to_string(),
             false,
