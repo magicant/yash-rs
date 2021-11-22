@@ -250,6 +250,7 @@ impl Env {
         let task: ChildProcessTask = Box::new(move |env| {
             if let Some(f) = f.take() {
                 Box::pin(async move {
+                    env.traps.enter_subshell(&mut env.system);
                     match f(env).await {
                         Continue(()) => (),
                         Break(divert) => {
@@ -513,6 +514,31 @@ mod tests {
                 .unwrap();
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+        });
+    }
+
+    #[test]
+    fn trap_reset_in_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.traps
+                .set_trap(
+                    &mut env.system,
+                    Signal::SIGCHLD,
+                    Trap::Command("".into()),
+                    Location::dummy(""),
+                    false,
+                )
+                .unwrap();
+            let pid = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        assert_eq!(env.traps.get_trap(Signal::SIGCHLD), None);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            env.wait_for_subshell(pid).await.unwrap();
         });
     }
 
