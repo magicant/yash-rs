@@ -766,23 +766,23 @@ impl fmt::Display for Fd {
 /// process redirection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RedirOp {
-    // `<` (open a file for input)
+    /// `<` (open a file for input)
     FileIn,
-    // `<>` (open a file for input and output)
+    /// `<>` (open a file for input and output)
     FileInOut,
-    // `>` (open a file for output; truncate or fail if existing)
+    /// `>` (open a file for output; truncate or fail if existing)
     FileOut,
-    // `>>` (open a file for output; append if existing)
+    /// `>>` (open a file for output; append if existing)
     FileAppend,
-    // `>|` (open a file for output; always truncate if existing)
+    /// `>|` (open a file for output; always truncate if existing)
     FileClobber,
-    // `<&` (copy or close a file descriptor for input)
+    /// `<&` (copy or close a file descriptor for input)
     FdIn,
-    // `>&` (copy or close a file descriptor for output)
+    /// `>&` (copy or close a file descriptor for output)
     FdOut,
-    // `>>|` (open a pipe, one end for input and the other output)
+    /// `>>|` (open a pipe, one end for input and the other output)
     Pipe,
-    // `<<<` (here-string)
+    /// `<<<` (here-string)
     String,
 }
 
