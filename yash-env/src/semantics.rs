@@ -20,6 +20,51 @@ use nix::sys::signal::Signal;
 use std::convert::TryFrom;
 use std::ops::ControlFlow;
 use std::os::raw::c_int;
+use yash_syntax::source::Location;
+
+/// Resultant string of word expansion.
+///
+/// A field is a string accompanied with the original word location.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Field {
+    /// String value of the field.
+    pub value: String,
+    /// Location of the word this field resulted from.
+    pub origin: Location,
+}
+
+impl Field {
+    /// Creates a new field with a dummy origin location.
+    ///
+    /// The value of the resulting field will be `value.into()`.
+    /// The origin of the field will be created by [`Location::dummy`] with a
+    /// clone of the value.
+    #[inline]
+    pub fn dummy<S: Into<String>>(value: S) -> Field {
+        fn with_value(value: String) -> Field {
+            let origin = Location::dummy(value.clone());
+            Field { value, origin }
+        }
+        with_value(value.into())
+    }
+
+    /// Creates an array of fields with dummy origin locations.
+    ///
+    /// This function calls [`dummy`](Self::dummy) to create the results.
+    pub fn dummies<I, S>(values: I) -> Vec<Field>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        values.into_iter().map(Self::dummy).collect()
+    }
+}
+
+impl std::fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
+    }
+}
 
 /// Number that summarizes the result of command execution.
 ///

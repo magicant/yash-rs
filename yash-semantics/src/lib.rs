@@ -107,11 +107,11 @@ pub(crate) mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::{Intrinsic, Special};
-    use yash_env::expansion::Field;
     use yash_env::io::Fd;
     use yash_env::job::Pid;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
     use yash_env::variable::Scalar;

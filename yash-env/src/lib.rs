@@ -32,7 +32,6 @@
 //! system's behavior without affecting the actual system.
 
 pub mod builtin;
-pub mod expansion;
 pub mod function;
 pub mod input;
 pub mod io;

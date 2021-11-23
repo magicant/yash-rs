@@ -22,8 +22,8 @@
 //! `yash_env` crate. For implementations of specific built-ins like `cd` and
 //! `export`, see the `yash_builtin` crate.
 
-use crate::expansion::Field;
 use crate::semantics::ExitStatus;
+use crate::semantics::Field;
 use crate::Env;
 use std::fmt::Debug;
 use std::future::Future;

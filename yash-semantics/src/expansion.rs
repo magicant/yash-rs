@@ -87,7 +87,7 @@ use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
-pub use yash_env::expansion::*;
+pub use yash_env::semantics::Field;
 
 pub use quote_removal::*;
 
