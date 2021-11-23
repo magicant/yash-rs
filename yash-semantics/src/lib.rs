@@ -21,6 +21,9 @@
 //! A command can be executed by calling [`Command::execute`].
 //! A word can be expanded by using functions and traits defined in
 //! [`expansion`].
+//!
+//! The [`read_eval_loop`] function reads, parses, and executes commands from an
+//! input. It is a utility function that calls `Command::execute` for you.
 
 pub mod assign;
 mod command_impl;

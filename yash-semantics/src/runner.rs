@@ -42,8 +42,25 @@ use yash_syntax::parser::Parser;
 /// [Pending traps are run](run_traps_for_caught_signals) between parsing input
 /// and running commands.
 ///
-/// TODO: `Break(Divert::Interrupt(...))` does not end the loop in an
+/// TODO: `Break(Divert::Interrupt(...))` should not end the loop in an
 /// interactive shell
+///
+/// # Example
+///
+/// ```
+/// # futures_executor::block_on(async {
+/// # use std::ops::ControlFlow::Continue;
+/// # use yash_env::Env;
+/// # use yash_semantics::*;
+/// # use yash_syntax::parser::lex::Lexer;
+/// # use yash_syntax::source::Source;
+/// let mut env = Env::new_virtual();
+/// let mut lexer = Lexer::from_memory("case foo in (bar) ;; esac", Source::Unknown);
+/// let result = read_eval_loop(&mut env, &mut lexer).await;
+/// assert_eq!(result, Continue(()));
+/// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+/// # })
+/// ```
 pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
     let mut executed = false;
 
