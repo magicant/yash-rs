@@ -16,7 +16,7 @@
 
 //! Implementation of the read-eval loop
 
-use crate::run_traps_for_caught_signals;
+use crate::trap::run_traps_for_caught_signals;
 use crate::Command;
 use crate::Handle;
 use std::future::Future;

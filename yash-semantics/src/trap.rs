@@ -14,7 +14,32 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Handling traps
+//! Handling traps.
+//!
+//! A _trap_ is an event handling mechanism in the shell. The user can prepare a
+//! trap by using the `trap` built-in so that the shell runs desired commands in
+//! response to a specific event happening later. This module contains functions
+//! to detect the occurrence of events and run trap commands accordingly.
+//!
+//! # Related items
+//!
+//! Traps set by the user are stored in a [trap set](yash_env::trap::TrapSet)
+//! provided by the [`yash_env`] crate.
+//! The `trap` built-in is implemented in the `yash_builtin` crate.
+//!
+//! # Signal traps
+//!
+//! When an [environment](Env) catches a signal with a function like
+//! [`wait_for_signals`](Env::wait_for_signals) and
+//! [`poll_signals`](Env::poll_signals), the signal is stored as "pending" in
+//! the trap set in the environment. The [`run_traps_for_caught_signals`]
+//! function consumes those pending signals and runs the corresponding commands
+//! specified in the trap set. The function is called periodically as the shell
+//! executes main commands; roughly before and after each command.
+//!
+//! # Non-signal traps
+//!
+//! TODO: Not yet implemented
 
 use crate::read_eval_loop_boxed;
 use std::ops::ControlFlow::Continue;
@@ -29,7 +54,8 @@ use yash_syntax::source::Source;
 /// Runs trap commands for signals that have been caught.
 ///
 /// This function resets the `pending` flag of caught signals by calling
-/// [`TrapSet::take_caught_signal`].
+/// [`TrapSet::take_caught_signal`]. See the [module doc](self) for more
+/// details.
 pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
     env.poll_signals();
 

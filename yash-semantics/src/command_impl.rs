@@ -24,7 +24,7 @@ mod pipeline;
 mod simple_command;
 
 use super::Command;
-use crate::run_traps_for_caught_signals;
+use crate::trap::run_traps_for_caught_signals;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Result;
