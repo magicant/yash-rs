@@ -19,7 +19,7 @@
 use super::Command;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
-use yash_env::exec::Result;
+use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax::AndOrList;
 
@@ -60,8 +60,8 @@ mod tests {
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
-    use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
+    use yash_env::semantics::Divert;
+    use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
 
     #[test]

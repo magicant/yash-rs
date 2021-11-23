@@ -662,7 +662,7 @@ pub trait Executor: Debug {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exec::ExitStatus;
+    use crate::semantics::ExitStatus;
     use futures_executor::LocalPool;
     use std::ffi::CString;
 

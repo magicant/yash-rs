@@ -69,10 +69,10 @@ use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::pin::Pin;
-use yash_env::exec::ExitStatus;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::job::WaitStatus;
+use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_env::variable::ContextStack;
 use yash_env::variable::ContextType;
@@ -241,7 +241,7 @@ pub trait Env: std::fmt::Debug {
         F: for<'a> FnOnce(
                 &'a mut yash_env::Env,
             )
-                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
             + 'static;
 
     // Waits for a subshell to terminate.
@@ -297,7 +297,7 @@ impl Env for yash_env::Env {
         F: for<'a> FnOnce(
                 &'a mut yash_env::Env,
             )
-                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
             + 'static,
     {
         self.start_subshell(f).await
@@ -395,7 +395,7 @@ impl<E: Env> Env for ExitStatusAdapter<'_, E> {
         F: for<'a> FnOnce(
                 &'a mut yash_env::Env,
             )
-                -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
             + 'static,
     {
         self.env.start_subshell(f).await
@@ -747,7 +747,7 @@ mod tests {
         fn positional_params_mut(&mut self) -> &mut Variable {
             unimplemented!("NullEnv's method must not be called")
         }
-        fn exit_status(&self) -> yash_env::exec::ExitStatus {
+        fn exit_status(&self) -> yash_env::semantics::ExitStatus {
             unimplemented!("NullEnv's method must not be called")
         }
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
@@ -777,7 +777,7 @@ mod tests {
             F: for<'a> FnOnce(
                     &'a mut yash_env::Env,
                 )
-                    -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                    -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
                 + 'static,
         {
             unimplemented!("NullEnv's method must not be called")

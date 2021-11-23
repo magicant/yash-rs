@@ -20,11 +20,11 @@ use super::Command;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
-use yash_env::exec::Divert;
-use yash_env::exec::ExitStatus;
-use yash_env::exec::Result;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
+use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Result;
 use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System;
@@ -229,8 +229,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::rc::Rc;
-    use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 

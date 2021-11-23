@@ -32,23 +32,23 @@
 //! system's behavior without affecting the actual system.
 
 pub mod builtin;
-pub mod exec;
 pub mod expansion;
 pub mod function;
 pub mod input;
 pub mod io;
 pub mod job;
+pub mod semantics;
 pub mod system;
 pub mod trap;
 pub mod variable;
 
 use self::builtin::Builtin;
-use self::exec::ExitStatus;
 use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
+use self::semantics::ExitStatus;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
@@ -240,7 +240,10 @@ impl Env {
     /// - Other `Divert` values are ignored.
     pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+        F: for<'a> FnOnce(
+                &'a mut Env,
+            )
+                -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
     {
         let mut f = Some(f);
@@ -298,7 +301,10 @@ impl Env {
     /// [`new_child_process`](System::new_child_process), the error is returned.
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
-        F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = self::exec::Result> + 'a>>
+        F: for<'a> FnOnce(
+                &'a mut Env,
+            )
+                -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
     {
         // TODO Use a virtual subshell when possible

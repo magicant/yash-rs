@@ -23,10 +23,10 @@ use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
-use yash_env::exec::ExitStatus;
-use yash_env::exec::Result;
 use yash_env::function::Function;
 use yash_env::function::HashEntry;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 

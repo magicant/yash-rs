@@ -43,7 +43,7 @@ use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
 
 #[doc(no_inline)]
-pub use yash_env::exec::*;
+pub use yash_env::semantics::*;
 
 /// Syntactic construct that can be executed.
 #[async_trait(?Send)]
@@ -107,11 +107,11 @@ pub(crate) mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::{Intrinsic, Special};
-    use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
     use yash_env::expansion::Field;
     use yash_env::io::Fd;
     use yash_env::job::Pid;
+    use yash_env::semantics::Divert;
+    use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
     use yash_env::variable::Scalar;

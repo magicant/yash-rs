@@ -18,7 +18,7 @@
 
 use crate::read_eval_loop_boxed;
 use std::ops::ControlFlow::Continue;
-use yash_env::exec::Result;
+use yash_env::semantics::Result;
 use yash_env::trap::Trap;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
@@ -60,8 +60,8 @@ mod tests {
     use crate::tests::return_builtin;
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
-    use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
+    use yash_env::semantics::Divert;
+    use yash_env::semantics::ExitStatus;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
     use yash_env::VirtualSystem;

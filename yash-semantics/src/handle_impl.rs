@@ -22,8 +22,8 @@ use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::exec::Divert;
 use yash_env::io::Fd;
+use yash_env::semantics::Divert;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
 

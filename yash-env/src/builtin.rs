@@ -22,8 +22,8 @@
 //! `yash_env` crate. For implementations of specific built-ins like `cd` and
 //! `export`, see the `yash_builtin` crate.
 
-use crate::exec::ExitStatus;
 use crate::expansion::Field;
+use crate::semantics::ExitStatus;
 use crate::Env;
 use std::fmt::Debug;
 use std::future::Future;
@@ -56,7 +56,7 @@ pub enum Type {
 }
 
 /// Result of built-in utility execution.
-pub type Result = (ExitStatus, crate::exec::Result);
+pub type Result = (ExitStatus, crate::semantics::Result);
 
 /// Type of functions that implement the behavior of a built-in.
 pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;

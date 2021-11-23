@@ -27,7 +27,7 @@ use super::Command;
 use crate::run_traps_for_caught_signals;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::exec::Result;
+use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
@@ -60,8 +60,8 @@ impl Command for syntax::List {
     /// Executes the list.
     ///
     /// The list is executed by executing each item in sequence. If any item
-    /// results in a [`Divert`](yash_env::exec::Divert), the remaining items are
-    /// not executed.
+    /// results in a [`Divert`](yash_env::semantics::Divert), the remaining
+    /// items are not executed.
     async fn execute(&self, env: &mut Env) -> Result {
         for item in &self.0 {
             item.execute(env).await?
@@ -76,8 +76,8 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
-    use yash_env::exec::Divert;
-    use yash_env::exec::ExitStatus;
+    use yash_env::semantics::Divert;
+    use yash_env::semantics::ExitStatus;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
     use yash_env::VirtualSystem;

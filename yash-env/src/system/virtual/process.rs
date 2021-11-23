@@ -17,8 +17,8 @@
 //! Processes in a virtual system.
 
 use super::io::FdBody;
-use crate::exec::ExitStatus;
 use crate::io::Fd;
+use crate::semantics::ExitStatus;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use nix::sys::signal::SigSet;

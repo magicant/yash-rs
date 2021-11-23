@@ -192,10 +192,10 @@ mod tests {
     use futures_executor::block_on;
     use std::future::Future;
     use std::pin::Pin;
-    use yash_env::exec::ExitStatus;
     use yash_env::io::Fd;
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
+    use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
     use yash_env::variable::ReadOnlyError;
     use yash_env::variable::Scope;
@@ -244,7 +244,7 @@ mod tests {
         fn positional_params_mut(&mut self) -> &mut Variable {
             unimplemented!("not available for Singleton");
         }
-        fn exit_status(&self) -> yash_env::exec::ExitStatus {
+        fn exit_status(&self) -> yash_env::semantics::ExitStatus {
             unimplemented!("not available for Singleton");
         }
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
@@ -274,7 +274,7 @@ mod tests {
             F: for<'a> FnOnce(
                     &'a mut yash_env::Env,
                 )
-                    -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                    -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
                 + 'static,
         {
             unimplemented!("not available for Singleton");
@@ -309,7 +309,7 @@ mod tests {
         fn positional_params_mut(&mut self) -> &mut Variable {
             &mut self.0
         }
-        fn exit_status(&self) -> yash_env::exec::ExitStatus {
+        fn exit_status(&self) -> yash_env::semantics::ExitStatus {
             unimplemented!("not available for PositionalParams");
         }
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
@@ -339,7 +339,7 @@ mod tests {
             F: for<'a> FnOnce(
                     &'a mut yash_env::Env,
                 )
-                    -> Pin<Box<dyn Future<Output = yash_env::exec::Result> + 'a>>
+                    -> Pin<Box<dyn Future<Output = yash_env::semantics::Result> + 'a>>
                 + 'static,
         {
             unimplemented!("not available for PositionalParams");

@@ -21,8 +21,8 @@ use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
-use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
+use yash_env::semantics::ExitStatus;
 use yash_syntax::alias::{AliasSet, HashEntry};
 
 /// Part of the shell execution environment the alias built-in depends on.

@@ -19,7 +19,7 @@
 use super::Command;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
-use yash_env::exec::Result;
+use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
@@ -58,7 +58,7 @@ mod tests {
     use super::*;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
-    use yash_env::exec::ExitStatus;
+    use yash_env::semantics::ExitStatus;
 
     #[test]
     fn grouping_executes_list() {

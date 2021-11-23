@@ -75,9 +75,9 @@ use std::future::Future;
 use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
 use yash_env::builtin::Result;
-use yash_env::exec::Divert;
-use yash_env::exec::ExitStatus;
 use yash_env::expansion::Field;
+use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
 
 /// Part of the shell execution environment the return built-in depends on.
 pub trait Env {
@@ -125,7 +125,7 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_env::exec::ExitStatus;
+    use yash_env::semantics::ExitStatus;
 
     #[derive(Default)]
     struct DummyEnv;
