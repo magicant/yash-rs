@@ -271,6 +271,7 @@ dependencies = [
  "futures-util",
  "yash-builtin",
  "yash-env",
+ "yash-quote",
  "yash-semantics",
  "yash-syntax",
 ]
@@ -281,6 +282,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "yash-env",
+ "yash-quote",
  "yash-syntax",
 ]
 
@@ -297,6 +299,10 @@ dependencies = [
  "nix",
  "yash-syntax",
 ]
+
+[[package]]
+name = "yash-quote"
+version = "0.1.0"
 
 [[package]]
 name = "yash-semantics"
