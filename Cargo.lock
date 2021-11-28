@@ -281,6 +281,7 @@ name = "yash-builtin"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures-executor",
  "futures-util",
  "yash-env",
  "yash-quote",
