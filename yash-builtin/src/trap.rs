@@ -18,7 +18,6 @@
 //!
 //! TODO Elaborate
 
-use std::future::ready;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
@@ -84,7 +83,7 @@ impl Env for yash_env::Env {
 }
 
 /// Implementation of the readonly built-in.
-pub fn builtin_main_sync<E: Env>(env: &mut E, mut args: Vec<Field>) -> Result {
+pub async fn builtin_body<E: Env>(env: &mut E, mut args: Vec<Field>) -> Result {
     if args.len() != 3 {
         // TODO Support full syntax
         return (ExitStatus::ERROR, Continue(()));
@@ -114,17 +113,18 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, mut args: Vec<Field>) -> Result {
 
 /// Implementation of the trap built-in.
 ///
-/// This function calls [`builtin_main_sync`] and wraps the result in a `Future`.
+/// This function calls [`builtin_body`] and wraps the result in a pinned box.
 pub fn builtin_main(
     env: &mut yash_env::Env,
     args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(builtin_main_sync(env, args)))
+) -> Pin<Box<dyn Future<Output = Result> + '_>> {
+    Box::pin(builtin_body(env, args))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::future::FutureExt;
     use std::rc::Rc;
     use yash_env::system::SignalHandling;
     use yash_env::Env;
@@ -137,7 +137,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["trap", "", "USR1"]);
-        let result = builtin_main_sync(&mut env, args);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
@@ -153,7 +153,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["trap", "echo", "USR2"]);
-        let result = builtin_main_sync(&mut env, args);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
@@ -169,7 +169,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["trap", "-", "PIPE"]);
-        let result = builtin_main_sync(&mut env, args);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
         assert_eq!(

@@ -19,3 +19,6 @@ async-trait = "0.1.50"
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-quote = { path = "../yash-quote", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
+
+[dev-dependencies]
+futures-util = "0.3.17"
