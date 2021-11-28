@@ -15,5 +15,6 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
+async-trait = "0.1.50"
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
