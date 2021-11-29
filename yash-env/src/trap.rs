@@ -128,7 +128,7 @@ impl From<&UserSignalState> for SignalHandling {
 
 #[derive(Clone, Debug)]
 struct SignalState {
-    user_state: UserSignalState,
+    current_user_state: UserSignalState,
     internal_handler_enabled: bool,
 }
 
@@ -143,7 +143,7 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<(&'a Signal, &'a TrapState)> {
         loop {
             let item = self.inner.next()?;
-            if let UserSignalState::Trap(trap) = &item.1.user_state {
+            if let UserSignalState::Trap(trap) = &item.1.current_user_state {
                 return Some((item.0, trap));
             }
         }
@@ -182,7 +182,7 @@ impl TrapSet {
     /// inherited on startup.
     pub fn get_trap(&self, signal: Signal) -> Option<&TrapState> {
         self.signals.get(&signal).and_then(|state| {
-            if let UserSignalState::Trap(trap) = &state.user_state {
+            if let UserSignalState::Trap(trap) = &state.current_user_state {
                 Some(trap)
             } else {
                 None
@@ -231,7 +231,7 @@ impl TrapSet {
                         system.set_signal_handling(signal, SignalHandling::Ignore)?;
                     if initial_handling == SignalHandling::Ignore {
                         vacant.insert(SignalState {
-                            user_state: UserSignalState::InitiallyIgnored,
+                            current_user_state: UserSignalState::InitiallyIgnored,
                             internal_handler_enabled: false,
                         });
                         return Err(SetTrapError::InitiallyIgnored);
@@ -241,12 +241,12 @@ impl TrapSet {
             }
             Entry::Occupied(mut occupied) => {
                 if !override_ignore
-                    && occupied.get().user_state == UserSignalState::InitiallyIgnored
+                    && occupied.get().current_user_state == UserSignalState::InitiallyIgnored
                 {
                     return Err(SetTrapError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
-                    occupied.get_mut().user_state = UserSignalState::Trap(state);
+                    occupied.get_mut().current_user_state = UserSignalState::Trap(state);
                     return Ok(());
                 }
                 Entry::Occupied(occupied)
@@ -256,7 +256,7 @@ impl TrapSet {
         system.set_signal_handling(signal, (&state.action).into())?;
 
         let state = SignalState {
-            user_state: UserSignalState::Trap(state),
+            current_user_state: UserSignalState::Trap(state),
             internal_handler_enabled: false,
         };
         #[allow(clippy::drop_ref)]
@@ -280,9 +280,9 @@ impl TrapSet {
     /// entering a subshell. This function achieves that effect.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
         for (&signal, state) in &mut self.signals {
-            if let UserSignalState::Trap(trap) = &state.user_state {
+            if let UserSignalState::Trap(trap) = &state.current_user_state {
                 if let Trap::Command(_) = &trap.action {
-                    state.user_state = UserSignalState::InitiallyDefaulted;
+                    state.current_user_state = UserSignalState::InitiallyDefaulted;
                     if !state.internal_handler_enabled {
                         system
                             .set_signal_handling(signal, crate::system::SignalHandling::Default)
@@ -299,7 +299,7 @@ impl TrapSet {
     /// [set](Self::set_trap) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
         if let Some(state) = self.signals.get_mut(&signal) {
-            if let UserSignalState::Trap(trap) = &mut state.user_state {
+            if let UserSignalState::Trap(trap) = &mut state.current_user_state {
                 trap.pending = true;
             }
         }
@@ -315,7 +315,7 @@ impl TrapSet {
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
         self.signals
             .iter_mut()
-            .find_map(|(signal, state)| match &mut state.user_state {
+            .find_map(|(signal, state)| match &mut state.current_user_state {
                 UserSignalState::Trap(trap) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
@@ -348,13 +348,13 @@ impl TrapSet {
                 occupied.get_mut().internal_handler_enabled = true;
             }
             Entry::Vacant(vacant) => {
-                let user_state = if previous_handler == SignalHandling::Ignore {
+                let current_user_state = if previous_handler == SignalHandling::Ignore {
                     UserSignalState::InitiallyIgnored
                 } else {
                     UserSignalState::InitiallyDefaulted
                 };
                 vacant.insert(SignalState {
-                    user_state,
+                    current_user_state,
                     internal_handler_enabled: true,
                 });
             }
@@ -374,7 +374,7 @@ impl TrapSet {
     ) -> Result<(), Errno> {
         if let Some(state) = self.signals.get_mut(&Signal::SIGCHLD) {
             if state.internal_handler_enabled {
-                system.set_signal_handling(Signal::SIGCHLD, (&state.user_state).into())?;
+                system.set_signal_handling(Signal::SIGCHLD, (&state.current_user_state).into())?;
                 state.internal_handler_enabled = false;
             }
         }
