@@ -126,9 +126,16 @@ impl From<&UserSignalState> for SignalHandling {
     }
 }
 
+/// Whole configuration for a signal.
 #[derive(Clone, Debug)]
 struct SignalState {
+    /// User signal state that is effective in the current environment.
     current_user_state: UserSignalState,
+
+    /// User signal state that was effective in the parent environment.
+    parent_user_state: Option<UserSignalState>,
+
+    /// Whether the internal handler has been installed in the current environment.
     internal_handler_enabled: bool,
 }
 
@@ -232,6 +239,7 @@ impl TrapSet {
                     if initial_handling == SignalHandling::Ignore {
                         vacant.insert(SignalState {
                             current_user_state: UserSignalState::InitiallyIgnored,
+                            parent_user_state: None,
                             internal_handler_enabled: false,
                         });
                         return Err(SetTrapError::InitiallyIgnored);
@@ -257,6 +265,7 @@ impl TrapSet {
 
         let state = SignalState {
             current_user_state: UserSignalState::Trap(state),
+            parent_user_state: None,
             internal_handler_enabled: false,
         };
         #[allow(clippy::drop_ref)]
@@ -355,6 +364,7 @@ impl TrapSet {
                 };
                 vacant.insert(SignalState {
                     current_user_state,
+                    parent_user_state: None,
                     internal_handler_enabled: true,
                 });
             }
