@@ -1,0 +1,15 @@
+[package]
+name = "yash-quote"
+version = "0.1.0"
+authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
+edition = "2018"
+description = "Utility for quoting strings to be used in a POSIX shell script"
+# documentation = "https://yash.osdn.jp/doc/"
+# readme = "README.md"
+# homepage = "https://yash.osdn.jp/"
+repository = "https://github.com/magicant/yash-rs"
+license = "MIT OR Apache-2.0"
+# license-file = "../LICENSE"
+keywords = ["posix", "shell"]
+categories = ["command-line-interface"]
+publish = false
