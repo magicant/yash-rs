@@ -41,15 +41,15 @@ pub trait Env: Stdout + Stderr {
     /// Returns an iterator for currently configured trap actions.
     fn iter(&self) -> Iter;
 
-    /// Returns the currently configured trap action for a signal.
+    /// Returns the trap action for a signal.
     ///
-    /// This function returns an optional pair of a trap action and the location
-    /// specified when setting the trap. The result is `None` if no trap has
-    /// been set for the signal.
+    /// This function returns a pair of optional trap states. The first is the
+    /// currently configured trap action, and the second is the action set
+    /// before entering the current subshell environment.
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    fn get_trap(&self, signal: Signal) -> Option<&TrapState>;
+    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>);
 
     /// Sets a trap action for a signal.
     ///
@@ -79,7 +79,7 @@ impl Env for yash_env::Env {
         self.traps.iter()
     }
 
-    fn get_trap(&self, signal: Signal) -> Option<&TrapState> {
+    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
         self.traps.get_trap(signal)
     }
 
