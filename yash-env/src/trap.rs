@@ -116,6 +116,16 @@ enum UserSignalState {
     Trap(TrapState),
 }
 
+impl UserSignalState {
+    fn as_trap(&self) -> Option<&TrapState> {
+        if let UserSignalState::Trap(trap) = self {
+            Some(trap)
+        } else {
+            None
+        }
+    }
+}
+
 impl From<&UserSignalState> for SignalHandling {
     fn from(state: &UserSignalState) -> Self {
         match state {
@@ -140,20 +150,25 @@ struct SignalState {
 }
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).
+///
+/// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
     inner: std::collections::btree_map::Iter<'a, Signal, SignalState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Signal, &'a TrapState);
-    fn next(&mut self) -> Option<(&'a Signal, &'a TrapState)> {
-        loop {
-            let item = self.inner.next()?;
-            if let UserSignalState::Trap(trap) = &item.1.current_user_state {
-                return Some((item.0, trap));
-            }
-        }
+    type Item = (&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>);
+    fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
+        // loop {
+        let item = self.inner.next()?;
+        // TODO Should not yield (_, None, None)
+        let current = &item.1.current_user_state;
+        let current = current.as_trap();
+        let parent = &item.1.parent_user_state;
+        let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+        Some((item.0, current, parent))
+        // }
     }
 }
 
@@ -190,16 +205,10 @@ impl TrapSet {
         match self.signals.get(&signal) {
             None => (None, None),
             Some(state) => {
-                let current = if let UserSignalState::Trap(trap) = &state.current_user_state {
-                    Some(trap)
-                } else {
-                    None
-                };
-                let parent = if let Some(UserSignalState::Trap(trap)) = &state.parent_user_state {
-                    Some(trap)
-                } else {
-                    None
-                };
+                let current = &state.current_user_state;
+                let current = current.as_trap();
+                let parent = &state.parent_user_state;
+                let parent = parent.as_ref().and_then(UserSignalState::as_trap);
                 (current, parent)
             }
         }
@@ -285,7 +294,11 @@ impl TrapSet {
         Ok(())
     }
 
-    /// Returns an iterator over the currently configured signal actions.
+    /// Returns an iterator over the signal actions configured in this trap set.
+    ///
+    /// The iterator yields tuples of the signal, the currently configured trap
+    /// action, and the action set before
+    /// [`enter_subshell`](Self::enter_subshell) was called.
     pub fn iter(&self) -> Iter {
         let inner = self.signals.iter();
         Iter { inner }
@@ -297,8 +310,11 @@ impl TrapSet {
     /// entering a subshell. This function achieves that effect.
     ///
     /// The trap set will remember the original trap states as the parent
-    /// states. You can get them as the second return value of
-    /// [`get_trap`](Self::get_trap).
+    /// states. You can get them from the second return value of
+    /// [`get_trap`](Self::get_trap) or the third item of tuples yielded by an
+    /// [iterator](Self::iter).
+    ///
+    /// Note that trap actions other than `Trap::Command` remain as before.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
         for (&signal, state) in &mut self.signals {
             if let UserSignalState::Trap(trap) = &state.current_user_state {
@@ -663,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    fn iteration() {
+    fn basic_iteration() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
@@ -691,12 +707,55 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Signal::SIGUSR1);
-        assert_eq!(first.1.action, Trap::Ignore);
-        assert_eq!(first.1.origin, origin_1);
+        assert_eq!(first.1.unwrap().action, Trap::Ignore);
+        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.2, None);
         let second = i.next().unwrap();
         assert_eq!(second.0, &Signal::SIGUSR2);
-        assert_eq!(second.1.action, command);
-        assert_eq!(second.1.origin, origin_2);
+        assert_eq!(second.1.unwrap().action, command);
+        assert_eq!(second.1.unwrap().origin, origin_2);
+        assert_eq!(first.2, None);
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn iteration_after_entering_subshell() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin_1 = Location::dummy("foo");
+        trap_set
+            .set_trap(
+                &mut system,
+                Signal::SIGUSR1,
+                Trap::Ignore,
+                origin_1.clone(),
+                false,
+            )
+            .unwrap();
+        let command = Trap::Command("echo".to_string());
+        let origin_2 = Location::dummy("bar");
+        trap_set
+            .set_trap(
+                &mut system,
+                Signal::SIGUSR2,
+                command.clone(),
+                origin_2.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enter_subshell(&mut system);
+
+        let mut i = trap_set.iter();
+        let first = i.next().unwrap();
+        assert_eq!(first.0, &Signal::SIGUSR1);
+        assert_eq!(first.1.unwrap().action, Trap::Ignore);
+        assert_eq!(first.1.unwrap().origin, origin_1);
+        assert_eq!(first.2, None);
+        let second = i.next().unwrap();
+        assert_eq!(second.0, &Signal::SIGUSR2);
+        assert_eq!(second.1, None);
+        assert_eq!(second.2.unwrap().action, command);
+        assert_eq!(second.2.unwrap().origin, origin_2);
         assert_eq!(i.next(), None);
     }
 
