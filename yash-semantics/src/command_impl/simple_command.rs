@@ -351,7 +351,7 @@ async fn execute_external_utility(
         return Continue(());
     }
 
-    let subshell = env.run_in_subshell(move |mut env| {
+    let subshell = env.run_in_subshell(move |env| {
         Box::pin(async move {
             env.traps.disable_internal_handlers(&mut env.system).ok();
 
@@ -369,7 +369,7 @@ async fn execute_external_utility(
                 }
             }
             print_error(
-                &mut env,
+                env,
                 format!("cannot execute external utility {:?}", path).into(),
                 errno.desc().into(),
                 &location,
