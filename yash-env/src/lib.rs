@@ -355,6 +355,7 @@ mod tests {
     use super::*;
     use crate::system::r#virtual::SystemState;
     use crate::trap::Trap;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
@@ -429,7 +430,7 @@ mod tests {
             }
             env.wait_for_signal(Signal::SIGCHLD).await;
 
-            let trap_state = env.traps.get_trap(Signal::SIGCHLD).unwrap();
+            let trap_state = env.traps.get_trap(Signal::SIGCHLD).0.unwrap();
             assert!(trap_state.pending);
         })
     }
@@ -526,7 +527,7 @@ mod tests {
                 .set_trap(
                     &mut env.system,
                     Signal::SIGCHLD,
-                    Trap::Command("".into()),
+                    Trap::Command("echo foo".into()),
                     Location::dummy(""),
                     false,
                 )
@@ -534,7 +535,14 @@ mod tests {
             let pid = env
                 .start_subshell(|env| {
                     Box::pin(async move {
-                        assert_eq!(env.traps.get_trap(Signal::SIGCHLD), None);
+                        let trap_state = assert_matches!(
+                            env.traps.get_trap(Signal::SIGCHLD),
+                            (None, Some(trap_state)) => trap_state
+                        );
+                        assert_matches!(
+                            &trap_state.action,
+                            Trap::Command(body) => assert_eq!(body, "echo foo")
+                        );
                         Continue(())
                     })
                 })

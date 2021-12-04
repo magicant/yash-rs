@@ -41,15 +41,15 @@ pub trait Env: Stdout + Stderr {
     /// Returns an iterator for currently configured trap actions.
     fn iter(&self) -> Iter;
 
-    /// Returns the currently configured trap action for a signal.
+    /// Returns the trap action for a signal.
     ///
-    /// This function returns an optional pair of a trap action and the location
-    /// specified when setting the trap. The result is `None` if no trap has
-    /// been set for the signal.
+    /// This function returns a pair of optional trap states. The first is the
+    /// currently configured trap action, and the second is the action set
+    /// before entering the current subshell environment.
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    fn get_trap(&self, signal: Signal) -> Option<&TrapState>;
+    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>);
 
     /// Sets a trap action for a signal.
     ///
@@ -79,7 +79,7 @@ impl Env for yash_env::Env {
         self.traps.iter()
     }
 
-    fn get_trap(&self, signal: Signal) -> Option<&TrapState> {
+    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
         self.traps.get_trap(signal)
     }
 
@@ -98,7 +98,12 @@ impl Env for yash_env::Env {
 /// Prints the currently configured traps.
 pub async fn print_traps<E: Env>(env: &mut E) -> Result {
     let mut output = String::new();
-    for (&signal, trap) in env.iter() {
+    for (&signal, current, parent) in env.iter() {
+        let trap = match (current, parent) {
+            (Some(trap), _) => trap,
+            (None, Some(trap)) => trap,
+            (None, None) => continue,
+        };
         let command = match &trap.action {
             Trap::Default => continue,
             Trap::Ignore => "",
@@ -276,5 +281,43 @@ mod tests {
         assert_ne!(file.content, []);
     }
 
-    // TODO printing_traps_in_subshell
+    #[test]
+    fn printing_traps_in_subshell() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let args = Field::dummies(["trap", "echo", "INT"]);
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let args = Field::dummies(["trap", "", "TERM"]);
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        env.traps.enter_subshell(&mut env.system);
+        let args = Field::dummies(["trap"]);
+
+        let result = block_on(builtin_body(&mut env, args));
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(file.content, b"trap -- echo INT\ntrap -- '' TERM\n");
+    }
+
+    #[test]
+    fn printing_traps_after_setting_in_subshell() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let args = Field::dummies(["trap", "echo", "INT"]);
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let args = Field::dummies(["trap", "", "TERM"]);
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        env.traps.enter_subshell(&mut env.system);
+        let args = Field::dummies(["trap", "ls", "QUIT"]);
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let args = Field::dummies(["trap"]);
+
+        let result = block_on(builtin_body(&mut env, args));
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(file.content, b"trap -- ls QUIT\ntrap -- '' TERM\n");
+    }
 }
