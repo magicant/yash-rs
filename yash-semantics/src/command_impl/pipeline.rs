@@ -121,7 +121,7 @@ async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Re
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
         Err(errno) => {
-            env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"))
+            env.print_system_error(errno, format_args!("cannot connect pipes in the pipeline"))
                 .await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
@@ -136,7 +136,7 @@ async fn connect_pipe_and_execute_command(
     match pipes.move_to_stdin_stdout(env) {
         Ok(()) => (),
         Err(errno) => {
-            env.print_system_error(errno, &format_args!("cannot connect pipes in the pipeline"))
+            env.print_system_error(errno, format_args!("cannot connect pipes in the pipeline"))
                 .await;
             return Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)));
         }
@@ -149,7 +149,7 @@ async fn pid_or_fail(env: &mut Env, pid: std::result::Result<Pid, Errno>) -> Res
     match pid {
         Ok(pid) => Continue(pid),
         Err(errno) => {
-            let message = &format_args!("cannot start a subshell in the pipeline");
+            let message = format_args!("cannot start a subshell in the pipeline");
             env.print_system_error(errno, message).await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }

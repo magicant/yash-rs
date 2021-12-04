@@ -58,7 +58,7 @@ pub trait Stderr {
     /// change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    async fn print_error(&mut self, message: &std::fmt::Arguments<'_>);
+    async fn print_error(&mut self, message: std::fmt::Arguments<'_>);
 
     /// Convenience function that prints an error message for the given `errno`.
     ///
@@ -67,23 +67,23 @@ pub trait Stderr {
     /// message is subject to change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    async fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
-        self.print_error(&format_args!("{}: {}", message, errno.desc()))
+    async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
+        self.print_error(format_args!("{}: {}", message, errno.desc()))
             .await
     }
 }
 
 #[async_trait(?Send)]
 impl Stderr for yash_env::Env {
-    async fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
+    async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
         self.print_error(message).await
     }
 }
 
 #[async_trait(?Send)]
 impl Stderr for String {
-    async fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
-        std::fmt::write(&mut self, *message).ok();
+    async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
+        std::fmt::write(&mut self, message).ok();
     }
 }
 
@@ -103,11 +103,8 @@ impl<T: Stdout + Stderr> Print for T {
         match self.try_print(text).await {
             Ok(()) => ExitStatus::SUCCESS,
             Err(errno) => {
-                self.print_system_error(
-                    errno,
-                    &format_args!("cannot print to the standard output"),
-                )
-                .await;
+                self.print_system_error(errno, format_args!("cannot print to the standard output"))
+                    .await;
                 ExitStatus::FAILURE
             }
         }

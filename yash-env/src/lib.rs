@@ -155,7 +155,7 @@ impl Env {
     /// change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub async fn print_error(&mut self, message: &std::fmt::Arguments<'_>) {
+    pub async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
         // TODO print `$0` first
         // TODO localize message
         let message = format!("{}\n", message);
@@ -169,8 +169,8 @@ impl Env {
     /// message is subject to change.)
     ///
     /// Any errors that may happen writing to the standard error are ignored.
-    pub async fn print_system_error(&mut self, errno: Errno, message: &std::fmt::Arguments<'_>) {
-        self.print_error(&format_args!("{}: {}", message, errno.desc()))
+    pub async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
+        self.print_error(format_args!("{}: {}", message, errno.desc()))
             .await
     }
 
@@ -402,7 +402,7 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        block_on(env.print_system_error(Errno::EINVAL, &format_args!("dummy message {}", 42)));
+        block_on(env.print_system_error(Errno::EINVAL, format_args!("dummy message {}", 42)));
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
