@@ -160,15 +160,16 @@ pub struct Iter<'a> {
 impl<'a> Iterator for Iter<'a> {
     type Item = (&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>);
     fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
-        // loop {
-        let item = self.inner.next()?;
-        // TODO Should not yield (_, None, None)
-        let current = &item.1.current_user_state;
-        let current = current.as_trap();
-        let parent = &item.1.parent_user_state;
-        let parent = parent.as_ref().and_then(UserSignalState::as_trap);
-        Some((item.0, current, parent))
-        // }
+        loop {
+            let item = self.inner.next()?;
+            let current = &item.1.current_user_state;
+            let current = current.as_trap();
+            let parent = &item.1.parent_user_state;
+            let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+            if current.is_some() || parent.is_some() {
+                return Some((item.0, current, parent));
+            }
+        }
     }
 }
 
@@ -768,6 +769,37 @@ mod tests {
         assert_eq!(second.1, None);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, origin_2);
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn iteration_after_setting_trap_in_subshell() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin_1 = Location::dummy("foo");
+        let command = Trap::Command("echo".to_string());
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .unwrap();
+        trap_set.enter_subshell(&mut system);
+        let origin_2 = Location::dummy("bar");
+        let command = Trap::Command("ls".to_string());
+        trap_set
+            .set_trap(
+                &mut system,
+                Signal::SIGUSR2,
+                command.clone(),
+                origin_2.clone(),
+                false,
+            )
+            .unwrap();
+
+        let mut i = trap_set.iter();
+        let first = i.next().unwrap();
+        assert_eq!(first.0, &Signal::SIGUSR2);
+        assert_eq!(first.1.unwrap().action, command);
+        assert_eq!(first.1.unwrap().origin, origin_2);
+        assert_eq!(first.2, None);
         assert_eq!(i.next(), None);
     }
 
