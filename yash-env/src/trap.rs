@@ -228,6 +228,10 @@ impl TrapSet {
     /// `origin` should be the location of the command performing this trap
     /// update. It is only informative: It does not affect the signal handling
     /// behavior and can be referenced later by [`get_trap`](Self::get_trap).
+    ///
+    /// This function clears all parent states remembered when [entering a
+    /// subshell](Self::enter_subshell), not only for `signal` but also for
+    /// other signals.
     pub fn set_trap<S: SignalSystem>(
         &mut self,
         system: &mut S,
@@ -241,6 +245,8 @@ impl TrapSet {
             Signal::SIGSTOP => return Err(SetTrapError::SIGSTOP),
             _ => (),
         }
+
+        self.clear_parent_states();
 
         let state = TrapState {
             action,
@@ -292,6 +298,12 @@ impl TrapSet {
         }
 
         Ok(())
+    }
+
+    fn clear_parent_states(&mut self) {
+        for state in self.signals.values_mut() {
+            state.parent_user_state = None;
+        }
     }
 
     /// Returns an iterator over the signal actions configured in this trap set.
@@ -858,6 +870,56 @@ mod tests {
         assert_eq!(
             system.0[&Signal::SIGCHLD],
             crate::system::SignalHandling::Catch
+        );
+    }
+
+    #[test]
+    fn setting_trap_after_entering_subshell_clears_parent_states() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin_1 = Location::dummy("foo");
+        let command = Trap::Command("echo 1".to_string());
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .unwrap();
+        let origin_2 = Location::dummy("bar");
+        let command = Trap::Command("echo 2".to_string());
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
+            .unwrap();
+        trap_set.enter_subshell(&mut system);
+
+        let command = Trap::Command("echo 9".to_string());
+        let origin_3 = Location::dummy("qux");
+        trap_set
+            .set_trap(
+                &mut system,
+                Signal::SIGUSR1,
+                command.clone(),
+                origin_3.clone(),
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            trap_set.get_trap(Signal::SIGUSR1),
+            (
+                Some(&TrapState {
+                    action: command,
+                    origin: origin_3,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(
+            system.0[&Signal::SIGUSR1],
+            crate::system::SignalHandling::Catch
+        );
+        assert_eq!(
+            system.0[&Signal::SIGUSR2],
+            crate::system::SignalHandling::Default
         );
     }
 
