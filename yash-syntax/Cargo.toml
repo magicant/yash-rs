@@ -17,8 +17,8 @@ publish = false
 [dependencies]
 annotate-snippets = { version = "0.9.1", optional = true }
 async-trait = "0.1.50"
-futures-util = "0.3.17"
+futures-util = "0.3.18"
 itertools = "0.10.1"
 
 [dev-dependencies]
-futures-executor = "0.3.17"
+futures-executor = "0.3.18"

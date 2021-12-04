@@ -21,5 +21,5 @@ yash-quote = { path = "../yash-quote", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
 
 [dev-dependencies]
-futures-util = "0.3.17"
-futures-executor = "0.3.17"
+futures-util = "0.3.18"
+futures-executor = "0.3.18"
