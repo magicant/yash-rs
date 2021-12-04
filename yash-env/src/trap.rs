@@ -329,6 +329,8 @@ impl TrapSet {
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
+        self.clear_parent_states();
+
         for (&signal, state) in &mut self.signals {
             if let UserSignalState::Trap(trap) = &state.current_user_state {
                 if let Trap::Command(_) = &trap.action {
@@ -948,6 +950,35 @@ mod tests {
         assert_eq!(
             system.0[&Signal::SIGUSR1],
             crate::system::SignalHandling::Catch
+        );
+        assert_eq!(
+            system.0[&Signal::SIGUSR2],
+            crate::system::SignalHandling::Default
+        );
+    }
+
+    #[test]
+    fn entering_nested_subshell_clears_parent_states() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let origin_1 = Location::dummy("foo");
+        let command = Trap::Command("echo 1".to_string());
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .unwrap();
+        let origin_2 = Location::dummy("bar");
+        let command = Trap::Command("echo 2".to_string());
+        trap_set
+            .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
+            .unwrap();
+        trap_set.enter_subshell(&mut system);
+        trap_set.enter_subshell(&mut system);
+
+        assert_eq!(trap_set.get_trap(Signal::SIGUSR1), (None, None));
+        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(
+            system.0[&Signal::SIGUSR1],
+            crate::system::SignalHandling::Default
         );
         assert_eq!(
             system.0[&Signal::SIGUSR2],
