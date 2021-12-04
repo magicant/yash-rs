@@ -46,7 +46,7 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 /// Otherwise, it is `Owned(new_quoted_string)`.
 ///
 /// See the [module doc](self) for more details.
-pub fn quote(s: &str) -> Cow<str> {
+pub fn quote(s: &str) -> Cow<'_, str> {
     if !s.is_empty() && !str_needs_quoting(s) {
         return Borrowed(s);
     }

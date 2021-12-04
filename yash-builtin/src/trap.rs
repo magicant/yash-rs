@@ -39,7 +39,7 @@ use yash_syntax::source::Location;
 /// Part of the shell execution environment the trap built-in depends on.
 pub trait Env: Stdout + Stderr {
     /// Returns an iterator for currently configured trap actions.
-    fn iter(&self) -> Iter;
+    fn iter(&self) -> Iter<'_>;
 
     /// Returns the trap action for a signal.
     ///
@@ -75,7 +75,7 @@ pub trait Env: Stdout + Stderr {
 }
 
 impl Env for yash_env::Env {
-    fn iter(&self) -> Iter {
+    fn iter(&self) -> Iter<'_> {
         self.traps.iter()
     }
 

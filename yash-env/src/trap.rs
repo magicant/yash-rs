@@ -312,7 +312,7 @@ impl TrapSet {
     /// The iterator yields tuples of the signal, the currently configured trap
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         let inner = self.signals.iter();
         Iter { inner }
     }
