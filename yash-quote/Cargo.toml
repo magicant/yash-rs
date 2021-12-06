@@ -2,7 +2,8 @@
 name = "yash-quote"
 version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.56.0"
 description = "Utility for quoting strings to be used in a POSIX shell script"
 # documentation = "https://yash.osdn.jp/doc/"
 # readme = "README.md"
