@@ -39,7 +39,6 @@ use nix::sys::stat::Mode;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
-use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::future::Future;

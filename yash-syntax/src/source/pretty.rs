@@ -113,7 +113,6 @@ mod annotate_snippets_support {
     use super::*;
     use annotate_snippets::snippet;
     use annotate_snippets::snippet::Snippet;
-    use std::convert::TryInto;
 
     /// Converts `yash_syntax::source::pretty::AnnotationType` into
     /// `annotate_snippets::snippet::AnnotationType`.

@@ -83,7 +83,6 @@
 use crate::parser::lex::Operator;
 use crate::source::Location;
 use itertools::Itertools;
-use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Write;
 use std::os::unix::io::RawFd;

@@ -17,7 +17,6 @@
 //! Type definitions for command execution.
 
 use nix::sys::signal::Signal;
-use std::convert::TryFrom;
 use std::ops::ControlFlow;
 use std::os::raw::c_int;
 use yash_syntax::source::Location;

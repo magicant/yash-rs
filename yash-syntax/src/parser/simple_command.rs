@@ -30,7 +30,6 @@ use crate::syntax::Redir;
 use crate::syntax::Scalar;
 use crate::syntax::SimpleCommand;
 use crate::syntax::Word;
-use std::convert::TryFrom;
 
 /// Simple command builder.
 #[derive(Default)]

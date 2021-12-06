@@ -26,7 +26,6 @@ use super::Parser;
 use super::Rec;
 use crate::source::Source;
 use crate::syntax::*;
-use std::convert::TryInto;
 use std::future::Future;
 use std::iter::empty;
 use std::str::FromStr;

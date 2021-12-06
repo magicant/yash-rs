@@ -27,7 +27,6 @@ use super::op::is_operator_char;
 use crate::parser::core::Result;
 use crate::syntax::MaybeLiteral;
 use crate::syntax::Word;
-use std::convert::TryFrom;
 
 /// Tests whether the given character is a token delimiter.
 ///

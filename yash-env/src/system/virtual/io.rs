@@ -21,7 +21,6 @@ use nix::errno::Errno;
 use nix::libc::off_t;
 use nix::unistd::Whence;
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::rc::Rc;
 use std::rc::Weak;

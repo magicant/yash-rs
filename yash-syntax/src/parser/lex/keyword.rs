@@ -16,7 +16,6 @@
 
 //! Types and functions for parsing reserved words.
 
-use std::convert::TryFrom;
 use std::fmt;
 
 /// Token identifier for reserved words.

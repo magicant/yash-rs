@@ -30,7 +30,6 @@ use crate::syntax::Redir;
 use crate::syntax::RedirBody;
 use crate::syntax::RedirOp;
 use crate::syntax::Word;
-use std::convert::TryFrom;
 
 impl Parser<'_, '_> {
     /// Parses the operand of a redirection operator.
