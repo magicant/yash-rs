@@ -4,16 +4,14 @@ version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.56.0"
-description = "Yash shell language syntax definition and parser"
+description = "POSIX-compatible shell script syntax parser"
 # documentation = "https://yash.osdn.jp/doc/"
-# readme = "README.md"
+readme = "README.md"
 # homepage = "https://yash.osdn.jp/"
 repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
-# license-file = "../LICENSE"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities", "parser-implementations"]
-publish = false
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", optional = true }
