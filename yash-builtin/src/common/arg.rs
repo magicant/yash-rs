@@ -53,8 +53,11 @@ pub struct Error {}
 pub fn parse_arguments(
     _option_specs: &[OptionSpec],
     _mode: Mode,
-    arguments: Vec<Field>,
+    mut arguments: Vec<Field>,
 ) -> Result<(Vec<ParsedOption>, Vec<Field>), Error> {
+    if !arguments.is_empty() {
+        arguments.remove(0);
+    }
     Ok((vec![], arguments))
 }
 
@@ -67,5 +70,23 @@ mod tests {
         let (options, operands) = parse_arguments(&[], Mode::default(), vec![]).unwrap();
         assert_eq!(options, []);
         assert_eq!(operands, []);
+    }
+
+    #[test]
+    fn only_operands() {
+        let arguments = Field::dummies(["foo"]);
+        let (options, operands) = parse_arguments(&[], Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", ""]);
+        let (options, operands) = parse_arguments(&[], Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies([""]));
+
+        let arguments = Field::dummies(["foo", "bar", "", "baz"]);
+        let (options, operands) = parse_arguments(&[], Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies(["bar", "", "baz"]));
     }
 }
