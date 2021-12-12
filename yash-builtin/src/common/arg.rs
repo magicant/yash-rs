@@ -85,9 +85,33 @@ pub struct Error {}
 
 /// TODO impl std::error::Error for Error
 
+/// Parses short options in an argument.
+///
+/// Returns true iff one or more options were found.
+fn parse_short_options<'a>(
+    option_specs: &'a [OptionSpec],
+    argument: &Field,
+    option_occurrences: &mut Vec<OptionOccurrence<'a>>,
+) -> bool {
+    let mut i = argument.value.chars();
+    if i.next() != Some('-') {
+        return false;
+    }
+
+    if let Some(c) = i.next() {
+        if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
+            option_occurrences.push(OptionOccurrence { spec });
+        }
+    }
+    // TODO Return false if no options were found
+    true
+}
+
 /// Parses command-line arguments into options and operands.
 ///
-/// The first argument is always dropped.
+/// The first argument is always dropped and the remaining arguments are parsed.
+///
+/// If successful, returns a pair of option occurrences and operands.
 pub fn parse_arguments(
     option_specs: &[OptionSpec],
     _mode: Mode,
@@ -103,18 +127,12 @@ pub fn parse_arguments(
     }
 
     let mut option_occurrences = vec![];
-    'outer: while let Some(argument) = arguments.first() {
-        for spec in option_specs {
-            if let Some(short_name) = spec.get_short() {
-                let expected_option_argument = format!("-{}", short_name);
-                if argument.value == expected_option_argument {
-                    option_occurrences.push(OptionOccurrence { spec });
-                    arguments.remove(0);
-                    continue 'outer;
-                }
-            }
+    while let Some(argument) = arguments.first() {
+        if parse_short_options(option_specs, argument, &mut option_occurrences) {
+            arguments.remove(0);
+        } else {
+            break;
         }
-        break;
     }
     Ok((option_occurrences, arguments))
 }
@@ -239,5 +257,6 @@ mod tests {
 
     // TODO multiple_occurrences_of_short_options_in_single_argument
 
+    // TODO single_hyphen_argument_is_not_option
     // TODO options_are_not_recognized_after_separator
 }
