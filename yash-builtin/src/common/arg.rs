@@ -98,7 +98,7 @@ fn parse_short_options<'a>(
         return false;
     }
 
-    if let Some(c) = i.next() {
+    for c in i {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
             option_occurrences.push(OptionOccurrence { spec });
         }
@@ -255,7 +255,25 @@ mod tests {
         assert_eq!(operands, []);
     }
 
-    // TODO multiple_occurrences_of_short_options_in_single_argument
+    #[test]
+    fn multiple_occurrences_of_short_options_in_single_argument() {
+        let specs = &[OptionSpec::new().short('p'), OptionSpec::new().short('q')];
+
+        let arguments = Field::dummies(["command", "-pq", "!"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('p'));
+        assert_eq!(options[1].spec.get_short(), Some('q'));
+        assert_eq!(operands, Field::dummies(["!"]));
+
+        let arguments = Field::dummies(["command", "-qpq"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 3, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('q'));
+        assert_eq!(options[1].spec.get_short(), Some('p'));
+        assert_eq!(options[2].spec.get_short(), Some('q'));
+        assert_eq!(operands, []);
+    }
 
     // TODO single_hyphen_argument_is_not_option
     // TODO options_are_not_recognized_after_separator
