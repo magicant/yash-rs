@@ -304,6 +304,16 @@ mod tests {
         assert_eq!(operands, Field::dummies(["-a", "--", "-a"]));
     }
 
-    // TODO options_are_not_recognized_after_operand (depending mode)
+    #[test]
+    fn options_are_not_recognized_after_operand_by_default() {
+        let specs = &[OptionSpec::new().short('x'), OptionSpec::new().short('y')];
+
+        let arguments = Field::dummies(["foo", "-x", "bar", "-y", "baz"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('x'));
+        assert_eq!(operands, Field::dummies(["bar", "-y", "baz"]));
+    }
+
     // TODO options_are_recognized_after_operand (depending mode)
 }
