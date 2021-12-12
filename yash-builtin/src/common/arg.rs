@@ -72,9 +72,12 @@ impl OptionSpec {
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct Mode {}
 
-/// TODO
+/// Occurrence of an option
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParsedOption {}
+pub struct OptionOccurrence<'a> {
+    /// Specification for this option.
+    pub spec: &'a OptionSpec,
+}
 
 /// TODO
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -86,10 +89,10 @@ pub struct Error {}
 ///
 /// The first argument is always dropped.
 pub fn parse_arguments(
-    _option_specs: &[OptionSpec],
+    option_specs: &[OptionSpec],
     _mode: Mode,
     mut arguments: Vec<Field>,
-) -> Result<(Vec<ParsedOption>, Vec<Field>), Error> {
+) -> Result<(Vec<OptionOccurrence<'_>>, Vec<Field>), Error> {
     if !arguments.is_empty() {
         arguments.remove(0);
     }
@@ -98,7 +101,20 @@ pub fn parse_arguments(
             arguments.remove(0);
         }
     }
-    Ok((vec![], arguments))
+
+    let mut option_occurrences = vec![];
+    if let Some(argument) = arguments.first() {
+        if let Some(spec) = option_specs.first() {
+            if let Some(short_name) = spec.get_short() {
+                let expected_option_argument = format!("-{}", short_name);
+                if argument.value == expected_option_argument {
+                    option_occurrences.push(OptionOccurrence { spec });
+                    arguments.remove(0);
+                }
+            }
+        }
+    }
+    Ok((option_occurrences, arguments))
 }
 
 #[cfg(test)]
@@ -162,6 +178,27 @@ mod tests {
         assert_eq!(options, []);
         assert_eq!(operands, Field::dummies([""]));
     }
+
+    #[test]
+    fn single_occurrence_of_short_option() {
+        let specs = &[OptionSpec::new().short('a')];
+
+        let arguments = Field::dummies(["foo", "-a"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "-a", "bar"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(operands, Field::dummies(["bar"]));
+    }
+
+    // TODO multiple_occurrences_of_same_option_spec
+    // TODO occurrences_of_multiple_option_specs
+    // TODO multiple_occurrences_of_short_options_in_single_argument
 
     // TODO options_are_not_recognized_after_separator
 }
