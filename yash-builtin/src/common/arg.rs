@@ -34,19 +34,38 @@ pub use yash_env::semantics::Field;
 pub struct OptionSpec {}
 
 /// TODO
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct Mode {}
 
 /// TODO
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedOption {}
 
 /// TODO
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {}
 
+/// TODO impl std::error::Error for Error
+
 /// Parses command-line arguments into options and operands.
+///
+/// The first argument is always dropped.
 pub fn parse_arguments(
     _option_specs: &[OptionSpec],
     _mode: Mode,
-    _arguments: Vec<Field>,
+    arguments: Vec<Field>,
 ) -> Result<(Vec<ParsedOption>, Vec<Field>), Error> {
-    todo!()
+    Ok((vec![], arguments))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_arguments() {
+        let (options, operands) = parse_arguments(&[], Mode::default(), vec![]).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, []);
+    }
 }
