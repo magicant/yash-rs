@@ -98,13 +98,14 @@ fn parse_short_options<'a>(
         return false;
     }
 
+    let mut found = false;
     for c in i {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
+            found = true;
             option_occurrences.push(OptionOccurrence { spec });
         }
     }
-    // TODO Return false if no options were found
-    true
+    found
 }
 
 /// Parses command-line arguments into options and operands.
@@ -275,6 +276,22 @@ mod tests {
         assert_eq!(operands, []);
     }
 
-    // TODO single_hyphen_argument_is_not_option
+    #[test]
+    fn single_hyphen_argument_is_not_option() {
+        let specs = &[OptionSpec::new().short('a')];
+
+        let arguments = Field::dummies(["foo", "-"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies(["-"]));
+
+        let arguments = Field::dummies(["foo", "-", "-"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies(["-", "-"]));
+    }
+
     // TODO options_are_not_recognized_after_separator
+    // TODO options_are_not_recognized_after_operand (depending mode)
+    // TODO options_are_recognized_after_operand (depending mode)
 }
