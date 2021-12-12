@@ -103,14 +103,14 @@ pub fn parse_arguments(
     }
 
     let mut option_occurrences = vec![];
-    while let Some(argument) = arguments.first() {
-        if let Some(spec) = option_specs.first() {
+    'outer: while let Some(argument) = arguments.first() {
+        for spec in option_specs {
             if let Some(short_name) = spec.get_short() {
                 let expected_option_argument = format!("-{}", short_name);
                 if argument.value == expected_option_argument {
                     option_occurrences.push(OptionOccurrence { spec });
                     arguments.remove(0);
-                    continue;
+                    continue 'outer;
                 }
             }
         }
@@ -217,7 +217,26 @@ mod tests {
         assert_eq!(operands, Field::dummies(["argument"]));
     }
 
-    // TODO occurrences_of_multiple_option_specs
+    #[test]
+    fn occurrences_of_multiple_option_specs() {
+        let specs = &[OptionSpec::new().short('x'), OptionSpec::new().short('y')];
+
+        let arguments = Field::dummies(["command", "-x", "-y", "!"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('x'));
+        assert_eq!(options[1].spec.get_short(), Some('y'));
+        assert_eq!(operands, Field::dummies(["!"]));
+
+        let arguments = Field::dummies(["command", "-y", "-x", "-y"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 3, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('y'));
+        assert_eq!(options[1].spec.get_short(), Some('x'));
+        assert_eq!(options[2].spec.get_short(), Some('y'));
+        assert_eq!(operands, []);
+    }
+
     // TODO multiple_occurrences_of_short_options_in_single_argument
 
     // TODO options_are_not_recognized_after_separator
