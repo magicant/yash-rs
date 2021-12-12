@@ -121,11 +121,6 @@ pub fn parse_arguments(
     if !arguments.is_empty() {
         arguments.remove(0);
     }
-    if let Some(argument) = arguments.first() {
-        if argument.value == "--" {
-            arguments.remove(0);
-        }
-    }
 
     let mut option_occurrences = vec![];
     while let Some(argument) = arguments.first() {
@@ -135,6 +130,13 @@ pub fn parse_arguments(
             break;
         }
     }
+
+    if let Some(argument) = arguments.first() {
+        if argument.value == "--" {
+            arguments.remove(0);
+        }
+    }
+
     Ok((option_occurrences, arguments))
 }
 
@@ -291,7 +293,17 @@ mod tests {
         assert_eq!(operands, Field::dummies(["-", "-"]));
     }
 
-    // TODO options_are_not_recognized_after_separator
+    #[test]
+    fn options_are_not_recognized_after_separator() {
+        let specs = &[OptionSpec::new().short('a')];
+
+        let arguments = Field::dummies(["foo", "-a", "--", "-a", "--", "-a"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(operands, Field::dummies(["-a", "--", "-a"]));
+    }
+
     // TODO options_are_not_recognized_after_operand (depending mode)
     // TODO options_are_recognized_after_operand (depending mode)
 }
