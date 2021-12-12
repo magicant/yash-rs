@@ -30,8 +30,43 @@
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
 
-/// TODO
-pub struct OptionSpec {}
+/// Specification of an option
+///
+/// This structure may contain the following properties:
+///
+/// - Short option name (a single character)
+/// - Long option name (a string)
+/// - Whether this option takes an argument
+///
+/// All of these are optional, but either or both of the short and long names
+/// should be set for the option spec to have meaningful effect.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OptionSpec {
+    short: Option<char>,
+}
+
+impl OptionSpec {
+    /// Creates a new empty option spec.
+    pub const fn new() -> Self {
+        OptionSpec { short: None }
+    }
+
+    /// Returns the short option name.
+    pub const fn get_short(&self) -> Option<char> {
+        self.short
+    }
+
+    /// Gives a short name for this option.
+    pub fn set_short(&mut self, name: char) {
+        self.short = Some(name);
+    }
+
+    /// Chained version of [`set_short`](Self::set_short)
+    pub const fn short(mut self, name: char) -> Self {
+        self.short = Some(name);
+        self
+    }
+}
 
 /// TODO
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
@@ -111,6 +146,21 @@ mod tests {
         let (options, operands) = parse_arguments(&[], Mode::default(), arguments).unwrap();
         assert_eq!(options, []);
         assert_eq!(operands, Field::dummies(["a", "", "z"]));
+    }
+
+    #[test]
+    fn non_occurring_short_option() {
+        let specs = &[OptionSpec::new().short('a')];
+
+        let arguments = Field::dummies(["foo"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", ""]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies([""]));
     }
 
     // TODO options_are_not_recognized_after_separator
