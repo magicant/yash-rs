@@ -30,6 +30,24 @@
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
 
+/// Specification for an options's argument
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum OptionArgumentSpec {
+    /// The option does not take an argument. (default)
+    None,
+    /// The option requires an argument.
+    Required,
+    // /// The option may have an argument.
+    // Optional,
+}
+
+impl Default for OptionArgumentSpec {
+    fn default() -> Self {
+        OptionArgumentSpec::None
+    }
+}
+
 /// Specification of an option
 ///
 /// This structure may contain the following properties:
@@ -43,12 +61,16 @@ pub use yash_env::semantics::Field;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OptionSpec {
     short: Option<char>,
+    argument: OptionArgumentSpec,
 }
 
 impl OptionSpec {
     /// Creates a new empty option spec.
     pub const fn new() -> Self {
-        OptionSpec { short: None }
+        OptionSpec {
+            short: None,
+            argument: OptionArgumentSpec::None,
+        }
     }
 
     /// Returns the short option name.
@@ -66,6 +88,22 @@ impl OptionSpec {
         self.short = Some(name);
         self
     }
+
+    /// Returns whether this option takes an argument.
+    pub const fn get_argument(&self) -> OptionArgumentSpec {
+        self.argument
+    }
+
+    /// Specifies whether this option takes an argument.
+    pub fn set_argument(&mut self, argument: OptionArgumentSpec) {
+        self.argument = argument;
+    }
+
+    /// Chained version of [`set_argument`](Self::set_argument)
+    pub const fn argument(mut self, argument: OptionArgumentSpec) -> Self {
+        self.argument = argument;
+        self
+    }
 }
 
 /// TODO
@@ -77,6 +115,16 @@ pub struct Mode {}
 pub struct OptionOccurrence<'a> {
     /// Specification for this option.
     pub spec: &'a OptionSpec,
+
+    /// Argument to this option.
+    ///
+    /// This value is always `None` for an option that does not take an argument.
+    ///
+    /// This value always contains a field for an option that requires an argument.
+    ///
+    /// If the option name and its argument are given in a single field,
+    /// the field value is modified to contain only the option argument.
+    pub argument: Option<Field>,
 }
 
 /// TODO
@@ -99,10 +147,25 @@ fn parse_short_options<'a>(
     }
 
     let mut found = false;
-    for c in i {
+    while let Some(c) = i.next() {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
             found = true;
-            option_occurrences.push(OptionOccurrence { spec });
+
+            match spec.get_argument() {
+                OptionArgumentSpec::None => {
+                    let argument = None;
+                    option_occurrences.push(OptionOccurrence { spec, argument });
+                }
+                OptionArgumentSpec::Required => {
+                    let prefix = argument.value.len() - i.as_str().len();
+                    let argument = Some(Field {
+                        value: argument.value[prefix..].to_string(),
+                        origin: argument.origin.clone(),
+                    });
+                    option_occurrences.push(OptionOccurrence { spec, argument });
+                    break;
+                }
+            };
         }
     }
     found
@@ -143,6 +206,7 @@ pub fn parse_arguments(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn empty_arguments() {
@@ -315,5 +379,43 @@ mod tests {
         assert_eq!(operands, Field::dummies(["bar", "-y", "baz"]));
     }
 
+    #[test]
+    fn adjacent_argument_to_short_option() {
+        let specs = &[OptionSpec::new()
+            .short('a')
+            .argument(OptionArgumentSpec::Required)];
+
+        let arguments = Field::dummies(["foo", "-abar"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "bar");
+            assert_eq!(field.origin.line.value, "-abar");
+        });
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "-a1", "-a2", "3"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "1");
+            assert_eq!(field.origin.line.value, "-a1");
+        });
+        assert_eq!(options[1].spec.get_short(), Some('a'));
+        assert_matches!(options[1].argument, Some(ref field) => {
+            assert_eq!(field.value, "2");
+            assert_eq!(field.origin.line.value, "-a2");
+        });
+        assert_eq!(operands, Field::dummies(["3"]));
+    }
+
+    // TODO separate_argument_to_short_option
+    // TODO argument_taking_option_adjacent_to_another_option
+    // TODO empty_argument_to_short_option
+
     // TODO options_are_recognized_after_operand (depending mode)
+
+    // TODO missing_argument_to_short_option
 }
