@@ -28,6 +28,7 @@
 //! TODO
 
 #[doc(no_inline)]
+use std::iter::Peekable;
 pub use yash_env::semantics::Field;
 
 /// Specification for an options's argument
@@ -135,19 +136,29 @@ pub struct Error {}
 
 /// Parses short options in an argument.
 ///
-/// Returns true iff one or more options were found.
-fn parse_short_options<'a>(
+/// This function examines the first field yielded by `arguments` and consumes
+/// it if it contains one or more short options. If the last option requires an
+/// argument and the field does not include one, the following field is consumed
+/// as the argument.
+///
+/// This function returns `true` if consumed one or more fields.
+fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec],
-    argument: &Field,
+    arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
 ) -> bool {
-    let mut i = argument.value.chars();
-    if i.next() != Some('-') {
+    let argument = match arguments.peek() {
+        Some(argument) => argument,
+        None => return false,
+    };
+
+    let mut chars = argument.value.chars();
+    if chars.next() != Some('-') {
         return false;
     }
 
     let mut found = false;
-    while let Some(c) = i.next() {
+    while let Some(c) = chars.next() {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
             found = true;
 
@@ -157,16 +168,18 @@ fn parse_short_options<'a>(
                     option_occurrences.push(OptionOccurrence { spec, argument });
                 }
                 OptionArgumentSpec::Required => {
-                    let prefix = argument.value.len() - i.as_str().len();
-                    let argument = Some(Field {
-                        value: argument.value[prefix..].to_string(),
-                        origin: argument.origin.clone(),
-                    });
+                    let prefix = argument.value.len() - chars.as_str().len();
+                    let mut argument = arguments.next().unwrap();
+                    argument.value.drain(..prefix);
+                    let argument = Some(argument);
                     option_occurrences.push(OptionOccurrence { spec, argument });
-                    break;
+                    return true;
                 }
             };
         }
+    }
+    if found {
+        arguments.next();
     }
     found
 }
@@ -179,28 +192,17 @@ fn parse_short_options<'a>(
 pub fn parse_arguments(
     option_specs: &[OptionSpec],
     _mode: Mode,
-    mut arguments: Vec<Field>,
+    arguments: Vec<Field>,
 ) -> Result<(Vec<OptionOccurrence<'_>>, Vec<Field>), Error> {
-    if !arguments.is_empty() {
-        arguments.remove(0);
-    }
+    let mut arguments = arguments.into_iter().skip(1).peekable();
 
     let mut option_occurrences = vec![];
-    while let Some(argument) = arguments.first() {
-        if parse_short_options(option_specs, argument, &mut option_occurrences) {
-            arguments.remove(0);
-        } else {
-            break;
-        }
-    }
+    while parse_short_options(option_specs, &mut arguments, &mut option_occurrences) {}
 
-    if let Some(argument) = arguments.first() {
-        if argument.value == "--" {
-            arguments.remove(0);
-        }
-    }
+    arguments.next_if(|argument| argument.value == "--");
 
-    Ok((option_occurrences, arguments))
+    let operands = arguments.collect();
+    Ok((option_occurrences, operands))
 }
 
 #[cfg(test)]
