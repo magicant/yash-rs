@@ -458,7 +458,35 @@ mod tests {
         assert_eq!(operands, Field::dummies(["3"]));
     }
 
-    // TODO argument_taking_option_adjacent_to_another_option
+    #[test]
+    fn argument_taking_option_adjacent_to_another_option() {
+        let specs = &[
+            OptionSpec::new()
+                .short('a')
+                .argument(OptionArgumentSpec::None),
+            OptionSpec::new()
+                .short('b')
+                .argument(OptionArgumentSpec::None),
+            OptionSpec::new()
+                .short('c')
+                .argument(OptionArgumentSpec::Required),
+        ];
+
+        let arguments = Field::dummies(["foo", "-abcdef"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 3, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].argument, None);
+        assert_eq!(options[1].spec.get_short(), Some('b'));
+        assert_eq!(options[1].argument, None);
+        assert_eq!(options[2].spec.get_short(), Some('c'));
+        assert_matches!(options[2].argument, Some(ref field) => {
+            assert_eq!(field.value, "def");
+            assert_eq!(field.origin.line.value, "-abcdef");
+        });
+        assert_eq!(operands, []);
+    }
+
     // TODO empty_argument_to_short_option
 
     // TODO options_are_recognized_after_operand (depending mode)
