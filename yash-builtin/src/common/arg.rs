@@ -489,6 +489,28 @@ mod tests {
 
     // TODO empty_argument_to_short_option
 
+    #[test]
+    fn option_argument_that_looks_like_separator() {
+        let specs = &[OptionSpec::new()
+            .short('a')
+            .argument(OptionArgumentSpec::Required)];
+
+        let arguments = Field::dummies(["foo", "-a", "argument", "-a", "--", "--", "operand"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "argument");
+            assert_eq!(field.origin.line.value, "argument");
+        });
+        assert_eq!(options[1].spec.get_short(), Some('a'));
+        assert_matches!(options[1].argument, Some(ref field) => {
+            assert_eq!(field.value, "--");
+            assert_eq!(field.origin.line.value, "--");
+        });
+        assert_eq!(operands, Field::dummies(["operand"]));
+    }
+
     // TODO options_are_recognized_after_operand (depending mode)
 
     // TODO missing_argument_to_short_option
