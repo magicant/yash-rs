@@ -154,14 +154,20 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
 
     let mut chars = argument.value.chars();
     if chars.next() != Some('-') {
+        // argument.value not starting with a hyphen
+        return false;
+    }
+    if chars.as_str().is_empty() {
+        // argument.value == "-"
+        return false;
+    }
+    if chars.as_str() == "-" {
+        // argument.value == "--"
         return false;
     }
 
-    let mut found = false;
     while let Some(c) = chars.next() {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
-            found = true;
-
             match spec.get_argument() {
                 OptionArgumentSpec::None => {
                     let argument = None;
@@ -187,10 +193,8 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
             };
         }
     }
-    if found {
-        arguments.next();
-    }
-    found
+    drop(arguments.next());
+    true
 }
 
 /// Parses command-line arguments into options and operands.
