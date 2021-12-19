@@ -168,10 +168,19 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                     option_occurrences.push(OptionOccurrence { spec, argument });
                 }
                 OptionArgumentSpec::Required => {
-                    let prefix = argument.value.len() - chars.as_str().len();
-                    let mut argument = arguments.next().unwrap();
-                    argument.value.drain(..prefix);
-                    let argument = Some(argument);
+                    let remainder_len = chars.as_str().len();
+                    let argument = if remainder_len == 0 {
+                        // The option argument is the next command-line argument.
+                        drop(arguments.next());
+                        arguments.next()
+                        // TODO Error if argument is none
+                    } else {
+                        // The option argument is the rest of the current command-line argument.
+                        let prefix = argument.value.len() - remainder_len;
+                        let mut argument = arguments.next().unwrap();
+                        argument.value.drain(..prefix);
+                        Some(argument)
+                    };
                     option_occurrences.push(OptionOccurrence { spec, argument });
                     return true;
                 }
@@ -413,7 +422,38 @@ mod tests {
         assert_eq!(operands, Field::dummies(["3"]));
     }
 
-    // TODO separate_argument_to_short_option
+    #[test]
+    fn separate_argument_to_short_option() {
+        let specs = &[OptionSpec::new()
+            .short('a')
+            .argument(OptionArgumentSpec::Required)];
+
+        let arguments = Field::dummies(["foo", "-a", "bar"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "bar");
+            assert_eq!(field.origin.line.value, "bar");
+        });
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "-a", "1", "-a", "2", "3"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "1");
+            assert_eq!(field.origin.line.value, "1");
+        });
+        assert_eq!(options[1].spec.get_short(), Some('a'));
+        assert_matches!(options[1].argument, Some(ref field) => {
+            assert_eq!(field.value, "2");
+            assert_eq!(field.origin.line.value, "2");
+        });
+        assert_eq!(operands, Field::dummies(["3"]));
+    }
+
     // TODO argument_taking_option_adjacent_to_another_option
     // TODO empty_argument_to_short_option
 
