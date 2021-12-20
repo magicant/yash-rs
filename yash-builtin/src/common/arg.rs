@@ -60,20 +60,24 @@ impl Default for OptionArgumentSpec {
 /// All of these are optional, but either or both of the short and long names
 /// should be set for the option spec to have meaningful effect.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct OptionSpec {
+pub struct OptionSpec<'a> {
     short: Option<char>,
+    long: Option<&'a str>,
     argument: OptionArgumentSpec,
 }
 
-impl OptionSpec {
+impl OptionSpec<'static> {
     /// Creates a new empty option spec.
     pub const fn new() -> Self {
         OptionSpec {
             short: None,
+            long: None,
             argument: OptionArgumentSpec::None,
         }
     }
+}
 
+impl OptionSpec<'_> {
     /// Returns the short option name.
     pub const fn get_short(&self) -> Option<char> {
         self.short
@@ -89,7 +93,29 @@ impl OptionSpec {
         self.short = Some(name);
         self
     }
+}
 
+impl<'a> OptionSpec<'a> {
+    /// Returns the long option name.
+    pub const fn get_long(&self) -> Option<&'a str> {
+        self.long
+    }
+
+    /// Gives a long name for this option.
+    ///
+    /// The name should not include the `"--"` prefix.
+    pub fn set_long(&mut self, name: &'a str) {
+        self.long = Some(name);
+    }
+
+    /// Chained version of [`set_long`](Self::set_long)
+    pub const fn long(mut self, name: &'a str) -> Self {
+        self.long = Some(name);
+        self
+    }
+}
+
+impl OptionSpec<'_> {
     /// Returns whether this option takes an argument.
     pub const fn get_argument(&self) -> OptionArgumentSpec {
         self.argument
@@ -115,7 +141,7 @@ pub struct Mode {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionOccurrence<'a> {
     /// Specification for this option.
-    pub spec: &'a OptionSpec,
+    pub spec: &'a OptionSpec<'a>,
 
     /// Argument to this option.
     ///
@@ -202,11 +228,11 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
 /// The first argument is always dropped and the remaining arguments are parsed.
 ///
 /// If successful, returns a pair of option occurrences and operands.
-pub fn parse_arguments(
-    option_specs: &[OptionSpec],
+pub fn parse_arguments<'a>(
+    option_specs: &'a [OptionSpec<'a>],
     _mode: Mode,
     arguments: Vec<Field>,
-) -> Result<(Vec<OptionOccurrence<'_>>, Vec<Field>), Error> {
+) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error> {
     let mut arguments = arguments.into_iter().skip(1).peekable();
 
     let mut option_occurrences = vec![];
