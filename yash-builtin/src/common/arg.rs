@@ -141,29 +141,29 @@ pub struct Error {}
 /// argument and the field does not include one, the following field is consumed
 /// as the argument.
 ///
-/// This function returns `true` if consumed one or more fields.
+/// This function returns `Ok(true)` if consumed one or more fields.
 fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec],
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
-) -> bool {
+) -> Result<bool, Error> {
     let argument = match arguments.peek() {
         Some(argument) => argument,
-        None => return false,
+        None => return Ok(false),
     };
 
     let mut chars = argument.value.chars();
     if chars.next() != Some('-') {
         // argument.value not starting with a hyphen
-        return false;
+        return Ok(false);
     }
     if chars.as_str().is_empty() {
         // argument.value == "-"
-        return false;
+        return Ok(false);
     }
     if chars.as_str() == "-" {
         // argument.value == "--"
-        return false;
+        return Ok(false);
     }
 
     while let Some(c) = chars.next() {
@@ -188,13 +188,13 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                         Some(argument)
                     };
                     option_occurrences.push(OptionOccurrence { spec, argument });
-                    return true;
+                    return Ok(true);
                 }
             };
         }
     }
     drop(arguments.next());
-    true
+    Ok(true)
 }
 
 /// Parses command-line arguments into options and operands.
@@ -210,7 +210,7 @@ pub fn parse_arguments(
     let mut arguments = arguments.into_iter().skip(1).peekable();
 
     let mut option_occurrences = vec![];
-    while parse_short_options(option_specs, &mut arguments, &mut option_occurrences) {}
+    while parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {}
 
     arguments.next_if(|argument| argument.value == "--");
 
