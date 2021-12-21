@@ -187,8 +187,8 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
         // argument.value == "-"
         return Ok(false);
     }
-    if chars.as_str() == "-" {
-        // argument.value == "--"
+    if chars.as_str().starts_with('-') {
+        // argument.value starts with a double hyphen
         return Ok(false);
     }
 
@@ -223,6 +223,38 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     Ok(true)
 }
 
+/// Parses a long option.
+///
+/// This function examines the first field yielded by `arguments` and consumes
+/// it if it is a long option. If the option requires an argument and the field
+/// does not include a delimiting `=` sign, the following field is consumed as
+/// the argument.
+fn parse_long_option<'a, I: Iterator<Item = Field>>(
+    option_specs: &'a [OptionSpec],
+    arguments: &mut Peekable<I>,
+) -> Result<Option<OptionOccurrence<'a>>, Error> {
+    let argument = match arguments.peek() {
+        Some(argument) => argument,
+        None => return Ok(None),
+    };
+
+    let name = match argument.value.strip_prefix("--") {
+        Some(name) if !name.is_empty() => name,
+        _ => return Ok(None),
+    };
+
+    if let Some(spec) = option_specs
+        .iter()
+        .find(|spec| spec.get_long() == Some(name))
+    {
+        drop(arguments.next());
+        let argument = None;
+        Ok(Some(OptionOccurrence { spec, argument }))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Parses command-line arguments into options and operands.
 ///
 /// The first argument is always dropped and the remaining arguments are parsed.
@@ -236,7 +268,16 @@ pub fn parse_arguments<'a>(
     let mut arguments = arguments.into_iter().skip(1).peekable();
 
     let mut option_occurrences = vec![];
-    while parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {}
+    loop {
+        if parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {
+            continue;
+        }
+        if let Some(occurrence) = parse_long_option(option_specs, &mut arguments)? {
+            option_occurrences.push(occurrence);
+            continue;
+        }
+        break;
+    }
 
     arguments.next_if(|argument| argument.value == "--");
 
@@ -325,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_occurrences_of_same_option_spec() {
+    fn multiple_occurrences_of_same_option_spec_short() {
         let specs = &[OptionSpec::new().short('b')];
 
         let arguments = Field::dummies(["command", "-b", "-b"]);
@@ -344,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn occurrences_of_multiple_option_specs() {
+    fn occurrences_of_multiple_option_specs_short() {
         let specs = &[OptionSpec::new().short('x'), OptionSpec::new().short('y')];
 
         let arguments = Field::dummies(["command", "-x", "-y", "!"]);
@@ -527,6 +568,77 @@ mod tests {
             assert_eq!(field.value, "");
             assert_eq!(field.origin.line.value, "");
         });
+        assert_eq!(operands, []);
+    }
+
+    #[test]
+    fn non_occurring_long_option() {
+        let specs = &[OptionSpec::new().long("option")];
+
+        let arguments = Field::dummies(["foo"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", ""]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options, []);
+        assert_eq!(operands, Field::dummies([""]));
+    }
+
+    #[test]
+    fn single_occurrence_of_long_option() {
+        let specs = &[OptionSpec::new().long("option")];
+
+        let arguments = Field::dummies(["foo", "--option"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "--option", "bar"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(operands, Field::dummies(["bar"]));
+    }
+
+    #[test]
+    fn multiple_occurrences_of_same_option_spec_long() {
+        let specs = &[OptionSpec::new().long("foo")];
+
+        let arguments = Field::dummies(["command", "--foo", "--foo"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("foo"));
+        assert_eq!(options[1].spec.get_long(), Some("foo"));
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["command", "--foo", "--foo", "argument"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("foo"));
+        assert_eq!(options[1].spec.get_long(), Some("foo"));
+        assert_eq!(operands, Field::dummies(["argument"]));
+    }
+
+    #[test]
+    fn occurrences_of_multiple_option_specs_long() {
+        let specs = &[OptionSpec::new().long("foo"), OptionSpec::new().long("bar")];
+
+        let arguments = Field::dummies(["command", "--foo", "--bar", "!"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("foo"));
+        assert_eq!(options[1].spec.get_long(), Some("bar"));
+        assert_eq!(operands, Field::dummies(["!"]));
+
+        let arguments = Field::dummies(["command", "--bar", "--foo", "--bar"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 3, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("bar"));
+        assert_eq!(options[1].spec.get_long(), Some("foo"));
+        assert_eq!(options[2].spec.get_long(), Some("bar"));
         assert_eq!(operands, []);
     }
 
