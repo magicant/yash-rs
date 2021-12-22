@@ -191,7 +191,7 @@ pub struct Error {}
 ///
 /// This function returns `Ok(true)` if consumed one or more fields.
 fn parse_short_options<'a, I: Iterator<Item = Field>>(
-    option_specs: &'a [OptionSpec],
+    option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
 ) -> Result<bool, Error> {
@@ -245,6 +245,24 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     Ok(true)
 }
 
+fn long_match<'a>(
+    option_specs: &'a [OptionSpec<'a>],
+    name: &str,
+) -> Result<Option<&'a OptionSpec<'a>>, Error> {
+    let mut matches = Vec::new();
+    for spec in option_specs {
+        match spec.long_match(name) {
+            LongMatch::None => (),
+            LongMatch::Partial => {
+                matches.push(spec);
+            }
+            LongMatch::Exact => return Ok(Some(spec)),
+        }
+    }
+    // TODO Error if more than one match
+    Ok(matches.first().copied())
+}
+
 /// Parses a long option.
 ///
 /// This function examines the first field yielded by `arguments` and consumes
@@ -252,7 +270,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
 /// does not include a delimiting `=` sign, the following field is consumed as
 /// the argument.
 fn parse_long_option<'a, I: Iterator<Item = Field>>(
-    option_specs: &'a [OptionSpec],
+    option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
 ) -> Result<Option<OptionOccurrence<'a>>, Error> {
     let argument = match arguments.peek() {
@@ -265,23 +283,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         _ => return Ok(None),
     };
 
-    let mut matches = Vec::new();
-    for spec in option_specs {
-        match spec.long_match(name) {
-            LongMatch::None => (),
-            LongMatch::Partial => {
-                matches.push(spec);
-            }
-            LongMatch::Exact => {
-                matches = vec![spec];
-                break;
-                // TODO Can we go without allocating the vec?
-            }
-        }
-    }
-
-    // TODO Error if more than one match
-    if let Some(spec) = matches.first() {
+    if let Some(spec) = long_match(option_specs, name)? {
         drop(arguments.next());
         let argument = None;
         Ok(Some(OptionOccurrence { spec, argument }))
