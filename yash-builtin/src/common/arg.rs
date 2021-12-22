@@ -643,6 +643,27 @@ mod tests {
     }
 
     #[test]
+    fn mixed_occurrences_of_various_option_specs() {
+        let specs = &[
+            OptionSpec::new().short('a'),
+            OptionSpec::new().short('b').long("bar"),
+            OptionSpec::new().long("baz"),
+        ];
+
+        let arguments = Field::dummies(["foo", "-ba", "--baz", "--bar", "--", "-a"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 4, "{:?}", options);
+        assert_eq!(options[0].spec, &OptionSpec::new().short('b').long("bar"));
+        assert_eq!(options[1].spec, &OptionSpec::new().short('a'));
+        assert_eq!(options[2].spec, &OptionSpec::new().long("baz"));
+        assert_eq!(options[3].spec, &OptionSpec::new().short('b').long("bar"));
+        assert_eq!(operands, Field::dummies(["-a"]));
+    }
+
+    // TODO abbreviated_long_option
+    // TODO exact_match_is_not_ambiguous_error
+
+    #[test]
     fn option_argument_that_looks_like_separator() {
         let specs = &[OptionSpec::new()
             .short('a')
@@ -667,4 +688,5 @@ mod tests {
     // TODO options_are_recognized_after_operand (depending mode)
 
     // TODO missing_argument_to_short_option
+    // TODO ambiguous_long_option
 }
