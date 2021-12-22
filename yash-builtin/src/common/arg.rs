@@ -137,20 +137,21 @@ impl OptionSpec<'_> {
 enum LongMatch {
     None,
     Partial,
-    Full,
+    Exact,
 }
 
 impl OptionSpec<'_> {
     fn long_match(&self, name: &str) -> LongMatch {
         if let Some(long) = self.long {
             if long.starts_with(name) {
-                LongMatch::Partial
-            } else {
-                LongMatch::None
+                return if long.len() == name.len() {
+                    LongMatch::Exact
+                } else {
+                    LongMatch::Partial
+                };
             }
-        } else {
-            LongMatch::None
         }
+        LongMatch::None
     }
 }
 
@@ -264,18 +265,29 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         _ => return Ok(None),
     };
 
+    let mut matches = Vec::new();
     for spec in option_specs {
         match spec.long_match(name) {
             LongMatch::None => (),
             LongMatch::Partial => {
-                drop(arguments.next());
-                let argument = None;
-                return Ok(Some(OptionOccurrence { spec, argument }));
+                matches.push(spec);
             }
-            LongMatch::Full => todo!("TODO: long option full match"),
+            LongMatch::Exact => {
+                matches = vec![spec];
+                break;
+                // TODO Can we go without allocating the vec?
+            }
         }
     }
-    Ok(None)
+
+    // TODO Error if more than one match
+    if let Some(spec) = matches.first() {
+        drop(arguments.next());
+        let argument = None;
+        Ok(Some(OptionOccurrence { spec, argument }))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Parses command-line arguments into options and operands.
@@ -705,7 +717,20 @@ mod tests {
         assert_eq!(operands, []);
     }
 
-    // TODO exact_match_is_not_ambiguous_error
+    #[test]
+    fn long_option_prefers_exact_match() {
+        let specs = &[
+            OptionSpec::new().long("many"),
+            OptionSpec::new().long("man"),
+            OptionSpec::new().long("manual"),
+        ];
+
+        let arguments = Field::dummies(["command", "--man"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("man"));
+        assert_eq!(operands, []);
+    }
 
     #[test]
     fn option_argument_that_looks_like_separator() {
