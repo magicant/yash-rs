@@ -133,6 +133,27 @@ impl OptionSpec<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LongMatch {
+    None,
+    Partial,
+    Full,
+}
+
+impl OptionSpec<'_> {
+    fn long_match(&self, name: &str) -> LongMatch {
+        if let Some(long) = self.long {
+            if long.starts_with(name) {
+                LongMatch::Partial
+            } else {
+                LongMatch::None
+            }
+        } else {
+            LongMatch::None
+        }
+    }
+}
+
 /// TODO
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct Mode {}
@@ -243,16 +264,18 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         _ => return Ok(None),
     };
 
-    if let Some(spec) = option_specs
-        .iter()
-        .find(|spec| spec.get_long() == Some(name))
-    {
-        drop(arguments.next());
-        let argument = None;
-        Ok(Some(OptionOccurrence { spec, argument }))
-    } else {
-        Ok(None)
+    for spec in option_specs {
+        match spec.long_match(name) {
+            LongMatch::None => (),
+            LongMatch::Partial => {
+                drop(arguments.next());
+                let argument = None;
+                return Ok(Some(OptionOccurrence { spec, argument }));
+            }
+            LongMatch::Full => todo!("TODO: long option full match"),
+        }
     }
+    Ok(None)
 }
 
 /// Parses command-line arguments into options and operands.
@@ -660,7 +683,28 @@ mod tests {
         assert_eq!(operands, Field::dummies(["-a"]));
     }
 
-    // TODO abbreviated_long_option
+    #[test]
+    fn abbreviated_long_option_without_non_match() {
+        let specs = &[OptionSpec::new().long("min")];
+
+        let arguments = Field::dummies(["command", "--mi"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("min"));
+        assert_eq!(operands, []);
+    }
+
+    #[test]
+    fn abbreviated_long_option_with_non_match() {
+        let specs = &[OptionSpec::new().long("max"), OptionSpec::new().long("min")];
+
+        let arguments = Field::dummies(["command", "--mi"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("min"));
+        assert_eq!(operands, []);
+    }
+
     // TODO exact_match_is_not_ambiguous_error
 
     #[test]
