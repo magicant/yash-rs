@@ -292,22 +292,34 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         None => body,
     };
 
-    if let Some(spec) = long_match(option_specs, name)? {
-        let argument = match equal {
-            Some(index) => {
-                let mut argument = arguments.next().unwrap();
-                argument.value.drain(..index + 3);
-                Some(argument)
-            }
-            None => {
-                drop(arguments.next());
-                None
-            }
-        };
-        Ok(Some(OptionOccurrence { spec, argument }))
-    } else {
-        Ok(None)
+    let spec = match long_match(option_specs, name)? {
+        Some(spec) => spec,
+        None => return Ok(None),
+    };
+
+    let mut argument = match equal {
+        Some(index) => {
+            let mut argument = arguments.next().unwrap();
+            argument.value.drain(..index + 3);
+            Some(argument)
+        }
+        None => {
+            drop(arguments.next());
+            None
+        }
+    };
+
+    match (spec.get_argument(), &argument) {
+        (OptionArgumentSpec::None, None) => (),
+        (OptionArgumentSpec::None, Some(_)) => todo!("TODO: unexpected argument error"),
+        (OptionArgumentSpec::Required, None) => {
+            argument = arguments.next();
+            // TODO: Error if none
+        }
+        (OptionArgumentSpec::Required, Some(_)) => (),
     }
+
+    Ok(Some(OptionOccurrence { spec, argument }))
 }
 
 /// Parses command-line arguments into options and operands.
@@ -785,6 +797,38 @@ mod tests {
     }
 
     #[test]
+    fn separate_argument_to_long_option() {
+        let specs = &[OptionSpec::new()
+            .long("option")
+            .argument(OptionArgumentSpec::Required)];
+
+        let arguments = Field::dummies(["foo", "--option", ""]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "");
+            assert_eq!(field.origin.line.value, "");
+        });
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "--option", "x", "--option", "value", "argument"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "x");
+            assert_eq!(field.origin.line.value, "x");
+        });
+        assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_matches!(options[1].argument, Some(ref field) => {
+            assert_eq!(field.value, "value");
+            assert_eq!(field.origin.line.value, "value");
+        });
+        assert_eq!(operands, Field::dummies(["argument"]));
+    }
+
+    #[test]
     fn option_argument_that_looks_like_separator() {
         let specs = &[OptionSpec::new()
             .short('a')
@@ -807,7 +851,11 @@ mod tests {
     }
 
     // TODO options_are_recognized_after_operand (depending mode)
+    // TODO digit_options_are_recognized (depending mode)
+    // TODO rejecting_non_portable_options (depending mode)
 
+    // TODO unknown_short_option
+    // TODO unknown_long_option
     // TODO missing_argument_to_short_option
     // TODO missing_argument_to_long_option
     // TODO unexpected_argument_to_long_option
