@@ -84,6 +84,8 @@ impl OptionSpec<'_> {
     }
 
     /// Gives a short name for this option.
+    ///
+    /// The name should not be a hyphen.
     pub fn set_short(&mut self, name: char) {
         self.short = Some(name);
     }
@@ -103,7 +105,7 @@ impl<'a> OptionSpec<'a> {
 
     /// Gives a long name for this option.
     ///
-    /// The name should not include the `"--"` prefix.
+    /// The name should not start with `"--"` or include `"="`.
     pub fn set_long(&mut self, name: &'a str) {
         self.long = Some(name);
     }
@@ -278,14 +280,30 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         None => return Ok(None),
     };
 
-    let name = match argument.value.strip_prefix("--") {
-        Some(name) if !name.is_empty() => name,
+    let body = match argument.value.strip_prefix("--") {
+        Some(body) if !body.is_empty() => body,
         _ => return Ok(None),
     };
 
+    let equal = body.find('=');
+
+    let name = match equal {
+        Some(index) => &body[..index],
+        None => body,
+    };
+
     if let Some(spec) = long_match(option_specs, name)? {
-        drop(arguments.next());
-        let argument = None;
+        let argument = match equal {
+            Some(index) => {
+                let mut argument = arguments.next().unwrap();
+                argument.value.drain(..index + 3);
+                Some(argument)
+            }
+            None => {
+                drop(arguments.next());
+                None
+            }
+        };
         Ok(Some(OptionOccurrence { spec, argument }))
     } else {
         Ok(None)
@@ -735,6 +753,38 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_argument_to_long_option() {
+        let specs = &[OptionSpec::new()
+            .long("option")
+            .argument(OptionArgumentSpec::Required)];
+
+        let arguments = Field::dummies(["foo", "--option="]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 1, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "");
+            assert_eq!(field.origin.line.value, "--option=");
+        });
+        assert_eq!(operands, []);
+
+        let arguments = Field::dummies(["foo", "--option=x", "--option=value", "argument"]);
+        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 2, "{:?}", options);
+        assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_matches!(options[0].argument, Some(ref field) => {
+            assert_eq!(field.value, "x");
+            assert_eq!(field.origin.line.value, "--option=x");
+        });
+        assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_matches!(options[1].argument, Some(ref field) => {
+            assert_eq!(field.value, "value");
+            assert_eq!(field.origin.line.value, "--option=value");
+        });
+        assert_eq!(operands, Field::dummies(["argument"]));
+    }
+
+    #[test]
     fn option_argument_that_looks_like_separator() {
         let specs = &[OptionSpec::new()
             .short('a')
@@ -759,5 +809,7 @@ mod tests {
     // TODO options_are_recognized_after_operand (depending mode)
 
     // TODO missing_argument_to_short_option
+    // TODO missing_argument_to_long_option
+    // TODO unexpected_argument_to_long_option
     // TODO ambiguous_long_option
 }
