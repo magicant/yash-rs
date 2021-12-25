@@ -183,6 +183,8 @@ pub struct OptionOccurrence<'a> {
 pub enum Error {
     /// Short option that is not defined in the option specs
     UnknownShortOption(char, Field),
+    /// Long option that is not defined in the option specs
+    UnknownLongOption(Field),
 }
 
 impl std::fmt::Display for Error {
@@ -190,6 +192,13 @@ impl std::fmt::Display for Error {
         use Error::*;
         match self {
             UnknownShortOption(c, _field) => write!(f, "unknown option {:?}", c),
+            UnknownLongOption(field) => {
+                let name = match field.value.find('=') {
+                    None => &field.value,
+                    Some(index) => &field.value[..index],
+                };
+                write!(f, "unknown option {:?}", name)
+            }
         }
     }
 }
@@ -308,7 +317,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) => spec,
-        Err(_) => return Ok(None), // TODO Return error
+        Err(_) => return Err(Error::UnknownLongOption(argument)), // TODO case of ambiguous option
     };
 
     let mut argument = equal.map(|index| {
@@ -881,7 +890,25 @@ mod tests {
         assert_eq!(error.to_string(), "unknown option 'x'");
     }
 
-    // TODO unknown_long_option
+    #[test]
+    fn unknown_long_option() {
+        let specs = &[OptionSpec::new().long("one")];
+
+        let arguments = Field::dummies(["foo", "--two"]);
+        let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, Error::UnknownLongOption(field) => {
+            assert_eq!(field.value, "--two");
+        });
+        assert_eq!(error.to_string(), "unknown option \"--two\"");
+
+        let arguments = Field::dummies(["foo", "--two=three"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, Error::UnknownLongOption(field) => {
+            assert_eq!(field.value, "--two=three");
+        });
+        assert_eq!(error.to_string(), "unknown option \"--two\"");
+    }
+
     // TODO missing_argument_to_short_option
     // TODO missing_argument_to_long_option
     // TODO unexpected_argument_to_long_option
