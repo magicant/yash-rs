@@ -178,11 +178,23 @@ pub struct OptionOccurrence<'a> {
     pub argument: Option<Field>,
 }
 
-/// TODO
+/// Error in command line parsing
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Error {}
+pub enum Error {
+    /// Short option that is not defined in the option specs
+    UnknownShortOption(char, Field),
+}
 
-/// TODO impl std::error::Error for Error
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Error::*;
+        match self {
+            UnknownShortOption(c, _field) => write!(f, "unknown option {:?}", c),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 /// Parses short options in an argument.
 ///
@@ -211,30 +223,32 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     chars.next(); // Skip the initial hyphen
 
     while let Some(c) = chars.next() {
-        if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
-            match spec.get_argument() {
-                OptionArgumentSpec::None => {
-                    let argument = None;
-                    option_occurrences.push(OptionOccurrence { spec, argument });
-                }
-                OptionArgumentSpec::Required => {
-                    let remainder_len = chars.as_str().len();
-                    let argument = if remainder_len == 0 {
-                        // The option argument is the next command-line argument.
-                        arguments.next()
-                        // TODO Error if argument is none
-                    } else {
-                        // The option argument is the rest of the current command-line argument.
-                        let prefix = argument.value.len() - remainder_len;
-                        let mut argument = argument;
-                        argument.value.drain(..prefix);
-                        Some(argument)
-                    };
-                    option_occurrences.push(OptionOccurrence { spec, argument });
-                    break;
-                }
-            };
-        }
+        let spec = match option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
+            None => return Err(Error::UnknownShortOption(c, argument)),
+            Some(spec) => spec,
+        };
+        match spec.get_argument() {
+            OptionArgumentSpec::None => {
+                let argument = None;
+                option_occurrences.push(OptionOccurrence { spec, argument });
+            }
+            OptionArgumentSpec::Required => {
+                let remainder_len = chars.as_str().len();
+                let argument = if remainder_len == 0 {
+                    // The option argument is the next command-line argument.
+                    arguments.next()
+                    // TODO Error if argument is none
+                } else {
+                    // The option argument is the rest of the current command-line argument.
+                    let prefix = argument.value.len() - remainder_len;
+                    let mut argument = argument;
+                    argument.value.drain(..prefix);
+                    Some(argument)
+                };
+                option_occurrences.push(OptionOccurrence { spec, argument });
+                break;
+            }
+        };
     }
     Ok(true)
 }
@@ -846,7 +860,25 @@ mod tests {
     // TODO digit_options_are_recognized (depending mode)
     // TODO rejecting_non_portable_options (depending mode)
 
-    // TODO unknown_short_option
+    #[test]
+    fn unknown_short_option() {
+        let specs = &[OptionSpec::new().short('a')];
+
+        let arguments = Field::dummies(["foo", "-x"]);
+        let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+            assert_eq!(field.value, "-x");
+        });
+        assert_eq!(error.to_string(), "unknown option 'x'");
+
+        let arguments = Field::dummies(["foo", "-x"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+            assert_eq!(field.value, "-x");
+        });
+        assert_eq!(error.to_string(), "unknown option 'x'");
+    }
+
     // TODO unknown_long_option
     // TODO missing_argument_to_short_option
     // TODO missing_argument_to_long_option
