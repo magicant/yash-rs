@@ -303,17 +303,13 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         None => return Ok(None),
     };
 
-    let mut argument = match equal {
-        Some(index) => {
-            let mut argument = arguments.next().unwrap();
-            argument.value.drain(..index + 3);
-            Some(argument)
-        }
-        None => {
-            drop(arguments.next());
-            None
-        }
-    };
+    let argument = arguments.next().unwrap();
+
+    let mut argument = equal.map(|index| {
+        let mut argument = argument;
+        argument.value.drain(..index + 3); // Remove "--", name, and "="
+        argument
+    });
 
     match (spec.get_argument(), &argument) {
         (OptionArgumentSpec::None, None) => (),
