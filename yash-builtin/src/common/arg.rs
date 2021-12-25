@@ -197,24 +197,18 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
 ) -> Result<bool, Error> {
-    let argument = match arguments.peek() {
-        Some(argument) => argument,
+    fn starts_with_single_hyphen(field: &Field) -> bool {
+        let mut chars = field.value.chars();
+        chars.next() == Some('-') && !matches!(chars.next(), None | Some('-'))
+    }
+
+    let argument = match arguments.next_if(starts_with_single_hyphen) {
         None => return Ok(false),
+        Some(argument) => argument,
     };
 
     let mut chars = argument.value.chars();
-    if chars.next() != Some('-') {
-        // argument.value not starting with a hyphen
-        return Ok(false);
-    }
-    if chars.as_str().is_empty() {
-        // argument.value == "-"
-        return Ok(false);
-    }
-    if chars.as_str().starts_with('-') {
-        // argument.value starts with a double hyphen
-        return Ok(false);
-    }
+    chars.next(); // Skip the initial hyphen
 
     while let Some(c) = chars.next() {
         if let Some(spec) = option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
@@ -227,23 +221,21 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                     let remainder_len = chars.as_str().len();
                     let argument = if remainder_len == 0 {
                         // The option argument is the next command-line argument.
-                        drop(arguments.next());
                         arguments.next()
                         // TODO Error if argument is none
                     } else {
                         // The option argument is the rest of the current command-line argument.
                         let prefix = argument.value.len() - remainder_len;
-                        let mut argument = arguments.next().unwrap();
+                        let mut argument = argument;
                         argument.value.drain(..prefix);
                         Some(argument)
                     };
                     option_occurrences.push(OptionOccurrence { spec, argument });
-                    return Ok(true);
+                    break;
                 }
             };
         }
     }
-    drop(arguments.next());
     Ok(true)
 }
 
