@@ -287,21 +287,23 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
 ) -> Result<Option<OptionOccurrence<'a>>, Error> {
-    let argument = match arguments.peek() {
+    fn starts_with_double_hyphen(field: &Field) -> bool {
+        match field.value.strip_prefix("--") {
+            Some(body) => !body.is_empty(),
+            None => false,
+        }
+    }
+
+    let argument = match arguments.next_if(starts_with_double_hyphen) {
         Some(argument) => argument,
         None => return Ok(None),
     };
 
-    let body = match argument.value.strip_prefix("--") {
-        Some(body) if !body.is_empty() => body,
-        _ => return Ok(None),
-    };
-
-    let equal = body.find('=');
+    let equal = argument.value.find('=');
 
     let name = match equal {
-        Some(index) => &body[..index],
-        None => body,
+        Some(index) => &argument.value[2..index],
+        None => &argument.value[2..],
     };
 
     let spec = match long_match(option_specs, name) {
@@ -309,11 +311,9 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         Err(_) => return Ok(None), // TODO Return error
     };
 
-    let argument = arguments.next().unwrap();
-
     let mut argument = equal.map(|index| {
         let mut argument = argument;
-        argument.value.drain(..index + 3); // Remove "--", name, and "="
+        argument.value.drain(..index + 1); // Remove "--", name, and "="
         argument
     });
 
