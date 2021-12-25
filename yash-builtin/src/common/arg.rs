@@ -253,10 +253,13 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     Ok(true)
 }
 
+/// Finds an option spec that matches the given long option name.
+///
+/// Returns `Err(all_matched_options)` if there is no match or more than one match.
 fn long_match<'a>(
     option_specs: &'a [OptionSpec<'a>],
     name: &str,
-) -> Result<Option<&'a OptionSpec<'a>>, Error> {
+) -> Result<&'a OptionSpec<'a>, Vec<&'a OptionSpec<'a>>> {
     let mut matches = Vec::new();
     for spec in option_specs {
         match spec.long_match(name) {
@@ -264,11 +267,14 @@ fn long_match<'a>(
             LongMatch::Partial => {
                 matches.push(spec);
             }
-            LongMatch::Exact => return Ok(Some(spec)),
+            LongMatch::Exact => return Ok(spec),
         }
     }
-    // TODO Error if more than one match
-    Ok(matches.first().copied())
+    if matches.len() == 1 {
+        Ok(matches[0])
+    } else {
+        Err(matches)
+    }
 }
 
 /// Parses a long option.
@@ -298,9 +304,9 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         None => body,
     };
 
-    let spec = match long_match(option_specs, name)? {
-        Some(spec) => spec,
-        None => return Ok(None),
+    let spec = match long_match(option_specs, name) {
+        Ok(spec) => spec,
+        Err(_) => return Ok(None), // TODO Return error
     };
 
     let argument = arguments.next().unwrap();
