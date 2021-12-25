@@ -329,7 +329,13 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) => spec,
-        Err(_) => return Err(Error::UnknownLongOption(argument)), // TODO case of ambiguous option
+        Err(matched_specs) => {
+            return Err(if matched_specs.is_empty() {
+                Error::UnknownLongOption(argument)
+            } else {
+                Error::AmbiguousLongOption(argument, matched_specs)
+            })
+        }
     };
 
     let mut argument = equal.map(|index| {
@@ -921,8 +927,24 @@ mod tests {
         assert_eq!(error.to_string(), "unknown option \"--two\"");
     }
 
+    #[test]
+    fn ambiguous_long_option() {
+        let specs = &[
+            OptionSpec::new().long("max"),
+            OptionSpec::new().long("min"),
+            OptionSpec::new().long("value"),
+        ];
+
+        let arguments = Field::dummies(["command", "--m"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, Error::AmbiguousLongOption(field, matched_specs) => {
+            assert_eq!(field.value, "--m");
+            assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
+        });
+        assert_eq!(error.to_string(), "ambiguous option \"--m\"");
+    }
+
     // TODO missing_argument_to_short_option
     // TODO missing_argument_to_long_option
     // TODO unexpected_argument_to_long_option
-    // TODO ambiguous_long_option
 }
