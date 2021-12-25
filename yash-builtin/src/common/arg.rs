@@ -180,30 +180,42 @@ pub struct OptionOccurrence<'a> {
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Error {
+pub enum Error<'a> {
     /// Short option that is not defined in the option specs
     UnknownShortOption(char, Field),
+
     /// Long option that is not defined in the option specs
     UnknownLongOption(Field),
+
+    /// Long option that matches more than one option spec
+    ///
+    /// The second item of the tuple is a list of all option specs that matched.
+    AmbiguousLongOption(Field, Vec<&'a OptionSpec<'a>>),
 }
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn long_option_name(field: &Field) -> &str {
+            match field.value.find('=') {
+                None => &field.value,
+                Some(index) => &field.value[..index],
+            }
+        }
+
         use Error::*;
         match self {
             UnknownShortOption(c, _field) => write!(f, "unknown option {:?}", c),
             UnknownLongOption(field) => {
-                let name = match field.value.find('=') {
-                    None => &field.value,
-                    Some(index) => &field.value[..index],
-                };
-                write!(f, "unknown option {:?}", name)
+                write!(f, "unknown option {:?}", long_option_name(field))
+            }
+            AmbiguousLongOption(field, _specs) => {
+                write!(f, "ambiguous option {:?}", long_option_name(field))
             }
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error<'_> {}
 
 /// Parses short options in an argument.
 ///
@@ -217,7 +229,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
-) -> Result<bool, Error> {
+) -> Result<bool, Error<'a>> {
     fn starts_with_single_hyphen(field: &Field) -> bool {
         let mut chars = field.value.chars();
         chars.next() == Some('-') && !matches!(chars.next(), None | Some('-'))
@@ -295,7 +307,7 @@ fn long_match<'a>(
 fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
-) -> Result<Option<OptionOccurrence<'a>>, Error> {
+) -> Result<Option<OptionOccurrence<'a>>, Error<'a>> {
     fn starts_with_double_hyphen(field: &Field) -> bool {
         match field.value.strip_prefix("--") {
             Some(body) => !body.is_empty(),
@@ -348,7 +360,7 @@ pub fn parse_arguments<'a>(
     option_specs: &'a [OptionSpec<'a>],
     _mode: Mode,
     arguments: Vec<Field>,
-) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error> {
+) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error<'a>> {
     let mut arguments = arguments.into_iter().skip(1).peekable();
 
     let mut option_occurrences = vec![];
