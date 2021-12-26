@@ -203,6 +203,7 @@ pub struct OptionOccurrence<'a> {
 
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Error<'a> {
     /// Short option that is not defined in the option specs
     UnknownShortOption(char, Field),
