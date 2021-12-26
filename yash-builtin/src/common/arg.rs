@@ -323,44 +323,45 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         }
     }
 
-    let argument = match arguments.next_if(starts_with_double_hyphen) {
-        Some(argument) => argument,
+    let field = match arguments.next_if(starts_with_double_hyphen) {
+        Some(field) => field,
         None => return Ok(None),
     };
 
-    let equal = argument.value.find('=');
+    let equal = field.value.find('=');
 
     let name = match equal {
-        Some(index) => &argument.value[2..index],
-        None => &argument.value[2..],
+        Some(index) => &field.value[2..index],
+        None => &field.value[2..],
     };
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) => spec,
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
-                Error::UnknownLongOption(argument)
+                Error::UnknownLongOption(field)
             } else {
-                Error::AmbiguousLongOption(argument, matched_specs)
+                Error::AmbiguousLongOption(field, matched_specs)
             })
         }
     };
 
-    let mut argument = equal.map(|index| {
-        let mut argument = argument;
-        argument.value.drain(..index + 1); // Remove "--", name, and "="
-        argument
-    });
-
-    match (spec.get_argument(), &argument) {
-        (OptionArgumentSpec::None, None) => (),
+    let argument = match (spec.get_argument(), equal) {
+        (OptionArgumentSpec::None, None) => None,
         (OptionArgumentSpec::None, Some(_)) => todo!("TODO: unexpected argument error"),
         (OptionArgumentSpec::Required, None) => {
-            argument = arguments.next();
-            // TODO: Error if none
+            let argument = arguments.next();
+            if argument.is_none() {
+                return Err(Error::MissingOptionArgument(field, spec));
+            }
+            argument
         }
-        (OptionArgumentSpec::Required, Some(_)) => (),
-    }
+        (OptionArgumentSpec::Required, Some(index)) => {
+            let mut field = field;
+            field.value.drain(..index + 1); // Remove "--", name, and "="
+            Some(field)
+        }
+    };
 
     Ok(Some(OptionOccurrence { spec, argument }))
 }
@@ -977,6 +978,22 @@ mod tests {
         assert_eq!(error.to_string(), "option \"-ba\" missing an argument");
     }
 
-    // TODO missing_argument_to_long_option
+    #[test]
+    fn missing_argument_to_long_option() {
+        use OptionArgumentSpec::Required;
+        let specs = &[
+            OptionSpec::new().long("foo").argument(Required),
+            OptionSpec::new().long("bar"),
+        ];
+
+        let arguments = Field::dummies(["command", "--fo"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "--fo");
+            assert_eq!(spec, &specs[0]);
+        });
+        assert_eq!(error.to_string(), "option \"--fo\" missing an argument");
+    }
+
     // TODO unexpected_argument_to_long_option
 }
