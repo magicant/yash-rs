@@ -194,6 +194,9 @@ pub enum Error<'a> {
 
     /// Option missing its required argument
     MissingOptionArgument(Field, &'a OptionSpec<'a>),
+
+    /// Long option having an unexpected argument
+    UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
 }
 
 impl std::fmt::Display for Error<'_> {
@@ -216,6 +219,9 @@ impl std::fmt::Display for Error<'_> {
             }
             MissingOptionArgument(field, _spec) => {
                 write!(f, "option {:?} missing an argument", field.value)
+            }
+            UnexpectedOptionArgument(field, _spec) => {
+                write!(f, "option {:?} with an unexpected argument", field.value)
             }
         }
     }
@@ -348,7 +354,9 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let argument = match (spec.get_argument(), equal) {
         (OptionArgumentSpec::None, None) => None,
-        (OptionArgumentSpec::None, Some(_)) => todo!("TODO: unexpected argument error"),
+        (OptionArgumentSpec::None, Some(_)) => {
+            return Err(Error::UnexpectedOptionArgument(field, spec))
+        }
         (OptionArgumentSpec::Required, None) => {
             let argument = arguments.next();
             if argument.is_none() {
@@ -995,5 +1003,23 @@ mod tests {
         assert_eq!(error.to_string(), "option \"--fo\" missing an argument");
     }
 
-    // TODO unexpected_argument_to_long_option
+    #[test]
+    fn unexpected_argument_to_long_option() {
+        use OptionArgumentSpec::Required;
+        let specs = &[
+            OptionSpec::new().long("foo").argument(Required),
+            OptionSpec::new().long("bar"),
+        ];
+
+        let arguments = Field::dummies(["command", "--bar=baz"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &Error::UnexpectedOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "--bar=baz");
+            assert_eq!(spec, &specs[1]);
+        });
+        assert_eq!(
+            error.to_string(),
+            "option \"--bar=baz\" with an unexpected argument"
+        );
+    }
 }
