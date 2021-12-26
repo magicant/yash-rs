@@ -19,13 +19,35 @@
 //! This module provides functionalities for parsing command-line arguments into
 //! options and operands.
 //!
-//! This module's parser can parse command lines that adhere to POSIX Utility
-//! Syntax Guidelines and support non-standard syntax extensions such as long
+//! This module's parser can parse command lines that adhere to [POSIX Utility
+//! Syntax Guidelines] and support non-standard syntax extensions such as long
 //! options and options after operands.
+//!
+//! [POSIX Utility Syntax Guidelines]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html#tag_12_02
 //!
 //! # Example
 //!
-//! TODO
+//! ```
+//! use yash_builtin::common::arg::*;
+//! let specs = &[
+//!     OptionSpec::new().short('a'),
+//!     OptionSpec::new().short('b').long("bar"),
+//!     OptionSpec::new().long("baz").argument(OptionArgumentSpec::Required),
+//! ];
+//!
+//! let arguments = Field::dummies(["foo", "-ba", "--baz", "--", "--bar", "--", "-a", "foo"]);
+//! let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+//! assert_eq!(options.len(), 4);
+//! assert_eq!(options[0].spec, &specs[1]); // 'b' in "-ba"
+//! assert_eq!(options[0].argument, None);
+//! assert_eq!(options[1].spec, &specs[0]); // 'a' in "-ba"
+//! assert_eq!(options[1].argument, None);
+//! assert_eq!(options[2].spec, &specs[2]); // "--baz"
+//! assert_eq!(options[2].argument, Some(Field::dummy("--")));
+//! assert_eq!(options[3].spec, &specs[1]); // "--bar"
+//! assert_eq!(options[3].argument, None);
+//! assert_eq!(operands, Field::dummies(["-a", "foo"]));
+//! ```
 
 #[doc(no_inline)]
 use std::iter::Peekable;
@@ -759,24 +781,6 @@ mod tests {
         assert_eq!(options[1].spec.get_long(), Some("foo"));
         assert_eq!(options[2].spec.get_long(), Some("bar"));
         assert_eq!(operands, []);
-    }
-
-    #[test]
-    fn mixed_occurrences_of_various_option_specs() {
-        let specs = &[
-            OptionSpec::new().short('a'),
-            OptionSpec::new().short('b').long("bar"),
-            OptionSpec::new().long("baz"),
-        ];
-
-        let arguments = Field::dummies(["foo", "-ba", "--baz", "--bar", "--", "-a"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
-        assert_eq!(options.len(), 4, "{:?}", options);
-        assert_eq!(options[0].spec, &OptionSpec::new().short('b').long("bar"));
-        assert_eq!(options[1].spec, &OptionSpec::new().short('a'));
-        assert_eq!(options[2].spec, &OptionSpec::new().long("baz"));
-        assert_eq!(options[3].spec, &OptionSpec::new().short('b').long("bar"));
-        assert_eq!(operands, Field::dummies(["-a"]));
     }
 
     #[test]
