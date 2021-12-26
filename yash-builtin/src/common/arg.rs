@@ -191,6 +191,9 @@ pub enum Error<'a> {
     ///
     /// The second item of the tuple is a list of all option specs that matched.
     AmbiguousLongOption(Field, Vec<&'a OptionSpec<'a>>),
+
+    /// Option missing its required argument
+    MissingOptionArgument(Field, &'a OptionSpec<'a>),
 }
 
 impl std::fmt::Display for Error<'_> {
@@ -210,6 +213,9 @@ impl std::fmt::Display for Error<'_> {
             }
             AmbiguousLongOption(field, _specs) => {
                 write!(f, "ambiguous option {:?}", long_option_name(field))
+            }
+            MissingOptionArgument(field, _spec) => {
+                write!(f, "option {:?} missing an argument", field.value)
             }
         }
     }
@@ -235,17 +241,17 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
         chars.next() == Some('-') && !matches!(chars.next(), None | Some('-'))
     }
 
-    let argument = match arguments.next_if(starts_with_single_hyphen) {
+    let field = match arguments.next_if(starts_with_single_hyphen) {
         None => return Ok(false),
-        Some(argument) => argument,
+        Some(field) => field,
     };
 
-    let mut chars = argument.value.chars();
+    let mut chars = field.value.chars();
     chars.next(); // Skip the initial hyphen
 
     while let Some(c) = chars.next() {
         let spec = match option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
-            None => return Err(Error::UnknownShortOption(c, argument)),
+            None => return Err(Error::UnknownShortOption(c, field)),
             Some(spec) => spec,
         };
         match spec.get_argument() {
@@ -257,15 +263,17 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                 let remainder_len = chars.as_str().len();
                 let argument = if remainder_len == 0 {
                     // The option argument is the next command-line argument.
-                    arguments.next()
-                    // TODO Error if argument is none
+                    arguments
+                        .next()
+                        .ok_or(Error::MissingOptionArgument(field, spec))?
                 } else {
                     // The option argument is the rest of the current command-line argument.
-                    let prefix = argument.value.len() - remainder_len;
-                    let mut argument = argument;
-                    argument.value.drain(..prefix);
-                    Some(argument)
+                    let prefix = field.value.len() - remainder_len;
+                    let mut field = field;
+                    field.value.drain(..prefix);
+                    field
                 };
+                let argument = Some(argument);
                 option_occurrences.push(OptionOccurrence { spec, argument });
                 break;
             }
@@ -944,7 +952,31 @@ mod tests {
         assert_eq!(error.to_string(), "ambiguous option \"--m\"");
     }
 
-    // TODO missing_argument_to_short_option
+    #[test]
+    fn missing_argument_to_short_option() {
+        use OptionArgumentSpec::Required;
+        let specs = &[
+            OptionSpec::new().short('a').argument(Required),
+            OptionSpec::new().short('b'),
+        ];
+
+        let arguments = Field::dummies(["foo", "-a"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "-a");
+            assert_eq!(spec, &specs[0]);
+        });
+        assert_eq!(error.to_string(), "option \"-a\" missing an argument");
+
+        let arguments = Field::dummies(["foo", "-ba"]);
+        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+            assert_eq!(field.value, "-ba");
+            assert_eq!(spec, &specs[0]);
+        });
+        assert_eq!(error.to_string(), "option \"-ba\" missing an argument");
+    }
+
     // TODO missing_argument_to_long_option
     // TODO unexpected_argument_to_long_option
 }
