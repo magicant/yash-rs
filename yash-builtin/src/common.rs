@@ -21,6 +21,8 @@ use yash_env::io::Fd;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 
+pub mod arg;
+
 /// Part of the execution environment that allows printing to the standard
 /// output.
 #[async_trait(?Send)]
