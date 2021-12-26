@@ -49,8 +49,9 @@
 //! assert_eq!(operands, Field::dummies(["-a", "foo"]));
 //! ```
 
-#[doc(no_inline)]
 use std::iter::Peekable;
+
+#[doc(no_inline)]
 pub use yash_env::semantics::Field;
 
 /// Specification for an options's argument
