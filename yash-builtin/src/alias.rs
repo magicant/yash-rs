@@ -66,7 +66,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
             let entry = HashEntry::new(name, replacement, false, origin);
-            env.alias_set_mut().insert(entry);
+            env.alias_set_mut().replace(entry);
         } else {
             // TODO print alias definition
         }
@@ -162,6 +162,29 @@ mod tests {
         assert_eq!(ls.origin.line.number.get(), 1);
         assert_eq!(ls.origin.line.source, Source::Unknown);
         assert_eq!(ls.origin.column.get(), 1);
+    }
+
+    #[test]
+    fn builtin_replaces_alias() {
+        let mut env = DummyEnv::default();
+        let args = Field::dummies(["", "foo=1"]);
+
+        let result = builtin_main_sync(&mut env, args);
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let args = Field::dummies(["", "foo=2"]);
+
+        let result = builtin_main_sync(&mut env, args);
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        assert_eq!(env.aliases.len(), 1);
+
+        let alias = env.aliases.get("foo").unwrap().0.as_ref();
+        assert_eq!(alias.name, "foo");
+        assert_eq!(alias.replacement, "2");
+        assert_eq!(alias.global, false);
+        // TODO Test with the global option
+        // assert_eq!(alias.global, true);
     }
 
     #[test]
