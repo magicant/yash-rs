@@ -18,6 +18,9 @@
 //!
 //! TODO Elaborate
 
+use crate::common::arg::parse_arguments;
+use crate::common::arg::Mode;
+use crate::common::print_error_message;
 use crate::common::Print;
 use crate::common::Stderr;
 use crate::common::Stdout;
@@ -116,18 +119,22 @@ pub async fn print_traps<E: Env>(env: &mut E) -> Result {
 }
 
 /// Implementation of the readonly built-in.
-pub async fn builtin_body<E: Env>(env: &mut E, mut args: Vec<Field>) -> Result {
-    if args.len() != 3 {
+pub async fn builtin_body<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
+    let (_options, mut operands) = match parse_arguments(&[], Mode::default(), args) {
+        Ok(result) => result,
+        Err(error) => return print_error_message(env, &error).await,
+    };
+
+    match operands.len() {
+        0 => return print_traps(env).await,
+        2 => (),
+        _ => return (ExitStatus::ERROR, Continue(())),
         // TODO Support full syntax
-        if args.len() == 1 {
-            return print_traps(env).await;
-        }
-        return (ExitStatus::ERROR, Continue(()));
     }
 
-    let Field { value, origin } = args.remove(1);
+    let Field { value, origin } = operands.remove(0);
 
-    let signal_name = format!("SIG{}", args[1].value);
+    let signal_name = format!("SIG{}", operands[0].value);
     // TODO Support real-time signals
     let signal = match signal_name.parse() {
         Ok(signal) => signal,

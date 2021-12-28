@@ -50,6 +50,9 @@
 //! ```
 
 use std::iter::Peekable;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -223,6 +226,20 @@ pub enum Error<'a> {
     UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
 }
 
+impl Error<'_> {
+    /// Returns a reference to the field in which the error occurred.
+    pub fn field(&self) -> &Field {
+        use Error::*;
+        match self {
+            UnknownShortOption(_char, field) => field,
+            UnknownLongOption(field) => field,
+            AmbiguousLongOption(field, _specs) => field,
+            MissingOptionArgument(field, _spec) => field,
+            UnexpectedOptionArgument(field, _spec) => field,
+        }
+    }
+}
+
 impl std::fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn long_option_name(field: &Field) -> &str {
@@ -252,6 +269,26 @@ impl std::fmt::Display for Error<'_> {
 }
 
 impl std::error::Error for Error<'_> {}
+
+impl<'a> From<&'a Error<'_>> for Message<'a> {
+    fn from(error: &'a Error<'_>) -> Self {
+        let field = error.field();
+
+        let mut a = vec![Annotation {
+            r#type: AnnotationType::Error,
+            label: field.value.as_str().into(),
+            location: field.origin.clone(),
+        }];
+
+        field.origin.line.source.complement_annotations(&mut a);
+
+        Message {
+            r#type: AnnotationType::Error,
+            title: error.to_string().into(),
+            annotations: a,
+        }
+    }
+}
 
 /// Parses short options in an argument.
 ///

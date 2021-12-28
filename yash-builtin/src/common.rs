@@ -16,10 +16,14 @@
 
 //! Common items for implementing built-ins.
 
+use annotate_snippets::display_list::DisplayList;
+use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
 use yash_env::io::Fd;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
+use yash_syntax::source::pretty::Message;
 
 pub mod arg;
 
@@ -111,4 +115,27 @@ impl<T: Stdout + Stderr> Print for T {
             }
         }
     }
+}
+
+/// Prints an error message.
+///
+/// This function prepares a [`Message`] from the given error and prints it to
+/// the standard error.
+///
+/// Returns `(ExitStatus::ERROR, ControlFlow::Continue(()))`.
+pub async fn print_error_message<'a, E, F>(
+    env: &mut E,
+    error: F,
+) -> (ExitStatus, yash_env::semantics::Result)
+where
+    E: Stderr,
+    F: 'a,
+    Message<'a>: From<F>,
+{
+    let m = Message::from(error);
+    let mut s = Snippet::from(&m);
+    s.opt.color = true;
+    let l = DisplayList::from(s);
+    env.print_error(format_args!("{}\n", l)).await;
+    (ExitStatus::ERROR, Continue(()))
 }
