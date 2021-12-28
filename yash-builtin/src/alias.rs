@@ -109,9 +109,7 @@ mod tests {
     #[test]
     fn builtin_defines_alias() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("");
-        let arg1 = Field::dummy("foo=bar baz");
-        let args = vec![arg0, arg1];
+        let args = Field::dummies(["", "foo=bar baz"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
@@ -131,11 +129,7 @@ mod tests {
     #[test]
     fn builtin_defines_many_aliases() {
         let mut env = DummyEnv::default();
-        let arg0 = Field::dummy("alias");
-        let arg1 = Field::dummy("abc=xyz");
-        let arg2 = Field::dummy("yes=no");
-        let arg3 = Field::dummy("ls=ls --color");
-        let args = vec![arg0, arg1, arg2, arg3];
+        let args = Field::dummies(["alias", "abc=xyz", "yes=no", "ls=ls --color"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
