@@ -265,6 +265,7 @@ impl Process {
                     }
                 }
             }
+            _ => unreachable!(),
         }
 
         let mut delivered = false;

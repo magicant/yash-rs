@@ -16,14 +16,14 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-async-trait = "0.1.50"
+async-trait = "0.1.52"
 either = "1.6.1"
-futures-util = "0.3.18"
-itertools = "0.10.1"
-nix = "0.22.0"
+futures-util = "0.3.19"
+itertools = "0.10.3"
+nix = "0.23.1"
 yash-syntax = { path = "../yash-syntax", version = "0.1.0" }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-futures-executor = "0.3.18"
-futures-util = { version = "0.3.18", features = ["channel"] }
+futures-executor = "0.3.19"
+futures-util = { version = "0.3.19", features = ["channel"] }

@@ -855,7 +855,7 @@ impl AsyncIo {
     /// FDs in `readers` and `writers` are considered ready and corresponding
     /// awaiters are woken. Once woken, awaiters are removed from `self`.
     pub fn wake(&mut self, readers: FdSet, writers: FdSet) {
-        fn scan(awaiters: &mut Vec<FdAwaiter>, mut fds: FdSet) {
+        fn scan(awaiters: &mut Vec<FdAwaiter>, fds: FdSet) {
             // TODO Use Vec::drain_filter
             for i in (0..awaiters.len()).rev() {
                 if fds.contains(awaiters[i].fd.0) {
