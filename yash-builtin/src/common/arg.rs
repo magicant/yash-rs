@@ -486,7 +486,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 /// If successful, returns a pair of option occurrences and operands.
 pub fn parse_arguments<'a>(
     option_specs: &'a [OptionSpec<'a>],
-    _mode: Mode,
+    mode: Mode,
     arguments: Vec<Field>,
 ) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error<'a>> {
     let mut arguments = arguments.into_iter().skip(1).peekable();
@@ -496,10 +496,17 @@ pub fn parse_arguments<'a>(
         if parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {
             continue;
         }
-        if let Some(occurrence) = parse_long_option(option_specs, &mut arguments)? {
+
+        let long_option_specs = if mode.accepts_long_options() {
+            option_specs
+        } else {
+            &[]
+        };
+        if let Some(occurrence) = parse_long_option(long_option_specs, &mut arguments)? {
             option_occurrences.push(occurrence);
             continue;
         }
+
         break;
     }
 
@@ -1062,6 +1069,23 @@ mod tests {
             assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
         });
         assert_eq!(error.to_string(), "ambiguous option \"--m\"");
+    }
+
+    #[test]
+    fn disabled_long_option() {
+        let specs = &[OptionSpec::new().long("option")];
+
+        let arguments = Field::dummies(["foo", "--option"]);
+        let result = parse_arguments(
+            specs,
+            *Mode::with_extensions().accept_long_options(false),
+            arguments,
+        );
+        let error = result.unwrap_err();
+        assert_matches!(&error, Error::UnknownLongOption(field) => {
+            assert_eq!(field.value, "--option");
+        });
+        assert_eq!(error.to_string(), "unknown option \"--option\"");
     }
 
     #[test]
