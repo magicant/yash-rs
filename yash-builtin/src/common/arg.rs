@@ -258,6 +258,10 @@ pub enum Error<'a> {
     /// Long option that is not defined in the option specs
     UnknownLongOption(Field),
 
+    /// Long option that is defined in an option spec but disabled by
+    /// configuration ([`Mode`]).
+    UnsupportedLongOption(Field, &'a OptionSpec<'a>),
+
     /// Long option that matches more than one option spec
     ///
     /// The second item of the tuple is a list of all option specs that matched.
@@ -277,6 +281,7 @@ impl Error<'_> {
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
+            UnsupportedLongOption(field, _spec) => field,
             AmbiguousLongOption(field, _specs) => field,
             MissingOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
@@ -298,6 +303,9 @@ impl std::fmt::Display for Error<'_> {
             UnknownShortOption(c, _field) => write!(f, "unknown option {:?}", c),
             UnknownLongOption(field) => {
                 write!(f, "unknown option {:?}", long_option_name(field))
+            }
+            UnsupportedLongOption(field, _spec) => {
+                write!(f, "unsupported option {:?}", field.value)
             }
             AmbiguousLongOption(field, _specs) => {
                 write!(f, "ambiguous option {:?}", long_option_name(field))
@@ -425,6 +433,7 @@ fn long_match<'a>(
 /// the argument.
 fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
+    mode: Mode,
     arguments: &mut Peekable<I>,
 ) -> Result<Option<OptionOccurrence<'a>>, Error<'a>> {
     fn starts_with_double_hyphen(field: &Field) -> bool {
@@ -447,7 +456,8 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     };
 
     let spec = match long_match(option_specs, name) {
-        Ok(spec) => spec,
+        Ok(spec) if mode.accepts_long_options() => spec,
+        Ok(spec) => return Err(Error::UnsupportedLongOption(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
                 Error::UnknownLongOption(field)
@@ -496,17 +506,10 @@ pub fn parse_arguments<'a>(
         if parse_short_options(option_specs, &mut arguments, &mut option_occurrences)? {
             continue;
         }
-
-        let long_option_specs = if mode.accepts_long_options() {
-            option_specs
-        } else {
-            &[]
-        };
-        if let Some(occurrence) = parse_long_option(long_option_specs, &mut arguments)? {
+        if let Some(occurrence) = parse_long_option(option_specs, mode, &mut arguments)? {
             option_occurrences.push(occurrence);
             continue;
         }
-
         break;
     }
 
@@ -1055,6 +1058,20 @@ mod tests {
     }
 
     #[test]
+    fn disabled_long_option() {
+        let specs = &[OptionSpec::new().long("option")];
+
+        let mode = *Mode::with_extensions().accept_long_options(false);
+        let arguments = Field::dummies(["foo", "--option"]);
+        let error = parse_arguments(specs, mode, arguments).unwrap_err();
+        assert_matches!(&error, &Error::UnsupportedLongOption(ref field, spec) => {
+            assert_eq!(field.value, "--option");
+            assert_eq!(spec, &specs[0]);
+        });
+        assert_eq!(error.to_string(), "unsupported option \"--option\"");
+    }
+
+    #[test]
     fn ambiguous_long_option() {
         let specs = &[
             OptionSpec::new().long("max"),
@@ -1069,23 +1086,6 @@ mod tests {
             assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
         });
         assert_eq!(error.to_string(), "ambiguous option \"--m\"");
-    }
-
-    #[test]
-    fn disabled_long_option() {
-        let specs = &[OptionSpec::new().long("option")];
-
-        let arguments = Field::dummies(["foo", "--option"]);
-        let result = parse_arguments(
-            specs,
-            *Mode::with_extensions().accept_long_options(false),
-            arguments,
-        );
-        let error = result.unwrap_err();
-        assert_matches!(&error, Error::UnknownLongOption(field) => {
-            assert_eq!(field.value, "--option");
-        });
-        assert_eq!(error.to_string(), "unknown option \"--option\"");
     }
 
     #[test]
