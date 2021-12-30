@@ -36,7 +36,7 @@
 //! ];
 //!
 //! let arguments = Field::dummies(["foo", "-ba", "--baz", "--", "--bar", "--", "-a", "foo"]);
-//! let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+//! let (options, operands) = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
 //! assert_eq!(options.len(), 4);
 //! assert_eq!(options[0].spec, &specs[1]); // 'b' in "-ba"
 //! assert_eq!(options[0].argument, None);
@@ -800,12 +800,14 @@ mod tests {
         let specs = &[OptionSpec::new().long("option")];
 
         let arguments = Field::dummies(["foo"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options, []);
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["foo", ""]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options, []);
         assert_eq!(operands, Field::dummies([""]));
     }
@@ -815,13 +817,15 @@ mod tests {
         let specs = &[OptionSpec::new().long("option")];
 
         let arguments = Field::dummies(["foo", "--option"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["foo", "--option", "bar"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_eq!(operands, Field::dummies(["bar"]));
@@ -832,14 +836,16 @@ mod tests {
         let specs = &[OptionSpec::new().long("foo")];
 
         let arguments = Field::dummies(["command", "--foo", "--foo"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("foo"));
         assert_eq!(options[1].spec.get_long(), Some("foo"));
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["command", "--foo", "--foo", "argument"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("foo"));
         assert_eq!(options[1].spec.get_long(), Some("foo"));
@@ -851,14 +857,16 @@ mod tests {
         let specs = &[OptionSpec::new().long("foo"), OptionSpec::new().long("bar")];
 
         let arguments = Field::dummies(["command", "--foo", "--bar", "!"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("foo"));
         assert_eq!(options[1].spec.get_long(), Some("bar"));
         assert_eq!(operands, Field::dummies(["!"]));
 
         let arguments = Field::dummies(["command", "--bar", "--foo", "--bar"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 3, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("bar"));
         assert_eq!(options[1].spec.get_long(), Some("foo"));
@@ -871,7 +879,8 @@ mod tests {
         let specs = &[OptionSpec::new().long("min")];
 
         let arguments = Field::dummies(["command", "--mi"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("min"));
         assert_eq!(operands, []);
@@ -882,7 +891,8 @@ mod tests {
         let specs = &[OptionSpec::new().long("max"), OptionSpec::new().long("min")];
 
         let arguments = Field::dummies(["command", "--mi"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("min"));
         assert_eq!(operands, []);
@@ -897,7 +907,8 @@ mod tests {
         ];
 
         let arguments = Field::dummies(["command", "--man"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("man"));
         assert_eq!(operands, []);
@@ -910,7 +921,8 @@ mod tests {
             .argument(OptionArgumentSpec::Required)];
 
         let arguments = Field::dummies(["foo", "--option="]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -920,7 +932,8 @@ mod tests {
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["foo", "--option=x", "--option=value", "argument"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -942,7 +955,8 @@ mod tests {
             .argument(OptionArgumentSpec::Required)];
 
         let arguments = Field::dummies(["foo", "--option", ""]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -952,7 +966,8 @@ mod tests {
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["foo", "--option", "x", "--option", "value", "argument"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_long(), Some("option"));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -974,7 +989,8 @@ mod tests {
             .argument(OptionArgumentSpec::Required)];
 
         let arguments = Field::dummies(["foo", "-a", "argument", "-a", "--", "--", "operand"]);
-        let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        let (options, operands) =
+            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "{:?}", options);
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
@@ -1017,14 +1033,14 @@ mod tests {
         let specs = &[OptionSpec::new().long("one")];
 
         let arguments = Field::dummies(["foo", "--two"]);
-        let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
+        let error = parse_arguments(&[], Mode::with_extensions(), arguments).unwrap_err();
         assert_matches!(&error, Error::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two");
         });
         assert_eq!(error.to_string(), "unknown option \"--two\"");
 
         let arguments = Field::dummies(["foo", "--two=three"]);
-        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
         assert_matches!(&error, Error::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two=three");
         });
@@ -1040,7 +1056,7 @@ mod tests {
         ];
 
         let arguments = Field::dummies(["command", "--m"]);
-        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
         assert_matches!(&error, Error::AmbiguousLongOption(field, matched_specs) => {
             assert_eq!(field.value, "--m");
             assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
@@ -1082,7 +1098,7 @@ mod tests {
         ];
 
         let arguments = Field::dummies(["command", "--fo"]);
-        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
         assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--fo");
             assert_eq!(spec, &specs[0]);
@@ -1099,7 +1115,7 @@ mod tests {
         ];
 
         let arguments = Field::dummies(["command", "--bar=baz"]);
-        let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
+        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
         assert_matches!(&error, &Error::UnexpectedOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--bar=baz");
             assert_eq!(spec, &specs[1]);
