@@ -183,9 +183,53 @@ impl OptionSpec<'_> {
     }
 }
 
-/// TODO
+/// Configuration for customizing the argument parsing behavior
+///
+/// # Examples
+///
+/// The default configuration disables all non-portable extensions:
+///
+/// ```
+/// # use yash_builtin::common::arg::Mode;
+/// let mode = Mode::default();
+/// assert!(!mode.accepts_long_options());
+/// # // TODO other properties
+/// ```
+///
+/// The [`with_extensions`](Self::with_extensions) function returns a `Mode`
+/// with those extensions enabled.
+///
+/// ```
+/// # use yash_builtin::common::arg::Mode;
+/// let mode = Mode::with_extensions();
+/// assert!(mode.accepts_long_options());
+/// # // TODO other properties
+/// ```
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
-pub struct Mode {}
+pub struct Mode {
+    long_options: bool,
+    // TODO options_after_operands
+    // TODO negative_integer_operands
+    // TODO rejecting_non_portable_option_specs
+}
+
+impl Mode {
+    /// Returns a new `Mode` with non-portable extensions enabled.
+    pub const fn with_extensions() -> Self {
+        Mode { long_options: true }
+    }
+
+    /// Whether the parser accepts long options or not
+    pub const fn accepts_long_options(&self) -> bool {
+        self.long_options
+    }
+
+    /// Sets whether the parser accepts long options or not.
+    pub fn accept_long_options(&mut self, accept: bool) -> &mut Self {
+        self.long_options = accept;
+        self
+    }
+}
 
 /// Occurrence of an option
 #[derive(Clone, Debug, Eq, PartialEq)]
