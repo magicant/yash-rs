@@ -722,7 +722,7 @@ mod tests {
     use std::num::NonZeroU64;
     use std::rc::Rc;
     use yash_env::variable::Value;
-    use yash_syntax::source::Line;
+    use yash_syntax::source::Code;
     use yash_syntax::source::Source;
 
     #[derive(Debug)]
@@ -793,7 +793,7 @@ mod tests {
     #[test]
     fn from_error_for_message() {
         let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
+        let line = Rc::new(Code {
             value: "".to_string(),
             number,
             source: Source::Unknown,

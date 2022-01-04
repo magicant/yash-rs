@@ -371,7 +371,7 @@ mod tests {
     use crate::input::Context;
     use crate::input::Input;
     use crate::source::lines;
-    use crate::source::Line;
+    use crate::source::Code;
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_should_not_peek_beyond_newline() {
-        struct OneLineInput(Option<Line>);
+        struct OneLineInput(Option<Code>);
         #[async_trait::async_trait(?Send)]
         impl Input for OneLineInput {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {

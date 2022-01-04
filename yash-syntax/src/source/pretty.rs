@@ -225,7 +225,7 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
         use std::rc::Rc;
 
-        let line = Rc::new(Line {
+        let line = Rc::new(Code {
             value: "".to_string(),
             number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
@@ -297,7 +297,7 @@ mod annotate_snippets_support {
             global: false,
             origin: Location::dummy("my origin"),
         });
-        let line = Rc::new(Line {
+        let line = Rc::new(Code {
             value: "substitution".to_string(),
             number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },

@@ -131,17 +131,16 @@ impl Source {
     }
 }
 
-/// Line in source code.
+/// Source code fragment
+///
+/// TODO Elaborate
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Line {
-    /// Content of the line, usually including a trailing newline.
-    ///
-    /// A line must be terminated by a newline character (unless the source code lacks a
-    /// newline in the last line). Newlines must not appear in any other part of the line.
+pub struct Code {
+    /// Content of the code, usually including a trailing newline.
     pub value: String,
     /// Line number. Counted from 1.
     pub number: NonZeroU64,
-    /// Source code containing this line.
+    /// Source of this code.
     pub source: Source,
 }
 
@@ -153,9 +152,9 @@ pub struct Lines<'a> {
 }
 
 impl<'a> Iterator for Lines<'a> {
-    type Item = Line;
+    type Item = Code;
 
-    fn next(&mut self) -> Option<Line> {
+    fn next(&mut self) -> Option<Code> {
         if self.code.is_empty() {
             return None;
         }
@@ -181,7 +180,7 @@ impl<'a> Iterator for Lines<'a> {
         }
         .to_string();
 
-        Some(Line {
+        Some(Code {
             value,
             number,
             source,
@@ -194,8 +193,8 @@ impl FusedIterator for Lines<'_> {}
 impl Lines<'_> {
     /// Like `next`, but returns an empty line if the end of input has been
     /// reached.
-    pub fn next_or_empty(&mut self) -> Line {
-        self.next().unwrap_or_else(|| Line {
+    pub fn next_or_empty(&mut self) -> Code {
+        self.next().unwrap_or_else(|| Code {
             value: String::new(),
             number: self.number,
             source: self.source.clone(),
@@ -203,7 +202,9 @@ impl Lines<'_> {
     }
 }
 
-/// Converts a source code string into an iterator of [Line]s.
+/// Creates an iterator of lines.
+///
+/// TODO Elaborate: Each `Code` yielded by the iterator contains a single line of code.
 pub fn lines(code: &str, source: Source) -> Lines<'_> {
     Lines {
         source,
@@ -216,7 +217,7 @@ pub fn lines(code: &str, source: Source) -> Lines<'_> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
     /// Line that contains the character.
-    pub line: Rc<Line>,
+    pub line: Rc<Code>,
 
     /// Character position in the line. Counted from 1.
     ///
@@ -235,7 +236,7 @@ impl Location {
     pub fn dummy<S: Into<String>>(line: S) -> Location {
         fn with_line(line: String) -> Location {
             let number = NonZeroU64::new(1).unwrap();
-            let line = Rc::new(Line {
+            let line = Rc::new(Code {
                 value: line,
                 number,
                 source: Source::Unknown,
@@ -264,7 +265,7 @@ pub struct SourceChar {
     pub location: Location,
 }
 
-impl Line {
+impl Code {
     /// Creates an iterator of `SourceChar`.
     ///
     /// The character columns are counted from 1.
@@ -389,19 +390,19 @@ mod tests {
     }
 
     #[test]
-    fn line_enumerate() {
-        fn make_line(v: &str, n: u64) -> Rc<Line> {
-            Rc::new(Line {
+    fn code_enumerate() {
+        fn make_code(v: &str, n: u64) -> Rc<Code> {
+            Rc::new(Code {
                 value: v.to_string(),
                 number: NonZeroU64::new(n).unwrap(),
                 source: Source::Unknown,
             })
         }
 
-        let empty = make_line("", 1);
+        let empty = make_code("", 1);
         assert_eq!(empty.enumerate().next(), None);
 
-        let line = make_line("foo", 2);
+        let line = make_code("foo", 2);
         let chars = line.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 3);
         assert_eq!(chars[0].value, 'f');
@@ -414,7 +415,7 @@ mod tests {
         assert_eq!(chars[2].location.column.get(), 3);
         assert!(Rc::ptr_eq(&chars[2].location.line, &line));
 
-        let line = make_line("hello", 4);
+        let line = make_code("hello", 4);
         let chars = line.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 5);
         assert_eq!(chars[0].value, 'h');

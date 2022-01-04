@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Items in the `source` module:
+    - `Line` renamed to `Code`
 - Dependency versions
     - `async-trait` 0.1.50 → 0.1.52
     - `futures-util` 0.3.18 → 0.3.19

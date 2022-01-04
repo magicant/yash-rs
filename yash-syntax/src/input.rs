@@ -17,7 +17,7 @@
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
 use crate::source::lines;
-use crate::source::Line;
+use crate::source::Code;
 use crate::source::Lines;
 use crate::source::Location;
 use crate::source::Source;
@@ -37,7 +37,7 @@ pub struct Context;
 pub type Error = (Location, std::io::Error);
 
 /// Result of the [Input] function.
-pub type Result = std::result::Result<Line, Error>;
+pub type Result = std::result::Result<Code, Error>;
 
 /// Line-oriented source code reader.
 ///
@@ -46,7 +46,7 @@ pub type Result = std::result::Result<Line, Error>;
 pub trait Input {
     /// Reads a next line of the source code.
     ///
-    /// The input function is line-oriented; that is, this function returns a [`Line`] that is
+    /// The input function is line-oriented; that is, this function returns a [`Code`] that is
     /// terminated by a newline unless the end of input (EOF) is reached, in which case the
     /// remaining characters up to the EOF must be returned without a trailing newline. If there
     /// are no more characters at all, the returned line is empty.
@@ -71,7 +71,7 @@ impl Memory<'_> {
         Memory { lines }
     }
 
-    fn next_line_sync(&mut self, _: &Context) -> Line {
+    fn next_line_sync(&mut self, _: &Context) -> Code {
         self.lines.next_or_empty()
     }
 }

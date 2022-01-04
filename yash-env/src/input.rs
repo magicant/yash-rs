@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 use std::slice::from_mut;
-use yash_syntax::source::Line;
+use yash_syntax::source::Code;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
 
@@ -73,11 +73,11 @@ impl Input for Stdin {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
-        fn to_line(bytes: Vec<u8>, number: NonZeroU64) -> Line {
+        fn to_code(bytes: Vec<u8>, number: NonZeroU64) -> Code {
             // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
             let value = String::from_utf8(bytes)
                 .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
-            Line {
+            Code {
                 value,
                 number,
                 source: Source::Stdin,
@@ -105,7 +105,7 @@ impl Input for Stdin {
                 }
 
                 Err(errno) => {
-                    let line = Rc::new(to_line(bytes, number));
+                    let line = Rc::new(to_code(bytes, number));
                     let column = line
                         .value
                         .chars()
@@ -121,7 +121,7 @@ impl Input for Stdin {
             }
         }
 
-        Ok(to_line(bytes, number))
+        Ok(to_code(bytes, number))
     }
 }
 

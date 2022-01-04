@@ -458,7 +458,7 @@ impl<'a> From<&'a Error> for Message<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Line;
+    use crate::source::Code;
     use crate::source::Source;
     use std::num::NonZeroU64;
     use std::rc::Rc;
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn display_for_error() {
         let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
+        let line = Rc::new(Code {
             value: "".to_string(),
             number,
             source: Source::Unknown,
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn from_error_for_message() {
         let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
+        let line = Rc::new(Code {
             value: "".to_string(),
             number,
             source: Source::Unknown,
