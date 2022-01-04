@@ -423,9 +423,9 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, " for ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " for ");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 6);
     }
 
@@ -437,9 +437,9 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, " for\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " for\n");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
 
@@ -451,9 +451,9 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, "for; do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "for; do :; done");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
 
@@ -482,17 +482,17 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
-        assert_eq!(e.location.line.value, "&");
-        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.code.value, "&");
+        assert_eq!(e.location.code.number.get(), 1);
         assert_eq!(e.location.column.get(), 1);
-        if let Source::Alias { original, alias } = &e.location.line.source {
-            assert_eq!(original.line.value, "FOR if do :; done");
-            assert_eq!(original.line.number.get(), 1);
-            assert_eq!(original.line.source, Source::Unknown);
+        if let Source::Alias { original, alias } = &e.location.code.source {
+            assert_eq!(original.code.value, "FOR if do :; done");
+            assert_eq!(original.code.number.get(), 1);
+            assert_eq!(original.code.source, Source::Unknown);
             assert_eq!(original.column.get(), 5);
             assert_eq!(alias.name, "if");
         } else {
-            panic!("Not an alias: {:?}", e.location.line.source);
+            panic!("Not an alias: {:?}", e.location.code.source);
         }
     }
 
@@ -504,16 +504,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
-            assert_eq!(opening_location.line.value, "for X\n");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "for X\n");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Not MissingForBody: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, "; do :; done");
-        assert_eq!(e.location.line.number.get(), 2);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "; do :; done");
+        assert_eq!(e.location.code.number.get(), 2);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
 
@@ -542,17 +542,17 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForValue));
-        assert_eq!(e.location.line.value, "&");
-        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.code.value, "&");
+        assert_eq!(e.location.code.number.get(), 1);
         assert_eq!(e.location.column.get(), 1);
-        if let Source::Alias { original, alias } = &e.location.line.source {
-            assert_eq!(original.line.value, "for_A_in_a_b if c; do :; done");
-            assert_eq!(original.line.number.get(), 1);
-            assert_eq!(original.line.source, Source::Unknown);
+        if let Source::Alias { original, alias } = &e.location.code.source {
+            assert_eq!(original.code.value, "for_A_in_a_b if c; do :; done");
+            assert_eq!(original.code.number.get(), 1);
+            assert_eq!(original.code.source, Source::Unknown);
             assert_eq!(original.column.get(), 14);
             assert_eq!(alias.name, "if");
         } else {
-            panic!("Not an alias: {:?}", e.location.line.source);
+            panic!("Not an alias: {:?}", e.location.code.source);
         }
     }
 
@@ -564,16 +564,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
-            assert_eq!(opening_location.line.value, " for X; ! do :; done");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, " for X; ! do :; done");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("Not MissingForBody: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, " for X; ! do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " for X; ! do :; done");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 9);
     }
 }

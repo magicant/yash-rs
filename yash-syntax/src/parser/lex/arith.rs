@@ -110,9 +110,9 @@ mod tests {
             .unwrap();
         if let TextUnit::Arith { content, location } = result {
             assert_eq!(content.0, []);
-            assert_eq!(location.line.value, "X");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "X");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not an arithmetic expansion: {:?}", result);
@@ -129,9 +129,9 @@ mod tests {
         let location = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
             .unwrap_err();
-        assert_eq!(location.line.value, "Y");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.code.value, "Y");
+        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
@@ -147,9 +147,9 @@ mod tests {
             .unwrap();
         if let TextUnit::Arith { content, location } = result {
             assert_eq!(content.0, []);
-            assert_eq!(location.line.value, "X");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "X");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not an arithmetic expansion: {:?}", result);
@@ -177,9 +177,9 @@ mod tests {
                     Backslashed('$')
                 ]
             );
-            assert_eq!(location.line.value, "X");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "X");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not an arithmetic expansion: {:?}", result);
@@ -195,16 +195,16 @@ mod tests {
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "Z");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "Z");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
-        assert_eq!(e.location.line.value, "((1");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "((1");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
 
@@ -215,16 +215,16 @@ mod tests {
 
         let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "Z");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "Z");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
-        assert_eq!(e.location.line.value, "((1)");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "((1)");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
 
@@ -236,9 +236,9 @@ mod tests {
         let location = block_on(lexer.arithmetic_expansion(location))
             .unwrap()
             .unwrap_err();
-        assert_eq!(location.line.value, "Z");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.code.value, "Z");
+        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 
         assert_eq!(lexer.index(), 0);

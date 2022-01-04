@@ -104,7 +104,7 @@ impl Source {
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// Rc::make_mut(&mut original.line).source = source;
+    /// Rc::make_mut(&mut original.code).source = source;
     /// let source = Source::Alias{original, alias};
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), true);
@@ -112,7 +112,7 @@ impl Source {
     /// ```
     pub fn is_alias_for(&self, name: &str) -> bool {
         if let Source::Alias { original, alias } = self {
-            alias.name == name || original.line.source.is_alias_for(name)
+            alias.name == name || original.code.source.is_alias_for(name)
         } else {
             false
         }
@@ -216,10 +216,10 @@ pub fn lines(code: &str, source: Source) -> Lines<'_> {
 /// Position of a character in source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
-    /// Line that contains the character.
-    pub line: Rc<Code>,
+    /// Code that contains the character.
+    pub code: Rc<Code>,
 
-    /// Character position in the line. Counted from 1.
+    /// Character position in the code. Counted from 1.
     ///
     /// Characters are counted in the number of Unicode scalar values, not bytes.
     pub column: NonZeroU64,
@@ -228,25 +228,25 @@ pub struct Location {
 impl Location {
     /// Creates a dummy location.
     ///
-    /// The returned location has [unknown](Source::Unknown) source and the given line value. The
-    /// line and column numbers are 1.
+    /// The returned location has [unknown](Source::Unknown) source and the
+    /// given source code value. The line and column numbers are 1.
     ///
     /// This function is mainly for use in testing.
     #[inline]
-    pub fn dummy<S: Into<String>>(line: S) -> Location {
-        fn with_line(line: String) -> Location {
+    pub fn dummy<S: Into<String>>(value: S) -> Location {
+        fn with_line(value: String) -> Location {
             let number = NonZeroU64::new(1).unwrap();
-            let line = Rc::new(Code {
-                value: line,
+            let code = Rc::new(Code {
+                value,
                 number,
                 source: Source::Unknown,
             });
             Location {
-                line,
+                code,
                 column: number,
             }
         }
-        with_line(line.into())
+        with_line(value.into())
     }
 
     /// Increases the column number
@@ -274,7 +274,7 @@ impl Code {
         self.value.chars().zip(1u64..).map(move |(value, i)| {
             let column = NonZeroU64::new(i).unwrap();
             let location = Location {
-                line: self.clone(),
+                code: self.clone(),
                 column,
             };
             SourceChar { value, location }
@@ -370,10 +370,10 @@ mod tests {
 
     #[test]
     fn location_advance() {
-        let line = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
+        let code = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
         let column = NonZeroU64::new(1).unwrap();
         let mut location = Location {
-            line: line.clone(),
+            code: code.clone(),
             column,
         };
 
@@ -386,7 +386,7 @@ mod tests {
         location.advance(5);
         assert_eq!(location.column.get(), 9);
 
-        assert!(Rc::ptr_eq(&location.line, &line));
+        assert!(Rc::ptr_eq(&location.code, &code));
     }
 
     #[test]
@@ -402,27 +402,27 @@ mod tests {
         let empty = make_code("", 1);
         assert_eq!(empty.enumerate().next(), None);
 
-        let line = make_code("foo", 2);
-        let chars = line.enumerate().collect::<Vec<SourceChar>>();
+        let code = make_code("foo", 2);
+        let chars = code.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 3);
         assert_eq!(chars[0].value, 'f');
         assert_eq!(chars[0].location.column.get(), 1);
-        assert!(Rc::ptr_eq(&chars[0].location.line, &line));
+        assert!(Rc::ptr_eq(&chars[0].location.code, &code));
         assert_eq!(chars[1].value, 'o');
         assert_eq!(chars[1].location.column.get(), 2);
-        assert!(Rc::ptr_eq(&chars[1].location.line, &line));
+        assert!(Rc::ptr_eq(&chars[1].location.code, &code));
         assert_eq!(chars[2].value, 'o');
         assert_eq!(chars[2].location.column.get(), 3);
-        assert!(Rc::ptr_eq(&chars[2].location.line, &line));
+        assert!(Rc::ptr_eq(&chars[2].location.code, &code));
 
-        let line = make_code("hello", 4);
-        let chars = line.enumerate().collect::<Vec<SourceChar>>();
+        let code = make_code("hello", 4);
+        let chars = code.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 5);
         assert_eq!(chars[0].value, 'h');
         assert_eq!(chars[0].location.column.get(), 1);
-        assert!(Rc::ptr_eq(&chars[0].location.line, &line));
+        assert!(Rc::ptr_eq(&chars[0].location.code, &code));
         assert_eq!(chars[4].value, 'o');
         assert_eq!(chars[4].location.column.get(), 5);
-        assert!(Rc::ptr_eq(&chars[4].location.line, &line));
+        assert!(Rc::ptr_eq(&chars[4].location.code, &code));
     }
 }

@@ -164,7 +164,7 @@ impl<'a> LexerCore<'a> {
                         } else {
                             // Completely empty source
                             Location {
-                                line: Rc::new(line),
+                                code: Rc::new(line),
                                 column: NonZeroU64::new(1).unwrap(),
                             }
                         };
@@ -280,7 +280,7 @@ impl<'a> LexerCore<'a> {
         fn is_same_alias(alias: &Alias, sc: Option<&SourceChar>) -> bool {
             match sc {
                 None => false,
-                Some(sc) => sc.location.line.source.is_alias_for(&alias.name),
+                Some(sc) => sc.location.code.source.is_alias_for(&alias.name),
             }
         }
 
@@ -291,7 +291,7 @@ impl<'a> LexerCore<'a> {
                 return false;
             }
 
-            if let Source::Alias { ref alias, .. } = sc.location.line.source {
+            if let Source::Alias { ref alias, .. } = sc.location.code.source {
                 #[allow(clippy::collapsible_if)]
                 if ends_with_blank(&alias.replacement) {
                     if !is_same_alias(alias, self.source.get(index + 1)) {
@@ -673,9 +673,9 @@ mod tests {
         let mut lexer = LexerCore::new(Box::new(input));
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
-            assert_eq!(location.line.value, "");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not end-of-input: {:?}", result);
@@ -708,9 +708,9 @@ mod tests {
         } else {
             panic!("expected IoError, but actually {}", e.cause)
         }
-        assert_eq!(e.location.line.value, "line");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "line");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
 
@@ -722,18 +722,18 @@ mod tests {
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'a');
-            assert_eq!(c.location.line.value, "a\n");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "a\n");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
             panic!("Not a char: {:?}", result);
         }
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'a');
-            assert_eq!(c.location.line.value, "a\n");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "a\n");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
             panic!("Not a char: {:?}", result);
@@ -743,9 +743,9 @@ mod tests {
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, '\n');
-            assert_eq!(c.location.line.value, "a\n");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "a\n");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
         } else {
             panic!("Not a char: {:?}", result);
@@ -755,9 +755,9 @@ mod tests {
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'b');
-            assert_eq!(c.location.line.value, "b");
-            assert_eq!(c.location.line.number.get(), 2);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "b");
+            assert_eq!(c.location.code.number.get(), 2);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
             panic!("Not a char: {:?}", result);
@@ -766,9 +766,9 @@ mod tests {
 
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
-            assert_eq!(location.line.value, "b");
-            assert_eq!(location.line.number.get(), 2);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "b");
+            assert_eq!(location.code.number.get(), 2);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 2);
         } else {
             panic!("Not end-of-input: {:?}", result);
@@ -848,9 +848,9 @@ mod tests {
             let result = lexer.peek_char().await;
             if let Ok(PeekChar::Char(c)) = result {
                 assert_eq!(c.value, 'a');
-                assert_eq!(c.location.line.value, "abc");
-                assert_eq!(c.location.line.number.get(), 1);
-                assert_eq!(c.location.line.source, Source::Unknown);
+                assert_eq!(c.location.code.value, "abc");
+                assert_eq!(c.location.code.number.get(), 1);
+                assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.column.get(), 1);
             } else {
                 panic!("Not a char: {:?}", result);
@@ -917,20 +917,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, 'l');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.code.value, "lex");
+            assert_eq!(c.location.code.number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, "a b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
@@ -940,20 +940,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, 'e');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.code.value, "lex");
+            assert_eq!(c.location.code.number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, "a b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
@@ -963,20 +963,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, 'x');
-            assert_eq!(c.location.line.value, "lex");
-            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.code.value, "lex");
+            assert_eq!(c.location.code.number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, "a b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, "a b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 3);
             lexer.consume_char();
@@ -986,9 +986,9 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, "a b");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "a b");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
         });
@@ -1018,20 +1018,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, 'x');
-            assert_eq!(c.location.line.value, "x\n");
-            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.code.value, "x\n");
+            assert_eq!(c.location.code.number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, " foo b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
@@ -1041,20 +1041,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, '\n');
-            assert_eq!(c.location.line.value, "x\n");
-            assert_eq!(c.location.line.number.get(), 1);
+            assert_eq!(c.location.code.value, "x\n");
+            assert_eq!(c.location.code.number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, " foo b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
@@ -1064,20 +1064,20 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, 'y');
-            assert_eq!(c.location.line.value, "y");
-            assert_eq!(c.location.line.number.get(), 2);
+            assert_eq!(c.location.code.value, "y");
+            assert_eq!(c.location.code.number.get(), 2);
             if let Source::Alias {
                 original,
                 alias: alias2,
-            } = &c.location.line.source
+            } = &c.location.code.source
             {
-                assert_eq!(original.line.value, " foo b");
-                assert_eq!(original.line.number.get(), 1);
-                assert_eq!(original.line.source, Source::Unknown);
+                assert_eq!(original.code.value, " foo b");
+                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
             } else {
-                panic!("Wrong source: {:?}", c.location.line.source);
+                panic!("Wrong source: {:?}", c.location.code.source);
             }
             assert_eq!(c.location.column.get(), 1);
             lexer.consume_char();
@@ -1087,9 +1087,9 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, " foo b");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, " foo b");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 5);
             lexer.consume_char();
         });
@@ -1117,9 +1117,9 @@ mod tests {
                 other => panic!("Not a char: {:?}", other),
             };
             assert_eq!(c.value, ' ');
-            assert_eq!(c.location.line.value, "x ");
-            assert_eq!(c.location.line.number.get(), 1);
-            assert_eq!(c.location.line.source, Source::Unknown);
+            assert_eq!(c.location.code.value, "x ");
+            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
         });
     }
@@ -1229,9 +1229,9 @@ mod tests {
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'w');
-        assert_eq!(c.location.line.value, "word\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.code.value, "word\n");
+        assert_eq!(c.location.code.number.get(), 1);
+        assert_eq!(c.location.code.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
         let mut called = 0;
@@ -1262,9 +1262,9 @@ mod tests {
         .unwrap();
         assert_eq!(called, 1);
         assert_eq!(c.value, 'o');
-        assert_eq!(c.location.line.value, "word\n");
-        assert_eq!(c.location.line.number.get(), 1);
-        assert_eq!(c.location.line.source, Source::Unknown);
+        assert_eq!(c.location.code.value, "word\n");
+        assert_eq!(c.location.code.number.get(), 1);
+        assert_eq!(c.location.code.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
 
         block_on(lexer.consume_char_if(|c| {
@@ -1308,9 +1308,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
-        assert_eq!(e.location.line.value, "<< )");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "<< )");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
 }

@@ -169,7 +169,7 @@ impl<'a> From<&'a Error> for Message<'a> {
             location: e.location.clone(),
         }];
 
-        e.location.line.source.complement_annotations(&mut a);
+        e.location.code.source.complement_annotations(&mut a);
 
         Message {
             r#type: AnnotationType::Error,

@@ -158,7 +158,7 @@ impl<'a> From<&'a Error> for Message<'a> {
             location: e.location.clone(),
         }];
 
-        e.location.line.source.complement_annotations(&mut a);
+        e.location.code.source.complement_annotations(&mut a);
 
         if let Some((location, label)) = e.cause.related_location() {
             a.push(Annotation {
@@ -793,13 +793,13 @@ mod tests {
     #[test]
     fn from_error_for_message() {
         let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Code {
+        let code = Rc::new(Code {
             value: "".to_string(),
             number,
             source: Source::Unknown,
         });
         let location = Location {
-            line,
+            code,
             column: number,
         };
         let new_value = Variable {

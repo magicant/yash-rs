@@ -186,7 +186,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         if !self.aliases.is_empty() {
             if let Token(_) = token.id {
                 if let Some(name) = token.word.to_string_if_literal() {
-                    if !token.word.location.line.source.is_alias_for(&name) {
+                    if !token.word.location.code.source.is_alias_for(&name) {
                         if let Some(alias) = self.aliases.get(&name as &str) {
                             if is_command_name
                                 || alias.0.global
@@ -736,7 +736,7 @@ mod tests {
             assert!(parser.take_read_here_docs().is_empty());
 
             let location = lexer.location().await.unwrap();
-            assert_eq!(location.line.number.get(), 1);
+            assert_eq!(location.code.number.get(), 1);
             assert_eq!(location.column.get(), 1);
         })
     }
@@ -764,7 +764,7 @@ mod tests {
             assert!(parser.take_read_here_docs().is_empty());
 
             let location = lexer.location().await.unwrap();
-            assert_eq!(location.line.number.get(), 2);
+            assert_eq!(location.code.number.get(), 2);
             assert_eq!(location.column.get(), 1);
         })
     }

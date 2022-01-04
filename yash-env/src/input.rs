@@ -105,8 +105,8 @@ impl Input for Stdin {
                 }
 
                 Err(errno) => {
-                    let line = Rc::new(to_code(bytes, number));
-                    let column = line
+                    let code = Rc::new(to_code(bytes, number));
+                    let column = code
                         .value
                         .chars()
                         .count()
@@ -114,7 +114,7 @@ impl Input for Stdin {
                         .unwrap_or(u64::MAX)
                         .saturating_add(1);
                     let column = unsafe { NonZeroU64::new_unchecked(column) };
-                    let location = Location { line, column };
+                    let location = Location { code, column };
                     let error = std::io::Error::from_raw_os_error(errno as i32);
                     return Err((location, error));
                 }
@@ -202,9 +202,9 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let (location, error) = block_on(stdin.next_line(&Context)).unwrap_err();
-        assert_eq!(location.line.value, "");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Stdin);
+        assert_eq!(location.code.value, "");
+        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.source, Source::Stdin);
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 }

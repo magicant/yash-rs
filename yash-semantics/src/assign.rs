@@ -129,8 +129,8 @@ mod tests {
             assert_eq!(roe.read_only_location, location);
             assert_eq!(roe.new_value.value, Value::Scalar("new".into()));
         });
-        assert_eq!(e.location.line.value, "v=new");
-        assert_eq!(e.location.line.number.get(), 1);
+        assert_eq!(e.location.code.value, "v=new");
+        assert_eq!(e.location.code.number.get(), 1);
         assert_eq!(e.location.column.get(), 1);
     }
 }

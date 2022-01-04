@@ -100,9 +100,9 @@ mod tests {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
-        assert_eq!(t.word.location.line.value, "");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.code.value, "");
+        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::EndOfInput);
         assert_eq!(t.index, 0);
@@ -117,9 +117,9 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('a')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('b')));
         assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('c')));
-        assert_eq!(t.word.location.line.value, "abc ");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.code.value, "abc ");
+        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
@@ -150,9 +150,9 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
-        assert_eq!(t.word.location.line.value, "12<");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.code.value, "12<");
+        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
@@ -167,9 +167,9 @@ mod tests {
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 1);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
-        assert_eq!(t.word.location.line.value, "0>>");
-        assert_eq!(t.word.location.line.number.get(), 1);
-        assert_eq!(t.word.location.line.source, Source::Unknown);
+        assert_eq!(t.word.location.code.value, "0>>");
+        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
@@ -184,18 +184,18 @@ mod tests {
 
             lexer.skip_blanks().await.unwrap();
             let t = lexer.token().await.unwrap();
-            assert_eq!(t.word.location.line.value, " a  ");
-            assert_eq!(t.word.location.line.number.get(), 1);
-            assert_eq!(t.word.location.line.source, Source::Unknown);
+            assert_eq!(t.word.location.code.value, " a  ");
+            assert_eq!(t.word.location.code.number.get(), 1);
+            assert_eq!(t.word.location.code.source, Source::Unknown);
             assert_eq!(t.word.location.column.get(), 2);
             assert_eq!(t.id, TokenId::Token(None));
             assert_eq!(t.index, 1);
 
             lexer.skip_blanks().await.unwrap();
             let t = lexer.token().await.unwrap();
-            assert_eq!(t.word.location.line.value, " a  ");
-            assert_eq!(t.word.location.line.number.get(), 1);
-            assert_eq!(t.word.location.line.source, Source::Unknown);
+            assert_eq!(t.word.location.code.value, " a  ");
+            assert_eq!(t.word.location.code.number.get(), 1);
+            assert_eq!(t.word.location.code.source, Source::Unknown);
             assert_eq!(t.word.location.column.get(), 5);
             assert_eq!(t.id, TokenId::EndOfInput);
             assert_eq!(t.index, 4);

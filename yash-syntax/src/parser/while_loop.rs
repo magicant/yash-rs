@@ -151,16 +151,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedWhileClause { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "while :");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "while :");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Wrong error cause: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, "while :");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "while :");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 8);
     }
 
@@ -175,9 +175,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::EmptyWhileCondition)
         );
-        assert_eq!(e.location.line.value, " while do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " while do :; done");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 8);
     }
 
@@ -254,16 +254,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedUntilClause { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "until :");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "until :");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Wrong error cause: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, "until :");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "until :");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 8);
     }
 
@@ -278,9 +278,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::EmptyUntilCondition)
         );
-        assert_eq!(e.location.line.value, "  until do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "  until do :; done");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 9);
     }
 

@@ -129,9 +129,9 @@ mod tests {
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "0");
-            assert_eq!(location.line.value, "$0");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$0");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not a raw parameter: {:?}", result);
@@ -148,9 +148,9 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.line.value, "$()");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$()");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, "");
         } else {
@@ -165,9 +165,9 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.line.value, "$( foo bar )");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$( foo bar )");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, " foo bar ");
         } else {
@@ -186,9 +186,9 @@ mod tests {
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::Arith { content, location } = result {
             assert_eq!(content, Text(vec![Literal('1')]));
-            assert_eq!(location.line.value, "$((1))");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$((1))");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("unexpected result {:?}", result);

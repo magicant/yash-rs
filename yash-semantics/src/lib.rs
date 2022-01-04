@@ -80,7 +80,7 @@ pub async fn print_error(
         label,
         location: location.clone(),
     }];
-    location.line.source.complement_annotations(&mut a);
+    location.code.source.complement_annotations(&mut a);
     let message = Message {
         r#type: AnnotationType::Error,
         title,

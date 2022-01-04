@@ -161,9 +161,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::UnmatchedParenthesis)
         );
-        assert_eq!(e.location.line.value, "( ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "( ");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
 
@@ -183,9 +183,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingFunctionBody)
         );
-        assert_eq!(e.location.line.value, "( ) ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "( ) ");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
 
@@ -205,9 +205,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
-        assert_eq!(e.location.line.value, "() foo ; ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "() foo ; ");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
 
@@ -326,9 +326,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
-        assert_eq!(e.location.line.value, "()b");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "()b");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
 }

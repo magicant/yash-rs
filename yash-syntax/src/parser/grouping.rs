@@ -139,16 +139,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedGrouping { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, " { oh no ");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, " { oh no ");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("Wrong error cause: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, " { oh no ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " { oh no ");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 10);
     }
 
@@ -160,9 +160,9 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyGrouping));
-        assert_eq!(e.location.line.value, "{ }");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "{ }");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
 
@@ -238,16 +238,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedSubshell { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, " ( oh no");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, " ( oh no");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("Wrong error cause: {:?}", e.cause);
         }
-        assert_eq!(e.location.line.value, " ( oh no");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, " ( oh no");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 9);
     }
 
@@ -259,9 +259,9 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptySubshell));
-        assert_eq!(e.location.line.value, "( )");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "( )");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
 }

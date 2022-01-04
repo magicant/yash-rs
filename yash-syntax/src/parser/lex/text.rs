@@ -604,16 +604,16 @@ mod tests {
         let mut lexer = Lexer::from_memory("x(()", Source::Unknown);
         let e = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "x(()");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
+            assert_eq!(opening_location.code.value, "x(()");
+            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
-        assert_eq!(e.location.line.value, "x(()");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "x(()");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
 }

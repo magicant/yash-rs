@@ -96,13 +96,13 @@ impl super::Source {
                     label: format!("alias `{}` was substituted here", alias.name).into(),
                     location: original.clone(),
                 }));
-                original.line.source.complement_annotations(result);
+                original.code.source.complement_annotations(result);
                 result.extend(std::iter::once(Annotation {
                     r#type: AnnotationType::Info,
                     label: format!("alias `{}` was defined here", alias.name).into(),
                     location: alias.origin.clone(),
                 }));
-                alias.origin.line.source.complement_annotations(result);
+                alias.origin.code.source.complement_annotations(result);
             }
         }
     }
@@ -147,27 +147,27 @@ mod annotate_snippets_support {
 
             let mut lines = vec![];
             for annotation in &message.annotations {
-                let line = &annotation.location.line;
-                let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
+                let code = &annotation.location.code;
+                let line_start = code.number.get().try_into().unwrap_or(usize::MAX);
                 let column = &annotation.location.column;
                 let column = column.get().try_into().unwrap_or(usize::MAX);
-                let column = column.min(line.value.chars().count()).max(1);
+                let column = column.min(code.value.chars().count()).max(1);
                 let annotation = snippet::SourceAnnotation {
                     range: (column - 1, column),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
                 };
-                if let Some(i) = lines.iter().position(|l| l == line) {
+                if let Some(i) = lines.iter().position(|l| l == code) {
                     snippet.slices[i].annotations.push(annotation);
                 } else {
                     snippet.slices.push(snippet::Slice {
-                        source: &line.value,
+                        source: &code.value,
                         line_start,
-                        origin: Some(line.source.label()),
+                        origin: Some(code.source.label()),
                         fold: true,
                         annotations: vec![annotation],
                     });
-                    lines.push(line.clone());
+                    lines.push(code.clone());
                 }
             }
 
@@ -225,13 +225,13 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
         use std::rc::Rc;
 
-        let line = Rc::new(Code {
+        let code = Rc::new(Code {
             value: "".to_string(),
             number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
         });
         let location = Location {
-            line,
+            code,
             column: NonZeroU64::new(42).unwrap(),
         };
         let message = Message {
@@ -297,13 +297,13 @@ mod annotate_snippets_support {
             global: false,
             origin: Location::dummy("my origin"),
         });
-        let line = Rc::new(Code {
+        let code = Rc::new(Code {
             value: "substitution".to_string(),
             number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });
         let location = Location {
-            line,
+            code,
             column: NonZeroU64::new(5).unwrap(),
         };
         let message = Message {

@@ -129,9 +129,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingPipeline(AndOr::AndThen))
         );
-        assert_eq!(e.location.line.value, "foo &&");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
+        assert_eq!(e.location.code.value, "foo &&");
+        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
     }
 }

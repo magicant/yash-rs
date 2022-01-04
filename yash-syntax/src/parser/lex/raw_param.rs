@@ -92,9 +92,9 @@ mod tests {
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "@");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
@@ -111,9 +111,9 @@ mod tests {
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "1");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
@@ -130,9 +130,9 @@ mod tests {
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "az_AZ_019");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
@@ -149,9 +149,9 @@ mod tests {
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "abc");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
+            assert_eq!(location.code.value, "$");
+            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
@@ -166,9 +166,9 @@ mod tests {
         let location = Location::dummy("X");
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
-        assert_eq!(location.line.value, "X");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
+        assert_eq!(location.code.value, "X");
+        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
