@@ -2,8 +2,7 @@
 
 This is a reimplementation project of Yet Another Shell (yash) in Rust.
 
-<!-- TODO Other badges -->
-![workflow](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)
+[![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
 
 <!-- TODO Features -->
 
