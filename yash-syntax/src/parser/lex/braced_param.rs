@@ -167,7 +167,7 @@ mod tests {
 
     fn assert_opening_location(location: &Location) {
         assert_eq!(location.code.value, "$");
-        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
     }
@@ -256,7 +256,7 @@ mod tests {
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
         assert_eq!(e.location.code.value, "{};");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -277,7 +277,7 @@ mod tests {
             panic!("Unexpected cause: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "{;");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -298,7 +298,7 @@ mod tests {
             panic!("Unexpected cause: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "{_;");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }

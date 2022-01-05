@@ -232,14 +232,14 @@ mod tests {
         let e = block_on(parser.array_values()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "(a b");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Unexpected cause {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "(a b");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
@@ -252,14 +252,14 @@ mod tests {
         let e = block_on(parser.array_values()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "(a;b)");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Unexpected cause {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "(a;b)");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
@@ -297,7 +297,7 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "my");
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
         assert_eq!(sc.assigns[0].location.code.value, "my=assignment");
-        assert_eq!(sc.assigns[0].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.column.get(), 1);
     }
@@ -315,19 +315,19 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(sc.assigns[0].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[0].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.column.get(), 1);
         assert_eq!(sc.assigns[1].name, "b");
         assert_eq!(sc.assigns[1].value.to_string(), "!");
         assert_eq!(sc.assigns[1].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[1].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[1].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[1].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[1].location.column.get(), 4);
         assert_eq!(sc.assigns[2].name, "c");
         assert_eq!(sc.assigns[2].value.to_string(), "X");
         assert_eq!(sc.assigns[2].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[2].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[2].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[2].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[2].location.column.get(), 8);
     }
@@ -558,7 +558,7 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
         assert_eq!(sc.assigns[0].location.code.value, "a= ()");
-        assert_eq!(sc.assigns[0].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.column.get(), 1);
 
@@ -579,7 +579,7 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
         assert_eq!(sc.assigns[0].location.code.value, "a=b()");
-        assert_eq!(sc.assigns[0].location.code.number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.column.get(), 1);
 

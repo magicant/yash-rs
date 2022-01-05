@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('-')));
         assert_eq!(t.word.location.code.value, "<<-");
-        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.code.value, "<<>");
-        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
@@ -438,7 +438,7 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.code.value, "<<");
-        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
@@ -455,7 +455,7 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.location.code.value, "<\\\n");
-        assert_eq!(t.word.location.code.number.get(), 3);
+        assert_eq!(t.word.location.code.start_line_number.get(), 3);
         assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
@@ -491,7 +491,7 @@ mod tests {
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
         assert_eq!(t.word.location.code.value, "\n");
-        assert_eq!(t.word.location.code.number.get(), 1);
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
         assert_eq!(t.word.location.column.get(), 1);
         assert_eq!(t.id, TokenId::Operator(Operator::Newline));

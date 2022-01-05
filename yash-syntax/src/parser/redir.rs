@@ -365,7 +365,7 @@ mod tests {
             e.location.code.value,
             "9999999999999999999999999999999999999999< x"
         );
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
@@ -391,7 +391,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
         assert_eq!(e.location.code.value, " < >");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
@@ -408,7 +408,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
         assert_eq!(e.location.code.value, "  < ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
@@ -425,7 +425,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
         assert_eq!(e.location.code.value, "<< <<");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
@@ -442,7 +442,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
         assert_eq!(e.location.code.value, "<<");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }

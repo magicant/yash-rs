@@ -93,7 +93,7 @@ mod tests {
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "@");
             assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
@@ -112,7 +112,7 @@ mod tests {
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "1");
             assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
@@ -131,7 +131,7 @@ mod tests {
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "az_AZ_019");
             assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
@@ -150,7 +150,7 @@ mod tests {
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "abc");
             assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
@@ -167,7 +167,7 @@ mod tests {
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
         assert_eq!(location.code.value, "X");
-        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 1);
 

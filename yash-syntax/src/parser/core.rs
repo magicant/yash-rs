@@ -736,7 +736,7 @@ mod tests {
             assert!(parser.take_read_here_docs().is_empty());
 
             let location = lexer.location().await.unwrap();
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.column.get(), 1);
         })
     }
@@ -764,7 +764,7 @@ mod tests {
             assert!(parser.take_read_here_docs().is_empty());
 
             let location = lexer.location().await.unwrap();
-            assert_eq!(location.code.number.get(), 2);
+            assert_eq!(location.code.start_line_number.get(), 2);
             assert_eq!(location.column.get(), 1);
         })
     }

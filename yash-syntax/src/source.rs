@@ -138,8 +138,8 @@ impl Source {
 pub struct Code {
     /// Content of the code, usually including a trailing newline.
     pub value: String,
-    /// Line number. Counted from 1.
-    pub number: NonZeroU64,
+    /// Line number of the first line of the code. Counted from 1.
+    pub start_line_number: NonZeroU64,
     /// Source of this code.
     pub source: Source,
 }
@@ -159,7 +159,7 @@ impl<'a> Iterator for Lines<'a> {
             return None;
         }
 
-        let number = self.number;
+        let start_line_number = self.number;
         let source = self.source.clone();
 
         let value = match self.code.find('\n') {
@@ -182,7 +182,7 @@ impl<'a> Iterator for Lines<'a> {
 
         Some(Code {
             value,
-            number,
+            start_line_number,
             source,
         })
     }
@@ -196,7 +196,7 @@ impl Lines<'_> {
     pub fn next_or_empty(&mut self) -> Code {
         self.next().unwrap_or_else(|| Code {
             value: String::new(),
-            number: self.number,
+            start_line_number: self.number,
             source: self.source.clone(),
         })
     }
@@ -238,7 +238,7 @@ impl Location {
             let number = NonZeroU64::new(1).unwrap();
             let code = Rc::new(Code {
                 value,
-                number,
+                start_line_number: number,
                 source: Source::Unknown,
             });
             Location {
@@ -293,7 +293,7 @@ mod tests {
 
         let line = l.next_or_empty();
         assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -303,7 +303,7 @@ mod tests {
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "foo\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         // No second line
@@ -311,7 +311,7 @@ mod tests {
 
         let line = l.next_or_empty();
         assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -321,17 +321,17 @@ mod tests {
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "foo\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("second line should exist");
         assert_eq!(&line.value, "bar\n");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("third line should exist");
         assert_eq!(&line.value, "\n");
-        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
 
         // No more lines
@@ -339,7 +339,7 @@ mod tests {
 
         let line = l.next_or_empty();
         assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 4);
+        assert_eq!(line.start_line_number.get(), 4);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -349,12 +349,12 @@ mod tests {
 
         let line = l.next().expect("first line should exist");
         assert_eq!(&line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("second line should exist");
         assert_eq!(&line.value, "two");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
         // No more lines
@@ -364,7 +364,7 @@ mod tests {
 
         let line = l.next_or_empty();
         assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -394,7 +394,7 @@ mod tests {
         fn make_code(v: &str, n: u64) -> Rc<Code> {
             Rc::new(Code {
                 value: v.to_string(),
-                number: NonZeroU64::new(n).unwrap(),
+                start_line_number: NonZeroU64::new(n).unwrap(),
                 source: Source::Unknown,
             })
         }

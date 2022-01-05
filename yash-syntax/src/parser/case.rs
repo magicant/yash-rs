@@ -315,7 +315,7 @@ mod tests {
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
         assert_eq!(e.location.code.value, ")");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
@@ -329,7 +329,7 @@ mod tests {
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
         assert_eq!(e.location.code.value, "(esac)");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -343,7 +343,7 @@ mod tests {
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidPattern));
         assert_eq!(e.location.code.value, "(&");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -357,7 +357,7 @@ mod tests {
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
         assert_eq!(e.location.code.value, "(foo| |");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
     }
@@ -374,7 +374,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnclosedPatternList)
         );
         assert_eq!(e.location.code.value, "(foo bar");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 6);
     }
@@ -582,7 +582,7 @@ mod tests {
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingCaseSubject));
         assert_eq!(e.location.code.value, " case  ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 8);
     }
@@ -596,7 +596,7 @@ mod tests {
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidCaseSubject));
         assert_eq!(e.location.code.value, " case ; ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
     }
@@ -610,14 +610,14 @@ mod tests {
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::MissingIn { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, " case x esac");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("Not a MissingIn: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, " case x esac");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 9);
     }
@@ -631,14 +631,14 @@ mod tests {
         let e = block_on(parser.compound_command()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedCase { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "case x in a) }");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("Not a MissingIn: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "case x in a) }");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 14);
     }

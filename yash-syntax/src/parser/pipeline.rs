@@ -171,7 +171,7 @@ mod tests {
         let e = block_on(parser.pipeline()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
         assert_eq!(e.location.code.value, " !  !");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
@@ -188,7 +188,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBang)
         );
         assert_eq!(e.location.code.value, "!\n");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -205,7 +205,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBar)
         );
         assert_eq!(e.location.code.value, "foo | ;");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
     }
@@ -219,7 +219,7 @@ mod tests {
         let e = block_on(parser.pipeline()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
         assert_eq!(e.location.code.value, "foo | !");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
     }

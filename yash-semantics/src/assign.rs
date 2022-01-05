@@ -130,7 +130,7 @@ mod tests {
             assert_eq!(roe.new_value.value, Value::Scalar("new".into()));
         });
         assert_eq!(e.location.code.value, "v=new");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.column.get(), 1);
     }
 }

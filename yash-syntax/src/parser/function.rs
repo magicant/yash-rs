@@ -162,7 +162,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::UnmatchedParenthesis)
         );
         assert_eq!(e.location.code.value, "( ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }
@@ -184,7 +184,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingFunctionBody)
         );
         assert_eq!(e.location.code.value, "( ) ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
@@ -206,7 +206,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
         assert_eq!(e.location.code.value, "() foo ; ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
@@ -327,7 +327,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
         assert_eq!(e.location.code.value, "()b");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
     }

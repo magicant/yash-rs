@@ -148,7 +148,11 @@ mod annotate_snippets_support {
             let mut lines = vec![];
             for annotation in &message.annotations {
                 let code = &annotation.location.code;
-                let line_start = code.number.get().try_into().unwrap_or(usize::MAX);
+                let line_start = code
+                    .start_line_number
+                    .get()
+                    .try_into()
+                    .unwrap_or(usize::MAX);
                 let column = &annotation.location.column;
                 let column = column.get().try_into().unwrap_or(usize::MAX);
                 let column = column.min(code.value.chars().count()).max(1);
@@ -227,7 +231,7 @@ mod annotate_snippets_support {
 
         let code = Rc::new(Code {
             value: "".to_string(),
-            number: NonZeroU64::new(128).unwrap(),
+            start_line_number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
         });
         let location = Location {
@@ -299,7 +303,7 @@ mod annotate_snippets_support {
         });
         let code = Rc::new(Code {
             value: "substitution".to_string(),
-            number: NonZeroU64::new(10).unwrap(),
+            start_line_number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });
         let location = Location {

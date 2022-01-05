@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(heredoc.content.0, []);
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.number.get(), 2);
+        assert_eq!(location.code.start_line_number.get(), 2);
         assert_eq!(location.column.get(), 1);
     }
 
@@ -183,7 +183,7 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "content\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.number.get(), 3);
+        assert_eq!(location.code.start_line_number.get(), 3);
         assert_eq!(location.column.get(), 1);
     }
 
@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.number.get(), 6);
+        assert_eq!(location.code.start_line_number.get(), 6);
         assert_eq!(location.column.get(), 1);
     }
 
@@ -278,7 +278,7 @@ END
         assert_eq!(heredoc.content.to_string(), "foo\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.number.get(), 3);
+        assert_eq!(location.code.start_line_number.get(), 3);
         assert_eq!(location.column.get(), 1);
     }
 
@@ -292,14 +292,14 @@ END
             e.cause
         {
             assert_eq!(redir_op_location.code.value, "END");
-            assert_eq!(redir_op_location.code.number.get(), 1);
+            assert_eq!(redir_op_location.code.start_line_number.get(), 1);
             assert_eq!(redir_op_location.code.source, Source::Unknown);
             assert_eq!(redir_op_location.column.get(), 1);
         } else {
             panic!("Not UnclosedHereDocContent: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, "");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }

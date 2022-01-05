@@ -795,7 +795,7 @@ mod tests {
         let number = NonZeroU64::new(1).unwrap();
         let code = Rc::new(Code {
             value: "".to_string(),
-            number,
+            start_line_number: number,
             source: Source::Unknown,
         });
         let location = Location {

@@ -343,14 +343,14 @@ mod tests {
             .unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedSingleQuote { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "'abc\n");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.code.value, "def\\");
-        assert_eq!(e.location.code.number.get(), 2);
+        assert_eq!(e.location.code.start_line_number.get(), 2);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }
@@ -467,14 +467,14 @@ mod tests {
             .unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedDoubleQuote { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "\"abc\n");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.code.value, "def");
-        assert_eq!(e.location.code.number.get(), 2);
+        assert_eq!(e.location.code.start_line_number.get(), 2);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }
@@ -493,7 +493,7 @@ mod tests {
         if let WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) = &word.units[1] {
             assert_eq!(content, ":");
             assert_eq!(location.code.value, r"0$(:)X\#");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 2);
         } else {
@@ -505,7 +505,7 @@ mod tests {
             WordUnit::Unquoted(TextUnit::Backslashed('#'))
         );
         assert_eq!(word.location.code.value, r"0$(:)X\#");
-        assert_eq!(word.location.code.number.get(), 1);
+        assert_eq!(word.location.code.start_line_number.get(), 1);
         assert_eq!(word.location.code.source, Source::Unknown);
         assert_eq!(word.location.column.get(), 1);
 
@@ -522,7 +522,7 @@ mod tests {
         let word = block_on(lexer.word(|_| panic!("unexpected call to is_delimiter"))).unwrap();
         assert_eq!(word.units, []);
         assert_eq!(word.location.code.value, "");
-        assert_eq!(word.location.code.number.get(), 1);
+        assert_eq!(word.location.code.start_line_number.get(), 1);
         assert_eq!(word.location.code.source, Source::Unknown);
         assert_eq!(word.location.column.get(), 1);
     }

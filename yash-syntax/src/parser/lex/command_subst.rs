@@ -75,7 +75,7 @@ mod tests {
             .unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
             assert_eq!(location.code.value, "X");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, " foo bar ");
@@ -85,7 +85,7 @@ mod tests {
 
         let next = block_on(lexer.location()).unwrap();
         assert_eq!(next.code.value, "( foo bar )baz");
-        assert_eq!(next.code.number.get(), 1);
+        assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
         assert_eq!(next.column.get(), 12);
     }
@@ -100,7 +100,7 @@ mod tests {
 
         let next = block_on(lexer.location()).unwrap();
         assert_eq!(next.code.value, " foo bar )baz");
-        assert_eq!(next.code.number.get(), 1);
+        assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
         assert_eq!(next.column.get(), 1);
     }
@@ -115,14 +115,14 @@ mod tests {
             e.cause
         {
             assert_eq!(opening_location.code.value, "Z");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.code.value, "( foo bar baz");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 14);
     }

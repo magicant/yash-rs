@@ -95,7 +95,7 @@ mod tests {
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -105,12 +105,12 @@ mod tests {
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
 
@@ -120,22 +120,22 @@ mod tests {
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "two\n");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "three");
-        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
     }
 }

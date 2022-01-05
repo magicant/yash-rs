@@ -674,7 +674,7 @@ mod tests {
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
             assert_eq!(location.code.value, "");
-            assert_eq!(location.code.number.get(), 1);
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
         } else {
@@ -709,7 +709,7 @@ mod tests {
             panic!("expected IoError, but actually {}", e.cause)
         }
         assert_eq!(e.location.code.value, "line");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 1);
     }
@@ -723,7 +723,7 @@ mod tests {
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'a');
             assert_eq!(c.location.code.value, "a\n");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
@@ -732,7 +732,7 @@ mod tests {
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'a');
             assert_eq!(c.location.code.value, "a\n");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
@@ -744,7 +744,7 @@ mod tests {
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, '\n');
             assert_eq!(c.location.code.value, "a\n");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
         } else {
@@ -756,7 +756,7 @@ mod tests {
         if let Ok(PeekChar::Char(c)) = result {
             assert_eq!(c.value, 'b');
             assert_eq!(c.location.code.value, "b");
-            assert_eq!(c.location.code.number.get(), 2);
+            assert_eq!(c.location.code.start_line_number.get(), 2);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 1);
         } else {
@@ -767,7 +767,7 @@ mod tests {
         let result = block_on(lexer.peek_char());
         if let Ok(PeekChar::EndOfInput(location)) = result {
             assert_eq!(location.code.value, "b");
-            assert_eq!(location.code.number.get(), 2);
+            assert_eq!(location.code.start_line_number.get(), 2);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 2);
         } else {
@@ -849,7 +849,7 @@ mod tests {
             if let Ok(PeekChar::Char(c)) = result {
                 assert_eq!(c.value, 'a');
                 assert_eq!(c.location.code.value, "abc");
-                assert_eq!(c.location.code.number.get(), 1);
+                assert_eq!(c.location.code.start_line_number.get(), 1);
                 assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.column.get(), 1);
             } else {
@@ -918,14 +918,14 @@ mod tests {
             };
             assert_eq!(c.value, 'l');
             assert_eq!(c.location.code.value, "lex");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, "a b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
@@ -941,14 +941,14 @@ mod tests {
             };
             assert_eq!(c.value, 'e');
             assert_eq!(c.location.code.value, "lex");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, "a b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
@@ -964,14 +964,14 @@ mod tests {
             };
             assert_eq!(c.value, 'x');
             assert_eq!(c.location.code.value, "lex");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, "a b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 1);
                 assert_eq!(alias2, &alias);
@@ -987,7 +987,7 @@ mod tests {
             };
             assert_eq!(c.value, ' ');
             assert_eq!(c.location.code.value, "a b");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
             lexer.consume_char();
@@ -1019,14 +1019,14 @@ mod tests {
             };
             assert_eq!(c.value, 'x');
             assert_eq!(c.location.code.value, "x\n");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, " foo b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
@@ -1042,14 +1042,14 @@ mod tests {
             };
             assert_eq!(c.value, '\n');
             assert_eq!(c.location.code.value, "x\n");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, " foo b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
@@ -1065,14 +1065,14 @@ mod tests {
             };
             assert_eq!(c.value, 'y');
             assert_eq!(c.location.code.value, "y");
-            assert_eq!(c.location.code.number.get(), 2);
+            assert_eq!(c.location.code.start_line_number.get(), 2);
             if let Source::Alias {
                 original,
                 alias: alias2,
             } = &c.location.code.source
             {
                 assert_eq!(original.code.value, " foo b");
-                assert_eq!(original.code.number.get(), 1);
+                assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
                 assert_eq!(original.column.get(), 2);
                 assert_eq!(alias2, &alias);
@@ -1088,7 +1088,7 @@ mod tests {
             };
             assert_eq!(c.value, ' ');
             assert_eq!(c.location.code.value, " foo b");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 5);
             lexer.consume_char();
@@ -1118,7 +1118,7 @@ mod tests {
             };
             assert_eq!(c.value, ' ');
             assert_eq!(c.location.code.value, "x ");
-            assert_eq!(c.location.code.number.get(), 1);
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.column.get(), 2);
         });
@@ -1230,7 +1230,7 @@ mod tests {
         assert_eq!(called, 1);
         assert_eq!(c.value, 'w');
         assert_eq!(c.location.code.value, "word\n");
-        assert_eq!(c.location.code.number.get(), 1);
+        assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 1);
 
@@ -1263,7 +1263,7 @@ mod tests {
         assert_eq!(called, 1);
         assert_eq!(c.value, 'o');
         assert_eq!(c.location.code.value, "word\n");
-        assert_eq!(c.location.code.number.get(), 1);
+        assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
         assert_eq!(c.location.column.get(), 2);
 
@@ -1309,7 +1309,7 @@ mod tests {
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
         assert_eq!(e.location.code.value, "<< )");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }

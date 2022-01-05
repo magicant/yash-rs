@@ -237,14 +237,14 @@ mod tests {
         let e = block_on(lexer.backquote()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "`");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.code.value, "`");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
     }
@@ -259,14 +259,14 @@ mod tests {
         let e = block_on(lexer.backquote()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, "`foo");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
         } else {
             panic!("unexpected error cause {:?}", e);
         }
         assert_eq!(e.location.code.value, "`foo");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
     }

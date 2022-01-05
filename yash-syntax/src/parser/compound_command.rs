@@ -154,14 +154,14 @@ mod tests {
         let e = block_on(parser.do_clause()).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) = e.cause {
             assert_eq!(opening_location.code.value, " do not close ");
-            assert_eq!(opening_location.code.number.get(), 1);
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
         } else {
             panic!("Wrong error cause: {:?}", e.cause);
         }
         assert_eq!(e.location.code.value, " do not close ");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 15);
     }
@@ -175,7 +175,7 @@ mod tests {
         let e = block_on(parser.do_clause()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
         assert_eq!(e.location.code.value, "do done");
-        assert_eq!(e.location.code.number.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
     }

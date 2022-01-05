@@ -73,13 +73,13 @@ impl Input for Stdin {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
-        fn to_code(bytes: Vec<u8>, number: NonZeroU64) -> Code {
+        fn to_code(bytes: Vec<u8>, start_line_number: NonZeroU64) -> Code {
             // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
             let value = String::from_utf8(bytes)
                 .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
             Code {
                 value,
-                number,
+                start_line_number,
                 source: Source::Stdin,
             }
         }
@@ -140,7 +140,7 @@ mod tests {
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
     }
 
@@ -157,11 +157,11 @@ mod tests {
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "echo ok\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Stdin);
     }
 
@@ -178,19 +178,19 @@ mod tests {
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "#!/bin/sh\n");
-        assert_eq!(line.number.get(), 1);
+        assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "echo ok\n");
-        assert_eq!(line.number.get(), 2);
+        assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "exit");
-        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
         assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 3);
+        assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Stdin);
     }
 
@@ -203,7 +203,7 @@ mod tests {
 
         let (location, error) = block_on(stdin.next_line(&Context)).unwrap_err();
         assert_eq!(location.code.value, "");
-        assert_eq!(location.code.number.get(), 1);
+        assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Stdin);
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
