@@ -378,7 +378,7 @@ mod tests {
         .unwrap();
         if let Backquote { content, location } = result {
             assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
@@ -404,7 +404,7 @@ mod tests {
                 content,
                 [BackquoteUnit::Literal('\\'), BackquoteUnit::Literal('"')]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }

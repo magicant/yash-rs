@@ -70,6 +70,8 @@ impl WordLexer<'_, '_> {
         }
 
         if self.skip_if(|c| c == '`').await? {
+            // FIXME Correct LocationRef
+            let location = location.into();
             Ok(Some(TextUnit::Backquote { content, location }))
         } else {
             let opening_location = location;
@@ -109,7 +111,7 @@ mod tests {
         let result = block_on(lexer.backquote()).unwrap().unwrap();
         if let TextUnit::Backquote { content, location } = result {
             assert_eq!(content, []);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
@@ -135,7 +137,7 @@ mod tests {
                     BackquoteUnit::Literal('o')
                 ]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
@@ -166,7 +168,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
@@ -198,7 +200,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
@@ -219,7 +221,7 @@ mod tests {
                 content,
                 [BackquoteUnit::Literal('a'), BackquoteUnit::Literal('b')]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a backquote: {:?}", result);
         }
