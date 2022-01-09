@@ -457,7 +457,7 @@ pub enum TextUnit {
         /// Expression that is to be evaluated.
         content: Text,
         /// Location of the initial `$` character of this command substitution.
-        location: Location,
+        location: LocationRef,
     },
 }
 
@@ -1542,7 +1542,7 @@ mod tests {
 
         let arith = Arith {
             content: Text(vec![literal, backslashed, command_subst, backquote]),
-            location: Location::dummy(""),
+            location: LocationRef::dummy(""),
         };
         assert_eq!(arith.to_string(), r"$((A\X$(foo\bar)`a\b\cd`))");
     }
@@ -1576,7 +1576,7 @@ mod tests {
             },
             Arith {
                 content: Text(vec![Literal('0')]),
-                location: Location::dummy(""),
+                location: LocationRef::dummy(""),
             },
         ]);
         let (unquoted, is_quoted) = nonempty.unquote();
@@ -1592,7 +1592,7 @@ mod tests {
             Literal('c'),
             Arith {
                 content: Text(vec![Literal('d')]),
-                location: Location::dummy(""),
+                location: LocationRef::dummy(""),
             },
             Literal('e'),
         ]);
@@ -1608,7 +1608,7 @@ mod tests {
         assert_eq!(is_quoted, true);
 
         let content = Text(vec![Backslashed('X')]);
-        let location = Location::dummy("");
+        let location = LocationRef::dummy("");
         let quoted = Text(vec![Arith { content, location }]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "$((X))");

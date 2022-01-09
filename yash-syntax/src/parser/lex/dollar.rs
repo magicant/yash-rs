@@ -48,13 +48,13 @@ impl WordLexer<'_, '_> {
         };
 
         // FIXME avoid LocationRef conversion
-        let location = match self.arithmetic_expansion(location.get()).await? {
+        let location = match self.arithmetic_expansion(location).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,
         };
 
         // FIXME avoid LocationRef conversion
-        if let Some(result) = self.command_substitution(location.into()).await? {
+        if let Some(result) = self.command_substitution(location).await? {
             return Ok(Some(result));
         }
 
@@ -189,10 +189,10 @@ mod tests {
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::Arith { content, location } = result {
             assert_eq!(content, Text(vec![Literal('1')]));
-            assert_eq!(location.code.value, "$((1))");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$((1))");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
         }
