@@ -196,8 +196,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(switch.word.location.code.value, "+}");
-            assert_eq!(switch.word.location.column.get(), 2);
+            assert_eq!(switch.word.location.code().value, "+}");
+            assert_eq!(switch.word.location.column().get(), 2);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -226,8 +226,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('z')),
                 ]
             );
-            assert_eq!(switch.word.location.code.value, "+a  z}");
-            assert_eq!(switch.word.location.column.get(), 2);
+            assert_eq!(switch.word.location.code().value, "+a  z}");
+            assert_eq!(switch.word.location.column().get(), 2);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -248,8 +248,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
-            assert_eq!(switch.word.location.code.value, ":+}");
-            assert_eq!(switch.word.location.column.get(), 3);
+            assert_eq!(switch.word.location.code().value, ":+}");
+            assert_eq!(switch.word.location.column().get(), 3);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -270,8 +270,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(switch.word.location.code.value, "-}");
-            assert_eq!(switch.word.location.column.get(), 2);
+            assert_eq!(switch.word.location.code().value, "-}");
+            assert_eq!(switch.word.location.column().get(), 2);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -300,8 +300,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('l')),
                 ]
             );
-            assert_eq!(switch.word.location.code.value, ":-cool}");
-            assert_eq!(switch.word.location.column.get(), 3);
+            assert_eq!(switch.word.location.code().value, ":-cool}");
+            assert_eq!(switch.word.location.column().get(), 3);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -322,8 +322,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
-            assert_eq!(switch.word.location.code.value, ":=}");
-            assert_eq!(switch.word.location.column.get(), 3);
+            assert_eq!(switch.word.location.code().value, ":=}");
+            assert_eq!(switch.word.location.column().get(), 3);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -351,8 +351,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('s')),
                 ]
             );
-            assert_eq!(switch.word.location.code.value, "=Yes}");
-            assert_eq!(switch.word.location.column.get(), 2);
+            assert_eq!(switch.word.location.code().value, "=Yes}");
+            assert_eq!(switch.word.location.column().get(), 2);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -373,8 +373,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(switch.word.location.code.value, "?}");
-            assert_eq!(switch.word.location.column.get(), 2);
+            assert_eq!(switch.word.location.code().value, "?}");
+            assert_eq!(switch.word.location.column().get(), 2);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -401,8 +401,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('o')),
                 ]
             );
-            assert_eq!(switch.word.location.code.value, ":?No}");
-            assert_eq!(switch.word.location.column.get(), 3);
+            assert_eq!(switch.word.location.code().value, ":?No}");
+            assert_eq!(switch.word.location.column().get(), 3);
         } else {
             panic!("Not a switch: {:?}", result);
         }
@@ -458,8 +458,8 @@ mod tests {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
-            assert_eq!(trim.pattern.location.code.value, "#'*'}");
-            assert_eq!(trim.pattern.location.column.get(), 2);
+            assert_eq!(trim.pattern.location.code().value, "#'*'}");
+            assert_eq!(trim.pattern.location.column().get(), 2);
         } else {
             panic!("Not a trim: {:?}", result);
         }
@@ -480,8 +480,8 @@ mod tests {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
-            assert_eq!(trim.pattern.location.code.value, "#'*'}");
-            assert_eq!(trim.pattern.location.column.get(), 2);
+            assert_eq!(trim.pattern.location.code().value, "#'*'}");
+            assert_eq!(trim.pattern.location.column().get(), 2);
         } else {
             panic!("Not a trim: {:?}", result);
         }
@@ -507,8 +507,8 @@ mod tests {
             } else {
                 panic!("Not a double quote: {:?}", trim.pattern);
             }
-            assert_eq!(trim.pattern.location.code.value, r#"##"?"}"#);
-            assert_eq!(trim.pattern.location.column.get(), 3);
+            assert_eq!(trim.pattern.location.code().value, r#"##"?"}"#);
+            assert_eq!(trim.pattern.location.column().get(), 3);
         } else {
             panic!("Not a trim: {:?}", result);
         }
@@ -532,8 +532,8 @@ mod tests {
                 trim.pattern.units,
                 [WordUnit::Unquoted(TextUnit::Backslashed('%'))]
             );
-            assert_eq!(trim.pattern.location.code.value, r"%\%}");
-            assert_eq!(trim.pattern.location.column.get(), 2);
+            assert_eq!(trim.pattern.location.code().value, r"%\%}");
+            assert_eq!(trim.pattern.location.column().get(), 2);
         } else {
             panic!("Not a trim: {:?}", result);
         }
@@ -557,8 +557,8 @@ mod tests {
                 trim.pattern.units,
                 [WordUnit::Unquoted(TextUnit::Literal('%'))]
             );
-            assert_eq!(trim.pattern.location.code.value, "%%%}");
-            assert_eq!(trim.pattern.location.column.get(), 3);
+            assert_eq!(trim.pattern.location.code().value, "%%%}");
+            assert_eq!(trim.pattern.location.column().get(), 3);
         } else {
             panic!("Not a trim: {:?}", result);
         }

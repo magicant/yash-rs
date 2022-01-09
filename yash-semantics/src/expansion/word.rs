@@ -88,7 +88,7 @@ impl ExpandToField for Word {
     async fn expand_to_field<E: Env>(&self, env: &mut E) -> Result<AttrField> {
         let mut chars = Vec::new();
         self.units.expand(env, &mut Output::new(&mut chars)).await?;
-        let origin = self.location.clone();
+        let origin = self.location.get();
         Ok(AttrField { chars, origin })
     }
 
@@ -103,7 +103,7 @@ impl ExpandToField for Word {
             .await?;
         fields.extend(fields_without_origin.into_iter().map(|chars| AttrField {
             chars,
-            origin: self.location.clone(),
+            origin: self.location.get(),
         }));
         Ok(())
     }
@@ -278,7 +278,7 @@ mod tests {
                 }
             ]
         );
-        assert_eq!(result.origin, w.location);
+        assert_eq!(result.origin, w.location.get());
     }
 
     #[test]
@@ -311,7 +311,7 @@ mod tests {
                 }
             ]
         );
-        assert_eq!(result[0].origin, w.location);
+        assert_eq!(result[0].origin, w.location.get());
         // TODO Test with a word that expands to more than one field
     }
 }

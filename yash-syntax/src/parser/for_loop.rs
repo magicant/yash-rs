@@ -25,7 +25,7 @@ use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
-use crate::source::Location;
+use crate::source::LocationRef;
 use crate::syntax::CompoundCommand;
 use crate::syntax::List;
 use crate::syntax::Word;
@@ -39,12 +39,12 @@ impl Parser<'_, '_> {
         match name.id {
             EndOfInput | Operator(Newline) | Operator(Semicolon) => {
                 let cause = SyntaxError::MissingForName.into();
-                let location = name.word.location;
+                let location = name.word.location.get();
                 return Err(Error { cause, location });
             }
             Operator(_) => {
                 let cause = SyntaxError::InvalidForName.into();
-                let location = name.word.location;
+                let location = name.word.location.get();
                 return Err(Error { cause, location });
             }
             Token(_) | IoNumber => (),
@@ -64,8 +64,8 @@ impl Parser<'_, '_> {
     /// of the tuple.
     async fn for_loop_values(
         &mut self,
-        opening_location: Location,
-    ) -> Result<(Option<Vec<Word>>, Location)> {
+        opening_location: LocationRef,
+    ) -> Result<(Option<Vec<Word>>, LocationRef)> {
         // Parse the `in`
         let mut first_line = true;
         loop {
@@ -88,8 +88,9 @@ impl Parser<'_, '_> {
                 _ => match self.take_token_manual(false).await? {
                     Rec::AliasSubstituted => (),
                     Rec::Parsed(token) => {
+                        let opening_location = opening_location.get();
                         let cause = SyntaxError::MissingForBody { opening_location }.into();
-                        let location = token.word.location;
+                        let location = token.word.location.get();
                         return Err(Error { cause, location });
                     }
                 },
@@ -109,7 +110,7 @@ impl Parser<'_, '_> {
                 }
                 _ => {
                     let cause = SyntaxError::InvalidForValue.into();
-                    let location = next.word.location;
+                    let location = next.word.location.get();
                     return Err(Error { cause, location });
                 }
             }
@@ -117,7 +118,10 @@ impl Parser<'_, '_> {
     }
 
     /// Parses the body of a for loop, possibly preceded by newlines.
-    async fn for_loop_body(&mut self, opening_location: Location) -> Result<List<MissingHereDoc>> {
+    async fn for_loop_body(
+        &mut self,
+        opening_location: LocationRef,
+    ) -> Result<List<MissingHereDoc>> {
         loop {
             while self.newline_and_here_doc_contents().await? {}
 
@@ -128,8 +132,9 @@ impl Parser<'_, '_> {
             match self.take_token_manual(false).await? {
                 Rec::AliasSubstituted => (),
                 Rec::Parsed(token) => {
+                    let opening_location = opening_location.get();
                     let cause = SyntaxError::MissingForBody { opening_location }.into();
-                    let location = token.word.location;
+                    let location = token.word.location.get();
                     return Err(Error { cause, location });
                 }
             }
@@ -162,7 +167,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Source;
+    use crate::source::{Location, Source};
     use futures_executor::block_on;
 
     #[test]

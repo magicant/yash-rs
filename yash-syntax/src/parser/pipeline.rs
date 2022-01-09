@@ -58,7 +58,7 @@ impl Parser<'_, '_> {
                             } else {
                                 SyntaxError::MissingCommandAfterBang.into()
                             };
-                            let location = next.word.location;
+                            let location = next.word.location.get();
                             return Err(Error { cause, location });
                         }
                     }
@@ -89,7 +89,7 @@ impl Parser<'_, '_> {
                     } else {
                         SyntaxError::MissingCommandAfterBar.into()
                     };
-                    let location = next.word.location;
+                    let location = next.word.location.get();
                     return Err(Error { cause, location });
                 }
             });

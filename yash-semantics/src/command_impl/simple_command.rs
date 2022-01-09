@@ -224,7 +224,7 @@ async fn execute_absent_target(
 ) -> Result {
     // Perform redirections in a subshell
     let exit_status = if let Some(redir) = redirs.first() {
-        let first_redir_location = redir.body.operand().location.clone();
+        let first_redir_location = redir.body.operand().location.get();
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut ExitStatusAdapter::new(env);

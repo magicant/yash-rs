@@ -78,10 +78,10 @@ impl Parser<'_, '_> {
                 Operator(CloseParen) => break,
                 Token(_keyword) => words.push(next.word),
                 _ => {
-                    return Err(Error {
-                        cause: SyntaxError::UnclosedArrayValue { opening_location }.into(),
-                        location: next.word.location,
-                    })
+                    let opening_location = opening_location.get();
+                    let cause = SyntaxError::UnclosedArrayValue { opening_location }.into();
+                    let location = next.word.location.get();
+                    return Err(Error { cause, location });
                 }
             }
         }

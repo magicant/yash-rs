@@ -54,7 +54,7 @@ impl Parser<'_, '_> {
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: SyntaxError::UnmatchedParenthesis.into(),
-                location: close.word.location,
+                location: close.word.location.get(),
             });
         }
 
@@ -81,7 +81,7 @@ impl Parser<'_, '_> {
                     } else {
                         SyntaxError::MissingFunctionBody.into()
                     };
-                    let location = next.word.location;
+                    let location = next.word.location.get();
                     Err(Error { cause, location })
                 }
             };

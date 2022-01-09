@@ -42,16 +42,16 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyWhileCondition.into();
-            let location = self.take_token_raw().await?.word.location;
+            let location = self.take_token_raw().await?.word.location.get();
             return Err(Error { cause, location });
         }
 
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                let opening_location = open.word.location;
+                let opening_location = open.word.location.get();
                 let cause = SyntaxError::UnclosedWhileClause { opening_location }.into();
-                let location = self.take_token_raw().await?.word.location;
+                let location = self.take_token_raw().await?.word.location.get();
                 return Err(Error { cause, location });
             }
         };
@@ -75,16 +75,16 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyUntilCondition.into();
-            let location = self.take_token_raw().await?.word.location;
+            let location = self.take_token_raw().await?.word.location.get();
             return Err(Error { cause, location });
         }
 
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                let opening_location = open.word.location;
+                let opening_location = open.word.location.get();
                 let cause = SyntaxError::UnclosedUntilClause { opening_location }.into();
-                let location = self.take_token_raw().await?.word.location;
+                let location = self.take_token_raw().await?.word.location.get();
                 return Err(Error { cause, location });
             }
         };

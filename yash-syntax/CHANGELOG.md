@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         - `TextUnit::CommandSubst::location`
         - `TextUnit::Backquote::location`
         - `TextUnit::Arith::location`
+        - `Word::location`
     - Parameter and return type of `WordLexer::braced_param` from `Location` to `LocationRef`
 - Dependency versions
     - `async-trait` 0.1.50 → 0.1.52

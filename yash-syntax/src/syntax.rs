@@ -64,7 +64,7 @@
 //! use yash_syntax::source::Source;
 //! # use yash_syntax::syntax::Word;
 //! let word: Word = "foo".parse().unwrap();
-//! assert_eq!(word.location.code.source, Source::Unknown);
+//! assert_eq!(word.location.code().source, Source::Unknown);
 //! ```
 //!
 //! To include substantial source information in the AST, you need to prepare a
@@ -633,7 +633,7 @@ pub struct Word {
     /// Word units that constitute the word.
     pub units: Vec<WordUnit>,
     /// Location of the first character of the word.
-    pub location: Location,
+    pub location: LocationRef,
 }
 
 impl fmt::Display for Word {
@@ -717,7 +717,7 @@ impl TryFrom<Word> for Assign {
                     assert!(!name.is_empty());
                     word.units.drain(..=eq);
                     word.parse_tilde_everywhere();
-                    let location = word.location.clone();
+                    let location = word.location.get();
                     let value = Scalar(word);
                     return Ok(Assign {
                         name,
@@ -1681,7 +1681,7 @@ mod tests {
 
     #[test]
     fn word_to_string_if_literal_failure() {
-        let location = Location::dummy("foo");
+        let location = LocationRef::dummy("foo");
         let backslashed = Unquoted(Backslashed('?'));
         let word = Word {
             units: vec![backslashed],
@@ -1767,7 +1767,7 @@ mod tests {
         } else {
             panic!("wrong value: {:?}", assign.value);
         }
-        assert_eq!(assign.location, location);
+        assert_eq!(assign.location, location.get());
     }
 
     #[test]

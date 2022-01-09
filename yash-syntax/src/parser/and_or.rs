@@ -58,7 +58,7 @@ impl Parser<'_, '_> {
             let pipeline = match maybe_pipeline {
                 None => {
                     let cause = SyntaxError::MissingPipeline(condition).into();
-                    let location = self.peek_token().await?.word.location.clone();
+                    let location = self.peek_token().await?.word.location.get();
                     return Err(Error { cause, location });
                 }
                 Some(pipeline) => pipeline,

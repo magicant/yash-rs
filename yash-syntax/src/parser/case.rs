@@ -68,14 +68,14 @@ impl Parser<'_, '_> {
                     Token(keyword) if keyword != Some(Esac) => next_token.word,
                     _ => {
                         let cause = pattern_error_cause(next_token.id).into();
-                        let location = next_token.word.location;
+                        let location = next_token.word.location.get();
                         return Err(Error { cause, location });
                     }
                 }
             }
             _ => {
                 let cause = pattern_error_cause(first_token.id).into();
-                let location = first_token.word.location;
+                let location = first_token.word.location.get();
                 return Err(Error { cause, location });
             }
         };
@@ -91,14 +91,14 @@ impl Parser<'_, '_> {
                         Token(_) => patterns.push(pattern.word),
                         _ => {
                             let cause = pattern_error_cause(pattern.id).into();
-                            let location = pattern.word.location;
+                            let location = pattern.word.location.get();
                             return Err(Error { cause, location });
                         }
                     }
                 }
                 _ => {
                     let cause = SyntaxError::UnclosedPatternList.into();
-                    let location = separator.word.location;
+                    let location = separator.word.location.get();
                     return Err(Error { cause, location });
                 }
             }
@@ -125,12 +125,12 @@ impl Parser<'_, '_> {
             Token(_) => (),
             Operator(Newline) | EndOfInput => {
                 let cause = SyntaxError::MissingCaseSubject.into();
-                let location = subject.word.location;
+                let location = subject.word.location.get();
                 return Err(Error { cause, location });
             }
             _ => {
                 let cause = SyntaxError::InvalidCaseSubject.into();
-                let location = subject.word.location;
+                let location = subject.word.location.get();
                 return Err(Error { cause, location });
             }
         }
@@ -144,9 +144,9 @@ impl Parser<'_, '_> {
                 Token(Some(In)) => break,
                 Operator(Newline) => (),
                 _ => {
-                    let opening_location = open.word.location;
+                    let opening_location = open.word.location.get();
                     let cause = SyntaxError::MissingIn { opening_location }.into();
-                    let location = next_token.word.location;
+                    let location = next_token.word.location.get();
                     return Err(Error { cause, location });
                 }
             }
@@ -164,9 +164,9 @@ impl Parser<'_, '_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Token(Some(Esac)) {
-            let opening_location = open.word.location;
+            let opening_location = open.word.location.get();
             let cause = SyntaxError::UnclosedCase { opening_location }.into();
-            let location = close.word.location;
+            let location = close.word.location.get();
             return Err(Error { cause, location });
         }
 

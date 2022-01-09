@@ -59,7 +59,7 @@ impl Parser<'_, '_> {
             let token = self.peek_token().await?;
             let (async_flag, next) = match token.id {
                 Operator(Semicolon) => (None, true),
-                Operator(And) => (Some(token.word.location.clone()), true),
+                Operator(And) => (Some(token.word.location.get()), true),
                 _ => (None, false),
             };
 
@@ -117,7 +117,7 @@ impl Parser<'_, '_> {
                 // TODO Return a better error depending on the token id of the peeked token
                 return Err(Error {
                     cause: SyntaxError::UnexpectedToken.into(),
-                    location: next.word.location.clone(),
+                    location: next.word.location.get(),
                 });
             }
             if list.0.is_empty() {

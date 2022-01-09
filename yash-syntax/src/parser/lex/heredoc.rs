@@ -93,7 +93,7 @@ impl Lexer<'_> {
             };
 
             if !self.skip_if(|c| c == NEWLINE).await? {
-                let redir_op_location = delimiter.location;
+                let redir_op_location = delimiter.location.get();
                 let cause = SyntaxError::UnclosedHereDocContent { redir_op_location }.into();
                 let location = self.location().await?.clone();
                 return Err(Error { cause, location });
