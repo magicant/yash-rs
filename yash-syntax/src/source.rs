@@ -21,6 +21,7 @@
 pub mod pretty;
 
 use crate::alias::Alias;
+use std::cell::RefCell;
 use std::iter::FusedIterator;
 use std::num::NonZeroU64;
 use std::rc::Rc;
@@ -253,6 +254,87 @@ impl Location {
     pub fn advance(&mut self, count: u64) {
         let column = self.column.get().checked_add(count).unwrap();
         self.column = NonZeroU64::new(column).unwrap();
+    }
+}
+
+/// Opaque container that provides a [`Location`] on demand
+///
+/// Many data types in the [`syntax`](crate::syntax) module contain a
+/// `LocationRef` that provides a `Location` indicating a corresponding source
+/// code fragment. Those types do not include a `Location` directly because the
+/// parser has to construct both the source code string included in the
+/// `Location` and the parse results containing the location data
+/// simultaneously. Instead, the results have `LocationRef` instances that can
+/// provide a `Location` when requested after the parse.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocationRef {
+    /// Shared, dynamically constructed code
+    ///
+    /// The outer `Rc<RefCell<_>>` allows the parser to update the inner code
+    /// while it is shared among `LocationRef`s. The inner `Rc` prevents the
+    /// whole `Code` instance from being cloned when preparing a `Location`.
+    ///
+    /// We keep this field private to maintain the `RefCell`'s integrity. We
+    /// never let a `Ref` go out of `LocationRef`, so there's no risk of panics
+    /// happening in `RefCell`'s dynamic borrow checker.
+    code: Rc<RefCell<Rc<Code>>>,
+
+    /// See Location::column
+    column: NonZeroU64,
+}
+
+impl LocationRef {
+    /// Creates a new `LocationRef`.
+    ///
+    /// Basically, this function is only used by the parser implementation.
+    pub fn with_code_and_column(code: Rc<RefCell<Rc<Code>>>, column: NonZeroU64) -> Self {
+        LocationRef { code, column }
+    }
+
+    /// Creates a dummy location.
+    ///
+    /// The returned location has [unknown](Source::Unknown) source and the
+    /// given source code value. The line and column numbers are 1.
+    ///
+    /// This function is mainly for use in testing.
+    #[inline]
+    pub fn dummy<S: Into<String>>(value: S) -> Self {
+        Location::dummy(value).into()
+    }
+
+    /// Returns the `Code` associated with this location.
+    ///
+    /// This is equivalent to `self.get().code`.
+    pub fn code(&self) -> Rc<Code> {
+        Rc::clone(&self.code.borrow())
+    }
+
+    /// Returns the column associated with this location.
+    ///
+    /// This is equivalent to `self.get().column`.
+    pub fn column(&self) -> NonZeroU64 {
+        self.column
+    }
+
+    /// Returns a `Location` instance.
+    pub fn get(&self) -> Location {
+        let code = self.code();
+        let column = self.column();
+        Location { code, column }
+    }
+}
+
+impl From<Location> for LocationRef {
+    fn from(location: Location) -> Self {
+        let Location { code, column } = location;
+        let code = Rc::new(RefCell::new(code));
+        LocationRef { code, column }
+    }
+}
+
+impl From<&LocationRef> for Location {
+    fn from(location: &LocationRef) -> Self {
+        location.get()
     }
 }
 
