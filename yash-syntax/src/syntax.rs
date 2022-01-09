@@ -82,6 +82,7 @@
 
 use crate::parser::lex::Operator;
 use crate::source::Location;
+use crate::source::LocationRef;
 use itertools::Itertools;
 use std::fmt;
 use std::fmt::Write;
@@ -343,7 +344,7 @@ pub struct Param {
     /// Modifier.
     pub modifier: Modifier,
     /// Location of the initial `$` character of this parameter expansion.
-    pub location: Location,
+    pub location: LocationRef,
 }
 
 impl fmt::Display for Param {
@@ -1409,7 +1410,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy(""),
+            location: LocationRef::dummy(""),
         };
         assert_eq!(param.to_string(), "${foo}");
 
@@ -1447,7 +1448,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy(""),
+            location: LocationRef::dummy(""),
         };
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${foo}");

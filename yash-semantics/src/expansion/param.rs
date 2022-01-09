@@ -145,11 +145,11 @@ fn expand_variable<'a, E: Env>(env: &'a E, name: &str) -> ParamValue<'a> {
 pub struct ParamRef<'a> {
     name: &'a str,
     #[allow(unused)] // TODO Use this
-    location: &'a Location,
+    location: Location,
 }
 
 impl<'a> ParamRef<'a> {
-    pub fn from_name_and_location(name: &'a str, location: &'a Location) -> Self {
+    pub fn from_name_and_location(name: &'a str, location: Location) -> Self {
         ParamRef { name, location }
     }
 }
@@ -158,7 +158,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
     fn from(param: &'a Param) -> Self {
         ParamRef {
             name: &param.name,
-            location: &param.location,
+            location: param.location.get(),
         }
     }
 }
@@ -365,7 +365,7 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("!bar", &location);
+        let p = ParamRef::from_name_and_location("!bar", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
     }
@@ -383,7 +383,7 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("foo", &location);
+        let p = ParamRef::from_name_and_location("foo", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -415,7 +415,7 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("1", &location);
+        let p = ParamRef::from_name_and_location("1", location.clone());
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -429,7 +429,7 @@ mod tests {
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let p = ParamRef::from_name_and_location("2", &location);
+        let p = ParamRef::from_name_and_location("2", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -453,20 +453,20 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("2", &location);
+        let p = ParamRef::from_name_and_location("2", location.clone());
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let p = ParamRef::from_name_and_location("3", &location);
+        let p = ParamRef::from_name_and_location("3", location.clone());
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let p =
-            ParamRef::from_name_and_location("9999999999999999999999999999999999999999", &location);
+            ParamRef::from_name_and_location("9999999999999999999999999999999999999999", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
     }
@@ -479,7 +479,7 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("?", &location);
+        let p = ParamRef::from_name_and_location("?", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -508,7 +508,7 @@ mod tests {
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
         let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("!", &location);
+        let p = ParamRef::from_name_and_location("!", location);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,

@@ -41,12 +41,14 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        let location = match self.braced_param(location).await? {
+        // FIXME avoid LocationRef conversion
+        let location = match self.braced_param(location.into()).await? {
             Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
             Err(location) => location,
         };
 
-        let location = match self.arithmetic_expansion(location).await? {
+        // FIXME avoid LocationRef conversion
+        let location = match self.arithmetic_expansion(location.get()).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,
         };

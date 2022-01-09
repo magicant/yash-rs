@@ -22,7 +22,7 @@ use super::raw_param::is_special_parameter_char;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
-use crate::source::Location;
+use crate::source::LocationRef;
 use crate::syntax::Modifier;
 use crate::syntax::Param;
 
@@ -94,8 +94,8 @@ impl WordLexer<'_, '_> {
     /// actually is a location of `$`.
     pub async fn braced_param(
         &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<Param, Location>> {
+        location: LocationRef,
+    ) -> Result<std::result::Result<Param, LocationRef>> {
         if !self.skip_if(|c| c == '{').await? {
             return Ok(Err(location));
         }
@@ -118,7 +118,7 @@ impl WordLexer<'_, '_> {
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
         } else {
-            let opening_location = location;
+            let opening_location = location.get();
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
@@ -128,7 +128,7 @@ impl WordLexer<'_, '_> {
         let suffix = self.suffix_modifier().await?;
 
         if !self.skip_if(|c| c == '}').await? {
-            let opening_location = location;
+            let opening_location = location.get();
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
@@ -158,6 +158,7 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::parser::lex::Lexer;
     use crate::parser::lex::WordContext;
+    use crate::source::Location;
     use crate::source::Source;
     use crate::syntax::SwitchCondition;
     use crate::syntax::SwitchType;
@@ -179,13 +180,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "@");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
@@ -197,13 +198,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -215,13 +216,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -233,13 +234,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -251,7 +252,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
@@ -268,7 +269,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
@@ -289,7 +290,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
@@ -310,13 +311,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -328,13 +329,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -346,13 +347,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "?");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -364,13 +365,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "-");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -382,7 +383,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "x");
@@ -394,7 +395,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
@@ -406,7 +407,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo");
@@ -418,7 +419,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
@@ -430,7 +431,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -442,7 +443,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -454,7 +455,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -466,7 +467,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -478,7 +479,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -490,7 +491,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -502,7 +503,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -514,7 +515,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -526,7 +527,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -538,7 +539,7 @@ mod tests {
             panic!("Not a switch: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -550,7 +551,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -562,7 +563,7 @@ mod tests {
             panic!("Not a modifier: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
@@ -574,7 +575,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
@@ -586,7 +587,7 @@ mod tests {
             panic!("Not a modifier: {:?}", result.modifier);
         }
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
@@ -598,7 +599,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
@@ -613,13 +614,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "a_1");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }
@@ -631,13 +632,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_opening_location(&result.location.get());
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }

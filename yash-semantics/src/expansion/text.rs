@@ -110,7 +110,7 @@ impl Expand for TextUnit {
                 Ok(())
             }
             RawParam { name, location } => {
-                let param = ParamRef::from_name_and_location(name, location);
+                let param = ParamRef::from_name_and_location(name, location.clone());
                 param.expand(env, output).await
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
