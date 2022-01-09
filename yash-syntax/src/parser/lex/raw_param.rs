@@ -18,7 +18,7 @@
 
 use super::core::Lexer;
 use crate::parser::core::Result;
-use crate::source::Location;
+use crate::source::LocationRef;
 use crate::syntax::TextUnit;
 
 /// Tests if a character can be part of a POSIXly-portable name.
@@ -61,8 +61,8 @@ impl Lexer<'_> {
     /// actually is a location of `$`.
     pub async fn raw_param(
         &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<TextUnit, Location>> {
+        location: LocationRef,
+    ) -> Result<std::result::Result<TextUnit, LocationRef>> {
         if let Some(c) = self.consume_char_if(is_single_char_name).await? {
             let name = c.value.to_string();
             Ok(Ok(TextUnit::RawParam { name, location }))
@@ -87,15 +87,15 @@ mod tests {
     #[test]
     fn lexer_raw_param_special_parameter() {
         let mut lexer = Lexer::from_memory("@;", Source::Unknown);
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "@");
-            assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
         }
@@ -106,15 +106,15 @@ mod tests {
     #[test]
     fn lexer_raw_param_digit() {
         let mut lexer = Lexer::from_memory("12", Source::Unknown);
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "1");
-            assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
         }
@@ -125,15 +125,15 @@ mod tests {
     #[test]
     fn lexer_raw_param_posix_name() {
         let mut lexer = Lexer::from_memory("az_AZ_019<", Source::Unknown);
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "az_AZ_019");
-            assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
         }
@@ -144,15 +144,15 @@ mod tests {
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
         let mut lexer = Lexer::from_memory("a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
-        let location = Location::dummy("$");
+        let location = LocationRef::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "abc");
-            assert_eq!(location.code.value, "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a parameter expansion: {:?}", result);
         }
@@ -163,13 +163,13 @@ mod tests {
     #[test]
     fn lexer_raw_param_not_parameter() {
         let mut lexer = Lexer::from_memory(";", Source::Unknown);
-        let location = Location::dummy("X");
+        let location = LocationRef::dummy("X");
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
-        assert_eq!(location.code.value, "X");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(location.code().value, "X");
+        assert_eq!(location.code().start_line_number.get(), 1);
+        assert_eq!(location.code().source, Source::Unknown);
+        assert_eq!(location.column().get(), 1);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }

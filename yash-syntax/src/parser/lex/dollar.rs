@@ -36,13 +36,13 @@ impl WordLexer<'_, '_> {
             Some(c) => c.location.clone(),
         };
 
-        let location = match self.raw_param(location).await? {
+        // FIXME avoid LocationRef conversion
+        let location = match self.raw_param(location.into()).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,
         };
 
-        // FIXME avoid LocationRef conversion
-        let location = match self.braced_param(location.into()).await? {
+        let location = match self.braced_param(location).await? {
             Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
             Err(location) => location,
         };
@@ -131,10 +131,10 @@ mod tests {
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::RawParam { name, location } = result {
             assert_eq!(name, "0");
-            assert_eq!(location.code.value, "$0");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$0");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("Not a raw parameter: {:?}", result);
         }

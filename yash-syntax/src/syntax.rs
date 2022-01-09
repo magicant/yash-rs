@@ -432,7 +432,7 @@ pub enum TextUnit {
         /// Parameter name.
         name: String,
         /// Location of the initial `$` character of this parameter expansion.
-        location: Location,
+        location: LocationRef,
     },
     /// Parameter expansion that is enclosed in braces.
     BracedParam(Param),
@@ -1519,7 +1519,7 @@ mod tests {
 
         let raw_param = RawParam {
             name: "PARAM".to_string(),
-            location: Location::dummy(""),
+            location: LocationRef::dummy(""),
         };
         assert_eq!(raw_param.to_string(), "$PARAM");
 
@@ -1564,7 +1564,7 @@ mod tests {
             Literal('W'),
             RawParam {
                 name: "X".to_string(),
-                location: Location::dummy(""),
+                location: LocationRef::dummy(""),
             },
             CommandSubst {
                 content: "Y".to_string(),

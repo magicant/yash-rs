@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `Location`'s field `line` renamed to `code`
     - Type of the following fields from `Location` to `LocationRef`:
         - `Param::location`
+        - `TextUnit::RawParam::location`
     - Parameter and return type of `WordLexer::braced_param` from `Location` to `LocationRef`
 - Dependency versions
     - `async-trait` 0.1.50 → 0.1.52
