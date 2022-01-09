@@ -53,7 +53,8 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        if let Some(result) = self.command_substitution(location).await? {
+        // FIXME avoid LocationRef conversion
+        if let Some(result) = self.command_substitution(location.into()).await? {
             return Ok(Some(result));
         }
 
@@ -150,10 +151,10 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.code.value, "$()");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$()");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
             assert_eq!(content, "");
         } else {
             panic!("unexpected result {:?}", result);
@@ -167,10 +168,10 @@ mod tests {
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.code.value, "$( foo bar )");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "$( foo bar )");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
             assert_eq!(content, " foo bar ");
         } else {
             panic!("unexpected result {:?}", result);

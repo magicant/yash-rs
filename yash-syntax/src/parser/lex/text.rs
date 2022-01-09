@@ -355,7 +355,7 @@ mod tests {
         .unwrap();
         if let CommandSubst { content, location } = result {
             assert_eq!(content, "");
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
         }

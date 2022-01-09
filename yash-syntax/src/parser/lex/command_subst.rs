@@ -20,7 +20,7 @@ use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
-use crate::source::Location;
+use crate::source::LocationRef;
 use crate::syntax::TextUnit;
 
 impl Lexer<'_> {
@@ -38,7 +38,7 @@ impl Lexer<'_> {
     /// is a location of `$`.
     pub async fn command_substitution(
         &mut self,
-        opening_location: Location,
+        opening_location: LocationRef,
     ) -> Result<Option<TextUnit>> {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(None);
@@ -48,6 +48,7 @@ impl Lexer<'_> {
 
         if !self.skip_if(|c| c == ')').await? {
             // TODO Return a better error depending on the token id of the next token
+            let opening_location = opening_location.get();
             let cause = SyntaxError::UnclosedCommandSubstitution { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
@@ -62,22 +63,23 @@ impl Lexer<'_> {
 mod tests {
     use super::*;
     use crate::parser::error::ErrorCause;
+    use crate::source::LocationRef;
     use crate::source::Source;
     use futures_executor::block_on;
 
     #[test]
     fn lexer_command_substitution_success() {
         let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
-        let location = Location::dummy("X");
+        let location = LocationRef::dummy("X");
 
         let result = block_on(lexer.command_substitution(location))
             .unwrap()
             .unwrap();
         if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.code.value, "X");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.code().value, "X");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 1);
             assert_eq!(content, " foo bar ");
         } else {
             panic!("unexpected result {:?}", result);
@@ -93,7 +95,7 @@ mod tests {
     #[test]
     fn lexer_command_substitution_none() {
         let mut lexer = Lexer::from_memory(" foo bar )baz", Source::Unknown);
-        let location = Location::dummy("Y");
+        let location = LocationRef::dummy("Y");
 
         let result = block_on(lexer.command_substitution(location)).unwrap();
         assert_eq!(result, None);
@@ -108,7 +110,7 @@ mod tests {
     #[test]
     fn lexer_command_substitution_unclosed() {
         let mut lexer = Lexer::from_memory("( foo bar baz", Source::Unknown);
-        let location = Location::dummy("Z");
+        let location = LocationRef::dummy("Z");
 
         let e = block_on(lexer.command_substitution(location)).unwrap_err();
         if let ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) =

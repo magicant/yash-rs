@@ -190,7 +190,7 @@ mod tests {
                 .unwrap();
         if let Unquoted(CommandSubst { content, location }) = result {
             assert_eq!(content, "");
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.column().get(), 1);
         } else {
             panic!("unexpected result {:?}", result);
         }
@@ -492,10 +492,10 @@ mod tests {
         assert_eq!(word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
         if let WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) = &word.units[1] {
             assert_eq!(content, ":");
-            assert_eq!(location.code.value, r"0$(:)X\#");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 2);
+            assert_eq!(location.code().value, r"0$(:)X\#");
+            assert_eq!(location.code().start_line_number.get(), 1);
+            assert_eq!(location.code().source, Source::Unknown);
+            assert_eq!(location.column().get(), 2);
         } else {
             panic!("unexpected word unit: {:?}", word.units[1]);
         }

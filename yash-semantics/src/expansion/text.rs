@@ -115,13 +115,13 @@ impl Expand for TextUnit {
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
             CommandSubst { content, location } => {
-                CommandSubstRef::new(content, location)
+                CommandSubstRef::new(content, location.get())
                     .expand(env, output)
                     .await
             }
             Backquote { content, location } => {
                 let content = content.unquote().0;
-                CommandSubstRef::new(&content, location)
+                CommandSubstRef::new(&content, location.clone())
                     .expand(env, output)
                     .await
             }
@@ -151,6 +151,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use futures_executor::block_on;
     use yash_syntax::source::Location;
+    use yash_syntax::source::LocationRef;
     use yash_syntax::syntax::TextUnit;
 
     #[test]
@@ -204,7 +205,7 @@ mod tests {
             let mut output = Output::new(&mut field);
             let subst = TextUnit::CommandSubst {
                 content: "echo .".to_string(),
-                location: Location::dummy(""),
+                location: LocationRef::dummy(""),
             };
             env.builtins.insert("echo", echo_builtin());
             subst.expand(&mut env, &mut output).await.unwrap();

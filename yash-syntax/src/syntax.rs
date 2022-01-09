@@ -442,7 +442,7 @@ pub enum TextUnit {
         /// substitution is expanded.
         content: String,
         /// Location of the initial `$` character of this command substitution.
-        location: Location,
+        location: LocationRef,
     },
     /// Command substitution of the form `` `...` ``.
     Backquote {
@@ -1525,7 +1525,7 @@ mod tests {
 
         let command_subst = CommandSubst {
             content: r"foo\bar".to_string(),
-            location: Location::dummy(""),
+            location: LocationRef::dummy(""),
         };
         assert_eq!(command_subst.to_string(), r"$(foo\bar)");
 
@@ -1568,7 +1568,7 @@ mod tests {
             },
             CommandSubst {
                 content: "Y".to_string(),
-                location: Location::dummy(""),
+                location: LocationRef::dummy(""),
             },
             Backquote {
                 content: vec![BackquoteUnit::Literal('Z')],
