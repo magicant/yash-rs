@@ -692,7 +692,7 @@ pub struct Assign {
     /// Value assigned to the variable.
     pub value: Value,
     /// Location of the first character of the assignment word.
-    pub location: Location,
+    pub location: LocationRef,
 }
 
 impl fmt::Display for Assign {
@@ -717,7 +717,7 @@ impl TryFrom<Word> for Assign {
                     assert!(!name.is_empty());
                     word.units.drain(..=eq);
                     word.parse_tilde_everywhere();
-                    let location = word.location.get();
+                    let location = word.location.clone();
                     let value = Scalar(word);
                     return Ok(Assign {
                         name,
@@ -1767,7 +1767,7 @@ mod tests {
         } else {
             panic!("wrong value: {:?}", assign.value);
         }
-        assert_eq!(assign.location, location.get());
+        assert_eq!(assign.location, location);
     }
 
     #[test]

@@ -296,10 +296,10 @@ mod tests {
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "my");
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
-        assert_eq!(sc.assigns[0].location.code.value, "my=assignment");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().value, "my=assignment");
+        assert_eq!(sc.assigns[0].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column().get(), 1);
     }
 
     #[test]
@@ -314,22 +314,22 @@ mod tests {
         assert_eq!(sc.assigns.len(), 3);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(sc.assigns[0].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().value, "a= b=! c=X");
+        assert_eq!(sc.assigns[0].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column().get(), 1);
         assert_eq!(sc.assigns[1].name, "b");
         assert_eq!(sc.assigns[1].value.to_string(), "!");
-        assert_eq!(sc.assigns[1].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[1].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[1].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[1].location.column.get(), 4);
+        assert_eq!(sc.assigns[1].location.code().value, "a= b=! c=X");
+        assert_eq!(sc.assigns[1].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[1].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[1].location.column().get(), 4);
         assert_eq!(sc.assigns[2].name, "c");
         assert_eq!(sc.assigns[2].value.to_string(), "X");
-        assert_eq!(sc.assigns[2].location.code.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[2].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[2].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[2].location.column.get(), 8);
+        assert_eq!(sc.assigns[2].location.code().value, "a= b=! c=X");
+        assert_eq!(sc.assigns[2].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[2].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[2].location.column().get(), 8);
     }
 
     #[test]
@@ -557,10 +557,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(sc.assigns[0].location.code.value, "a= ()");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().value, "a= ()");
+        assert_eq!(sc.assigns[0].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column().get(), 1);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));
@@ -578,10 +578,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
-        assert_eq!(sc.assigns[0].location.code.value, "a=b()");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().value, "a=b()");
+        assert_eq!(sc.assigns[0].location.code().start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code().source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.column().get(), 1);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));

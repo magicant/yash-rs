@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `Line` renamed to `Code`
     - `Location`'s field `line` renamed to `code`
     - Type of the following fields from `Location` to `LocationRef`:
+        - `Assign::location`
         - `Param::location`
         - `TextUnit::RawParam::location`
         - `TextUnit::CommandSubst::location`
