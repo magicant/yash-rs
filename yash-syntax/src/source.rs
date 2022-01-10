@@ -250,9 +250,10 @@ impl Location {
         with_line(value.into())
     }
 
-    /// Increases the column number
+    /// Increases the column number.
     pub fn advance(&mut self, count: u64) {
-        let column = self.column.get().checked_add(count).unwrap();
+        // TODO self.column = self.column.saturating_add(count);
+        let column = self.column.get().saturating_add(count);
         self.column = NonZeroU64::new(column).unwrap();
     }
 }
@@ -321,6 +322,17 @@ impl LocationRef {
         let code = self.code();
         let column = self.column();
         Location { code, column }
+    }
+
+    /// Increases the column number.
+    ///
+    /// The effect of this function applies only to this specific instance of
+    /// `LocationRef`. Other `LocationRef` instances sharing the same `Code` are
+    /// not affected.
+    pub fn advance(&mut self, count: u64) {
+        // TODO self.column = self.column.saturating_add(count);
+        let column = self.column.get().saturating_add(count);
+        self.column = NonZeroU64::new(column).unwrap();
     }
 }
 
@@ -469,6 +481,25 @@ mod tests {
         assert_eq!(location.column.get(), 9);
 
         assert!(Rc::ptr_eq(&location.code, &code));
+    }
+
+    #[test]
+    fn location_ref_advance() {
+        let code = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
+        let column = NonZeroU64::new(1).unwrap();
+        let mut location =
+            LocationRef::with_code_and_column(Rc::new(RefCell::new(code.clone())), column);
+
+        location.advance(1);
+        assert_eq!(location.column.get(), 2);
+        location.advance(2);
+        assert_eq!(location.column.get(), 4);
+
+        // The advance function does not check the line length.
+        location.advance(5);
+        assert_eq!(location.column.get(), 9);
+
+        assert!(Rc::ptr_eq(&location.code(), &code));
     }
 
     #[test]
