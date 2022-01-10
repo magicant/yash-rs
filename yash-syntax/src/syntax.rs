@@ -52,8 +52,8 @@
 //! Most AST types defined in this module implement the
 //! [`FromStr`](std::str::FromStr) trait, which means you can easily get an AST
 //! out of source code by calling `parse` on a `&str`. However, all
-//! [location](crate::source::Location)s in ASTs constructed this way will only
-//! have [unknown source](crate::source::Source::Unknown).
+//! [location](crate::source::LocationRef)s in ASTs constructed this way will
+//! only have [unknown source](crate::source::Source::Unknown).
 //!
 //! ```
 //! use std::str::FromStr;
@@ -81,7 +81,6 @@
 //! with here-document contents included, you can use ... TODO TBD.
 
 use crate::parser::lex::Operator;
-use crate::source::Location;
 use crate::source::LocationRef;
 use itertools::Itertools;
 use std::fmt;
@@ -1227,7 +1226,7 @@ pub struct Item<H = HereDoc> {
     /// asynchronously without cloning it.
     pub and_or: Rc<AndOrList<H>>,
     /// Location of the `&` operator for this item, if any.
-    pub async_flag: Option<Location>,
+    pub async_flag: Option<LocationRef>,
 }
 
 /// Allows conversion from Item to String.
@@ -2147,7 +2146,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(LocationRef::dummy("")),
         };
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
@@ -2174,7 +2173,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(LocationRef::dummy("")),
         };
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");

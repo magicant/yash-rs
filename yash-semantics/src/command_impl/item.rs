@@ -25,7 +25,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
-use yash_syntax::source::Location;
+use yash_syntax::source::LocationRef;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
 
@@ -58,7 +58,7 @@ impl Command for syntax::Item {
     }
 }
 
-async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
+async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &LocationRef) -> Result {
     let and_or = Rc::clone(and_or);
     let result = env
         .start_subshell(|env| Box::pin(async move { and_or.execute(env).await }))
@@ -74,7 +74,7 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
                 env,
                 "cannot start a subshell to run an asynchronous command".into(),
                 errno.desc().into(),
-                async_flag,
+                &async_flag.get(),
             )
             .await;
 
@@ -121,7 +121,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(LocationRef::dummy("")),
         };
         let result = executor.run_until(item.execute(&mut env));
         assert_eq!(result, Continue(()));
@@ -140,7 +140,7 @@ mod tests {
         let and_or: syntax::AndOrList = "echo foo".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(LocationRef::dummy("")),
         };
 
         executor
@@ -170,7 +170,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(LocationRef::dummy("")),
         };
         executor.run_until(item.execute(&mut env));
 
@@ -188,7 +188,7 @@ mod tests {
         let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
         let item = syntax::Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("X")),
+            async_flag: Some(LocationRef::dummy("X")),
         };
         let result = block_on(item.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::NOEXEC))));

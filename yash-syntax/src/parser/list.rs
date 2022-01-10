@@ -59,7 +59,7 @@ impl Parser<'_, '_> {
             let token = self.peek_token().await?;
             let (async_flag, next) = match token.id {
                 Operator(Semicolon) => (None, true),
-                Operator(And) => (Some(token.word.location.get()), true),
+                Operator(And) => (Some(token.word.location.clone()), true),
                 _ => (None, false),
             };
 
@@ -228,20 +228,20 @@ mod tests {
         assert_eq!(list.0.len(), 3);
 
         let location = list.0[0].async_flag.as_ref().unwrap();
-        assert_eq!(location.code.value, "foo & bar ; baz&");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.column.get(), 5);
+        assert_eq!(location.code().value, "foo & bar ; baz&");
+        assert_eq!(location.code().start_line_number.get(), 1);
+        assert_eq!(location.code().source, Source::Unknown);
+        assert_eq!(location.column().get(), 5);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
 
         assert_eq!(list.0[1].async_flag, None);
         assert_eq!(list.0[1].and_or.to_string(), "bar");
 
         let location = list.0[2].async_flag.as_ref().unwrap();
-        assert_eq!(location.code.value, "foo & bar ; baz&");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.column.get(), 16);
+        assert_eq!(location.code().value, "foo & bar ; baz&");
+        assert_eq!(location.code().start_line_number.get(), 1);
+        assert_eq!(location.code().source, Source::Unknown);
+        assert_eq!(location.column().get(), 16);
         assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
 
