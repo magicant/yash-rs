@@ -63,6 +63,7 @@ use std::ffi::CString;
 use std::ffi::NulError;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
@@ -164,9 +165,10 @@ impl From<crate::expansion::Error> for Error {
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
         let mut a = vec![Annotation {
+            code: Rc::new(&*e.location.code),
+            column: e.location.column,
             r#type: AnnotationType::Error,
             label: e.cause.label(),
-            location: e.location.clone(),
         }];
 
         e.location.code.source.complement_annotations(&mut a);
@@ -421,7 +423,6 @@ mod tests {
     use futures_executor::block_on;
     use std::cell::RefCell;
     use std::path::PathBuf;
-    use std::rc::Rc;
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;

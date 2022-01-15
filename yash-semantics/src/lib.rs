@@ -38,6 +38,7 @@ use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
 use std::borrow::Cow;
+use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
@@ -76,9 +77,10 @@ pub async fn print_error(
     location: &Location,
 ) {
     let mut a = vec![Annotation {
+        code: Rc::new(&*location.code),
+        column: location.column,
         r#type: AnnotationType::Error,
         label,
-        location: location.clone(),
     }];
     location.code.source.complement_annotations(&mut a);
     let message = Message {

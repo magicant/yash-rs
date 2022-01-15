@@ -50,6 +50,7 @@
 //! ```
 
 use std::iter::Peekable;
+use std::rc::Rc;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -327,9 +328,10 @@ impl<'a> From<&'a Error<'_>> for Message<'a> {
         let field = error.field();
 
         let mut a = vec![Annotation {
+            code: Rc::new(&*field.origin.code),
+            column: field.origin.column,
             r#type: AnnotationType::Error,
             label: field.value.as_str().into(),
-            location: field.origin.clone(),
         }];
 
         field.origin.code.source.complement_annotations(&mut a);

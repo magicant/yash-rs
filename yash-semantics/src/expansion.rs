@@ -69,6 +69,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::pin::Pin;
+use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::job::WaitStatus;
@@ -153,18 +154,20 @@ pub struct Error {
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
         let mut a = vec![Annotation {
+            code: Rc::new(&*e.location.code),
+            column: e.location.column,
             r#type: AnnotationType::Error,
             label: e.cause.label(),
-            location: e.location.clone(),
         }];
 
         e.location.code.source.complement_annotations(&mut a);
 
         if let Some((location, label)) = e.cause.related_location() {
             a.push(Annotation {
+                code: Rc::new(&*location.code),
+                column: location.column,
                 r#type: AnnotationType::Info,
                 label: label.into(),
-                location: location.clone(),
             });
         }
 
@@ -720,7 +723,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::num::NonZeroU64;
-    use std::rc::Rc;
     use yash_env::variable::Value;
     use yash_syntax::source::Code;
     use yash_syntax::source::Source;
@@ -820,15 +822,17 @@ mod tests {
         assert_eq!(message.r#type, AnnotationType::Error);
         assert_eq!(message.title, "cannot assign to read-only variable");
         assert_eq!(message.annotations.len(), 2);
+        assert_eq!(**message.annotations[0].code, *error.location.code);
+        assert_eq!(message.annotations[0].column, error.location.column);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(message.annotations[0].label, "variable `var` is read-only");
-        assert_eq!(message.annotations[0].location, error.location);
+        assert_eq!(message.annotations[1].code.value, "ROL");
+        assert_eq!(message.annotations[1].column.get(), 1);
         assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
         assert_eq!(
             message.annotations[1].label,
             "the variable was made read-only here"
         );
-        assert_eq!(message.annotations[1].location, Location::dummy("ROL"));
     }
 
     #[test]

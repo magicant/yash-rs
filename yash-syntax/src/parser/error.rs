@@ -425,25 +425,28 @@ impl fmt::Display for Error {
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
         let mut a = vec![Annotation {
+            code: Rc::new(&*e.location.code),
+            column: e.location.column,
             r#type: AnnotationType::Error,
             label: e.cause.label().into(),
-            location: e.location.clone(),
         }];
 
         e.location.code.source.complement_annotations(&mut a);
 
         if let Some((location, label)) = e.cause.related_location() {
             a.push(Annotation {
+                code: Rc::new(&*location.code),
+                column: location.column,
                 r#type: AnnotationType::Info,
                 label: label.into(),
-                location: location.clone(),
             });
         }
         if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &e.cause {
             a.push(Annotation {
+                code: Rc::new(&*e.location.code),
+                column: e.location.column,
                 r#type: AnnotationType::Help,
                 label: "surround this in a grouping: `{ ! ...; }`".into(),
-                location: e.location.clone(),
             })
         }
 
@@ -508,8 +511,9 @@ mod tests {
             "The here-document operator is missing its delimiter"
         );
         assert_eq!(message.annotations.len(), 1);
+        assert_eq!(**message.annotations[0].code, *error.location.code);
+        assert_eq!(message.annotations[0].column.get(), 1);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(message.annotations[0].label, "expected a delimiter word");
-        assert_eq!(message.annotations[0].location, error.location);
     }
 }
