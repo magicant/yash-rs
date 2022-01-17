@@ -329,7 +329,7 @@ impl<'a> From<&'a Error<'_>> for Message<'a> {
         let mut a = vec![Annotation {
             r#type: AnnotationType::Error,
             label: field.value.as_str().into(),
-            location: field.origin.clone(),
+            location: &field.origin,
         }];
 
         field.origin.code.source.complement_annotations(&mut a);

@@ -53,7 +53,7 @@ pub struct Annotation<'a> {
     /// String that describes the annotated part of the source code.
     pub label: Cow<'a, str>,
     /// Position of the annotated fragment in the source code.
-    pub location: Location,
+    pub location: &'a Location,
 }
 
 /// Entire diagnostic message.
@@ -78,7 +78,7 @@ impl super::Source {
                 result.extend(std::iter::once(Annotation {
                     r#type: AnnotationType::Info,
                     label: "command substitution appeared here".into(),
-                    location: original.clone(),
+                    location: original,
                 }));
             }
             Trap { origin, .. } => {
@@ -86,7 +86,7 @@ impl super::Source {
                 result.extend(std::iter::once(Annotation {
                     r#type: AnnotationType::Info,
                     label: "trap was set here".into(),
-                    location: origin.clone(),
+                    location: origin,
                 }));
             }
             Alias { original, alias } => {
@@ -94,13 +94,13 @@ impl super::Source {
                 result.extend(std::iter::once(Annotation {
                     r#type: AnnotationType::Info,
                     label: format!("alias `{}` was substituted here", alias.name).into(),
-                    location: original.clone(),
+                    location: original,
                 }));
                 original.code.source.complement_annotations(result);
                 result.extend(std::iter::once(Annotation {
                     r#type: AnnotationType::Info,
                     label: format!("alias `{}` was defined here", alias.name).into(),
-                    location: alias.origin.clone(),
+                    location: &alias.origin,
                 }));
                 alias.origin.code.source.complement_annotations(result);
             }
@@ -202,7 +202,7 @@ mod annotate_snippets_support {
             annotations: vec![Annotation {
                 r#type: AnnotationType::Info,
                 label: "my label".into(),
-                location,
+                location: &location,
             }],
         };
         let snippet = Snippet::from(&message);
@@ -244,7 +244,7 @@ mod annotate_snippets_support {
             annotations: vec![Annotation {
                 r#type: AnnotationType::Info,
                 label: "".into(),
-                location,
+                location: &location,
             }],
         };
         let snippet = Snippet::from(&message);
@@ -263,7 +263,7 @@ mod annotate_snippets_support {
             annotations: vec![Annotation {
                 r#type: AnnotationType::Info,
                 label: "".into(),
-                location,
+                location: &location,
             }],
         };
         let snippet = Snippet::from(&message);
@@ -282,7 +282,7 @@ mod annotate_snippets_support {
             annotations: vec![Annotation {
                 r#type: AnnotationType::Info,
                 label: "".into(),
-                location,
+                location: &location,
             }],
         };
         let snippet = Snippet::from(&message);
@@ -316,7 +316,7 @@ mod annotate_snippets_support {
             annotations: vec![Annotation {
                 r#type: AnnotationType::Info,
                 label: "my label".into(),
-                location,
+                location: &location,
             }],
         };
         let snippet = Snippet::from(&message);
@@ -327,6 +327,8 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_two_annotations_different_slice() {
+        let location_1 = Location::dummy("my location 1");
+        let location_2 = Location::dummy("my location 2");
         let message = Message {
             r#type: AnnotationType::Error,
             title: "some title".into(),
@@ -334,12 +336,12 @@ mod annotate_snippets_support {
                 Annotation {
                     r#type: AnnotationType::Note,
                     label: "my label 1".into(),
-                    location: Location::dummy("my location 1"),
+                    location: &location_1,
                 },
                 Annotation {
                     r#type: AnnotationType::Info,
                     label: "my label 2".into(),
-                    location: Location::dummy("my location 2"),
+                    location: &location_2,
                 },
             ],
         };
@@ -371,7 +373,11 @@ mod annotate_snippets_support {
     fn from_message_two_annotations_same_slice() {
         use std::num::NonZeroU64;
 
-        let location = Location::dummy("my location");
+        let location_1 = Location::dummy("my location");
+        let location_3 = Location {
+            column: NonZeroU64::new(3).unwrap(),
+            ..location_1.clone()
+        };
         let message = Message {
             r#type: AnnotationType::Error,
             title: "some title".into(),
@@ -379,15 +385,12 @@ mod annotate_snippets_support {
                 Annotation {
                     r#type: AnnotationType::Info,
                     label: "my label 1".into(),
-                    location: Location {
-                        column: NonZeroU64::new(3).unwrap(),
-                        ..location.clone()
-                    },
+                    location: &location_3,
                 },
                 Annotation {
                     r#type: AnnotationType::Help,
                     label: "my label 2".into(),
-                    location,
+                    location: &location_1,
                 },
             ],
         };

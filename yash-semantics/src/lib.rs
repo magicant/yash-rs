@@ -78,7 +78,7 @@ pub async fn print_error(
     let mut a = vec![Annotation {
         r#type: AnnotationType::Error,
         label,
-        location: location.clone(),
+        location,
     }];
     location.code.source.complement_annotations(&mut a);
     let message = Message {

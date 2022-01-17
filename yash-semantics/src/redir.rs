@@ -166,7 +166,7 @@ impl<'a> From<&'a Error> for Message<'a> {
         let mut a = vec![Annotation {
             r#type: AnnotationType::Error,
             label: e.cause.label(),
-            location: e.location.clone(),
+            location: &e.location,
         }];
 
         e.location.code.source.complement_annotations(&mut a);

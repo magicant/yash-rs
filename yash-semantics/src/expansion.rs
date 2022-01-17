@@ -155,7 +155,7 @@ impl<'a> From<&'a Error> for Message<'a> {
         let mut a = vec![Annotation {
             r#type: AnnotationType::Error,
             label: e.cause.label(),
-            location: e.location.clone(),
+            location: &e.location,
         }];
 
         e.location.code.source.complement_annotations(&mut a);
@@ -164,7 +164,7 @@ impl<'a> From<&'a Error> for Message<'a> {
             a.push(Annotation {
                 r#type: AnnotationType::Info,
                 label: label.into(),
-                location: location.clone(),
+                location,
             });
         }
 
@@ -822,13 +822,13 @@ mod tests {
         assert_eq!(message.annotations.len(), 2);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(message.annotations[0].label, "variable `var` is read-only");
-        assert_eq!(message.annotations[0].location, error.location);
+        assert_eq!(message.annotations[0].location, &error.location);
         assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
         assert_eq!(
             message.annotations[1].label,
             "the variable was made read-only here"
         );
-        assert_eq!(message.annotations[1].location, Location::dummy("ROL"));
+        assert_eq!(message.annotations[1].location, &Location::dummy("ROL"));
     }
 
     #[test]

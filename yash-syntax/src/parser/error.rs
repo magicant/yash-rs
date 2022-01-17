@@ -427,7 +427,7 @@ impl<'a> From<&'a Error> for Message<'a> {
         let mut a = vec![Annotation {
             r#type: AnnotationType::Error,
             label: e.cause.label().into(),
-            location: e.location.clone(),
+            location: &e.location,
         }];
 
         e.location.code.source.complement_annotations(&mut a);
@@ -436,14 +436,14 @@ impl<'a> From<&'a Error> for Message<'a> {
             a.push(Annotation {
                 r#type: AnnotationType::Info,
                 label: label.into(),
-                location: location.clone(),
+                location,
             });
         }
         if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &e.cause {
             a.push(Annotation {
                 r#type: AnnotationType::Help,
                 label: "surround this in a grouping: `{ ! ...; }`".into(),
-                location: e.location.clone(),
+                location: &e.location,
             })
         }
 
@@ -510,6 +510,6 @@ mod tests {
         assert_eq!(message.annotations.len(), 1);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(message.annotations[0].label, "expected a delimiter word");
-        assert_eq!(message.annotations[0].location, error.location);
+        assert_eq!(message.annotations[0].location, &error.location);
     }
 }
