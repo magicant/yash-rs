@@ -183,9 +183,10 @@ mod annotate_snippets_support {
                     .get()
                     .try_into()
                     .unwrap_or(usize::MAX);
+                let value = &annotation.code;
                 let column = &annotation.location.column;
                 let column = column.get().try_into().unwrap_or(usize::MAX);
-                let column = column.min(code.value.chars().count()).max(1);
+                let column = column.min(value.chars().count()).max(1);
                 let annotation = snippet::SourceAnnotation {
                     range: (column - 1, column),
                     label: &annotation.label,
@@ -195,7 +196,7 @@ mod annotate_snippets_support {
                     snippet.slices[i].annotations.push(annotation);
                 } else {
                     snippet.slices.push(snippet::Slice {
-                        source: &code.value,
+                        source: value,
                         line_start,
                         origin: Some(code.source.label()),
                         fold: true,
