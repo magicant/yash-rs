@@ -152,20 +152,20 @@ pub struct Error {
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation {
-            r#type: AnnotationType::Error,
-            label: e.cause.label(),
-            location: &e.location,
-        }];
+        let mut a = vec![Annotation::new(
+            AnnotationType::Error,
+            e.cause.label(),
+            &e.location,
+        )];
 
         e.location.code.source.complement_annotations(&mut a);
 
         if let Some((location, label)) = e.cause.related_location() {
-            a.push(Annotation {
-                r#type: AnnotationType::Info,
-                label: label.into(),
+            a.push(Annotation::new(
+                AnnotationType::Info,
+                label.into(),
                 location,
-            });
+            ));
         }
 
         Message {

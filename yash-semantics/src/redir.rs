@@ -163,11 +163,11 @@ impl From<crate::expansion::Error> for Error {
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation {
-            r#type: AnnotationType::Error,
-            label: e.cause.label(),
-            location: &e.location,
-        }];
+        let mut a = vec![Annotation::new(
+            AnnotationType::Error,
+            e.cause.label(),
+            &e.location,
+        )];
 
         e.location.code.source.complement_annotations(&mut a);
 

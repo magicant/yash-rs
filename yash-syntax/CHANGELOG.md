@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `Line` renamed to `Code`
     - `Location`'s field `line` renamed to `code`
     - `Annotation`'s field `location` changed to a reference
+    - `Annotation`'s field `code` added
+    - `Annotation`'s method `new` added
 - Dependency versions
     - `async-trait` 0.1.50 → 0.1.52
     - `futures-util` 0.3.18 → 0.3.19

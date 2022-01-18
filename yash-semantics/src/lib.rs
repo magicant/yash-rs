@@ -75,11 +75,7 @@ pub async fn print_error(
     label: Cow<'_, str>,
     location: &Location,
 ) {
-    let mut a = vec![Annotation {
-        r#type: AnnotationType::Error,
-        label,
-        location,
-    }];
+    let mut a = vec![Annotation::new(AnnotationType::Error, label, location)];
     location.code.source.complement_annotations(&mut a);
     let message = Message {
         r#type: AnnotationType::Error,
