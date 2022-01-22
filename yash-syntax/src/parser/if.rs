@@ -142,6 +142,7 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -293,15 +294,13 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::IfMissingThen { if_location }) = e.cause {
-            assert_eq!(if_location.code.value, " if :; fi");
+        assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::IfMissingThen { if_location }) => {
+            assert_eq!(*if_location.code.value.borrow(), " if :; fi");
             assert_eq!(if_location.code.start_line_number.get(), 1);
             assert_eq!(if_location.code.source, Source::Unknown);
             assert_eq!(if_location.column.get(), 2);
-        } else {
-            panic!("Wrong error cause: {:?}", e);
-        }
-        assert_eq!(e.location.code.value, " if :; fi");
+        });
+        assert_eq!(*e.location.code.value.borrow(), " if :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 8);
@@ -314,15 +313,14 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::ElifMissingThen { elif_location }) = e.cause {
-            assert_eq!(elif_location.code.value, "if a; then b; elif c; fi");
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::ElifMissingThen { elif_location }) => {
+            assert_eq!(*elif_location.code.value.borrow(), "if a; then b; elif c; fi");
             assert_eq!(elif_location.code.start_line_number.get(), 1);
             assert_eq!(elif_location.code.source, Source::Unknown);
             assert_eq!(elif_location.column.get(), 15);
-        } else {
-            panic!("Wrong error cause: {:?}", e);
-        }
-        assert_eq!(e.location.code.value, "if a; then b; elif c; fi");
+        });
+        assert_eq!(*e.location.code.value.borrow(), "if a; then b; elif c; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 23);
@@ -335,15 +333,14 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedIf { opening_location }) = e.cause {
-            assert_eq!(opening_location.code.value, "  if :; then :; }");
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedIf { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "  if :; then :; }");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 3);
-        } else {
-            panic!("Wrong error cause: {:?}", e);
-        }
-        assert_eq!(e.location.code.value, "  if :; then :; }");
+        });
+        assert_eq!(*e.location.code.value.borrow(), "  if :; then :; }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 17);
@@ -357,7 +354,7 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfCondition));
-        assert_eq!(e.location.code.value, "   if then :; fi");
+        assert_eq!(*e.location.code.value.borrow(), "   if then :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 7);
@@ -371,7 +368,7 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfBody));
-        assert_eq!(e.location.code.value, "if :; then fi");
+        assert_eq!(*e.location.code.value.borrow(), "if :; then fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 12);
@@ -385,7 +382,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifCondition));
-        assert_eq!(e.location.code.value, "if :; then :; elif then :; fi");
+        assert_eq!(
+            *e.location.code.value.borrow(),
+            "if :; then :; elif then :; fi"
+        );
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 20);
@@ -399,7 +399,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifBody));
-        assert_eq!(e.location.code.value, "if :; then :; elif :; then fi");
+        assert_eq!(
+            *e.location.code.value.borrow(),
+            "if :; then :; elif :; then fi"
+        );
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 28);
@@ -413,7 +416,7 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElse));
-        assert_eq!(e.location.code.value, "if :; then :; else fi");
+        assert_eq!(*e.location.code.value.borrow(), "if :; then :; else fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 20);

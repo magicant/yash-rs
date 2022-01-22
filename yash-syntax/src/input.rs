@@ -94,7 +94,7 @@ mod tests {
         let mut input = Memory::new("", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -104,12 +104,12 @@ mod tests {
         let mut input = Memory::new("one\n", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "one\n");
+        assert_eq!(*line.value.borrow(), "one\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -119,22 +119,22 @@ mod tests {
         let mut input = Memory::new("one\ntwo\nthree", Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "one\n");
+        assert_eq!(*line.value.borrow(), "one\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "two\n");
+        assert_eq!(*line.value.borrow(), "two\n");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "three");
+        assert_eq!(*line.value.borrow(), "three");
         assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
     }

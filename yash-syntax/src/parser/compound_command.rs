@@ -105,6 +105,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Command;
     use crate::syntax::SimpleCommand;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -152,15 +153,14 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.do_clause()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) = e.cause {
-            assert_eq!(opening_location.code.value, " do not close ");
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), " do not close ");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 2);
-        } else {
-            panic!("Wrong error cause: {:?}", e.cause);
-        }
-        assert_eq!(e.location.code.value, " do not close ");
+        });
+        assert_eq!(*e.location.code.value.borrow(), " do not close ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 15);
@@ -174,7 +174,7 @@ mod tests {
 
         let e = block_on(parser.do_clause()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
-        assert_eq!(e.location.code.value, "do done");
+        assert_eq!(*e.location.code.value.borrow(), "do done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
@@ -275,13 +275,11 @@ mod tests {
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Function(f) = result {
+        assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "foo");
             assert_eq!(f.body.to_string(), "(:) >/dev/null");
-        } else {
-            panic!("Not a function definition: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

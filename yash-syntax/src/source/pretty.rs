@@ -32,6 +32,7 @@
 
 use super::Location;
 use std::borrow::Cow;
+use std::cell::Ref;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -81,7 +82,7 @@ impl<'a> Annotation<'a> {
             r#type,
             label,
             location,
-            code: Rc::new(location.code.value.as_str()),
+            code: Rc::new(Ref::map(location.code.value.borrow(), String::as_str)),
         }
     }
 }
@@ -261,7 +262,7 @@ mod annotate_snippets_support {
         use std::rc::Rc;
 
         let code = Rc::new(Code {
-            value: "".to_string(),
+            value: "".to_string().into(),
             start_line_number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
         });
@@ -321,7 +322,7 @@ mod annotate_snippets_support {
             origin: Location::dummy("my origin"),
         });
         let code = Rc::new(Code {
-            value: "substitution".to_string(),
+            value: "substitution".to_string().into(),
             start_line_number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });

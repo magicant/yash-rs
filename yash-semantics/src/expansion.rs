@@ -794,7 +794,7 @@ mod tests {
     fn from_error_for_message() {
         let number = NonZeroU64::new(1).unwrap();
         let code = Rc::new(Code {
-            value: "".to_string(),
+            value: "".to_string().into(),
             start_line_number: number,
             source: Source::Unknown,
         });

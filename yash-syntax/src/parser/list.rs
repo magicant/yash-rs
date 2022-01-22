@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(list.0.len(), 3);
 
         let location = list.0[0].async_flag.as_ref().unwrap();
-        assert_eq!(location.code.value, "foo & bar ; baz&");
+        assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 5);
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(list.0[1].and_or.to_string(), "bar");
 
         let location = list.0[2].async_flag.as_ref().unwrap();
-        assert_eq!(location.code.value, "foo & bar ; baz&");
+        assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
         assert_eq!(location.column.get(), 16);
@@ -322,7 +322,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
         );
-        assert_eq!(e.location.code.value, "<<END");
+        assert_eq!(*e.location.code.value.borrow(), "<<END");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
@@ -336,7 +336,7 @@ mod tests {
 
         let e = block_on(parser.command_line()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnexpectedToken));
-        assert_eq!(e.location.code.value, "foo)");
+        assert_eq!(*e.location.code.value.borrow(), "foo)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);

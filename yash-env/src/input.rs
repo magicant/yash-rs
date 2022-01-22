@@ -76,7 +76,8 @@ impl Input for Stdin {
         fn to_code(bytes: Vec<u8>, start_line_number: NonZeroU64) -> Code {
             // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
             let value = String::from_utf8(bytes)
-                .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
+                .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string())
+                .into();
             Code {
                 value,
                 start_line_number,
@@ -108,6 +109,7 @@ impl Input for Stdin {
                     let code = Rc::new(to_code(bytes, number));
                     let column = code
                         .value
+                        .borrow()
                         .chars()
                         .count()
                         .try_into()
@@ -139,7 +141,7 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
     }
@@ -156,11 +158,11 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "echo ok\n");
+        assert_eq!(*line.value.borrow(), "echo ok\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Stdin);
     }
@@ -177,19 +179,19 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "#!/bin/sh\n");
+        assert_eq!(*line.value.borrow(), "#!/bin/sh\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "echo ok\n");
+        assert_eq!(*line.value.borrow(), "echo ok\n");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "exit");
+        assert_eq!(*line.value.borrow(), "exit");
         assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Stdin);
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Stdin);
     }
@@ -202,7 +204,7 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let (location, error) = block_on(stdin.next_line(&Context)).unwrap_err();
-        assert_eq!(location.code.value, "");
+        assert_eq!(*location.code.value.borrow(), "");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Stdin);
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));

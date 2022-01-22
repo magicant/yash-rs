@@ -86,6 +86,7 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::parser::lex::Lexer;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -107,12 +108,10 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        if let TextUnit::Backquote { content, location } = result {
+        assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(content, []);
             assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -125,7 +124,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        if let TextUnit::Backquote { content, location } = result {
+        assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
                 [
@@ -136,9 +135,7 @@ mod tests {
                 ]
             );
             assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -151,7 +148,7 @@ mod tests {
             context: WordContext::Text,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        if let TextUnit::Backquote { content, location } = result {
+        assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
                 [
@@ -167,9 +164,7 @@ mod tests {
                 ]
             );
             assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -235,15 +230,14 @@ mod tests {
             context: WordContext::Word,
         };
         let e = block_on(lexer.backquote()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
-            assert_eq!(opening_location.code.value, "`");
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "`");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("unexpected error cause {:?}", e);
-        }
-        assert_eq!(e.location.code.value, "`");
+        });
+        assert_eq!(*e.location.code.value.borrow(), "`");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 2);
@@ -257,15 +251,13 @@ mod tests {
             context: WordContext::Word,
         };
         let e = block_on(lexer.backquote()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) = e.cause {
-            assert_eq!(opening_location.code.value, "`foo");
+        assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "`foo");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("unexpected error cause {:?}", e);
-        }
-        assert_eq!(e.location.code.value, "`foo");
+        });
+        assert_eq!(*e.location.code.value.borrow(), "`foo");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);

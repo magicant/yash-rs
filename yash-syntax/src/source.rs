@@ -21,6 +21,7 @@
 pub mod pretty;
 
 use crate::alias::Alias;
+use std::cell::RefCell;
 use std::iter::FusedIterator;
 use std::num::NonZeroU64;
 use std::rc::Rc;
@@ -136,10 +137,15 @@ impl Source {
 /// TODO Elaborate
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Code {
-    /// Content of the code, usually including a trailing newline.
-    pub value: String,
+    /// Content of the code, usually terminated by a newline.
+    ///
+    /// The value is contained in a `RefCell` so that more lines can be appended
+    /// to the value as the parser reads input lines.
+    pub value: RefCell<String>,
+
     /// Line number of the first line of the code. Counted from 1.
     pub start_line_number: NonZeroU64,
+
     /// Source of this code.
     pub source: Source,
 }
@@ -178,7 +184,8 @@ impl<'a> Iterator for Lines<'a> {
                 value_range
             }
         }
-        .to_string();
+        .to_string()
+        .into();
 
         Some(Code {
             value,
@@ -195,7 +202,7 @@ impl Lines<'_> {
     /// reached.
     pub fn next_or_empty(&mut self) -> Code {
         self.next().unwrap_or_else(|| Code {
-            value: String::new(),
+            value: RefCell::new(String::new()),
             start_line_number: self.number,
             source: self.source.clone(),
         })
@@ -235,6 +242,7 @@ impl Location {
     #[inline]
     pub fn dummy<S: Into<String>>(value: S) -> Location {
         fn with_line(value: String) -> Location {
+            let value = RefCell::new(value);
             let number = NonZeroU64::new(1).unwrap();
             let code = Rc::new(Code {
                 value,
@@ -271,7 +279,10 @@ impl Code {
     /// The character columns are counted from 1.
     #[allow(clippy::needless_lifetimes)] // This lifetime is actually needed.
     pub fn enumerate<'a>(self: &'a Rc<Self>) -> impl Iterator<Item = SourceChar> + 'a {
-        self.value.chars().zip(1u64..).map(move |(value, i)| {
+        // We do need to collect the iterator to release the borrow.
+        #[allow(clippy::needless_collect)]
+        let chars = self.value.borrow().chars().collect::<Vec<char>>();
+        chars.into_iter().zip(1u64..).map(move |(value, i)| {
             let column = NonZeroU64::new(i).unwrap();
             let location = Location {
                 code: self.clone(),
@@ -292,7 +303,7 @@ mod tests {
         assert_eq!(l.next(), None);
 
         let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -302,7 +313,7 @@ mod tests {
         let mut l = lines("foo\n", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "foo\n");
+        assert_eq!(*line.value.borrow(), "foo\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
@@ -310,7 +321,7 @@ mod tests {
         assert_eq!(l.next(), None);
 
         let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -320,17 +331,17 @@ mod tests {
         let mut l = lines("foo\nbar\n\n", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "foo\n");
+        assert_eq!(*line.value.borrow(), "foo\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("second line should exist");
-        assert_eq!(&line.value, "bar\n");
+        assert_eq!(*line.value.borrow(), "bar\n");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("third line should exist");
-        assert_eq!(&line.value, "\n");
+        assert_eq!(*line.value.borrow(), "\n");
         assert_eq!(line.start_line_number.get(), 3);
         assert_eq!(line.source, Source::Unknown);
 
@@ -338,7 +349,7 @@ mod tests {
         assert_eq!(l.next(), None);
 
         let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 4);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -348,12 +359,12 @@ mod tests {
         let mut l = lines("one\ntwo", Source::Unknown);
 
         let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "one\n");
+        assert_eq!(*line.value.borrow(), "one\n");
         assert_eq!(line.start_line_number.get(), 1);
         assert_eq!(line.source, Source::Unknown);
 
         let line = l.next().expect("second line should exist");
-        assert_eq!(&line.value, "two");
+        assert_eq!(*line.value.borrow(), "two");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
 
@@ -363,7 +374,7 @@ mod tests {
         assert_eq!(l.next(), None);
 
         let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
+        assert_eq!(*line.value.borrow(), "");
         assert_eq!(line.start_line_number.get(), 2);
         assert_eq!(line.source, Source::Unknown);
     }
@@ -393,7 +404,7 @@ mod tests {
     fn code_enumerate() {
         fn make_code(v: &str, n: u64) -> Rc<Code> {
             Rc::new(Code {
-                value: v.to_string(),
+                value: v.to_string().into(),
                 start_line_number: NonZeroU64::new(n).unwrap(),
                 source: Source::Unknown,
             })

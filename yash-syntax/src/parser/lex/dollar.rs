@@ -69,6 +69,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::Literal;
     use crate::syntax::Text;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -127,15 +128,13 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        if let TextUnit::RawParam { name, location } = result {
+        assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "0");
-            assert_eq!(location.code.value, "$0");
+            assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a raw parameter: {:?}", result);
-        }
+        });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
@@ -147,15 +146,13 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.code.value, "$()");
+        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
+            assert_eq!(*location.code.value.borrow(), "$()");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, "");
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
 
         let mut lexer = Lexer::from_memory("$( foo bar )", Source::Unknown);
@@ -164,15 +161,13 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        if let TextUnit::CommandSubst { location, content } = result {
-            assert_eq!(location.code.value, "$( foo bar )");
+        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
+            assert_eq!(*location.code.value.borrow(), "$( foo bar )");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
             assert_eq!(content, " foo bar ");
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
@@ -184,15 +179,13 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        if let TextUnit::Arith { content, location } = result {
+        assert_matches!(result, TextUnit::Arith { content, location } => {
             assert_eq!(content, Text(vec![Literal('1')]));
-            assert_eq!(location.code.value, "$((1))");
+            assert_eq!(*location.code.value.borrow(), "$((1))");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 
@@ -204,11 +197,9 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        if let TextUnit::RawParam { name, .. } = result {
+        assert_matches!(result, TextUnit::RawParam { name, .. } => {
             assert_eq!(name, "0");
-        } else {
-            panic!("Not a raw parameter: {:?}", result);
-        }
+        });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
 }

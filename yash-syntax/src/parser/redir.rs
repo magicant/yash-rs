@@ -362,7 +362,7 @@ mod tests {
         let e = block_on(parser.redirection()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::FdOutOfRange));
         assert_eq!(
-            e.location.code.value,
+            *e.location.code.value.borrow(),
             "9999999999999999999999999999999999999999< x"
         );
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -390,7 +390,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
-        assert_eq!(e.location.code.value, " < >");
+        assert_eq!(*e.location.code.value.borrow(), " < >");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
@@ -407,7 +407,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
-        assert_eq!(e.location.code.value, "  < ");
+        assert_eq!(*e.location.code.value.borrow(), "  < ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
@@ -424,7 +424,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
-        assert_eq!(e.location.code.value, "<< <<");
+        assert_eq!(*e.location.code.value.borrow(), "<< <<");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
@@ -441,7 +441,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
-        assert_eq!(e.location.code.value, "<<");
+        assert_eq!(*e.location.code.value.borrow(), "<<");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);

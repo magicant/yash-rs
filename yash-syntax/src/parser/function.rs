@@ -100,6 +100,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -161,7 +162,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::UnmatchedParenthesis)
         );
-        assert_eq!(e.location.code.value, "( ");
+        assert_eq!(*e.location.code.value.borrow(), "( ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
@@ -183,7 +184,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingFunctionBody)
         );
-        assert_eq!(e.location.code.value, "( ) ");
+        assert_eq!(*e.location.code.value.borrow(), "( ) ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 5);
@@ -205,7 +206,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
-        assert_eq!(e.location.code.value, "() foo ; ");
+        assert_eq!(*e.location.code.value.borrow(), "() foo ; ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 4);
@@ -242,13 +243,11 @@ mod tests {
             parser.short_function_definition(c).await.unwrap()
         });
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Function(f) = result {
+        assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
             assert_eq!(f.body.to_string(), "(:)");
-        } else {
-            panic!("Not a function definition: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -285,13 +284,11 @@ mod tests {
             parser.short_function_definition(c).await.unwrap()
         });
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Function(f) = result {
+        assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
             assert_eq!(f.body.to_string(), "(:)");
-        } else {
-            panic!("Not a function definition: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -326,7 +323,7 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
         );
-        assert_eq!(e.location.code.value, "()b");
+        assert_eq!(*e.location.code.value.borrow(), "()b");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.column.get(), 3);
