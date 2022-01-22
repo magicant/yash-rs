@@ -123,7 +123,7 @@ mod tests {
         assert_eq!(*alias.origin.code.value.borrow(), "foo=bar baz");
         assert_eq!(alias.origin.code.start_line_number.get(), 1);
         assert_eq!(alias.origin.code.source, Source::Unknown);
-        assert_eq!(alias.origin.column.get(), 1);
+        assert_eq!(alias.origin.index.get(), 1);
     }
 
     #[test]
@@ -143,7 +143,7 @@ mod tests {
         assert_eq!(*abc.origin.code.value.borrow(), "abc=xyz");
         assert_eq!(abc.origin.code.start_line_number.get(), 1);
         assert_eq!(abc.origin.code.source, Source::Unknown);
-        assert_eq!(abc.origin.column.get(), 1);
+        assert_eq!(abc.origin.index.get(), 1);
 
         let yes = env.aliases.get("yes").unwrap().0.as_ref();
         assert_eq!(yes.name, "yes");
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(*yes.origin.code.value.borrow(), "yes=no");
         assert_eq!(yes.origin.code.start_line_number.get(), 1);
         assert_eq!(yes.origin.code.source, Source::Unknown);
-        assert_eq!(yes.origin.column.get(), 1);
+        assert_eq!(yes.origin.index.get(), 1);
 
         let ls = env.aliases.get("ls").unwrap().0.as_ref();
         assert_eq!(ls.name, "ls");
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(*ls.origin.code.value.borrow(), "ls=ls --color");
         assert_eq!(ls.origin.code.start_line_number.get(), 1);
         assert_eq!(ls.origin.code.source, Source::Unknown);
-        assert_eq!(ls.origin.column.get(), 1);
+        assert_eq!(ls.origin.index.get(), 1);
     }
 
     #[test]

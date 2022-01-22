@@ -354,12 +354,10 @@ mod tests {
         ))
         .unwrap()
         .unwrap();
-        if let CommandSubst { content, location } = result {
+        assert_matches!(result, CommandSubst { content, location } => {
             assert_eq!(content, "");
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+            assert_eq!(location.index.get(), 1);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -377,12 +375,10 @@ mod tests {
         ))
         .unwrap()
         .unwrap();
-        if let Backquote { content, location } = result {
+        assert_matches!(result, Backquote { content, location } => {
             assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+            assert_eq!(location.index.get(), 1);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -405,7 +401,7 @@ mod tests {
                 content,
                 [BackquoteUnit::Literal('\\'), BackquoteUnit::Literal('"')]
             );
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -603,11 +599,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "x(()");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 2);
+            assert_eq!(opening_location.index.get(), 2);
         });
         assert_eq!(*e.location.code.value.borrow(), "x(()");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(e.location.index.get(), 5);
     }
 }

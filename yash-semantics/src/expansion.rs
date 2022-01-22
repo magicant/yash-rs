@@ -800,7 +800,7 @@ mod tests {
         });
         let location = Location {
             code,
-            column: number,
+            index: number,
         };
         let new_value = Variable {
             value: Value::Scalar("value".into()),

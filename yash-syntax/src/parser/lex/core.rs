@@ -165,7 +165,7 @@ impl<'a> LexerCore<'a> {
                             // Completely empty source
                             Location {
                                 code: Rc::new(line),
-                                column: NonZeroU64::new(1).unwrap(),
+                                index: NonZeroU64::new(1).unwrap(),
                             }
                         };
                         self.state = InputState::EndOfInput(location);
@@ -677,7 +677,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
     }
 
@@ -708,7 +708,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "line");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.index.get(), 1);
     }
 
     #[test]
@@ -722,14 +722,14 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 1);
+            assert_eq!(c.location.index.get(), 1);
         });
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, 'a');
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 1);
+            assert_eq!(c.location.index.get(), 1);
         });
         lexer.consume_char();
 
@@ -739,7 +739,7 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 2);
+            assert_eq!(c.location.index.get(), 2);
         });
         lexer.consume_char();
 
@@ -749,7 +749,7 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "b");
             assert_eq!(c.location.code.start_line_number.get(), 2);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.column.get(), 1);
+            assert_eq!(c.location.index.get(), 1);
         });
         lexer.consume_char();
 
@@ -758,7 +758,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "b");
             assert_eq!(location.code.start_line_number.get(), 2);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 2);
+            assert_eq!(location.index.get(), 2);
         });
     }
 
@@ -829,7 +829,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "abc");
                 assert_eq!(c.location.code.start_line_number.get(), 1);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.column.get(), 1);
+                assert_eq!(c.location.index.get(), 1);
             });
         });
     }
@@ -897,10 +897,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 1);
+                    assert_eq!(original.index.get(), 1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 1);
+                assert_eq!(c.location.index.get(), 1);
             });
             lexer.consume_char();
 
@@ -913,10 +913,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 1);
+                    assert_eq!(original.index.get(), 1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 2);
+                assert_eq!(c.location.index.get(), 2);
             });
             lexer.consume_char();
 
@@ -929,10 +929,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 1);
+                    assert_eq!(original.index.get(), 1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 3);
+                assert_eq!(c.location.index.get(), 3);
             });
             lexer.consume_char();
 
@@ -941,7 +941,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "a b");
                 assert_eq!(c.location.code.start_line_number.get(), 1);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.column.get(), 2);
+                assert_eq!(c.location.index.get(), 2);
             });
             lexer.consume_char();
         });
@@ -975,10 +975,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 2);
+                    assert_eq!(original.index.get(), 2);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 1);
+                assert_eq!(c.location.index.get(), 1);
             });
             lexer.consume_char();
 
@@ -991,10 +991,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 2);
+                    assert_eq!(original.index.get(), 2);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 2);
+                assert_eq!(c.location.index.get(), 2);
             });
             lexer.consume_char();
 
@@ -1006,10 +1006,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number.get(), 1);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.column.get(), 2);
+                    assert_eq!(original.index.get(), 2);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.column.get(), 1);
+                assert_eq!(c.location.index.get(), 1);
             });
             lexer.consume_char();
 
@@ -1018,7 +1018,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), " foo b");
                 assert_eq!(c.location.code.start_line_number.get(), 1);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.column.get(), 5);
+                assert_eq!(c.location.index.get(), 5);
             });
             lexer.consume_char();
         });
@@ -1046,7 +1046,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "x ");
                 assert_eq!(c.location.code.start_line_number.get(), 1);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.column.get(), 2);
+                assert_eq!(c.location.index.get(), 2);
             });
         });
     }
@@ -1159,7 +1159,7 @@ mod tests {
         assert_eq!(*c.location.code.value.borrow(), "word\n");
         assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 1);
+        assert_eq!(c.location.index.get(), 1);
 
         let mut called = 0;
         let r = block_on(lexer.consume_char_if(|c| {
@@ -1192,7 +1192,7 @@ mod tests {
         assert_eq!(*c.location.code.value.borrow(), "word\n");
         assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
-        assert_eq!(c.location.column.get(), 2);
+        assert_eq!(c.location.index.get(), 2);
 
         block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'r');
@@ -1238,6 +1238,6 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "<< )");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(e.location.index.get(), 4);
     }
 }

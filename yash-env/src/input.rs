@@ -107,7 +107,7 @@ impl Input for Stdin {
 
                 Err(errno) => {
                     let code = Rc::new(to_code(bytes, number));
-                    let column = code
+                    let index = code
                         .value
                         .borrow()
                         .chars()
@@ -115,8 +115,8 @@ impl Input for Stdin {
                         .try_into()
                         .unwrap_or(u64::MAX)
                         .saturating_add(1);
-                    let column = unsafe { NonZeroU64::new_unchecked(column) };
-                    let location = Location { code, column };
+                    let index = unsafe { NonZeroU64::new_unchecked(index) };
+                    let location = Location { code, index };
                     let error = std::io::Error::from_raw_os_error(errno as i32);
                     return Err((location, error));
                 }

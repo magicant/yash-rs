@@ -78,7 +78,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "X");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
             assert_eq!(content, " foo bar ");
         });
 
@@ -86,7 +86,7 @@ mod tests {
         assert_eq!(*next.code.value.borrow(), "( foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
-        assert_eq!(next.column.get(), 12);
+        assert_eq!(next.index.get(), 12);
     }
 
     #[test]
@@ -101,7 +101,7 @@ mod tests {
         assert_eq!(*next.code.value.borrow(), " foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
-        assert_eq!(next.column.get(), 1);
+        assert_eq!(next.index.get(), 1);
     }
 
     #[test]
@@ -115,11 +115,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "Z");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
+            assert_eq!(opening_location.index.get(), 1);
         });
         assert_eq!(*e.location.code.value.borrow(), "( foo bar baz");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 14);
+        assert_eq!(e.location.index.get(), 14);
     }
 }

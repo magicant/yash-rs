@@ -185,11 +185,11 @@ mod annotate_snippets_support {
                     .try_into()
                     .unwrap_or(usize::MAX);
                 let value = &annotation.code;
-                let column = &annotation.location.column;
-                let column = column.get().try_into().unwrap_or(usize::MAX);
-                let column = column.min(value.chars().count()).max(1);
+                let index = &annotation.location.index;
+                let index = index.get().try_into().unwrap_or(usize::MAX);
+                let index = index.min(value.chars().count()).max(1);
                 let annotation = snippet::SourceAnnotation {
-                    range: (column - 1, column),
+                    range: (index - 1, index),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
                 };
@@ -268,7 +268,7 @@ mod annotate_snippets_support {
         });
         let location = Location {
             code,
-            column: NonZeroU64::new(42).unwrap(),
+            index: NonZeroU64::new(42).unwrap(),
         };
         let message = Message {
             r#type: AnnotationType::Warning,
@@ -284,7 +284,7 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
 
         let mut location = Location::dummy("my location");
-        location.column = NonZeroU64::new(7).unwrap();
+        location.index = NonZeroU64::new(7).unwrap();
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -299,7 +299,7 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
 
         let mut location = Location::dummy("my location");
-        location.column = NonZeroU64::new(12).unwrap();
+        location.index = NonZeroU64::new(12).unwrap();
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -328,7 +328,7 @@ mod annotate_snippets_support {
         });
         let location = Location {
             code,
-            column: NonZeroU64::new(5).unwrap(),
+            index: NonZeroU64::new(5).unwrap(),
         };
         let message = Message {
             r#type: AnnotationType::Warning,
@@ -387,7 +387,7 @@ mod annotate_snippets_support {
 
         let location_1 = Location::dummy("my location");
         let location_3 = Location {
-            column: NonZeroU64::new(3).unwrap(),
+            index: NonZeroU64::new(3).unwrap(),
             ..location_1.clone()
         };
         let message = Message {

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Items in the `source` module:
     - `Line` renamed to `Code`
     - `Location`'s field `line` renamed to `code`
+    - `Location`'s field `column` renamed to `index`
     - `Code`'s field `value` wrapped in the `RefCell`
     - `Annotation`'s field `location` changed to a reference
     - `Annotation`'s field `code` added

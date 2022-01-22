@@ -229,14 +229,14 @@ pub struct Location {
     /// Character position in the code. Counted from 1.
     ///
     /// Characters are counted in the number of Unicode scalar values, not bytes.
-    pub column: NonZeroU64,
+    pub index: NonZeroU64,
 }
 
 impl Location {
     /// Creates a dummy location.
     ///
     /// The returned location has [unknown](Source::Unknown) source and the
-    /// given source code value. The line and column numbers are 1.
+    /// given source code value. The `start_line_number` and `index` are 1.
     ///
     /// This function is mainly for use in testing.
     #[inline]
@@ -251,16 +251,16 @@ impl Location {
             });
             Location {
                 code,
-                column: number,
+                index: number,
             }
         }
         with_line(value.into())
     }
 
-    /// Increases the column number
+    /// Increases the `index` by `count`.
     pub fn advance(&mut self, count: u64) {
-        let column = self.column.get().checked_add(count).unwrap();
-        self.column = NonZeroU64::new(column).unwrap();
+        let index = self.index.get().checked_add(count).unwrap();
+        self.index = NonZeroU64::new(index).unwrap();
     }
 }
 
@@ -275,19 +275,15 @@ pub struct SourceChar {
 
 impl Code {
     /// Creates an iterator of `SourceChar`.
-    ///
-    /// The character columns are counted from 1.
     #[allow(clippy::needless_lifetimes)] // This lifetime is actually needed.
     pub fn enumerate<'a>(self: &'a Rc<Self>) -> impl Iterator<Item = SourceChar> + 'a {
         // We do need to collect the iterator to release the borrow.
         #[allow(clippy::needless_collect)]
         let chars = self.value.borrow().chars().collect::<Vec<char>>();
         chars.into_iter().zip(1u64..).map(move |(value, i)| {
-            let column = NonZeroU64::new(i).unwrap();
-            let location = Location {
-                code: self.clone(),
-                column,
-            };
+            let code = self.clone();
+            let index = NonZeroU64::new(i).unwrap();
+            let location = Location { code, index };
             SourceChar { value, location }
         })
     }
@@ -382,20 +378,20 @@ mod tests {
     #[test]
     fn location_advance() {
         let code = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
-        let column = NonZeroU64::new(1).unwrap();
+        let index = NonZeroU64::new(1).unwrap();
         let mut location = Location {
             code: code.clone(),
-            column,
+            index,
         };
 
         location.advance(1);
-        assert_eq!(location.column.get(), 2);
+        assert_eq!(location.index.get(), 2);
         location.advance(2);
-        assert_eq!(location.column.get(), 4);
+        assert_eq!(location.index.get(), 4);
 
         // The advance function does not check the line length.
         location.advance(5);
-        assert_eq!(location.column.get(), 9);
+        assert_eq!(location.index.get(), 9);
 
         assert!(Rc::ptr_eq(&location.code, &code));
     }
@@ -417,23 +413,23 @@ mod tests {
         let chars = code.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 3);
         assert_eq!(chars[0].value, 'f');
-        assert_eq!(chars[0].location.column.get(), 1);
+        assert_eq!(chars[0].location.index.get(), 1);
         assert!(Rc::ptr_eq(&chars[0].location.code, &code));
         assert_eq!(chars[1].value, 'o');
-        assert_eq!(chars[1].location.column.get(), 2);
+        assert_eq!(chars[1].location.index.get(), 2);
         assert!(Rc::ptr_eq(&chars[1].location.code, &code));
         assert_eq!(chars[2].value, 'o');
-        assert_eq!(chars[2].location.column.get(), 3);
+        assert_eq!(chars[2].location.index.get(), 3);
         assert!(Rc::ptr_eq(&chars[2].location.code, &code));
 
         let code = make_code("hello", 4);
         let chars = code.enumerate().collect::<Vec<SourceChar>>();
         assert_eq!(chars.len(), 5);
         assert_eq!(chars[0].value, 'h');
-        assert_eq!(chars[0].location.column.get(), 1);
+        assert_eq!(chars[0].location.index.get(), 1);
         assert!(Rc::ptr_eq(&chars[0].location.code, &code));
         assert_eq!(chars[4].value, 'o');
-        assert_eq!(chars[4].location.column.get(), 5);
+        assert_eq!(chars[4].location.index.get(), 5);
         assert!(Rc::ptr_eq(&chars[4].location.code, &code));
     }
 }

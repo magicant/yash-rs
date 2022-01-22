@@ -96,7 +96,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -113,7 +113,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('2')));
@@ -130,7 +130,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
@@ -147,7 +147,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
+            assert_eq!(location.index.get(), 1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "X");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(location.index.get(), 1);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }

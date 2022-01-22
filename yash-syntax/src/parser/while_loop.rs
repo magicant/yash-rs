@@ -156,12 +156,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "while :");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
+            assert_eq!(opening_location.index.get(), 1);
         });
         assert_eq!(*e.location.code.value.borrow(), "while :");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 8);
+        assert_eq!(e.location.index.get(), 8);
     }
 
     #[test]
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), " while do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 8);
+        assert_eq!(e.location.index.get(), 8);
     }
 
     #[test]
@@ -258,12 +258,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "until :");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
+            assert_eq!(opening_location.index.get(), 1);
         });
         assert_eq!(*e.location.code.value.borrow(), "until :");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 8);
+        assert_eq!(e.location.index.get(), 8);
     }
 
     #[test]
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "  until do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 9);
+        assert_eq!(e.location.index.get(), 9);
     }
 
     #[test]

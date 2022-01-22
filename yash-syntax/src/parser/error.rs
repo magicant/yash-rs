@@ -473,7 +473,7 @@ mod tests {
         });
         let location = Location {
             code,
-            column: number,
+            index: number,
         };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
@@ -495,7 +495,7 @@ mod tests {
         });
         let location = Location {
             code,
-            column: number,
+            index: number,
         };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),

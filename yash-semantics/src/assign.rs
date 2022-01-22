@@ -131,6 +131,6 @@ mod tests {
         });
         assert_eq!(*e.location.code.value.borrow(), "v=new");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.index.get(), 1);
     }
 }

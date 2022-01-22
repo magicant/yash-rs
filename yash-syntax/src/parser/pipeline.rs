@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), " !  !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(e.location.index.get(), 5);
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "!\n");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(e.location.index.get(), 2);
     }
 
     #[test]
@@ -207,7 +207,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "foo | ;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(e.location.index.get(), 7);
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "foo | !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(e.location.index.get(), 7);
     }
 
     #[test]
