@@ -427,7 +427,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), " for ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 6);
+        assert_eq!(e.location.index, 5);
     }
 
     #[test]
@@ -441,7 +441,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), " for\n");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 5);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -455,7 +455,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "for; do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 4);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]
@@ -485,12 +485,12 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.index.get(), 1);
+        assert_eq!(e.location.index, 0);
         assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
             assert_eq!(*original.code.value.borrow(), "FOR if do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
             assert_eq!(original.code.source, Source::Unknown);
-            assert_eq!(original.index.get(), 5);
+            assert_eq!(original.index, 4);
             assert_eq!(alias.name, "if");
         });
     }
@@ -507,12 +507,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "for X\n");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 1);
+            assert_eq!(opening_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "; do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 2);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 1);
+        assert_eq!(e.location.index, 0);
     }
 
     #[test]
@@ -542,12 +542,12 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForValue));
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.index.get(), 1);
+        assert_eq!(e.location.index, 0);
         assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
             assert_eq!(*original.code.value.borrow(), "for_A_in_a_b if c; do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
             assert_eq!(original.code.source, Source::Unknown);
-            assert_eq!(original.index.get(), 14);
+            assert_eq!(original.index, 13);
             assert_eq!(alias.name, "if");
         });
     }
@@ -564,11 +564,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), " for X; ! do :; done");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 2);
+            assert_eq!(opening_location.index, 1);
         });
         assert_eq!(*e.location.code.value.borrow(), " for X; ! do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 9);
+        assert_eq!(e.location.index, 8);
     }
 }

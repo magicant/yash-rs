@@ -103,7 +103,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index.get(), 1);
+        assert_eq!(t.word.location.index, 0);
         assert_eq!(t.id, TokenId::EndOfInput);
         assert_eq!(t.index, 0);
     }
@@ -120,7 +120,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "abc ");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index.get(), 1);
+        assert_eq!(t.word.location.index, 0);
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
 
@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "12<");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index.get(), 1);
+        assert_eq!(t.word.location.index, 0);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
@@ -170,11 +170,11 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "0>>");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index.get(), 1);
+        assert_eq!(t.word.location.index, 0);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.location()).unwrap().index.get(), 2);
+        assert_eq!(block_on(lexer.location()).unwrap().index, 1);
     }
 
     #[test]
@@ -187,7 +187,7 @@ mod tests {
             assert_eq!(*t.word.location.code.value.borrow(), " a  ");
             assert_eq!(t.word.location.code.start_line_number.get(), 1);
             assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.index.get(), 2);
+            assert_eq!(t.word.location.index, 1);
             assert_eq!(t.id, TokenId::Token(None));
             assert_eq!(t.index, 1);
 
@@ -196,7 +196,7 @@ mod tests {
             assert_eq!(*t.word.location.code.value.borrow(), " a  ");
             assert_eq!(t.word.location.code.start_line_number.get(), 1);
             assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.index.get(), 5);
+            assert_eq!(t.word.location.index, 4);
             assert_eq!(t.id, TokenId::EndOfInput);
             assert_eq!(t.index, 4);
         });

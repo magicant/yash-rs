@@ -465,16 +465,12 @@ mod tests {
 
     #[test]
     fn display_for_error() {
-        let number = NonZeroU64::new(1).unwrap();
         let code = Rc::new(Code {
             value: "".to_string().into(),
-            start_line_number: number,
+            start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            code,
-            index: number,
-        };
+        let location = Location { code, index: 0 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,
@@ -487,16 +483,12 @@ mod tests {
 
     #[test]
     fn from_error_for_message() {
-        let number = NonZeroU64::new(1).unwrap();
         let code = Rc::new(Code {
             value: "".to_string().into(),
-            start_line_number: number,
+            start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            code,
-            index: number,
-        };
+        let location = Location { code, index: 0 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,

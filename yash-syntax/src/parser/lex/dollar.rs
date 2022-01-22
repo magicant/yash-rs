@@ -133,7 +133,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -150,7 +150,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$()");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
             assert_eq!(content, "");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -165,7 +165,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
             assert_eq!(content, " foo bar ");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -184,7 +184,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$((1))");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }

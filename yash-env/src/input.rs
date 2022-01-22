@@ -107,15 +107,7 @@ impl Input for Stdin {
 
                 Err(errno) => {
                     let code = Rc::new(to_code(bytes, number));
-                    let index = code
-                        .value
-                        .borrow()
-                        .chars()
-                        .count()
-                        .try_into()
-                        .unwrap_or(u64::MAX)
-                        .saturating_add(1);
-                    let index = unsafe { NonZeroU64::new_unchecked(index) };
+                    let index = code.value.borrow().chars().count();
                     let location = Location { code, index };
                     let error = std::io::Error::from_raw_os_error(errno as i32);
                     return Err((location, error));

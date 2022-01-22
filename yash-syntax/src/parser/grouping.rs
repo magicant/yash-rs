@@ -144,12 +144,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), " { oh no ");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 2);
+            assert_eq!(opening_location.index, 1);
         });
         assert_eq!(*e.location.code.value.borrow(), " { oh no ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 10);
+        assert_eq!(e.location.index, 9);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "{ }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 3);
+        assert_eq!(e.location.index, 2);
     }
 
     #[test]
@@ -242,12 +242,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), " ( oh no");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 2);
+            assert_eq!(opening_location.index, 1);
         });
         assert_eq!(*e.location.code.value.borrow(), " ( oh no");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 9);
+        assert_eq!(e.location.index, 8);
     }
 
     #[test]
@@ -261,6 +261,6 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "( )");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 3);
+        assert_eq!(e.location.index, 2);
     }
 }

@@ -110,7 +110,7 @@ mod tests {
         let result = block_on(lexer.backquote()).unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(content, []);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -134,7 +134,7 @@ mod tests {
                     BackquoteUnit::Literal('o')
                 ]
             );
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -163,7 +163,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -177,7 +177,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        if let TextUnit::Backquote { content, location } = result {
+        assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
                 [
@@ -193,10 +193,8 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -209,15 +207,13 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        if let TextUnit::Backquote { content, location } = result {
+        assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
                 [BackquoteUnit::Literal('a'), BackquoteUnit::Literal('b')]
             );
-            assert_eq!(location.index.get(), 1);
-        } else {
-            panic!("Not a backquote: {:?}", result);
-        }
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -235,12 +231,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "`");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 1);
+            assert_eq!(opening_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "`");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 2);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -255,11 +251,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "`foo");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 1);
+            assert_eq!(opening_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "`foo");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 5);
+        assert_eq!(e.location.index, 4);
     }
 }

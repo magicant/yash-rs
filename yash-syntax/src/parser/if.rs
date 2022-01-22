@@ -298,12 +298,12 @@ mod tests {
             assert_eq!(*if_location.code.value.borrow(), " if :; fi");
             assert_eq!(if_location.code.start_line_number.get(), 1);
             assert_eq!(if_location.code.source, Source::Unknown);
-            assert_eq!(if_location.index.get(), 2);
+            assert_eq!(if_location.index, 1);
         });
         assert_eq!(*e.location.code.value.borrow(), " if :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 8);
+        assert_eq!(e.location.index, 7);
     }
 
     #[test]
@@ -318,12 +318,12 @@ mod tests {
             assert_eq!(*elif_location.code.value.borrow(), "if a; then b; elif c; fi");
             assert_eq!(elif_location.code.start_line_number.get(), 1);
             assert_eq!(elif_location.code.source, Source::Unknown);
-            assert_eq!(elif_location.index.get(), 15);
+            assert_eq!(elif_location.index, 14);
         });
         assert_eq!(*e.location.code.value.borrow(), "if a; then b; elif c; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 23);
+        assert_eq!(e.location.index, 22);
     }
 
     #[test]
@@ -338,12 +338,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "  if :; then :; }");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 3);
+            assert_eq!(opening_location.index, 2);
         });
         assert_eq!(*e.location.code.value.borrow(), "  if :; then :; }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 17);
+        assert_eq!(e.location.index, 16);
     }
 
     #[test]
@@ -357,7 +357,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "   if then :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 7);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "if :; then fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 12);
+        assert_eq!(e.location.index, 11);
     }
 
     #[test]
@@ -388,7 +388,7 @@ mod tests {
         );
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 20);
+        assert_eq!(e.location.index, 19);
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
         );
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 28);
+        assert_eq!(e.location.index, 27);
     }
 
     #[test]
@@ -419,6 +419,6 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "if :; then :; else fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 20);
+        assert_eq!(e.location.index, 19);
     }
 }

@@ -189,12 +189,10 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let Unquoted(CommandSubst { content, location }) = result {
+        assert_matches!(result, Unquoted(CommandSubst { content, location }) => {
             assert_eq!(content, "");
-            assert_eq!(location.index.get(), 1);
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -303,11 +301,7 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let SingleQuote(content) = result {
-            assert_eq!(content, "");
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        assert_matches!(result, SingleQuote(content) => assert_eq!(content, ""));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -323,11 +317,7 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let SingleQuote(content) = result {
-            assert_eq!(content, "abc\\\n$def\\");
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        assert_matches!(result, SingleQuote(content) => assert_eq!(content, "abc\\\n$def\\"));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -347,12 +337,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "'abc\n");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 1);
+            assert_eq!(opening_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "def\\");
         assert_eq!(e.location.code.start_line_number.get(), 2);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 5);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -385,11 +375,7 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let DoubleQuote(Text(content)) = result {
-            assert_eq!(content, []);
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        assert_matches!(result, DoubleQuote(Text(content)) => assert_eq!(content, []));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -405,11 +391,9 @@ mod tests {
             block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        if let DoubleQuote(Text(content)) = result {
+        assert_matches!(result, DoubleQuote(Text(content)) => {
             assert_eq!(content, [Literal('a'), Literal('b'), Literal('c')]);
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -431,7 +415,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            if let DoubleQuote(Text(ref units)) = result {
+            assert_matches!(result, DoubleQuote(Text(ref units)) => {
                 assert_eq!(
                     units,
                     &[
@@ -447,9 +431,7 @@ mod tests {
                         Literal('#'),
                     ]
                 );
-            } else {
-                panic!("Not a double quote: {:?}", result);
-            }
+            });
 
             assert_eq!(lexer.peek_char().await, Ok(None));
         })
@@ -470,12 +452,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "\"abc\n");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index.get(), 1);
+            assert_eq!(opening_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "def");
         assert_eq!(e.location.code.start_line_number.get(), 2);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 4);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]
@@ -494,7 +476,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), r"0$(:)X\#");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index.get(), 2);
+            assert_eq!(location.index, 1);
         });
         assert_eq!(word.units[2], WordUnit::Unquoted(TextUnit::Literal('X')));
         assert_eq!(
@@ -504,7 +486,7 @@ mod tests {
         assert_eq!(*word.location.code.value.borrow(), r"0$(:)X\#");
         assert_eq!(word.location.code.start_line_number.get(), 1);
         assert_eq!(word.location.code.source, Source::Unknown);
-        assert_eq!(word.location.index.get(), 1);
+        assert_eq!(word.location.index, 0);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -521,7 +503,7 @@ mod tests {
         assert_eq!(*word.location.code.value.borrow(), "");
         assert_eq!(word.location.code.start_line_number.get(), 1);
         assert_eq!(word.location.code.source, Source::Unknown);
-        assert_eq!(word.location.index.get(), 1);
+        assert_eq!(word.location.index, 0);
     }
 
     #[test]
@@ -557,19 +539,13 @@ mod tests {
             false
         }))
         .unwrap();
-        if let [DoubleQuote(Text(ref units))] = result.units[..] {
-            if let [BracedParam(ref param)] = units[..] {
-                if let Modifier::Switch(ref switch) = param.modifier {
+        assert_matches!(result.units[..], [DoubleQuote(Text(ref units))] => {
+            assert_matches!(units[..], [BracedParam(ref param)] => {
+                assert_matches!(param.modifier, Modifier::Switch(ref switch) => {
                     assert_eq!(switch.word.units, [Unquoted(Literal('~'))]);
-                } else {
-                    panic!("Not a switch: {:?}", param.modifier);
-                }
-            } else {
-                panic!("Not a single parameter: {:?}", units);
-            }
-        } else {
-            panic!("Not a single double-quote: {:?}", result);
-        }
+                });
+            });
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }

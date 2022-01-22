@@ -170,7 +170,7 @@ mod tests {
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.code.start_line_number.get(), 2);
-        assert_eq!(location.index.get(), 1);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -185,7 +185,7 @@ mod tests {
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.code.start_line_number.get(), 3);
-        assert_eq!(location.index.get(), 1);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.code.start_line_number.get(), 6);
-        assert_eq!(location.index.get(), 1);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -280,7 +280,7 @@ END
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(location.code.start_line_number.get(), 3);
-        assert_eq!(location.index.get(), 1);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -294,11 +294,11 @@ END
             assert_eq!(*redir_op_location.code.value.borrow(), "END");
             assert_eq!(redir_op_location.code.start_line_number.get(), 1);
             assert_eq!(redir_op_location.code.source, Source::Unknown);
-            assert_eq!(redir_op_location.index.get(), 1);
+            assert_eq!(redir_op_location.index, 0);
         });
         assert_eq!(*e.location.code.value.borrow(), "");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 1);
+        assert_eq!(e.location.index, 0);
     }
 }

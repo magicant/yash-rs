@@ -737,7 +737,7 @@ mod tests {
 
             let location = lexer.location().await.unwrap();
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         })
     }
 
@@ -765,7 +765,7 @@ mod tests {
 
             let location = lexer.location().await.unwrap();
             assert_eq!(location.code.start_line_number.get(), 2);
-            assert_eq!(location.index.get(), 1);
+            assert_eq!(location.index, 0);
         })
     }
 

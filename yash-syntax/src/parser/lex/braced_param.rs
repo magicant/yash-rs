@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "$");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index.get(), 1);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "{};");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 2);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "{;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 2);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -299,7 +299,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "{_;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index.get(), 3);
+        assert_eq!(e.location.index, 2);
     }
 
     #[test]
@@ -584,7 +584,7 @@ mod tests {
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
         assert_eq!(*e.location.code.value.borrow(), "{#x+};");
-        assert_eq!(e.location.index.get(), 4);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]

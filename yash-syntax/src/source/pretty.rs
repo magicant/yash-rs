@@ -185,11 +185,10 @@ mod annotate_snippets_support {
                     .try_into()
                     .unwrap_or(usize::MAX);
                 let value = &annotation.code;
-                let index = &annotation.location.index;
-                let index = index.get().try_into().unwrap_or(usize::MAX);
-                let index = index.min(value.chars().count()).max(1);
+                let index = annotation.location.index;
+                let index = index.min(value.chars().count().saturating_sub(1));
                 let annotation = snippet::SourceAnnotation {
-                    range: (index - 1, index),
+                    range: (index, index + 1),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
                 };
@@ -266,10 +265,7 @@ mod annotate_snippets_support {
             start_line_number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            code,
-            index: NonZeroU64::new(42).unwrap(),
-        };
+        let location = Location { code, index: 42 };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -281,10 +277,8 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_non_default_range() {
-        use std::num::NonZeroU64;
-
         let mut location = Location::dummy("my location");
-        location.index = NonZeroU64::new(7).unwrap();
+        location.index = 6;
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -296,10 +290,8 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_range_overflow() {
-        use std::num::NonZeroU64;
-
         let mut location = Location::dummy("my location");
-        location.index = NonZeroU64::new(12).unwrap();
+        location.index = 11;
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -326,10 +318,7 @@ mod annotate_snippets_support {
             start_line_number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });
-        let location = Location {
-            code,
-            index: NonZeroU64::new(5).unwrap(),
-        };
+        let location = Location { code, index: 4 };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "my title".into(),
@@ -383,11 +372,9 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_two_annotations_same_slice() {
-        use std::num::NonZeroU64;
-
         let location_1 = Location::dummy("my location");
         let location_3 = Location {
-            index: NonZeroU64::new(3).unwrap(),
+            index: 2,
             ..location_1.clone()
         };
         let message = Message {
