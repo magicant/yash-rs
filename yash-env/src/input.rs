@@ -23,7 +23,6 @@
 use crate::io::Fd;
 use crate::system::SharedSystem;
 use async_trait::async_trait;
-use std::num::NonZeroU64;
 use std::slice::from_mut;
 
 #[doc(no_inline)]
@@ -41,26 +40,12 @@ pub use yash_syntax::input::*;
 #[derive(Clone, Debug)]
 pub struct Stdin {
     system: SharedSystem,
-    line_number: NonZeroU64,
 }
 
 impl Stdin {
     /// Creates a new `Stdin` instance.
     pub fn new(system: SharedSystem) -> Self {
-        Stdin {
-            system,
-            line_number: NonZeroU64::new(1).unwrap(),
-        }
-    }
-
-    /// Returns the current line number.
-    pub fn line_number(&self) -> NonZeroU64 {
-        self.line_number
-    }
-
-    /// Overwrites the current line number.
-    pub fn set_line_number(&mut self, line_number: NonZeroU64) {
-        self.line_number = line_number;
+        Stdin { system }
     }
 }
 
@@ -80,10 +65,6 @@ impl Input for Stdin {
                     assert_eq!(count, 1);
                     bytes.push(byte);
                     if byte == b'\n' {
-                        // TODO self.line_number = self.line_number.saturating_add(1);
-                        self.line_number = unsafe {
-                            NonZeroU64::new_unchecked(self.line_number.get().saturating_add(1))
-                        };
                         break;
                     }
                 }
