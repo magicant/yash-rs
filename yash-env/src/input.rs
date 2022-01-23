@@ -24,11 +24,7 @@ use crate::io::Fd;
 use crate::system::SharedSystem;
 use async_trait::async_trait;
 use std::num::NonZeroU64;
-use std::rc::Rc;
 use std::slice::from_mut;
-use yash_syntax::source::Code;
-use yash_syntax::source::Location;
-use yash_syntax::source::Source;
 
 #[doc(no_inline)]
 pub use yash_syntax::input::*;
@@ -73,19 +69,6 @@ impl Input for Stdin {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
-        fn to_code(bytes: Vec<u8>, start_line_number: NonZeroU64) -> Code {
-            // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
-            let value = String::from_utf8(bytes)
-                .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string())
-                .into();
-            Code {
-                value,
-                start_line_number,
-                source: Source::Stdin,
-            }
-        }
-
-        let number = self.line_number;
         let mut bytes = Vec::new();
         loop {
             let mut byte = 0;
@@ -105,17 +88,13 @@ impl Input for Stdin {
                     }
                 }
 
-                Err(errno) => {
-                    let code = Rc::new(to_code(bytes, number));
-                    let index = code.value.borrow().chars().count();
-                    let location = Location { code, index };
-                    let error = std::io::Error::from_raw_os_error(errno as i32);
-                    return Err((location, error));
-                }
+                Err(errno) => return Err(std::io::Error::from_raw_os_error(errno as i32)),
             }
         }
 
-        Ok(to_code(bytes, number).value.into_inner())
+        // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
+        Ok(String::from_utf8(bytes)
+            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string()))
     }
 }
 
@@ -181,10 +160,7 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let (location, error) = block_on(stdin.next_line(&Context)).unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Stdin);
+        let error = block_on(stdin.next_line(&Context)).unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 }

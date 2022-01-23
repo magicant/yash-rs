@@ -182,10 +182,13 @@ impl<'a> LexerCore<'a> {
                             }))
                     }
                 }
-                Err((location, io_error)) => {
+                Err(io_error) => {
                     self.state = InputState::Error(Error {
                         cause: io_error.into(),
-                        location,
+                        location: Location {
+                            code: Rc::clone(&self.raw_code),
+                            index: self.index,
+                        },
                     });
                 }
             }
@@ -713,9 +716,7 @@ mod tests {
         #[async_trait::async_trait(?Send)]
         impl Input for Failing {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
-                let location = Location::dummy("line");
-                let error = std::io::Error::new(std::io::ErrorKind::Other, Failing);
-                Err((location, error))
+                Err(std::io::Error::new(std::io::ErrorKind::Other, Failing))
             }
         }
         let line = NonZeroU64::new(42).unwrap();
@@ -725,8 +726,8 @@ mod tests {
         assert_matches!(e.cause, ErrorCause::Io(io_error) => {
             assert_eq!(io_error.kind(), std::io::ErrorKind::Other);
         });
-        assert_eq!(*e.location.code.value.borrow(), "line");
-        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(*e.location.code.value.borrow(), "");
+        assert_eq!(e.location.code.start_line_number, line);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.index, 0);
     }

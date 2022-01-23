@@ -16,7 +16,6 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
-use crate::source::Location;
 use crate::source::Source;
 use async_trait::async_trait;
 
@@ -31,7 +30,7 @@ use async_trait::async_trait;
 pub struct Context;
 
 /// Error returned by the [Input] function.
-pub type Error = (Location, std::io::Error);
+pub type Error = std::io::Error;
 
 /// Result of the [Input] function.
 pub type Result = std::result::Result<String, Error>;
