@@ -376,6 +376,7 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use futures_executor::block_on;
+    use std::num::NonZeroU64;
 
     fn ensure_sorted(trie: &Trie) {
         assert!(
@@ -486,7 +487,12 @@ mod tests {
         }
 
         let line = lines("\n", Source::Unknown).next().unwrap();
-        let mut lexer = Lexer::new(Box::new(OneLineInput(Some(line))));
+        let line_number = NonZeroU64::new(1).unwrap();
+        let mut lexer = Lexer::new(
+            Box::new(OneLineInput(Some(line))),
+            line_number,
+            Source::Unknown,
+        );
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);

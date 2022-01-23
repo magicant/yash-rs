@@ -25,12 +25,15 @@ use crate::input::Memory;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::source::lines;
+use crate::source::Code;
 use crate::source::Location;
 use crate::source::Source;
 use crate::source::SourceChar;
 use crate::syntax::Word;
+use std::cell::RefCell;
 use std::fmt;
 use std::future::Future;
+use std::num::NonZeroU64;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -118,6 +121,7 @@ enum InputState {
 struct LexerCore<'a> {
     input: Box<dyn Input + 'a>,
     state: InputState,
+    raw_code: Rc<Code>,
     source: Vec<SourceChar>,
     index: usize,
 }
@@ -125,9 +129,18 @@ struct LexerCore<'a> {
 impl<'a> LexerCore<'a> {
     /// Creates a new lexer core that reads using the given input function.
     #[must_use]
-    fn new(input: Box<dyn Input + 'a>) -> LexerCore<'a> {
+    fn new(
+        input: Box<dyn Input + 'a>,
+        start_line_number: NonZeroU64,
+        source: Source,
+    ) -> LexerCore<'a> {
         LexerCore {
             input,
+            raw_code: Rc::new(Code {
+                value: RefCell::new(String::new()),
+                start_line_number,
+                source,
+            }),
             state: InputState::Alive,
             source: Vec::new(),
             index: 0,
@@ -230,6 +243,11 @@ impl<'a> LexerCore<'a> {
     /// parsing.
     fn reset(&mut self) {
         self.state = InputState::Alive;
+        self.raw_code = Rc::new(Code {
+            value: RefCell::new(String::new()),
+            start_line_number: self.raw_code.start_line_number,
+            source: self.raw_code.source.clone(),
+        });
         self.source.clear();
         self.index = 0;
     }
@@ -337,9 +355,13 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     /// Creates a new lexer that reads using the given input function.
     #[must_use]
-    pub fn new(input: Box<dyn Input + 'a>) -> Lexer<'a> {
+    pub fn new(
+        input: Box<dyn Input + 'a>,
+        start_line_number: NonZeroU64,
+        source: Source,
+    ) -> Lexer<'a> {
         Lexer {
-            core: LexerCore::new(input),
+            core: LexerCore::new(input, start_line_number, source),
             line_continuation_enabled: true,
         }
     }
@@ -347,7 +369,8 @@ impl<'a> Lexer<'a> {
     /// Creates a new lexer with a fixed source code.
     #[must_use]
     pub fn from_memory(code: &'a str, source: Source) -> Lexer<'a> {
-        Lexer::new(Box::new(Memory::new(code, source)))
+        let line = NonZeroU64::new(1).unwrap();
+        Lexer::new(Box::new(Memory::new(code, source.clone())), line, source)
     }
 
     /// Disables line continuation recognition onward.
@@ -670,7 +693,8 @@ mod tests {
     #[test]
     fn lexer_core_peek_char_empty_source() {
         let input = Memory::new("", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(32).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         let result = block_on(lexer.peek_char());
         assert_matches!(result, Ok(PeekChar::EndOfInput(location)) => {
             assert_eq!(*location.code.value.borrow(), "");
@@ -698,7 +722,8 @@ mod tests {
                 Err((location, error))
             }
         }
-        let mut lexer = LexerCore::new(Box::new(Failing));
+        let line = NonZeroU64::new(42).unwrap();
+        let mut lexer = LexerCore::new(Box::new(Failing), line, Source::Unknown);
 
         let e = block_on(lexer.peek_char()).unwrap_err();
         assert_matches!(e.cause, ErrorCause::Io(io_error) => {
@@ -713,20 +738,21 @@ mod tests {
     #[test]
     fn lexer_core_consume_char_success() {
         let input = Memory::new("a\nb", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
 
         let result = block_on(lexer.peek_char());
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, 'a');
             assert_eq!(*c.location.code.value.borrow(), "a\n");
-            assert_eq!(c.location.code.start_line_number.get(), 1);
+            assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.index, 0);
         });
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, 'a');
             assert_eq!(*c.location.code.value.borrow(), "a\n");
-            assert_eq!(c.location.code.start_line_number.get(), 1);
+            assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.index, 0);
         });
@@ -736,7 +762,7 @@ mod tests {
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, '\n');
             assert_eq!(*c.location.code.value.borrow(), "a\n");
-            assert_eq!(c.location.code.start_line_number.get(), 1);
+            assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
             assert_eq!(c.location.index, 1);
         });
@@ -765,14 +791,16 @@ mod tests {
     #[should_panic(expected = "A character must have been peeked before being consumed: index=0")]
     fn lexer_core_consume_char_panic() {
         let input = Memory::new("a", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         lexer.consume_char();
     }
 
     #[test]
     fn lexer_core_peek_char_at() {
         let input = Memory::new("a\nb", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
 
         let c0 = assert_matches!(block_on(lexer.peek_char()), Ok(PeekChar::Char(c)) => c.clone());
         lexer.consume_char();
@@ -790,7 +818,8 @@ mod tests {
     #[test]
     fn lexer_core_index() {
         let input = Memory::new("a\nb", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
 
         assert_eq!(lexer.index(), 0);
         block_on(lexer.peek_char()).unwrap();
@@ -811,7 +840,8 @@ mod tests {
     #[test]
     fn lexer_core_rewind_success() {
         let input = Memory::new("abc", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         lexer.rewind(0);
         assert_eq!(lexer.index(), 0);
 
@@ -826,7 +856,7 @@ mod tests {
             assert_matches!(result, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'a');
                 assert_eq!(*c.location.code.value.borrow(), "abc");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.index, 0);
             });
@@ -837,14 +867,16 @@ mod tests {
     #[should_panic(expected = "The new index 1 must not be larger than the current index 0")]
     fn lexer_core_rewind_invalid_index() {
         let input = Memory::new("abc", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         lexer.rewind(1);
     }
 
     #[test]
     fn lexer_core_source_string() {
         let input = Memory::new("ab\ncd", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         block_on(async {
             for _ in 0..4 {
                 let _ = lexer.peek_char().await;
@@ -860,7 +892,8 @@ mod tests {
     #[should_panic(expected = "begin index 0 should be less than end index 0")]
     fn lexer_core_substitute_alias_with_invalid_index() {
         let input = Memory::new("a b", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         let alias = Rc::new(Alias {
             name: "a".to_string(),
             replacement: "".to_string(),
@@ -873,7 +906,8 @@ mod tests {
     #[test]
     fn lexer_core_substitute_alias_single_line_replacement() {
         let input = Memory::new("a b", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         let alias = Rc::new(Alias {
             name: "a".to_string(),
             replacement: "lex".to_string(),
@@ -894,7 +928,7 @@ mod tests {
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), "a b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 0);
                     assert_eq!(alias2, &alias);
@@ -906,11 +940,11 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'e');
                 assert_eq!(*c.location.code.value.borrow(), "lex");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), "a b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 0);
                     assert_eq!(alias2, &alias);
@@ -922,11 +956,11 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'x');
                 assert_eq!(*c.location.code.value.borrow(), "lex");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), "a b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 0);
                     assert_eq!(alias2, &alias);
@@ -938,7 +972,7 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, ' ');
                 assert_eq!(*c.location.code.value.borrow(), "a b");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.index, 1);
             });
@@ -949,7 +983,8 @@ mod tests {
     #[test]
     fn lexer_core_substitute_alias_multi_line_replacement() {
         let input = Memory::new(" foo b", Source::Unknown);
-        let mut lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         let alias = Rc::new(Alias {
             name: "foo".to_string(),
             replacement: "x\ny".to_string(),
@@ -968,11 +1003,11 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'x');
                 assert_eq!(*c.location.code.value.borrow(), "x\n");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), " foo b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 1);
                     assert_eq!(alias2, &alias);
@@ -984,11 +1019,11 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, '\n');
                 assert_eq!(*c.location.code.value.borrow(), "x\n");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), " foo b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 1);
                     assert_eq!(alias2, &alias);
@@ -1003,7 +1038,7 @@ mod tests {
                 assert_eq!(c.location.code.start_line_number.get(), 2);
                 assert_matches!(&c.location.code.source, Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), " foo b");
-                    assert_eq!(original.code.start_line_number.get(), 1);
+                    assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
                     assert_eq!(original.index, 1);
                     assert_eq!(alias2, &alias);
@@ -1015,7 +1050,7 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, ' ');
                 assert_eq!(*c.location.code.value.borrow(), " foo b");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.index, 4);
             });
@@ -1027,7 +1062,8 @@ mod tests {
     fn lexer_core_substitute_alias_empty_replacement() {
         block_on(async {
             let input = Memory::new("x ", Source::Unknown);
-            let mut lexer = LexerCore::new(Box::new(input));
+            let line = NonZeroU64::new(1).unwrap();
+            let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
             let alias = Rc::new(Alias {
                 name: "x".to_string(),
                 replacement: "".to_string(),
@@ -1043,7 +1079,7 @@ mod tests {
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, ' ');
                 assert_eq!(*c.location.code.value.borrow(), "x ");
-                assert_eq!(c.location.code.start_line_number.get(), 1);
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
                 assert_eq!(c.location.index, 1);
             });
@@ -1060,7 +1096,8 @@ mod tests {
             origin: Location::dummy("origin"),
         });
         let input = Memory::new("a", Source::Alias { original, alias });
-        let lexer = LexerCore::new(Box::new(input));
+        let line = NonZeroU64::new(1).unwrap();
+        let lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
         assert!(!lexer.is_after_blank_ending_alias(0));
     }
 
@@ -1068,7 +1105,8 @@ mod tests {
     fn lexer_core_is_after_blank_ending_alias_not_blank_ending() {
         block_on(async {
             let input = Memory::new("a x", Source::Unknown);
-            let mut lexer = LexerCore::new(Box::new(input));
+            let line = NonZeroU64::new(1).unwrap();
+            let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
                 replacement: " b".to_string(),
@@ -1092,7 +1130,8 @@ mod tests {
     fn lexer_core_is_after_blank_ending_alias_blank_ending() {
         block_on(async {
             let input = Memory::new("a x", Source::Unknown);
-            let mut lexer = LexerCore::new(Box::new(input));
+            let line = NonZeroU64::new(1).unwrap();
+            let mut lexer = LexerCore::new(Box::new(input), line, Source::Unknown);
             let alias = Rc::new(Alias {
                 name: "a".to_string(),
                 replacement: " b ".to_string(),
