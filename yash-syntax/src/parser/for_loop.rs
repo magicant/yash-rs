@@ -504,15 +504,15 @@ mod tests {
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_matches!(&e.cause,
             ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "for X\n");
+            assert_eq!(*opening_location.code.value.borrow(), "for X\n; do :; done");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.index, 0);
         });
-        assert_eq!(*e.location.code.value.borrow(), "; do :; done");
-        assert_eq!(e.location.code.start_line_number.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "for X\n; do :; done");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 0);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]

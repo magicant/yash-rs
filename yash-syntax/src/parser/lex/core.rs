@@ -163,27 +163,23 @@ impl<'a> LexerCore<'a> {
             // Read more input
             match self.input.next_line(&Context).await {
                 Ok(line) => {
-                    if line.value.borrow().is_empty() {
+                    if line.is_empty() {
                         // End of input
-                        let location = if let Some(c) = self.source.last() {
-                            // TODO correctly count line number after newline
-                            //if sc.value == '\n' {
-                            //} else {
-                            let mut location = c.location.clone();
-                            location.advance(1);
-                            location
-                        //}
-                        } else {
-                            // Completely empty source
-                            Location {
-                                code: Rc::new(line),
-                                index: 0,
-                            }
-                        };
-                        self.state = InputState::EndOfInput(location);
+                        self.state = InputState::EndOfInput(Location {
+                            code: Rc::clone(&self.raw_code),
+                            index: self.index,
+                        });
                     } else {
                         // Successful read
-                        self.source.extend(Rc::new(line).enumerate())
+                        self.raw_code.value.borrow_mut().push_str(&line);
+                        self.source
+                            .extend(line.chars().enumerate().map(|(i, value)| SourceChar {
+                                value,
+                                location: Location {
+                                    code: Rc::clone(&self.raw_code),
+                                    index: self.index + i,
+                                },
+                            }))
                     }
                 }
                 Err((location, io_error)) => {
@@ -698,7 +694,7 @@ mod tests {
         let result = block_on(lexer.peek_char());
         assert_matches!(result, Ok(PeekChar::EndOfInput(location)) => {
             assert_eq!(*location.code.value.borrow(), "");
-            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.start_line_number, line);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.index, 0);
         });
@@ -771,19 +767,19 @@ mod tests {
         let result = block_on(lexer.peek_char());
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, 'b');
-            assert_eq!(*c.location.code.value.borrow(), "b");
-            assert_eq!(c.location.code.start_line_number.get(), 2);
+            assert_eq!(*c.location.code.value.borrow(), "a\nb");
+            assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.index, 0);
+            assert_eq!(c.location.index, 2);
         });
         lexer.consume_char();
 
         let result = block_on(lexer.peek_char());
         assert_matches!(result, Ok(PeekChar::EndOfInput(location)) => {
-            assert_eq!(*location.code.value.borrow(), "b");
-            assert_eq!(location.code.start_line_number.get(), 2);
+            assert_eq!(*location.code.value.borrow(), "a\nb");
+            assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 1);
+            assert_eq!(location.index, 3);
         });
     }
 

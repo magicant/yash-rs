@@ -370,8 +370,6 @@ mod tests {
     use super::*;
     use crate::input::Context;
     use crate::input::Input;
-    use crate::source::lines;
-    use crate::source::Code;
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
@@ -455,10 +453,10 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
-        assert_eq!(*t.word.location.code.value.borrow(), "<\\\n");
-        assert_eq!(t.word.location.code.start_line_number.get(), 3);
+        assert_eq!(*t.word.location.code.value.borrow(), "\\\n\\\n<\\\n<\\\n>");
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(t.word.location.index, 4);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
@@ -474,7 +472,7 @@ mod tests {
 
     #[test]
     fn lexer_operator_should_not_peek_beyond_newline() {
-        struct OneLineInput(Option<Code>);
+        struct OneLineInput(Option<String>);
         #[async_trait::async_trait(?Send)]
         impl Input for OneLineInput {
             async fn next_line(&mut self, _: &Context) -> crate::input::Result {
@@ -486,10 +484,9 @@ mod tests {
             }
         }
 
-        let line = lines("\n", Source::Unknown).next().unwrap();
         let line_number = NonZeroU64::new(1).unwrap();
         let mut lexer = Lexer::new(
-            Box::new(OneLineInput(Some(line))),
+            Box::new(OneLineInput(Some("\n".to_owned()))),
             line_number,
             Source::Unknown,
         );

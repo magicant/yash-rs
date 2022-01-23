@@ -334,15 +334,15 @@ mod tests {
             .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedSingleQuote { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "'abc\n");
+            assert_eq!(*opening_location.code.value.borrow(), "'abc\ndef\\");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.index, 0);
         });
-        assert_eq!(*e.location.code.value.borrow(), "def\\");
-        assert_eq!(e.location.code.start_line_number.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "'abc\ndef\\");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 4);
+        assert_eq!(e.location.index, 9);
     }
 
     #[test]
@@ -449,15 +449,15 @@ mod tests {
             .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedDoubleQuote { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "\"abc\n");
+            assert_eq!(*opening_location.code.value.borrow(), "\"abc\ndef");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.index, 0);
         });
-        assert_eq!(*e.location.code.value.borrow(), "def");
-        assert_eq!(e.location.code.start_line_number.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "\"abc\ndef");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.index, 8);
     }
 
     #[test]

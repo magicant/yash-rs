@@ -764,8 +764,8 @@ mod tests {
             assert!(parser.take_read_here_docs().is_empty());
 
             let location = lexer.location().await.unwrap();
-            assert_eq!(location.code.start_line_number.get(), 2);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.index, 4);
         })
     }
 

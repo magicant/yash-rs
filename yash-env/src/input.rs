@@ -115,7 +115,7 @@ impl Input for Stdin {
             }
         }
 
-        Ok(to_code(bytes, number))
+        Ok(to_code(bytes, number).value.into_inner())
     }
 }
 
@@ -133,9 +133,7 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "");
-        assert_eq!(line.start_line_number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]
@@ -150,13 +148,9 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "echo ok\n");
-        assert_eq!(line.start_line_number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "echo ok\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "");
-        assert_eq!(line.start_line_number.get(), 2);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]
@@ -171,21 +165,13 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "#!/bin/sh\n");
-        assert_eq!(line.start_line_number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "#!/bin/sh\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "echo ok\n");
-        assert_eq!(line.start_line_number.get(), 2);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "echo ok\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "exit");
-        assert_eq!(line.start_line_number.get(), 3);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "exit");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(*line.value.borrow(), "");
-        assert_eq!(line.start_line_number.get(), 3);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]

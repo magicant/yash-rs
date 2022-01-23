@@ -169,8 +169,9 @@ mod tests {
         assert_eq!(heredoc.content.0, []);
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.start_line_number.get(), 2);
-        assert_eq!(location.index, 0);
+        assert_eq!(*location.code.value.borrow(), "END\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 4);
     }
 
     #[test]
@@ -184,8 +185,9 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "content\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.start_line_number.get(), 3);
-        assert_eq!(location.index, 0);
+        assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 12);
     }
 
     #[test]
@@ -199,8 +201,9 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.start_line_number.get(), 6);
-        assert_eq!(location.index, 0);
+        assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 18);
     }
 
     #[test]
@@ -279,8 +282,9 @@ END
         assert_eq!(heredoc.content.to_string(), "foo\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.code.start_line_number.get(), 3);
-        assert_eq!(location.index, 0);
+        assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 12);
     }
 
     #[test]
