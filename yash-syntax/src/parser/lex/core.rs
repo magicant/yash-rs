@@ -24,7 +24,6 @@ use crate::input::Input;
 use crate::input::Memory;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
-use crate::source::lines;
 use crate::source::Code;
 use crate::source::Location;
 use crate::source::Source;
@@ -299,10 +298,22 @@ impl<'a> LexerCore<'a> {
             original,
             alias: alias.clone(),
         };
-        let mut repl = vec![];
-        for line in lines(&alias.replacement, source) {
-            repl.extend(Rc::new(line).enumerate());
-        }
+        let code = Rc::new(Code {
+            value: RefCell::new(alias.replacement.clone()),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source,
+        });
+        let repl = alias
+            .replacement
+            .chars()
+            .enumerate()
+            .map(|(index, value)| SourceChar {
+                value,
+                location: Location {
+                    code: Rc::clone(&code),
+                    index,
+                },
+            });
 
         self.source.splice(begin..end, repl);
         self.index = begin;
@@ -1043,7 +1054,7 @@ mod tests {
 
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'x');
-                assert_eq!(*c.location.code.value.borrow(), "x\n");
+                assert_eq!(*c.location.code.value.borrow(), "x\ny");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
@@ -1059,7 +1070,7 @@ mod tests {
 
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, '\n');
-                assert_eq!(*c.location.code.value.borrow(), "x\n");
+                assert_eq!(*c.location.code.value.borrow(), "x\ny");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source,
                     Source::Alias { original, alias: alias2 } => {
@@ -1075,8 +1086,8 @@ mod tests {
 
             assert_matches!(lexer.peek_char().await, Ok(PeekChar::Char(c)) => {
                 assert_eq!(c.value, 'y');
-                assert_eq!(*c.location.code.value.borrow(), "y");
-                assert_eq!(c.location.code.start_line_number.get(), 2);
+                assert_eq!(*c.location.code.value.borrow(), "x\ny");
+                assert_eq!(c.location.code.start_line_number, line);
                 assert_matches!(&c.location.code.source, Source::Alias { original, alias: alias2 } => {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
@@ -1084,7 +1095,7 @@ mod tests {
                     assert_eq!(original.index, 1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 0);
+                assert_eq!(c.location.index, 2);
             });
             lexer.consume_char();
 
