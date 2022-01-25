@@ -238,17 +238,42 @@ impl<'a> LexerCore<'a> {
         self.index = index;
     }
 
-    /// Clears an end-of-input or error status so that the lexer can resume
-    /// parsing.
-    fn reset(&mut self) {
-        self.state = InputState::Alive;
+    /// Checks if there is any character that has been read from the input
+    /// source but not yet consumed.
+    #[must_use]
+    fn pending(&self) -> bool {
+        self.index < self.source.len()
+    }
+
+    /// Clears the internal buffer.
+    fn flush(&mut self) {
+        let lines = self
+            .raw_code
+            .value
+            .borrow()
+            .chars()
+            .filter(|&c| c == '\n')
+            .count()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        // TODO Use NonZeroU64::saturating_add
+        // let start_line_number = self.raw_code.start_line_number.saturating_add(lines);
+        let start_line_number = self.raw_code.start_line_number.get().saturating_add(lines);
+        let start_line_number = NonZeroU64::new(start_line_number).unwrap();
         self.raw_code = Rc::new(Code {
             value: RefCell::new(String::new()),
-            start_line_number: self.raw_code.start_line_number,
+            start_line_number,
             source: self.raw_code.source.clone(),
         });
         self.source.clear();
         self.index = 0;
+    }
+
+    /// Clears an end-of-input or error status so that the lexer can resume
+    /// parsing.
+    fn reset(&mut self) {
+        self.state = InputState::Alive;
+        self.flush();
     }
 
     /// Extracts a string from the source code.
@@ -448,7 +473,7 @@ impl<'a> Lexer<'a> {
     /// If there is no more character (that is, it is the end of input), an imaginary location
     /// is returned that would be returned if a character existed.
     ///
-    /// This function required a mutable reference to `self` since it may need to read a next
+    /// This function requires a mutable reference to `self` since it may need to read a next
     /// line if it is not yet read.
     pub async fn location(&mut self) -> Result<&Location> {
         self.core.peek_char().await.map(|p| p.location())
@@ -503,6 +528,25 @@ impl<'a> Lexer<'a> {
     /// ```
     pub fn rewind(&mut self, index: usize) {
         self.core.rewind(index)
+    }
+
+    /// Checks if there is any character that has been read from the input
+    /// source but not yet consumed.
+    #[must_use]
+    pub fn pending(&self) -> bool {
+        self.core.pending()
+    }
+
+    /// Clears the internal buffer of the lexer.
+    ///
+    /// Locations returned from [`location`](Self::location) share a single code
+    /// instance that is also retained by the lexer. The code grows long as the
+    /// lexer reads more input. To prevent the code from getting too large, you
+    /// can call this function that replaces the retained code with a new empty
+    /// one. The new code's `start_line_number` will be incremented by the
+    /// number of lines in the previous.
+    pub fn flush(&mut self) {
+        self.core.flush()
     }
 
     /// Clears an end-of-input or error status so that the lexer can resume
@@ -1175,6 +1219,35 @@ mod tests {
         let mut lexer = lexer.disable_line_continuation();
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('\\')));
         assert_eq!(lexer.index(), 0);
+    }
+
+    #[test]
+    fn lexer_flush() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory(" \n\n\t\n", Source::Unknown);
+            let location_1 = lexer.location().await.unwrap().clone();
+            assert_eq!(*location_1.code.value.borrow(), " \n");
+
+            lexer.consume_char();
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+            lexer.flush();
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
+
+            let location_2 = lexer.location().await.unwrap().clone();
+
+            assert_eq!(*location_1.code.value.borrow(), " \n\n");
+            assert_eq!(location_1.code.start_line_number.get(), 1);
+            assert_eq!(location_1.code.source, Source::Unknown);
+            assert_eq!(location_1.index, 0);
+            assert_eq!(*location_2.code.value.borrow(), "\t\n");
+            assert_eq!(location_2.code.start_line_number.get(), 3);
+            assert_eq!(location_2.code.source, Source::Unknown);
+            assert_eq!(location_2.index, 1);
+        });
     }
 
     #[test]

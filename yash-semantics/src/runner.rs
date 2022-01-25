@@ -65,6 +65,9 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
     let mut executed = false;
 
     loop {
+        if !lexer.pending() {
+            lexer.flush();
+        }
         let mut parser = Parser::new(lexer, &env.aliases);
         match parser.command_line().await {
             Ok(Some(command)) => {
