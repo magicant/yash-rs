@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Items in the `input` module:
     - `Result` redefined as `Result<String, Error>` (previously `Result<Code, Error>`)
     - `Error` redefined as `std::io::Error` (previously `(Location, std::io::Error)`)
+    - `Memory::new` no longer taking a `Source` parameter
 - `Lexer::new` now requiring the `start_line_number` and `source` parameters
 - Dependency versions
     - `async-trait` 0.1.50 → 0.1.52

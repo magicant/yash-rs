@@ -16,7 +16,6 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
-use crate::source::Source;
 use async_trait::async_trait;
 
 /// Current state in which source code is read.
@@ -62,8 +61,7 @@ pub struct Memory<'a> {
 
 impl Memory<'_> {
     /// Creates a new `Memory` that reads the given string.
-    pub fn new(code: &str, _source: Source) -> Memory<'_> {
-        // FIXME Remove the source parameter
+    pub fn new(code: &str) -> Memory<'_> {
         let lines = code.split_inclusive('\n');
         Memory { lines }
     }
@@ -79,12 +77,11 @@ impl Input for Memory<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Source;
     use futures_executor::block_on;
 
     #[test]
     fn memory_empty_source() {
-        let mut input = Memory::new("", Source::Unknown);
+        let mut input = Memory::new("");
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line, "");
@@ -92,7 +89,7 @@ mod tests {
 
     #[test]
     fn memory_one_line() {
-        let mut input = Memory::new("one\n", Source::Unknown);
+        let mut input = Memory::new("one\n");
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line, "one\n");
@@ -103,7 +100,7 @@ mod tests {
 
     #[test]
     fn memory_three_lines() {
-        let mut input = Memory::new("one\ntwo\nthree", Source::Unknown);
+        let mut input = Memory::new("one\ntwo\nthree");
 
         let line = block_on(input.next_line(&Context)).unwrap();
         assert_eq!(line, "one\n");

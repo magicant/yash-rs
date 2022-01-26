@@ -35,7 +35,7 @@
 //! use yash_syntax::input::Memory;
 //! use yash_syntax::source::Source;
 //! # // TODO demonstrate with a Source other than Unknown
-//! let input = Box::new(Memory::new("echo $?", Source::Unknown));
+//! let input = Box::new(Memory::new("echo $?"));
 //!
 //! // Next, create a lexer.
 //! # use std::num::NonZeroU64;
