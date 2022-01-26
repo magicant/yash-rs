@@ -24,6 +24,7 @@ use crate::input::Input;
 use crate::input::Memory;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
+use crate::source::source_chars;
 use crate::source::Code;
 use crate::source::Location;
 use crate::source::Source;
@@ -172,13 +173,7 @@ impl<'a> LexerCore<'a> {
                         // Successful read
                         self.raw_code.value.borrow_mut().push_str(&line);
                         self.source
-                            .extend(line.chars().enumerate().map(|(i, value)| SourceChar {
-                                value,
-                                location: Location {
-                                    code: Rc::clone(&self.raw_code),
-                                    index: self.index + i,
-                                },
-                            }))
+                            .extend(source_chars(&line, &self.raw_code, self.index));
                     }
                 }
                 Err(io_error) => {
@@ -303,17 +298,7 @@ impl<'a> LexerCore<'a> {
             start_line_number: NonZeroU64::new(1).unwrap(),
             source,
         });
-        let repl = alias
-            .replacement
-            .chars()
-            .enumerate()
-            .map(|(index, value)| SourceChar {
-                value,
-                location: Location {
-                    code: Rc::clone(&code),
-                    index,
-                },
-            });
+        let repl = source_chars(&alias.replacement, &code, 0);
 
         self.source.splice(begin..end, repl);
         self.index = begin;
