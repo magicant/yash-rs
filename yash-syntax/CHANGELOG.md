@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `futures-util` 0.3.18 → 0.3.19
     - `itertools` 0.10.1 → 0.10.3
 
+## Removed
+
+- `Code::enumerate`
+
 ## [0.1.0] - 2021-12-11
 
 ### Added

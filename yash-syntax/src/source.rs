@@ -309,21 +309,6 @@ pub struct SourceChar {
     pub location: Location,
 }
 
-impl Code {
-    /// Creates an iterator of `SourceChar`.
-    #[allow(clippy::needless_lifetimes)] // This lifetime is actually needed.
-    pub fn enumerate<'a>(self: &'a Rc<Self>) -> impl Iterator<Item = SourceChar> + 'a {
-        // We do need to collect the iterator to release the borrow.
-        #[allow(clippy::needless_collect)]
-        let chars = self.value.borrow().chars().collect::<Vec<char>>();
-        chars.into_iter().enumerate().map(move |(index, value)| {
-            let code = self.clone();
-            let location = Location { code, index };
-            SourceChar { value, location }
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,42 +413,5 @@ mod tests {
         assert_eq!(location.index, 8);
 
         assert!(Rc::ptr_eq(&location.code, &code));
-    }
-
-    #[test]
-    fn code_enumerate() {
-        fn make_code(v: &str, n: u64) -> Rc<Code> {
-            Rc::new(Code {
-                value: v.to_string().into(),
-                start_line_number: NonZeroU64::new(n).unwrap(),
-                source: Source::Unknown,
-            })
-        }
-
-        let empty = make_code("", 1);
-        assert_eq!(empty.enumerate().next(), None);
-
-        let code = make_code("foo", 2);
-        let chars = code.enumerate().collect::<Vec<SourceChar>>();
-        assert_eq!(chars.len(), 3);
-        assert_eq!(chars[0].value, 'f');
-        assert_eq!(chars[0].location.index, 0);
-        assert!(Rc::ptr_eq(&chars[0].location.code, &code));
-        assert_eq!(chars[1].value, 'o');
-        assert_eq!(chars[1].location.index, 1);
-        assert!(Rc::ptr_eq(&chars[1].location.code, &code));
-        assert_eq!(chars[2].value, 'o');
-        assert_eq!(chars[2].location.index, 2);
-        assert!(Rc::ptr_eq(&chars[2].location.code, &code));
-
-        let code = make_code("hello", 4);
-        let chars = code.enumerate().collect::<Vec<SourceChar>>();
-        assert_eq!(chars.len(), 5);
-        assert_eq!(chars[0].value, 'h');
-        assert_eq!(chars[0].location.index, 0);
-        assert!(Rc::ptr_eq(&chars[0].location.code, &code));
-        assert_eq!(chars[4].value, 'o');
-        assert_eq!(chars[4].location.index, 4);
-        assert!(Rc::ptr_eq(&chars[4].location.code, &code));
     }
 }
