@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ????-??-??
 
+Previously, source code attribution attached to ASTs was line-oriented. The
+attribution now contains a whole fragment of code corresponding to a complete
+command.
+
 ### Added
 
 - `source_chars`

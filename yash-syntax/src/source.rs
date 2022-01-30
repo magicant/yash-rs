@@ -16,7 +16,11 @@
 
 //! Source code that is passed to the parser.
 //!
-//! TODO Elaborate
+//! This module contains items representing information about the source code
+//! from which ASTs originate. [`Source`] identifies the origin of source code
+//! fragments contained in [`Code`]. A [`Location`] specifies a particular
+//! character in a `Code` instance. You can use the [`pretty`] submodule to
+//! format messages describing source code locations.
 
 pub mod pretty;
 
@@ -133,7 +137,8 @@ impl Source {
 
 /// Source code fragment
 ///
-/// TODO Elaborate
+/// An instance of `Code` contains a block of the source code that was parsed to
+/// produce an AST.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Code {
     /// Content of the code, usually terminated by a newline.
