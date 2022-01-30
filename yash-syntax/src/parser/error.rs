@@ -424,27 +424,27 @@ impl fmt::Display for Error {
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation {
-            r#type: AnnotationType::Error,
-            label: e.cause.label().into(),
-            location: e.location.clone(),
-        }];
+        let mut a = vec![Annotation::new(
+            AnnotationType::Error,
+            e.cause.label().into(),
+            &e.location,
+        )];
 
-        e.location.line.source.complement_annotations(&mut a);
+        e.location.code.source.complement_annotations(&mut a);
 
         if let Some((location, label)) = e.cause.related_location() {
-            a.push(Annotation {
-                r#type: AnnotationType::Info,
-                label: label.into(),
-                location: location.clone(),
-            });
+            a.push(Annotation::new(
+                AnnotationType::Info,
+                label.into(),
+                location,
+            ));
         }
         if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &e.cause {
-            a.push(Annotation {
-                r#type: AnnotationType::Help,
-                label: "surround this in a grouping: `{ ! ...; }`".into(),
-                location: e.location.clone(),
-            })
+            a.push(Annotation::new(
+                AnnotationType::Help,
+                "surround this in a grouping: `{ ! ...; }`".into(),
+                &e.location,
+            ));
         }
 
         Message {
@@ -458,23 +458,19 @@ impl<'a> From<&'a Error> for Message<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Line;
+    use crate::source::Code;
     use crate::source::Source;
     use std::num::NonZeroU64;
     use std::rc::Rc;
 
     #[test]
     fn display_for_error() {
-        let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
-            value: "".to_string(),
-            number,
+        let code = Rc::new(Code {
+            value: "".to_string().into(),
+            start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            line,
-            column: number,
-        };
+        let location = Location { code, index: 0 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,
@@ -487,16 +483,12 @@ mod tests {
 
     #[test]
     fn from_error_for_message() {
-        let number = NonZeroU64::new(1).unwrap();
-        let line = Rc::new(Line {
-            value: "".to_string(),
-            number,
+        let code = Rc::new(Code {
+            value: "".to_string().into(),
+            start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            line,
-            column: number,
-        };
+        let location = Location { code, index: 0 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,
@@ -510,6 +502,6 @@ mod tests {
         assert_eq!(message.annotations.len(), 1);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(message.annotations[0].label, "expected a delimiter word");
-        assert_eq!(message.annotations[0].location, error.location);
+        assert_eq!(message.annotations[0].location, &error.location);
     }
 }

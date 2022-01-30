@@ -163,13 +163,14 @@ mod tests {
     use crate::syntax::SwitchType;
     use crate::syntax::TrimLength;
     use crate::syntax::TrimSide;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     fn assert_opening_location(location: &Location) {
-        assert_eq!(location.line.value, "$");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "$");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
+        assert_eq!(location.index, 0);
     }
 
     #[test]
@@ -255,10 +256,10 @@ mod tests {
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
-        assert_eq!(e.location.line.value, "{};");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "{};");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -271,15 +272,14 @@ mod tests {
         let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
             assert_opening_location(&opening_location);
-        } else {
-            panic!("Unexpected cause: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "{;");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "{;");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -292,15 +292,14 @@ mod tests {
         let location = Location::dummy("$");
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) = e.cause {
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
             assert_opening_location(&opening_location);
-        } else {
-            panic!("Unexpected cause: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "{_;");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "{_;");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 2);
     }
 
     #[test]
@@ -386,13 +385,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "x");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -410,13 +407,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "foo");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.to_string(), "'!'");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -434,13 +429,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -458,13 +451,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "-");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -482,13 +473,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -506,13 +495,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.to_string(), "?");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -530,13 +517,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Switch(switch) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.to_string(), "");
-        } else {
-            panic!("Not a switch: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -554,13 +539,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Trim(trim) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Longest);
             assert_eq!(trim.pattern.to_string(), "");
-        } else {
-            panic!("Not a modifier: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -578,13 +561,11 @@ mod tests {
 
         let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
         assert_eq!(result.name, "#");
-        if let Modifier::Trim(trim) = result.modifier {
+        assert_matches!(result.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Suffix);
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.to_string(), "");
-        } else {
-            panic!("Not a modifier: {:?}", result.modifier);
-        }
+        });
         // TODO assert about other result members
         assert_opening_location(&result.location);
 
@@ -602,8 +583,8 @@ mod tests {
 
         let e = block_on(lexer.braced_param(location)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
-        assert_eq!(e.location.line.value, "{#x+};");
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(*e.location.code.value.borrow(), "{#x+};");
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]

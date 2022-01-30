@@ -16,12 +16,16 @@
 
 //! Source code that is passed to the parser.
 //!
-//! TODO Elaborate
+//! This module contains items representing information about the source code
+//! from which ASTs originate. [`Source`] identifies the origin of source code
+//! fragments contained in [`Code`]. A [`Location`] specifies a particular
+//! character in a `Code` instance. You can use the [`pretty`] submodule to
+//! format messages describing source code locations.
 
 pub mod pretty;
 
 use crate::alias::Alias;
-use std::iter::FusedIterator;
+use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::rc::Rc;
 
@@ -104,7 +108,7 @@ impl Source {
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// Rc::make_mut(&mut original.line).source = source;
+    /// Rc::make_mut(&mut original.code).source = source;
     /// let source = Source::Alias{original, alias};
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), true);
@@ -112,7 +116,7 @@ impl Source {
     /// ```
     pub fn is_alias_for(&self, name: &str) -> bool {
         if let Source::Alias { original, alias } = self {
-            alias.name == name || original.line.source.is_alias_for(name)
+            alias.name == name || original.code.source.is_alias_for(name)
         } else {
             false
         }
@@ -131,127 +135,102 @@ impl Source {
     }
 }
 
-/// Line in source code.
+/// Source code fragment
+///
+/// An instance of `Code` contains a block of the source code that was parsed to
+/// produce an AST.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Line {
-    /// Content of the line, usually including a trailing newline.
+pub struct Code {
+    /// Content of the code, usually terminated by a newline.
     ///
-    /// A line must be terminated by a newline character (unless the source code lacks a
-    /// newline in the last line). Newlines must not appear in any other part of the line.
-    pub value: String,
-    /// Line number. Counted from 1.
-    pub number: NonZeroU64,
-    /// Source code containing this line.
+    /// The value is contained in a `RefCell` so that more lines can be appended
+    /// to the value as the parser reads input lines.
+    pub value: RefCell<String>,
+
+    /// Line number of the first line of the code. Counted from 1.
+    pub start_line_number: NonZeroU64,
+
+    /// Source of this code.
     pub source: Source,
 }
 
-/// Iterator created by [lines].
-pub struct Lines<'a> {
-    source: Source,
-    code: &'a str,
-    number: NonZeroU64,
-}
-
-impl<'a> Iterator for Lines<'a> {
-    type Item = Line;
-
-    fn next(&mut self) -> Option<Line> {
-        if self.code.is_empty() {
-            return None;
-        }
-
-        let number = self.number;
-        let source = self.source.clone();
-
-        let value = match self.code.find('\n') {
-            None => {
-                let value_range = self.code;
-                self.code = &self.code[self.code.len()..];
-                value_range
-            }
-            Some(mut i) => {
-                i += 1;
-                // TODO self.number = self.number.saturating_add(1);
-                self.number =
-                    unsafe { NonZeroU64::new_unchecked(self.number.get().saturating_add(1)) };
-                let value_range = &self.code[..i];
-                self.code = &self.code[i..];
-                value_range
-            }
-        }
-        .to_string();
-
-        Some(Line {
-            value,
-            number,
-            source,
-        })
-    }
-}
-
-impl FusedIterator for Lines<'_> {}
-
-impl Lines<'_> {
-    /// Like `next`, but returns an empty line if the end of input has been
-    /// reached.
-    pub fn next_or_empty(&mut self) -> Line {
-        self.next().unwrap_or_else(|| Line {
-            value: String::new(),
-            number: self.number,
-            source: self.source.clone(),
-        })
-    }
-}
-
-/// Converts a source code string into an iterator of [Line]s.
-pub fn lines(code: &str, source: Source) -> Lines<'_> {
-    Lines {
-        source,
-        code,
-        number: NonZeroU64::new(1).unwrap(),
-    }
+/// Creates an iterator of [source char](SourceChar)s from a string.
+///
+/// `index_offset` will be the `index` of the first source char's location. For
+/// each succeeding char, the `index` will be incremented by one.
+///
+/// ```
+/// # use yash_syntax::source::{Code, Source, source_chars};
+/// # use std::cell::RefCell;
+/// # use std::num::NonZeroU64;
+/// # use std::rc::Rc;
+/// let s = "abc";
+/// let code = Rc::new(Code {
+///     value: RefCell::new(s.to_string()),
+///     start_line_number: NonZeroU64::new(1).unwrap(),
+///     source: Source::Unknown,
+/// });
+/// let chars: Vec<_> = source_chars(s, &code, 10).collect();
+/// assert_eq!(chars[0].value, 'a');
+/// assert_eq!(chars[0].location.code, code);
+/// assert_eq!(chars[0].location.index, 10);
+/// assert_eq!(chars[1].value, 'b');
+/// assert_eq!(chars[1].location.code, code);
+/// assert_eq!(chars[1].location.index, 11);
+/// ```
+pub fn source_chars<'a>(
+    s: &'a str,
+    code: &'a Rc<Code>,
+    index_offset: usize,
+) -> impl Iterator<Item = SourceChar> + 'a {
+    s.chars().enumerate().map(move |(i, value)| SourceChar {
+        value,
+        location: Location {
+            code: Rc::clone(code),
+            index: index_offset + i,
+        },
+    })
 }
 
 /// Position of a character in source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
-    /// Line that contains the character.
-    pub line: Rc<Line>,
+    /// Code that contains the character.
+    pub code: Rc<Code>,
 
-    /// Character position in the line. Counted from 1.
+    /// Character position in the code, counted from 0.
     ///
-    /// Characters are counted in the number of Unicode scalar values, not bytes.
-    pub column: NonZeroU64,
+    /// Characters are counted in the number of Unicode scalar values, not
+    /// bytes. That means the `index` should be between 0 and
+    /// `code.value.borrow().chars().count()`.
+    pub index: usize,
 }
 
 impl Location {
     /// Creates a dummy location.
     ///
-    /// The returned location has [unknown](Source::Unknown) source and the given line value. The
-    /// line and column numbers are 1.
+    /// The returned location has [unknown](Source::Unknown) source and the
+    /// given source code value. The `start_line_number` and `index` are 1.
     ///
     /// This function is mainly for use in testing.
     #[inline]
-    pub fn dummy<S: Into<String>>(line: S) -> Location {
-        fn with_line(line: String) -> Location {
-            let number = NonZeroU64::new(1).unwrap();
-            let line = Rc::new(Line {
-                value: line,
-                number,
+    pub fn dummy<S: Into<String>>(value: S) -> Location {
+        fn with_line(value: String) -> Location {
+            let code = Rc::new(Code {
+                value: RefCell::new(value),
+                start_line_number: NonZeroU64::new(1).unwrap(),
                 source: Source::Unknown,
             });
-            Location {
-                line,
-                column: number,
-            }
+            Location { code, index: 0 }
         }
-        with_line(line.into())
+        with_line(value.into())
     }
 
-    /// Increases the column number
-    pub fn advance(&mut self, count: u64) {
-        let column = self.column.get().checked_add(count).unwrap();
-        self.column = NonZeroU64::new(column).unwrap();
+    /// Increases the `index` by `count`.
+    ///
+    /// This function panics if the result overflows.
+    pub fn advance(&mut self, count: usize) {
+        self.index = self.index.checked_add(count).unwrap();
     }
 }
 
@@ -264,164 +243,31 @@ pub struct SourceChar {
     pub location: Location,
 }
 
-impl Line {
-    /// Creates an iterator of `SourceChar`.
-    ///
-    /// The character columns are counted from 1.
-    #[allow(clippy::needless_lifetimes)] // This lifetime is actually needed.
-    pub fn enumerate<'a>(self: &'a Rc<Self>) -> impl Iterator<Item = SourceChar> + 'a {
-        self.value.chars().zip(1u64..).map(move |(value, i)| {
-            let column = NonZeroU64::new(i).unwrap();
-            let location = Location {
-                line: self.clone(),
-                column,
-            };
-            SourceChar { value, location }
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn lines_empty() {
-        let mut l = lines("", Source::Unknown);
-        assert_eq!(l.next(), None);
-
-        let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
-    }
-
-    #[test]
-    fn lines_one_line() {
-        let mut l = lines("foo\n", Source::Unknown);
-
-        let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "foo\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
-
-        // No second line
-        assert_eq!(l.next(), None);
-
-        let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
-    }
-
-    #[test]
-    fn lines_three_lines() {
-        let mut l = lines("foo\nbar\n\n", Source::Unknown);
-
-        let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "foo\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
-
-        let line = l.next().expect("second line should exist");
-        assert_eq!(&line.value, "bar\n");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
-
-        let line = l.next().expect("third line should exist");
-        assert_eq!(&line.value, "\n");
-        assert_eq!(line.number.get(), 3);
-        assert_eq!(line.source, Source::Unknown);
-
-        // No more lines
-        assert_eq!(l.next(), None);
-
-        let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 4);
-        assert_eq!(line.source, Source::Unknown);
-    }
-
-    #[test]
-    fn lines_without_trailing_newline() {
-        let mut l = lines("one\ntwo", Source::Unknown);
-
-        let line = l.next().expect("first line should exist");
-        assert_eq!(&line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
-
-        let line = l.next().expect("second line should exist");
-        assert_eq!(&line.value, "two");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
-
-        // No more lines
-        assert_eq!(l.next(), None);
-        // Lines is fused
-        assert_eq!(l.next(), None);
-
-        let line = l.next_or_empty();
-        assert_eq!(&line.value, "");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
-    }
-
-    #[test]
     fn location_advance() {
-        let line = Rc::new(lines("line\n", Source::Unknown).next().unwrap());
-        let column = NonZeroU64::new(1).unwrap();
+        let code = Rc::new(Code {
+            value: RefCell::new("line\n".to_owned()),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown,
+        });
         let mut location = Location {
-            line: line.clone(),
-            column,
+            code: code.clone(),
+            index: 0,
         };
 
         location.advance(1);
-        assert_eq!(location.column.get(), 2);
+        assert_eq!(location.index, 1);
         location.advance(2);
-        assert_eq!(location.column.get(), 4);
+        assert_eq!(location.index, 3);
 
         // The advance function does not check the line length.
         location.advance(5);
-        assert_eq!(location.column.get(), 9);
+        assert_eq!(location.index, 8);
 
-        assert!(Rc::ptr_eq(&location.line, &line));
-    }
-
-    #[test]
-    fn line_enumerate() {
-        fn make_line(v: &str, n: u64) -> Rc<Line> {
-            Rc::new(Line {
-                value: v.to_string(),
-                number: NonZeroU64::new(n).unwrap(),
-                source: Source::Unknown,
-            })
-        }
-
-        let empty = make_line("", 1);
-        assert_eq!(empty.enumerate().next(), None);
-
-        let line = make_line("foo", 2);
-        let chars = line.enumerate().collect::<Vec<SourceChar>>();
-        assert_eq!(chars.len(), 3);
-        assert_eq!(chars[0].value, 'f');
-        assert_eq!(chars[0].location.column.get(), 1);
-        assert!(Rc::ptr_eq(&chars[0].location.line, &line));
-        assert_eq!(chars[1].value, 'o');
-        assert_eq!(chars[1].location.column.get(), 2);
-        assert!(Rc::ptr_eq(&chars[1].location.line, &line));
-        assert_eq!(chars[2].value, 'o');
-        assert_eq!(chars[2].location.column.get(), 3);
-        assert!(Rc::ptr_eq(&chars[2].location.line, &line));
-
-        let line = make_line("hello", 4);
-        let chars = line.enumerate().collect::<Vec<SourceChar>>();
-        assert_eq!(chars.len(), 5);
-        assert_eq!(chars[0].value, 'h');
-        assert_eq!(chars[0].location.column.get(), 1);
-        assert!(Rc::ptr_eq(&chars[0].location.line, &line));
-        assert_eq!(chars[4].value, 'o');
-        assert_eq!(chars[4].location.column.get(), 5);
-        assert!(Rc::ptr_eq(&chars[4].location.line, &line));
+        assert!(Rc::ptr_eq(&location.code, &code));
     }
 }

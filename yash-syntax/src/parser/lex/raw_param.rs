@@ -82,6 +82,7 @@ impl Lexer<'_> {
 mod tests {
     use super::*;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -90,15 +91,13 @@ mod tests {
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        if let TextUnit::RawParam { name, location } = result {
+        assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "@");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a parameter expansion: {:?}", result);
-        }
+            assert_eq!(*location.code.value.borrow(), "$");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
@@ -109,15 +108,13 @@ mod tests {
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        if let TextUnit::RawParam { name, location } = result {
+        assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "1");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a parameter expansion: {:?}", result);
-        }
+            assert_eq!(*location.code.value.borrow(), "$");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('2')));
     }
@@ -128,15 +125,13 @@ mod tests {
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        if let TextUnit::RawParam { name, location } = result {
+        assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "az_AZ_019");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a parameter expansion: {:?}", result);
-        }
+            assert_eq!(*location.code.value.borrow(), "$");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
@@ -147,15 +142,13 @@ mod tests {
         let location = Location::dummy("$");
 
         let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        if let TextUnit::RawParam { name, location } = result {
+        assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "abc");
-            assert_eq!(location.line.value, "$");
-            assert_eq!(location.line.number.get(), 1);
-            assert_eq!(location.line.source, Source::Unknown);
-            assert_eq!(location.column.get(), 1);
-        } else {
-            panic!("Not a parameter expansion: {:?}", result);
-        }
+            assert_eq!(*location.code.value.borrow(), "$");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.index, 0);
+        });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
     }
@@ -166,10 +159,10 @@ mod tests {
         let location = Location::dummy("X");
 
         let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
-        assert_eq!(location.line.value, "X");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Unknown);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "X");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
+        assert_eq!(location.index, 0);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }

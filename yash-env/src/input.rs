@@ -23,12 +23,7 @@
 use crate::io::Fd;
 use crate::system::SharedSystem;
 use async_trait::async_trait;
-use std::num::NonZeroU64;
-use std::rc::Rc;
 use std::slice::from_mut;
-use yash_syntax::source::Line;
-use yash_syntax::source::Location;
-use yash_syntax::source::Source;
 
 #[doc(no_inline)]
 pub use yash_syntax::input::*;
@@ -45,26 +40,12 @@ pub use yash_syntax::input::*;
 #[derive(Clone, Debug)]
 pub struct Stdin {
     system: SharedSystem,
-    line_number: NonZeroU64,
 }
 
 impl Stdin {
     /// Creates a new `Stdin` instance.
     pub fn new(system: SharedSystem) -> Self {
-        Stdin {
-            system,
-            line_number: NonZeroU64::new(1).unwrap(),
-        }
-    }
-
-    /// Returns the current line number.
-    pub fn line_number(&self) -> NonZeroU64 {
-        self.line_number
-    }
-
-    /// Overwrites the current line number.
-    pub fn set_line_number(&mut self, line_number: NonZeroU64) {
-        self.line_number = line_number;
+        Stdin { system }
     }
 }
 
@@ -73,18 +54,6 @@ impl Input for Stdin {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
-        fn to_line(bytes: Vec<u8>, number: NonZeroU64) -> Line {
-            // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
-            let value = String::from_utf8(bytes)
-                .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
-            Line {
-                value,
-                number,
-                source: Source::Stdin,
-            }
-        }
-
-        let number = self.line_number;
         let mut bytes = Vec::new();
         loop {
             let mut byte = 0;
@@ -96,32 +65,17 @@ impl Input for Stdin {
                     assert_eq!(count, 1);
                     bytes.push(byte);
                     if byte == b'\n' {
-                        // TODO self.line_number = self.line_number.saturating_add(1);
-                        self.line_number = unsafe {
-                            NonZeroU64::new_unchecked(self.line_number.get().saturating_add(1))
-                        };
                         break;
                     }
                 }
 
-                Err(errno) => {
-                    let line = Rc::new(to_line(bytes, number));
-                    let column = line
-                        .value
-                        .chars()
-                        .count()
-                        .try_into()
-                        .unwrap_or(u64::MAX)
-                        .saturating_add(1);
-                    let column = unsafe { NonZeroU64::new_unchecked(column) };
-                    let location = Location { line, column };
-                    let error = std::io::Error::from_raw_os_error(errno as i32);
-                    return Err((location, error));
-                }
+                Err(errno) => return Err(std::io::Error::from_raw_os_error(errno as i32)),
             }
         }
 
-        Ok(to_line(bytes, number))
+        // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
+        Ok(String::from_utf8(bytes)
+            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string()))
     }
 }
 
@@ -139,9 +93,7 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]
@@ -156,13 +108,9 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "echo ok\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "echo ok\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]
@@ -177,21 +125,13 @@ mod tests {
         let mut stdin = Stdin::new(system);
 
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "#!/bin/sh\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "#!/bin/sh\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "echo ok\n");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "echo ok\n");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "exit");
-        assert_eq!(line.number.get(), 3);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "exit");
         let line = block_on(stdin.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 3);
-        assert_eq!(line.source, Source::Stdin);
+        assert_eq!(line, "");
     }
 
     #[test]
@@ -201,10 +141,7 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let (location, error) = block_on(stdin.next_line(&Context)).unwrap_err();
-        assert_eq!(location.line.value, "");
-        assert_eq!(location.line.number.get(), 1);
-        assert_eq!(location.line.source, Source::Stdin);
+        let error = block_on(stdin.next_line(&Context)).unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 }

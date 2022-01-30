@@ -163,6 +163,7 @@ mod tests {
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -423,10 +424,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, " for ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 6);
+        assert_eq!(*e.location.code.value.borrow(), " for ");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 5);
     }
 
     #[test]
@@ -437,10 +438,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, " for\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(*e.location.code.value.borrow(), " for\n");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -451,10 +452,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
-        assert_eq!(e.location.line.value, "for; do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(*e.location.code.value.borrow(), "for; do :; done");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]
@@ -482,18 +483,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
-        assert_eq!(e.location.line.value, "&");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.column.get(), 1);
-        if let Source::Alias { original, alias } = &e.location.line.source {
-            assert_eq!(original.line.value, "FOR if do :; done");
-            assert_eq!(original.line.number.get(), 1);
-            assert_eq!(original.line.source, Source::Unknown);
-            assert_eq!(original.column.get(), 5);
+        assert_eq!(*e.location.code.value.borrow(), "&");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.index, 0);
+        assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
+            assert_eq!(*original.code.value.borrow(), "FOR if do :; done");
+            assert_eq!(original.code.start_line_number.get(), 1);
+            assert_eq!(original.code.source, Source::Unknown);
+            assert_eq!(original.index, 4);
             assert_eq!(alias.name, "if");
-        } else {
-            panic!("Not an alias: {:?}", e.location.line.source);
-        }
+        });
     }
 
     #[test]
@@ -503,18 +502,17 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
-            assert_eq!(opening_location.line.value, "for X\n");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("Not MissingForBody: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "; do :; done");
-        assert_eq!(e.location.line.number.get(), 2);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_matches!(&e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "for X\n; do :; done");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 0);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "for X\n; do :; done");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]
@@ -542,18 +540,16 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForValue));
-        assert_eq!(e.location.line.value, "&");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.column.get(), 1);
-        if let Source::Alias { original, alias } = &e.location.line.source {
-            assert_eq!(original.line.value, "for_A_in_a_b if c; do :; done");
-            assert_eq!(original.line.number.get(), 1);
-            assert_eq!(original.line.source, Source::Unknown);
-            assert_eq!(original.column.get(), 14);
+        assert_eq!(*e.location.code.value.borrow(), "&");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.index, 0);
+        assert_matches!(&e.location.code.source, Source::Alias { original, alias } => {
+            assert_eq!(*original.code.value.borrow(), "for_A_in_a_b if c; do :; done");
+            assert_eq!(original.code.start_line_number.get(), 1);
+            assert_eq!(original.code.source, Source::Unknown);
+            assert_eq!(original.index, 13);
             assert_eq!(alias.name, "if");
-        } else {
-            panic!("Not an alias: {:?}", e.location.line.source);
-        }
+        });
     }
 
     #[test]
@@ -563,17 +559,16 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) = &e.cause {
-            assert_eq!(opening_location.line.value, " for X; ! do :; done");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 2);
-        } else {
-            panic!("Not MissingForBody: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, " for X; ! do :; done");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 9);
+        assert_matches!(&e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), " for X; ! do :; done");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 1);
+        });
+        assert_eq!(*e.location.code.value.borrow(), " for X; ! do :; done");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 8);
     }
 }

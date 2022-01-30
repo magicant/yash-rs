@@ -170,10 +170,10 @@ mod tests {
 
         let e = block_on(parser.pipeline()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
-        assert_eq!(e.location.line.value, " !  !");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(*e.location.code.value.borrow(), " !  !");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -187,10 +187,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBang)
         );
-        assert_eq!(e.location.line.value, "!\n");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "!\n");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -204,10 +204,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBar)
         );
-        assert_eq!(e.location.line.value, "foo | ;");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(*e.location.code.value.borrow(), "foo | ;");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]
@@ -218,10 +218,10 @@ mod tests {
 
         let e = block_on(parser.pipeline()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
-        assert_eq!(e.location.line.value, "foo | !");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(*e.location.code.value.borrow(), "foo | !");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]

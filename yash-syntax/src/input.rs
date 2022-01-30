@@ -16,11 +16,6 @@
 
 //! Methods about passing [source](crate::source) code to the [parser](crate::parser).
 
-use crate::source::lines;
-use crate::source::Line;
-use crate::source::Lines;
-use crate::source::Location;
-use crate::source::Source;
 use async_trait::async_trait;
 
 /// Current state in which source code is read.
@@ -34,10 +29,10 @@ use async_trait::async_trait;
 pub struct Context;
 
 /// Error returned by the [Input] function.
-pub type Error = (Location, std::io::Error);
+pub type Error = std::io::Error;
 
 /// Result of the [Input] function.
-pub type Result = std::result::Result<Line, Error>;
+pub type Result = std::result::Result<String, Error>;
 
 /// Line-oriented source code reader.
 ///
@@ -46,7 +41,7 @@ pub type Result = std::result::Result<Line, Error>;
 pub trait Input {
     /// Reads a next line of the source code.
     ///
-    /// The input function is line-oriented; that is, this function returns a [`Line`] that is
+    /// The input function is line-oriented; that is, this function returns a string that is
     /// terminated by a newline unless the end of input (EOF) is reached, in which case the
     /// remaining characters up to the EOF must be returned without a trailing newline. If there
     /// are no more characters at all, the returned line is empty.
@@ -61,81 +56,62 @@ pub trait Input {
 
 /// Input function that reads from a string in memory.
 pub struct Memory<'a> {
-    lines: Lines<'a>,
+    lines: std::str::SplitInclusive<'a, char>,
 }
 
 impl Memory<'_> {
     /// Creates a new `Memory` that reads the given string.
-    pub fn new(code: &str, source: Source) -> Memory<'_> {
-        let lines = lines(code, source);
+    pub fn new(code: &str) -> Memory<'_> {
+        let lines = code.split_inclusive('\n');
         Memory { lines }
-    }
-
-    fn next_line_sync(&mut self, _: &Context) -> Line {
-        self.lines.next_or_empty()
     }
 }
 
 #[async_trait(?Send)]
 impl Input for Memory<'_> {
-    async fn next_line(&mut self, context: &Context) -> Result {
-        Ok(self.next_line_sync(context))
+    async fn next_line(&mut self, _context: &Context) -> Result {
+        Ok(self.lines.next().unwrap_or("").to_owned())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::source::Source;
     use futures_executor::block_on;
 
     #[test]
     fn memory_empty_source() {
-        let mut input = Memory::new("", Source::Unknown);
+        let mut input = Memory::new("");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "");
     }
 
     #[test]
     fn memory_one_line() {
-        let mut input = Memory::new("one\n", Source::Unknown);
+        let mut input = Memory::new("one\n");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "one\n");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "");
     }
 
     #[test]
     fn memory_three_lines() {
-        let mut input = Memory::new("one\ntwo\nthree", Source::Unknown);
+        let mut input = Memory::new("one\ntwo\nthree");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "one\n");
-        assert_eq!(line.number.get(), 1);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "one\n");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "two\n");
-        assert_eq!(line.number.get(), 2);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "two\n");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "three");
-        assert_eq!(line.number.get(), 3);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "three");
 
         let line = block_on(input.next_line(&Context)).unwrap();
-        assert_eq!(line.value, "");
-        assert_eq!(line.number.get(), 3);
-        assert_eq!(line.source, Source::Unknown);
+        assert_eq!(line, "");
     }
 }

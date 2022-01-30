@@ -64,7 +64,7 @@
 //! use yash_syntax::source::Source;
 //! # use yash_syntax::syntax::Word;
 //! let word: Word = "foo".parse().unwrap();
-//! assert_eq!(word.location.line.source, Source::Unknown);
+//! assert_eq!(word.location.code.source, Source::Unknown);
 //! ```
 //!
 //! To include substantial source information in the AST, you need to prepare a

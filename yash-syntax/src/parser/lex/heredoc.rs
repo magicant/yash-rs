@@ -125,6 +125,7 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -168,8 +169,9 @@ mod tests {
         assert_eq!(heredoc.content.0, []);
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.line.number.get(), 2);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "END\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 4);
     }
 
     #[test]
@@ -183,8 +185,9 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "content\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.line.number.get(), 3);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 12);
     }
 
     #[test]
@@ -198,8 +201,9 @@ mod tests {
         assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.line.number.get(), 6);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 18);
     }
 
     #[test]
@@ -278,8 +282,9 @@ END
         assert_eq!(heredoc.content.to_string(), "foo\n");
 
         let location = block_on(lexer.location()).unwrap();
-        assert_eq!(location.line.number.get(), 3);
-        assert_eq!(location.column.get(), 1);
+        assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.index, 12);
     }
 
     #[test]
@@ -288,19 +293,16 @@ END
 
         let mut lexer = Lexer::from_memory("", Source::Unknown);
         let e = block_on(lexer.here_doc_content(heredoc)).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) =
-            e.cause
-        {
-            assert_eq!(redir_op_location.line.value, "END");
-            assert_eq!(redir_op_location.line.number.get(), 1);
-            assert_eq!(redir_op_location.line.source, Source::Unknown);
-            assert_eq!(redir_op_location.column.get(), 1);
-        } else {
-            panic!("Not UnclosedHereDocContent: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) => {
+            assert_eq!(*redir_op_location.code.value.borrow(), "END");
+            assert_eq!(redir_op_location.code.start_line_number.get(), 1);
+            assert_eq!(redir_op_location.code.source, Source::Unknown);
+            assert_eq!(redir_op_location.index, 0);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 0);
     }
 }

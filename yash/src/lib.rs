@@ -25,6 +25,7 @@ pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
+    use std::num::NonZeroU64;
     use std::ops::ControlFlow::Break;
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
@@ -44,7 +45,9 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
 
-    let mut lexer = parser::lex::Lexer::new(Box::new(Stdin::new(env.system.clone())));
+    let input = Box::new(Stdin::new(env.system.clone()));
+    let line = NonZeroU64::new(1).unwrap();
+    let mut lexer = parser::lex::Lexer::new(input, line, source::Source::Stdin);
     let result = semantics::read_eval_loop(&mut env, &mut lexer).await;
     if let Break(divert) = result {
         if let Some(exit_status) = divert.exit_status() {

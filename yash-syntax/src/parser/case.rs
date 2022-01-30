@@ -183,6 +183,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -314,10 +315,10 @@ mod tests {
 
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
-        assert_eq!(e.location.line.value, ")");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(*e.location.code.value.borrow(), ")");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 0);
     }
 
     #[test]
@@ -328,10 +329,10 @@ mod tests {
 
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EsacAsPattern));
-        assert_eq!(e.location.line.value, "(esac)");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "(esac)");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -342,10 +343,10 @@ mod tests {
 
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidPattern));
-        assert_eq!(e.location.line.value, "(&");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 2);
+        assert_eq!(*e.location.code.value.borrow(), "(&");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 1);
     }
 
     #[test]
@@ -356,10 +357,10 @@ mod tests {
 
         let e = block_on(parser.case_item()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingPattern));
-        assert_eq!(e.location.line.value, "(foo| |");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(*e.location.code.value.borrow(), "(foo| |");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]
@@ -373,10 +374,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedPatternList)
         );
-        assert_eq!(e.location.line.value, "(foo bar");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 6);
+        assert_eq!(*e.location.code.value.borrow(), "(foo bar");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 5);
     }
 
     #[test]
@@ -387,12 +388,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "foo");
             assert_eq!(items, []);
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -423,12 +422,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items, []);
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -459,13 +456,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "in");
             assert_eq!(items.len(), 1);
             assert_eq!(items[0].to_string(), "(a | b) ;;");
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -496,12 +491,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items, []);
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -515,13 +508,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "foo");
             assert_eq!(items.len(), 1);
             assert_eq!(items[0].to_string(), "(bar) ;;");
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -538,15 +529,13 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items.len(), 3);
             assert_eq!(items[0].to_string(), "(a) ;;");
             assert_eq!(items[1].to_string(), "(b | c) :& :;;");
             assert_eq!(items[2].to_string(), "(d) echo;;");
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -560,14 +549,12 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Case { subject, items } = result {
+        assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].to_string(), "(1) ;;");
             assert_eq!(items[1].to_string(), "(2) echo;;");
-        } else {
-            panic!("Not a case command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -581,10 +568,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingCaseSubject));
-        assert_eq!(e.location.line.value, " case  ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 8);
+        assert_eq!(*e.location.code.value.borrow(), " case  ");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 7);
     }
 
     #[test]
@@ -595,10 +582,10 @@ mod tests {
 
         let e = block_on(parser.compound_command()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidCaseSubject));
-        assert_eq!(e.location.line.value, " case ; ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 7);
+        assert_eq!(*e.location.code.value.borrow(), " case ; ");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 6);
     }
 
     #[test]
@@ -608,18 +595,17 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::MissingIn { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, " case x esac");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 2);
-        } else {
-            panic!("Not a MissingIn: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, " case x esac");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 9);
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::MissingIn { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), " case x esac");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 1);
+        });
+        assert_eq!(*e.location.code.value.borrow(), " case x esac");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 8);
     }
 
     #[test]
@@ -629,17 +615,16 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.compound_command()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedCase { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "case x in a) }");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("Not a MissingIn: {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "case x in a) }");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 14);
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedCase { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "case x in a) }");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 0);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "case x in a) }");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 13);
     }
 }

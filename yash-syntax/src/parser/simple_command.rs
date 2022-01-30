@@ -171,6 +171,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -230,18 +231,17 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
         let e = block_on(parser.array_values()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "(a b");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("Unexpected cause {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "(a b");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_matches!(e.cause,
+             ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "(a b");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 0);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "(a b");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -250,18 +250,17 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
         let e = block_on(parser.array_values()).unwrap_err();
-        if let ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) = e.cause {
-            assert_eq!(opening_location.line.value, "(a;b)");
-            assert_eq!(opening_location.line.number.get(), 1);
-            assert_eq!(opening_location.line.source, Source::Unknown);
-            assert_eq!(opening_location.column.get(), 1);
-        } else {
-            panic!("Unexpected cause {:?}", e.cause);
-        }
-        assert_eq!(e.location.line.value, "(a;b)");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        assert_matches!(e.cause,
+            ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
+            assert_eq!(*opening_location.code.value.borrow(), "(a;b)");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.index, 0);
+        });
+        assert_eq!(*e.location.code.value.borrow(), "(a;b)");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 2);
     }
 
     #[test]
@@ -296,10 +295,10 @@ mod tests {
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "my");
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
-        assert_eq!(sc.assigns[0].location.line.value, "my=assignment");
-        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "my=assignment");
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.index, 0);
     }
 
     #[test]
@@ -314,22 +313,22 @@ mod tests {
         assert_eq!(sc.assigns.len(), 3);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(sc.assigns[0].location.line.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.index, 0);
         assert_eq!(sc.assigns[1].name, "b");
         assert_eq!(sc.assigns[1].value.to_string(), "!");
-        assert_eq!(sc.assigns[1].location.line.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[1].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[1].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[1].location.column.get(), 4);
+        assert_eq!(*sc.assigns[1].location.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[1].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[1].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[1].location.index, 3);
         assert_eq!(sc.assigns[2].name, "c");
         assert_eq!(sc.assigns[2].value.to_string(), "X");
-        assert_eq!(sc.assigns[2].location.line.value, "a= b=! c=X");
-        assert_eq!(sc.assigns[2].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[2].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[2].location.column.get(), 8);
+        assert_eq!(*sc.assigns[2].location.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[2].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[2].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[2].location.index, 7);
     }
 
     #[test]
@@ -557,10 +556,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(sc.assigns[0].location.line.value, "a= ()");
-        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= ()");
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.index, 0);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));
@@ -578,10 +577,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
-        assert_eq!(sc.assigns[0].location.line.value, "a=b()");
-        assert_eq!(sc.assigns[0].location.line.number.get(), 1);
-        assert_eq!(sc.assigns[0].location.line.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.column.get(), 1);
+        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a=b()");
+        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].location.index, 0);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));

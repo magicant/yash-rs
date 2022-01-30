@@ -120,10 +120,10 @@ mod tests {
         assert_eq!(alias.name, "foo");
         assert_eq!(alias.replacement, "bar baz");
         assert_eq!(alias.global, false);
-        assert_eq!(alias.origin.line.value, "foo=bar baz");
-        assert_eq!(alias.origin.line.number.get(), 1);
-        assert_eq!(alias.origin.line.source, Source::Unknown);
-        assert_eq!(alias.origin.column.get(), 1);
+        assert_eq!(*alias.origin.code.value.borrow(), "foo=bar baz");
+        assert_eq!(alias.origin.code.start_line_number.get(), 1);
+        assert_eq!(alias.origin.code.source, Source::Unknown);
+        assert_eq!(alias.origin.index, 0);
     }
 
     #[test]
@@ -140,28 +140,28 @@ mod tests {
         assert_eq!(abc.name, "abc");
         assert_eq!(abc.replacement, "xyz");
         assert_eq!(abc.global, false);
-        assert_eq!(abc.origin.line.value, "abc=xyz");
-        assert_eq!(abc.origin.line.number.get(), 1);
-        assert_eq!(abc.origin.line.source, Source::Unknown);
-        assert_eq!(abc.origin.column.get(), 1);
+        assert_eq!(*abc.origin.code.value.borrow(), "abc=xyz");
+        assert_eq!(abc.origin.code.start_line_number.get(), 1);
+        assert_eq!(abc.origin.code.source, Source::Unknown);
+        assert_eq!(abc.origin.index, 0);
 
         let yes = env.aliases.get("yes").unwrap().0.as_ref();
         assert_eq!(yes.name, "yes");
         assert_eq!(yes.replacement, "no");
         assert_eq!(yes.global, false);
-        assert_eq!(yes.origin.line.value, "yes=no");
-        assert_eq!(yes.origin.line.number.get(), 1);
-        assert_eq!(yes.origin.line.source, Source::Unknown);
-        assert_eq!(yes.origin.column.get(), 1);
+        assert_eq!(*yes.origin.code.value.borrow(), "yes=no");
+        assert_eq!(yes.origin.code.start_line_number.get(), 1);
+        assert_eq!(yes.origin.code.source, Source::Unknown);
+        assert_eq!(yes.origin.index, 0);
 
         let ls = env.aliases.get("ls").unwrap().0.as_ref();
         assert_eq!(ls.name, "ls");
         assert_eq!(ls.replacement, "ls --color");
         assert_eq!(ls.global, false);
-        assert_eq!(ls.origin.line.value, "ls=ls --color");
-        assert_eq!(ls.origin.line.number.get(), 1);
-        assert_eq!(ls.origin.line.source, Source::Unknown);
-        assert_eq!(ls.origin.column.get(), 1);
+        assert_eq!(*ls.origin.code.value.borrow(), "ls=ls --color");
+        assert_eq!(ls.origin.code.start_line_number.get(), 1);
+        assert_eq!(ls.origin.code.source, Source::Unknown);
+        assert_eq!(ls.origin.index, 0);
     }
 
     #[test]

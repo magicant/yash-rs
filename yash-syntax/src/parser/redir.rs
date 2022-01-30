@@ -362,12 +362,12 @@ mod tests {
         let e = block_on(parser.redirection()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::FdOutOfRange));
         assert_eq!(
-            e.location.line.value,
+            *e.location.code.value.borrow(),
             "9999999999999999999999999999999999999999< x"
         );
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 1);
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 0);
     }
 
     #[test]
@@ -390,10 +390,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
-        assert_eq!(e.location.line.value, " < >");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(*e.location.code.value.borrow(), " < >");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]
@@ -407,10 +407,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
         );
-        assert_eq!(e.location.line.value, "  < ");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 5);
+        assert_eq!(*e.location.code.value.borrow(), "  < ");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 4);
     }
 
     #[test]
@@ -424,10 +424,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
-        assert_eq!(e.location.line.value, "<< <<");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 4);
+        assert_eq!(*e.location.code.value.borrow(), "<< <<");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 3);
     }
 
     #[test]
@@ -441,9 +441,9 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
         );
-        assert_eq!(e.location.line.value, "<<");
-        assert_eq!(e.location.line.number.get(), 1);
-        assert_eq!(e.location.line.source, Source::Unknown);
-        assert_eq!(e.location.column.get(), 3);
+        assert_eq!(*e.location.code.value.borrow(), "<<");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.index, 2);
     }
 }

@@ -32,6 +32,9 @@
 
 use super::Location;
 use std::borrow::Cow;
+use std::cell::Ref;
+use std::ops::Deref;
+use std::rc::Rc;
 
 /// Type of annotation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -46,14 +49,42 @@ pub enum AnnotationType {
 /// Source code fragment annotated with a label.
 ///
 /// Annotations are part of an entire [`Message`].
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Annotation<'a> {
     /// Type of annotation.
     pub r#type: AnnotationType,
     /// String that describes the annotated part of the source code.
     pub label: Cow<'a, str>,
     /// Position of the annotated fragment in the source code.
-    pub location: Location,
+    pub location: &'a Location,
+    /// Annotated code string.
+    ///
+    /// This value provides an access to the string held in
+    /// `self.location.code.value`, which can only be accessed by a `Ref`.
+    pub code: Rc<dyn Deref<Target = str> + 'a>,
+}
+
+impl std::fmt::Debug for Annotation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Annotation")
+            .field("type", &self.r#type)
+            .field("label", &self.label)
+            .field("location", &self.location)
+            .field("code", &&**self.code)
+            .finish()
+    }
+}
+
+impl<'a> Annotation<'a> {
+    /// Creates a new annotation.
+    pub fn new(r#type: AnnotationType, label: Cow<'a, str>, location: &'a Location) -> Self {
+        Annotation {
+            r#type,
+            label,
+            location,
+            code: Rc::new(Ref::map(location.code.value.borrow(), String::as_str)),
+        }
+    }
 }
 
 /// Entire diagnostic message.
@@ -75,34 +106,34 @@ impl super::Source {
             Unknown | Stdin => (),
             CommandSubst { original } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation {
-                    r#type: AnnotationType::Info,
-                    label: "command substitution appeared here".into(),
-                    location: original.clone(),
-                }));
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    "command substitution appeared here".into(),
+                    original,
+                )));
             }
             Trap { origin, .. } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation {
-                    r#type: AnnotationType::Info,
-                    label: "trap was set here".into(),
-                    location: origin.clone(),
-                }));
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    "trap was set here".into(),
+                    origin,
+                )));
             }
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation {
-                    r#type: AnnotationType::Info,
-                    label: format!("alias `{}` was substituted here", alias.name).into(),
-                    location: original.clone(),
-                }));
-                original.line.source.complement_annotations(result);
-                result.extend(std::iter::once(Annotation {
-                    r#type: AnnotationType::Info,
-                    label: format!("alias `{}` was defined here", alias.name).into(),
-                    location: alias.origin.clone(),
-                }));
-                alias.origin.line.source.complement_annotations(result);
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    format!("alias `{}` was substituted here", alias.name).into(),
+                    original,
+                )));
+                original.code.source.complement_annotations(result);
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    format!("alias `{}` was defined here", alias.name).into(),
+                    &alias.origin,
+                )));
+                alias.origin.code.source.complement_annotations(result);
             }
         }
     }
@@ -147,27 +178,31 @@ mod annotate_snippets_support {
 
             let mut lines = vec![];
             for annotation in &message.annotations {
-                let line = &annotation.location.line;
-                let line_start = line.number.get().try_into().unwrap_or(usize::MAX);
-                let column = &annotation.location.column;
-                let column = column.get().try_into().unwrap_or(usize::MAX);
-                let column = column.min(line.value.chars().count()).max(1);
+                let code = &annotation.location.code;
+                let line_start = code
+                    .start_line_number
+                    .get()
+                    .try_into()
+                    .unwrap_or(usize::MAX);
+                let value = &annotation.code;
+                let index = annotation.location.index;
+                let index = index.min(value.chars().count().saturating_sub(1));
                 let annotation = snippet::SourceAnnotation {
-                    range: (column - 1, column),
+                    range: (index, index + 1),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
                 };
-                if let Some(i) = lines.iter().position(|l| l == line) {
+                if let Some(i) = lines.iter().position(|l| l == code) {
                     snippet.slices[i].annotations.push(annotation);
                 } else {
                     snippet.slices.push(snippet::Slice {
-                        source: &line.value,
+                        source: value,
                         line_start,
-                        origin: Some(line.source.label()),
+                        origin: Some(code.source.label()),
                         fold: true,
                         annotations: vec![annotation],
                     });
-                    lines.push(line.clone());
+                    lines.push(code.clone());
                 }
             }
 
@@ -195,11 +230,11 @@ mod annotate_snippets_support {
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "my title".into(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Info,
-                label: "my label".into(),
-                location,
-            }],
+            annotations: vec![Annotation::new(
+                AnnotationType::Info,
+                "my label".into(),
+                &location,
+            )],
         };
         let snippet = Snippet::from(&message);
         let title = snippet.title.unwrap();
@@ -225,23 +260,16 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
         use std::rc::Rc;
 
-        let line = Rc::new(Line {
-            value: "".to_string(),
-            number: NonZeroU64::new(128).unwrap(),
+        let code = Rc::new(Code {
+            value: "".to_string().into(),
+            start_line_number: NonZeroU64::new(128).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location {
-            line,
-            column: NonZeroU64::new(42).unwrap(),
-        };
+        let location = Location { code, index: 42 };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Info,
-                label: "".into(),
-                location,
-            }],
+            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].line_start, 128);
@@ -249,18 +277,12 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_non_default_range() {
-        use std::num::NonZeroU64;
-
         let mut location = Location::dummy("my location");
-        location.column = NonZeroU64::new(7).unwrap();
+        location.index = 6;
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Info,
-                label: "".into(),
-                location,
-            }],
+            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].annotations[0].range, (6, 7));
@@ -268,18 +290,12 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_range_overflow() {
-        use std::num::NonZeroU64;
-
         let mut location = Location::dummy("my location");
-        location.column = NonZeroU64::new(12).unwrap();
+        location.index = 11;
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Info,
-                label: "".into(),
-                location,
-            }],
+            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].annotations[0].range, (10, 11));
@@ -297,23 +313,20 @@ mod annotate_snippets_support {
             global: false,
             origin: Location::dummy("my origin"),
         });
-        let line = Rc::new(Line {
-            value: "substitution".to_string(),
-            number: NonZeroU64::new(10).unwrap(),
+        let code = Rc::new(Code {
+            value: "substitution".to_string().into(),
+            start_line_number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });
-        let location = Location {
-            line,
-            column: NonZeroU64::new(5).unwrap(),
-        };
+        let location = Location { code, index: 4 };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "my title".into(),
-            annotations: vec![Annotation {
-                r#type: AnnotationType::Info,
-                label: "my label".into(),
-                location,
-            }],
+            annotations: vec![Annotation::new(
+                AnnotationType::Info,
+                "my label".into(),
+                &location,
+            )],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].source, "substitution");
@@ -323,20 +336,14 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_two_annotations_different_slice() {
+        let location_1 = Location::dummy("my location 1");
+        let location_2 = Location::dummy("my location 2");
         let message = Message {
             r#type: AnnotationType::Error,
             title: "some title".into(),
             annotations: vec![
-                Annotation {
-                    r#type: AnnotationType::Note,
-                    label: "my label 1".into(),
-                    location: Location::dummy("my location 1"),
-                },
-                Annotation {
-                    r#type: AnnotationType::Info,
-                    label: "my label 2".into(),
-                    location: Location::dummy("my location 2"),
-                },
+                Annotation::new(AnnotationType::Note, "my label 1".into(), &location_1),
+                Annotation::new(AnnotationType::Info, "my label 2".into(), &location_2),
             ],
         };
         let snippet = Snippet::from(&message);
@@ -365,26 +372,17 @@ mod annotate_snippets_support {
 
     #[test]
     fn from_message_two_annotations_same_slice() {
-        use std::num::NonZeroU64;
-
-        let location = Location::dummy("my location");
+        let location_1 = Location::dummy("my location");
+        let location_3 = Location {
+            index: 2,
+            ..location_1.clone()
+        };
         let message = Message {
             r#type: AnnotationType::Error,
             title: "some title".into(),
             annotations: vec![
-                Annotation {
-                    r#type: AnnotationType::Info,
-                    label: "my label 1".into(),
-                    location: Location {
-                        column: NonZeroU64::new(3).unwrap(),
-                        ..location.clone()
-                    },
-                },
-                Annotation {
-                    r#type: AnnotationType::Help,
-                    label: "my label 2".into(),
-                    location,
-                },
+                Annotation::new(AnnotationType::Info, "my label 1".into(), &location_3),
+                Annotation::new(AnnotationType::Help, "my label 2".into(), &location_1),
             ],
         };
         let snippet = Snippet::from(&message);
