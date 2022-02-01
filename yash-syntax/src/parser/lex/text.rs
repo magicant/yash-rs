@@ -238,16 +238,12 @@ mod tests {
                 assert_eq!(c, 'X');
                 false
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
         assert!(called);
-        if let Literal(c) = result {
-            assert_eq!(c, 'X');
-        } else {
-            panic!("unexpected result {:?}", result);
-        }
+        assert_matches!(result, Literal('X'));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -266,7 +262,7 @@ mod tests {
                 assert_eq!(c, ';');
                 true
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert!(called);
@@ -284,7 +280,7 @@ mod tests {
         };
         let mut called = false;
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
             |c| {
                 called = true;
                 assert_eq!(c, '#');
@@ -307,8 +303,8 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -326,7 +322,7 @@ mod tests {
         };
         let mut called = false;
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
             |c| {
                 called = true;
                 assert_eq!(c, '\\');
@@ -349,8 +345,8 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -370,8 +366,8 @@ mod tests {
             context: WordContext::Text,
         };
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -391,8 +387,8 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.text_unit(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -416,7 +412,7 @@ mod tests {
         };
         let result = block_on(lexer.text_unit(
             |_| false,
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap()
         .unwrap();
@@ -429,8 +425,8 @@ mod tests {
     fn lexer_text_empty() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
         let Text(units) = block_on(lexer.text(
-            |c| panic!("unexpected call to is_delimiter({:?})", c),
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[]);
@@ -451,7 +447,7 @@ mod tests {
                 called += 1;
                 false
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
@@ -475,7 +471,7 @@ mod tests {
                 called += 1;
                 c == 'c'
             },
-            |c| panic!("unexpected call to is_escapable({:?})", c),
+            |c| unreachable!("unexpected call to is_escapable({:?})", c),
         ))
         .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b')]);

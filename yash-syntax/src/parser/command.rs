@@ -52,6 +52,7 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -62,11 +63,9 @@ mod tests {
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Simple(c) = result {
+        assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo <bar");
-        } else {
-            panic!("Not a simple command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -80,11 +79,9 @@ mod tests {
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Compound(c) = result {
+        assert_matches!(result, Command::Compound(c) => {
             assert_eq!(c.to_string(), "(foo) <bar");
-        } else {
-            panic!("Not a compound command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -98,11 +95,9 @@ mod tests {
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Function(f) = result {
+        assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.to_string(), "fun() (echo)");
-        } else {
-            panic!("Not a function definition: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

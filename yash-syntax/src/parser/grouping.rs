@@ -110,11 +110,9 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Grouping(list) = result {
+        assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
-        } else {
-            panic!("Not a grouping: {:?}", result);
-        }
+        });
     }
 
     #[test]
@@ -125,11 +123,9 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Grouping(list) = result {
+        assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), "foo; bar&");
-        } else {
-            panic!("Not a grouping: {:?}", result);
-        }
+        });
     }
 
     #[test]
@@ -193,11 +189,9 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Grouping(list) = result {
+        assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
-        } else {
-            panic!("Not a grouping: {:?}", result);
-        }
+        });
     }
 
     #[test]
@@ -208,11 +202,9 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Subshell(list) = result {
+        assert_matches!(result, CompoundCommand::Subshell(list) => {
             assert_eq!(list.to_string(), ":");
-        } else {
-            panic!("Not a subshell: {:?}", result);
-        }
+        });
     }
 
     #[test]
@@ -223,11 +215,9 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Subshell(list) = result {
+        assert_matches!(result, CompoundCommand::Subshell(list) => {
             assert_eq!(list.to_string(), "foo& bar");
-        } else {
-            panic!("Not a subshell: {:?}", result);
-        }
+        });
     }
 
     #[test]

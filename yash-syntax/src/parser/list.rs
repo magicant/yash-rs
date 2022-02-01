@@ -179,6 +179,7 @@ mod tests {
     use crate::syntax::HereDoc;
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -270,25 +271,16 @@ mod tests {
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);
-        let cmd = match *commands[0] {
-            Command::Simple(ref c) => c,
-            _ => panic!("Expected a simple command but got {:?}", commands[0]),
-        };
+        let cmd = assert_matches!(*commands[0], Command::Simple(ref c) => c);
         assert_eq!(cmd.words, []);
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
-        if let RedirBody::HereDoc(ref here_doc) = cmd.redirs[0].body {
-            let HereDoc {
-                delimiter,
-                remove_tabs,
-                content,
-            } = here_doc;
+        assert_matches!(cmd.redirs[0].body, RedirBody::HereDoc(ref here_doc) => {
+            let HereDoc { delimiter, remove_tabs, content } = here_doc;
             assert_eq!(delimiter.to_string(), "END");
             assert_eq!(*remove_tabs, false);
             assert_eq!(content.to_string(), "foo\n");
-        } else {
-            panic!("Expected here-document, but got {:?}", cmd.redirs[0].body);
-        }
+        });
     }
 
     #[test]

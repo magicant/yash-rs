@@ -1280,6 +1280,7 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 mod tests {
     use super::*;
     use crate::parser::MissingHereDoc;
+    use assert_matches::assert_matches;
     use std::str::FromStr;
 
     #[test]
@@ -1760,12 +1761,10 @@ mod tests {
         let location = word.location.clone();
         let assign = Assign::try_from(word).unwrap();
         assert_eq!(assign.name, "night");
-        if let Scalar(value) = assign.value {
+        assert_matches!(assign.value, Scalar(value) => {
             assert_eq!(value.to_string(), "foo");
             assert_eq!(value.location, location);
-        } else {
-            panic!("wrong value: {:?}", assign.value);
-        }
+        });
         assert_eq!(assign.location, location);
     }
 
@@ -1773,7 +1772,7 @@ mod tests {
     fn assign_try_from_word_tilde() {
         let word = Word::from_str("a=~:~b").unwrap();
         let assign = Assign::try_from(word).unwrap();
-        if let Scalar(value) = assign.value {
+        assert_matches!(assign.value, Scalar(value) => {
             assert_eq!(
                 value.units,
                 [
@@ -1782,9 +1781,7 @@ mod tests {
                     WordUnit::Tilde("b".to_string()),
                 ]
             );
-        } else {
-            panic!("wrong value: {:?}", assign.value);
-        }
+        });
     }
 
     #[test]

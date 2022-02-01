@@ -370,16 +370,10 @@ mod tests {
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.redirs[0].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[0].body
-        {
+        assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
             assert_eq!(operand.to_string(), "foo")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -396,38 +390,20 @@ mod tests {
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 3);
         assert_eq!(sc.redirs[0].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[0].body
-        {
+        assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
             assert_eq!(operand.to_string(), "one")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
-        }
+        });
         assert_eq!(sc.redirs[1].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[1].body
-        {
+        assert_matches!(sc.redirs[1].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileOut);
             assert_eq!(operand.to_string(), "two")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[1].body);
-        }
+        });
         assert_eq!(sc.redirs[2].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[2].body
-        {
+        assert_matches!(sc.redirs[2].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileAppend);
             assert_eq!(operand.to_string(), "three")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[2].body);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -460,16 +436,10 @@ mod tests {
         assert_eq!(sc.redirs.len(), 1);
         assert_eq!(sc.words[0].to_string(), "word");
         assert_eq!(sc.redirs[0].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[0].body
-        {
+        assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
             assert_eq!(operand.to_string(), "redirection")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
-        }
+        });
     }
 
     #[test]
@@ -485,16 +455,10 @@ mod tests {
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
         assert_eq!(sc.redirs[0].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[0].body
-        {
+        assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
             assert_eq!(operand.to_string(), "foo")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
-        }
+        });
     }
 
     #[test]
@@ -511,16 +475,10 @@ mod tests {
         assert_eq!(sc.assigns[0].value.to_string(), "then");
         assert_eq!(sc.words[0].to_string(), "else");
         assert_eq!(sc.redirs[0].fd, None);
-        if let RedirBody::Normal {
-            ref operator,
-            ref operand,
-        } = sc.redirs[0].body
-        {
+        assert_matches!(sc.redirs[0].body, RedirBody::Normal { ref operator, ref operand } => {
             assert_eq!(operator, &RedirOp::FileIn);
             assert_eq!(operand.to_string(), "foo")
-        } else {
-            panic!("Unexpected redirection body {:?}", sc.redirs[0].body);
-        }
+        });
     }
 
     #[test]
@@ -534,11 +492,9 @@ mod tests {
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
-        if let Array(words) = &sc.assigns[0].value {
+        assert_matches!(&sc.assigns[0].value, Array(words) => {
             assert_eq!(words, &[]);
-        } else {
-            panic!("Non-array assignment value {:?}", sc.assigns[0].value);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

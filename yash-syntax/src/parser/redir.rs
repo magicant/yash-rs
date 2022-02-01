@@ -146,6 +146,7 @@ mod tests {
     use super::super::lex::Operator::Newline;
     use super::*;
     use crate::source::Source;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     #[test]
@@ -156,12 +157,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(Newline));
@@ -175,12 +174,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileInOut);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -191,12 +188,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileOut);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -207,12 +202,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileAppend);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -223,12 +216,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileClobber);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -239,12 +230,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FdIn);
             assert_eq!(operand.to_string(), "-")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -255,12 +244,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FdOut);
             assert_eq!(operand.to_string(), "3")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -271,12 +258,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::Pipe);
             assert_eq!(operand.to_string(), "3")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -287,12 +272,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::String);
             assert_eq!(operand.to_string(), "foo")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
     }
 
     #[test]
@@ -339,12 +322,10 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, Some(Fd(12)));
-        if let RedirBody::Normal { operator, operand } = redir.body {
+        assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")
-        } else {
-            panic!("Unexpected redirection body {:?}", redir.body);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(Newline));

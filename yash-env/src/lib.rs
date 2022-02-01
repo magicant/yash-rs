@@ -497,7 +497,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let result = executor.run_until(env.run_in_subshell(|_env| {
             Box::pin(async {
-                panic!("Not expected to reach here");
+                unreachable!("subshell not expected to run");
             })
         }));
         assert_eq!(result, Err(Errno::ENOSYS));

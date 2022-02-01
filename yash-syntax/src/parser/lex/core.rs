@@ -1320,7 +1320,7 @@ mod tests {
 
         // end of input
         let r = block_on(lexer.consume_char_if(|c| {
-            panic!("Unexpected call to the decider function: argument={}", c)
+            unreachable!("unexpected call to the decider function: argument={}", c)
         }));
         assert_eq!(r, Ok(None));
     }

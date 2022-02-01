@@ -152,20 +152,12 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        if let CompoundCommand::If {
-            condition,
-            body,
-            elifs,
-            r#else,
-        } = result
-        {
+        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs, []);
             assert_eq!(r#else, None);
-        } else {
-            panic!("Not an if command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -181,21 +173,13 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        if let CompoundCommand::If {
-            condition,
-            body,
-            elifs,
-            r#else,
-        } = result
-        {
+        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), "false");
             assert_eq!(elifs.len(), 1);
             assert_eq!(elifs[0].to_string(), "elif x; then y&");
             assert_eq!(r#else, None);
-        } else {
-            panic!("Not an if command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -211,13 +195,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        if let CompoundCommand::If {
-            condition,
-            body,
-            elifs,
-            r#else,
-        } = result
-        {
+        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs.len(), 3);
@@ -225,9 +203,7 @@ mod tests {
             assert_eq!(elifs[1].to_string(), "elif e 1; e 2& then f 1; f 2&");
             assert_eq!(elifs[2].to_string(), "elif g; then h");
             assert_eq!(r#else, None);
-        } else {
-            panic!("Not an if command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -240,20 +216,12 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        if let CompoundCommand::If {
-            condition,
-            body,
-            elifs,
-            r#else,
-        } = result
-        {
+        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs, []);
             assert_eq!(r#else.unwrap().to_string(), "c; d");
-        } else {
-            panic!("Not an if command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -267,21 +235,13 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        if let CompoundCommand::If {
-            condition,
-            body,
-            elifs,
-            r#else,
-        } = result
-        {
+        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "1");
             assert_eq!(body.to_string(), "2");
             assert_eq!(elifs.len(), 1);
             assert_eq!(elifs[0].to_string(), "elif 3; then 4");
             assert_eq!(r#else.unwrap().to_string(), "5");
-        } else {
-            panic!("Not an if command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

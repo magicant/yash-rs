@@ -188,6 +188,7 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use std::collections::HashSet;
     use yash_env::function::HashEntry as FunctionEntry;
     use yash_env::variable::Value::{Array, Scalar};
@@ -246,7 +247,7 @@ mod tests {
             "foo",
             Builtin {
                 r#type: Special,
-                execute: |_, _| panic!(),
+                execute: |_, _| unreachable!(),
             },
         );
         env.functions.insert(FunctionEntry::new(
@@ -265,14 +266,13 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: Special,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
 
-        match search(&mut env, "foo") {
-            Some(Target::Builtin(result)) => assert_eq!(result.r#type, builtin.r#type),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
     }
 
     #[test]
@@ -286,10 +286,9 @@ mod tests {
         );
         env.functions.insert(function.clone());
 
-        match search(&mut env, "foo") {
-            Some(Target::Function(result)) => assert_eq!(result, function.0),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function.0);
+        });
     }
 
     #[test]
@@ -297,7 +296,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: Special,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
         env.functions.insert(FunctionEntry::new(
@@ -307,10 +306,9 @@ mod tests {
             false,
         ));
 
-        match search(&mut env, "foo") {
-            Some(Target::Builtin(result)) => assert_eq!(result.r#type, builtin.r#type),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
     }
 
     #[test]
@@ -318,14 +316,13 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: Intrinsic,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
 
-        match search(&mut env, "foo") {
-            Some(Target::Builtin(result)) => assert_eq!(result.r#type, builtin.r#type),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
     }
 
     #[test]
@@ -335,7 +332,7 @@ mod tests {
             "foo",
             Builtin {
                 r#type: Intrinsic,
-                execute: |_, _| panic!(),
+                execute: |_, _| unreachable!(),
             },
         );
 
@@ -347,10 +344,9 @@ mod tests {
         );
         env.functions.insert(function.clone());
 
-        match search(&mut env, "foo") {
-            Some(Target::Function(result)) => assert_eq!(result, function.0),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function.0);
+        });
     }
 
     #[test]
@@ -358,7 +354,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: NonIntrinsic,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
         env.path = Some(Variable {
@@ -369,10 +365,9 @@ mod tests {
         });
         env.executables.insert("/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::Builtin(result)) => assert_eq!(result.r#type, builtin.r#type),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
     }
 
     #[test]
@@ -380,7 +375,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: NonIntrinsic,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
 
@@ -393,7 +388,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: NonIntrinsic,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
         env.path = Some(Variable {
@@ -412,10 +407,9 @@ mod tests {
         );
         env.functions.insert(function.clone());
 
-        match search(&mut env, "foo") {
-            Some(Target::Function(result)) => assert_eq!(result, function.0),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function.0);
+        });
     }
 
     #[test]
@@ -429,10 +423,9 @@ mod tests {
         });
         env.executables.insert("/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => assert_eq!(path.to_bytes(), "/bin/foo".as_bytes()),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "/bin/foo".as_bytes());
+        });
     }
 
     #[test]
@@ -440,7 +433,7 @@ mod tests {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
             r#type: NonIntrinsic,
-            execute: |_, _| panic!(),
+            execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
         env.functions.insert(FunctionEntry::new(
@@ -450,10 +443,9 @@ mod tests {
             false,
         ));
 
-        match search(&mut env, "bar/baz") {
-            Some(Target::External { path }) => assert_eq!(path.to_bytes(), "bar/baz".as_bytes()),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "bar/baz"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "bar/baz".as_bytes());
+        });
     }
 
     #[test]
@@ -468,21 +460,15 @@ mod tests {
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => {
-                assert_eq!(path.to_bytes(), "/usr/bin/foo".as_bytes())
-            }
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "/usr/bin/foo".as_bytes());
+        });
 
         env.executables.insert("/usr/local/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => {
-                assert_eq!(path.to_bytes(), "/usr/local/bin/foo".as_bytes())
-            }
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "/usr/local/bin/foo".as_bytes());
+        });
     }
 
     #[test]
@@ -501,21 +487,15 @@ mod tests {
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => {
-                assert_eq!(path.to_bytes(), "/usr/bin/foo".as_bytes())
-            }
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "/usr/bin/foo".as_bytes());
+        });
 
         env.executables.insert("/usr/local/bin/foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => {
-                assert_eq!(path.to_bytes(), "/usr/local/bin/foo".as_bytes())
-            }
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "/usr/local/bin/foo".as_bytes());
+        });
     }
 
     #[test]
@@ -529,9 +509,8 @@ mod tests {
         });
         env.executables.insert("foo".to_string());
 
-        match search(&mut env, "foo") {
-            Some(Target::External { path }) => assert_eq!(path.to_bytes(), "foo".as_bytes()),
-            result => panic!("{:?}", result),
-        }
+        assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
+            assert_eq!(path.to_bytes(), "foo".as_bytes());
+        });
     }
 }

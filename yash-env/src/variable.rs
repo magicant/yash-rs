@@ -463,9 +463,7 @@ impl ContextStack for VariableSet {
     /// tried to do so.
     fn pop_context(&mut self) {
         debug_assert!(!self.contexts.is_empty());
-        if self.contexts.len() == 1 {
-            panic!("cannot pop the base context");
-        }
+        assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
         self.contexts.pop();
         // TODO Use HashMap::drain_filter to remove empty values
         // TODO Use complementary stack of hash tables to avoid scanning the

@@ -174,13 +174,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "A");
             assert_eq!(values, None);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -194,13 +192,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -214,13 +210,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -234,13 +228,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -254,13 +246,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -274,7 +264,7 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             let values = values
                 .unwrap()
@@ -282,10 +272,8 @@ mod tests {
                 .map(ToString::to_string)
                 .collect::<Vec<String>>();
             assert_eq!(values, vec!["bar"]);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -299,7 +287,7 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "in");
             let values = values
                 .unwrap()
@@ -307,10 +295,8 @@ mod tests {
                 .map(ToString::to_string)
                 .collect::<Vec<String>>();
             assert_eq!(values, vec!["in", "a", "b", "c"]);
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -324,13 +310,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -344,13 +328,11 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::For { name, values, body } = result {
+        assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
-            assert_eq!(body.to_string(), ":")
-        } else {
-            panic!("Not a for loop: {:?}", result);
-        }
+            assert_eq!(body.to_string(), ":");
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

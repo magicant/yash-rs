@@ -449,6 +449,7 @@ mod tests {
     use super::*;
     use crate::parser::ErrorCause;
     use crate::parser::SyntaxError;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
 
     // Most of the tests below are surrounded with `block_on(async {...})` in
@@ -477,11 +478,9 @@ mod tests {
             assert_eq!(parse.0.len(), 3);
             assert_eq!(parse.0[0], Literal('a'));
             assert_eq!(parse.0[1], Backslashed('b'));
-            if let CommandSubst { content, .. } = &parse.0[2] {
+            assert_matches!(&parse.0[2], CommandSubst { content, .. } => {
                 assert_eq!(content, "c");
-            } else {
-                panic!("not a command substitution: {:?}", parse.0[2]);
-            }
+            });
         })
     }
 
@@ -544,12 +543,10 @@ mod tests {
         block_on(async {
             let parse: Redir<MissingHereDoc> = "2> /dev/null".parse().unwrap();
             assert_eq!(parse.fd, Some(Fd(2)));
-            if let RedirBody::Normal { operator, operand } = parse.body {
+            assert_matches!(parse.body, RedirBody::Normal { operator, operand } => {
                 assert_eq!(operator, RedirOp::FileOut);
                 assert_eq!(operand.to_string(), "/dev/null");
-            } else {
-                panic!("Not normal redirection: {:?}", parse.body);
-            }
+            });
         })
     }
 

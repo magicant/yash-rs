@@ -186,7 +186,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result =
-            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         assert_matches!(result, Unquoted(CommandSubst { content, location }) => {
@@ -208,39 +208,39 @@ mod tests {
             };
 
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('a')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('$')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('`')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('"')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('\\')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('\'')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('#')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('{')))));
             let result = lexer
-                .word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c))
+                .word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c))
                 .await;
             assert_eq!(result, Ok(Some(Unquoted(Backslashed('}')))));
 
@@ -298,7 +298,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result =
-            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         assert_matches!(result, SingleQuote(content) => assert_eq!(content, ""));
@@ -314,7 +314,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result =
-            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         assert_matches!(result, SingleQuote(content) => assert_eq!(content, "abc\\\n$def\\"));
@@ -330,8 +330,9 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let e = block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
-            .unwrap_err();
+        let e =
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedSingleQuote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "'abc\ndef\\");
@@ -372,7 +373,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result =
-            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         assert_matches!(result, DoubleQuote(Text(content)) => assert_eq!(content, []));
@@ -388,7 +389,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result =
-            block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
         assert_matches!(result, DoubleQuote(Text(content)) => {
@@ -410,7 +411,7 @@ mod tests {
             let result = lexer
                 .word_unit(|c| match c {
                     'a' | '\'' | '#' => true,
-                    _ => panic!("unexpected call to is_delimiter({:?})", c),
+                    _ => unreachable!("unexpected call to is_delimiter({:?})", c),
                 })
                 .await
                 .unwrap()
@@ -445,8 +446,9 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let e = block_on(lexer.word_unit(|c| panic!("unexpected call to is_delimiter({:?})", c)))
-            .unwrap_err();
+        let e =
+            block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
+                .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedDoubleQuote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "\"abc\ndef");
@@ -498,7 +500,8 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let word = block_on(lexer.word(|_| panic!("unexpected call to is_delimiter"))).unwrap();
+        let word =
+            block_on(lexer.word(|_| unreachable!("unexpected call to is_delimiter"))).unwrap();
         assert_eq!(word.units, []);
         assert_eq!(*word.location.code.value.borrow(), "");
         assert_eq!(word.location.code.start_line_number.get(), 1);

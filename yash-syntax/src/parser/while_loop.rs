@@ -114,12 +114,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::While { condition, body } = result {
+        assert_matches!(result, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
-        } else {
-            panic!("Not a while loop: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -133,12 +131,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::While { condition, body } = result {
+        assert_matches!(result, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
-        } else {
-            panic!("Not a while loop: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -216,12 +212,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Until { condition, body } = result {
+        assert_matches!(result, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
-        } else {
-            panic!("Not an until loop: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);
@@ -235,12 +229,10 @@ mod tests {
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let CompoundCommand::Until { condition, body } = result {
+        assert_matches!(result, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
-        } else {
-            panic!("Not an until loop: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, EndOfInput);

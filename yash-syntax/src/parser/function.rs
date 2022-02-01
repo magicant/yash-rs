@@ -116,11 +116,9 @@ mod tests {
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Simple(c) = result {
+        assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "");
-        } else {
-            panic!("Not a simple command: {:?}", result);
-        }
+        });
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));
@@ -139,11 +137,9 @@ mod tests {
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
         let result = result.fill(&mut std::iter::empty()).unwrap();
-        if let Command::Simple(c) = result {
+        assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo");
-        } else {
-            panic!("Not a simple command: {:?}", result);
-        }
+        });
     }
 
     #[test]
