@@ -10,6 +10,8 @@ Note that `yash-syntax` does not include functionality for executing parsed scri
 [![yash-syntax at docs.rs](https://docs.rs/yash-syntax/badge.svg)](https://docs.rs/yash-syntax)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
 
+- [Changelog](CHANGELOG.md)
+
 ## Features
 
 - Parsing POSIX-compatible shell scripts
@@ -20,9 +22,8 @@ Note that `yash-syntax` does not include functionality for executing parsed scri
 
 Add `yash-syntax` as a dependency in your `Cargo.toml`.
 
-See the API documentation for details.
+See the [API documentation](https://docs.rs/yash-syntax) for details.
 
-<!-- TODO Link to the API documentation -->
 <!-- TODO code example -->
 
 ## License

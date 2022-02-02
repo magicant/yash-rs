@@ -7,6 +7,8 @@ This crate provides just one function: `quote`. It returns a quoted version of t
 [![yash-quote at docs.rs](https://docs.rs/yash-quote/badge.svg)](https://docs.rs/yash-quote)
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
 
+- [Changelog](CHANGELOG.md)
+
 ## Usage
 
 Add `yash-quote` as a dependency in your `Cargo.toml`.

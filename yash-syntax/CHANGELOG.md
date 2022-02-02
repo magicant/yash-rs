@@ -5,7 +5,7 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - ????-??-??
+## [0.2.0] - 2022-02-03
 
 Previously, source code attribution attached to ASTs was line-oriented. The
 attribution now contains a whole fragment of code corresponding to a complete
@@ -39,7 +39,7 @@ command.
     - `futures-util` 0.3.18 → 0.3.19
     - `itertools` 0.10.1 → 0.10.3
 
-## Removed
+### Removed
 
 - `Code::enumerate`
 - `Lines`
@@ -52,4 +52,5 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.1.0

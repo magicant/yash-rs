@@ -1,6 +1,6 @@
 [package]
 name = "yash-quote"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
 rust-version = "1.56.0"
