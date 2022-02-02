@@ -16,6 +16,7 @@ command.
 - `source_chars`
 - `Lexer::pending`
 - `Lexer::flush`
+- `impl Default for input::Context`
 
 ### Changed
 
@@ -30,6 +31,7 @@ command.
 - Items in the `input` module:
     - `Result` redefined as `Result<String, Error>` (previously `Result<Code, Error>`)
     - `Error` redefined as `std::io::Error` (previously `(Location, std::io::Error)`)
+    - `Context` now `non_exhaustive`
     - `Memory::new` no longer taking a `Source` parameter
 - `Lexer::new` now requiring the `start_line_number` and `source` parameters
 - Dependency versions

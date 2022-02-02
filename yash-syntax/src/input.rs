@@ -25,7 +25,8 @@ use async_trait::async_trait;
 ///
 /// Currently, this structure is empty. It may be extended to provide with some useful data in
 /// future versions.
-#[derive(Debug)]
+#[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct Context;
 
 /// Error returned by the [Input] function.

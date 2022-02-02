@@ -92,7 +92,7 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "");
     }
 
@@ -107,9 +107,9 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "echo ok\n");
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "");
     }
 
@@ -124,13 +124,13 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "#!/bin/sh\n");
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "echo ok\n");
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "exit");
-        let line = block_on(stdin.next_line(&Context)).unwrap();
+        let line = block_on(stdin.next_line(&Context::default())).unwrap();
         assert_eq!(line, "");
     }
 
@@ -141,7 +141,7 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let error = block_on(stdin.next_line(&Context)).unwrap_err();
+        let error = block_on(stdin.next_line(&Context::default())).unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 }
