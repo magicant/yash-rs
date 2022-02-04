@@ -83,6 +83,7 @@
 use crate::parser::lex::Operator;
 use crate::source::Location;
 use itertools::Itertools;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Write;
 use std::os::unix::io::RawFd;
@@ -844,7 +845,12 @@ pub struct HereDoc {
     ///
     /// The content ends with a newline unless it is empty. If the delimiter
     /// is quoted, the content must be all literal.
-    pub content: Text,
+    ///
+    /// This value is wrapped in `RefCell` because the here-doc content is
+    /// parsed separately from the here-doc operator. When the operator is
+    /// parsed, the `HereDoc` instance is created with an empty value. The value
+    /// is filled when the content is parsed later.
+    pub content: RefCell<Text>,
 }
 
 impl fmt::Display for HereDoc {
@@ -1808,14 +1814,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("there").unwrap(),
+            content: Text::from_str("there").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -1825,14 +1831,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -1842,7 +1848,7 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
 
         let redir = Redir {
@@ -1892,7 +1898,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Text::from_str("").unwrap(),
+                content: Text::from_str("").unwrap().into(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -1908,7 +1914,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Text::from_str("ignored").unwrap(),
+                content: Text::from_str("ignored").unwrap().into(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");

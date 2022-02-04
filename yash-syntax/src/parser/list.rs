@@ -279,7 +279,7 @@ mod tests {
             let HereDoc { delimiter, remove_tabs, content } = here_doc;
             assert_eq!(delimiter.to_string(), "END");
             assert_eq!(*remove_tabs, false);
-            assert_eq!(content.to_string(), "foo\n");
+            assert_eq!(content.borrow().to_string(), "foo\n");
         });
     }
 

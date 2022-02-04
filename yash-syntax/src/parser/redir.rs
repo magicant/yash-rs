@@ -293,7 +293,7 @@ mod tests {
         assert_eq!(here_docs.len(), 1);
         assert_eq!(here_docs[0].delimiter.to_string(), "end");
         assert_eq!(here_docs[0].remove_tabs, false);
-        assert_eq!(here_docs[0].content.to_string(), "");
+        assert_eq!(here_docs[0].content.borrow().to_string(), "");
     }
 
     #[test]
@@ -311,7 +311,7 @@ mod tests {
         assert_eq!(here_docs.len(), 1);
         assert_eq!(here_docs[0].delimiter.to_string(), "end");
         assert_eq!(here_docs[0].remove_tabs, true);
-        assert_eq!(here_docs[0].content.to_string(), "");
+        assert_eq!(here_docs[0].content.borrow().to_string(), "");
     }
 
     #[test]

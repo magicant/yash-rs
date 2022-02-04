@@ -25,6 +25,7 @@ use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
 use crate::syntax::Unquote;
 use crate::syntax::Word;
+use std::cell::RefCell;
 
 /// Here-document without a content.
 ///
@@ -108,7 +109,7 @@ impl Lexer<'_> {
                 return Ok(HereDoc {
                     delimiter,
                     remove_tabs,
-                    content,
+                    content: RefCell::new(content),
                 });
             }
 
@@ -166,7 +167,7 @@ mod tests {
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.0, []);
+        assert_eq!(heredoc.content.borrow().0, []);
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "END\nX");
@@ -182,7 +183,7 @@ mod tests {
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.to_string(), "content\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "content\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
@@ -198,7 +199,7 @@ mod tests {
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "foo\n\tBAR\n\nbaz\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
@@ -219,7 +220,7 @@ END
         );
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(
-            heredoc.content.0,
+            heredoc.content.borrow().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -249,7 +250,7 @@ END
         );
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(
-            heredoc.content.0,
+            heredoc.content.borrow().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -279,7 +280,7 @@ END
         let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, true);
-        assert_eq!(heredoc.content.to_string(), "foo\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "foo\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");

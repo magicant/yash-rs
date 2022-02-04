@@ -759,7 +759,7 @@ mod tests {
             assert_eq!(here_docs.len(), 1);
             assert_eq!(here_docs[0].delimiter.to_string(), "END");
             assert_eq!(here_docs[0].remove_tabs, remove_tabs);
-            assert_eq!(here_docs[0].content.0, []);
+            assert_eq!(here_docs[0].content.borrow().0, []);
 
             assert!(parser.take_read_here_docs().is_empty());
 
@@ -796,13 +796,13 @@ mod tests {
             assert_eq!(here_docs.len(), 3);
             assert_eq!(here_docs[0].delimiter.to_string(), "ONE");
             assert_eq!(here_docs[0].remove_tabs, false);
-            assert_eq!(here_docs[0].content.to_string(), "1\n");
+            assert_eq!(here_docs[0].content.borrow().to_string(), "1\n");
             assert_eq!(here_docs[1].delimiter.to_string(), "TWO");
             assert_eq!(here_docs[1].remove_tabs, true);
-            assert_eq!(here_docs[1].content.to_string(), "");
+            assert_eq!(here_docs[1].content.borrow().to_string(), "");
             assert_eq!(here_docs[2].delimiter.to_string(), "THREE");
             assert_eq!(here_docs[2].remove_tabs, false);
-            assert_eq!(here_docs[2].content.to_string(), "3\n");
+            assert_eq!(here_docs[2].content.borrow().to_string(), "3\n");
         })
     }
 
@@ -824,7 +824,7 @@ mod tests {
             assert_eq!(here_docs.len(), 1);
             assert_eq!(here_docs[0].delimiter.to_string(), "ONE");
             assert_eq!(here_docs[0].remove_tabs, false);
-            assert_eq!(here_docs[0].content.to_string(), "1\n");
+            assert_eq!(here_docs[0].content.borrow().to_string(), "1\n");
 
             parser.memorize_unread_here_doc(PartialHereDoc {
                 delimiter: delimiter2,
@@ -835,7 +835,7 @@ mod tests {
             assert_eq!(here_docs.len(), 1);
             assert_eq!(here_docs[0].delimiter.to_string(), "TWO");
             assert_eq!(here_docs[0].remove_tabs, true);
-            assert_eq!(here_docs[0].content.to_string(), "2\n");
+            assert_eq!(here_docs[0].content.borrow().to_string(), "2\n");
         })
     }
 
