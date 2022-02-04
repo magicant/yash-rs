@@ -176,7 +176,6 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::AndOrList;
     use crate::syntax::Command;
-    use crate::syntax::HereDoc;
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
     use assert_matches::assert_matches;
@@ -276,10 +275,9 @@ mod tests {
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
         assert_matches!(cmd.redirs[0].body, RedirBody::HereDoc(ref here_doc) => {
-            let HereDoc { delimiter, remove_tabs, content } = here_doc;
-            assert_eq!(delimiter.to_string(), "END");
-            assert_eq!(*remove_tabs, false);
-            assert_eq!(content.borrow().to_string(), "foo\n");
+            assert_eq!(here_doc.delimiter.to_string(), "END");
+            assert_eq!(here_doc.remove_tabs, false);
+            assert_eq!(here_doc.content.borrow().to_string(), "foo\n");
         });
     }
 

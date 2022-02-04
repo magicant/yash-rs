@@ -872,7 +872,7 @@ pub enum RedirBody<H = HereDoc> {
     /// Normal redirection.
     Normal { operator: RedirOp, operand: Word },
     /// Here-document.
-    HereDoc(H),
+    HereDoc(Rc<H>),
     // TODO process redirection
 }
 
@@ -895,9 +895,9 @@ impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     }
 }
 
-impl From<HereDoc> for RedirBody {
-    fn from(h: HereDoc) -> Self {
-        RedirBody::HereDoc(h)
+impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody {
+    fn from(t: T) -> Self {
+        RedirBody::HereDoc(t.into())
     }
 }
 

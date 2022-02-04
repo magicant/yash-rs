@@ -30,6 +30,7 @@ use crate::syntax::Redir;
 use crate::syntax::RedirBody;
 use crate::syntax::RedirOp;
 use crate::syntax::Word;
+use std::rc::Rc;
 
 impl Parser<'_, '_> {
     /// Parses the operand of a redirection operator.
@@ -79,7 +80,7 @@ impl Parser<'_, '_> {
             remove_tabs,
         });
 
-        Ok(RedirBody::HereDoc(MissingHereDoc))
+        Ok(RedirBody::HereDoc(Rc::new(MissingHereDoc)))
     }
 
     /// Parses the redirection body.
@@ -286,7 +287,7 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
+        assert_eq!(redir.body, RedirBody::HereDoc(Rc::new(MissingHereDoc)));
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
         let here_docs = parser.take_read_here_docs();
@@ -304,7 +305,7 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_eq!(redir.body, RedirBody::HereDoc(MissingHereDoc));
+        assert_eq!(redir.body, RedirBody::HereDoc(Rc::new(MissingHereDoc)));
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
         let here_docs = parser.take_read_here_docs();
