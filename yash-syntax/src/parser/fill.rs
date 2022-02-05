@@ -44,7 +44,7 @@ impl std::fmt::Display for MissingHereDoc {
 
 /// Partial abstract syntax tree (AST) that can be filled with missing parts to create the whole,
 /// final AST.
-pub trait Fill<T = HereDoc> {
+pub trait Fill<T = Rc<HereDoc>> {
     /// Final AST created by filling `self`.
     type Full;
 
@@ -62,7 +62,7 @@ where
     T: Fill,
 {
     type Full = Option<<T as Fill>::Full>;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Self::Full> {
         self.map(|v| v.fill(i)).transpose()
     }
 }
@@ -72,7 +72,7 @@ where
     T: Fill,
 {
     type Full = Vec<<T as Fill>::Full>;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Self::Full> {
         self.into_iter().map(|x| x.fill(i)).collect()
     }
 }
@@ -82,7 +82,7 @@ where
     T: Clone + Fill,
 {
     type Full = Rc<<T as Fill>::Full>;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Self::Full> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Self::Full> {
         Rc::try_unwrap(self)
             .unwrap_or_else(|rc| (*rc).clone())
             .fill(i)
@@ -92,7 +92,7 @@ where
 
 impl Fill for RedirBody<MissingHereDoc> {
     type Full = RedirBody;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<RedirBody> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<RedirBody> {
         match self {
             RedirBody::Normal { operator, operand } => Ok(RedirBody::Normal { operator, operand }),
             RedirBody::HereDoc(_) => Ok(i.next().expect("missing value to fill").into()),
@@ -102,7 +102,7 @@ impl Fill for RedirBody<MissingHereDoc> {
 
 impl Fill for Redir<MissingHereDoc> {
     type Full = Redir;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Redir> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Redir> {
         Ok(Redir {
             fd: self.fd,
             body: self.body.fill(i)?,
@@ -112,7 +112,7 @@ impl Fill for Redir<MissingHereDoc> {
 
 impl Fill for SimpleCommand<MissingHereDoc> {
     type Full = SimpleCommand;
-    fn fill(mut self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<SimpleCommand> {
+    fn fill(mut self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<SimpleCommand> {
         Ok(SimpleCommand {
             assigns: self.assigns,
             words: self.words,
@@ -127,7 +127,7 @@ impl Fill for SimpleCommand<MissingHereDoc> {
 
 impl Fill for CaseItem<MissingHereDoc> {
     type Full = CaseItem;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CaseItem> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<CaseItem> {
         let CaseItem { patterns, body } = self;
         Ok(CaseItem {
             patterns,
@@ -138,7 +138,7 @@ impl Fill for CaseItem<MissingHereDoc> {
 
 impl Fill for ElifThen<MissingHereDoc> {
     type Full = ElifThen;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<ElifThen> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<ElifThen> {
         let ElifThen { condition, body } = self;
         let condition = condition.fill(i)?;
         let body = body.fill(i)?;
@@ -148,7 +148,7 @@ impl Fill for ElifThen<MissingHereDoc> {
 
 impl Fill for CompoundCommand<MissingHereDoc> {
     type Full = CompoundCommand;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<CompoundCommand> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<CompoundCommand> {
         use CompoundCommand::*;
         Ok(match self {
             Grouping(list) => Grouping(list.fill(i)?),
@@ -195,7 +195,7 @@ impl Fill for CompoundCommand<MissingHereDoc> {
 
 impl Fill for FullCompoundCommand<MissingHereDoc> {
     type Full = FullCompoundCommand;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<FullCompoundCommand> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<FullCompoundCommand> {
         let FullCompoundCommand { command, redirs } = self;
         Ok(FullCompoundCommand {
             command: command.fill(i)?,
@@ -206,7 +206,7 @@ impl Fill for FullCompoundCommand<MissingHereDoc> {
 
 impl Fill for FunctionDefinition<MissingHereDoc> {
     type Full = FunctionDefinition;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<FunctionDefinition> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<FunctionDefinition> {
         let FunctionDefinition {
             has_keyword,
             name,
@@ -223,7 +223,7 @@ impl Fill for FunctionDefinition<MissingHereDoc> {
 
 impl Fill for Command<MissingHereDoc> {
     type Full = Command;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Command> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Command> {
         use Command::*;
         Ok(match self {
             Simple(c) => Simple(c.fill(i)?),
@@ -235,7 +235,7 @@ impl Fill for Command<MissingHereDoc> {
 
 impl Fill for Pipeline<MissingHereDoc> {
     type Full = Pipeline;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Pipeline> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Pipeline> {
         let Pipeline { commands, negation } = self;
         let commands = commands.fill(i)?;
         Ok(Pipeline { commands, negation })
@@ -244,7 +244,7 @@ impl Fill for Pipeline<MissingHereDoc> {
 
 impl Fill for AndOrList<MissingHereDoc> {
     type Full = AndOrList;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<AndOrList> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<AndOrList> {
         let first = self.first.fill(i)?;
         let rest = self
             .rest
@@ -257,7 +257,7 @@ impl Fill for AndOrList<MissingHereDoc> {
 
 impl Fill for Item<MissingHereDoc> {
     type Full = Item;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<Item> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<Item> {
         let and_or = self.and_or.fill(i)?;
         let async_flag = self.async_flag;
         Ok(Item { and_or, async_flag })
@@ -266,7 +266,7 @@ impl Fill for Item<MissingHereDoc> {
 
 impl Fill for List<MissingHereDoc> {
     type Full = List;
-    fn fill(self, i: &mut dyn Iterator<Item = HereDoc>) -> Result<List> {
+    fn fill(self, i: &mut dyn Iterator<Item = Rc<HereDoc>>) -> Result<List> {
         let items = self
             .0
             .into_iter()

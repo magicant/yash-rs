@@ -30,6 +30,9 @@ use crate::alias::AliasSet;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
+use crate::syntax::Text;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Entire result of parsing.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -125,14 +128,16 @@ pub struct Parser<'a, 'b> {
 
     /// Here-documents without contents.
     ///
-    /// The contents must be read just after a next newline token is parsed.
-    unread_here_docs: Vec<PartialHereDoc>,
+    /// The here-document is added to this list when the parser finds a
+    /// here-document operator. After consuming the next newline token, the
+    /// parser reads and fills the contents, then clears this list.
+    unread_here_docs: Vec<Rc<HereDoc>>,
 
     /// Here-documents with contents.
     ///
     /// After here-document contents have been read, the results are saved in this vector until
     /// they are merged into the whose parse result.
-    read_here_docs: Vec<HereDoc>,
+    read_here_docs: Vec<Rc<HereDoc>>,
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
@@ -282,7 +287,16 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     /// Remembers the given partial here-document for later parsing of its content.
     pub fn memorize_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
-        self.unread_here_docs.push(here_doc)
+        let PartialHereDoc {
+            delimiter,
+            remove_tabs,
+        } = here_doc;
+        let here_doc = HereDoc {
+            delimiter,
+            remove_tabs,
+            content: RefCell::new(Text(Vec::new())),
+        };
+        self.unread_here_docs.push(Rc::new(here_doc))
     }
 
     /// Reads here-document contents that matches the remembered list of partial here-documents.
@@ -303,8 +317,8 @@ impl<'a, 'b> Parser<'a, 'b> {
             .reserve_exact(self.unread_here_docs.len());
 
         for here_doc in self.unread_here_docs.drain(..) {
-            self.read_here_docs
-                .push(self.lexer.here_doc_content(here_doc).await?);
+            self.lexer.here_doc_content(&here_doc).await?;
+            self.read_here_docs.push(here_doc);
         }
 
         Ok(())
@@ -324,7 +338,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     /// Returns a list of here-documents with contents that have been read.
-    pub fn take_read_here_docs(&mut self) -> Vec<HereDoc> {
+    pub(crate) fn take_read_here_docs(&mut self) -> Vec<Rc<HereDoc>> {
         std::mem::take(&mut self.read_here_docs)
     }
 }

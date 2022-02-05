@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `syntax::HereDoc::content` redefined as `RefCell<Text>` (previously `Text`)
 - `syntax::RedirBody<H>::HereDoc::0` redefined as `Rc<H>` (previously `H`)
     - `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`
+- `parser::Lexer::here_doc_content` now taking a `&HereDoc` parameter and returning `Result<()>`
+
+### Removed
+
+- `parser::Parser::take_read_here_docs`
+- `parser::fill` and all the items in it
+    - `MissingHereDoc`
+    - `Fill`
 
 ## [0.2.0] - 2022-02-03
 
