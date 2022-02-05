@@ -18,9 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `parser::Parser::take_read_here_docs`
-- `parser::fill` and all the items in it
-    - `MissingHereDoc`
-    - `Fill`
+- `parser::Fill`
+- `parser::MissingHereDoc`
 
 ## [0.2.0] - 2022-02-03
 

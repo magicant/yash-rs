@@ -97,12 +97,13 @@ impl<T> Rec<T> {
 ///
 /// This `struct` contains a set of data used in syntax parsing.
 ///
-/// Because of the nature of here-document contents that cannot be parsed by a
-/// standard recursive descent parser, most intrinsic functions of `Parser`
-/// return an AST with [`MissingHereDoc`](super::MissingHereDoc) filled in place
-/// of a proper here-document data. When the parser parses a here-document
-/// content, the content is accumulated in the parser so that it can be merged
-/// into the main AST in the final step of parsing.
+/// # Parsing here-documents
+///
+/// Most intrinsic functions of `Parser` may return an AST containing `HereDoc`s
+/// with empty content. The parser creates the `HereDoc` instance when it finds
+/// a here-document operator, but it has not read its content at that time. When
+/// finding a newline token, the parser reads the content and fills it into the
+/// `HereDoc` instance.
 ///
 /// Unless you are interested in parsing a specific syntactic construct that is
 /// only part of source code, you will want to use a function that returns a
