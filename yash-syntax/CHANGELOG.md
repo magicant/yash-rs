@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::Parser::take_read_here_docs`
 - `parser::Fill`
 - `parser::MissingHereDoc`
+- Generic type parameters of AST types `RedirBody`, `Redir`, `SimpleCommand`, `ElifThen`, `CaseItem`, `CompoundCommand`, `FullCompoundCommand`, `FunctionDefinition`, `Command`, `Pipeline`, `AndOrList`, `Item`, `List` in the `syntax` module
 
 ## [0.2.0] - 2022-02-03
 
