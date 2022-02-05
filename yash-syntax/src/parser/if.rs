@@ -20,7 +20,6 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Elif, Else, Fi, If, Then};
 use super::lex::TokenId::Token;
 use crate::syntax::CompoundCommand;
@@ -30,7 +29,7 @@ impl Parser<'_, '_> {
     /// Parses an elif-then clause.
     ///
     /// Returns `Ok(None)` if the next token is not `elif`.
-    async fn elif_then_clause(&mut self) -> Result<Option<ElifThen<MissingHereDoc>>> {
+    async fn elif_then_clause(&mut self) -> Result<Option<ElifThen>> {
         if self.peek_token().await?.id != Token(Some(Elif)) {
             return Ok(None);
         }
@@ -71,7 +70,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not `if`.
-    pub async fn if_command(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn if_command(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(If)));
 

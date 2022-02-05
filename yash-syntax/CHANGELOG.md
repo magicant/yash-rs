@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `syntax::RedirBody<H>::HereDoc::0` redefined as `Rc<H>` (previously `H`)
     - `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`
 - `parser::Lexer::here_doc_content` now taking a `&HereDoc` parameter and returning `Result<()>`
+- `parser::Parser::memorize_unread_here_doc` now taking an `Rc<HereDoc>` parameter
 
 ### Removed
 

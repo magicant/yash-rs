@@ -23,15 +23,12 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword;
 use super::lex::Lexer;
-use super::lex::PartialHereDoc;
 use super::lex::Token;
 use super::lex::TokenId::*;
 use crate::alias::AliasSet;
 use crate::parser::lex::is_blank;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
-use crate::syntax::Text;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Entire result of parsing.
@@ -286,17 +283,8 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     /// Remembers the given partial here-document for later parsing of its content.
-    pub fn memorize_unread_here_doc(&mut self, here_doc: PartialHereDoc) {
-        let PartialHereDoc {
-            delimiter,
-            remove_tabs,
-        } = here_doc;
-        let here_doc = HereDoc {
-            delimiter,
-            remove_tabs,
-            content: RefCell::new(Text(Vec::new())),
-        };
-        self.unread_here_docs.push(Rc::new(here_doc))
+    pub fn memorize_unread_here_doc(&mut self, here_doc: Rc<HereDoc>) {
+        self.unread_here_docs.push(here_doc)
     }
 
     /// Reads here-document contents that matches the remembered list of partial here-documents.
@@ -338,6 +326,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     /// Returns a list of here-documents with contents that have been read.
+    #[cfg(test)]
     pub(crate) fn take_read_here_docs(&mut self) -> Vec<Rc<HereDoc>> {
         std::mem::take(&mut self.read_here_docs)
     }
@@ -351,7 +340,9 @@ mod tests {
     use crate::alias::HashEntry;
     use crate::source::Location;
     use crate::source::Source;
+    use crate::syntax::Text;
     use futures_executor::block_on;
+    use std::cell::RefCell;
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
@@ -764,10 +755,11 @@ mod tests {
             let aliases = AliasSet::new();
             let mut parser = Parser::new(&mut lexer, &aliases);
             let remove_tabs = false;
-            parser.memorize_unread_here_doc(PartialHereDoc {
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter,
                 remove_tabs,
-            });
+                content: RefCell::new(Text(Vec::new())),
+            }));
             parser.here_doc_contents().await.unwrap();
             let here_docs = parser.take_read_here_docs();
             assert_eq!(here_docs.len(), 1);
@@ -793,18 +785,21 @@ mod tests {
             let mut lexer = Lexer::from_memory("1\nONE\nTWO\n3\nTHREE\nX", Source::Unknown);
             let aliases = AliasSet::new();
             let mut parser = Parser::new(&mut lexer, &aliases);
-            parser.memorize_unread_here_doc(PartialHereDoc {
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter: delimiter1,
                 remove_tabs: false,
-            });
-            parser.memorize_unread_here_doc(PartialHereDoc {
+                content: RefCell::new(Text(Vec::new())),
+            }));
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter: delimiter2,
                 remove_tabs: true,
-            });
-            parser.memorize_unread_here_doc(PartialHereDoc {
+                content: RefCell::new(Text(Vec::new())),
+            }));
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter: delimiter3,
                 remove_tabs: false,
-            });
+                content: RefCell::new(Text(Vec::new())),
+            }));
             parser.here_doc_contents().await.unwrap();
             let here_docs = parser.take_read_here_docs();
             assert_eq!(here_docs.len(), 3);
@@ -829,10 +824,11 @@ mod tests {
             let mut lexer = Lexer::from_memory("1\nONE\n2\nTWO\n", Source::Unknown);
             let aliases = AliasSet::new();
             let mut parser = Parser::new(&mut lexer, &aliases);
-            parser.memorize_unread_here_doc(PartialHereDoc {
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter: delimiter1,
                 remove_tabs: false,
-            });
+                content: RefCell::new(Text(Vec::new())),
+            }));
             parser.here_doc_contents().await.unwrap();
             let here_docs = parser.take_read_here_docs();
             assert_eq!(here_docs.len(), 1);
@@ -840,10 +836,11 @@ mod tests {
             assert_eq!(here_docs[0].remove_tabs, false);
             assert_eq!(here_docs[0].content.borrow().to_string(), "1\n");
 
-            parser.memorize_unread_here_doc(PartialHereDoc {
+            parser.memorize_unread_here_doc(Rc::new(HereDoc {
                 delimiter: delimiter2,
                 remove_tabs: true,
-            });
+                content: RefCell::new(Text(Vec::new())),
+            }));
             parser.here_doc_contents().await.unwrap();
             let here_docs = parser.take_read_here_docs();
             assert_eq!(here_docs.len(), 1);

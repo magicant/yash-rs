@@ -22,7 +22,6 @@
 use super::core::Parser;
 use super::core::Rec;
 use super::core::Result;
-use super::fill::MissingHereDoc;
 use crate::syntax::Command;
 
 impl Parser<'_, '_> {
@@ -30,7 +29,7 @@ impl Parser<'_, '_> {
     ///
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn command(&mut self) -> Result<Rec<Option<Command<MissingHereDoc>>>> {
+    pub async fn command(&mut self) -> Result<Rec<Option<Command>>> {
         match self.simple_command().await? {
             Rec::AliasSubstituted => Ok(Rec::AliasSubstituted),
             Rec::Parsed(None) => self
@@ -47,7 +46,6 @@ impl Parser<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
@@ -62,7 +60,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo <bar");
         });
@@ -78,7 +75,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Compound(c) => {
             assert_eq!(c.to_string(), "(foo) <bar");
         });
@@ -94,7 +90,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.to_string(), "fun() (echo)");
         });

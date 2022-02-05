@@ -1285,7 +1285,6 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::MissingHereDoc;
     use assert_matches::assert_matches;
     use std::str::FromStr;
 
@@ -2062,13 +2061,13 @@ mod tests {
         assert_eq!(case.to_string(), "case foo in esac");
 
         let subject = "bar".parse().unwrap();
-        let items = vec!["foo)".parse::<CaseItem<MissingHereDoc>>().unwrap()];
+        let items = vec!["foo)".parse::<CaseItem>().unwrap()];
         let case = CompoundCommand::Case { subject, items };
         assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
 
         let subject = "baz".parse().unwrap();
         let items = vec![
-            "1)".parse::<CaseItem<MissingHereDoc>>().unwrap(),
+            "1)".parse::<CaseItem>().unwrap(),
             "(a|b|c) :&".parse().unwrap(),
         ];
         let case = CompoundCommand::Case { subject, items };
@@ -2078,9 +2077,7 @@ mod tests {
     #[test]
     fn function_definition_display() {
         let body = FullCompoundCommand {
-            command: "( bar )"
-                .parse::<CompoundCommand<MissingHereDoc>>()
-                .unwrap(),
+            command: "( bar )".parse::<CompoundCommand>().unwrap(),
             redirs: vec![],
         };
         let fd = FunctionDefinition {
@@ -2094,7 +2091,7 @@ mod tests {
     #[test]
     fn pipeline_display() {
         let mut p = Pipeline {
-            commands: vec![Rc::new("first".parse::<Command<MissingHereDoc>>().unwrap())],
+            commands: vec![Rc::new("first".parse::<Command>().unwrap())],
             negation: false,
         };
         assert_eq!(p.to_string(), "first");
@@ -2120,7 +2117,7 @@ mod tests {
 
     #[test]
     fn and_or_list_display() {
-        let p = "first".parse::<Pipeline<MissingHereDoc>>().unwrap();
+        let p = "first".parse::<Pipeline>().unwrap();
         let mut aol = AndOrList {
             first: p,
             rest: vec![],
@@ -2138,7 +2135,7 @@ mod tests {
 
     #[test]
     fn list_display() {
-        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
+        let and_or = "first".parse::<AndOrList>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
             async_flag: None,
@@ -2165,7 +2162,7 @@ mod tests {
 
     #[test]
     fn list_display_alternate() {
-        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
+        let and_or = "first".parse::<AndOrList>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
             async_flag: None,

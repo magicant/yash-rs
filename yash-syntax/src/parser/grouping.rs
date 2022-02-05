@@ -20,7 +20,6 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{CloseBrace, OpenBrace};
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
@@ -34,7 +33,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not a `{`.
-    pub async fn grouping(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn grouping(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(OpenBrace)));
 
@@ -65,7 +64,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not a `(`.
-    pub async fn subshell(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn subshell(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Operator(OpenParen));
 
@@ -93,7 +92,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
@@ -109,7 +107,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
         });
@@ -122,7 +119,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), "foo; bar&");
         });
@@ -188,7 +184,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
         });
@@ -201,7 +196,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Subshell(list) => {
             assert_eq!(list.to_string(), ":");
         });
@@ -214,7 +208,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Subshell(list) => {
             assert_eq!(list.to_string(), "foo& bar");
         });

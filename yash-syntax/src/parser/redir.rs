@@ -20,16 +20,17 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Operator::{LessLess, LessLessDash};
-use super::lex::PartialHereDoc;
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
 use crate::source::Location;
 use crate::syntax::Fd;
+use crate::syntax::HereDoc;
 use crate::syntax::Redir;
 use crate::syntax::RedirBody;
 use crate::syntax::RedirOp;
+use crate::syntax::Text;
 use crate::syntax::Word;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 impl Parser<'_, '_> {
@@ -45,10 +46,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses a normal redirection body.
-    async fn normal_redirection_body(
-        &mut self,
-        operator: RedirOp,
-    ) -> Result<RedirBody<MissingHereDoc>> {
+    async fn normal_redirection_body(&mut self, operator: RedirOp) -> Result<RedirBody> {
         // TODO reject >>| and <<< if POSIXly-correct
         self.take_token_raw().await?;
         let operand = self
@@ -62,10 +60,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses the redirection body for a here-document.
-    async fn here_doc_redirection_body(
-        &mut self,
-        remove_tabs: bool,
-    ) -> Result<RedirBody<MissingHereDoc>> {
+    async fn here_doc_redirection_body(&mut self, remove_tabs: bool) -> Result<RedirBody> {
         self.take_token_raw().await?;
         let delimiter = self
             .redirection_operand()
@@ -74,17 +69,18 @@ impl Parser<'_, '_> {
                 cause: SyntaxError::MissingHereDocDelimiter.into(),
                 location,
             })?;
-
-        self.memorize_unread_here_doc(PartialHereDoc {
+        let here_doc = Rc::new(HereDoc {
             delimiter,
             remove_tabs,
+            content: RefCell::new(Text(Vec::new())),
         });
+        self.memorize_unread_here_doc(Rc::clone(&here_doc));
 
-        Ok(RedirBody::HereDoc(Rc::new(MissingHereDoc)))
+        Ok(RedirBody::HereDoc(here_doc))
     }
 
     /// Parses the redirection body.
-    async fn redirection_body(&mut self) -> Result<Option<RedirBody<MissingHereDoc>>> {
+    async fn redirection_body(&mut self) -> Result<Option<RedirBody>> {
         let operator = match self.peek_token().await?.id {
             Operator(operator) => operator,
             _ => return Ok(None),
@@ -107,7 +103,7 @@ impl Parser<'_, '_> {
     /// is missing after the operator, `Err(Error{...})` is returned with a cause of
     /// [`MissingRedirOperand`](SyntaxError::MissingRedirOperand) or
     /// [`MissingHereDocDelimiter`](SyntaxError::MissingHereDocDelimiter).
-    pub async fn redirection(&mut self) -> Result<Option<Redir<MissingHereDoc>>> {
+    pub async fn redirection(&mut self) -> Result<Option<Redir>> {
         let fd = if self.peek_token().await?.id == IoNumber {
             let token = self.take_token_raw().await?;
             if let Ok(fd) = token.word.to_string().parse() {
@@ -129,7 +125,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses a (possibly empty) sequence of redirections.
-    pub async fn redirections(&mut self) -> Result<Vec<Redir<MissingHereDoc>>> {
+    pub async fn redirections(&mut self) -> Result<Vec<Redir>> {
         // TODO substitute global aliases
         let mut redirs = vec![];
         while let Some(redir) = self.redirection().await? {
@@ -287,7 +283,11 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_eq!(redir.body, RedirBody::HereDoc(Rc::new(MissingHereDoc)));
+        assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => {
+            assert_eq!(here_doc.delimiter.to_string(), "end");
+            assert_eq!(here_doc.remove_tabs, false);
+            assert_eq!(here_doc.content.borrow().to_string(), "");
+        });
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
         let here_docs = parser.take_read_here_docs();
@@ -305,7 +305,11 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_eq!(redir.body, RedirBody::HereDoc(Rc::new(MissingHereDoc)));
+        assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => {
+            assert_eq!(here_doc.delimiter.to_string(), "end");
+            assert_eq!(here_doc.remove_tabs, true);
+            assert_eq!(here_doc.content.borrow().to_string(), "");
+        });
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
         let here_docs = parser.take_read_here_docs();

@@ -23,7 +23,6 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Case, Do, Done, For, If, OpenBrace, Until, While};
 use super::lex::Operator::OpenParen;
 use super::lex::TokenId::{Operator, Token};
@@ -35,7 +34,7 @@ impl Parser<'_, '_> {
     /// Parses a `do` clause, i.e., a compound list surrounded in `do ... done`.
     ///
     /// Returns `Ok(None)` if the first token is not `do`.
-    pub async fn do_clause(&mut self) -> Result<Option<List<MissingHereDoc>>> {
+    pub async fn do_clause(&mut self) -> Result<Option<List>> {
         if self.peek_token().await?.id != Token(Some(Do)) {
             return Ok(None);
         }
@@ -63,7 +62,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses a compound command.
-    pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand<MissingHereDoc>>> {
+    pub async fn compound_command(&mut self) -> Result<Option<CompoundCommand>> {
         match self.peek_token().await?.id {
             Token(Some(OpenBrace)) => self.grouping().await.map(Some),
             Operator(OpenParen) => self.subshell().await.map(Some),
@@ -77,9 +76,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses a compound command with optional redirections.
-    pub async fn full_compound_command(
-        &mut self,
-    ) -> Result<Option<FullCompoundCommand<MissingHereDoc>>> {
+    pub async fn full_compound_command(&mut self) -> Result<Option<FullCompoundCommand>> {
         let command = match self.compound_command().await? {
             Some(command) => command,
             None => return Ok(None),
@@ -95,7 +92,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::Operator::Semicolon;
     use super::super::lex::TokenId::EndOfInput;
@@ -125,7 +121,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), ":");
 
         let next = block_on(parser.peek_token()).unwrap();
@@ -139,7 +134,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "foo; bar&");
 
         let next = block_on(parser.peek_token()).unwrap();
@@ -206,7 +200,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.do_clause()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), ":");
 
         let next = block_on(parser.peek_token()).unwrap();
@@ -229,8 +222,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
-        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        let FullCompoundCommand { command, redirs } =
+            block_on(parser.full_compound_command()).unwrap().unwrap();
         assert_eq!(command.to_string(), "(:)");
         assert_eq!(redirs, []);
     }
@@ -241,8 +234,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.full_compound_command()).unwrap().unwrap();
-        let FullCompoundCommand { command, redirs } = result.fill(&mut std::iter::empty()).unwrap();
+        let FullCompoundCommand { command, redirs } =
+            block_on(parser.full_compound_command()).unwrap().unwrap();
         assert_eq!(command.to_string(), "(command)");
         assert_eq!(redirs.len(), 2);
         assert_eq!(redirs[0].to_string(), "<foo");
@@ -274,7 +267,6 @@ mod tests {
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "foo");

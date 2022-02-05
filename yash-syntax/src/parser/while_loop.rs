@@ -20,7 +20,6 @@ use super::core::Parser;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Until, While};
 use super::lex::TokenId::Token;
 use crate::syntax::CompoundCommand;
@@ -33,7 +32,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not `while`.
-    pub async fn while_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn while_loop(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(While)));
 
@@ -66,7 +65,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not `until`.
-    pub async fn until_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn until_loop(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(Until)));
 
@@ -96,7 +95,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
@@ -113,7 +111,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
@@ -130,7 +127,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
@@ -197,7 +193,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "while :; do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();
@@ -211,7 +206,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
@@ -228,7 +222,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
@@ -295,7 +288,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "until :; do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();

@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Command;
@@ -39,10 +38,7 @@ impl Parser<'_, '_> {
     /// If the simple command has only one word and the next token is `(`, it is
     /// parsed as a function definition command.
     /// Otherwise, the simple command is returned intact.
-    pub async fn short_function_definition(
-        &mut self,
-        mut intro: SimpleCommand<MissingHereDoc>,
-    ) -> Result<Command<MissingHereDoc>> {
+    pub async fn short_function_definition(&mut self, mut intro: SimpleCommand) -> Result<Command> {
         if !intro.is_one_word() || self.peek_token().await?.id != Operator(OpenParen) {
             return Ok(Command::Simple(intro));
         }
@@ -93,7 +89,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
@@ -115,7 +110,6 @@ mod tests {
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "");
         });
@@ -136,7 +130,6 @@ mod tests {
         };
 
         let result = block_on(parser.short_function_definition(c)).unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo");
         });
@@ -238,7 +231,6 @@ mod tests {
             let c = parser.simple_command().await.unwrap().unwrap().unwrap();
             parser.short_function_definition(c).await.unwrap()
         });
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
@@ -279,7 +271,6 @@ mod tests {
             let c = parser.simple_command().await.unwrap().unwrap().unwrap();
             parser.short_function_definition(c).await.unwrap()
         });
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
