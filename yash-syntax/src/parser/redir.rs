@@ -283,18 +283,12 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => {
-            assert_eq!(here_doc.delimiter.to_string(), "end");
-            assert_eq!(here_doc.remove_tabs, false);
-            assert_eq!(here_doc.content.borrow().to_string(), "");
-        });
+        let here_doc = assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => here_doc);
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
-        let here_docs = parser.take_read_here_docs();
-        assert_eq!(here_docs.len(), 1);
-        assert_eq!(here_docs[0].delimiter.to_string(), "end");
-        assert_eq!(here_docs[0].remove_tabs, false);
-        assert_eq!(here_docs[0].content.borrow().to_string(), "");
+        assert_eq!(here_doc.delimiter.to_string(), "end");
+        assert_eq!(here_doc.remove_tabs, false);
+        assert_eq!(here_doc.content.borrow().to_string(), "");
     }
 
     #[test]
@@ -305,18 +299,12 @@ mod tests {
 
         let redir = block_on(parser.redirection()).unwrap().unwrap();
         assert_eq!(redir.fd, None);
-        assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => {
-            assert_eq!(here_doc.delimiter.to_string(), "end");
-            assert_eq!(here_doc.remove_tabs, true);
-            assert_eq!(here_doc.content.borrow().to_string(), "");
-        });
+        let here_doc = assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => here_doc);
 
         block_on(parser.newline_and_here_doc_contents()).unwrap();
-        let here_docs = parser.take_read_here_docs();
-        assert_eq!(here_docs.len(), 1);
-        assert_eq!(here_docs[0].delimiter.to_string(), "end");
-        assert_eq!(here_docs[0].remove_tabs, true);
-        assert_eq!(here_docs[0].content.borrow().to_string(), "");
+        assert_eq!(here_doc.delimiter.to_string(), "end");
+        assert_eq!(here_doc.remove_tabs, true);
+        assert_eq!(here_doc.content.borrow().to_string(), "");
     }
 
     #[test]
