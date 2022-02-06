@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Operator::{AndAnd, BarBar};
 use super::lex::TokenId::Operator;
 use crate::syntax::AndOr;
@@ -32,7 +31,7 @@ impl Parser<'_, '_> {
     ///
     /// If there is no valid and-or list at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList<MissingHereDoc>>>> {
+    pub async fn and_or_list(&mut self) -> Result<Rec<Option<AndOrList>>> {
         let first = match self.pipeline().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
             Rec::Parsed(None) => return Ok(Rec::Parsed(None)),
@@ -74,7 +73,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
     use crate::source::Source;
@@ -97,7 +95,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
-        let aol = aol.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(aol.first.to_string(), "foo");
         assert_eq!(aol.rest, vec![]);
     }
@@ -109,7 +106,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
-        let aol = aol.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(aol.first.to_string(), "first");
         assert_eq!(aol.rest.len(), 2);
         assert_eq!(aol.rest[0].0, AndOr::AndThen);

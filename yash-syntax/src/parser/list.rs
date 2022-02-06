@@ -21,8 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::Fill;
-use super::fill::MissingHereDoc;
 use super::lex::Operator::{And, Newline, Semicolon};
 use super::lex::TokenId::Operator;
 use crate::syntax::Item;
@@ -38,7 +36,7 @@ impl Parser<'_, '_> {
     // very useful for parsing a list. An item requires a separator operator
     // ('&' or ';') for it to be followed by another item. You cannot tell from
     // the resultant item whether there was a separator operator.
-    // pub async fn item(&mut self) -> Result<Rec<Item<MissingHereDoc>>> { }
+    // pub async fn item(&mut self) -> Result<Rec<Item>> { }
 
     /// Parses a list.
     ///
@@ -47,7 +45,7 @@ impl Parser<'_, '_> {
     ///
     /// If there is no valid command at the current position, this function
     /// returns a list with no items.
-    pub async fn list(&mut self) -> Result<Rec<List<MissingHereDoc>>> {
+    pub async fn list(&mut self) -> Result<Rec<List>> {
         let mut items = vec![];
 
         let mut result = match self.and_or_list().await? {
@@ -126,8 +124,6 @@ impl Parser<'_, '_> {
         }
 
         self.ensure_no_unread_here_doc()?;
-        let mut here_docs = self.take_read_here_docs().into_iter();
-        let list = list.fill(&mut here_docs)?;
         Ok(Some(list))
     }
 
@@ -140,7 +136,7 @@ impl Parser<'_, '_> {
     /// This function stops parsing on encountering an unexpected token that
     /// cannot be parsed as the beginning of an and-or list. The caller should
     /// check that the next token is an expected one.
-    pub async fn maybe_compound_list(&mut self) -> Result<List<MissingHereDoc>> {
+    pub async fn maybe_compound_list(&mut self) -> Result<List> {
         let mut items = vec![];
 
         loop {
@@ -162,7 +158,7 @@ impl Parser<'_, '_> {
     /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
     pub fn maybe_compound_list_boxed(
         &mut self,
-    ) -> Pin<Box<dyn Future<Output = Result<List<MissingHereDoc>>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<List>> + '_>> {
         Box::pin(self.maybe_compound_list())
     }
 }
@@ -176,7 +172,6 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::AndOrList;
     use crate::syntax::Command;
-    use crate::syntax::HereDoc;
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
     use assert_matches::assert_matches;
@@ -199,7 +194,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let list = block_on(parser.list()).unwrap().unwrap();
-        let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 1);
         assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
@@ -212,7 +206,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let list = block_on(parser.list()).unwrap().unwrap();
-        let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 1);
         assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
@@ -225,7 +218,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let list = block_on(parser.list()).unwrap().unwrap();
-        let list = list.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(list.0.len(), 3);
 
         let location = list.0[0].async_flag.as_ref().unwrap();
@@ -276,10 +268,9 @@ mod tests {
         assert_eq!(cmd.redirs.len(), 1);
         assert_eq!(cmd.redirs[0].fd, None);
         assert_matches!(cmd.redirs[0].body, RedirBody::HereDoc(ref here_doc) => {
-            let HereDoc { delimiter, remove_tabs, content } = here_doc;
-            assert_eq!(delimiter.to_string(), "END");
-            assert_eq!(*remove_tabs, false);
-            assert_eq!(content.to_string(), "foo\n");
+            assert_eq!(here_doc.delimiter.to_string(), "END");
+            assert_eq!(here_doc.remove_tabs, false);
+            assert_eq!(here_doc.content.borrow().to_string(), "foo\n");
         });
     }
 

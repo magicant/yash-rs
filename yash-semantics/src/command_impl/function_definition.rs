@@ -90,7 +90,7 @@ mod tests {
     fn function_definition_new() {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus::ERROR;
-        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+        let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),
             body: Rc::new("{ :; }".parse().unwrap()),
@@ -118,7 +118,7 @@ mod tests {
             origin: Location::dummy("dummy"),
             is_read_only: false,
         })));
-        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+        let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),
             body: Rc::new("( :; )".parse().unwrap()),
@@ -148,7 +148,7 @@ mod tests {
             is_read_only: true,
         });
         env.functions.insert(HashEntry(Rc::clone(&function)));
-        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+        let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),
             body: Rc::new("( :; )".parse().unwrap()),
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn function_definition_name_expansion() {
         let mut env = Env::new_virtual();
-        let definition = syntax::FunctionDefinition::<syntax::HereDoc> {
+        let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: r"\a".parse().unwrap(),
             body: Rc::new("{ :; }".parse().unwrap()),

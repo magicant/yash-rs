@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::Array;
@@ -33,20 +32,20 @@ use crate::syntax::Word;
 
 /// Simple command builder.
 #[derive(Default)]
-struct Builder<H> {
+struct Builder {
     assigns: Vec<Assign>,
     words: Vec<Word>,
-    redirs: Vec<Redir<H>>,
+    redirs: Vec<Redir>,
 }
 
-impl<H> Builder<H> {
+impl Builder {
     fn is_empty(&self) -> bool {
         self.assigns.is_empty() && self.words.is_empty() && self.redirs.is_empty()
     }
 }
 
-impl<H> From<Builder<H>> for SimpleCommand<H> {
-    fn from(builder: Builder<H>) -> Self {
+impl From<Builder> for SimpleCommand {
+    fn from(builder: Builder) -> Self {
         SimpleCommand {
             assigns: builder.assigns,
             words: builder.words,
@@ -93,7 +92,7 @@ impl Parser<'_, '_> {
     ///
     /// If there is no valid command at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand<MissingHereDoc>>>> {
+    pub async fn simple_command(&mut self) -> Result<Rec<Option<SimpleCommand>>> {
         let mut result = Builder::default();
 
         loop {

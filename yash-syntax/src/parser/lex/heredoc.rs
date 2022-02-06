@@ -68,17 +68,22 @@ impl Lexer<'_> {
     }
 
     /// Parses the content of a here-document.
-    pub async fn here_doc_content(&mut self, heredoc: PartialHereDoc) -> Result<HereDoc> {
+    ///
+    /// This function reads here-document content corresponding to the
+    /// here-document operator represented by the argument and fills
+    /// `here_doc.content` with the results. The argument does not have to be
+    /// mutable because `here_doc.content` is a `RefCell`. Note that this
+    /// function will panic if `here_doc.content` has been borrowed.
+    ///
+    /// In case of an error, partial results may be left in `here_doc.content`.
+    pub async fn here_doc_content(&mut self, here_doc: &HereDoc) -> Result<()> {
         fn is_escapable(c: char) -> bool {
             matches!(c, '$' | '`' | '\\')
         }
 
-        let delimiter = heredoc.delimiter;
-        let remove_tabs = heredoc.remove_tabs;
-
-        let (delimiter_string, literal) = delimiter.unquote();
+        let (delimiter_string, literal) = here_doc.delimiter.unquote();
         // TODO Reject if the delimiter contains a newline
-        let mut content = Text(vec![]);
+        let mut content = here_doc.content.borrow_mut();
         loop {
             let (line_text, line_string) = if literal {
                 let line_string = self.line().await?;
@@ -93,23 +98,19 @@ impl Lexer<'_> {
             };
 
             if !self.skip_if(|c| c == NEWLINE).await? {
-                let redir_op_location = delimiter.location;
+                let redir_op_location = here_doc.delimiter.location.clone();
                 let cause = SyntaxError::UnclosedHereDocContent { redir_op_location }.into();
                 let location = self.location().await?.clone();
                 return Err(Error { cause, location });
             }
 
-            let skip_count = if remove_tabs {
+            let skip_count = if here_doc.remove_tabs {
                 leading_tabs(&line_text.0)
             } else {
                 0
             };
             if line_string[skip_count..] == delimiter_string {
-                return Ok(HereDoc {
-                    delimiter,
-                    remove_tabs,
-                    content,
-                });
+                return Ok(());
             }
 
             content.0.extend({ line_text }.0.drain(skip_count..));
@@ -127,6 +128,7 @@ mod tests {
     use crate::syntax::TextUnit::*;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use std::cell::RefCell;
 
     #[test]
     fn leading_tabs_test() {
@@ -151,22 +153,23 @@ mod tests {
         assert_eq!(next, '\n');
     }
 
-    fn partial_here_doc(delimiter: &str, remove_tabs: bool) -> PartialHereDoc {
-        PartialHereDoc {
+    fn here_doc_operator(delimiter: &str, remove_tabs: bool) -> HereDoc {
+        HereDoc {
             delimiter: delimiter.parse().unwrap(),
             remove_tabs,
+            content: RefCell::new(Text(Vec::new())),
         }
     }
 
     #[test]
     fn lexer_here_doc_content_empty_content() {
-        let heredoc = partial_here_doc("END", false);
+        let heredoc = here_doc_operator("END", false);
 
         let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.0, []);
+        assert_eq!(heredoc.content.borrow().0, []);
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "END\nX");
@@ -176,13 +179,13 @@ mod tests {
 
     #[test]
     fn lexer_here_doc_content_one_line_content() {
-        let heredoc = partial_here_doc("FOO", false);
+        let heredoc = here_doc_operator("FOO", false);
 
         let mut lexer = Lexer::from_memory("content\nFOO\nX", Source::Unknown);
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.to_string(), "content\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "content\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
@@ -192,13 +195,13 @@ mod tests {
 
     #[test]
     fn lexer_here_doc_content_long_content() {
-        let heredoc = partial_here_doc("BAR", false);
+        let heredoc = here_doc_operator("BAR", false);
 
         let mut lexer = Lexer::from_memory("foo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.to_string(), "foo\n\tBAR\n\nbaz\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "foo\n\tBAR\n\nbaz\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
@@ -208,7 +211,7 @@ mod tests {
 
     #[test]
     fn lexer_here_doc_content_escapes_with_unquoted_delimiter() {
-        let heredoc = partial_here_doc("END", false);
+        let heredoc = here_doc_operator("END", false);
 
         let mut lexer = Lexer::from_memory(
             r#"\a\$\"\'\`\\\
@@ -217,9 +220,9 @@ END
 "#,
             Source::Unknown,
         );
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(
-            heredoc.content.0,
+            heredoc.content.borrow().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -238,7 +241,7 @@ END
 
     #[test]
     fn lexer_here_doc_content_escapes_with_quoted_delimiter() {
-        let heredoc = partial_here_doc(r"\END", false);
+        let heredoc = here_doc_operator(r"\END", false);
 
         let mut lexer = Lexer::from_memory(
             r#"\a\$\"\'\`\\\
@@ -247,9 +250,9 @@ END
 "#,
             Source::Unknown,
         );
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(
-            heredoc.content.0,
+            heredoc.content.borrow().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -273,13 +276,13 @@ END
 
     #[test]
     fn lexer_here_doc_content_with_tabs_removed() {
-        let heredoc = partial_here_doc("BAR", true);
+        let heredoc = here_doc_operator("BAR", true);
 
         let mut lexer = Lexer::from_memory("\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
-        let heredoc = block_on(lexer.here_doc_content(heredoc)).unwrap();
+        block_on(lexer.here_doc_content(&heredoc)).unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, true);
-        assert_eq!(heredoc.content.to_string(), "foo\n");
+        assert_eq!(heredoc.content.borrow().to_string(), "foo\n");
 
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
@@ -289,10 +292,10 @@ END
 
     #[test]
     fn lexer_here_doc_content_unclosed() {
-        let heredoc = partial_here_doc("END", false);
+        let heredoc = here_doc_operator("END", false);
 
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let e = block_on(lexer.here_doc_content(heredoc)).unwrap_err();
+        let e = block_on(lexer.here_doc_content(&heredoc)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) => {
             assert_eq!(*redir_op_location.code.value.borrow(), "END");

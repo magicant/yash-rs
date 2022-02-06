@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::Bang;
 use super::lex::Operator::Bar;
 use super::lex::TokenId::{Operator, Token};
@@ -33,7 +32,7 @@ impl Parser<'_, '_> {
     ///
     /// If there is no valid pipeline at the current position, this function
     /// returns `Ok(Rec::Parsed(None))`.
-    pub async fn pipeline(&mut self) -> Result<Rec<Option<Pipeline<MissingHereDoc>>>> {
+    pub async fn pipeline(&mut self) -> Result<Rec<Option<Pipeline>>> {
         // Parse the first command
         let (first, negation) = match self.command().await? {
             Rec::AliasSubstituted => return Ok(Rec::AliasSubstituted),
@@ -103,7 +102,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
@@ -128,7 +126,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
-        let p = p.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(p.negation, false);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "foo");
@@ -141,7 +138,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
-        let p = p.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(p.negation, false);
         assert_eq!(p.commands.len(), 3);
         assert_eq!(p.commands[0].to_string(), "one");
@@ -156,7 +152,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
-        let p = p.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(p.negation, true);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "foo");
@@ -238,7 +233,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
-        let p = p.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(p.negation, true);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "ok");

@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Case, Esac, In};
 use super::lex::Operator::{Bar, CloseParen, Newline, OpenParen, SemicolonSemicolon};
 use super::lex::TokenId::{self, EndOfInput, Operator, Token};
@@ -34,7 +33,7 @@ impl Parser<'_, '_> {
     /// Does not parse the optional trailing double semicolon.
     ///
     /// Returns `None` if the next token is `esac`.
-    pub async fn case_item(&mut self) -> Result<Option<CaseItem<MissingHereDoc>>> {
+    pub async fn case_item(&mut self) -> Result<Option<CaseItem>> {
         fn pattern_error_cause(token_id: TokenId) -> SyntaxError {
             match token_id {
                 Token(Some(Esac)) => SyntaxError::EsacAsPattern,
@@ -116,7 +115,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not `case`.
-    pub async fn case_command(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn case_command(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(Case)));
 
@@ -177,7 +176,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
@@ -387,7 +385,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "foo");
             assert_eq!(items, []);
@@ -421,7 +418,6 @@ mod tests {
         assert!(first_pass.is_alias_substituted());
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items, []);
@@ -455,7 +451,6 @@ mod tests {
         assert!(first_pass.is_alias_substituted());
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "in");
             assert_eq!(items.len(), 1);
@@ -490,7 +485,6 @@ mod tests {
         assert!(first_pass.is_alias_substituted());
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items, []);
@@ -507,7 +501,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "foo");
             assert_eq!(items.len(), 1);
@@ -528,7 +521,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items.len(), 3);
@@ -548,7 +540,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::Case { subject, items } => {
             assert_eq!(subject.to_string(), "x");
             assert_eq!(items.len(), 2);

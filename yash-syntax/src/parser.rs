@@ -72,7 +72,6 @@
 
 mod core;
 mod error;
-mod fill;
 mod from_str;
 
 mod and_or;
@@ -97,5 +96,3 @@ pub use self::core::Result;
 pub use self::error::Error;
 pub use self::error::ErrorCause;
 pub use self::error::SyntaxError;
-pub use self::fill::Fill;
-pub use self::fill::MissingHereDoc;

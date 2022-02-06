@@ -21,7 +21,6 @@ use super::core::Rec;
 use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
-use super::fill::MissingHereDoc;
 use super::lex::Keyword::{Do, For, In};
 use super::lex::Operator::{Newline, Semicolon};
 use super::lex::TokenId::{EndOfInput, IoNumber, Operator, Token};
@@ -117,7 +116,7 @@ impl Parser<'_, '_> {
     }
 
     /// Parses the body of a for loop, possibly preceded by newlines.
-    async fn for_loop_body(&mut self, opening_location: Location) -> Result<List<MissingHereDoc>> {
+    async fn for_loop_body(&mut self, opening_location: Location) -> Result<List> {
         loop {
             while self.newline_and_here_doc_contents().await? {}
 
@@ -143,7 +142,7 @@ impl Parser<'_, '_> {
     /// # Panics
     ///
     /// If the first token is not `for`.
-    pub async fn for_loop(&mut self) -> Result<CompoundCommand<MissingHereDoc>> {
+    pub async fn for_loop(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(For)));
         let opening_location = open.word.location;
@@ -158,7 +157,6 @@ impl Parser<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::super::error::ErrorCause;
-    use super::super::fill::Fill;
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
@@ -173,7 +171,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "A");
             assert_eq!(values, None);
@@ -191,7 +188,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
@@ -209,7 +205,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
@@ -227,7 +222,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
@@ -245,7 +239,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
@@ -263,7 +256,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             let values = values
@@ -286,7 +278,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "in");
             let values = values
@@ -309,7 +300,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
@@ -327,7 +317,6 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_matches!(result, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
@@ -361,7 +350,6 @@ mod tests {
         assert!(first_pass.is_alias_substituted());
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "for A do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();
@@ -391,7 +379,6 @@ mod tests {
         assert!(first_pass.is_alias_substituted());
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        let result = result.fill(&mut std::iter::empty()).unwrap();
         assert_eq!(result.to_string(), "for A do :; done");
 
         let next = block_on(parser.peek_token()).unwrap();

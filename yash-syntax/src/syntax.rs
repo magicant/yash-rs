@@ -19,13 +19,6 @@
 //! This module contains types that represent abstract syntax trees (ASTs) of
 //! the shell language.
 //!
-//! Some types in this module has the type parameter `<H = HereDoc>`. As a user
-//! of ASTs, you will never have to specify the parameter other than the default
-//! `HereDoc`. The parameter with non-default types is used internally by the
-//! parser to create intermediate ASTs that lack sub-trees for here-documents,
-//! as the contents of here-documents have to be parsed separately from the
-//! normal flow of source code.
-//!
 //! ## Syntactic elements
 //!
 //! The AST type that represents the whole shell script is [`List`], which is a
@@ -83,6 +76,7 @@
 use crate::parser::lex::Operator;
 use crate::source::Location;
 use itertools::Itertools;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Write;
 use std::os::unix::io::RawFd;
@@ -844,7 +838,12 @@ pub struct HereDoc {
     ///
     /// The content ends with a newline unless it is empty. If the delimiter
     /// is quoted, the content must be all literal.
-    pub content: Text,
+    ///
+    /// This value is wrapped in `RefCell` because the here-doc content is
+    /// parsed separately from the here-doc operator. When the operator is
+    /// parsed, the `HereDoc` instance is created with an empty value. The value
+    /// is filled when the content is parsed later.
+    pub content: RefCell<Text>,
 }
 
 impl fmt::Display for HereDoc {
@@ -862,15 +861,15 @@ impl fmt::Display for HereDoc {
 
 /// Part of a redirection that defines the nature of the resulting file descriptor.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RedirBody<H = HereDoc> {
+pub enum RedirBody {
     /// Normal redirection.
     Normal { operator: RedirOp, operand: Word },
     /// Here-document.
-    HereDoc(H),
+    HereDoc(Rc<HereDoc>),
     // TODO process redirection
 }
 
-impl RedirBody<HereDoc> {
+impl RedirBody {
     /// Returns the operand word of the redirection.
     pub fn operand(&self) -> &Word {
         match self {
@@ -880,7 +879,7 @@ impl RedirBody<HereDoc> {
     }
 }
 
-impl<H: fmt::Display> fmt::Display for RedirBody<H> {
+impl fmt::Display for RedirBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RedirBody::Normal { operator, operand } => write!(f, "{}{}", operator, operand),
@@ -889,22 +888,22 @@ impl<H: fmt::Display> fmt::Display for RedirBody<H> {
     }
 }
 
-impl From<HereDoc> for RedirBody {
-    fn from(h: HereDoc) -> Self {
-        RedirBody::HereDoc(h)
+impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody {
+    fn from(t: T) -> Self {
+        RedirBody::HereDoc(t.into())
     }
 }
 
 /// Redirection.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Redir<H = HereDoc> {
+pub struct Redir {
     /// File descriptor that is modified by this redirection.
     pub fd: Option<Fd>,
     /// Nature of the resulting file descriptor.
-    pub body: RedirBody<H>,
+    pub body: RedirBody,
 }
 
-impl<H> Redir<H> {
+impl Redir {
     /// Computes the file descriptor that is modified by this redirection.
     ///
     /// If `self.fd` is `Some(_)`, the `RawFd` value is returned intact. Otherwise,
@@ -921,7 +920,7 @@ impl<H> Redir<H> {
     }
 }
 
-impl<H: fmt::Display> fmt::Display for Redir<H> {
+impl fmt::Display for Redir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(fd) = self.fd {
             write!(f, "{}", fd)?;
@@ -935,13 +934,13 @@ impl<H: fmt::Display> fmt::Display for Redir<H> {
 /// In the shell language syntax, a valid simple command must contain at least one of assignments,
 /// redirections, and words. The parser must not produce a completely empty simple command.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SimpleCommand<H = HereDoc> {
+pub struct SimpleCommand {
     pub assigns: Vec<Assign>,
     pub words: Vec<Word>,
-    pub redirs: Rc<Vec<Redir<H>>>,
+    pub redirs: Rc<Vec<Redir>>,
 }
 
-impl<H> SimpleCommand<H> {
+impl SimpleCommand {
     /// Returns true if the simple command does not contain any assignments,
     /// words, or redirections.
     pub fn is_empty(&self) -> bool {
@@ -954,7 +953,7 @@ impl<H> SimpleCommand<H> {
     }
 }
 
-impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
+impl fmt::Display for SimpleCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let i1 = self.assigns.iter().map(|x| x as &dyn fmt::Display);
         let i2 = self.words.iter().map(|x| x as &dyn fmt::Display);
@@ -966,12 +965,12 @@ impl<H: fmt::Display> fmt::Display for SimpleCommand<H> {
 
 /// `elif-then` clause.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ElifThen<H = HereDoc> {
-    pub condition: List<H>,
-    pub body: List<H>,
+pub struct ElifThen {
+    pub condition: List,
+    pub body: List,
 }
 
-impl<H: fmt::Display> fmt::Display for ElifThen<H> {
+impl fmt::Display for ElifThen {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "elif {:#} then ", self.condition)?;
         if f.alternate() {
@@ -984,17 +983,17 @@ impl<H: fmt::Display> fmt::Display for ElifThen<H> {
 
 /// Branch item of a `case` compound command.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CaseItem<H = HereDoc> {
+pub struct CaseItem {
     /// Array of patterns that are matched against the main word of the case
     /// compound command to decide if the body of this item should be executed.
     ///
     /// A syntactically valid case item must have at least one pattern.
     pub patterns: Vec<Word>,
     /// Commands that are executed if any of the patterns matched.
-    pub body: List<H>,
+    pub body: List,
 }
 
-impl<H: fmt::Display> fmt::Display for CaseItem<H> {
+impl fmt::Display for CaseItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -1007,37 +1006,34 @@ impl<H: fmt::Display> fmt::Display for CaseItem<H> {
 
 /// Command that contains other commands.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CompoundCommand<H = HereDoc> {
+pub enum CompoundCommand {
     /// List as a command.
-    Grouping(List<H>),
+    Grouping(List),
     /// Command for executing commands in a subshell.
-    Subshell(List<H>),
+    Subshell(List),
     /// For loop.
     For {
         name: Word,
         values: Option<Vec<Word>>,
-        body: List<H>,
+        body: List,
     },
     /// While loop.
-    While { condition: List<H>, body: List<H> },
+    While { condition: List, body: List },
     /// Until loop.
-    Until { condition: List<H>, body: List<H> },
+    Until { condition: List, body: List },
     /// If conditional construct.
     If {
-        condition: List<H>,
-        body: List<H>,
-        elifs: Vec<ElifThen<H>>,
-        r#else: Option<List<H>>,
+        condition: List,
+        body: List,
+        elifs: Vec<ElifThen>,
+        r#else: Option<List>,
     },
     /// Case conditional construct.
-    Case {
-        subject: Word,
-        items: Vec<CaseItem<H>>,
-    },
+    Case { subject: Word, items: Vec<CaseItem> },
     // TODO [[ ]]
 }
 
-impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
+impl fmt::Display for CompoundCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompoundCommand::*;
         match self {
@@ -1084,14 +1080,14 @@ impl<H: fmt::Display> fmt::Display for CompoundCommand<H> {
 
 /// Compound command with redirections.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FullCompoundCommand<H = HereDoc> {
+pub struct FullCompoundCommand {
     /// The main part.
-    pub command: CompoundCommand<H>,
+    pub command: CompoundCommand,
     /// Redirections.
-    pub redirs: Vec<Redir<H>>,
+    pub redirs: Vec<Redir>,
 }
 
-impl<H: fmt::Display> fmt::Display for FullCompoundCommand<H> {
+impl fmt::Display for FullCompoundCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let FullCompoundCommand { command, redirs } = self;
         write!(f, "{}", command)?;
@@ -1101,16 +1097,16 @@ impl<H: fmt::Display> fmt::Display for FullCompoundCommand<H> {
 
 /// Function definition command.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FunctionDefinition<H = HereDoc> {
+pub struct FunctionDefinition {
     /// Whether the function definition command starts with the `function` reserved word.
     pub has_keyword: bool,
     /// Function name.
     pub name: Word,
     /// Function body.
-    pub body: Rc<FullCompoundCommand<H>>,
+    pub body: Rc<FullCompoundCommand>,
 }
 
-impl<H: fmt::Display> fmt::Display for FunctionDefinition<H> {
+impl fmt::Display for FunctionDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.has_keyword {
             f.write_str("function ")?;
@@ -1121,16 +1117,16 @@ impl<H: fmt::Display> fmt::Display for FunctionDefinition<H> {
 
 /// Element of a pipe sequence.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Command<H = HereDoc> {
+pub enum Command {
     /// Simple command.
-    Simple(SimpleCommand<H>),
+    Simple(SimpleCommand),
     /// Compound command.
-    Compound(FullCompoundCommand<H>),
+    Compound(FullCompoundCommand),
     /// Function definition command.
-    Function(FunctionDefinition<H>),
+    Function(FunctionDefinition),
 }
 
-impl<H: fmt::Display> fmt::Display for Command<H> {
+impl fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Command::Simple(c) => c.fmt(f),
@@ -1142,19 +1138,19 @@ impl<H: fmt::Display> fmt::Display for Command<H> {
 
 /// Commands separated by `|`
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Pipeline<H = HereDoc> {
+pub struct Pipeline {
     /// Elements of the pipeline.
     ///
     /// A valid pipeline must have at least one command.
     ///
     /// The commands are contained in `Rc` to allow executing them
     /// asynchronously without cloning them.
-    pub commands: Vec<Rc<Command<H>>>,
+    pub commands: Vec<Rc<Command>>,
     /// True if the pipeline begins with a `!`.
     pub negation: bool,
 }
 
-impl<H: fmt::Display> fmt::Display for Pipeline<H> {
+impl fmt::Display for Pipeline {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         if self.negation {
             write!(f, "! ")?;
@@ -1203,12 +1199,12 @@ impl fmt::Display for AndOr {
 
 /// Pipelines separated by `&&` and `||`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AndOrList<H = HereDoc> {
-    pub first: Pipeline<H>,
-    pub rest: Vec<(AndOr, Pipeline<H>)>,
+pub struct AndOrList {
+    pub first: Pipeline,
+    pub rest: Vec<(AndOr, Pipeline)>,
 }
 
-impl<H: fmt::Display> fmt::Display for AndOrList<H> {
+impl fmt::Display for AndOrList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.first)?;
         self.rest
@@ -1219,12 +1215,12 @@ impl<H: fmt::Display> fmt::Display for AndOrList<H> {
 
 /// Element of a [List].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Item<H = HereDoc> {
+pub struct Item {
     /// Main part of this item.
     ///
     /// The and-or list is contained in `Rc` to allow executing it
     /// asynchronously without cloning it.
-    pub and_or: Rc<AndOrList<H>>,
+    pub and_or: Rc<AndOrList>,
     /// Location of the `&` operator for this item, if any.
     pub async_flag: Option<Location>,
 }
@@ -1234,7 +1230,7 @@ pub struct Item<H = HereDoc> {
 /// By default, the `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl<H: fmt::Display> fmt::Display for Item<H> {
+impl fmt::Display for Item {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.and_or)?;
         if self.async_flag.is_some() {
@@ -1251,14 +1247,14 @@ impl<H: fmt::Display> fmt::Display for Item<H> {
 ///
 /// It depends on context whether an empty list is a valid syntax.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct List<H = HereDoc>(pub Vec<Item<H>>);
+pub struct List(pub Vec<Item>);
 
 /// Allows conversion from List to String.
 ///
 /// By default, the last `;` terminator is omitted from the formatted string.
 /// When the alternate flag is specified as in `{:#}`, the result is always
 /// terminated by either `;` or `&`.
-impl<H: fmt::Display> fmt::Display for List<H> {
+impl fmt::Display for List {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((last, others)) = self.0.split_last() {
             for item in others {
@@ -1279,7 +1275,6 @@ impl<H: fmt::Display> fmt::Display for List<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::MissingHereDoc;
     use assert_matches::assert_matches;
     use std::str::FromStr;
 
@@ -1808,14 +1803,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: true,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<-END");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("XXX").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("there").unwrap(),
+            content: Text::from_str("there").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<XXX");
     }
@@ -1825,14 +1820,14 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("--").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<< --");
 
         let heredoc = HereDoc {
             delimiter: Word::from_str("-").unwrap(),
             remove_tabs: true,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
         assert_eq!(heredoc.to_string(), "<<- -");
     }
@@ -1842,7 +1837,7 @@ mod tests {
         let heredoc = HereDoc {
             delimiter: Word::from_str("END").unwrap(),
             remove_tabs: false,
-            content: Text::from_str("here").unwrap(),
+            content: Text::from_str("here").unwrap().into(),
         };
 
         let redir = Redir {
@@ -1892,7 +1887,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("END").unwrap(),
                 remove_tabs: false,
-                content: Text::from_str("").unwrap(),
+                content: Text::from_str("").unwrap().into(),
             }),
         });
         assert_eq!(command.to_string(), "name=value hello=world echo foo <<END");
@@ -1908,7 +1903,7 @@ mod tests {
             body: RedirBody::from(HereDoc {
                 delimiter: Word::from_str("here").unwrap(),
                 remove_tabs: true,
-                content: Text::from_str("ignored").unwrap(),
+                content: Text::from_str("ignored").unwrap().into(),
             }),
         });
         assert_eq!(command.to_string(), "<<END 1<<-here");
@@ -2056,13 +2051,13 @@ mod tests {
         assert_eq!(case.to_string(), "case foo in esac");
 
         let subject = "bar".parse().unwrap();
-        let items = vec!["foo)".parse::<CaseItem<MissingHereDoc>>().unwrap()];
+        let items = vec!["foo)".parse::<CaseItem>().unwrap()];
         let case = CompoundCommand::Case { subject, items };
         assert_eq!(case.to_string(), "case bar in (foo) ;; esac");
 
         let subject = "baz".parse().unwrap();
         let items = vec![
-            "1)".parse::<CaseItem<MissingHereDoc>>().unwrap(),
+            "1)".parse::<CaseItem>().unwrap(),
             "(a|b|c) :&".parse().unwrap(),
         ];
         let case = CompoundCommand::Case { subject, items };
@@ -2072,9 +2067,7 @@ mod tests {
     #[test]
     fn function_definition_display() {
         let body = FullCompoundCommand {
-            command: "( bar )"
-                .parse::<CompoundCommand<MissingHereDoc>>()
-                .unwrap(),
+            command: "( bar )".parse::<CompoundCommand>().unwrap(),
             redirs: vec![],
         };
         let fd = FunctionDefinition {
@@ -2088,7 +2081,7 @@ mod tests {
     #[test]
     fn pipeline_display() {
         let mut p = Pipeline {
-            commands: vec![Rc::new("first".parse::<Command<MissingHereDoc>>().unwrap())],
+            commands: vec![Rc::new("first".parse::<Command>().unwrap())],
             negation: false,
         };
         assert_eq!(p.to_string(), "first");
@@ -2114,7 +2107,7 @@ mod tests {
 
     #[test]
     fn and_or_list_display() {
-        let p = "first".parse::<Pipeline<MissingHereDoc>>().unwrap();
+        let p = "first".parse::<Pipeline>().unwrap();
         let mut aol = AndOrList {
             first: p,
             rest: vec![],
@@ -2132,7 +2125,7 @@ mod tests {
 
     #[test]
     fn list_display() {
-        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
+        let and_or = "first".parse::<AndOrList>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
             async_flag: None,
@@ -2159,7 +2152,7 @@ mod tests {
 
     #[test]
     fn list_display_alternate() {
-        let and_or = "first".parse::<AndOrList<MissingHereDoc>>().unwrap();
+        let and_or = "first".parse::<AndOrList>().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
             async_flag: None,
