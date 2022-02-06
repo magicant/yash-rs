@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `source::Source` now `non_exhaustive`
 - `syntax::HereDoc::content` redefined as `RefCell<Text>` (previously `Text`)
 - `syntax::RedirBody<H>::HereDoc::0` redefined as `Rc<H>` (previously `H`)
     - `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`

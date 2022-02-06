@@ -31,6 +31,7 @@ use std::rc::Rc;
 
 /// Origin of source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Source {
     /// Source code of unknown origin.
     ///
