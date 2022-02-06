@@ -5,14 +5,17 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - ????-??-??
+## [0.3.0] - 2022-02-06
+
+This version simplifies type definitions for the abstract syntax tree (AST);
+`syntax::HereDoc::content` is now wrapped in `RefCell` to remove generic type
+parameters from `RedirBody` and other AST types. 
 
 ### Changed
 
 - `source::Source` now `non_exhaustive`
 - `syntax::HereDoc::content` redefined as `RefCell<Text>` (previously `Text`)
-- `syntax::RedirBody<H>::HereDoc::0` redefined as `Rc<H>` (previously `H`)
-    - `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`
+- `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`
 - `parser::Lexer::here_doc_content` now taking a `&HereDoc` parameter and returning `Result<()>`
 - `parser::Parser::memorize_unread_here_doc` now taking an `Rc<HereDoc>` parameter
 
@@ -70,5 +73,6 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.3.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.3.0
 [0.2.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.2.0
 [0.1.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.1.0
