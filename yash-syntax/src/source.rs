@@ -19,14 +19,16 @@
 //! This module contains items representing information about the source code
 //! from which ASTs originate. [`Source`] identifies the origin of source code
 //! fragments contained in [`Code`]. A [`Location`] specifies a particular
-//! character in a `Code` instance. You can use the [`pretty`] submodule to
-//! format messages describing source code locations.
+//! character in a `Code` instance. Similarly, a [`Span`] refers to a range of
+//! characters in `Code`. You can use the [`pretty`] submodule to format
+//! messages describing source code locations.
 
 pub mod pretty;
 
 use crate::alias::Alias;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
+use std::ops::Range;
 use std::rc::Rc;
 
 /// Origin of source code.
@@ -194,6 +196,29 @@ pub fn source_chars<'a>(
 }
 
 /// Position of a character in source code.
+///
+/// A `Location` is similar to a [`Span`] but refers to a single character in a
+/// [`Code`] instance.
+///
+/// # Example
+///
+/// This example location refers to the space character in the code:
+///
+/// ```
+/// # use std::cell::RefCell;
+/// # use std::num::NonZeroU64;
+/// # use std::rc::Rc;
+/// # use yash_syntax::source::*;
+/// let value = RefCell::new("echo ok".to_string());
+/// let start_line_number = NonZeroU64::new(1).unwrap();
+/// let source = Source::Unknown;
+/// let code = Rc::new(Code { value, start_line_number, source });
+/// let index = 4;
+/// let location = Location { code, index };
+/// assert_eq!(
+///     location.code.value.borrow().chars().nth(location.index),
+///     Some(' '));
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
     /// Code that contains the character.
@@ -244,6 +269,76 @@ pub struct SourceChar {
     pub location: Location,
 }
 
+/// Portion of source code.
+///
+/// A `Span` is similar to a [`Location`] but refers to a range of characters in
+/// a [`Code`] instance.
+///
+/// # Example
+///
+/// This example span refers to the word `hello` in the code:
+///
+/// ```
+/// # use std::cell::RefCell;
+/// # use std::num::NonZeroU64;
+/// # use std::rc::Rc;
+/// # use yash_syntax::source::*;
+/// let value = RefCell::new("echo hello world".to_string());
+/// let start_line_number = NonZeroU64::new(1).unwrap();
+/// let source = Source::Unknown;
+/// let code = Rc::new(Code { value, start_line_number, source });
+/// let range = 5..10;
+/// let span = Span { code, range };
+/// let s = span.code.value.borrow().chars().skip(span.range.start)
+///     .take(span.range.count()).collect::<String>();
+/// assert_eq!(s, "hello");
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Span {
+    /// Code that contains the character.
+    pub code: Rc<Code>,
+
+    /// Character position in the code, counted from 0.
+    ///
+    /// Characters are counted in the number of Unicode scalar values, not
+    /// bytes. That means the index should be between 0 and
+    /// `code.value.borrow().chars().count()`.
+    pub range: Range<usize>,
+}
+
+/// Creates a span ranging over the single character represented by the
+/// location.
+impl From<Location> for Span {
+    fn from(location: Location) -> Self {
+        let Location { code, index } = location;
+        let range = index..index + 1;
+        Span { code, range }
+    }
+}
+
+impl Span {
+    /// Creates a dummy span.
+    ///
+    /// The returned span has [unknown](Source::Unknown) source and the
+    /// given source code value. The `start_line_number` will be 1 and the
+    /// `range` will cover the whole code.
+    ///
+    /// This function is mainly for use in testing.
+    #[inline]
+    pub fn dummy<S: Into<String>>(value: S) -> Self {
+        fn with_line(value: String) -> Span {
+            let range = 0..value.chars().count();
+            let code = Rc::new(Code {
+                value: RefCell::new(value),
+                start_line_number: NonZeroU64::new(1).unwrap(),
+                source: Source::Unknown,
+            });
+            Span { code, range }
+        }
+        with_line(value.into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +365,28 @@ mod tests {
         assert_eq!(location.index, 8);
 
         assert!(Rc::ptr_eq(&location.code, &code));
+    }
+
+    #[test]
+    fn span_from_location() {
+        let code = Rc::new(Code {
+            value: RefCell::new("echo ok".to_string()),
+            start_line_number: NonZeroU64::new(1).unwrap(),
+            source: Source::Unknown,
+        });
+        let index = 4;
+        let location = Location { code, index };
+        let span = Span::from(location);
+        assert_eq!(*span.code.value.borrow(), "echo ok");
+        assert_eq!(span.range, 4..5);
+    }
+
+    #[test]
+    fn span_dummy() {
+        let span = Span::dummy("echo foo");
+        assert_eq!(*span.code.value.borrow(), "echo foo");
+        assert_eq!(span.code.start_line_number.get(), 1);
+        assert_eq!(span.code.source, Source::Unknown);
+        assert_eq!(span.range, 0..8);
     }
 }
