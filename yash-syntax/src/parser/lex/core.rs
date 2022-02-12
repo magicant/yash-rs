@@ -457,6 +457,9 @@ impl<'a> Lexer<'a> {
     /// and a newline are silently skipped before returning the next character.
     /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
     /// switch off line continuation recognition.
+    ///
+    /// This function requires a mutable reference to `self` since it may need
+    /// to read the next line if needed.
     pub async fn peek_char(&mut self) -> Result<Option<char>> {
         while self.line_continuation().await? {}
 
@@ -471,8 +474,8 @@ impl<'a> Lexer<'a> {
     /// If there is no more character (that is, it is the end of input), an imaginary location
     /// is returned that would be returned if a character existed.
     ///
-    /// This function requires a mutable reference to `self` since it may need to read a next
-    /// line if it is not yet read.
+    /// This function requires a mutable reference to `self` since it needs to
+    /// [peek](Self::peek_char) the next character.
     pub async fn location(&mut self) -> Result<&Location> {
         self.core.peek_char().await.map(|p| p.location())
     }

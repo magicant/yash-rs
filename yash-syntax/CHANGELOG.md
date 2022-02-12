@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `source::Span::dummy`
     - `impl From<source::Location> for source::Span`
 
+### Changed
+
+- The following items' field `location: source::Location` to `span: source::Span`
+    - `syntax::TextUnit::RawParam`
+
 ## [0.3.0] - 2022-02-06
 
 This version simplifies type definitions for the abstract syntax tree (AST);

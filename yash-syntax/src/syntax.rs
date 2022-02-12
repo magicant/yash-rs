@@ -75,6 +75,7 @@
 
 use crate::parser::lex::Operator;
 use crate::source::Location;
+use crate::source::Span;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::fmt;
@@ -424,8 +425,8 @@ pub enum TextUnit {
     RawParam {
         /// Parameter name.
         name: String,
-        /// Location of the initial `$` character of this parameter expansion.
-        location: Location,
+        /// Range of this parameter expansion including the initial `$` character.
+        span: Span,
     },
     /// Parameter expansion that is enclosed in braces.
     BracedParam(Param),
@@ -1514,7 +1515,7 @@ mod tests {
 
         let raw_param = RawParam {
             name: "PARAM".to_string(),
-            location: Location::dummy(""),
+            span: Span::dummy(""),
         };
         assert_eq!(raw_param.to_string(), "$PARAM");
 
@@ -1559,7 +1560,7 @@ mod tests {
             Literal('W'),
             RawParam {
                 name: "X".to_string(),
-                location: Location::dummy(""),
+                span: Span::dummy(""),
             },
             CommandSubst {
                 content: "Y".to_string(),

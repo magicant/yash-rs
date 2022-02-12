@@ -18,7 +18,6 @@
 
 use super::core::Lexer;
 use crate::parser::core::Result;
-use crate::source::Location;
 use crate::syntax::TextUnit;
 
 /// Tests if a character can be part of a POSIXly-portable name.
@@ -54,26 +53,25 @@ impl Lexer<'_> {
     /// The initial `$` must have been consumed before calling this function.
     /// This functions checks if the next character is a valid POSIXly-portable
     /// parameter name. If so, the name is consumed and returned. Otherwise, no
-    /// characters are consumed and the return value is `Ok(Err(location))`.
+    /// characters are consumed and the return value is `Ok(None)`.
     ///
-    /// The `location` parameter should be the location of the initial `$`. It
-    /// is used to construct the result, but this function does not check if it
-    /// actually is a location of `$`.
-    pub async fn raw_param(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<TextUnit, Location>> {
+    /// The `start` parameter should be the index for the initial `$`. It is
+    /// used to construct the result, but this function does not check if it
+    /// actually points to the `$`.
+    pub async fn raw_param(&mut self, start: usize) -> Result<Option<TextUnit>> {
         if let Some(c) = self.consume_char_if(is_single_char_name).await? {
             let name = c.value.to_string();
-            Ok(Ok(TextUnit::RawParam { name, location }))
+            let span = self.span(start..self.index());
+            Ok(Some(TextUnit::RawParam { name, span }))
         } else if let Some(c) = self.consume_char_if(is_portable_name_char).await? {
             let mut name = c.value.to_string();
             while let Some(c) = self.consume_char_if(is_portable_name_char).await? {
                 name.push(c.value);
             }
-            Ok(Ok(TextUnit::RawParam { name, location }))
+            let span = self.span(start..self.index());
+            Ok(Some(TextUnit::RawParam { name, span }))
         } else {
-            Ok(Err(location))
+            Ok(None)
         }
     }
 }
@@ -87,83 +85,88 @@ mod tests {
 
     #[test]
     fn lexer_raw_param_special_parameter() {
-        let mut lexer = Lexer::from_memory("@;", Source::Unknown);
-        let location = Location::dummy("$");
+        block_on(async {
+            let mut lexer = Lexer::from_memory("$@;", Source::Unknown);
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, location } => {
-            assert_eq!(name, "@");
-            assert_eq!(*location.code.value.borrow(), "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
-        });
+            let result = lexer.raw_param(0).await.unwrap().unwrap();
+            assert_matches!(result, TextUnit::RawParam { name, span } => {
+                assert_eq!(name, "@");
+                assert_eq!(*span.code.value.borrow(), "$@;");
+                assert_eq!(span.code.start_line_number.get(), 1);
+                assert_eq!(span.code.source, Source::Unknown);
+                assert_eq!(span.range, 0..2);
+            });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+            assert_eq!(lexer.peek_char().await, Ok(Some(';')));
+        })
     }
 
     #[test]
     fn lexer_raw_param_digit() {
-        let mut lexer = Lexer::from_memory("12", Source::Unknown);
-        let location = Location::dummy("$");
+        block_on(async {
+            let mut lexer = Lexer::from_memory("$12", Source::Unknown);
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, location } => {
-            assert_eq!(name, "1");
-            assert_eq!(*location.code.value.borrow(), "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
-        });
+            let result = lexer.raw_param(0).await.unwrap().unwrap();
+            assert_matches!(result, TextUnit::RawParam { name, span } => {
+                assert_eq!(name, "1");
+                assert_eq!(*span.code.value.borrow(), "$12");
+                assert_eq!(span.code.start_line_number.get(), 1);
+                assert_eq!(span.code.source, Source::Unknown);
+                assert_eq!(span.range, 0..2);
+            });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('2')));
+            assert_eq!(lexer.peek_char().await, Ok(Some('2')));
+        })
     }
 
     #[test]
     fn lexer_raw_param_posix_name() {
-        let mut lexer = Lexer::from_memory("az_AZ_019<", Source::Unknown);
-        let location = Location::dummy("$");
+        block_on(async {
+            let mut lexer = Lexer::from_memory("$az_AZ_019<", Source::Unknown);
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, location } => {
-            assert_eq!(name, "az_AZ_019");
-            assert_eq!(*location.code.value.borrow(), "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
-        });
+            let result = lexer.raw_param(0).await.unwrap().unwrap();
+            assert_matches!(result, TextUnit::RawParam { name, span } => {
+                assert_eq!(name, "az_AZ_019");
+                assert_eq!(*span.code.value.borrow(), "$az_AZ_019<");
+                assert_eq!(span.code.start_line_number.get(), 1);
+                assert_eq!(span.code.source, Source::Unknown);
+                assert_eq!(span.range, 0..10);
+            });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
+            assert_eq!(lexer.peek_char().await, Ok(Some('<')));
+        })
     }
 
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
-        let mut lexer = Lexer::from_memory("a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
-        let location = Location::dummy("$");
+        block_on(async {
+            let mut lexer = Lexer::from_memory("$a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
+            lexer.peek_char().await.unwrap();
+            lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(location)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, location } => {
-            assert_eq!(name, "abc");
-            assert_eq!(*location.code.value.borrow(), "$");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
-        });
+            let result = lexer.raw_param(0).await.unwrap().unwrap();
+            assert_matches!(result, TextUnit::RawParam { name, span } => {
+                assert_eq!(name, "abc");
+                assert_eq!(*span.code.value.borrow(), "$a\\\n\\\nb\\\n\\\nc\\\n>");
+                assert_eq!(span.code.start_line_number.get(), 1);
+                assert_eq!(span.code.source, Source::Unknown);
+                assert_eq!(span.range, 0..14);
+            });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
+            assert_eq!(lexer.peek_char().await, Ok(Some('>')));
+        })
     }
 
     #[test]
     fn lexer_raw_param_not_parameter() {
         let mut lexer = Lexer::from_memory(";", Source::Unknown);
-        let location = Location::dummy("X");
-
-        let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "X");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-
+        assert_eq!(block_on(lexer.raw_param(0)), Ok(None));
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 }

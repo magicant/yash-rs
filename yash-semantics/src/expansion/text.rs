@@ -26,6 +26,7 @@ use super::Origin;
 use super::Output;
 use super::Result;
 use async_trait::async_trait;
+use yash_syntax::source::Location;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit;
 use yash_syntax::syntax::Unquote;
@@ -109,8 +110,12 @@ impl Expand for TextUnit {
                 });
                 Ok(())
             }
-            RawParam { name, location } => {
-                let param = ParamRef::from_name_and_location(name, location);
+            RawParam { name, span } => {
+                let location = Location {
+                    code: span.code.clone(),
+                    index: span.range.start,
+                };
+                let param = ParamRef::from_name_and_location(name, &location);
                 param.expand(env, output).await
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
