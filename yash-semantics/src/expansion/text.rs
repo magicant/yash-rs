@@ -119,8 +119,12 @@ impl Expand for TextUnit {
                 param.expand(env, output).await
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
-            CommandSubst { content, location } => {
-                CommandSubstRef::new(content, location)
+            CommandSubst { content, span } => {
+                let location = Location {
+                    code: span.code.clone(),
+                    index: span.range.start,
+                };
+                CommandSubstRef::new(content, &location)
                     .expand(env, output)
                     .await
             }
@@ -156,6 +160,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use futures_executor::block_on;
     use yash_syntax::source::Location;
+    use yash_syntax::source::Span;
     use yash_syntax::syntax::TextUnit;
 
     #[test]
@@ -209,7 +214,7 @@ mod tests {
             let mut output = Output::new(&mut field);
             let subst = TextUnit::CommandSubst {
                 content: "echo .".to_string(),
-                location: Location::dummy(""),
+                span: Span::dummy(""),
             };
             env.builtins.insert("echo", echo_builtin());
             subst.expand(&mut env, &mut output).await.unwrap();

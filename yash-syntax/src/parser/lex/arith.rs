@@ -34,24 +34,21 @@ impl Lexer<'_> {
     /// begin an arithmetic expansion. If the characters are `((`, then the
     /// arithmetic expansion is parsed, in which case this function consumes up
     /// to the closing `))` (inclusive). Otherwise, no characters are consumed
-    /// and the return value is `Ok(Err(location))`.
+    /// and the return value is `Ok(None)`.
     ///
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
     /// actually is a location of `$`.
-    pub async fn arithmetic_expansion(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<TextUnit, Location>> {
+    pub async fn arithmetic_expansion(&mut self, location: Location) -> Result<Option<TextUnit>> {
         let index = self.index();
 
         // Part 1: Parse `((`
         if !self.skip_if(|c| c == '(').await? {
-            return Ok(Err(location));
+            return Ok(None);
         }
         if !self.skip_if(|c| c == '(').await? {
             self.rewind(index);
-            return Ok(Err(location));
+            return Ok(None);
         }
 
         // Part 2: Parse the content
@@ -77,7 +74,7 @@ impl Lexer<'_> {
             Some(sc) if sc == ')' => self.consume_char(),
             Some(_) => {
                 self.rewind(index);
-                return Ok(Err(location));
+                return Ok(None);
             }
             None => {
                 let opening_location = location;
@@ -87,7 +84,7 @@ impl Lexer<'_> {
             }
         }
 
-        Ok(Ok(TextUnit::Arith { content, location }))
+        Ok(Some(TextUnit::Arith { content, location }))
     }
 }
 
@@ -124,15 +121,7 @@ mod tests {
     fn lexer_arithmetic_expansion_none() {
         let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
         let location = Location::dummy("Y");
-
-        let location = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "Y");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-
+        assert_eq!(block_on(lexer.arithmetic_expansion(location)), Ok(None));
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
     }
 
@@ -225,15 +214,7 @@ mod tests {
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
         let mut lexer = Lexer::from_memory("((1) ", Source::Unknown);
         let location = Location::dummy("Z");
-
-        let location = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "Z");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-
+        assert_eq!(block_on(lexer.arithmetic_expansion(location)), Ok(None));
         assert_eq!(lexer.index(), 0);
     }
 }

@@ -21,6 +21,7 @@ use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
 use crate::source::Location;
+use crate::source::Span;
 use crate::syntax::TextUnit;
 
 impl Lexer<'_> {
@@ -33,13 +34,10 @@ impl Lexer<'_> {
     /// function returns. Otherwise, no characters are consumed and the return
     /// value is `Ok(None)`.
     ///
-    /// `opening_location` should be the location of the initial `$`. It is used
-    /// to construct the result, but this function does not check if it actually
-    /// is a location of `$`.
-    pub async fn command_substitution(
-        &mut self,
-        opening_location: Location,
-    ) -> Result<Option<TextUnit>> {
+    /// The `start` parameter should be the index for the initial `$`. It is
+    /// used to construct the result, but this function does not check if it
+    /// actually points to the `$`.
+    pub async fn command_substitution(&mut self, start: usize) -> Result<Option<TextUnit>> {
         if !self.skip_if(|c| c == '(').await? {
             return Ok(None);
         }
@@ -48,13 +46,18 @@ impl Lexer<'_> {
 
         if !self.skip_if(|c| c == ')').await? {
             // TODO Return a better error depending on the token id of the next token
+            let Span { code, range } = self.span(start..start);
+            let opening_location = Location {
+                code,
+                index: range.start,
+            };
             let cause = SyntaxError::UnclosedCommandSubstitution { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
         }
 
-        let location = opening_location;
-        Ok(Some(TextUnit::CommandSubst { content, location }))
+        let span = self.span(start..self.index());
+        Ok(Some(TextUnit::CommandSubst { content, span }))
     }
 }
 
@@ -68,58 +71,59 @@ mod tests {
 
     #[test]
     fn lexer_command_substitution_success() {
-        let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
-        let location = Location::dummy("X");
+        let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.command_substitution(location))
-            .unwrap()
-            .unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
-            assert_eq!(*location.code.value.borrow(), "X");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+        let result = block_on(lexer.command_substitution(0)).unwrap().unwrap();
+        assert_matches!(result, TextUnit::CommandSubst { content, span } => {
+            assert_eq!(*span.code.value.borrow(), "$( foo bar )baz");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 0..12);
             assert_eq!(content, " foo bar ");
         });
 
         let next = block_on(lexer.location()).unwrap();
-        assert_eq!(*next.code.value.borrow(), "( foo bar )baz");
+        assert_eq!(*next.code.value.borrow(), "$( foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
-        assert_eq!(next.index, 11);
+        assert_eq!(next.index, 12);
     }
 
     #[test]
     fn lexer_command_substitution_none() {
-        let mut lexer = Lexer::from_memory(" foo bar )baz", Source::Unknown);
-        let location = Location::dummy("Y");
+        let mut lexer = Lexer::from_memory("$ foo bar )baz", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.command_substitution(location)).unwrap();
+        let result = block_on(lexer.command_substitution(0)).unwrap();
         assert_eq!(result, None);
 
         let next = block_on(lexer.location()).unwrap();
-        assert_eq!(*next.code.value.borrow(), " foo bar )baz");
+        assert_eq!(*next.code.value.borrow(), "$ foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
-        assert_eq!(next.index, 0);
+        assert_eq!(next.index, 1);
     }
 
     #[test]
     fn lexer_command_substitution_unclosed() {
-        let mut lexer = Lexer::from_memory("( foo bar baz", Source::Unknown);
-        let location = Location::dummy("Z");
+        let mut lexer = Lexer::from_memory("$( foo bar baz", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.command_substitution(location)).unwrap_err();
+        let e = block_on(lexer.command_substitution(0)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "Z");
+            assert_eq!(*opening_location.code.value.borrow(), "$( foo bar baz");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
             assert_eq!(opening_location.index, 0);
         });
-        assert_eq!(*e.location.code.value.borrow(), "( foo bar baz");
+        assert_eq!(*e.location.code.value.borrow(), "$( foo bar baz");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 13);
+        assert_eq!(e.location.index, 14);
     }
 }

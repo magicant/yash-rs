@@ -350,9 +350,9 @@ mod tests {
         ))
         .unwrap()
         .unwrap();
-        assert_matches!(result, CommandSubst { content, location } => {
+        assert_matches!(result, CommandSubst { content, span } => {
             assert_eq!(content, "");
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The following items' field `location: source::Location` to `span: source::Span`
+    - `syntax::TextUnit::CommandSubst`
     - `syntax::TextUnit::RawParam`
 
 ## [0.3.0] - 2022-02-06

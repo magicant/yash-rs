@@ -189,9 +189,9 @@ mod tests {
             block_on(lexer.word_unit(|c| unreachable!("unexpected call to is_delimiter({:?})", c)))
                 .unwrap()
                 .unwrap();
-        assert_matches!(result, Unquoted(CommandSubst { content, location }) => {
+        assert_matches!(result, Unquoted(CommandSubst { content, span }) => {
             assert_eq!(content, "");
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -473,12 +473,12 @@ mod tests {
         let word = block_on(lexer.word(|_| false)).unwrap();
         assert_eq!(word.units.len(), 4);
         assert_eq!(word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
-        assert_matches!(&word.units[1], WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) => {
+        assert_matches!(&word.units[1], WordUnit::Unquoted(TextUnit::CommandSubst { content, span }) => {
             assert_eq!(content, ":");
-            assert_eq!(*location.code.value.borrow(), r"0$(:)X\#");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 1);
+            assert_eq!(*span.code.value.borrow(), r"0$(:)X\#");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 1..5);
         });
         assert_eq!(word.units[2], WordUnit::Unquoted(TextUnit::Literal('X')));
         assert_eq!(

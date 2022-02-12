@@ -45,12 +45,11 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        let location = match self.arithmetic_expansion(location).await? {
-            Ok(result) => return Ok(Some(result)),
-            Err(location) => location,
+        if let Some(result) = self.arithmetic_expansion(location).await? {
+            return Ok(Some(result));
         };
 
-        if let Some(result) = self.command_substitution(location).await? {
+        if let Some(result) = self.command_substitution(index).await? {
             return Ok(Some(result));
         }
 
@@ -145,11 +144,11 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
-            assert_eq!(*location.code.value.borrow(), "$()");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+        assert_matches!(result, TextUnit::CommandSubst { content, span } => {
+            assert_eq!(*span.code.value.borrow(), "$()");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 0..3);
             assert_eq!(content, "");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -160,11 +159,11 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
-            assert_eq!(*location.code.value.borrow(), "$( foo bar )");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+        assert_matches!(result, TextUnit::CommandSubst { content, span } => {
+            assert_eq!(*span.code.value.borrow(), "$( foo bar )");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 0..12);
             assert_eq!(content, " foo bar ");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
