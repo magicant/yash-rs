@@ -87,17 +87,14 @@ impl WordLexer<'_, '_> {
     /// This functions checks if the next character is an opening brace. If so,
     /// the following characters are parsed as a parameter expansion up to and
     /// including the closing brace. Otherwise, no characters are consumed and
-    /// the return value is `Ok(Err(location))`.
+    /// the return value is `Ok(None)`.
     ///
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
     /// actually is a location of `$`.
-    pub async fn braced_param(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<Param, Location>> {
+    pub async fn braced_param(&mut self, location: Location) -> Result<Option<Param>> {
         if !self.skip_if(|c| c == '{').await? {
-            return Ok(Err(location));
+            return Ok(None);
         }
 
         let has_length_prefix = self.length_prefix().await?;
@@ -144,7 +141,7 @@ impl WordLexer<'_, '_> {
             (false, suffix) => suffix,
         };
 
-        Ok(Ok(Param {
+        Ok(Some(Param {
             name,
             modifier,
             location,

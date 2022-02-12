@@ -40,12 +40,11 @@ impl WordLexer<'_, '_> {
             return Ok(Some(result));
         }
 
-        let location = match self.braced_param(location).await? {
-            Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
-            Err(location) => location,
+        if let Some(result) = self.braced_param(location).await? {
+            return Ok(Some(TextUnit::BracedParam(result)));
         };
 
-        if let Some(result) = self.arithmetic_expansion(location).await? {
+        if let Some(result) = self.arithmetic_expansion(index).await? {
             return Ok(Some(result));
         };
 
@@ -177,12 +176,12 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Arith { content, location } => {
+        assert_matches!(result, TextUnit::Arith { content, span } => {
             assert_eq!(content, Text(vec![Literal('1')]));
-            assert_eq!(*location.code.value.borrow(), "$((1))");
-            assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(*span.code.value.borrow(), "$((1))");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 0..6);
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
