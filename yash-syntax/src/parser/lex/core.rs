@@ -29,6 +29,7 @@ use crate::source::Code;
 use crate::source::Location;
 use crate::source::Source;
 use crate::source::SourceChar;
+use crate::source::Span;
 use crate::syntax::Word;
 use std::cell::RefCell;
 use std::fmt;
@@ -36,6 +37,7 @@ use std::future::Future;
 use std::num::NonZeroU64;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::ops::Range;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::slice::SliceIndex;
@@ -597,6 +599,27 @@ impl<'a> Lexer<'a> {
         I: SliceIndex<[SourceChar], Output = [SourceChar]>,
     {
         self.core.source_string(i)
+    }
+
+    /// Returns a span for a given range of the source code.
+    ///
+    /// All the characters in the range must have been
+    /// [consume](Self::consume_char)d. If the range refers to an unconsumed
+    /// character, this function will panic!
+    ///
+    /// If the characters are from more than one [`Code`] fragment, the span
+    /// will only cover the initial portion of the range sharing the same
+    /// `Code`.
+    #[must_use]
+    pub fn span(&self, range: Range<usize>) -> Span {
+        let start = &self.core.peek_char_at(range.start).location;
+        let code = start.code.clone();
+        let count = range
+            .map(|index| &self.core.peek_char_at(index).location)
+            .take_while(|location| location.code == code)
+            .count();
+        let range = start.index..start.index + count;
+        Span { code, range }
     }
 
     /// Performs alias substitution right before the current position.
@@ -1323,6 +1346,83 @@ mod tests {
             unreachable!("unexpected call to the decider function: argument={}", c)
         }));
         assert_eq!(r, Ok(None));
+    }
+
+    #[test]
+    fn lexer_span_with_empty_range() {
+        let mut lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        let span = lexer.span(0..0);
+        assert_eq!(*span.code.value.borrow(), "echo ok");
+        assert_eq!(span.code.start_line_number.get(), 1);
+        assert_eq!(span.code.source, Source::Unknown);
+        assert_eq!(span.range, 0..0);
+    }
+
+    #[test]
+    fn lexer_span_with_nonempty_range() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory("cat foo", Source::Stdin);
+            for _ in 0..4 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.peek_char().await.unwrap();
+
+            let span = lexer.span(1..4);
+            assert_eq!(*span.code.value.borrow(), "cat foo");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Stdin);
+            assert_eq!(span.range, 1..4);
+        })
+    }
+
+    #[test]
+    #[should_panic]
+    fn lexer_span_with_unconsumed_code() {
+        let lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        let _ = lexer.span(0..0);
+    }
+
+    #[test]
+    #[should_panic(expected = "The index 1 must not be larger than the current index 0")]
+    fn lexer_span_with_range_out_of_bounds() {
+        let lexer = Lexer::from_memory("", Source::Unknown);
+        let _ = lexer.span(1..2);
+    }
+
+    #[test]
+    fn lexer_span_with_alias_substitution() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory(" a;", Source::Unknown);
+            let alias_def = Rc::new(Alias {
+                name: "a".to_string(),
+                replacement: "abc".to_string(),
+                global: false,
+                origin: Location::dummy("dummy"),
+            });
+            for _ in 0..2 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.substitute_alias(1, &alias_def);
+            for _ in 1..5 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+
+            let span = lexer.span(2..5);
+            assert_eq!(*span.code.value.borrow(), "abc");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_matches!(&span.code.source, Source::Alias { original, alias } => {
+                assert_eq!(*original.code.value.borrow(), " a;");
+                assert_eq!(original.code.start_line_number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
+                assert_eq!(original.index, 1);
+                assert_eq!(alias, &alias_def);
+            });
+            assert_eq!(span.range, 1..3);
+        })
     }
 
     #[test]
