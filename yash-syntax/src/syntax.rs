@@ -443,8 +443,9 @@ pub enum TextUnit {
         /// Command string that will be parsed and executed when the command
         /// substitution is expanded.
         content: Vec<BackquoteUnit>,
-        /// Location of the initial backquote character of this command substitution.
-        location: Location,
+        /// Range of this command substitution including the surrounding
+        /// backquotes.
+        span: Span,
     },
     /// Arithmetic expansion.
     Arith {
@@ -1532,7 +1533,7 @@ mod tests {
                 BackquoteUnit::Backslashed('c'),
                 BackquoteUnit::Literal('d'),
             ],
-            location: Location::dummy(""),
+            span: Span::dummy(""),
         };
         assert_eq!(backquote.to_string(), r"`a\b\cd`");
 
@@ -1568,7 +1569,7 @@ mod tests {
             },
             Backquote {
                 content: vec![BackquoteUnit::Literal('Z')],
-                location: Location::dummy(""),
+                span: Span::dummy(""),
             },
             Arith {
                 content: Text(vec![Literal('0')]),
@@ -1597,8 +1598,8 @@ mod tests {
         assert_eq!(is_quoted, true);
 
         let content = vec![BackquoteUnit::Backslashed('X')];
-        let location = Location::dummy("");
-        let quoted = Text(vec![Backquote { content, location }]);
+        let span = Span::dummy("");
+        let quoted = Text(vec![Backquote { content, span }]);
         let (unquoted, is_quoted) = quoted.unquote();
         assert_eq!(unquoted, "`X`");
         assert_eq!(is_quoted, true);

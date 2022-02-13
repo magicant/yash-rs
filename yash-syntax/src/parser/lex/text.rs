@@ -371,9 +371,9 @@ mod tests {
         ))
         .unwrap()
         .unwrap();
-        assert_matches!(result, Backquote { content, location } => {
+        assert_matches!(result, Backquote { content, span } => {
             assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -392,12 +392,12 @@ mod tests {
         ))
         .unwrap()
         .unwrap();
-        assert_matches!(result, Backquote { content, location } => {
+        assert_matches!(result, Backquote { content, span } => {
             assert_eq!(
                 content,
                 [BackquoteUnit::Literal('\\'), BackquoteUnit::Literal('"')]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));

@@ -59,6 +59,7 @@ impl WordLexer<'_, '_> {
     /// another backslash. If `self.context` is `Text`, double quotes can also
     /// be backslash-escaped.
     pub async fn backquote(&mut self) -> Result<Option<TextUnit>> {
+        let start = self.index();
         let location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
@@ -70,7 +71,8 @@ impl WordLexer<'_, '_> {
         }
 
         if self.skip_if(|c| c == '`').await? {
-            Ok(Some(TextUnit::Backquote { content, location }))
+            let span = self.span(start..self.index());
+            Ok(Some(TextUnit::Backquote { content, span }))
         } else {
             let opening_location = location;
             let cause = SyntaxError::UnclosedBackquote { opening_location }.into();
@@ -108,9 +110,12 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Backquote { content, location } => {
+        assert_matches!(result, TextUnit::Backquote { content, span } => {
             assert_eq!(content, []);
-            assert_eq!(location.index, 0);
+            assert_eq!(*span.code.value.borrow(), "``");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Unknown);
+            assert_eq!(span.range, 0..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -124,7 +129,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Backquote { content, location } => {
+        assert_matches!(result, TextUnit::Backquote { content, span } => {
             assert_eq!(
                 content,
                 [
@@ -134,7 +139,7 @@ mod tests {
                     BackquoteUnit::Literal('o')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..6);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -148,7 +153,7 @@ mod tests {
             context: WordContext::Text,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Backquote { content, location } => {
+        assert_matches!(result, TextUnit::Backquote { content, span } => {
             assert_eq!(
                 content,
                 [
@@ -163,7 +168,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..15);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -177,7 +182,7 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Backquote { content, location } => {
+        assert_matches!(result, TextUnit::Backquote { content, span } => {
             assert_eq!(
                 content,
                 [
@@ -193,7 +198,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..15);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -207,12 +212,12 @@ mod tests {
             context: WordContext::Word,
         };
         let result = block_on(lexer.backquote()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Backquote { content, location } => {
+        assert_matches!(result, TextUnit::Backquote { content, span } => {
             assert_eq!(
                 content,
                 [BackquoteUnit::Literal('a'), BackquoteUnit::Literal('b')]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(span.range, 0..12);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));

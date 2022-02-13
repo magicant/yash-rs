@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The following items' field `location: source::Location` to `span: source::Span`
     - `syntax::TextUnit::Arith`
+    - `syntax::TextUnit::Backquote`
     - `syntax::TextUnit::CommandSubst`
     - `syntax::TextUnit::RawParam`
 - The following functions' parameter `location: source::Location` to `start:

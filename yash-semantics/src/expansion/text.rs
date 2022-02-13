@@ -128,9 +128,13 @@ impl Expand for TextUnit {
                     .expand(env, output)
                     .await
             }
-            Backquote { content, location } => {
+            Backquote { content, span } => {
                 let content = content.unquote().0;
-                CommandSubstRef::new(&content, location)
+                let location = Location {
+                    code: span.code.clone(),
+                    index: span.range.start,
+                };
+                CommandSubstRef::new(&content, &location)
                     .expand(env, output)
                     .await
             }
@@ -159,7 +163,6 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use futures_executor::block_on;
-    use yash_syntax::source::Location;
     use yash_syntax::source::Span;
     use yash_syntax::syntax::TextUnit;
 
@@ -246,7 +249,7 @@ mod tests {
                     Backslashed('\\'),
                     Backslashed('\\'),
                 ],
-                location: Location::dummy(""),
+                span: Span::dummy(""),
             };
             env.builtins.insert("echo", echo_builtin());
             subst.expand(&mut env, &mut output).await.unwrap();
