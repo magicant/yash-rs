@@ -120,21 +120,13 @@ impl Expand for TextUnit {
             }
             BracedParam(param) => ParamRef::from(param).expand(env, output).await,
             CommandSubst { content, span } => {
-                let location = Location {
-                    code: span.code.clone(),
-                    index: span.range.start,
-                };
-                CommandSubstRef::new(content, &location)
+                CommandSubstRef::new(content, span)
                     .expand(env, output)
                     .await
             }
             Backquote { content, span } => {
                 let content = content.unquote().0;
-                let location = Location {
-                    code: span.code.clone(),
-                    index: span.range.start,
-                };
-                CommandSubstRef::new(&content, &location)
+                CommandSubstRef::new(&content, span)
                     .expand(env, output)
                     .await
             }

@@ -34,23 +34,24 @@ use yash_env::System;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
+use yash_syntax::source::Span;
 
 /// Reference to a `CommandSubst` or `Backquote`.
 pub struct CommandSubstRef<'a> {
     content: &'a str,
-    location: &'a Location,
+    span: &'a Span,
 }
 
 impl<'a> CommandSubstRef<'a> {
-    pub fn new(content: &'a str, location: &'a Location) -> Self {
-        CommandSubstRef { content, location }
+    pub fn new(content: &'a str, span: &'a Span) -> Self {
+        CommandSubstRef { content, span }
     }
 }
 
 #[async_trait(?Send)]
 impl Expand for CommandSubstRef<'_> {
     async fn expand<E: Env>(&self, env: &mut E, output: &mut Output<'_>) -> Result {
-        let result = expand_command_substitution(env, self.content, self.location).await?;
+        let result = expand_command_substitution(env, self.content, self.span).await?;
         output.push_str(&result, Origin::SoftExpansion, false, false);
         Ok(())
     }
@@ -65,22 +66,28 @@ impl Expand for CommandSubstRef<'_> {
 pub async fn expand_command_substitution<E: Env>(
     env: &mut E,
     code: &str,
-    location: &Location,
+    span: &Span,
 ) -> Result<String> {
-    expand_command_substitution_inner(env, code.to_owned(), location)
+    expand_command_substitution_inner(env, code.to_owned(), span)
         .await
         .map_err(|errno| Error {
             cause: ErrorCause::CommandSubstError(errno),
-            location: location.clone(),
+            location: Location {
+                code: span.code.clone(),
+                index: span.range.start,
+            },
         })
 }
 
 async fn expand_command_substitution_inner<E: Env>(
     env: &mut E,
     code: String,
-    location: &Location,
+    span: &Span,
 ) -> std::result::Result<String, Errno> {
-    let original = location.clone();
+    let original = Location {
+        code: span.code.clone(),
+        index: span.range.start,
+    };
     let (reader, writer) = env.pipe()?;
 
     // Start a subshell to run the command
@@ -154,12 +161,11 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_executor::block_on;
-    use yash_syntax::source::Location;
 
     #[test]
     fn empty_substitution() {
         in_virtual_system(|mut env, _pid, _state| async move {
-            let result = expand_command_substitution(&mut env, "", &Location::dummy("")).await;
+            let result = expand_command_substitution(&mut env, "", &Span::dummy("")).await;
             assert_eq!(result, Ok("".to_string()));
         })
     }
@@ -168,8 +174,7 @@ mod tests {
     fn one_line_substitution() {
         in_virtual_system(|mut env, _pid, _state| async move {
             env.builtins.insert("echo", echo_builtin());
-            let result =
-                expand_command_substitution(&mut env, "echo ok", &Location::dummy("")).await;
+            let result = expand_command_substitution(&mut env, "echo ok", &Span::dummy("")).await;
             assert_eq!(result, Ok("ok".to_string()));
         })
     }
@@ -181,7 +186,7 @@ mod tests {
             let result = expand_command_substitution(
                 &mut env,
                 "echo 1; echo 2; echo; echo 3; echo; echo",
-                &Location::dummy(""),
+                &Span::dummy(""),
             )
             .await;
             assert_eq!(result, Ok("1\n2\n\n3".to_string()));
@@ -194,7 +199,7 @@ mod tests {
             let mut env = ExitStatusAdapter::new(&mut env);
             env.builtins.insert("return", return_builtin());
             let result =
-                expand_command_substitution(&mut env, "return -n 100", &Location::dummy("")).await;
+                expand_command_substitution(&mut env, "return -n 100", &Span::dummy("")).await;
             assert_eq!(result, Ok("".to_string()));
             assert_eq!(env.last_command_subst_exit_status(), Some(ExitStatus(100)));
         })
@@ -203,10 +208,11 @@ mod tests {
     #[test]
     fn error_in_substitution() {
         let mut env = yash_env::Env::new_virtual();
-        let location = Location::dummy("foo");
-        let result = block_on(expand_command_substitution(&mut env, "", &location));
+        let span = Span::dummy("foo");
+        let result = block_on(expand_command_substitution(&mut env, "", &span));
         let error = result.unwrap_err();
         assert_eq!(error.cause, ErrorCause::CommandSubstError(Errno::ENOSYS));
-        assert_eq!(error.location, location);
+        assert_eq!(error.location.code, span.code);
+        assert_eq!(error.location.index, span.range.start);
     }
 }
