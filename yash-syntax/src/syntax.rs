@@ -337,8 +337,9 @@ pub struct Param {
     // TODO index
     /// Modifier.
     pub modifier: Modifier,
-    /// Location of the initial `$` character of this parameter expansion.
-    pub location: Location,
+    /// Range of this parameter expansion including the initial `$` character
+    /// and the closing brace.
+    pub span: Span,
 }
 
 impl fmt::Display for Param {
@@ -1407,7 +1408,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy(""),
+            span: Span::dummy(""),
         };
         assert_eq!(param.to_string(), "${foo}");
 
@@ -1445,7 +1446,7 @@ mod tests {
         let param = Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
-            location: Location::dummy(""),
+            span: Span::dummy(""),
         };
         let (unquoted, is_quoted) = param.unquote();
         assert_eq!(unquoted, "${foo}");

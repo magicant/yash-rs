@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use std::borrow::Cow;
 use std::num::IntErrorKind::PosOverflow;
 use yash_env::variable::Value;
-use yash_syntax::source::Location;
+use yash_syntax::source::Span;
 use yash_syntax::syntax::Param;
 
 enum ParamValue<'a> {
@@ -145,12 +145,12 @@ fn expand_variable<'a, E: Env>(env: &'a E, name: &str) -> ParamValue<'a> {
 pub struct ParamRef<'a> {
     name: &'a str,
     #[allow(unused)] // TODO Use this
-    location: &'a Location,
+    span: &'a Span,
 }
 
 impl<'a> ParamRef<'a> {
-    pub fn from_name_and_location(name: &'a str, location: &'a Location) -> Self {
-        ParamRef { name, location }
+    pub fn from_name_and_location(name: &'a str, span: &'a Span) -> Self {
+        ParamRef { name, span }
     }
 }
 
@@ -158,7 +158,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
     fn from(param: &'a Param) -> Self {
         ParamRef {
             name: &param.name,
-            location: &param.location,
+            span: &param.span,
         }
     }
 }
@@ -364,8 +364,8 @@ mod tests {
         let mut env = Singleton { name, value };
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("!bar", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("!bar", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
     }
@@ -382,8 +382,8 @@ mod tests {
         let mut env = Singleton { name, value };
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("foo", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("foo", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -414,8 +414,8 @@ mod tests {
         });
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("1", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("1", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -429,7 +429,7 @@ mod tests {
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let p = ParamRef::from_name_and_location("2", &location);
+        let p = ParamRef::from_name_and_location("2", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -452,21 +452,20 @@ mod tests {
         });
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("2", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("2", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let p = ParamRef::from_name_and_location("3", &location);
+        let p = ParamRef::from_name_and_location("3", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
 
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let p =
-            ParamRef::from_name_and_location("9999999999999999999999999999999999999999", &location);
+        let p = ParamRef::from_name_and_location("9999999999999999999999999999999999999999", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(field, []);
     }
@@ -478,8 +477,8 @@ mod tests {
         env.exit_status = ExitStatus(56);
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("?", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("?", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
@@ -507,8 +506,8 @@ mod tests {
         env.jobs.set_last_async_pid(Pid::from_raw(72));
         let mut field = Vec::<AttrChar>::default();
         let mut output = Output::new(&mut field);
-        let location = Location::dummy("");
-        let p = ParamRef::from_name_and_location("!", &location);
+        let span = Span::dummy("");
+        let p = ParamRef::from_name_and_location("!", &span);
         block_on(p.expand(&mut env, &mut output)).unwrap();
         assert_eq!(
             field,
