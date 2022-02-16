@@ -45,8 +45,8 @@
 //! Most AST types defined in this module implement the
 //! [`FromStr`](std::str::FromStr) trait, which means you can easily get an AST
 //! out of source code by calling `parse` on a `&str`. However, all
-//! [location](crate::source::Location)s in ASTs constructed this way will only
-//! have [unknown source](crate::source::Source::Unknown).
+//! [location](Location)s and [span](Span)s in ASTs constructed this way will
+//! only have [unknown source](crate::source::Source::Unknown).
 //!
 //! ```
 //! use std::str::FromStr;
