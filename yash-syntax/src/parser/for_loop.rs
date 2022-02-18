@@ -38,12 +38,18 @@ impl Parser<'_, '_> {
         match name.id {
             EndOfInput | Operator(Newline) | Operator(Semicolon) => {
                 let cause = SyntaxError::MissingForName.into();
-                let location = name.word.location;
+                let location = Location {
+                    code: name.word.span.code.clone(),
+                    index: name.word.span.range.start,
+                };
                 return Err(Error { cause, location });
             }
             Operator(_) => {
                 let cause = SyntaxError::InvalidForName.into();
-                let location = name.word.location;
+                let location = Location {
+                    code: name.word.span.code.clone(),
+                    index: name.word.span.range.start,
+                };
                 return Err(Error { cause, location });
             }
             Token(_) | IoNumber => (),
@@ -88,7 +94,10 @@ impl Parser<'_, '_> {
                     Rec::AliasSubstituted => (),
                     Rec::Parsed(token) => {
                         let cause = SyntaxError::MissingForBody { opening_location }.into();
-                        let location = token.word.location;
+                        let location = Location {
+                            code: token.word.span.code.clone(),
+                            index: token.word.span.range.start,
+                        };
                         return Err(Error { cause, location });
                     }
                 },
@@ -108,7 +117,10 @@ impl Parser<'_, '_> {
                 }
                 _ => {
                     let cause = SyntaxError::InvalidForValue.into();
-                    let location = next.word.location;
+                    let location = Location {
+                        code: next.word.span.code.clone(),
+                        index: next.word.span.range.start,
+                    };
                     return Err(Error { cause, location });
                 }
             }
@@ -128,7 +140,10 @@ impl Parser<'_, '_> {
                 Rec::AliasSubstituted => (),
                 Rec::Parsed(token) => {
                     let cause = SyntaxError::MissingForBody { opening_location }.into();
-                    let location = token.word.location;
+                    let location = Location {
+                        code: token.word.span.code.clone(),
+                        index: token.word.span.range.start,
+                    };
                     return Err(Error { cause, location });
                 }
             }
@@ -145,7 +160,10 @@ impl Parser<'_, '_> {
     pub async fn for_loop(&mut self) -> Result<CompoundCommand> {
         let open = self.take_token_raw().await?;
         assert_eq!(open.id, Token(Some(For)));
-        let opening_location = open.word.location;
+        let opening_location = Location {
+            code: open.word.span.code,
+            index: open.word.span.range.start,
+        };
 
         let name = self.for_loop_name().await?;
         let (values, opening_location) = self.for_loop_values(opening_location).await?;

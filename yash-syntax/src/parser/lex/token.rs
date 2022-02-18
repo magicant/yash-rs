@@ -100,10 +100,10 @@ mod tests {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
 
         let t = block_on(lexer.token()).unwrap();
-        assert_eq!(*t.word.location.code.value.borrow(), "");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..0);
         assert_eq!(t.id, TokenId::EndOfInput);
         assert_eq!(t.index, 0);
     }
@@ -117,10 +117,10 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('a')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('b')));
         assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('c')));
-        assert_eq!(*t.word.location.code.value.borrow(), "abc ");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "abc ");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..3);
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
 
@@ -150,10 +150,10 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
-        assert_eq!(*t.word.location.code.value.borrow(), "12<");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "12<");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..2);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
@@ -167,10 +167,10 @@ mod tests {
         let t = block_on(lexer.token()).unwrap();
         assert_eq!(t.word.units.len(), 1);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
-        assert_eq!(*t.word.location.code.value.borrow(), "0>>");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "0>>");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..1);
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
@@ -184,19 +184,19 @@ mod tests {
 
             lexer.skip_blanks().await.unwrap();
             let t = lexer.token().await.unwrap();
-            assert_eq!(*t.word.location.code.value.borrow(), " a  ");
-            assert_eq!(t.word.location.code.start_line_number.get(), 1);
-            assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.index, 1);
+            assert_eq!(*t.word.span.code.value.borrow(), " a  ");
+            assert_eq!(t.word.span.code.start_line_number.get(), 1);
+            assert_eq!(t.word.span.code.source, Source::Unknown);
+            assert_eq!(t.word.span.range, 1..2);
             assert_eq!(t.id, TokenId::Token(None));
             assert_eq!(t.index, 1);
 
             lexer.skip_blanks().await.unwrap();
             let t = lexer.token().await.unwrap();
-            assert_eq!(*t.word.location.code.value.borrow(), " a  ");
-            assert_eq!(t.word.location.code.start_line_number.get(), 1);
-            assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.index, 4);
+            assert_eq!(*t.word.span.code.value.borrow(), " a  ");
+            assert_eq!(t.word.span.code.start_line_number.get(), 1);
+            assert_eq!(t.word.span.code.source, Source::Unknown);
+            assert_eq!(t.word.span.range, 4..4);
             assert_eq!(t.id, TokenId::EndOfInput);
             assert_eq!(t.index, 4);
         });

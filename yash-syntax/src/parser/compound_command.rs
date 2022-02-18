@@ -26,6 +26,7 @@ use super::error::SyntaxError;
 use super::lex::Keyword::{Case, Do, Done, For, If, OpenBrace, Until, While};
 use super::lex::Operator::OpenParen;
 use super::lex::TokenId::{Operator, Token};
+use crate::source::Location;
 use crate::syntax::CompoundCommand;
 use crate::syntax::FullCompoundCommand;
 use crate::syntax::List;
@@ -45,16 +46,25 @@ impl Parser<'_, '_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Token(Some(Done)) {
-            let opening_location = open.word.location;
+            let opening_location = Location {
+                code: open.word.span.code,
+                index: open.word.span.range.start,
+            };
             let cause = SyntaxError::UnclosedDoClause { opening_location }.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
         // TODO allow empty do clause if not POSIXly-correct
         if list.0.is_empty() {
             let cause = SyntaxError::EmptyDoClause.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 

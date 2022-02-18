@@ -23,6 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{AndAnd, BarBar};
 use super::lex::TokenId::Operator;
+use crate::source::Location;
 use crate::syntax::AndOr;
 use crate::syntax::AndOrList;
 
@@ -57,7 +58,11 @@ impl Parser<'_, '_> {
             let pipeline = match maybe_pipeline {
                 None => {
                     let cause = SyntaxError::MissingPipeline(condition).into();
-                    let location = self.peek_token().await?.word.location.clone();
+                    let next = self.peek_token().await?;
+                    let location = Location {
+                        code: next.word.span.code.clone(),
+                        index: next.word.span.range.start,
+                    };
                     return Err(Error { cause, location });
                 }
                 Some(pipeline) => pipeline,

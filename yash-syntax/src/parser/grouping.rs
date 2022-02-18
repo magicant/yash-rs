@@ -23,6 +23,7 @@ use super::error::SyntaxError;
 use super::lex::Keyword::{CloseBrace, OpenBrace};
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
+use crate::source::Location;
 use crate::syntax::CompoundCommand;
 
 impl Parser<'_, '_> {
@@ -41,16 +42,25 @@ impl Parser<'_, '_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Token(Some(CloseBrace)) {
-            let opening_location = open.word.location;
+            let opening_location = Location {
+                code: open.word.span.code,
+                index: open.word.span.range.start,
+            };
             let cause = SyntaxError::UnclosedGrouping { opening_location }.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
             let cause = SyntaxError::EmptyGrouping.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
@@ -72,16 +82,25 @@ impl Parser<'_, '_> {
 
         let close = self.take_token_raw().await?;
         if close.id != Operator(CloseParen) {
-            let opening_location = open.word.location;
+            let opening_location = Location {
+                code: open.word.span.code,
+                index: open.word.span.range.start,
+            };
             let cause = SyntaxError::UnclosedSubshell { opening_location }.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
         // TODO allow empty subshell if not POSIXly-correct
         if list.0.is_empty() {
             let cause = SyntaxError::EmptySubshell.into();
-            let location = close.word.location;
+            let location = Location {
+                code: close.word.span.code,
+                index: close.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 

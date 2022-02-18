@@ -18,6 +18,7 @@
 
 use crate::expansion::expand_value;
 use yash_env::variable::Variable;
+use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use crate::expansion::{Env, Error, ErrorCause, Result};
@@ -40,13 +41,19 @@ pub async fn perform_assignment<E: Env>(
     let value = expand_value(env, &assign.value).await?;
     let value = Variable {
         value,
-        last_assigned_location: Some(assign.location.clone()),
+        last_assigned_location: Some(Location {
+            code: assign.span.code.clone(),
+            index: assign.span.range.start,
+        }),
         is_exported: export,
         read_only_location: None,
     };
     env.assign_variable(scope, name, value).map_err(|e| Error {
         cause: ErrorCause::AssignReadOnly(e),
-        location: assign.location.clone(),
+        location: Location {
+            code: assign.span.code.clone(),
+            index: assign.span.range.start,
+        },
     })?;
     Ok(())
 }
@@ -84,7 +91,10 @@ mod tests {
             env.variables.get("foo").unwrap(),
             &Variable {
                 value: Value::Scalar("bar".to_string()),
-                last_assigned_location: Some(a.location),
+                last_assigned_location: Some(Location {
+                    code: a.span.code.clone(),
+                    index: a.span.range.start,
+                }),
                 is_exported: false,
                 read_only_location: None,
             }
@@ -102,7 +112,10 @@ mod tests {
             env.variables.get("foo").unwrap(),
             &Variable {
                 value: Value::Scalar("baz".to_string()),
-                last_assigned_location: Some(a.location),
+                last_assigned_location: Some(Location {
+                    code: a.span.code.clone(),
+                    index: a.span.range.start,
+                }),
                 is_exported: true,
                 read_only_location: None,
             }

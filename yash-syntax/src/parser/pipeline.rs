@@ -24,6 +24,7 @@ use super::error::SyntaxError;
 use super::lex::Keyword::Bang;
 use super::lex::Operator::Bar;
 use super::lex::TokenId::{Operator, Token};
+use crate::source::Location;
 use crate::syntax::Pipeline;
 use std::rc::Rc;
 
@@ -57,7 +58,10 @@ impl Parser<'_, '_> {
                             } else {
                                 SyntaxError::MissingCommandAfterBang.into()
                             };
-                            let location = next.word.location;
+                            let location = Location {
+                                code: next.word.span.code,
+                                index: next.word.span.range.start,
+                            };
                             return Err(Error { cause, location });
                         }
                     }
@@ -88,7 +92,10 @@ impl Parser<'_, '_> {
                     } else {
                         SyntaxError::MissingCommandAfterBar.into()
                     };
-                    let location = next.word.location;
+                    let location = Location {
+                        code: next.word.span.code,
+                        index: next.word.span.range.start,
+                    };
                     return Err(Error { cause, location });
                 }
             });

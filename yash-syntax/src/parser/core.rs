@@ -27,6 +27,7 @@ use super::lex::Token;
 use super::lex::TokenId::*;
 use crate::alias::AliasSet;
 use crate::parser::lex::is_blank;
+use crate::source::Location;
 use crate::syntax::HereDoc;
 use crate::syntax::MaybeLiteral;
 use std::rc::Rc;
@@ -182,7 +183,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         if !self.aliases.is_empty() {
             if let Token(_) = token.id {
                 if let Some(name) = token.word.to_string_if_literal() {
-                    if !token.word.location.code.source.is_alias_for(&name) {
+                    if !token.word.span.code.source.is_alias_for(&name) {
                         if let Some(alias) = self.aliases.get(&name as &str) {
                             if is_command_name
                                 || alias.0.global
@@ -318,7 +319,10 @@ impl<'a, 'b> Parser<'a, 'b> {
             None => Ok(()),
             Some(here_doc) => Err(Error {
                 cause: SyntaxError::MissingHereDocContent.into(),
-                location: here_doc.delimiter.location.clone(),
+                location: Location {
+                    code: here_doc.delimiter.span.code.clone(),
+                    index: here_doc.delimiter.span.range.start,
+                },
             }),
         }
     }

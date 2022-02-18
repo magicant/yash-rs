@@ -102,7 +102,11 @@ mod tests {
         assert_eq!(env.functions.len(), 1);
         let function = &env.functions.get("foo").unwrap().0;
         assert_eq!(function.name, "foo");
-        assert_eq!(function.origin, definition.name.location);
+        let definition_location = Location {
+            code: definition.name.span.code,
+            index: definition.name.span.range.start,
+        };
+        assert_eq!(function.origin, definition_location);
         assert_eq!(function.body, definition.body);
         assert_eq!(function.is_read_only, false);
     }
@@ -130,7 +134,11 @@ mod tests {
         assert_eq!(env.functions.len(), 1);
         let function = &env.functions.get("foo").unwrap().0;
         assert_eq!(function.name, "foo");
-        assert_eq!(function.origin, definition.name.location);
+        let definition_location = Location {
+            code: definition.name.span.code,
+            index: definition.name.span.range.start,
+        };
+        assert_eq!(function.origin, definition_location);
         assert_eq!(function.body, definition.body);
         assert_eq!(function.is_read_only, false);
     }

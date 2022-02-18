@@ -20,6 +20,7 @@ use super::Lexer;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
+use crate::source::Location;
 use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
@@ -98,7 +99,10 @@ impl Lexer<'_> {
             };
 
             if !self.skip_if(|c| c == NEWLINE).await? {
-                let redir_op_location = here_doc.delimiter.location.clone();
+                let redir_op_location = Location {
+                    code: here_doc.delimiter.span.code.clone(),
+                    index: here_doc.delimiter.span.range.start,
+                };
                 let cause = SyntaxError::UnclosedHereDocContent { redir_op_location }.into();
                 let location = self.location().await?.clone();
                 return Err(Error { cause, location });

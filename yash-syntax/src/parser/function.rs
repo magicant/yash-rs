@@ -23,6 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
+use crate::source::Location;
 use crate::syntax::Command;
 use crate::syntax::FunctionDefinition;
 use crate::syntax::SimpleCommand;
@@ -50,7 +51,10 @@ impl Parser<'_, '_> {
         if close.id != Operator(CloseParen) {
             return Err(Error {
                 cause: SyntaxError::UnmatchedParenthesis.into(),
-                location: close.word.location,
+                location: Location {
+                    code: close.word.span.code,
+                    index: close.word.span.range.start,
+                },
             });
         }
 
@@ -77,7 +81,10 @@ impl Parser<'_, '_> {
                     } else {
                         SyntaxError::MissingFunctionBody.into()
                     };
-                    let location = next.word.location;
+                    let location = Location {
+                        code: next.word.span.code,
+                        index: next.word.span.range.start,
+                    };
                     Err(Error { cause, location })
                 }
             };

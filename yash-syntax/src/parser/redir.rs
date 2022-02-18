@@ -39,7 +39,12 @@ impl Parser<'_, '_> {
         let operand = self.take_token_auto(&[]).await?;
         match operand.id {
             Token(_) => (),
-            Operator(_) | EndOfInput => return Ok(Err(operand.word.location)),
+            Operator(_) | EndOfInput => {
+                return Ok(Err(Location {
+                    code: operand.word.span.code,
+                    index: operand.word.span.range.start,
+                }));
+            }
             IoNumber => (), // TODO reject if POSIXly-correct
         }
         Ok(Ok(operand.word))
@@ -111,7 +116,10 @@ impl Parser<'_, '_> {
             } else {
                 return Err(Error {
                     cause: SyntaxError::FdOutOfRange.into(),
-                    location: token.word.location,
+                    location: Location {
+                        code: token.word.span.code,
+                        index: token.word.span.range.start,
+                    },
                 });
             }
         } else {

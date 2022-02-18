@@ -265,10 +265,14 @@ async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {
+            let operand = redir.body.operand();
             return Err(Error {
                 cause: ErrorCause::FdNotOverwritten(target_fd, errno),
-                location: redir.body.operand().location.clone(),
-            })
+                location: Location {
+                    code: operand.span.code.clone(),
+                    index: operand.span.range.start,
+                },
+            });
         }
     };
 
@@ -529,7 +533,12 @@ mod tests {
             e.cause,
             ErrorCause::OpenFile(CString::new("no_such_file").unwrap(), Errno::ENOENT)
         );
-        assert_eq!(e.location, redir.body.operand().location);
+        let operand = redir.body.operand();
+        let location = Location {
+            code: operand.span.code.clone(),
+            index: operand.span.range.start,
+        };
+        assert_eq!(e.location, location);
     }
 
     #[test]

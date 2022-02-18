@@ -156,12 +156,13 @@ impl WordLexer<'_, '_> {
 
     /// Dynamic version of [`Self::word`].
     async fn word_dyn(&mut self, is_delimiter: &dyn Fn(char) -> bool) -> Result<Word> {
-        let location = self.location().await?.clone();
+        let start = self.index();
         let mut units = vec![];
         while let Some(unit) = self.word_unit_dyn(is_delimiter).await? {
             units.push(unit)
         }
-        Ok(Word { units, location })
+        let span = self.span(start..self.index());
+        Ok(Word { units, span })
     }
 }
 
@@ -485,10 +486,10 @@ mod tests {
             word.units[3],
             WordUnit::Unquoted(TextUnit::Backslashed('#'))
         );
-        assert_eq!(*word.location.code.value.borrow(), r"0$(:)X\#");
-        assert_eq!(word.location.code.start_line_number.get(), 1);
-        assert_eq!(word.location.code.source, Source::Unknown);
-        assert_eq!(word.location.index, 0);
+        assert_eq!(*word.span.code.value.borrow(), r"0$(:)X\#");
+        assert_eq!(word.span.code.start_line_number.get(), 1);
+        assert_eq!(word.span.code.source, Source::Unknown);
+        assert_eq!(word.span.range, 0..8);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -503,10 +504,10 @@ mod tests {
         let word =
             block_on(lexer.word(|_| unreachable!("unexpected call to is_delimiter"))).unwrap();
         assert_eq!(word.units, []);
-        assert_eq!(*word.location.code.value.borrow(), "");
-        assert_eq!(word.location.code.start_line_number.get(), 1);
-        assert_eq!(word.location.code.source, Source::Unknown);
-        assert_eq!(word.location.index, 0);
+        assert_eq!(*word.span.code.value.borrow(), "");
+        assert_eq!(word.span.code.start_line_number.get(), 1);
+        assert_eq!(word.span.code.source, Source::Unknown);
+        assert_eq!(word.span.range, 0..0);
     }
 
     #[test]

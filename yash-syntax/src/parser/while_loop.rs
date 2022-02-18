@@ -22,6 +22,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::{Until, While};
 use super::lex::TokenId::Token;
+use crate::source::Location;
 use crate::syntax::CompoundCommand;
 
 impl Parser<'_, '_> {
@@ -41,16 +42,27 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyWhileCondition.into();
-            let location = self.take_token_raw().await?.word.location;
+            let next = self.take_token_raw().await?;
+            let location = Location {
+                code: next.word.span.code,
+                index: next.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                let opening_location = open.word.location;
+                let opening_location = Location {
+                    code: open.word.span.code,
+                    index: open.word.span.range.start,
+                };
                 let cause = SyntaxError::UnclosedWhileClause { opening_location }.into();
-                let location = self.take_token_raw().await?.word.location;
+                let next = self.take_token_raw().await?;
+                let location = Location {
+                    code: next.word.span.code,
+                    index: next.word.span.range.start,
+                };
                 return Err(Error { cause, location });
             }
         };
@@ -74,16 +86,27 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyUntilCondition.into();
-            let location = self.take_token_raw().await?.word.location;
+            let next = self.take_token_raw().await?;
+            let location = Location {
+                code: next.word.span.code,
+                index: next.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
         let body = match self.do_clause().await? {
             Some(body) => body,
             None => {
-                let opening_location = open.word.location;
+                let opening_location = Location {
+                    code: open.word.span.code,
+                    index: open.word.span.range.start,
+                };
                 let cause = SyntaxError::UnclosedUntilClause { opening_location }.into();
-                let location = self.take_token_raw().await?.word.location;
+                let next = self.take_token_raw().await?;
+                let location = Location {
+                    code: next.word.span.code,
+                    index: next.word.span.range.start,
+                };
                 return Err(Error { cause, location });
             }
         };

@@ -23,6 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{And, Newline, Semicolon};
 use super::lex::TokenId::Operator;
+use crate::source::Location;
 use crate::syntax::Item;
 use crate::syntax::List;
 use std::rc::Rc;
@@ -57,11 +58,15 @@ impl Parser<'_, '_> {
             let token = self.peek_token().await?;
             let (async_flag, next) = match token.id {
                 Operator(Semicolon) => (None, true),
-                Operator(And) => (Some(token.word.location.clone()), true),
+                Operator(And) => (Some(token.word.span.clone()), true),
                 _ => (None, false),
             };
 
             let and_or = Rc::new(and_or);
+            let async_flag = async_flag.map(|af| Location {
+                code: af.code,
+                index: af.range.start,
+            });
             items.push(Item { and_or, async_flag });
 
             if !next {
@@ -115,7 +120,10 @@ impl Parser<'_, '_> {
                 // TODO Return a better error depending on the token id of the peeked token
                 return Err(Error {
                     cause: SyntaxError::UnexpectedToken.into(),
-                    location: next.word.location.clone(),
+                    location: Location {
+                        code: next.word.span.code.clone(),
+                        index: next.word.span.range.start,
+                    },
                 });
             }
             if list.0.is_empty() {

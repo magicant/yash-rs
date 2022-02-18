@@ -22,6 +22,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Keyword::{Elif, Else, Fi, If, Then};
 use super::lex::TokenId::Token;
+use crate::source::Location;
 use crate::syntax::CompoundCommand;
 use crate::syntax::ElifThen;
 
@@ -42,13 +43,22 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyElifCondition.into();
-            let location = then.word.location;
+            let location = Location {
+                code: then.word.span.code,
+                index: then.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
         if then.id != Token(Some(Then)) {
-            let elif_location = elif.word.location;
+            let elif_location = Location {
+                code: elif.word.span.code,
+                index: elif.word.span.range.start,
+            };
             let cause = SyntaxError::ElifMissingThen { elif_location }.into();
-            let location = then.word.location;
+            let location = Location {
+                code: then.word.span.code,
+                index: then.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
@@ -56,7 +66,11 @@ impl Parser<'_, '_> {
         // TODO allow empty body if not POSIXly-correct
         if body.0.is_empty() {
             let cause = SyntaxError::EmptyElifBody.into();
-            let location = self.take_token_raw().await?.word.location;
+            let next = self.take_token_raw().await?;
+            let location = Location {
+                code: next.word.span.code,
+                index: next.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
@@ -80,13 +94,22 @@ impl Parser<'_, '_> {
         // TODO allow empty condition if not POSIXly-correct
         if condition.0.is_empty() {
             let cause = SyntaxError::EmptyIfCondition.into();
-            let location = then.word.location;
+            let location = Location {
+                code: then.word.span.code,
+                index: then.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
         if then.id != Token(Some(Then)) {
-            let if_location = open.word.location;
+            let if_location = Location {
+                code: open.word.span.code,
+                index: open.word.span.range.start,
+            };
             let cause = SyntaxError::IfMissingThen { if_location }.into();
-            let location = then.word.location;
+            let location = Location {
+                code: then.word.span.code,
+                index: then.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
@@ -94,7 +117,11 @@ impl Parser<'_, '_> {
         // TODO allow empty body if not POSIXly-correct
         if body.0.is_empty() {
             let cause = SyntaxError::EmptyIfBody.into();
-            let location = self.take_token_raw().await?.word.location;
+            let next = self.take_token_raw().await?;
+            let location = Location {
+                code: next.word.span.code,
+                index: next.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 
@@ -109,7 +136,11 @@ impl Parser<'_, '_> {
             // TODO allow empty else if not POSIXly-correct
             if content.0.is_empty() {
                 let cause = SyntaxError::EmptyElse.into();
-                let location = self.take_token_raw().await?.word.location;
+                let next = self.take_token_raw().await?;
+                let location = Location {
+                    code: next.word.span.code,
+                    index: next.word.span.range.start,
+                };
                 return Err(Error { cause, location });
             }
             Some(content)
@@ -119,9 +150,15 @@ impl Parser<'_, '_> {
 
         let fi = self.take_token_raw().await?;
         if fi.id != Token(Some(Fi)) {
-            let opening_location = open.word.location;
+            let opening_location = Location {
+                code: open.word.span.code,
+                index: open.word.span.range.start,
+            };
             let cause = SyntaxError::UnclosedIf { opening_location }.into();
-            let location = fi.word.location;
+            let location = Location {
+                code: fi.word.span.code,
+                index: fi.word.span.range.start,
+            };
             return Err(Error { cause, location });
         }
 

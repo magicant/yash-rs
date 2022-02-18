@@ -23,6 +23,7 @@ use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{CloseParen, Newline, OpenParen};
 use super::lex::TokenId::{Operator, Token};
+use crate::source::Location;
 use crate::syntax::Array;
 use crate::syntax::Assign;
 use crate::syntax::Redir;
@@ -67,7 +68,11 @@ impl Parser<'_, '_> {
             return Ok(None);
         }
 
-        let opening_location = self.take_token_raw().await?.word.location;
+        let opening_token = self.take_token_raw().await?;
+        let opening_location = Location {
+            code: opening_token.word.span.code,
+            index: opening_token.word.span.range.start,
+        };
         let mut words = vec![];
 
         loop {
@@ -79,7 +84,10 @@ impl Parser<'_, '_> {
                 _ => {
                     return Err(Error {
                         cause: SyntaxError::UnclosedArrayValue { opening_location }.into(),
-                        location: next.word.location,
+                        location: Location {
+                            code: next.word.span.code,
+                            index: next.word.span.range.start,
+                        },
                     })
                 }
             }
@@ -294,10 +302,10 @@ mod tests {
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.assigns[0].name, "my");
         assert_eq!(sc.assigns[0].value.to_string(), "assignment");
-        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "my=assignment");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.index, 0);
+        assert_eq!(*sc.assigns[0].span.code.value.borrow(), "my=assignment");
+        assert_eq!(sc.assigns[0].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].span.range, 0..13);
     }
 
     #[test]
@@ -312,22 +320,22 @@ mod tests {
         assert_eq!(sc.assigns.len(), 3);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= b=! c=X");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.index, 0);
+        assert_eq!(*sc.assigns[0].span.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[0].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].span.range, 0..2);
         assert_eq!(sc.assigns[1].name, "b");
         assert_eq!(sc.assigns[1].value.to_string(), "!");
-        assert_eq!(*sc.assigns[1].location.code.value.borrow(), "a= b=! c=X");
-        assert_eq!(sc.assigns[1].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[1].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[1].location.index, 3);
+        assert_eq!(*sc.assigns[1].span.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[1].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[1].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[1].span.range, 3..6);
         assert_eq!(sc.assigns[2].name, "c");
         assert_eq!(sc.assigns[2].value.to_string(), "X");
-        assert_eq!(*sc.assigns[2].location.code.value.borrow(), "a= b=! c=X");
-        assert_eq!(sc.assigns[2].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[2].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[2].location.index, 7);
+        assert_eq!(*sc.assigns[2].span.code.value.borrow(), "a= b=! c=X");
+        assert_eq!(sc.assigns[2].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[2].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[2].span.range, 7..10);
     }
 
     #[test]
@@ -511,10 +519,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "");
-        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a= ()");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.index, 0);
+        assert_eq!(*sc.assigns[0].span.code.value.borrow(), "a= ()");
+        assert_eq!(sc.assigns[0].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].span.range, 0..2);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));
@@ -532,10 +540,10 @@ mod tests {
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns[0].name, "a");
         assert_eq!(sc.assigns[0].value.to_string(), "b");
-        assert_eq!(*sc.assigns[0].location.code.value.borrow(), "a=b()");
-        assert_eq!(sc.assigns[0].location.code.start_line_number.get(), 1);
-        assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
-        assert_eq!(sc.assigns[0].location.index, 0);
+        assert_eq!(*sc.assigns[0].span.code.value.borrow(), "a=b()");
+        assert_eq!(sc.assigns[0].span.code.start_line_number.get(), 1);
+        assert_eq!(sc.assigns[0].span.code.source, Source::Unknown);
+        assert_eq!(sc.assigns[0].span.range, 0..3);
 
         let next = block_on(parser.peek_token()).unwrap();
         assert_eq!(next.id, Operator(OpenParen));

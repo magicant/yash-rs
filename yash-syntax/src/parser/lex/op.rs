@@ -20,7 +20,6 @@ use super::core::Lexer;
 use super::core::Token;
 use super::core::TokenId;
 use crate::parser::core::Result;
-use crate::source::Location;
 use crate::syntax::Literal;
 use crate::syntax::Unquoted;
 use crate::syntax::Word;
@@ -286,7 +285,6 @@ pub fn is_operator_char(c: char) -> bool {
 /// Return type for [`Lexer::operator_tail`]
 struct OperatorTail {
     pub operator: Operator,
-    pub location: Location,
     pub reversed_key: Vec<char>,
 }
 
@@ -311,21 +309,11 @@ impl Lexer<'_> {
             };
 
             let old_index = self.index();
-            let location = self.location().await?.clone();
             self.consume_char();
 
-            if let Some(OperatorTail {
-                operator,
-                location: _,
-                mut reversed_key,
-            }) = self.operator_tail(edge.next).await?
-            {
-                reversed_key.push(c);
-                return Ok(Some(OperatorTail {
-                    operator,
-                    location,
-                    reversed_key,
-                }));
+            if let Some(mut operator_tail) = self.operator_tail(edge.next).await? {
+                operator_tail.reversed_key.push(c);
+                return Ok(Some(operator_tail));
             }
 
             match edge.value {
@@ -335,7 +323,6 @@ impl Lexer<'_> {
                 }
                 Some(operator) => Ok(Some(OperatorTail {
                     operator,
-                    location,
                     reversed_key: vec![c],
                 })),
             }
@@ -349,7 +336,6 @@ impl Lexer<'_> {
             o.map(|ot| {
                 let OperatorTail {
                     operator,
-                    location,
                     reversed_key,
                 } = ot;
                 let units = reversed_key
@@ -357,7 +343,8 @@ impl Lexer<'_> {
                     .rev()
                     .map(|c| Unquoted(Literal(c)))
                     .collect::<Vec<_>>();
-                let word = Word { units, location };
+                let span = self.span(index..self.index());
+                let word = Word { units, span };
                 let id = TokenId::Operator(operator);
                 Token { word, id, index }
             })
@@ -402,10 +389,10 @@ mod tests {
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[2], WordUnit::Unquoted(TextUnit::Literal('-')));
-        assert_eq!(*t.word.location.code.value.borrow(), "<<-");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "<<-");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..3);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -419,10 +406,10 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
-        assert_eq!(*t.word.location.code.value.borrow(), "<<>");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "<<>");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.location()).unwrap().index, 2);
@@ -436,10 +423,10 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
-        assert_eq!(*t.word.location.code.value.borrow(), "<<");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "<<");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -453,10 +440,10 @@ mod tests {
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
-        assert_eq!(*t.word.location.code.value.borrow(), "\\\n\\\n<\\\n<\\\n>");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 4);
+        assert_eq!(*t.word.span.code.value.borrow(), "\\\n\\\n<\\\n<\\\n>");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..10);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
@@ -493,10 +480,10 @@ mod tests {
 
         let t = block_on(lexer.operator()).unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
-        assert_eq!(*t.word.location.code.value.borrow(), "\n");
-        assert_eq!(t.word.location.code.start_line_number.get(), 1);
-        assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(*t.word.span.code.value.borrow(), "\n");
+        assert_eq!(t.word.span.code.start_line_number.get(), 1);
+        assert_eq!(t.word.span.code.source, Source::Unknown);
+        assert_eq!(t.word.span.range, 0..1);
         assert_eq!(t.id, TokenId::Operator(Operator::Newline));
     }
 }

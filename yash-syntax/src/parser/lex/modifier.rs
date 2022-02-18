@@ -197,8 +197,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(*switch.word.location.code.value.borrow(), "+}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(*switch.word.span.code.value.borrow(), "+}");
+            assert_eq!(switch.word.span.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -225,8 +225,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('z')),
                 ]
             );
-            assert_eq!(*switch.word.location.code.value.borrow(), "+a  z}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(*switch.word.span.code.value.borrow(), "+a  z}");
+            assert_eq!(switch.word.span.range, 1..5);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -245,8 +245,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
-            assert_eq!(*switch.word.location.code.value.borrow(), ":+}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(*switch.word.span.code.value.borrow(), ":+}");
+            assert_eq!(switch.word.span.range, 2..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -265,8 +265,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(*switch.word.location.code.value.borrow(), "-}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(*switch.word.span.code.value.borrow(), "-}");
+            assert_eq!(switch.word.span.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -293,8 +293,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('l')),
                 ]
             );
-            assert_eq!(*switch.word.location.code.value.borrow(), ":-cool}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(*switch.word.span.code.value.borrow(), ":-cool}");
+            assert_eq!(switch.word.span.range, 2..6);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -313,8 +313,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
-            assert_eq!(*switch.word.location.code.value.borrow(), ":=}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(*switch.word.span.code.value.borrow(), ":=}");
+            assert_eq!(switch.word.span.range, 2..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -340,8 +340,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('s')),
                 ]
             );
-            assert_eq!(*switch.word.location.code.value.borrow(), "=Yes}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(*switch.word.span.code.value.borrow(), "=Yes}");
+            assert_eq!(switch.word.span.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -360,8 +360,8 @@ mod tests {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
-            assert_eq!(*switch.word.location.code.value.borrow(), "?}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(*switch.word.span.code.value.borrow(), "?}");
+            assert_eq!(switch.word.span.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -386,8 +386,8 @@ mod tests {
                     WordUnit::Unquoted(TextUnit::Literal('o')),
                 ]
             );
-            assert_eq!(*switch.word.location.code.value.borrow(), ":?No}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(*switch.word.span.code.value.borrow(), ":?No}");
+            assert_eq!(switch.word.span.range, 2..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -437,8 +437,8 @@ mod tests {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
-            assert_eq!(*trim.pattern.location.code.value.borrow(), "#'*'}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(*trim.pattern.span.code.value.borrow(), "#'*'}");
+            assert_eq!(trim.pattern.span.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -457,8 +457,8 @@ mod tests {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
-            assert_eq!(*trim.pattern.location.code.value.borrow(), "#'*'}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(*trim.pattern.span.code.value.borrow(), "#'*'}");
+            assert_eq!(trim.pattern.span.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -480,8 +480,8 @@ mod tests {
             assert_matches!(&trim.pattern.units[0], WordUnit::DoubleQuote(Text(units)) => {
                 assert_eq!(units[..], [TextUnit::Literal('?')]);
             });
-            assert_eq!(*trim.pattern.location.code.value.borrow(), r#"##"?"}"#);
-            assert_eq!(trim.pattern.location.index, 2);
+            assert_eq!(*trim.pattern.span.code.value.borrow(), r#"##"?"}"#);
+            assert_eq!(trim.pattern.span.range, 2..5);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -503,8 +503,8 @@ mod tests {
                 trim.pattern.units,
                 [WordUnit::Unquoted(TextUnit::Backslashed('%'))]
             );
-            assert_eq!(*trim.pattern.location.code.value.borrow(), r"%\%}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(*trim.pattern.span.code.value.borrow(), r"%\%}");
+            assert_eq!(trim.pattern.span.range, 1..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -526,8 +526,8 @@ mod tests {
                 trim.pattern.units,
                 [WordUnit::Unquoted(TextUnit::Literal('%'))]
             );
-            assert_eq!(*trim.pattern.location.code.value.borrow(), "%%%}");
-            assert_eq!(trim.pattern.location.index, 2);
+            assert_eq!(*trim.pattern.span.code.value.borrow(), "%%%}");
+            assert_eq!(trim.pattern.span.range, 2..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
