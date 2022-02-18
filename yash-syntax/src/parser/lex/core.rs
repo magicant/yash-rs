@@ -280,6 +280,27 @@ impl<'a> LexerCore<'a> {
         self.source[i].iter().map(|c| c.value).collect()
     }
 
+    /// Returns a span for a given range of the source code.
+    #[must_use]
+    fn span(&self, range: Range<usize>) -> Span {
+        if range.start == self.source.len() {
+            if let InputState::EndOfInput(ref location) = self.state {
+                return Span {
+                    code: location.code.clone(),
+                    range: location.index..location.index,
+                };
+            }
+        }
+        let start = &self.peek_char_at(range.start).location;
+        let code = start.code.clone();
+        let count = range
+            .map(|index| &self.peek_char_at(index).location)
+            .take_while(|location| location.code == code)
+            .count();
+        let range = start.index..start.index + count;
+        Span { code, range }
+    }
+
     /// Performs alias substitution.
     fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
         let end = self.index;
@@ -613,16 +634,16 @@ impl<'a> Lexer<'a> {
     /// If the characters are from more than one [`Code`] fragment, the span
     /// will only cover the initial portion of the range sharing the same
     /// `Code`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the range refers to an unconsumed character.
+    ///
+    /// If the start index of the range is the end of input, it must have been
+    /// peeked, or the function will panic.
     #[must_use]
     pub fn span(&self, range: Range<usize>) -> Span {
-        let start = &self.core.peek_char_at(range.start).location;
-        let code = start.code.clone();
-        let count = range
-            .map(|index| &self.core.peek_char_at(index).location)
-            .take_while(|location| location.code == code)
-            .count();
-        let range = start.index..start.index + count;
-        Span { code, range }
+        self.core.span(range)
     }
 
     /// Performs alias substitution right before the current position.
@@ -1353,10 +1374,10 @@ mod tests {
 
     #[test]
     fn lexer_span_with_empty_range() {
-        let mut lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
         block_on(lexer.peek_char()).unwrap();
         let span = lexer.span(0..0);
-        assert_eq!(*span.code.value.borrow(), "echo ok");
+        assert_eq!(*span.code.value.borrow(), "");
         assert_eq!(span.code.start_line_number.get(), 1);
         assert_eq!(span.code.source, Source::Unknown);
         assert_eq!(span.range, 0..0);
@@ -1377,6 +1398,24 @@ mod tests {
             assert_eq!(span.code.start_line_number.get(), 1);
             assert_eq!(span.code.source, Source::Stdin);
             assert_eq!(span.range, 1..4);
+        })
+    }
+
+    #[test]
+    fn lexer_span_with_range_starting_at_end() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory("cat", Source::Stdin);
+            for _ in 0..3 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.peek_char().await.unwrap();
+
+            let span = lexer.span(3..3);
+            assert_eq!(*span.code.value.borrow(), "cat");
+            assert_eq!(span.code.start_line_number.get(), 1);
+            assert_eq!(span.code.source, Source::Stdin);
+            assert_eq!(span.range, 3..3);
         })
     }
 
