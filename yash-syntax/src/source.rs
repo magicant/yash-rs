@@ -313,6 +313,7 @@ pub struct Span {
 /// Creates a span ranging over the single character represented by the
 /// location.
 impl From<Location> for Span {
+    // TODO FIXME Remove this
     fn from(location: Location) -> Self {
         let Location { code, index } = location;
         let range = index..index + 1;

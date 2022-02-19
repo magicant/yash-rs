@@ -20,14 +20,14 @@
 //! of the shell language. See the [`syntax`] module for details.
 //!
 //! Some AST elements (e.g. [`Word`](syntax::Word)) provide a
-//! [location](source::Location) where the element appears in the source code.
-//! See the [`source`] module to learn how locations are coded in this crate.
+//! [span](source::Span) where the element appears in the source code.
+//! See the [`source`] module to learn how spans are coded in this crate.
 //!
 //! To parse source code into an AST, you can use the `parse` function on a
 //! `&str`, which is enabled by the implementations of
 //! [`FromStr`](std::str::FromStr) for the AST data types. However, ASTs
-//! constructed this way do not contain very meaningful source information: All
-//! locations' source will be [unknown](source::Source::Unknown). To include
+//! constructed this way do not contain very meaningful source information as
+//! all source will be [unknown](source::Source::Unknown). To include
 //! substantial source information, you need to prepare a
 //! [lexer](parser::lex::Lexer) with source information and then pass it to a
 //! [parser](parser::Parser). See the [`parser`] module for details.

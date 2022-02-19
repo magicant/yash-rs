@@ -65,9 +65,9 @@
 //! from the input as needed to parse a complete AST.
 //!
 //! Note that most AST types have the [`FromStr`](std::str::FromStr) trait
-//! implemented for them. If you don't need to include source location
-//! information in the resultant AST, calling the `parse` function on a string
-//! is a convenient way to parse a code fragment.
+//! implemented for them. If you don't need to include source information in the
+//! resultant AST, calling the `parse` function on a string is a convenient way
+//! to parse a code fragment.
 //! See the [`syntax`](crate::syntax) module for an example of this.
 
 mod core;
