@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `syntax::TextUnit::CommandSubst`
     - `syntax::TextUnit::RawParam`
     - `syntax::Word`
+- `syntax::Item::async_flag` from `Option<Location>` to `Option<Span>`
 - The following functions' parameter `location: source::Location` to `start:
   usize`, with the return types modified accordingly
     - `parser::Lexer::arithmetic_expansion`

@@ -63,10 +63,6 @@ impl Parser<'_, '_> {
             };
 
             let and_or = Rc::new(and_or);
-            let async_flag = async_flag.map(|af| Location {
-                code: af.code,
-                index: af.range.start,
-            });
             items.push(Item { and_or, async_flag });
 
             if !next {
@@ -228,21 +224,21 @@ mod tests {
         let list = block_on(parser.list()).unwrap().unwrap();
         assert_eq!(list.0.len(), 3);
 
-        let location = list.0[0].async_flag.as_ref().unwrap();
-        assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 4);
+        let span = list.0[0].async_flag.as_ref().unwrap();
+        assert_eq!(*span.code.value.borrow(), "foo & bar ; baz&");
+        assert_eq!(span.code.start_line_number.get(), 1);
+        assert_eq!(span.code.source, Source::Unknown);
+        assert_eq!(span.range, 4..5);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
 
         assert_eq!(list.0[1].async_flag, None);
         assert_eq!(list.0[1].and_or.to_string(), "bar");
 
-        let location = list.0[2].async_flag.as_ref().unwrap();
-        assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 15);
+        let span = list.0[2].async_flag.as_ref().unwrap();
+        assert_eq!(*span.code.value.borrow(), "foo & bar ; baz&");
+        assert_eq!(span.code.start_line_number.get(), 1);
+        assert_eq!(span.code.source, Source::Unknown);
+        assert_eq!(span.range, 15..16);
         assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
 

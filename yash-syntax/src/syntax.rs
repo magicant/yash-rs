@@ -45,8 +45,8 @@
 //! Most AST types defined in this module implement the
 //! [`FromStr`](std::str::FromStr) trait, which means you can easily get an AST
 //! out of source code by calling `parse` on a `&str`. However, all
-//! [location](Location)s and [span](Span)s in ASTs constructed this way will
-//! only have [unknown source](crate::source::Source::Unknown).
+//! [span](Span)s in ASTs constructed this way will only have [unknown
+//! source](crate::source::Source::Unknown).
 //!
 //! ```
 //! use std::str::FromStr;
@@ -74,7 +74,6 @@
 //! with here-document contents included, you can use ... TODO TBD.
 
 use crate::parser::lex::Operator;
-use crate::source::Location;
 use crate::source::Span;
 use itertools::Itertools;
 use std::cell::RefCell;
@@ -1219,8 +1218,8 @@ pub struct Item {
     /// The and-or list is contained in `Rc` to allow executing it
     /// asynchronously without cloning it.
     pub and_or: Rc<AndOrList>,
-    /// Location of the `&` operator for this item, if any.
-    pub async_flag: Option<Location>,
+    /// Position of the `&` operator for this item, if any.
+    pub async_flag: Option<Span>,
 }
 
 /// Allows conversion from Item to String.
@@ -2132,7 +2131,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(Span::dummy("")),
         };
         list.0.push(item);
         assert_eq!(list.to_string(), "first; second&");
@@ -2159,7 +2158,7 @@ mod tests {
         let and_or = "second".parse().unwrap();
         let item = Item {
             and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
+            async_flag: Some(Span::dummy("")),
         };
         list.0.push(item);
         assert_eq!(format!("{:#}", list), "first; second&");
