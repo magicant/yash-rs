@@ -46,10 +46,10 @@ pub enum Source {
     /// Alias substitution.
     ///
     /// This applies to a code fragment that replaced another as a result of alias substitution.
-    ///
-    /// `original` is the location of the original word that was replaced.
     Alias {
-        original: Location,
+        /// Position of the original word that was replaced
+        original: Span,
+        /// Definition of the alias that was substituted
         alias: Rc<Alias>,
     },
 
@@ -88,7 +88,7 @@ impl Source {
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// let source = Source::Alias{original, alias};
+    /// let source = Source::Alias{ original: original.into(), alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), false);
     /// ```
@@ -104,7 +104,7 @@ impl Source {
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// let source = Source::Alias{original: original.clone(), alias};
+    /// let source = Source::Alias{original: original.clone().into(), alias};
     /// let alias = Rc::new(yash_syntax::alias::Alias{
     ///     name: "bar".to_string(),
     ///     replacement: "".to_string(),
@@ -112,7 +112,7 @@ impl Source {
     ///     origin: original.clone()
     /// });
     /// Rc::make_mut(&mut original.code).source = source;
-    /// let source = Source::Alias{original, alias};
+    /// let source = Source::Alias{ original: original.into(), alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), true);
     /// assert_eq!(source.is_alias_for("baz"), false);

@@ -122,11 +122,12 @@ impl super::Source {
             }
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation::new(
-                    AnnotationType::Info,
-                    format!("alias `{}` was substituted here", alias.name).into(),
-                    original,
-                )));
+                // FIXME
+                // result.extend(std::iter::once(Annotation::new(
+                //     AnnotationType::Info,
+                //     format!("alias `{}` was substituted here", alias.name).into(),
+                //     original,
+                // )));
                 original.code.source.complement_annotations(result);
                 result.extend(std::iter::once(Annotation::new(
                     AnnotationType::Info,
@@ -306,7 +307,7 @@ mod annotate_snippets_support {
         use super::super::*;
         use std::num::NonZeroU64;
 
-        let original = Location::dummy("my original");
+        let original = Span::dummy("my original");
         let alias = Rc::new(Alias {
             name: "foo".to_string(),
             replacement: "bar".to_string(),

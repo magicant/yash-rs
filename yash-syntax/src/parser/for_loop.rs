@@ -477,7 +477,7 @@ mod tests {
             assert_eq!(*original.code.value.borrow(), "FOR if do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
             assert_eq!(original.code.source, Source::Unknown);
-            assert_eq!(original.index, 4);
+            assert_eq!(original.range, 4..6);
             assert_eq!(alias.name, "if");
         });
     }
@@ -534,7 +534,7 @@ mod tests {
             assert_eq!(*original.code.value.borrow(), "for_A_in_a_b if c; do :; done");
             assert_eq!(original.code.start_line_number.get(), 1);
             assert_eq!(original.code.source, Source::Unknown);
-            assert_eq!(original.index, 13);
+            assert_eq!(original.range, 13..15);
             assert_eq!(alias.name, "if");
         });
     }

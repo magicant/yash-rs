@@ -311,9 +311,8 @@ impl<'a> LexerCore<'a> {
             end
         );
 
-        let original = self.source[begin].location.clone();
         let source = Source::Alias {
-            original,
+            original: self.span(begin..end),
             alias: alias.clone(),
         };
         let code = Rc::new(Code {
@@ -1014,7 +1013,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 0);
@@ -1030,7 +1029,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 1);
@@ -1046,7 +1045,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 2);
@@ -1093,7 +1092,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 0);
@@ -1109,7 +1108,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 1);
@@ -1124,7 +1123,7 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
                 assert_eq!(c.location.index, 2);
@@ -1172,7 +1171,7 @@ mod tests {
 
     #[test]
     fn lexer_core_is_after_blank_ending_alias_index_0() {
-        let original = Location::dummy("original");
+        let original = Span::dummy("original");
         let alias = Rc::new(Alias {
             name: "a".to_string(),
             replacement: " ".to_string(),
@@ -1460,7 +1459,7 @@ mod tests {
                 assert_eq!(*original.code.value.borrow(), " a;");
                 assert_eq!(original.code.start_line_number.get(), 1);
                 assert_eq!(original.code.source, Source::Unknown);
-                assert_eq!(original.index, 1);
+                assert_eq!(original.range, 1..2);
                 assert_eq!(alias, &alias_def);
             });
             assert_eq!(span.range, 1..3);
