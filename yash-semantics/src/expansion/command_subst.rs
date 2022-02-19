@@ -68,7 +68,7 @@ pub async fn expand_command_substitution<E: Env>(
     code: &str,
     span: &Span,
 ) -> Result<String> {
-    expand_command_substitution_inner(env, code.to_owned(), span)
+    expand_command_substitution_inner(env, code.to_owned(), span.clone())
         .await
         .map_err(|errno| Error {
             cause: ErrorCause::CommandSubstError(errno),
@@ -82,12 +82,8 @@ pub async fn expand_command_substitution<E: Env>(
 async fn expand_command_substitution_inner<E: Env>(
     env: &mut E,
     code: String,
-    span: &Span,
+    span: Span,
 ) -> std::result::Result<String, Errno> {
-    let original = Location {
-        code: span.code.clone(),
-        index: span.range.start,
-    };
     let (reader, writer) = env.pipe()?;
 
     // Start a subshell to run the command
@@ -99,14 +95,17 @@ async fn expand_command_substitution_inner<E: Env>(
                     if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
                         let error = Error {
                             cause: ErrorCause::CommandSubstError(errno),
-                            location: original,
+                            location: Location {
+                                code: span.code,
+                                index: span.range.start,
+                            },
                         };
                         return error.handle(env).await;
                     }
                     env.system.close(writer).ok();
                 }
 
-                let mut lexer = Lexer::from_memory(&code, Source::CommandSubst { original });
+                let mut lexer = Lexer::from_memory(&code, Source::CommandSubst { original: span });
                 read_eval_loop(env, &mut lexer).await
             })
         })

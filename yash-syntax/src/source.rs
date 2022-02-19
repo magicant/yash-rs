@@ -54,7 +54,10 @@ pub enum Source {
     },
 
     /// Command substitution.
-    CommandSubst { original: Location },
+    CommandSubst {
+        /// Position of the command substitution in the source code.
+        original: Span,
+    },
 
     /// Trap command.
     Trap {

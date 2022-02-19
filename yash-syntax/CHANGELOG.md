@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `syntax::TextUnit::RawParam`
     - `syntax::Word`
 - `source::Source::Alias::original` from `Location` to `Span`
+- `source::Source::CommandSubst::original` from `Location` to `Span`
 - `syntax::Item::async_flag` from `Option<Location>` to `Option<Span>`
 - The following functions' parameter `location: source::Location` to `start:
   usize`, with the return types modified accordingly

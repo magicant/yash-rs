@@ -104,13 +104,14 @@ impl super::Source {
         use super::Source::*;
         match self {
             Unknown | Stdin => (),
-            CommandSubst { original } => {
+            CommandSubst { original: _ } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation::new(
-                    AnnotationType::Info,
-                    "command substitution appeared here".into(),
-                    original,
-                )));
+                // FIXME
+                // result.extend(std::iter::once(Annotation::new(
+                //     AnnotationType::Info,
+                //     "command substitution appeared here".into(),
+                //     original,
+                // )));
             }
             Trap { origin, .. } => {
                 // TODO Use Extend::extend_one
