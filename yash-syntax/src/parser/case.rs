@@ -210,8 +210,8 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -219,7 +219,7 @@ mod tests {
     fn parser_case_item_esac() {
         let mut lexer = Lexer::from_memory("\nESAC", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "ESAC".to_string(),
             "\n\nesac".to_string(),
@@ -430,7 +430,7 @@ mod tests {
         // Alias substitution results in "case x \n\n \nin esac"
         let mut lexer = Lexer::from_memory("CASE_X IN_ESAC", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "CASE_X".to_string(),
             " case x \n\n ".to_string(),
@@ -463,7 +463,7 @@ mod tests {
         // Alias substitution results in " case   in in  a|b) esac"
         let mut lexer = Lexer::from_memory("CASE in a|b) esac", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "CASE".to_string(),
             " case ".to_string(),
@@ -497,7 +497,7 @@ mod tests {
         // Alias substitution results in "case x  in esac"
         let mut lexer = Lexer::from_memory("CASE_X in esac", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "CASE_X".to_string(),
             "case x ".to_string(),

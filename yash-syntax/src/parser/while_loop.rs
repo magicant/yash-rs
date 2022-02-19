@@ -122,8 +122,8 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -200,7 +200,7 @@ mod tests {
     fn parser_while_loop_aliasing() {
         let mut lexer = Lexer::from_memory(" while :; DO :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "DO".to_string(),
             "do".to_string(),
@@ -295,7 +295,7 @@ mod tests {
     fn parser_until_loop_aliasing() {
         let mut lexer = Lexer::from_memory(" until :; DO :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "DO".to_string(),
             "do".to_string(),

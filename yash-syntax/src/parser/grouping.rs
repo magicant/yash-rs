@@ -114,8 +114,8 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -181,7 +181,7 @@ mod tests {
     fn parser_grouping_aliasing() {
         let mut lexer = Lexer::from_memory(" { :; end ", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "{".to_string(),
             "".to_string(),

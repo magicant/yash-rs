@@ -100,8 +100,8 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -212,7 +212,7 @@ mod tests {
     fn parser_short_function_definition_close_parenthesis_alias() {
         let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "a".to_string(),
             "f( ".to_string(),
@@ -252,7 +252,7 @@ mod tests {
     fn parser_short_function_definition_body_alias_and_newline() {
         let mut lexer = Lexer::from_memory(" a b ", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "a".to_string(),
             "f() ".to_string(),
@@ -292,7 +292,7 @@ mod tests {
     fn parser_short_function_definition_alias_inapplicable() {
         let mut lexer = Lexer::from_memory("()b", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "b".to_string(),
             " c".to_string(),

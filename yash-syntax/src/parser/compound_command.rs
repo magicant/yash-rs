@@ -107,8 +107,8 @@ mod tests {
     use super::super::lex::TokenId::EndOfInput;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use crate::syntax::Command;
     use crate::syntax::SimpleCommand;
     use assert_matches::assert_matches;
@@ -188,7 +188,7 @@ mod tests {
     fn parser_do_clause_aliasing() {
         let mut lexer = Lexer::from_memory(" do :; end ", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "do".to_string(),
             "".to_string(),

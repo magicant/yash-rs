@@ -131,11 +131,12 @@ impl super::Source {
                 //     original,
                 // )));
                 original.code.source.complement_annotations(result);
-                result.extend(std::iter::once(Annotation::new(
-                    AnnotationType::Info,
-                    format!("alias `{}` was defined here", alias.name).into(),
-                    &alias.origin,
-                )));
+                // FIXME
+                // result.extend(std::iter::once(Annotation::new(
+                //     AnnotationType::Info,
+                //     format!("alias `{}` was defined here", alias.name).into(),
+                //     &alias.origin,
+                // )));
                 alias.origin.code.source.complement_annotations(result);
             }
         }
@@ -314,7 +315,7 @@ mod annotate_snippets_support {
             name: "foo".to_string(),
             replacement: "bar".to_string(),
             global: false,
-            origin: Location::dummy("my origin"),
+            origin: Span::dummy("my origin"),
         });
         let code = Rc::new(Code {
             value: "substitution".to_string().into(),

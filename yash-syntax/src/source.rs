@@ -85,14 +85,14 @@ impl Source {
     /// ```
     /// // `is_alias_for` returns true if the names match
     /// # use yash_syntax::source::*;
-    /// let original = Location::dummy("");
+    /// let original = Span::dummy("");
     /// let alias = std::rc::Rc::new(yash_syntax::alias::Alias{
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// let source = Source::Alias{ original: original.into(), alias };
+    /// let source = Source::Alias{ original: original, alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), false);
     /// ```
@@ -101,22 +101,22 @@ impl Source {
     /// // `is_alias_for` checks aliases recursively.
     /// # use std::rc::Rc;
     /// # use yash_syntax::source::*;
-    /// let mut original = Location::dummy("");
+    /// let mut original = Span::dummy("");
     /// let alias = Rc::new(yash_syntax::alias::Alias{
     ///     name: "foo".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
     ///     origin: original.clone()
     /// });
-    /// let source = Source::Alias{original: original.clone().into(), alias};
+    /// let source = Source::Alias{ original: original.clone(), alias };
     /// let alias = Rc::new(yash_syntax::alias::Alias{
     ///     name: "bar".to_string(),
     ///     replacement: "".to_string(),
     ///     global: false,
-    ///     origin: original.clone()
+    ///     origin: original.clone(),
     /// });
     /// Rc::make_mut(&mut original.code).source = source;
-    /// let source = Source::Alias{ original: original.into(), alias };
+    /// let source = Source::Alias{ original, alias };
     /// assert_eq!(source.is_alias_for("foo"), true);
     /// assert_eq!(source.is_alias_for("bar"), true);
     /// assert_eq!(source.is_alias_for("baz"), false);

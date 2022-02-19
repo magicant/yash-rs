@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `syntax::TextUnit::CommandSubst`
     - `syntax::TextUnit::RawParam`
     - `syntax::Word`
+- `alias::Alias::origin` from `Location` to `Span`
 - `source::Source::Alias::original` from `Location` to `Span`
 - `source::Source::CommandSubst::original` from `Location` to `Span`
 - `source::Source::Trap::original` from `Location` to `Span`

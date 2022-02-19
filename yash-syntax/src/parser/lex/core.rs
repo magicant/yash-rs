@@ -981,7 +981,7 @@ mod tests {
             name: "a".to_string(),
             replacement: "".to_string(),
             global: false,
-            origin: Location::dummy("dummy"),
+            origin: Span::dummy("dummy"),
         });
         lexer.substitute_alias(0, &alias);
     }
@@ -995,7 +995,7 @@ mod tests {
             name: "a".to_string(),
             replacement: "lex".to_string(),
             global: false,
-            origin: Location::dummy("dummy"),
+            origin: Span::dummy("dummy"),
         });
 
         block_on(async {
@@ -1072,7 +1072,7 @@ mod tests {
             name: "foo".to_string(),
             replacement: "x\ny".to_string(),
             global: true,
-            origin: Location::dummy("loc"),
+            origin: Span::dummy("loc"),
         });
 
         block_on(async {
@@ -1151,7 +1151,7 @@ mod tests {
                 name: "x".to_string(),
                 replacement: "".to_string(),
                 global: false,
-                origin: Location::dummy("dummy"),
+                origin: Span::dummy("dummy"),
             });
 
             let _ = lexer.peek_char().await;
@@ -1176,7 +1176,7 @@ mod tests {
             name: "a".to_string(),
             replacement: " ".to_string(),
             global: false,
-            origin: Location::dummy("origin"),
+            origin: Span::dummy("origin"),
         });
         let source = Source::Alias { original, alias };
         let input = Memory::new("a");
@@ -1195,7 +1195,7 @@ mod tests {
                 name: "a".to_string(),
                 replacement: " b".to_string(),
                 global: false,
-                origin: Location::dummy("dummy"),
+                origin: Span::dummy("dummy"),
             });
 
             lexer.peek_char().await.unwrap();
@@ -1220,7 +1220,7 @@ mod tests {
                 name: "a".to_string(),
                 replacement: " b ".to_string(),
                 global: false,
-                origin: Location::dummy("dummy"),
+                origin: Span::dummy("dummy"),
             });
 
             lexer.peek_char().await.unwrap();
@@ -1440,7 +1440,7 @@ mod tests {
                 name: "a".to_string(),
                 replacement: "abc".to_string(),
                 global: false,
-                origin: Location::dummy("dummy"),
+                origin: Span::dummy("dummy"),
             });
             for _ in 0..2 {
                 lexer.peek_char().await.unwrap();

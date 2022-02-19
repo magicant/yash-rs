@@ -112,8 +112,8 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
-    use crate::source::Location;
     use crate::source::Source;
+    use crate::source::Span;
     use futures_executor::block_on;
 
     #[test]
@@ -230,7 +230,7 @@ mod tests {
     fn parser_pipeline_no_aliasing_of_bang() {
         let mut lexer = Lexer::from_memory("! ok", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "!".to_string(),
             "; ; ;".to_string(),

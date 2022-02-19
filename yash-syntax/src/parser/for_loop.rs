@@ -179,6 +179,7 @@ mod tests {
     use super::*;
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Source;
+    use crate::source::Span;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
@@ -349,7 +350,7 @@ mod tests {
     fn parser_for_loop_aliasing_on_semicolon() {
         let mut lexer = Lexer::from_memory(" FOR_A if :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "if".to_string(),
             " ;\n\ndo".to_string(),
@@ -378,7 +379,7 @@ mod tests {
     fn parser_for_loop_aliasing_on_do() {
         let mut lexer = Lexer::from_memory(" FOR_A if :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "if".to_string(),
             "\ndo".to_string(),
@@ -450,7 +451,7 @@ mod tests {
         // Alias substitution results in "for & do :; done"
         let mut lexer = Lexer::from_memory("FOR if do :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "FOR".to_string(),
             "for ".to_string(),
@@ -507,7 +508,7 @@ mod tests {
         // Alias substitution results in "for A in a b & c; do :; done"
         let mut lexer = Lexer::from_memory("for_A_in_a_b if c; do :; done", Source::Unknown);
         let mut aliases = AliasSet::new();
-        let origin = Location::dummy("");
+        let origin = Span::dummy("");
         aliases.insert(HashEntry::new(
             "for_A_in_a_b".to_string(),
             "for A in a b ".to_string(),

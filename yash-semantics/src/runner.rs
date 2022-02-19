@@ -108,6 +108,7 @@ mod tests {
     use yash_env::trap::Trap;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
+    use yash_syntax::source::Span;
 
     #[test]
     fn exit_status_zero_with_no_commands() {
@@ -162,7 +163,7 @@ mod tests {
             name: "echo".to_string(),
             replacement: "echo alias\necho ok".to_string(),
             global: false,
-            origin: Location::dummy(""),
+            origin: Span::dummy(""),
         })));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo", Source::Unknown);

@@ -65,7 +65,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
             let name = value[..eq_index].to_owned();
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
-            let entry = HashEntry::new(name, replacement, false, origin);
+            let entry = HashEntry::new(name, replacement, false, origin.into());
             env.alias_set_mut().replace(entry);
         } else {
             // TODO print alias definition
@@ -89,8 +89,8 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_syntax::source::Location;
     use yash_syntax::source::Source;
+    use yash_syntax::source::Span;
 
     #[derive(Default)]
     struct DummyEnv {
@@ -123,7 +123,7 @@ mod tests {
         assert_eq!(*alias.origin.code.value.borrow(), "foo=bar baz");
         assert_eq!(alias.origin.code.start_line_number.get(), 1);
         assert_eq!(alias.origin.code.source, Source::Unknown);
-        assert_eq!(alias.origin.index, 0);
+        // FIXME assert_eq!(alias.origin.range, 0..11);
     }
 
     #[test]
@@ -143,7 +143,7 @@ mod tests {
         assert_eq!(*abc.origin.code.value.borrow(), "abc=xyz");
         assert_eq!(abc.origin.code.start_line_number.get(), 1);
         assert_eq!(abc.origin.code.source, Source::Unknown);
-        assert_eq!(abc.origin.index, 0);
+        // FIXME assert_eq!(abc.origin.range, 0..3);
 
         let yes = env.aliases.get("yes").unwrap().0.as_ref();
         assert_eq!(yes.name, "yes");
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(*yes.origin.code.value.borrow(), "yes=no");
         assert_eq!(yes.origin.code.start_line_number.get(), 1);
         assert_eq!(yes.origin.code.source, Source::Unknown);
-        assert_eq!(yes.origin.index, 0);
+        // FIXME assert_eq!(yes.origin.range, 0..2);
 
         let ls = env.aliases.get("ls").unwrap().0.as_ref();
         assert_eq!(ls.name, "ls");
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(*ls.origin.code.value.borrow(), "ls=ls --color");
         assert_eq!(ls.origin.code.start_line_number.get(), 1);
         assert_eq!(ls.origin.code.source, Source::Unknown);
-        assert_eq!(ls.origin.index, 0);
+        // FIXME assert_eq!(ls.origin.range, 0..10);
     }
 
     #[test]
@@ -194,13 +194,13 @@ mod tests {
             "foo".to_string(),
             "bar".to_string(),
             false,
-            Location::dummy(""),
+            Span::dummy(""),
         ));
         env.aliases.insert(HashEntry::new(
             "hello".to_string(),
             "world".to_string(),
             false,
-            Location::dummy(""),
+            Span::dummy(""),
         ));
         // TODO builtin should print to IoEnv rather than real standard output
     }
