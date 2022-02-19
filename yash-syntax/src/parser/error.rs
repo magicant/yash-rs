@@ -20,6 +20,7 @@ use crate::source::pretty::Annotation;
 use crate::source::pretty::AnnotationType;
 use crate::source::pretty::Message;
 use crate::source::Location;
+use crate::source::Span;
 use crate::syntax::AndOr;
 use std::borrow::Cow;
 use std::fmt;
@@ -29,7 +30,10 @@ use std::rc::Rc;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SyntaxError {
     /// A `(` lacks a closing `)`.
-    UnclosedParen { opening_location: Location },
+    UnclosedParen {
+        /// Position of the corresponding `(`
+        opening_span: Span,
+    },
     /// A modifier does not have a valid form in a parameter expansion.
     InvalidModifier,
     /// A braced parameter expansion has both a prefix and suffix modifier.
