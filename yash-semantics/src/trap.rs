@@ -68,7 +68,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
             continue;
         };
         let condition = signal.to_string();
-        let origin = state.origin.clone();
+        let origin = state.origin.clone().into();
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let previous_exit_status = env.exit_status;
         // TODO Update control flow stack

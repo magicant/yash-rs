@@ -63,8 +63,9 @@ pub enum Source {
     Trap {
         /// Trap condition name, typically the signal name.
         condition: String,
-        /// Location of the simple command that has set this trap command.
-        origin: Location,
+        /// Position of the simple command word that was parsed as this trap
+        /// command.
+        origin: Span,
     },
     // TODO More Source types
 }

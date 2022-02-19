@@ -113,13 +113,14 @@ impl super::Source {
                 //     original,
                 // )));
             }
-            Trap { origin, .. } => {
+            Trap { origin: _, .. } => {
                 // TODO Use Extend::extend_one
-                result.extend(std::iter::once(Annotation::new(
-                    AnnotationType::Info,
-                    "trap was set here".into(),
-                    origin,
-                )));
+                // FIXME
+                // result.extend(std::iter::once(Annotation::new(
+                //     AnnotationType::Info,
+                //     "trap was set here".into(),
+                //     origin,
+                // )));
             }
             Alias { original, alias } => {
                 // TODO Use Extend::extend_one
