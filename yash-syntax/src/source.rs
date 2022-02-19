@@ -226,13 +226,6 @@ impl Location {
         }
         with_line(value.into())
     }
-
-    /// Increases the `index` by `count`.
-    ///
-    /// This function panics if the result overflows.
-    pub fn advance(&mut self, count: usize) {
-        self.index = self.index.checked_add(count).unwrap();
-    }
 }
 
 /// Character with source description.
@@ -242,33 +235,4 @@ pub struct SourceChar {
     pub value: char,
     /// Location of this character in source code.
     pub location: Location,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn location_advance() {
-        let code = Rc::new(Code {
-            value: RefCell::new("line\n".to_owned()),
-            start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
-        });
-        let mut location = Location {
-            code: code.clone(),
-            index: 0,
-        };
-
-        location.advance(1);
-        assert_eq!(location.index, 1);
-        location.advance(2);
-        assert_eq!(location.index, 3);
-
-        // The advance function does not check the line length.
-        location.advance(5);
-        assert_eq!(location.index, 8);
-
-        assert!(Rc::ptr_eq(&location.code, &code));
-    }
 }
