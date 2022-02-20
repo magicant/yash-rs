@@ -625,7 +625,7 @@ impl MaybeLiteral for WordUnit {
 pub struct Word {
     /// Word units that constitute the word.
     pub units: Vec<WordUnit>,
-    /// Location of the first character of the word.
+    /// Position of the word in the source code.
     pub location: Location,
 }
 
@@ -653,9 +653,8 @@ pub enum Value {
     /// Scalar value, a possibly empty word.
     ///
     /// Note: Because a scalar assignment value is created from a normal command
-    /// word, the location of the word in the scalar value points to the first
-    /// character of the entire assignment word rather than that of the assigned
-    /// value.
+    /// word, the location of the word in the scalar value refers to the entire
+    /// assignment word rather than the assigned value.
     Scalar(Word),
 
     /// Array, possibly empty list of non-empty words.
@@ -684,7 +683,7 @@ pub struct Assign {
     pub name: String,
     /// Value assigned to the variable.
     pub value: Value,
-    /// Location of the first character of the assignment word.
+    /// Location of the assignment word.
     pub location: Location,
 }
 

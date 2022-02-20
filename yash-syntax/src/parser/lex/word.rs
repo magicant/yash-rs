@@ -156,11 +156,12 @@ impl WordLexer<'_, '_> {
 
     /// Dynamic version of [`Self::word`].
     async fn word_dyn(&mut self, is_delimiter: &dyn Fn(char) -> bool) -> Result<Word> {
-        let location = self.location().await?.clone();
+        let start = self.index();
         let mut units = vec![];
         while let Some(unit) = self.word_unit_dyn(is_delimiter).await? {
             units.push(unit)
         }
+        let location = self.location_range(start..self.index());
         Ok(Word { units, location })
     }
 }
