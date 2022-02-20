@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ????-??-??
 
+### Added
+
+- `parser::Lexer::location_range`
+
 ### Changed
 
 - `source::Location::index: usize` replaced with `range: Range<usize>`
