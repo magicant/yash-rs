@@ -59,7 +59,8 @@ impl WordLexer<'_, '_> {
     /// another backslash. If `self.context` is `Text`, double quotes can also
     /// be backslash-escaped.
     pub async fn backquote(&mut self) -> Result<Option<TextUnit>> {
-        let location = match self.consume_char_if(|c| c == '`').await? {
+        let start = self.index();
+        let opening_location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
         };
@@ -70,9 +71,9 @@ impl WordLexer<'_, '_> {
         }
 
         if self.skip_if(|c| c == '`').await? {
+            let location = self.location_range(start..self.index());
             Ok(Some(TextUnit::Backquote { content, location }))
         } else {
-            let opening_location = location;
             let cause = SyntaxError::UnclosedBackquote { opening_location }.into();
             let location = self.location().await?.clone();
             Err(Error { cause, location })

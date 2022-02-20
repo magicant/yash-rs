@@ -442,7 +442,7 @@ pub enum TextUnit {
         /// Command string that will be parsed and executed when the command
         /// substitution is expanded.
         content: Vec<BackquoteUnit>,
-        /// Location of the initial backquote character of this command substitution.
+        /// Position of this command substitution in the source code.
         location: Location,
     },
     /// Arithmetic expansion.
