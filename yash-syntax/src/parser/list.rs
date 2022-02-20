@@ -224,7 +224,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 4);
+        assert_eq!(location.range, 4..5);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
 
         assert_eq!(list.0[1].async_flag, None);
@@ -234,7 +234,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "foo & bar ; baz&");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 15);
+        assert_eq!(location.range, 15..16);
         assert_eq!(list.0[2].and_or.to_string(), "baz");
     }
 
@@ -308,7 +308,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "<<END");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 2);
+        assert_eq!(e.location.range, 2..5);
     }
 
     #[test]
@@ -322,6 +322,6 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "foo)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.range, 3..4);
     }
 }

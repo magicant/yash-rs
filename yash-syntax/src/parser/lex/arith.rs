@@ -114,7 +114,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "X");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "Y");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
+        assert_eq!(location.range, 0..1);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
     }
@@ -149,7 +149,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "X");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -177,7 +177,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "X");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -194,12 +194,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "Z");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "((1");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.range, 3..3);
     }
 
     #[test]
@@ -213,12 +213,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "Z");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "((1)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 4);
+        assert_eq!(e.location.range, 4..4);
     }
 
     #[test]
@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(*location.code.value.borrow(), "Z");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
+        assert_eq!(location.range, 0..1);
 
         assert_eq!(lexer.index(), 0);
     }

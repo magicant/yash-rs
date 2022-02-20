@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ????-??-??
 
+### Changed
+
+- `source::Location::index: usize` replaced with `range: Range<usize>`
+
 ### Removed
 
 - `source::Location::advance`
@@ -15,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This version simplifies type definitions for the abstract syntax tree (AST);
 `syntax::HereDoc::content` is now wrapped in `RefCell` to remove generic type
-parameters from `RedirBody` and other AST types. 
+parameters from `RedirBody` and other AST types.
 
 ### Changed
 

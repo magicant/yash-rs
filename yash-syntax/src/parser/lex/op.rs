@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "<<-");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(t.word.location.range, 0..3);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -422,10 +422,10 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "<<>");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
-        assert_eq!(block_on(lexer.location()).unwrap().index, 2);
+        assert_eq!(block_on(lexer.location()).unwrap().range, 2..3);
     }
 
     #[test]
@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "<<");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "\\\n\\\n<\\\n<\\\n>");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 4);
+        assert_eq!(t.word.location.range, 0..10);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
@@ -496,7 +496,7 @@ mod tests {
         assert_eq!(*t.word.location.code.value.borrow(), "\n");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
-        assert_eq!(t.word.location.index, 0);
+        assert_eq!(t.word.location.range, 0..1);
         assert_eq!(t.id, TokenId::Operator(Operator::Newline));
     }
 }

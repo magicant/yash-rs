@@ -27,6 +27,7 @@ pub mod pretty;
 use crate::alias::Alias;
 use std::cell::RefCell;
 use std::num::NonZeroU64;
+use std::ops::Range;
 use std::rc::Rc;
 
 /// Origin of source code.
@@ -157,8 +158,8 @@ pub struct Code {
 
 /// Creates an iterator of [source char](SourceChar)s from a string.
 ///
-/// `index_offset` will be the `index` of the first source char's location. For
-/// each succeeding char, the `index` will be incremented by one.
+/// `index_offset` will be the index of the first source char's location.
+/// For each succeeding char, the index will be incremented by one.
 ///
 /// ```
 /// # use yash_syntax::source::{Code, Source, source_chars};
@@ -174,10 +175,10 @@ pub struct Code {
 /// let chars: Vec<_> = source_chars(s, &code, 10).collect();
 /// assert_eq!(chars[0].value, 'a');
 /// assert_eq!(chars[0].location.code, code);
-/// assert_eq!(chars[0].location.index, 10);
+/// assert_eq!(chars[0].location.range, 10..11);
 /// assert_eq!(chars[1].value, 'b');
 /// assert_eq!(chars[1].location.code, code);
-/// assert_eq!(chars[1].location.index, 11);
+/// assert_eq!(chars[1].location.range, 11..12);
 /// ```
 pub fn source_chars<'a>(
     s: &'a str,
@@ -188,12 +189,12 @@ pub fn source_chars<'a>(
         value,
         location: Location {
             code: Rc::clone(code),
-            index: index_offset + i,
+            range: index_offset + i..index_offset + i + 1,
         },
     })
 }
 
-/// Position of a character in source code.
+/// Position of source code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
     /// Code that contains the character.
@@ -202,27 +203,29 @@ pub struct Location {
     /// Character position in the code, counted from 0.
     ///
     /// Characters are counted in the number of Unicode scalar values, not
-    /// bytes. That means the `index` should be between 0 and
+    /// bytes. That means the index should be between 0 and
     /// `code.value.borrow().chars().count()`.
-    pub index: usize,
+    pub range: Range<usize>,
 }
 
 impl Location {
     /// Creates a dummy location.
     ///
     /// The returned location has [unknown](Source::Unknown) source and the
-    /// given source code value. The `start_line_number` and `index` are 1.
+    /// given source code value. The `start_line_number` will be 1.
+    /// The location ranges over the whole code.
     ///
     /// This function is mainly for use in testing.
     #[inline]
     pub fn dummy<S: Into<String>>(value: S) -> Location {
         fn with_line(value: String) -> Location {
+            let range = 0..value.chars().count();
             let code = Rc::new(Code {
                 value: RefCell::new(value),
                 start_line_number: NonZeroU64::new(1).unwrap(),
                 source: Source::Unknown,
             });
-            Location { code, index: 0 }
+            Location { code, range }
         }
         with_line(value.into())
     }
