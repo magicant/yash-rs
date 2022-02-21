@@ -46,10 +46,9 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        let _location = match self.arithmetic_expansion(location).await? {
-            Ok(result) => return Ok(Some(result)),
-            Err(location) => location,
-        };
+        if let Some(result) = self.arithmetic_expansion(location).await? {
+            return Ok(Some(result));
+        }
 
         if let Some(result) = self.command_substitution(start_index).await? {
             return Ok(Some(result));
