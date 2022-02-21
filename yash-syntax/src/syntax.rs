@@ -434,7 +434,7 @@ pub enum TextUnit {
         /// Command string that will be parsed and executed when the command
         /// substitution is expanded.
         content: String,
-        /// Location of the initial `$` character of this command substitution.
+        /// Position of this command substitution in the source code.
         location: Location,
     },
     /// Command substitution of the form `` `...` ``.

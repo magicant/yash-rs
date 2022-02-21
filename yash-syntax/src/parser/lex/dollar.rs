@@ -30,7 +30,7 @@ impl WordLexer<'_, '_> {
     /// substitution, or arithmetic expansion is parsed. Otherwise, no
     /// characters are consumed and the return value is `Ok(None)`.
     pub async fn dollar_unit(&mut self) -> Result<Option<TextUnit>> {
-        let index = self.index();
+        let start_index = self.index();
         let location = match self.consume_char_if(|c| c == '$').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
@@ -46,17 +46,17 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        let location = match self.arithmetic_expansion(location).await? {
+        let _location = match self.arithmetic_expansion(location).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,
         };
 
-        if let Some(result) = self.command_substitution(location).await? {
+        if let Some(result) = self.command_substitution(start_index).await? {
             return Ok(Some(result));
         }
 
         // TODO maybe reject unrecognized dollar unit?
-        self.rewind(index);
+        self.rewind(start_index);
         Ok(None)
     }
 }

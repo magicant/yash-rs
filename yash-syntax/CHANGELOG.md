@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `source::Location::index: usize` replaced with `range: Range<usize>`
+- The following functions now taking the `start_index: usize` parameter instead of `opening_location: Location`:
+    - `parser::Lexer::command_substitution`
 
 ### Removed
 
