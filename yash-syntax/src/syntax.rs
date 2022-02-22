@@ -449,7 +449,7 @@ pub enum TextUnit {
     Arith {
         /// Expression that is to be evaluated.
         content: Text,
-        /// Location of the initial `$` character of this command substitution.
+        /// Position of this arithmetic expansion in the source code.
         location: Location,
     },
 }
