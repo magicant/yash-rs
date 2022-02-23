@@ -54,26 +54,23 @@ impl Lexer<'_> {
     /// The initial `$` must have been consumed before calling this function.
     /// This functions checks if the next character is a valid POSIXly-portable
     /// parameter name. If so, the name is consumed and returned. Otherwise, no
-    /// characters are consumed and the return value is `Ok(Err(location))`.
+    /// characters are consumed and the return value is `Ok(None)`.
     ///
     /// The `location` parameter should be the location of the initial `$`. It
     /// is used to construct the result, but this function does not check if it
     /// actually is a location of `$`.
-    pub async fn raw_param(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<TextUnit, Location>> {
+    pub async fn raw_param(&mut self, location: Location) -> Result<Option<TextUnit>> {
         if let Some(c) = self.consume_char_if(is_single_char_name).await? {
             let name = c.value.to_string();
-            Ok(Ok(TextUnit::RawParam { name, location }))
+            Ok(Some(TextUnit::RawParam { name, location }))
         } else if let Some(c) = self.consume_char_if(is_portable_name_char).await? {
             let mut name = c.value.to_string();
             while let Some(c) = self.consume_char_if(is_portable_name_char).await? {
                 name.push(c.value);
             }
-            Ok(Ok(TextUnit::RawParam { name, location }))
+            Ok(Some(TextUnit::RawParam { name, location }))
         } else {
-            Ok(Err(location))
+            Ok(None)
         }
     }
 }
@@ -157,13 +154,7 @@ mod tests {
     fn lexer_raw_param_not_parameter() {
         let mut lexer = Lexer::from_memory(";", Source::Unknown);
         let location = Location::dummy("X");
-
-        let location = block_on(lexer.raw_param(location)).unwrap().unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "X");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.range, 0..1);
-
+        assert_eq!(block_on(lexer.raw_param(location)), Ok(None));
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 }
