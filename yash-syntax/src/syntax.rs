@@ -336,7 +336,7 @@ pub struct Param {
     // TODO index
     /// Modifier.
     pub modifier: Modifier,
-    /// Location of the initial `$` character of this parameter expansion.
+    /// Position of this parameter expansion in the source code.
     pub location: Location,
 }
 

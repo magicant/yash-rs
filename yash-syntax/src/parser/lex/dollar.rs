@@ -36,12 +36,12 @@ impl WordLexer<'_, '_> {
             Some(c) => c.location.clone(),
         };
 
-        let location = match self.raw_param(location).await? {
+        let _location = match self.raw_param(location).await? {
             Ok(result) => return Ok(Some(result)),
             Err(location) => location,
         };
 
-        if let Some(result) = self.braced_param(location).await? {
+        if let Some(result) = self.braced_param(start_index).await? {
             return Ok(Some(TextUnit::BracedParam(result)));
         };
 
