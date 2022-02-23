@@ -20,7 +20,6 @@ use super::core::Lexer;
 use super::core::Token;
 use super::core::TokenId;
 use crate::parser::core::Result;
-use crate::source::Location;
 use crate::syntax::Literal;
 use crate::syntax::Unquoted;
 use crate::syntax::Word;
@@ -286,7 +285,6 @@ pub fn is_operator_char(c: char) -> bool {
 /// Return type for [`Lexer::operator_tail`]
 struct OperatorTail {
     pub operator: Operator,
-    pub location: Location,
     pub reversed_key: Vec<char>,
 }
 
@@ -311,21 +309,11 @@ impl Lexer<'_> {
             };
 
             let old_index = self.index();
-            let location = self.location().await?.clone();
             self.consume_char();
 
-            if let Some(OperatorTail {
-                operator,
-                location: _,
-                mut reversed_key,
-            }) = self.operator_tail(edge.next).await?
-            {
-                reversed_key.push(c);
-                return Ok(Some(OperatorTail {
-                    operator,
-                    location,
-                    reversed_key,
-                }));
+            if let Some(mut operator_tail) = self.operator_tail(edge.next).await? {
+                operator_tail.reversed_key.push(c);
+                return Ok(Some(operator_tail));
             }
 
             match edge.value {
@@ -335,7 +323,6 @@ impl Lexer<'_> {
                 }
                 Some(operator) => Ok(Some(OperatorTail {
                     operator,
-                    location,
                     reversed_key: vec![c],
                 })),
             }
@@ -349,7 +336,6 @@ impl Lexer<'_> {
             o.map(|ot| {
                 let OperatorTail {
                     operator,
-                    location,
                     reversed_key,
                 } = ot;
                 let units = reversed_key
@@ -357,6 +343,7 @@ impl Lexer<'_> {
                     .rev()
                     .map(|c| Unquoted(Literal(c)))
                     .collect::<Vec<_>>();
+                let location = self.location_range(index..self.index());
                 let word = Word { units, location };
                 let id = TokenId::Operator(operator);
                 Token { word, id, index }
