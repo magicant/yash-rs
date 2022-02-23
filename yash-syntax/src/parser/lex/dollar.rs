@@ -31,23 +31,19 @@ impl WordLexer<'_, '_> {
     /// characters are consumed and the return value is `Ok(None)`.
     pub async fn dollar_unit(&mut self) -> Result<Option<TextUnit>> {
         let start_index = self.index();
-        let location = match self.consume_char_if(|c| c == '$').await? {
-            None => return Ok(None),
-            Some(c) => c.location.clone(),
-        };
+        if !self.skip_if(|c| c == '$').await? {
+            return Ok(None);
+        }
 
-        if let Some(result) = self.raw_param(location).await? {
+        if let Some(result) = self.raw_param(start_index).await? {
             return Ok(Some(result));
-        };
-
+        }
         if let Some(result) = self.braced_param(start_index).await? {
             return Ok(Some(TextUnit::BracedParam(result)));
-        };
-
+        }
         if let Some(result) = self.arithmetic_expansion(start_index).await? {
             return Ok(Some(result));
         }
-
         if let Some(result) = self.command_substitution(start_index).await? {
             return Ok(Some(result));
         }

@@ -424,7 +424,7 @@ pub enum TextUnit {
     RawParam {
         /// Parameter name.
         name: String,
-        /// Location of the initial `$` character of this parameter expansion.
+        /// Position of this parameter expansion in the source code.
         location: Location,
     },
     /// Parameter expansion that is enclosed in braces.

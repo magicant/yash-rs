@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The following functions now taking the `start_index: usize` parameter instead of `opening_location: Location`:
     - `parser::lex::Lexer::arithmetic_expansion`
     - `parser::lex::Lexer::command_substitution`
+    - `parser::lex::Lexer::raw_param`
     - `parser::lex::WordLexer::braced_param`
 - The following functions now returning `Result<Option<TextUnit>>` instead of `Result<Result<TextUnit, Location>>`:
     - `parser::lex::Lexer::arithmetic_expansion`
