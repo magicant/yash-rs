@@ -41,9 +41,8 @@ impl WordLexer<'_, '_> {
             Err(location) => location,
         };
 
-        let _location = match self.braced_param(location).await? {
-            Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
-            Err(location) => location,
+        if let Some(result) = self.braced_param(location).await? {
+            return Ok(Some(TextUnit::BracedParam(result)));
         };
 
         if let Some(result) = self.arithmetic_expansion(start_index).await? {
