@@ -309,9 +309,8 @@ impl<'a> LexerCore<'a> {
             end
         );
 
-        let original = self.source[begin].location.clone();
         let source = Source::Alias {
-            original,
+            original: self.location_range(begin..end),
             alias: alias.clone(),
         };
         let code = Rc::new(Code {

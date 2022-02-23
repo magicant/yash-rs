@@ -45,10 +45,10 @@ pub enum Source {
     /// Alias substitution.
     ///
     /// This applies to a code fragment that replaced another as a result of alias substitution.
-    ///
-    /// `original` is the location of the original word that was replaced.
     Alias {
+        /// Position of the original word that was replaced
         original: Location,
+        /// Definition of the alias that was substituted
         alias: Rc<Alias>,
     },
 
