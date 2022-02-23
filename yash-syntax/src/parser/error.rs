@@ -235,7 +235,7 @@ impl SyntaxError {
             | MissingCommandAfterBar => "expected a command",
             InvalidForValue | MissingCaseSubject | InvalidCaseSubject | MissingPattern
             | InvalidPattern => "expected a word",
-            InvalidModifier => "unexpected character",
+            InvalidModifier => "broken modifier",
             MultipleModifier => "conflicting modifier",
             UnclosedSingleQuote { .. } => "expected `'`",
             UnclosedDoubleQuote { .. } => "expected `\"`",
