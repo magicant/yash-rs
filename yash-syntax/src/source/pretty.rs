@@ -185,10 +185,9 @@ mod annotate_snippets_support {
                     .try_into()
                     .unwrap_or(usize::MAX);
                 let value = &annotation.code;
-                let index = annotation.location.index;
-                let index = index.min(value.chars().count().saturating_sub(1));
+                let range = &annotation.location.range;
                 let annotation = snippet::SourceAnnotation {
-                    range: (index, index + 1),
+                    range: (range.start, range.end),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
                 };
@@ -246,7 +245,7 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[0].line_start, 1);
         assert_eq!(snippet.slices[0].origin, Some("<?>"));
         assert_eq!(snippet.slices[0].annotations.len(), 1);
-        assert_eq!(snippet.slices[0].annotations[0].range, (0, 1));
+        assert_eq!(snippet.slices[0].annotations[0].range, (0, 11));
         assert_eq!(snippet.slices[0].annotations[0].label, "my label");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
@@ -260,12 +259,14 @@ mod annotate_snippets_support {
         use std::num::NonZeroU64;
         use std::rc::Rc;
 
-        let code = Rc::new(Code {
-            value: "".to_string().into(),
-            start_line_number: NonZeroU64::new(128).unwrap(),
-            source: Source::Unknown,
-        });
-        let location = Location { code, index: 42 };
+        let location = Location {
+            code: Rc::new(Code {
+                value: "".to_string().into(),
+                start_line_number: NonZeroU64::new(128).unwrap(),
+                source: Source::Unknown,
+            }),
+            range: 42..123,
+        };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
@@ -278,27 +279,14 @@ mod annotate_snippets_support {
     #[test]
     fn from_message_non_default_range() {
         let mut location = Location::dummy("my location");
-        location.index = 6;
+        location.range = 6..9;
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "".into(),
             annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
         };
         let snippet = Snippet::from(&message);
-        assert_eq!(snippet.slices[0].annotations[0].range, (6, 7));
-    }
-
-    #[test]
-    fn from_message_range_overflow() {
-        let mut location = Location::dummy("my location");
-        location.index = 11;
-        let message = Message {
-            r#type: AnnotationType::Warning,
-            title: "".into(),
-            annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
-        };
-        let snippet = Snippet::from(&message);
-        assert_eq!(snippet.slices[0].annotations[0].range, (10, 11));
+        assert_eq!(snippet.slices[0].annotations[0].range, (6, 9));
     }
 
     #[test]
@@ -318,7 +306,7 @@ mod annotate_snippets_support {
             start_line_number: NonZeroU64::new(10).unwrap(),
             source: Source::Alias { original, alias },
         });
-        let location = Location { code, index: 4 };
+        let location = Location { code, range: 4..9 };
         let message = Message {
             r#type: AnnotationType::Warning,
             title: "my title".into(),
@@ -354,7 +342,7 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices.len(), 2, "{:?}", snippet.slices);
         assert_eq!(snippet.slices[0].source, "my location 1");
         assert_eq!(snippet.slices[0].annotations.len(), 1);
-        assert_eq!(snippet.slices[0].annotations[0].range, (0, 1));
+        assert_eq!(snippet.slices[0].annotations[0].range, (0, 13));
         assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
@@ -362,7 +350,7 @@ mod annotate_snippets_support {
         );
         assert_eq!(snippet.slices[1].source, "my location 2");
         assert_eq!(snippet.slices[1].annotations.len(), 1);
-        assert_eq!(snippet.slices[1].annotations[0].range, (0, 1));
+        assert_eq!(snippet.slices[1].annotations[0].range, (0, 13));
         assert_eq!(snippet.slices[1].annotations[0].label, "my label 2");
         assert_eq!(
             snippet.slices[1].annotations[0].annotation_type,
@@ -374,7 +362,7 @@ mod annotate_snippets_support {
     fn from_message_two_annotations_same_slice() {
         let location_1 = Location::dummy("my location");
         let location_3 = Location {
-            index: 2,
+            range: 2..4,
             ..location_1.clone()
         };
         let message = Message {
@@ -393,13 +381,13 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
         assert_eq!(snippet.slices[0].source, "my location");
         assert_eq!(snippet.slices[0].annotations.len(), 2);
-        assert_eq!(snippet.slices[0].annotations[0].range, (2, 3));
+        assert_eq!(snippet.slices[0].annotations[0].range, (2, 4));
         assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
             snippet::AnnotationType::Info
         );
-        assert_eq!(snippet.slices[0].annotations[1].range, (0, 1));
+        assert_eq!(snippet.slices[0].annotations[1].range, (0, 11));
         assert_eq!(snippet.slices[0].annotations[1].label, "my label 2");
         assert_eq!(
             snippet.slices[0].annotations[1].annotation_type,

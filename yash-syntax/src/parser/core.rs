@@ -733,7 +733,7 @@ mod tests {
 
             let location = lexer.location().await.unwrap();
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..1);
         })
     }
 
@@ -759,7 +759,7 @@ mod tests {
 
             let location = lexer.location().await.unwrap();
             assert_eq!(location.code.start_line_number.get(), 1);
-            assert_eq!(location.index, 4);
+            assert_eq!(location.range, 4..5);
         })
     }
 

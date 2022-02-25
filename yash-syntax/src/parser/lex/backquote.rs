@@ -59,7 +59,8 @@ impl WordLexer<'_, '_> {
     /// another backslash. If `self.context` is `Text`, double quotes can also
     /// be backslash-escaped.
     pub async fn backquote(&mut self) -> Result<Option<TextUnit>> {
-        let location = match self.consume_char_if(|c| c == '`').await? {
+        let start = self.index();
+        let opening_location = match self.consume_char_if(|c| c == '`').await? {
             None => return Ok(None),
             Some(c) => c.location.clone(),
         };
@@ -70,9 +71,9 @@ impl WordLexer<'_, '_> {
         }
 
         if self.skip_if(|c| c == '`').await? {
+            let location = self.location_range(start..self.index());
             Ok(Some(TextUnit::Backquote { content, location }))
         } else {
-            let opening_location = location;
             let cause = SyntaxError::UnclosedBackquote { opening_location }.into();
             let location = self.location().await?.clone();
             Err(Error { cause, location })
@@ -110,7 +111,7 @@ mod tests {
         let result = block_on(lexer.backquote()).unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(content, []);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -134,7 +135,7 @@ mod tests {
                     BackquoteUnit::Literal('o')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..6);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -163,7 +164,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..15);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -193,7 +194,7 @@ mod tests {
                     BackquoteUnit::Literal('\'')
                 ]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..15);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -212,7 +213,7 @@ mod tests {
                 content,
                 [BackquoteUnit::Literal('a'), BackquoteUnit::Literal('b')]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..12);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -231,12 +232,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "`");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "`");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 1..1);
     }
 
     #[test]
@@ -251,11 +252,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "`foo");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..1);
         });
         assert_eq!(*e.location.code.value.borrow(), "`foo");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 4);
+        assert_eq!(e.location.range, 4..4);
     }
 }

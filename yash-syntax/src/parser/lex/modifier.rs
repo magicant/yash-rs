@@ -34,15 +34,18 @@ use std::future::Future;
 use std::pin::Pin;
 
 impl Lexer<'_> {
-    async fn invalid_modifier(&mut self) -> Result<Modifier> {
+    /// Returns an invalid modifier error.
+    ///
+    /// The `start_index` must be the index of the first character of the modifier.
+    fn invalid_modifier(&mut self, start_index: usize) -> Result<Modifier> {
         let cause = SyntaxError::InvalidModifier.into();
-        let location = self.location().await?.clone();
+        let location = self.location_range(start_index..self.index());
         Err(Error { cause, location })
     }
 
-    async fn suffix_modifier_not_found(&mut self, colon: bool) -> Result<Modifier> {
+    fn suffix_modifier_not_found(&mut self, start_index: usize, colon: bool) -> Result<Modifier> {
         if colon {
-            self.invalid_modifier().await
+            self.invalid_modifier(start_index)
         } else {
             Ok(Modifier::None)
         }
@@ -52,12 +55,12 @@ impl Lexer<'_> {
     ///
     /// This function blindly consumes the current character, which must be
     /// `symbol`.
-    async fn trim(&mut self, colon: bool, symbol: char) -> Result<Modifier> {
+    async fn trim(&mut self, start_index: usize, colon: bool, symbol: char) -> Result<Modifier> {
+        self.consume_char();
         if colon {
-            return self.invalid_modifier().await;
+            return self.invalid_modifier(start_index);
         }
 
-        self.consume_char();
         let side = match symbol {
             '#' => TrimSide::Prefix,
             '%' => TrimSide::Suffix,
@@ -133,16 +136,17 @@ impl WordLexer<'_, '_> {
     /// `` ` ``, `\` and `}` can be escaped and single quotes are not recognized
     /// in the word.
     pub async fn suffix_modifier(&mut self) -> Result<Modifier> {
+        let start_index = self.index();
         let colon = self.skip_if(|c| c == ':').await?;
 
         if let Some(symbol) = self.peek_char().await? {
             match symbol {
                 '+' | '-' | '=' | '?' => self.switch(colon, symbol).await,
-                '#' | '%' => self.trim(colon, symbol).await,
-                _ => self.suffix_modifier_not_found(colon).await,
+                '#' | '%' => self.trim(start_index, colon, symbol).await,
+                _ => self.suffix_modifier_not_found(start_index, colon),
             }
         } else {
-            self.suffix_modifier_not_found(colon).await
+            self.suffix_modifier_not_found(start_index, colon)
         }
     }
 }
@@ -198,7 +202,7 @@ mod tests {
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "+}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(switch.word.location.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -226,7 +230,7 @@ mod tests {
                 ]
             );
             assert_eq!(*switch.word.location.code.value.borrow(), "+a  z}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(switch.word.location.range, 1..5);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -246,7 +250,7 @@ mod tests {
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), ":+}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(switch.word.location.range, 2..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -266,7 +270,7 @@ mod tests {
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "-}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(switch.word.location.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -294,7 +298,7 @@ mod tests {
                 ]
             );
             assert_eq!(*switch.word.location.code.value.borrow(), ":-cool}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(switch.word.location.range, 2..6);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -314,7 +318,7 @@ mod tests {
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), ":=}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(switch.word.location.range, 2..2);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -341,7 +345,7 @@ mod tests {
                 ]
             );
             assert_eq!(*switch.word.location.code.value.borrow(), "=Yes}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(switch.word.location.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -361,7 +365,7 @@ mod tests {
             assert_eq!(switch.condition, SwitchCondition::Unset);
             assert_eq!(switch.word.units, []);
             assert_eq!(*switch.word.location.code.value.borrow(), "?}");
-            assert_eq!(switch.word.location.index, 1);
+            assert_eq!(switch.word.location.range, 1..1);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -387,7 +391,7 @@ mod tests {
                 ]
             );
             assert_eq!(*switch.word.location.code.value.borrow(), ":?No}");
-            assert_eq!(switch.word.location.index, 2);
+            assert_eq!(switch.word.location.range, 2..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -438,7 +442,7 @@ mod tests {
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
             assert_eq!(*trim.pattern.location.code.value.borrow(), "#'*'}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(trim.pattern.location.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -458,7 +462,7 @@ mod tests {
             assert_eq!(trim.length, TrimLength::Shortest);
             assert_eq!(trim.pattern.units, [WordUnit::SingleQuote("*".to_string())]);
             assert_eq!(*trim.pattern.location.code.value.borrow(), "#'*'}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(trim.pattern.location.range, 1..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -481,7 +485,7 @@ mod tests {
                 assert_eq!(units[..], [TextUnit::Literal('?')]);
             });
             assert_eq!(*trim.pattern.location.code.value.borrow(), r#"##"?"}"#);
-            assert_eq!(trim.pattern.location.index, 2);
+            assert_eq!(trim.pattern.location.range, 2..5);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -504,7 +508,7 @@ mod tests {
                 [WordUnit::Unquoted(TextUnit::Backslashed('%'))]
             );
             assert_eq!(*trim.pattern.location.code.value.borrow(), r"%\%}");
-            assert_eq!(trim.pattern.location.index, 1);
+            assert_eq!(trim.pattern.location.range, 1..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -527,7 +531,7 @@ mod tests {
                 [WordUnit::Unquoted(TextUnit::Literal('%'))]
             );
             assert_eq!(*trim.pattern.location.code.value.borrow(), "%%%}");
-            assert_eq!(trim.pattern.location.index, 2);
+            assert_eq!(trim.pattern.location.range, 2..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
@@ -558,7 +562,7 @@ mod tests {
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":");
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 0..1);
     }
 
     #[test]
@@ -572,7 +576,7 @@ mod tests {
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":x}");
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 0..1);
     }
 
     #[test]
@@ -586,6 +590,6 @@ mod tests {
         let e = block_on(lexer.suffix_modifier()).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":#}");
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 0..2);
     }
 }

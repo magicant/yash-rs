@@ -36,6 +36,7 @@ use std::future::Future;
 use std::num::NonZeroU64;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::ops::Range;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::slice::SliceIndex;
@@ -167,7 +168,7 @@ impl<'a> LexerCore<'a> {
                         // End of input
                         self.state = InputState::EndOfInput(Location {
                             code: Rc::clone(&self.raw_code),
-                            index: self.index,
+                            range: self.index..self.index,
                         });
                     } else {
                         // Successful read
@@ -181,7 +182,7 @@ impl<'a> LexerCore<'a> {
                         cause: io_error.into(),
                         location: Location {
                             code: Rc::clone(&self.raw_code),
-                            index: self.index,
+                            range: self.index..self.index,
                         },
                     });
                 }
@@ -278,6 +279,26 @@ impl<'a> LexerCore<'a> {
         self.source[i].iter().map(|c| c.value).collect()
     }
 
+    /// Returns a location for a given range of the source code.
+    #[must_use]
+    fn location_range(&self, range: Range<usize>) -> Location {
+        if range.start == self.source.len() {
+            if let InputState::EndOfInput(ref location) = self.state {
+                return location.clone();
+            }
+        }
+        let start = &self.peek_char_at(range.start).location;
+        let code = start.code.clone();
+        let end = range
+            .map(|index| &self.peek_char_at(index).location)
+            .take_while(|location| location.code == code)
+            .last()
+            .map(|location| location.range.end)
+            .unwrap_or(start.range.start);
+        let range = start.range.start..end;
+        Location { code, range }
+    }
+
     /// Performs alias substitution.
     fn substitute_alias(&mut self, begin: usize, alias: &Rc<Alias>) {
         let end = self.index;
@@ -288,9 +309,8 @@ impl<'a> LexerCore<'a> {
             end
         );
 
-        let original = self.source[begin].location.clone();
         let source = Source::Alias {
-            original,
+            original: self.location_range(begin..end),
             alias: alias.clone(),
         };
         let code = Rc::new(Code {
@@ -455,6 +475,9 @@ impl<'a> Lexer<'a> {
     /// and a newline are silently skipped before returning the next character.
     /// Call [`disable_line_continuation`](Self::disable_line_continuation) to
     /// switch off line continuation recognition.
+    ///
+    /// This function requires a mutable reference to `self` since it may need
+    /// to read the next line if needed.
     pub async fn peek_char(&mut self) -> Result<Option<char>> {
         while self.line_continuation().await? {}
 
@@ -469,8 +492,8 @@ impl<'a> Lexer<'a> {
     /// If there is no more character (that is, it is the end of input), an imaginary location
     /// is returned that would be returned if a character existed.
     ///
-    /// This function requires a mutable reference to `self` since it may need to read a next
-    /// line if it is not yet read.
+    /// This function requires a mutable reference to `self` since it needs to
+    /// [peek](Self::peek_char) the next character.
     pub async fn location(&mut self) -> Result<&Location> {
         self.core.peek_char().await.map(|p| p.location())
     }
@@ -597,6 +620,27 @@ impl<'a> Lexer<'a> {
         I: SliceIndex<[SourceChar], Output = [SourceChar]>,
     {
         self.core.source_string(i)
+    }
+
+    /// Returns a location for a given range of the source code.
+    ///
+    /// All the characters in the range must have been
+    /// [consume](Self::consume_char)d. If the range refers to an unconsumed
+    /// character, this function will panic!
+    ///
+    /// If the characters are from more than one [`Code`] fragment, the location
+    /// will only cover the initial portion of the range sharing the same
+    /// `Code`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the range refers to an unconsumed character.
+    ///
+    /// If the start index of the range is the end of input, it must have been
+    /// peeked and the range must be empty, or the function will panic.
+    #[must_use]
+    pub fn location_range(&self, range: Range<usize>) -> Location {
+        self.core.location_range(range)
     }
 
     /// Performs alias substitution right before the current position.
@@ -739,7 +783,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "");
             assert_eq!(location.code.start_line_number, line);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..0);
         });
     }
 
@@ -769,7 +813,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "");
         assert_eq!(e.location.code.start_line_number, line);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 0);
+        assert_eq!(e.location.range, 0..0);
     }
 
     #[test]
@@ -784,14 +828,14 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.index, 0);
+            assert_eq!(c.location.range, 0..1);
         });
         assert_matches!(result, Ok(PeekChar::Char(c)) => {
             assert_eq!(c.value, 'a');
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.index, 0);
+            assert_eq!(c.location.range, 0..1);
         });
         lexer.consume_char();
 
@@ -801,7 +845,7 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "a\n");
             assert_eq!(c.location.code.start_line_number, line);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.index, 1);
+            assert_eq!(c.location.range, 1..2);
         });
         lexer.consume_char();
 
@@ -811,7 +855,7 @@ mod tests {
             assert_eq!(*c.location.code.value.borrow(), "a\nb");
             assert_eq!(c.location.code.start_line_number.get(), 1);
             assert_eq!(c.location.code.source, Source::Unknown);
-            assert_eq!(c.location.index, 2);
+            assert_eq!(c.location.range, 2..3);
         });
         lexer.consume_char();
 
@@ -820,7 +864,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "a\nb");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 3);
+            assert_eq!(location.range, 3..3);
         });
     }
 
@@ -895,7 +939,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "abc");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.index, 0);
+                assert_eq!(c.location.range, 0..1);
             });
         });
     }
@@ -967,10 +1011,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 0);
+                assert_eq!(c.location.range, 0..1);
             });
             lexer.consume_char();
 
@@ -983,10 +1027,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 1);
+                assert_eq!(c.location.range, 1..2);
             });
             lexer.consume_char();
 
@@ -999,10 +1043,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), "a b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 0);
+                    assert_eq!(original.range, 0..1);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 2);
+                assert_eq!(c.location.range, 2..3);
             });
             lexer.consume_char();
 
@@ -1011,7 +1055,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "a b");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.index, 1);
+                assert_eq!(c.location.range, 1..2);
             });
             lexer.consume_char();
         });
@@ -1046,10 +1090,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 0);
+                assert_eq!(c.location.range, 0..1);
             });
             lexer.consume_char();
 
@@ -1062,10 +1106,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 1);
+                assert_eq!(c.location.range, 1..2);
             });
             lexer.consume_char();
 
@@ -1077,10 +1121,10 @@ mod tests {
                     assert_eq!(*original.code.value.borrow(), " foo b");
                     assert_eq!(original.code.start_line_number, line);
                     assert_eq!(original.code.source, Source::Unknown);
-                    assert_eq!(original.index, 1);
+                    assert_eq!(original.range, 1..4);
                     assert_eq!(alias2, &alias);
                 });
-                assert_eq!(c.location.index, 2);
+                assert_eq!(c.location.range, 2..3);
             });
             lexer.consume_char();
 
@@ -1089,7 +1133,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), " foo b");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.index, 4);
+                assert_eq!(c.location.range, 4..5);
             });
             lexer.consume_char();
         });
@@ -1118,7 +1162,7 @@ mod tests {
                 assert_eq!(*c.location.code.value.borrow(), "x ");
                 assert_eq!(c.location.code.start_line_number, line);
                 assert_eq!(c.location.code.source, Source::Unknown);
-                assert_eq!(c.location.index, 1);
+                assert_eq!(c.location.range, 1..2);
             });
         });
     }
@@ -1239,11 +1283,11 @@ mod tests {
             assert_eq!(*location_1.code.value.borrow(), " \n\n");
             assert_eq!(location_1.code.start_line_number.get(), 1);
             assert_eq!(location_1.code.source, Source::Unknown);
-            assert_eq!(location_1.index, 0);
+            assert_eq!(location_1.range, 0..1);
             assert_eq!(*location_2.code.value.borrow(), "\t\n");
             assert_eq!(location_2.code.start_line_number.get(), 3);
             assert_eq!(location_2.code.source, Source::Unknown);
-            assert_eq!(location_2.index, 1);
+            assert_eq!(location_2.range, 1..2);
         });
     }
 
@@ -1264,7 +1308,7 @@ mod tests {
         assert_eq!(*c.location.code.value.borrow(), "word\n");
         assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
-        assert_eq!(c.location.index, 0);
+        assert_eq!(c.location.range, 0..1);
 
         let mut called = 0;
         let r = block_on(lexer.consume_char_if(|c| {
@@ -1297,7 +1341,7 @@ mod tests {
         assert_eq!(*c.location.code.value.borrow(), "word\n");
         assert_eq!(c.location.code.start_line_number.get(), 1);
         assert_eq!(c.location.code.source, Source::Unknown);
-        assert_eq!(c.location.index, 1);
+        assert_eq!(c.location.range, 1..2);
 
         block_on(lexer.consume_char_if(|c| {
             assert_eq!(c, 'r');
@@ -1326,6 +1370,101 @@ mod tests {
     }
 
     #[test]
+    fn lexer_location_range_with_empty_range() {
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        let location = lexer.location_range(0..0);
+        assert_eq!(*location.code.value.borrow(), "");
+        assert_eq!(location.code.start_line_number.get(), 1);
+        assert_eq!(location.code.source, Source::Unknown);
+        assert_eq!(location.range, 0..0);
+    }
+
+    #[test]
+    fn lexer_location_range_with_nonempty_range() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory("cat foo", Source::Stdin);
+            for _ in 0..4 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.peek_char().await.unwrap();
+
+            let location = lexer.location_range(1..4);
+            assert_eq!(*location.code.value.borrow(), "cat foo");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Stdin);
+            assert_eq!(location.range, 1..4);
+        })
+    }
+
+    #[test]
+    fn lexer_location_range_with_range_starting_at_end() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory("cat", Source::Stdin);
+            for _ in 0..3 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.peek_char().await.unwrap();
+
+            let location = lexer.location_range(3..3);
+            assert_eq!(*location.code.value.borrow(), "cat");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Stdin);
+            assert_eq!(location.range, 3..3);
+        })
+    }
+
+    #[test]
+    #[should_panic]
+    fn lexer_location_range_with_unconsumed_code() {
+        let lexer = Lexer::from_memory("echo ok", Source::Unknown);
+        let _ = lexer.location_range(0..0);
+    }
+
+    #[test]
+    #[should_panic(expected = "The index 1 must not be larger than the current index 0")]
+    fn lexer_location_range_with_range_out_of_bounds() {
+        let lexer = Lexer::from_memory("", Source::Unknown);
+        let _ = lexer.location_range(1..2);
+    }
+
+    #[test]
+    fn lexer_location_range_with_alias_substitution() {
+        block_on(async {
+            let mut lexer = Lexer::from_memory(" a;", Source::Unknown);
+            let alias_def = Rc::new(Alias {
+                name: "a".to_string(),
+                replacement: "abc".to_string(),
+                global: false,
+                origin: Location::dummy("dummy"),
+            });
+            for _ in 0..2 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+            lexer.substitute_alias(1, &alias_def);
+            for _ in 1..5 {
+                lexer.peek_char().await.unwrap();
+                lexer.consume_char();
+            }
+
+            let location = lexer.location_range(2..5);
+            assert_eq!(*location.code.value.borrow(), "abc");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_matches!(&location.code.source, Source::Alias { original, alias } => {
+                assert_eq!(*original.code.value.borrow(), " a;");
+                assert_eq!(original.code.start_line_number.get(), 1);
+                assert_eq!(original.code.source, Source::Unknown);
+                assert_eq!(original.range, 1..2);
+                assert_eq!(alias, &alias_def);
+            });
+            assert_eq!(location.range, 1..3);
+        })
+    }
+
+    #[test]
     fn lexer_inner_program_success() {
         let mut lexer = Lexer::from_memory("x y )", Source::Unknown);
         let source = block_on(lexer.inner_program()).unwrap();
@@ -1343,6 +1482,6 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "<< )");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.range, 3..4);
     }
 }

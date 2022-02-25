@@ -235,7 +235,7 @@ impl SyntaxError {
             | MissingCommandAfterBar => "expected a command",
             InvalidForValue | MissingCaseSubject | InvalidCaseSubject | MissingPattern
             | InvalidPattern => "expected a word",
-            InvalidModifier => "unexpected character",
+            InvalidModifier => "broken modifier",
             MultipleModifier => "conflicting modifier",
             UnclosedSingleQuote { .. } => "expected `'`",
             UnclosedDoubleQuote { .. } => "expected `\"`",
@@ -470,7 +470,7 @@ mod tests {
             start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location { code, index: 0 };
+        let location = Location { code, range: 0..42 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,
@@ -488,7 +488,7 @@ mod tests {
             start_line_number: NonZeroU64::new(1).unwrap(),
             source: Source::Unknown,
         });
-        let location = Location { code, index: 0 };
+        let location = Location { code, range: 0..42 };
         let error = Error {
             cause: SyntaxError::MissingHereDocDelimiter.into(),
             location,

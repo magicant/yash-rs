@@ -148,12 +148,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "while :");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..5);
         });
         assert_eq!(*e.location.code.value.borrow(), "while :");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 7);
+        assert_eq!(e.location.range, 7..7);
     }
 
     #[test]
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), " while do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 7);
+        assert_eq!(e.location.range, 7..9);
     }
 
     #[test]
@@ -243,12 +243,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "until :");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..5);
         });
         assert_eq!(*e.location.code.value.borrow(), "until :");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 7);
+        assert_eq!(e.location.range, 7..7);
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "  until do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 8);
+        assert_eq!(e.location.range, 8..10);
     }
 
     #[test]

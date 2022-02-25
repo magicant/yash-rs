@@ -174,7 +174,7 @@ mod tests {
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "END\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.index, 4);
+        assert_eq!(location.range, 4..5);
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.index, 12);
+        assert_eq!(location.range, 12..13);
     }
 
     #[test]
@@ -206,7 +206,7 @@ mod tests {
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.index, 18);
+        assert_eq!(location.range, 18..19);
     }
 
     #[test]
@@ -287,7 +287,7 @@ END
         let location = block_on(lexer.location()).unwrap();
         assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
         assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.index, 12);
+        assert_eq!(location.range, 12..13);
     }
 
     #[test]
@@ -301,11 +301,11 @@ END
             assert_eq!(*redir_op_location.code.value.borrow(), "END");
             assert_eq!(redir_op_location.code.start_line_number.get(), 1);
             assert_eq!(redir_op_location.code.source, Source::Unknown);
-            assert_eq!(redir_op_location.index, 0);
+            assert_eq!(redir_op_location.range, 0..3);
         });
         assert_eq!(*e.location.code.value.borrow(), "");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 0);
+        assert_eq!(e.location.range, 0..0);
     }
 }

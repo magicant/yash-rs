@@ -5,18 +5,41 @@ All notable changes to `yash-syntax` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - ????-??-??
+
+### Added
+
+- `parser::lex::Lexer::location_range`
+
+### Changed
+
+- `source::Location::index: usize` replaced with `range: Range<usize>`
+- The following functions now taking the `start_index: usize` parameter instead of `opening_location: Location`:
+    - `parser::lex::Lexer::arithmetic_expansion`
+    - `parser::lex::Lexer::command_substitution`
+    - `parser::lex::Lexer::raw_param`
+    - `parser::lex::WordLexer::braced_param`
+- The following functions now returning `Result<Option<TextUnit>>` instead of `Result<Result<TextUnit, Location>>`:
+    - `parser::lex::Lexer::arithmetic_expansion`
+    - `parser::lex::Lexer::raw_param`
+    - `parser::lex::WordLexer::braced_param`
+
+### Removed
+
+- `source::Location::advance`
+
 ## [0.3.0] - 2022-02-06
 
 This version simplifies type definitions for the abstract syntax tree (AST);
 `syntax::HereDoc::content` is now wrapped in `RefCell` to remove generic type
-parameters from `RedirBody` and other AST types. 
+parameters from `RedirBody` and other AST types.
 
 ### Changed
 
 - `source::Source` now `non_exhaustive`
 - `syntax::HereDoc::content` redefined as `RefCell<Text>` (previously `Text`)
 - `impl From<HereDoc> for RedirBody` replaced with `impl<T: Into<Rc<HereDoc>>> From<T> for RedirBody`
-- `parser::Lexer::here_doc_content` now taking a `&HereDoc` parameter and returning `Result<()>`
+- `parser::lex::Lexer::here_doc_content` now taking a `&HereDoc` parameter and returning `Result<()>`
 - `parser::Parser::memorize_unread_here_doc` now taking an `Rc<HereDoc>` parameter
 
 ### Removed

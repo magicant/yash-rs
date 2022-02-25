@@ -22,7 +22,6 @@ use super::raw_param::is_special_parameter_char;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
-use crate::source::Location;
 use crate::syntax::Modifier;
 use crate::syntax::Param;
 
@@ -87,18 +86,17 @@ impl WordLexer<'_, '_> {
     /// This functions checks if the next character is an opening brace. If so,
     /// the following characters are parsed as a parameter expansion up to and
     /// including the closing brace. Otherwise, no characters are consumed and
-    /// the return value is `Ok(Err(location))`.
+    /// the return value is `Ok(None)`.
     ///
-    /// The `location` parameter should be the location of the initial `$`. It
-    /// is used to construct the result, but this function does not check if it
-    /// actually is a location of `$`.
-    pub async fn braced_param(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<Param, Location>> {
+    /// The `start_index` parameter should be the index for the initial `$`. It is
+    /// used to construct the result, but this function does not check if it
+    /// actually points to the `$`.
+    pub async fn braced_param(&mut self, start_index: usize) -> Result<Option<Param>> {
         if !self.skip_if(|c| c == '{').await? {
-            return Ok(Err(location));
+            return Ok(None);
         }
+
+        let opening_location = self.location_range(start_index..self.index());
 
         let has_length_prefix = self.length_prefix().await?;
 
@@ -114,11 +112,11 @@ impl WordLexer<'_, '_> {
             }
             name
         } else if c == '}' {
+            // TODO Consider merging EmptyParam & UnclosedParam into InvalidParamName
             let cause = SyntaxError::EmptyParam.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
         } else {
-            let opening_location = location;
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
@@ -128,7 +126,6 @@ impl WordLexer<'_, '_> {
         let suffix = self.suffix_modifier().await?;
 
         if !self.skip_if(|c| c == '}').await? {
-            let opening_location = location;
             let cause = SyntaxError::UnclosedParam { opening_location }.into();
             let location = self.location().await?.clone();
             return Err(Error { cause, location });
@@ -144,10 +141,10 @@ impl WordLexer<'_, '_> {
             (false, suffix) => suffix,
         };
 
-        Ok(Ok(Param {
+        Ok(Some(Param {
             name,
             modifier,
-            location,
+            location: self.location_range(start_index..self.index()),
         }))
     }
 }
@@ -166,224 +163,274 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
 
-    fn assert_opening_location(location: &Location) {
-        assert_eq!(*location.code.value.borrow(), "$");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-    }
-
     #[test]
-    fn lexer_braced_param_minimum() {
-        let mut lexer = Lexer::from_memory("{@};", Source::Unknown);
+    fn lexer_braced_param_none() {
+        let mut lexer = Lexer::from_memory("$foo", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        assert_eq!(block_on(lexer.braced_param(0)), Ok(None));
+        assert_eq!(block_on(lexer.peek_char()), Ok(Some('f')));
+    }
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+    #[test]
+    fn lexer_braced_param_minimum() {
+        let mut lexer = Lexer::from_memory("${@};", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+        let mut lexer = WordLexer {
+            lexer: &mut lexer,
+            context: WordContext::Word,
+        };
+
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "@");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${@};");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..4);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_braced_param_alphanumeric_name() {
-        let mut lexer = Lexer::from_memory("{foo_123}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("X${foo_123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(1)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "X${foo_123}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 1..11);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_numeric_name() {
-        let mut lexer = Lexer::from_memory("{123}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "123");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${123}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash() {
-        let mut lexer = Lexer::from_memory("{#}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..4);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_missing_name() {
-        let mut lexer = Lexer::from_memory("{};", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.braced_param(location)).unwrap_err();
+        let e = block_on(lexer.braced_param(0)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyParam));
-        assert_eq!(*e.location.code.value.borrow(), "{};");
+        assert_eq!(*e.location.code.value.borrow(), "${};");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 2..3);
     }
 
     #[test]
     fn lexer_braced_param_unclosed_without_name() {
-        let mut lexer = Lexer::from_memory("{;", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${;", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.braced_param(location)).unwrap_err();
+        let e = block_on(lexer.braced_param(0)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
-            assert_opening_location(&opening_location);
+            assert_eq!(*opening_location.code.value.borrow(), "${;");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.range, 0..2);
         });
-        assert_eq!(*e.location.code.value.borrow(), "{;");
+        assert_eq!(*e.location.code.value.borrow(), "${;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 1);
+        assert_eq!(e.location.range, 2..3);
     }
 
     #[test]
     fn lexer_braced_param_unclosed_with_name() {
-        let mut lexer = Lexer::from_memory("{_;", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${_;", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.braced_param(location)).unwrap_err();
+        let e = block_on(lexer.braced_param(0)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedParam { opening_location }) => {
-            assert_opening_location(&opening_location);
+            assert_eq!(*opening_location.code.value.borrow(), "${_;");
+            assert_eq!(opening_location.code.start_line_number.get(), 1);
+            assert_eq!(opening_location.code.source, Source::Unknown);
+            assert_eq!(opening_location.range, 0..2);
         });
-        assert_eq!(*e.location.code.value.borrow(), "{_;");
+        assert_eq!(*e.location.code.value.borrow(), "${_;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 2);
+        assert_eq!(e.location.range, 3..4);
     }
 
     #[test]
     fn lexer_braced_param_length_alphanumeric_name() {
-        let mut lexer = Lexer::from_memory("{#foo_123}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#foo_123}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "foo_123");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#foo_123}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..11);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_length_hash() {
-        let mut lexer = Lexer::from_memory("{##}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${##}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${##}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..5);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_length_question() {
-        let mut lexer = Lexer::from_memory("{#?}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "?");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#?}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..5);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_length_hyphen() {
-        let mut lexer = Lexer::from_memory("{#-}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#-}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "-");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#-}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..5);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_switch_minimum() {
-        let mut lexer = Lexer::from_memory("{x+})", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${x+})", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "x");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
@@ -391,21 +438,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${x+})");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..5);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
 
     #[test]
     fn lexer_braced_param_switch_full() {
-        let mut lexer = Lexer::from_memory("{foo:?'!'})", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${foo:?'!'})", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "foo");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
@@ -413,21 +464,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "'!'");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${foo:?'!'})");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..11);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
     }
 
     #[test]
     fn lexer_braced_param_hash_suffix_alter() {
-        let mut lexer = Lexer::from_memory("{#+?}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#+?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
@@ -435,21 +490,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "?");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#+?}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash_suffix_default() {
-        let mut lexer = Lexer::from_memory("{#--}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#--}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
@@ -457,21 +516,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "-");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#--}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash_suffix_assign() {
-        let mut lexer = Lexer::from_memory("{#=?}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#=?}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Assign);
@@ -479,21 +542,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "?");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#=?}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash_suffix_error() {
-        let mut lexer = Lexer::from_memory("{#??}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#??}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
@@ -501,21 +568,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "?");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#??}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash_suffix_with_colon() {
-        let mut lexer = Lexer::from_memory("{#:-}<", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#:-}<", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
@@ -523,21 +594,25 @@ mod tests {
             assert_eq!(switch.word.to_string(), "");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#:-}<");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_braced_param_hash_with_longest_prefix_trim() {
-        let mut lexer = Lexer::from_memory("{###};", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${###};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
@@ -545,21 +620,25 @@ mod tests {
             assert_eq!(trim.pattern.to_string(), "");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${###};");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..6);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_braced_param_hash_with_suffix_trim() {
-        let mut lexer = Lexer::from_memory("{#%};", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#%};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_matches!(result.modifier, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Suffix);
@@ -567,58 +646,73 @@ mod tests {
             assert_eq!(trim.pattern.to_string(), "");
         });
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#%};");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..5);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_braced_param_multiple_modifier() {
-        let mut lexer = Lexer::from_memory("{#x+};", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#x+};", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.braced_param(location)).unwrap_err();
+        let e = block_on(lexer.braced_param(0)).unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MultipleModifier));
-        assert_eq!(*e.location.code.value.borrow(), "{#x+};");
-        assert_eq!(e.location.index, 3);
+        assert_eq!(*e.location.code.value.borrow(), "${#x+};");
+        assert_eq!(e.location.range, 4..5);
     }
 
     #[test]
     fn lexer_braced_param_line_continuations() {
-        let mut lexer = Lexer::from_memory("{\\\n#\\\n\\\na_\\\n1\\\n\\\n}z", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${\\\n#\\\n\\\na_\\\n1\\\n\\\n}z", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "a_1");
         assert_eq!(result.modifier, Modifier::Length);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(
+            *result.location.code.value.borrow(),
+            "${\\\n#\\\n\\\na_\\\n1\\\n\\\n}z"
+        );
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..19);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }
 
     #[test]
     fn lexer_braced_param_line_continuations_hash() {
-        let mut lexer = Lexer::from_memory("{#\\\n\\\n}z", Source::Unknown);
+        let mut lexer = Lexer::from_memory("${#\\\n\\\n}z", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let location = Location::dummy("$");
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.braced_param(location)).unwrap().unwrap();
+        let result = block_on(lexer.braced_param(0)).unwrap().unwrap();
         assert_eq!(result.name, "#");
         assert_eq!(result.modifier, Modifier::None);
         // TODO assert about other result members
-        assert_opening_location(&result.location);
+        assert_eq!(*result.location.code.value.borrow(), "${#\\\n\\\n}z");
+        assert_eq!(result.location.code.start_line_number.get(), 1);
+        assert_eq!(result.location.code.source, Source::Unknown);
+        assert_eq!(result.location.range, 0..8);
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('z')));
     }

@@ -352,7 +352,7 @@ mod tests {
         .unwrap();
         assert_matches!(result, CommandSubst { content, location } => {
             assert_eq!(content, "");
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..3);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -373,7 +373,7 @@ mod tests {
         .unwrap();
         assert_matches!(result, Backquote { content, location } => {
             assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -397,7 +397,7 @@ mod tests {
                 content,
                 [BackquoteUnit::Literal('\\'), BackquoteUnit::Literal('"')]
             );
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..4);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -595,11 +595,11 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), "x(()");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 1);
+            assert_eq!(opening_location.range, 1..2);
         });
         assert_eq!(*e.location.code.value.borrow(), "x(()");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 4);
+        assert_eq!(e.location.range, 4..4);
     }
 }

@@ -20,7 +20,6 @@ use super::core::Lexer;
 use crate::parser::core::Result;
 use crate::parser::error::Error;
 use crate::parser::error::SyntaxError;
-use crate::source::Location;
 use crate::syntax::Text;
 use crate::syntax::TextUnit;
 use std::future::Future;
@@ -34,25 +33,24 @@ impl Lexer<'_> {
     /// begin an arithmetic expansion. If the characters are `((`, then the
     /// arithmetic expansion is parsed, in which case this function consumes up
     /// to the closing `))` (inclusive). Otherwise, no characters are consumed
-    /// and the return value is `Ok(Err(location))`.
+    /// and the return value is `Ok(None)`.
     ///
-    /// The `location` parameter should be the location of the initial `$`. It
-    /// is used to construct the result, but this function does not check if it
-    /// actually is a location of `$`.
-    pub async fn arithmetic_expansion(
-        &mut self,
-        location: Location,
-    ) -> Result<std::result::Result<TextUnit, Location>> {
-        let index = self.index();
+    /// The `start_index` parameter should be the index for the initial `$`. It is
+    /// used to construct the result, but this function does not check if it
+    /// actually points to the `$`.
+    pub async fn arithmetic_expansion(&mut self, start_index: usize) -> Result<Option<TextUnit>> {
+        let orig_index = self.index();
 
         // Part 1: Parse `((`
         if !self.skip_if(|c| c == '(').await? {
-            return Ok(Err(location));
+            return Ok(None);
         }
         if !self.skip_if(|c| c == '(').await? {
-            self.rewind(index);
-            return Ok(Err(location));
+            self.rewind(orig_index);
+            return Ok(None);
         }
+
+        let opening_location = self.location_range(start_index..self.index());
 
         // Part 2: Parse the content
         let is_delimiter = |c| c == ')';
@@ -67,7 +65,6 @@ impl Lexer<'_> {
             Some(sc) if sc == ')' => self.consume_char(),
             Some(_) => unreachable!(),
             None => {
-                let opening_location = location;
                 let cause = SyntaxError::UnclosedArith { opening_location }.into();
                 let location = self.location().await?.clone();
                 return Err(Error { cause, location });
@@ -76,18 +73,18 @@ impl Lexer<'_> {
         match self.peek_char().await? {
             Some(sc) if sc == ')' => self.consume_char(),
             Some(_) => {
-                self.rewind(index);
-                return Ok(Err(location));
+                self.rewind(orig_index);
+                return Ok(None);
             }
             None => {
-                let opening_location = location;
                 let cause = SyntaxError::UnclosedArith { opening_location }.into();
                 let location = self.location().await?.clone();
                 return Err(Error { cause, location });
             }
         }
 
-        Ok(Ok(TextUnit::Arith { content, location }))
+        let location = self.location_range(start_index..self.index());
+        Ok(Some(TextUnit::Arith { content, location }))
     }
 }
 
@@ -103,18 +100,17 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_empty() {
-        let mut lexer = Lexer::from_memory("(());", Source::Unknown);
-        let location = Location::dummy("X");
+        let mut lexer = Lexer::from_memory("$(());", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap();
+        let result = block_on(lexer.arithmetic_expansion(0)).unwrap().unwrap();
         assert_matches!(result, TextUnit::Arith { content, location } => {
             assert_eq!(content.0, []);
-            assert_eq!(*location.code.value.borrow(), "X");
+            assert_eq!(*location.code.value.borrow(), "$(());");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..5);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -122,34 +118,26 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_none() {
-        let mut lexer = Lexer::from_memory("( foo bar )baz", Source::Unknown);
-        let location = Location::dummy("Y");
-
-        let location = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "Y");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-
+        let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+        assert_eq!(block_on(lexer.arithmetic_expansion(0)), Ok(None));
         assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
     }
 
     #[test]
     fn lexer_arithmetic_expansion_line_continuations() {
-        let mut lexer = Lexer::from_memory("(\\\n\\\n(\\\n)\\\n\\\n);", Source::Unknown);
-        let location = Location::dummy("X");
+        let mut lexer = Lexer::from_memory("$(\\\n\\\n(\\\n)\\\n\\\n);", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap();
+        let result = block_on(lexer.arithmetic_expansion(0)).unwrap().unwrap();
         assert_matches!(result, TextUnit::Arith { content, location } => {
             assert_eq!(content.0, []);
-            assert_eq!(*location.code.value.borrow(), "X");
+            assert_eq!(*location.code.value.borrow(), "$(\\\n\\\n(\\\n)\\\n\\\n);");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..15);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -157,12 +145,13 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_escapes() {
-        let mut lexer = Lexer::from_memory(r#"((\\\"\`\$));"#, Source::Unknown);
-        let location = Location::dummy("X");
+        let mut lexer = Lexer::from_memory(r#".$((\\\"\`\$));"#, Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap();
+        let result = block_on(lexer.arithmetic_expansion(1)).unwrap().unwrap();
         assert_matches!(result, TextUnit::Arith { content, location } => {
             assert_eq!(
                 content.0,
@@ -174,10 +163,10 @@ mod tests {
                     Backslashed('$')
                 ]
             );
-            assert_eq!(*location.code.value.borrow(), "X");
+            assert_eq!(*location.code.value.borrow(), r#".$((\\\"\`\$));"#);
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 1..14);
         });
 
         assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
@@ -185,55 +174,50 @@ mod tests {
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_first() {
-        let mut lexer = Lexer::from_memory("((1", Source::Unknown);
-        let location = Location::dummy("Z");
+        let mut lexer = Lexer::from_memory("$((1", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        let e = block_on(lexer.arithmetic_expansion(0)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "Z");
+            assert_eq!(*opening_location.code.value.borrow(), "$((1");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..3);
         });
-        assert_eq!(*e.location.code.value.borrow(), "((1");
+        assert_eq!(*e.location.code.value.borrow(), "$((1");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.range, 4..4);
     }
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_second() {
-        let mut lexer = Lexer::from_memory("((1)", Source::Unknown);
-        let location = Location::dummy("Z");
+        let mut lexer = Lexer::from_memory("$((1)", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
 
-        let e = block_on(lexer.arithmetic_expansion(location)).unwrap_err();
+        let e = block_on(lexer.arithmetic_expansion(0)).unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
-            assert_eq!(*opening_location.code.value.borrow(), "Z");
+            assert_eq!(*opening_location.code.value.borrow(), "$((1)");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 0);
+            assert_eq!(opening_location.range, 0..3);
         });
-        assert_eq!(*e.location.code.value.borrow(), "((1)");
+        assert_eq!(*e.location.code.value.borrow(), "$((1)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 4);
+        assert_eq!(e.location.range, 5..5);
     }
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
-        let mut lexer = Lexer::from_memory("((1) ", Source::Unknown);
-        let location = Location::dummy("Z");
-
-        let location = block_on(lexer.arithmetic_expansion(location))
-            .unwrap()
-            .unwrap_err();
-        assert_eq!(*location.code.value.borrow(), "Z");
-        assert_eq!(location.code.start_line_number.get(), 1);
-        assert_eq!(location.code.source, Source::Unknown);
-        assert_eq!(location.index, 0);
-
-        assert_eq!(lexer.index(), 0);
+        let mut lexer = Lexer::from_memory("$((1) ", Source::Unknown);
+        block_on(lexer.peek_char()).unwrap();
+        lexer.consume_char();
+        assert_eq!(block_on(lexer.arithmetic_expansion(0)), Ok(None));
+        assert_eq!(lexer.index(), 1);
     }
 }

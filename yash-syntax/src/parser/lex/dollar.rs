@@ -30,33 +30,26 @@ impl WordLexer<'_, '_> {
     /// substitution, or arithmetic expansion is parsed. Otherwise, no
     /// characters are consumed and the return value is `Ok(None)`.
     pub async fn dollar_unit(&mut self) -> Result<Option<TextUnit>> {
-        let index = self.index();
-        let location = match self.consume_char_if(|c| c == '$').await? {
-            None => return Ok(None),
-            Some(c) => c.location.clone(),
-        };
+        let start_index = self.index();
+        if !self.skip_if(|c| c == '$').await? {
+            return Ok(None);
+        }
 
-        let location = match self.raw_param(location).await? {
-            Ok(result) => return Ok(Some(result)),
-            Err(location) => location,
-        };
-
-        let location = match self.braced_param(location).await? {
-            Ok(result) => return Ok(Some(TextUnit::BracedParam(result))),
-            Err(location) => location,
-        };
-
-        let location = match self.arithmetic_expansion(location).await? {
-            Ok(result) => return Ok(Some(result)),
-            Err(location) => location,
-        };
-
-        if let Some(result) = self.command_substitution(location).await? {
+        if let Some(result) = self.raw_param(start_index).await? {
+            return Ok(Some(result));
+        }
+        if let Some(result) = self.braced_param(start_index).await? {
+            return Ok(Some(TextUnit::BracedParam(result)));
+        }
+        if let Some(result) = self.arithmetic_expansion(start_index).await? {
+            return Ok(Some(result));
+        }
+        if let Some(result) = self.command_substitution(start_index).await? {
             return Ok(Some(result));
         }
 
         // TODO maybe reject unrecognized dollar unit?
-        self.rewind(index);
+        self.rewind(start_index);
         Ok(None)
     }
 }
@@ -133,7 +126,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..2);
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }
@@ -150,7 +143,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$()");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..3);
             assert_eq!(content, "");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -165,7 +158,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..12);
             assert_eq!(content, " foo bar ");
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
@@ -184,7 +177,7 @@ mod tests {
             assert_eq!(*location.code.value.borrow(), "$((1))");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
-            assert_eq!(location.index, 0);
+            assert_eq!(location.range, 0..6);
         });
         assert_eq!(block_on(lexer.peek_char()), Ok(None));
     }

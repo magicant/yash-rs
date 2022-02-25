@@ -152,12 +152,12 @@ mod tests {
             assert_eq!(*opening_location.code.value.borrow(), " do not close ");
             assert_eq!(opening_location.code.start_line_number.get(), 1);
             assert_eq!(opening_location.code.source, Source::Unknown);
-            assert_eq!(opening_location.index, 1);
+            assert_eq!(opening_location.range, 1..3);
         });
         assert_eq!(*e.location.code.value.borrow(), " do not close ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 14);
+        assert_eq!(e.location.range, 14..14);
     }
 
     #[test]
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "do done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.index, 3);
+        assert_eq!(e.location.range, 3..7);
     }
 
     #[test]
