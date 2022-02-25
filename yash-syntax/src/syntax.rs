@@ -909,7 +909,7 @@ impl Redir {
     /// the default file descriptor is selected depending on the type of `self.body`.
     pub fn fd_or_default(&self) -> Fd {
         use RedirOp::*;
-        self.fd.unwrap_or_else(|| match self.body {
+        self.fd.unwrap_or(match self.body {
             RedirBody::Normal { operator, .. } => match operator {
                 FileIn | FileInOut | FdIn | String => Fd::STDIN,
                 FileOut | FileAppend | FileClobber | FdOut | Pipe => Fd::STDOUT,
