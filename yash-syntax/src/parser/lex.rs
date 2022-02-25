@@ -39,7 +39,6 @@ mod word;
 
 pub use self::braced_param::is_name_char;
 pub use self::core::*;
-pub use self::heredoc::PartialHereDoc;
 pub use self::keyword::Keyword;
 pub use self::op::is_operator_char;
 pub use self::op::Operator;

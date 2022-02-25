@@ -24,23 +24,6 @@ use crate::syntax::HereDoc;
 use crate::syntax::Text;
 use crate::syntax::TextUnit::{self, Literal};
 use crate::syntax::Unquote;
-use crate::syntax::Word;
-
-/// Here-document without a content.
-///
-/// This is a temporary data that is created when a here-document operator is parsed. It contains
-/// the delimiter word and the type of the operator. It is used later when the content of the
-/// here-document is read.
-#[derive(Debug)]
-pub struct PartialHereDoc {
-    /// Token that marks the end of the content of the here-document.
-    pub delimiter: Word,
-
-    /// Whether leading tab characters should be removed from each line of the
-    /// here-document content. This value is `true` for the `<<-` operator and
-    /// `false` for `<<`.
-    pub remove_tabs: bool,
-}
 
 const NEWLINE: char = '\n';
 
