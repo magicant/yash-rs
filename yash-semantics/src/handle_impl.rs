@@ -27,7 +27,7 @@ use yash_env::semantics::Divert;
 use yash_env::Env;
 use yash_syntax::source::pretty::Message;
 
-async fn print_message<'a, E>(env: &mut Env, error: E)
+pub async fn print_message<'a, E>(env: &mut Env, error: E)
 where
     E: 'a,
     Message<'a>: From<E>,
