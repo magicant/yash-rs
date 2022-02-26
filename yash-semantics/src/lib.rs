@@ -36,6 +36,7 @@ pub mod trap;
 
 use async_trait::async_trait;
 use std::borrow::Cow;
+use yash_env::print_message;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -79,7 +80,7 @@ pub async fn print_error(
         title,
         annotations: a,
     };
-    handle_impl::print_message(env, message).await;
+    print_message(env, message).await;
 }
 
 pub use runner::read_eval_loop;

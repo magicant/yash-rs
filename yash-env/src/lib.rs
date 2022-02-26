@@ -56,6 +56,8 @@ use self::system::SignalHandling;
 pub use self::system::System;
 use self::variable::VariableSet;
 use crate::trap::TrapSet;
+use annotate_snippets::display_list::DisplayList;
+use annotate_snippets::snippet::Snippet;
 use futures_util::task::noop_waker_ref;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
@@ -69,6 +71,7 @@ use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
 use yash_syntax::alias::AliasSet;
+use yash_syntax::source::pretty::Message;
 
 /// Whole shell execution environment.
 ///
@@ -342,6 +345,25 @@ impl Env {
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
     }
+}
+
+/// Convenience function for printing an error message.
+///
+/// This function converts the `error` into a [`Message`] which in turn is
+/// converted into [`Snippet`] and then [`DisplayList`].
+/// The result is printed to the standard error using [`Env::print_error`].
+pub async fn print_message<'a, E>(env: &mut Env, error: E)
+where
+    E: 'a,
+    Message<'a>: From<E>,
+{
+    async fn inner(env: &mut Env, m: Message<'_>) {
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let f = format!("{}\n", DisplayList::from(s));
+        env.print_error(&f).await
+    }
+    inner(env, error.into()).await
 }
 
 #[cfg(test)]

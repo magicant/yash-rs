@@ -16,7 +16,6 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-annotate-snippets = "0.9.1"
 async-trait = "0.1.52"
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.3.0" }
