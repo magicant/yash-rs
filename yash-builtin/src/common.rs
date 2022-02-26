@@ -21,6 +21,8 @@ use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::io::Fd;
+#[doc(no_inline)]
+pub use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_syntax::source::pretty::Message;
@@ -50,43 +52,6 @@ impl Stdout for String {
     async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
         self.push_str(text);
         Ok(())
-    }
-}
-
-/// Part of the execution environment that allows printing to the standard
-/// error.
-#[async_trait(?Send)]
-pub trait Stderr {
-    /// Convenience function that prints the given error message.
-    ///
-    /// This function prints the `message` to the standard error of this
-    /// environment, ignoring any errors that may happen.
-    async fn print_error(&mut self, message: &str);
-
-    /// Convenience function that prints an error message for the given `errno`.
-    ///
-    /// This function prints `format!("{}: {}\n", message, errno.desc())` to the
-    /// standard error of this environment. (The exact format of the printed
-    /// message is subject to change.)
-    ///
-    /// Any errors that may happen writing to the standard error are ignored.
-    async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(&format!("{}: {}\n", message, errno.desc()))
-            .await
-    }
-}
-
-#[async_trait(?Send)]
-impl Stderr for yash_env::Env {
-    async fn print_error(&mut self, message: &str) {
-        self.print_error(message).await
-    }
-}
-
-#[async_trait(?Send)]
-impl Stderr for String {
-    async fn print_error(&mut self, message: &str) {
-        self.push_str(message)
     }
 }
 
