@@ -60,11 +60,8 @@ pub trait Stderr {
     /// Convenience function that prints the given error message.
     ///
     /// This function prints the `message` to the standard error of this
-    /// environment. (The exact format of the printed message is subject to
-    /// change.)
-    ///
-    /// Any errors that may happen writing to the standard error are ignored.
-    async fn print_error(&mut self, message: std::fmt::Arguments<'_>);
+    /// environment, ignoring any errors that may happen.
+    async fn print_error(&mut self, message: &str);
 
     /// Convenience function that prints an error message for the given `errno`.
     ///
@@ -74,22 +71,22 @@ pub trait Stderr {
     ///
     /// Any errors that may happen writing to the standard error are ignored.
     async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(format_args!("{}: {}\n", message, errno.desc()))
+        self.print_error(&format!("{}: {}\n", message, errno.desc()))
             .await
     }
 }
 
 #[async_trait(?Send)]
 impl Stderr for yash_env::Env {
-    async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
-        self.print_error(&format!("{}\n", message)).await
+    async fn print_error(&mut self, message: &str) {
+        self.print_error(message).await
     }
 }
 
 #[async_trait(?Send)]
 impl Stderr for String {
-    async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
-        std::fmt::write(&mut self, message).ok();
+    async fn print_error(&mut self, message: &str) {
+        self.push_str(message)
     }
 }
 
@@ -136,6 +133,6 @@ where
     let mut s = Snippet::from(&m);
     s.opt.color = true;
     let l = DisplayList::from(s);
-    env.print_error(format_args!("{}\n", l)).await;
+    env.print_error(&format!("{}\n", l)).await;
     (ExitStatus::ERROR, Continue(()))
 }
