@@ -19,7 +19,6 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::expansion::ExitStatusAdapter;
-use crate::print_error;
 use crate::redir::RedirGuard;
 use crate::Command;
 use crate::Handle;
@@ -29,6 +28,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
+use yash_env::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;

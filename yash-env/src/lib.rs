@@ -61,6 +61,7 @@ use annotate_snippets::snippet::Snippet;
 use futures_util::task::noop_waker_ref;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
@@ -71,7 +72,10 @@ use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
 use yash_syntax::alias::AliasSet;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 
 /// Whole shell execution environment.
 ///
@@ -364,6 +368,26 @@ where
         env.print_error(&f).await
     }
     inner(env, error.into()).await
+}
+
+/// Convenience function for printing an error message.
+///
+/// This function constructs a temporary [`Message`] based on the given `title`,
+/// `label`, and `location`. THe message is printed using [`print_message`].
+pub async fn print_error(
+    env: &mut Env,
+    title: Cow<'_, str>,
+    label: Cow<'_, str>,
+    location: &Location,
+) {
+    let mut a = vec![Annotation::new(AnnotationType::Error, label, location)];
+    location.code.source.complement_annotations(&mut a);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title,
+        annotations: a,
+    };
+    print_message(env, message).await;
 }
 
 #[cfg(test)]
