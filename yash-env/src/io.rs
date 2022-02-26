@@ -36,6 +36,18 @@ pub trait Stderr {
     /// This function prints the `message` to the standard error of this
     /// environment, ignoring any errors that may happen.
     async fn print_error(&mut self, message: &str);
+
+    /// Returns whether you should include color code in messages printed.
+    ///
+    /// If this function returns true, you can include escape sequences in the
+    /// message passed to [`print_error`](Self::print_error) so that the
+    /// terminal shows the message in color. Otherwise, the message should be
+    /// plain text.
+    ///
+    /// The default implementation returns false.
+    fn should_print_error_in_color(&self) -> bool {
+        false
+    }
 }
 
 #[async_trait(?Send)]
@@ -64,7 +76,7 @@ where
 {
     async fn inner(stderr: &mut dyn Stderr, m: Message<'_>) {
         let mut s = Snippet::from(&m);
-        s.opt.color = true;
+        s.opt.color = stderr.should_print_error_in_color();
         let f = format!("{}\n", DisplayList::from(s));
         stderr.print_error(&f).await
     }
