@@ -54,11 +54,10 @@ use self::system::ChildProcessTask;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
+use self::trap::Signal;
+use self::trap::TrapSet;
 use self::variable::VariableSet;
-use crate::trap::TrapSet;
 use futures_util::task::noop_waker_ref;
-use nix::errno::Errno;
-use nix::sys::signal::Signal;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
@@ -157,18 +156,6 @@ impl Env {
     /// [`io::print_error`] to format a message before printing.
     pub async fn print_error(&mut self, message: &str) {
         let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
-    }
-
-    /// Convenience function that prints an error message for the given `errno`.
-    ///
-    /// This function prints `format!("{}: {}\n", message, errno.desc())` to the
-    /// standard error of this environment. (The exact format of the printed
-    /// message is subject to change.)
-    ///
-    /// Any errors that may happen writing to the standard error are ignored.
-    pub async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(&format!("{}: {}\n", message, errno.desc()))
-            .await
     }
 
     /// Waits for some signals to be caught in the current process.
@@ -351,9 +338,9 @@ impl Env {
 mod tests {
     use super::*;
     use crate::system::r#virtual::SystemState;
+    use crate::system::Errno;
     use crate::trap::Trap;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
@@ -392,19 +379,6 @@ mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
-    }
-
-    #[test]
-    fn print_system_error_einval() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        block_on(env.print_system_error(Errno::EINVAL, format_args!("dummy message {}", 42)));
-
-        let state = state.borrow();
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        let message = format!("dummy message {}: {}\n", 42, Errno::EINVAL.desc());
-        assert_eq!(stderr.content, message.as_bytes());
     }
 
     #[test]

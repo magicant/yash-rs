@@ -16,7 +16,6 @@
 
 //! Type definitions for I/O.
 
-use crate::system::Errno;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
@@ -37,18 +36,6 @@ pub trait Stderr {
     /// This function prints the `message` to the standard error of this
     /// environment, ignoring any errors that may happen.
     async fn print_error(&mut self, message: &str);
-
-    /// Convenience function that prints an error message for the given `errno`.
-    ///
-    /// This function prints `format!("{}: {}\n", message, errno.desc())` to the
-    /// standard error of this environment. (The exact format of the printed
-    /// message is subject to change.)
-    ///
-    /// Any errors that may happen writing to the standard error are ignored.
-    async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(&format!("{}: {}\n", message, errno.desc()))
-            .await
-    }
 }
 
 #[async_trait(?Send)]

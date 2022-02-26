@@ -121,8 +121,12 @@ async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Re
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
         Err(errno) => {
-            env.print_system_error(errno, format_args!("cannot connect pipes in the pipeline"))
-                .await;
+            // TODO print error location using yash_env::io::print_error
+            env.print_error(&format!(
+                "cannot connect pipes in the pipeline: {}\n",
+                errno.desc()
+            ))
+            .await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
@@ -136,8 +140,12 @@ async fn connect_pipe_and_execute_command(
     match pipes.move_to_stdin_stdout(env) {
         Ok(()) => (),
         Err(errno) => {
-            env.print_system_error(errno, format_args!("cannot connect pipes in the pipeline"))
-                .await;
+            // TODO print error location using yash_env::io::print_error
+            env.print_error(&format!(
+                "cannot connect pipes in the pipeline: {}\n",
+                errno.desc()
+            ))
+            .await;
             return Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)));
         }
     }
@@ -149,8 +157,12 @@ async fn pid_or_fail(env: &mut Env, pid: std::result::Result<Pid, Errno>) -> Res
     match pid {
         Ok(pid) => Continue(pid),
         Err(errno) => {
-            let message = format_args!("cannot start a subshell in the pipeline");
-            env.print_system_error(errno, message).await;
+            // TODO print error location using yash_env::io::print_error
+            env.print_error(&format!(
+                "cannot start a subshell in the pipeline: {}\n",
+                errno.desc()
+            ))
+            .await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }

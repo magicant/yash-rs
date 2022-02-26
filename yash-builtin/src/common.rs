@@ -69,8 +69,12 @@ impl<T: Stdout + Stderr> Print for T {
         match self.try_print(text).await {
             Ok(()) => ExitStatus::SUCCESS,
             Err(errno) => {
-                self.print_system_error(errno, format_args!("cannot print to the standard output"))
-                    .await;
+                // TODO print error location using yash_env::io::print_error
+                self.print_error(&format!(
+                    "cannot print to the standard output: {}\n",
+                    errno.desc()
+                ))
+                .await;
                 ExitStatus::FAILURE
             }
         }
