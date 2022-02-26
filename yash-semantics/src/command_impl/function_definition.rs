@@ -54,11 +54,8 @@ impl Command for syntax::FunctionDefinition {
         if let Some(function) = env.functions.get(name.as_str()) {
             if function.0.is_read_only {
                 // TODO Use pretty::Message and annotate_snippet
-                env.print_error(format_args!(
-                    "cannot re-define read-only function {:?}",
-                    name
-                ))
-                .await;
+                env.print_error(&format!("cannot re-define read-only function {:?}\n", name))
+                    .await;
                 env.exit_status = ExitStatus::ERROR;
                 return Continue(());
             }

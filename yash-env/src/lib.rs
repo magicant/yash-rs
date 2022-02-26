@@ -151,14 +151,8 @@ impl Env {
     /// Convenience function that prints the given error message.
     ///
     /// This function prints the `message` to the standard error of this
-    /// environment. (The exact format of the printed message is subject to
-    /// change.)
-    ///
-    /// Any errors that may happen writing to the standard error are ignored.
-    pub async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
-        // TODO print `$0` first
-        // TODO localize message
-        let message = format!("{}\n", message);
+    /// environment, ignoring any errors that may happen.
+    pub async fn print_error(&mut self, message: &str) {
         let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
     }
 
@@ -170,7 +164,7 @@ impl Env {
     ///
     /// Any errors that may happen writing to the standard error are ignored.
     pub async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(format_args!("{}: {}", message, errno.desc()))
+        self.print_error(&format!("{}: {}\n", message, errno.desc()))
             .await
     }
 

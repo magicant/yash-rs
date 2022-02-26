@@ -45,7 +45,7 @@ impl Command for syntax::CompoundCommand {
                 // TODO execute while/until loop
                 // TODO execute case
                 // TODO execute if
-                env.print_error(format_args!("Not implemented: {}", self))
+                env.print_error(&format!("Not implemented: {}\n", self))
                     .await;
                 Continue(())
             }

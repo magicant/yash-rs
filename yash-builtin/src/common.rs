@@ -74,7 +74,7 @@ pub trait Stderr {
     ///
     /// Any errors that may happen writing to the standard error are ignored.
     async fn print_system_error(&mut self, errno: Errno, message: std::fmt::Arguments<'_>) {
-        self.print_error(format_args!("{}: {}", message, errno.desc()))
+        self.print_error(format_args!("{}: {}\n", message, errno.desc()))
             .await
     }
 }
@@ -82,7 +82,7 @@ pub trait Stderr {
 #[async_trait(?Send)]
 impl Stderr for yash_env::Env {
     async fn print_error(&mut self, message: std::fmt::Arguments<'_>) {
-        self.print_error(message).await
+        self.print_error(&format!("{}\n", message)).await
     }
 }
 
