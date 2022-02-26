@@ -20,7 +20,7 @@ use super::Command;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
-use yash_env::print_error;
+use yash_env::io::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;

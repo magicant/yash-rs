@@ -17,7 +17,14 @@
 //! Type definitions for I/O.
 
 use crate::system::Errno;
+use annotate_snippets::display_list::DisplayList;
+use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
+use std::borrow::Cow;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;
 
@@ -56,4 +63,43 @@ impl Stderr for String {
     async fn print_error(&mut self, message: &str) {
         self.push_str(message)
     }
+}
+
+/// Convenience function for printing an error message.
+///
+/// This function converts the `error` into a [`Message`] which in turn is
+/// converted into [`Snippet`] and then [`DisplayList`].
+/// The result is printed to the standard error using [`Stderr::print_error`].
+pub async fn print_message<'a, Env: Stderr, E>(env: &mut Env, error: E)
+where
+    E: 'a,
+    Message<'a>: From<E>,
+{
+    async fn inner(stderr: &mut dyn Stderr, m: Message<'_>) {
+        let mut s = Snippet::from(&m);
+        s.opt.color = true;
+        let f = format!("{}\n", DisplayList::from(s));
+        stderr.print_error(&f).await
+    }
+    inner(env, error.into()).await
+}
+
+/// Convenience function for printing an error message.
+///
+/// This function constructs a temporary [`Message`] based on the given `title`,
+/// `label`, and `location`. The message is printed using [`print_message`].
+pub async fn print_error<Env: Stderr>(
+    env: &mut Env,
+    title: Cow<'_, str>,
+    label: Cow<'_, str>,
+    location: &Location,
+) {
+    let mut a = vec![Annotation::new(AnnotationType::Error, label, location)];
+    location.code.source.complement_annotations(&mut a);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title,
+        annotations: a,
+    };
+    print_message(env, message).await;
 }

@@ -28,7 +28,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
-use yash_env::print_error;
+use yash_env::io::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -341,7 +341,7 @@ async fn execute_external_utility(
 
     if path.to_bytes().is_empty() {
         print_error(
-            &mut env,
+            &mut **env,
             format!("cannot execute external utility {:?}", name.value).into(),
             "utility not found".into(),
             &name.origin,
@@ -385,7 +385,7 @@ async fn execute_external_utility(
         }
         Err(errno) => {
             print_error(
-                &mut env,
+                &mut **env,
                 format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,

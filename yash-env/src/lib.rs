@@ -56,12 +56,9 @@ use self::system::SignalHandling;
 pub use self::system::System;
 use self::variable::VariableSet;
 use crate::trap::TrapSet;
-use annotate_snippets::display_list::DisplayList;
-use annotate_snippets::snippet::Snippet;
 use futures_util::task::noop_waker_ref;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::ready;
@@ -72,10 +69,6 @@ use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
 use yash_syntax::alias::AliasSet;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
-use yash_syntax::source::Location;
 
 /// Whole shell execution environment.
 ///
@@ -159,6 +152,9 @@ impl Env {
     ///
     /// This function prints the `message` to the standard error of this
     /// environment, ignoring any errors that may happen.
+    ///
+    /// No formatting takes place in this function. Use [`io::print_message`] or
+    /// [`io::print_error`] to format a message before printing.
     pub async fn print_error(&mut self, message: &str) {
         let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
     }
@@ -349,45 +345,6 @@ impl Env {
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
     }
-}
-
-/// Convenience function for printing an error message.
-///
-/// This function converts the `error` into a [`Message`] which in turn is
-/// converted into [`Snippet`] and then [`DisplayList`].
-/// The result is printed to the standard error using [`Env::print_error`].
-pub async fn print_message<'a, E>(env: &mut Env, error: E)
-where
-    E: 'a,
-    Message<'a>: From<E>,
-{
-    async fn inner(env: &mut Env, m: Message<'_>) {
-        let mut s = Snippet::from(&m);
-        s.opt.color = true;
-        let f = format!("{}\n", DisplayList::from(s));
-        env.print_error(&f).await
-    }
-    inner(env, error.into()).await
-}
-
-/// Convenience function for printing an error message.
-///
-/// This function constructs a temporary [`Message`] based on the given `title`,
-/// `label`, and `location`. THe message is printed using [`print_message`].
-pub async fn print_error(
-    env: &mut Env,
-    title: Cow<'_, str>,
-    label: Cow<'_, str>,
-    location: &Location,
-) {
-    let mut a = vec![Annotation::new(AnnotationType::Error, label, location)];
-    location.code.source.complement_annotations(&mut a);
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title,
-        annotations: a,
-    };
-    print_message(env, message).await;
 }
 
 #[cfg(test)]

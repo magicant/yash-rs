@@ -20,7 +20,7 @@ use crate::ExitStatus;
 use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
-use yash_env::print_message;
+use yash_env::io::print_message;
 use yash_env::semantics::Divert;
 use yash_env::Env;
 
