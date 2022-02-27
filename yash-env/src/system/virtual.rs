@@ -306,6 +306,10 @@ impl System for VirtualSystem {
         Ok(())
     }
 
+    fn isatty(&self, _fd: Fd) -> nix::Result<bool> {
+        Ok(false)
+    }
+
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         self.with_open_file_description(fd, |ofd| ofd.read(buffer))
     }

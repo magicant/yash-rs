@@ -114,6 +114,9 @@ pub trait System: Debug {
     /// Sets the file status flags for the file descriptor.
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
 
+    /// Tests if a file descriptor is associated with a terminal device.
+    fn isatty(&self, fd: Fd) -> nix::Result<bool>;
+
     /// Reads from the file descriptor.
     ///
     /// This is a thin wrapper around the `read` system call.
@@ -580,6 +583,9 @@ impl System for SharedSystem {
     }
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
         self.0.borrow_mut().fcntl_setfl(fd, flags)
+    }
+    fn isatty(&self, fd: Fd) -> nix::Result<bool> {
+        self.0.borrow().isatty(fd)
     }
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         self.0.borrow_mut().read(fd, buffer)

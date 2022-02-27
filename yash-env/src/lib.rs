@@ -57,6 +57,7 @@ pub use self::system::System;
 use self::trap::Signal;
 use self::trap::TrapSet;
 use self::variable::VariableSet;
+use async_trait::async_trait;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -331,6 +332,18 @@ impl Env {
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl io::Stderr for Env {
+    async fn print_error(&mut self, message: &str) {
+        self.print_error(message).await
+    }
+    fn should_print_error_in_color(&self) -> bool {
+        // TODO Enable color depending on user config (force/auto/never)
+        // TODO Check if the terminal really supports color (needs terminfo)
+        self.system.isatty(Fd::STDERR) == Ok(true)
     }
 }
 

@@ -51,13 +51,6 @@ pub trait Stderr {
 }
 
 #[async_trait(?Send)]
-impl Stderr for crate::Env {
-    async fn print_error(&mut self, message: &str) {
-        self.print_error(message).await
-    }
-}
-
-#[async_trait(?Send)]
 impl Stderr for String {
     async fn print_error(&mut self, message: &str) {
         self.push_str(message)

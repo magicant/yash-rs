@@ -160,6 +160,10 @@ impl System for RealSystem {
         nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags)).map(drop)
     }
 
+    fn isatty(&self, fd: Fd) -> nix::Result<bool> {
+        nix::unistd::isatty(fd.0)
+    }
+
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
         loop {
             let result = nix::unistd::read(fd.0, buffer);
