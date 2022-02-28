@@ -27,6 +27,7 @@ use std::rc::Rc;
 
 /// Types of syntax errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SyntaxError {
     /// A `(` lacks a closing `)`.
     UnclosedParen { opening_location: Location },
