@@ -37,6 +37,7 @@ pub mod input;
 pub mod io;
 pub mod job;
 pub mod semantics;
+pub mod stack;
 pub mod system;
 pub mod trap;
 pub mod variable;
@@ -48,6 +49,7 @@ use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
 use self::semantics::ExitStatus;
+use self::stack::Stack;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 use self::system::ChildProcessTask;
@@ -100,6 +102,9 @@ pub struct Env {
     /// Jobs managed in the environment.
     pub jobs: JobSet,
 
+    /// Runtime execution context stack.
+    pub stack: Stack,
+
     /// Traps defined in the environment.
     pub traps: TrapSet,
 
@@ -119,6 +124,7 @@ impl Env {
             exit_status: Default::default(),
             functions: Default::default(),
             jobs: Default::default(),
+            stack: Default::default(),
             traps: Default::default(),
             variables: Default::default(),
             system: SharedSystem::new(system),
@@ -142,6 +148,7 @@ impl Env {
             exit_status: self.exit_status,
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
+            stack: self.stack.clone(),
             traps: self.traps.clone(),
             variables: self.variables.clone(),
             system: SharedSystem::new(system),
