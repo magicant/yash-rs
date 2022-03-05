@@ -141,14 +141,14 @@ pub(crate) mod tests {
         _env: &mut Env,
         mut args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let divert = match args.get(1) {
+        let divert = match args.get(0) {
             Some(field) if field.value == "-n" => {
-                args.remove(1);
+                args.remove(0);
                 Continue(())
             }
             _ => Break(Divert::Return),
         };
-        let exit_status = match args.get(1) {
+        let exit_status = match args.get(0) {
             Some(field) => field.value.parse().unwrap_or(2),
             None => 0,
         };
@@ -168,7 +168,7 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
         Box::pin(async move {
-            for Field { value, origin } in args.into_iter().skip(1) {
+            for Field { value, origin } in args {
                 if let Some(eq_index) = value.find('=') {
                     let name = value[..eq_index].to_owned();
                     // TODO reject invalid name
@@ -212,7 +212,7 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
         Box::pin(async move {
-            let fields = (&args[1..]).iter().map(|f| &f.value).format(" ");
+            let fields = args.iter().map(|f| &f.value).format(" ");
             let message = format!("{}\n", fields);
             let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()).await {
                 Ok(_) => ExitStatus::SUCCESS,

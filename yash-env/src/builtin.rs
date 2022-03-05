@@ -59,6 +59,11 @@ pub enum Type {
 pub type Result = (ExitStatus, crate::semantics::Result);
 
 /// Type of functions that implement the behavior of a built-in.
+///
+/// The function takes two arguments.
+/// The first is an environment in which the built-in is executed.
+/// The second is arguments to the built-in
+/// (not including the leading command name word).
 pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
 /// Built-in utility definition.

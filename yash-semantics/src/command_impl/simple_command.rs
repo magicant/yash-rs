@@ -261,9 +261,10 @@ async fn execute_builtin(
     env: &mut Env,
     builtin: Builtin,
     assigns: &[Assign],
-    fields: Vec<Field>,
+    mut fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
+    fields.remove(0);
     let env = &mut ExitStatusAdapter::new(env);
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;

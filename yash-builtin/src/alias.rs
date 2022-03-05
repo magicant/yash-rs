@@ -49,10 +49,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
-    let mut args = args.into_iter();
-    args.next(); // ignore the first argument, which is the command name
-
-    if args.as_ref().is_empty() {
+    if args.is_empty() {
         for alias in env.alias_set() {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
@@ -109,7 +106,7 @@ mod tests {
     #[test]
     fn builtin_defines_alias() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["", "foo=bar baz"]);
+        let args = Field::dummies(["foo=bar baz"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
@@ -129,7 +126,7 @@ mod tests {
     #[test]
     fn builtin_defines_many_aliases() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["alias", "abc=xyz", "yes=no", "ls=ls --color"]);
+        let args = Field::dummies(["abc=xyz", "yes=no", "ls=ls --color"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
@@ -167,12 +164,12 @@ mod tests {
     #[test]
     fn builtin_replaces_alias() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["", "foo=1"]);
+        let args = Field::dummies(["foo=1"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let args = Field::dummies(["", "foo=2"]);
+        let args = Field::dummies(["foo=2"]);
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));

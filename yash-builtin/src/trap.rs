@@ -181,7 +181,7 @@ mod tests {
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "", "USR1"]);
+        let args = Field::dummies(["", "USR1"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
@@ -197,7 +197,7 @@ mod tests {
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "USR2"]);
+        let args = Field::dummies(["echo", "USR2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
@@ -213,7 +213,7 @@ mod tests {
         let pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "-", "PIPE"]);
+        let args = Field::dummies(["-", "PIPE"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let process = &state.borrow().processes[&pid];
@@ -228,9 +228,8 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
@@ -242,11 +241,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "INT"]);
+        let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
@@ -258,13 +256,12 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "INT"]);
+        let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap", "echo t", "TERM"]);
+        let args = Field::dummies(["echo t", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
@@ -277,11 +274,10 @@ mod tests {
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "INT"]);
+        let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
@@ -293,14 +289,13 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "INT"]);
+        let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap", "", "TERM"]);
+        let args = Field::dummies(["", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
         env.traps.enter_subshell(&mut env.system);
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
@@ -312,16 +307,15 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let args = Field::dummies(["trap", "echo", "INT"]);
+        let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap", "", "TERM"]);
+        let args = Field::dummies(["", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
         env.traps.enter_subshell(&mut env.system);
-        let args = Field::dummies(["trap", "ls", "QUIT"]);
+        let args = Field::dummies(["ls", "QUIT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        let args = Field::dummies(["trap"]);
 
-        let result = block_on(builtin_body(&mut env, args));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();

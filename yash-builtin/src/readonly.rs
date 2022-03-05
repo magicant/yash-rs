@@ -62,10 +62,6 @@ impl Env for yash_env::Env {
 /// Implementation of the readonly built-in.
 pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
     // TODO support options
-
-    let mut args = args.into_iter();
-    args.next(); // ignore the first argument, which is the command name
-
     // TODO print read-only variables if there are no operands
 
     for Field { value, origin } in args {
@@ -122,10 +118,8 @@ mod tests {
     #[test]
     fn builtin_defines_read_only_variable() {
         let mut env = Env::new_virtual();
-        let arg0 = Field::dummy("");
-        let arg1 = Field::dummy("foo=bar baz");
-        let location = arg1.origin.clone();
-        let args = vec![arg0, arg1];
+        let args = Field::dummies(["foo=bar baz"]);
+        let location = args[0].origin.clone();
 
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));

@@ -94,7 +94,7 @@ impl Env for yash_env::Env {}
 pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
     // TODO Reject returning from an interactive session
-    let mut i = args.iter().skip(1).peekable();
+    let mut i = args.iter().peekable();
     let no_return = matches!(i.peek(), Some(Field { value, .. }) if value == "-n");
     if no_return {
         i.next();
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn returns_exit_status_specified_without_n_option() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["return", "42"]);
+        let args = Field::dummies(["42"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(42), Break(Divert::Return)));
     }
@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn returns_exit_status_12_with_n_option() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["return", "-n", "12"]);
+        let args = Field::dummies(["-n", "12"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(12), Continue(())));
     }
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn returns_exit_status_47_with_n_option() {
         let mut env = DummyEnv::default();
-        let args = Field::dummies(["return", "-n", "47"]);
+        let args = Field::dummies(["-n", "47"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(47), Continue(())));
     }
