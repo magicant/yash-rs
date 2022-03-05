@@ -33,6 +33,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::system::Errno;
 use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
@@ -264,8 +265,9 @@ async fn execute_builtin(
     mut fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
-    fields.remove(0);
-    let env = &mut ExitStatusAdapter::new(env);
+    let name = fields.remove(0);
+    let env = &mut env.push_frame(Frame::Builtin { name });
+    let env = &mut ExitStatusAdapter::new(&mut **env);
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
@@ -413,7 +415,9 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::cell::RefCell;
+    use std::future::Future;
     use std::path::PathBuf;
+    use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
@@ -565,6 +569,33 @@ mod tests {
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(file.content, "v=42\n".as_bytes());
+    }
+
+    #[test]
+    fn simple_command_pushes_stack_frame_for_builtin() {
+        fn builtin_main(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async {
+                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name }] => {
+                    assert_eq!(name.value, "builtin");
+                });
+                (ExitStatus(0), Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "builtin",
+            Builtin {
+                r#type: yash_env::builtin::Type::Intrinsic,
+                execute: builtin_main,
+            },
+        );
+        let command: syntax::SimpleCommand = "builtin".parse().unwrap();
+        block_on(command.execute(&mut env));
+        assert_eq!(env.stack[..], []);
     }
 
     #[test]
