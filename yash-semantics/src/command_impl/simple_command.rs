@@ -269,24 +269,20 @@ async fn execute_builtin(
     perform_redirs(env, redirs).await?;
 
     use yash_env::builtin::Type::*;
-    match builtin.r#type {
+    let (exit_status, abort) = match builtin.r#type {
         Special => {
             perform_assignments(&mut **env, assigns, false).await?;
-
-            let (exit_status, abort) = (builtin.execute)(env, fields).await;
-            env.exit_status = exit_status;
-            abort
+            (builtin.execute)(env, fields).await
         }
-
         Intrinsic | NonIntrinsic => {
             let mut env = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
             perform_assignments(&mut *env, assigns, true).await?;
-
-            let (exit_status, abort) = (builtin.execute)(&mut env, fields).await;
-            env.exit_status = exit_status;
-            abort
+            (builtin.execute)(&mut env, fields).await
         }
-    }
+    };
+
+    env.exit_status = exit_status;
+    abort
 }
 
 async fn execute_function(
