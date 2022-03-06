@@ -15,6 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Common items for implementing built-ins.
+//!
+//! This module contains common traits to manipulate [`yash_env::Env`] from
+//! built-in implementations. These traits abstract the environment and reduce
+//! dependency on it.
 
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
@@ -22,10 +26,50 @@ use yash_env::io::Fd;
 #[doc(no_inline)]
 pub use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Field;
+use yash_env::stack::Frame;
+use yash_env::stack::Stack;
 use yash_env::system::Errno;
 use yash_syntax::source::pretty::Message;
 
 pub mod arg;
+
+/// Part of the execution environment that allows examining the name of the
+/// currently executing built-in.
+pub trait BuiltinName {
+    /// Returns the name of the currently-executing built-in.
+    #[must_use]
+    fn builtin_name(&self) -> &Field;
+}
+
+impl BuiltinName for Stack {
+    /// Returns the name of the currently-executing built-in.
+    ///
+    /// This function **panics** if `self` does not contain any `Frame::Builtin`
+    /// item.
+    fn builtin_name(&self) -> &Field {
+        self.iter()
+            .filter_map(|frame| {
+                if let &Frame::Builtin { ref name } = frame {
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .next_back()
+            .expect("a Frame::Builtin must be in the stack")
+    }
+}
+
+impl BuiltinName for yash_env::Env {
+    /// Returns the name of the currently-executing built-in.
+    ///
+    /// This function **panics** if `self.stack` does not contain any
+    /// `Frame::Builtin` item.
+    fn builtin_name(&self) -> &Field {
+        self.stack.builtin_name()
+    }
+}
 
 /// Part of the execution environment that allows printing to the standard
 /// output.
@@ -98,4 +142,23 @@ where
 {
     yash_env::io::print_message(env, error).await;
     (ExitStatus::ERROR, Continue(()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builtin_name_in_stack() {
+        let name = Field::dummy("my built-in");
+        let stack = Stack::from(vec![Frame::Builtin { name }]);
+        // TODO Test with a stack containing a frame other than Frame::Builtin
+        assert_eq!(stack.builtin_name().value, "my built-in");
+    }
+
+    #[test]
+    #[should_panic(expected = "a Frame::Builtin must be in the stack")]
+    fn builtin_name_not_in_stack() {
+        let _ = Stack::from(vec![]).builtin_name();
+    }
 }
