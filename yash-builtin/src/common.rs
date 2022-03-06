@@ -22,6 +22,7 @@
 
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
+use yash_env::io::print_error;
 use yash_env::io::Fd;
 #[doc(no_inline)]
 pub use yash_env::io::Stderr;
@@ -108,16 +109,18 @@ pub trait Print {
 }
 
 #[async_trait(?Send)]
-impl<T: Stdout + Stderr> Print for T {
+impl<T: BuiltinName + Stdout + Stderr> Print for T {
     async fn print(&mut self, text: &str) -> ExitStatus {
         match self.try_print(text).await {
             Ok(()) => ExitStatus::SUCCESS,
             Err(errno) => {
-                // TODO print error location using yash_env::io::print_error
-                self.print_error(&format!(
-                    "cannot print to the standard output: {}\n",
-                    errno.desc()
-                ))
+                let location = self.builtin_name().origin.clone();
+                print_error(
+                    self,
+                    errno.desc().into(),
+                    "cannot print results to the standard output".into(),
+                    &location,
+                )
                 .await;
                 ExitStatus::FAILURE
             }

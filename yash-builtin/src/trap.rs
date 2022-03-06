@@ -21,6 +21,7 @@
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::print_error_message;
+use crate::common::BuiltinName;
 use crate::common::Print;
 use crate::common::Stderr;
 use crate::common::Stdout;
@@ -40,7 +41,7 @@ use yash_quote::quote;
 use yash_syntax::source::Location;
 
 /// Part of the shell execution environment the trap built-in depends on.
-pub trait Env: Stdout + Stderr {
+pub trait Env: BuiltinName + Stdout + Stderr {
     /// Returns an iterator for currently configured trap actions.
     fn iter(&self) -> Iter<'_>;
 
@@ -171,6 +172,7 @@ mod tests {
     use futures_util::future::FutureExt;
     use std::rc::Rc;
     use yash_env::io::Fd;
+    use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
     use yash_env::Env;
     use yash_env::VirtualSystem;
@@ -274,10 +276,13 @@ mod tests {
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("trap"),
+        });
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = builtin_body(&mut *env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = block_on(builtin_body(&mut *env, vec![]));
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
