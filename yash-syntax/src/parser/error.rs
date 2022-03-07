@@ -49,9 +49,8 @@ pub enum SyntaxError {
     UnclosedBackquote { opening_location: Location },
     /// An arithmetic expansion lacks a closing `))`.
     UnclosedArith { opening_location: Location },
-    // TODO Should we remove `UnexpectedToken` in favor of other error types?
-    /// Unexpected token.
-    UnexpectedToken,
+    /// A command begins with an inappropriate keyword or operator token.
+    InvalidCommandToken,
     /// The file descriptor specified for a redirection cannot be used.
     FdOutOfRange,
     /// A redirection operator is missing its operand.
@@ -159,7 +158,7 @@ impl SyntaxError {
             UnclosedCommandSubstitution { .. } => "The command substitution is not closed",
             UnclosedBackquote { .. } => "The backquote is not closed",
             UnclosedArith { .. } => "The arithmetic expansion is not closed",
-            UnexpectedToken => "Unexpected token",
+            InvalidCommandToken => "The command starts with an inappropriate token",
             FdOutOfRange => "The file descriptor is too large",
             MissingRedirOperand => "The redirection operator is missing its operand",
             MissingHereDocDelimiter => "The here-document operator is missing its delimiter",
@@ -244,7 +243,7 @@ impl SyntaxError {
             EmptyParam => "expected a parameter name",
             UnclosedBackquote { .. } => "expected '`'",
             UnclosedArith { .. } => "expected `))`",
-            UnexpectedToken => "unexpected token",
+            InvalidCommandToken => "does not begin a valid command",
             FdOutOfRange => "unsupported file descriptor",
             MissingRedirOperand => "expected a redirection operand",
             MissingHereDocDelimiter => "expected a delimiter word",

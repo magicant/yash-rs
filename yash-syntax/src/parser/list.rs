@@ -114,7 +114,7 @@ impl Parser<'_, '_> {
             if next.id != EndOfInput {
                 // TODO Return a better error depending on the token id of the peeked token
                 return Err(Error {
-                    cause: SyntaxError::UnexpectedToken.into(),
+                    cause: SyntaxError::InvalidCommandToken.into(),
                     location: next.word.location.clone(),
                 });
             }
@@ -318,7 +318,10 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let e = block_on(parser.command_line()).unwrap_err();
-        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnexpectedToken));
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
+        );
         assert_eq!(*e.location.code.value.borrow(), "foo)");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
