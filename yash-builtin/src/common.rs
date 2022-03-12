@@ -140,8 +140,7 @@ pub async fn print_error_message<'a, E, F>(
 ) -> (ExitStatus, yash_env::semantics::Result)
 where
     E: Stderr,
-    F: 'a,
-    Message<'a>: From<F>,
+    F: Into<Message<'a>> + 'a,
 {
     yash_env::io::print_message(env, error).await;
     (ExitStatus::ERROR, Continue(()))

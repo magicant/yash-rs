@@ -62,10 +62,10 @@ impl Stderr for String {
 /// This function converts the `error` into a [`Message`] which in turn is
 /// converted into [`Snippet`] and then [`DisplayList`].
 /// The result is printed to the standard error using [`Stderr::print_error`].
-pub async fn print_message<'a, Env: Stderr, E>(env: &mut Env, error: E)
+pub async fn print_message<'a, Env, E>(env: &mut Env, error: E)
 where
-    E: 'a,
-    Message<'a>: From<E>,
+    Env: Stderr,
+    E: Into<Message<'a>> + 'a,
 {
     async fn inner(stderr: &mut dyn Stderr, m: Message<'_>) {
         let mut s = Snippet::from(&m);
