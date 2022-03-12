@@ -131,7 +131,7 @@ impl<T: BuiltinName + Stdout + Stderr> Print for T {
 /// Prints an error message.
 ///
 /// This function prepares a [`Message`] from the given error and prints it to
-/// the standard error using {`yash_env::io::print_message`}.
+/// the standard error using [`yash_env::io::print_message`].
 ///
 /// Returns `(ExitStatus::ERROR, ControlFlow::Continue(()))`.
 pub async fn print_error_message<'a, E, F>(
