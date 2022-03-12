@@ -77,6 +77,24 @@ pub enum Operator {
     BarBar,
 }
 
+impl Operator {
+    /// Determines if this token can be a delimiter of a clause.
+    ///
+    /// This function returns `true` for `CloseParen` and `SemicolonSemicolon`,
+    /// and `false` for others.
+    pub fn is_clause_delimiter(self) -> bool {
+        use Operator::*;
+        match self {
+            CloseParen | SemicolonSemicolon => true,
+            Newline | And | AndAnd | OpenParen | Semicolon | Less | LessAnd | LessOpenParen
+            | LessLess | LessLessDash | LessLessLess | LessGreater | Greater | GreaterAnd
+            | GreaterOpenParen | GreaterGreater | GreaterGreaterBar | GreaterBar | Bar | BarBar => {
+                false
+            }
+        }
+    }
+}
+
 impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Operator::*;

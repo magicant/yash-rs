@@ -90,6 +90,25 @@ pub enum TokenId {
     EndOfInput,
 }
 
+impl TokenId {
+    /// Determines if this token can be a delimiter of a clause.
+    ///
+    /// This function delegates to [`Keyword::is_clause_delimiter`] if the token
+    /// ID is a (possible) keyword, or to [`Operator::is_clause_delimiter`] if
+    /// it is an operator. For `EndOfInput` the function returns true.
+    /// Otherwise, the result is false.
+    pub fn is_clause_delimiter(self) -> bool {
+        use TokenId::*;
+        match self {
+            Token(Some(keyword)) => keyword.is_clause_delimiter(),
+            Token(None) => false,
+            Operator(operator) => operator.is_clause_delimiter(),
+            IoNumber => false,
+            EndOfInput => true,
+        }
+    }
+}
+
 /// Result of lexical analysis produced by the [`Lexer`].
 #[derive(Debug)]
 pub struct Token {

@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - Unreleased
 
+### Added
+
+- `parser::lex::Keyword::is_clause_delimiter`
+- `parser::lex::Operator::is_clause_delimiter`
+- `parser::lex::TokenId::is_clause_delimiter`
+
 ### Changed
 
 - `parser::Error` now `non_exhaustive`
 - `parser::Error::UnexpectedToken` renamed to `InvalidCommandToken`
+- `parser::Parser::maybe_compound_list` now returning an `InvalidCommandToken`
+error if the list is delimited by a token that is not a clause delimiter.
 
 ## [0.4.0] - 2022-02-27
 

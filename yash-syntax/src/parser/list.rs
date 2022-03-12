@@ -79,6 +79,7 @@ impl Parser<'_, '_> {
         Ok(Rec::Parsed(List(items)))
     }
 
+    // TODO Consider returning Result<Result<(), &Token>, Error>
     /// Parses an optional newline token and here-document contents.
     ///
     /// If the current token is a newline, it is consumed and any pending here-document contents
@@ -134,8 +135,10 @@ impl Parser<'_, '_> {
     /// newlines.
     ///
     /// This function stops parsing on encountering an unexpected token that
-    /// cannot be parsed as the beginning of an and-or list. The caller should
-    /// check that the next token is an expected one.
+    /// cannot be parsed as the beginning of an and-or list. If the token is a
+    /// possible [clause delimiter](super::lex::TokenId::is_clause_delimiter),
+    /// the result is a list of commands that have been parsed up to the token.
+    /// Otherwise, an `InvalidCommandToken` error is returned.
     pub async fn maybe_compound_list(&mut self) -> Result<List> {
         let mut items = vec![];
 
@@ -152,7 +155,14 @@ impl Parser<'_, '_> {
             }
         }
 
-        Ok(List(items))
+        let next = self.peek_token().await?;
+        if next.id.is_clause_delimiter() {
+            Ok(List(items))
+        } else {
+            let cause = SyntaxError::InvalidCommandToken.into();
+            let location = next.word.location.clone();
+            Err(Error { cause, location })
+        }
     }
 
     /// Like [`maybe_compound_list`](Self::maybe_compound_list), but returns the future in a pinned box.
@@ -326,5 +336,83 @@ mod tests {
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
         assert_eq!(e.location.range, 3..4);
+    }
+
+    #[test]
+    fn parser_maybe_compound_list_empty() {
+        let mut lexer = Lexer::from_memory("", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let list = block_on(parser.maybe_compound_list()).unwrap();
+        assert_eq!(list.0, []);
+    }
+
+    #[test]
+    fn parser_maybe_compound_list_some_commands() {
+        let mut lexer = Lexer::from_memory("echo; ls& cat", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let list = block_on(parser.maybe_compound_list()).unwrap();
+        assert_eq!(list.to_string(), "echo; ls& cat");
+    }
+
+    #[test]
+    fn parser_maybe_compound_list_some_commands_with_newline() {
+        let mut lexer = Lexer::from_memory("echo& ls\n\ncat\n\n", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let list = block_on(parser.maybe_compound_list()).unwrap();
+        assert_eq!(list.to_string(), "echo& ls; cat");
+
+        assert_eq!(lexer.index(), 15);
+    }
+
+    #[test]
+    fn parser_maybe_compound_list_empty_with_delimiter() {
+        let mut lexer = Lexer::from_memory("}", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let list = block_on(parser.maybe_compound_list()).unwrap();
+        assert_eq!(list.0, []);
+    }
+
+    // TODO Test maybe_compound_list with alias substitution
+
+    #[test]
+    fn parser_maybe_compound_list_empty_with_invalid_delimiter() {
+        let mut lexer = Lexer::from_memory(";", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let e = block_on(parser.maybe_compound_list()).unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
+        );
+        assert_eq!(*e.location.code.value.borrow(), ";");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 0..1);
+    }
+
+    #[test]
+    fn parser_maybe_compound_list_some_commands_with_invalid_delimiter() {
+        let mut lexer = Lexer::from_memory("echo; ls\n &", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let e = block_on(parser.maybe_compound_list()).unwrap_err();
+        assert_eq!(
+            e.cause,
+            ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
+        );
+        assert_eq!(*e.location.code.value.borrow(), "echo; ls\n &");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 10..11);
     }
 }
