@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::lex::Keyword::is_clause_delimiter`
 - `parser::lex::Operator::is_clause_delimiter`
 - `parser::lex::TokenId::is_clause_delimiter`
+- `impl std::error::Error for parser::Error`
 
 ### Changed
 

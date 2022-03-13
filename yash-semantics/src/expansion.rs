@@ -143,12 +143,31 @@ impl ErrorCause {
     }
 }
 
+impl std::fmt::Display for ErrorCause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ErrorCause::*;
+        match self {
+            Dummy(message) => message.fmt(f),
+            CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
+            AssignReadOnly(error) => error.fmt(f),
+        }
+    }
+}
+
 /// Explanation of an expansion failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.cause.fmt(f)
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {

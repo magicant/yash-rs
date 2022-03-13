@@ -237,6 +237,8 @@ pub enum Scope {
     Volatile,
 }
 
+// TODO Rename to AssignReadOnlyError
+// TODO Add UnsetReadOnlyError that does not have the new_value field
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReadOnlyError {
@@ -247,6 +249,14 @@ pub struct ReadOnlyError {
     /// New variable that was tried to assign.
     pub new_value: Variable,
 }
+
+impl std::fmt::Display for ReadOnlyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "variable `{}` is read-only", self.name)
+    }
+}
+
+impl std::error::Error for ReadOnlyError {}
 
 impl VariableSet {
     /// Creates an empty variable set.

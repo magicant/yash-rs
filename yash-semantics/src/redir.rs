@@ -133,6 +133,23 @@ impl ErrorCause {
     }
 }
 
+impl std::fmt::Display for ErrorCause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ErrorCause::*;
+        match self {
+            Expansion(e) => e.fmt(f),
+            NulByte(error) => error.fmt(f),
+            FdNotOverwritten(_fd, errno) => errno.fmt(f),
+            OpenFile(path, errno) => write!(
+                f,
+                "cannot open file `{}`: {}",
+                path.to_string_lossy(),
+                errno
+            ),
+        }
+    }
+}
+
 impl From<crate::expansion::ErrorCause> for ErrorCause {
     fn from(cause: crate::expansion::ErrorCause) -> Self {
         ErrorCause::Expansion(cause)
@@ -151,6 +168,14 @@ pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.cause.fmt(f)
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<crate::expansion::Error> for Error {
     fn from(e: crate::expansion::Error) -> Self {

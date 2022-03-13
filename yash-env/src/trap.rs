@@ -100,6 +100,20 @@ pub enum SetTrapError {
     SystemError(Errno),
 }
 
+impl std::fmt::Display for SetTrapError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SetTrapError::*;
+        match self {
+            InitiallyIgnored => "the signal has been ignored since startup".fmt(f),
+            SIGKILL => "cannot set a trap for SIGKILL".fmt(f),
+            SIGSTOP => "cannot set a trap for SIGSTOP".fmt(f),
+            SystemError(errno) => errno.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for SetTrapError {}
+
 impl From<Errno> for SetTrapError {
     fn from(errno: Errno) -> Self {
         SetTrapError::SystemError(errno)

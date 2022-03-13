@@ -327,7 +327,7 @@ impl SyntaxError {
 
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.message())
+        self.message().fmt(f)
     }
 }
 
@@ -415,12 +415,11 @@ pub struct Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.cause)
-        // TODO Print Location
+        self.cause.fmt(f)
     }
 }
 
-// TODO Consider implementing std::error::Error for self::Error
+impl std::error::Error for Error {}
 
 impl<'a> From<&'a Error> for Message<'a> {
     fn from(e: &'a Error) -> Self {
