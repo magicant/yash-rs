@@ -15,6 +15,20 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Type definitions for signal handling settings.
+//!
+//! [`TrapSet`] is part of an [`Env`](crate::Env) that remembers the trap
+//! configured for each signal and manages the signal handlers installed to the
+//! underlying system. `TrapSet` acts as a decorator for a [`SignalSystem`]
+//! implementor. Methods of `TrapSet` expect they are passed the same system
+//! instance in every call.
+//!
+//! `TrapSet` manages two types of signal handling configurations. One is
+//! user-defined traps, which the user explicitly configures with the trap
+//! built-in. The other is internal handlers, which the shell implicitly
+//! installs to implement additional actions the shell must perform.
+//! `TrapSet` merges the two configurations into a single
+//! [`system::SignalHandling`](SignalHandling) for each signal and sets it to
+//! the system.
 
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
@@ -175,18 +189,7 @@ impl<'a> Iterator for Iter<'a> {
 
 /// Collection of signal handling settings.
 ///
-/// A `TrapSet` remembers the trap configured for each signal and manages the
-/// signal handlers installed to the underlying system. `TrapSet` acts as a
-/// decorator for a system implementing [`SignalSystem`]. Methods of `TrapSet`
-/// expect to be passed the same system instance in every call.
-///
-/// `TrapSet` manages two types of signal handling configurations. One is
-/// user-defined traps, which the user explicitly configures with the trap
-/// built-in. The other is internal handlers, which the shell implicitly
-/// installs to implement additional actions the shell must perform.
-/// `TrapSet` merges the two configurations into a single
-/// [`system::SignalHandling`](SignalHandling) for each signal and sets it to
-/// the system.
+/// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
     signals: BTreeMap<Signal, SignalState>,

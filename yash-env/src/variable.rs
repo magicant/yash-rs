@@ -14,9 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for variables.
+//! Type definitions for shell variables.
 //!
-//! This module provides data types for defining shell variables.
+//! A [`VariableSet`] is a stack of contexts, and a _context_ is a map of
+//! name-variable pairs. The `VariableSet` has a _base context_ with the same
+//! lifetime as the `VariableSet` itself. Additional contexts can be added
+//! (pushed) and removed (popped) on a last-in-first-out basis.
+//!
+//! You can define any number of [`Variable`]s in a context.
+//! A new context is empty when pushed to the variable set.
+//! You can pop a context regardless of whether it is empty or not;
+//! all the variables in the popped context are removed as well.
+//!
+//! Variables in a context hide those with the same name in lower contexts. You
+//! cannot access such hidden variables until removing the hiding variable from
+//! the upper context.
+//!
+//! Each regular context has a special array variable called positional
+//! parameters. Because it does not have a name as a variable, you need to use
+//! dedicated methods for accessing it.
+//! See [`VariableSet::positional_params`] and its [mut
+//! variant](VariableSet::positional_params_mut).
+//!
+//! You should use [`ScopeGuard`] to ensure contexts are pushed and popped
+//! correctly. See its documentation for details.
 
 use crate::Env;
 use either::{Left, Right};
@@ -157,27 +178,7 @@ impl Context {
 
 /// Collection of variables.
 ///
-/// A `VariableSet` is a stack of contexts, and a _context_ is a map of
-/// name-variable pairs. The `VariableSet` has a _base context_ that has the
-/// same lifetime as the `VariableSet` itself. Additional contexts can be pushed
-/// and popped on a last-in-first-out basis.
-///
-/// You can define any number of variables in a context. A new context is empty
-/// when pushed. You can pop a context regardless of whether it is empty or not;
-/// all the variables in the context are removed together.
-///
-/// Variables in a context hide those with the same name in lower contexts. You
-/// cannot access such hidden variables until you remove the hiding variable
-/// from the upper context.
-///
-/// Each regular context has a special array variable called positional
-/// parameters. Because it does not have a name as a variable, you need to use
-/// dedicated methods for accessing it.
-/// See [`positional_params`](Self::positional_params) and
-/// [`positional_params_mut`](Self::positional_params_mut).
-///
-/// You should use [`ScopeGuard`] for pushing and popping contexts. See its
-/// documentation for details.
+/// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VariableSet {
     /// Hash map containing all variables.
