@@ -249,6 +249,10 @@ impl System for RealSystem {
         nix::sys::select::pselect(None, readers, writers, None, timeout, signal_mask)
     }
 
+    fn getpid(&self) -> Pid {
+        nix::unistd::getpid()
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

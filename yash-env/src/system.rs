@@ -236,6 +236,9 @@ pub trait System: Debug {
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int>;
 
+    /// Returns the process ID of the current process.
+    fn getpid(&self) -> Pid;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -618,6 +621,9 @@ impl System for SharedSystem {
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
         (**self.0.borrow_mut()).select(readers, writers, timeout, signal_mask)
+    }
+    fn getpid(&self) -> Pid {
+        self.0.borrow().getpid()
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
