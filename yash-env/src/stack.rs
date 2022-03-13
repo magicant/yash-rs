@@ -44,7 +44,9 @@ pub enum Frame {
         /// Name of the built-in
         name: Field,
     },
-    // TODO Loops, subshell, dot script, eval, trap
+    /// Trap
+    Trap,
+    // TODO Loops, subshell, dot script, eval
 }
 
 /// Runtime execution context stack

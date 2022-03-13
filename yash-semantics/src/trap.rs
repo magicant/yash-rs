@@ -44,6 +44,7 @@
 use crate::read_eval_loop_boxed;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::trap::Trap;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
@@ -51,15 +52,27 @@ use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
 
+fn in_trap(env: &Env) -> bool {
+    env.stack.iter().any(|frame| frame == &Frame::Trap)
+}
+
 /// Runs trap commands for signals that have been caught.
 ///
 /// This function resets the `pending` flag of caught signals by calling
 /// [`TrapSet::take_caught_signal`]. See the [module doc](self) for more
 /// details.
+///
+/// If we are already running a trap, this function does not run any traps to
+/// prevent unintended behavior of trap actions. Most shell script writers do
+/// not care for the reentrance of trap actions, so we should not assume they
+/// are reentrant.
 pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
     env.poll_signals();
 
-    // TODO Prevent running traps while running another
+    if in_trap(env) {
+        // Do not run a trap action while running another
+        return Continue(());
+    }
 
     while let Some((signal, state)) = env.traps.take_caught_signal() {
         let code = if let Trap::Command(command) = &state.action {
@@ -70,9 +83,9 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let condition = signal.to_string();
         let origin = state.origin.clone();
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
+        let mut env = env.push_frame(Frame::Trap);
         let previous_exit_status = env.exit_status;
-        // TODO Update control flow stack
-        read_eval_loop_boxed(env, &mut lexer).await?;
+        read_eval_loop_boxed(&mut env, &mut lexer).await?;
         env.exit_status = previous_exit_status;
     }
 
@@ -84,10 +97,15 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use std::future::Future;
     use std::ops::ControlFlow::Break;
+    use std::pin::Pin;
+    use yash_env::builtin::Builtin;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
     use yash_env::VirtualSystem;
@@ -164,6 +182,56 @@ mod tests {
                 .content,
             b"trapped\n"
         );
+    }
+
+    #[test]
+    fn no_reentrance() {
+        let (mut env, system) = signal_env();
+        raise_signal(&system, Signal::SIGINT);
+        let mut env = env.push_frame(Frame::Trap);
+        let result = block_on(run_traps_for_caught_signals(&mut env));
+        assert_eq!(result, Continue(()));
+        assert_eq!(
+            system
+                .state
+                .borrow()
+                .file_system
+                .get("/dev/stdout")
+                .unwrap()
+                .borrow()
+                .content,
+            []
+        );
+    }
+
+    // TODO still allow reentrance if in subshell in trap
+
+    #[test]
+    fn stack_frame_in_trap_action() {
+        fn execute(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                assert_matches!(&env.stack[0], Frame::Trap);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        let system = VirtualSystem::default();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("check", Builtin { r#type, execute });
+        env.traps
+            .set_trap(
+                &mut env.system,
+                Signal::SIGINT,
+                Trap::Command("check".to_string()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        raise_signal(&system, Signal::SIGINT);
+        let _ = block_on(run_traps_for_caught_signals(&mut env));
     }
 
     #[test]
