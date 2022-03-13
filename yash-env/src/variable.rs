@@ -148,6 +148,9 @@ pub enum ContextType {
 }
 
 /// Variable context.
+///
+/// Variables defined in the context are not stored in this struct.
+/// See `VariableSet::all_variables`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Context {
     /// Context type.
@@ -185,6 +188,10 @@ pub struct VariableSet {
     ///
     /// The value of a hash map entry is a stack of variables defined in
     /// contexts, sorted in the ascending order of the context index.
+    ///
+    /// Having the variables of all the contexts in this single hash map makes
+    /// the variable search faster than having a separate hash map for each
+    /// context.
     all_variables: HashMap<String, Vec<VariableInContext>>,
 
     /// Stack of contexts.
@@ -219,9 +226,9 @@ pub enum Scope {
 
     /// Assigns to the topmost regular context.
     ///
-    /// Any existing variables below the topmost regular context do not affect
-    /// this type of assignment. Existing variables above the topmost regular
-    /// context are removed.
+    /// Any existing variables below the topmost [regular](ContextType::Regular)
+    /// context do not affect this type of assignment. Existing variables above
+    /// the topmost regular context are removed.
     ///
     /// If the `VariableSet` only has the base context, the variable is assigned
     /// to it anyway.
