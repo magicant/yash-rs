@@ -105,7 +105,7 @@ fn expand_special_parameter<'a, E: Env>(env: &'a mut E, name: &str) -> Option<Pa
         '#' => todo!(),
         '?' => Some(env.exit_status().to_string().into()),
         '-' => todo!(),
-        '$' => todo!(),
+        '$' => Some(env.main_pid().to_string().into()),
         '!' => Some(env.last_async_pid().to_string().into()),
         '0' => todo!(),
         _ => None,
@@ -250,6 +250,9 @@ mod tests {
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
             unimplemented!("not available for Singleton");
         }
+        fn main_pid(&self) -> yash_env::job::Pid {
+            unimplemented!("not available for Singleton");
+        }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
             unimplemented!("not available for Singleton");
         }
@@ -313,6 +316,9 @@ mod tests {
             unimplemented!("not available for PositionalParams");
         }
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
+            unimplemented!("not available for PositionalParams");
+        }
+        fn main_pid(&self) -> yash_env::job::Pid {
             unimplemented!("not available for PositionalParams");
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
@@ -497,6 +503,26 @@ mod tests {
                     is_quoting: false,
                 }
             ]
+        );
+    }
+
+    #[test]
+    fn name_only_param_special_parameter_main_pid() {
+        let system = VirtualSystem::new();
+        let mut env = yash_env::Env::with_system(Box::new(system));
+        let mut field = Vec::<AttrChar>::default();
+        let mut output = Output::new(&mut field);
+        let location = Location::dummy("");
+        let p = ParamRef::from_name_and_location("$", &location);
+        block_on(p.expand(&mut env, &mut output)).unwrap();
+        assert_eq!(
+            field,
+            [AttrChar {
+                value: '2',
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            }]
         );
     }
 

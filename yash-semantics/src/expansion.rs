@@ -234,6 +234,12 @@ pub trait Env: std::fmt::Debug {
     /// [`exit_status`](Self::exit_status).
     fn save_command_subst_exit_status(&mut self, exit_status: ExitStatus);
 
+    /// Gets the process ID of the main shell process.
+    ///
+    /// Note that this value never changes in a single shell session, even in
+    /// subshells.
+    fn main_pid(&self) -> Pid;
+
     /// Gets the process ID of the last executed asynchronous command.
     ///
     /// This function marks the process ID as known by the user so that the
@@ -296,6 +302,9 @@ impl Env for yash_env::Env {
     ///
     /// See also [`ExitStatusAdapter`].
     fn save_command_subst_exit_status(&mut self, _: ExitStatus) {}
+    fn main_pid(&self) -> Pid {
+        self.main_pid
+    }
     fn last_async_pid(&mut self) -> Pid {
         self.jobs.expand_last_async_pid()
     }
@@ -393,6 +402,9 @@ impl<E: Env> Env for ExitStatusAdapter<'_, E> {
     }
     fn save_command_subst_exit_status(&mut self, exit_status: ExitStatus) {
         self.command_subst_exit_status = Some(exit_status);
+    }
+    fn main_pid(&self) -> Pid {
+        self.env.main_pid()
     }
     fn last_async_pid(&mut self) -> Pid {
         self.env.last_async_pid()
@@ -770,6 +782,9 @@ mod tests {
             unimplemented!("NullEnv's method must not be called")
         }
         fn save_command_subst_exit_status(&mut self, _: ExitStatus) {
+            unimplemented!("NullEnv's method must not be called")
+        }
+        fn main_pid(&self) -> yash_env::job::Pid {
             unimplemented!("NullEnv's method must not be called")
         }
         fn last_async_pid(&mut self) -> yash_env::job::Pid {
