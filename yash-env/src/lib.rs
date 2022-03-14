@@ -86,6 +86,7 @@ use yash_syntax::alias::AliasSet;
 /// deep copy of the system-managed parts. See also
 /// [`clone_with_system`](Self::clone_with_system).
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Env {
     /// Aliases defined in the environment.
     pub aliases: AliasSet,
@@ -102,6 +103,11 @@ pub struct Env {
     /// Jobs managed in the environment.
     pub jobs: JobSet,
 
+    /// Process ID of the main shell process.
+    ///
+    /// This PID represents the value of the `$` special parameter.
+    pub main_pid: Pid,
+
     /// Runtime execution context stack.
     pub stack: Stack,
 
@@ -117,6 +123,10 @@ pub struct Env {
 
 impl Env {
     /// Creates a new environment with the given system.
+    ///
+    /// Members of the new environments are default-constructed except that:
+    /// - `main_pid` is initialized as `system.getpid()`
+    /// - `system` is initialized as `SharedSystem::new(system)`
     pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
@@ -124,6 +134,7 @@ impl Env {
             exit_status: Default::default(),
             functions: Default::default(),
             jobs: Default::default(),
+            main_pid: system.getpid(),
             stack: Default::default(),
             traps: Default::default(),
             variables: Default::default(),
@@ -148,6 +159,7 @@ impl Env {
             exit_status: self.exit_status,
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
+            main_pid: self.main_pid,
             stack: self.stack.clone(),
             traps: self.traps.clone(),
             variables: self.variables.clone(),
