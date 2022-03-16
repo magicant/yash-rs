@@ -59,10 +59,11 @@
 
 mod command_subst;
 mod param;
-mod quote_removal;
+pub mod quote_removal;
 mod text;
 mod word;
 
+use self::quote_removal::*;
 use async_trait::async_trait;
 use std::borrow::Cow;
 use std::future::Future;
@@ -88,8 +89,6 @@ use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
-
-pub use quote_removal::*;
 
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
