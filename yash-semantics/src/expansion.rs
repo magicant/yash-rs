@@ -57,12 +57,16 @@
 //! that removes quotes from the field. It takes an [`AttrField`] input and
 //! returns a [`Field`].
 
+pub mod attr;
 mod command_subst;
 mod param;
 pub mod quote_removal;
 mod text;
 mod word;
 
+use self::attr::AttrChar;
+use self::attr::AttrField;
+use self::attr::Origin;
 use self::quote_removal::*;
 use async_trait::async_trait;
 use std::borrow::Cow;
@@ -442,49 +446,6 @@ impl<E: ContextStack> ContextStack for ExitStatusAdapter<'_, E> {
     fn pop_context(&mut self) {
         self.env.pop_context()
     }
-}
-
-/// Origin of a character produced in the initial expansion.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Origin {
-    /// The character appeared literally in the original word.
-    Literal,
-    /// The character originates from a tilde expansion or sequencing brace expansion.
-    ///
-    /// This kind of character is treated literally in the pathname expansion.
-    HardExpansion,
-    /// The character originates from a parameter expansion, command substitution, or arithmetic expansion.
-    ///
-    /// This kind of character is subject to field splitting where applicable.
-    SoftExpansion,
-}
-
-/// Character with attributes describing its origin.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct AttrChar {
-    /// Character value.
-    pub value: char,
-    /// Character origin.
-    pub origin: Origin,
-    /// Whether this character is quoted by another character.
-    pub is_quoted: bool,
-    /// Whether this is a quotation character that quotes another character.
-    ///
-    /// Note that a character can be both quoting and quoted. For example, the
-    /// backslash in `"\$"` quotes the dollar and is quoted by the
-    /// double-quotes.
-    pub is_quoting: bool,
-}
-
-/// Result of the initial expansion.
-///
-/// An `AttrField` is a string of `AttrChar`s with the location of the word.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AttrField {
-    /// Value of the field.
-    pub chars: Vec<AttrChar>,
-    /// Location of the word this field resulted from.
-    pub origin: Location,
 }
 
 /// Interface to accumulate results of the initial expansion.
