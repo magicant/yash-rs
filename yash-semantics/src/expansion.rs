@@ -59,6 +59,7 @@
 
 pub mod attr;
 mod command_subst;
+pub mod initial;
 mod param;
 pub mod phrase;
 pub mod quote_removal;
