@@ -60,6 +60,7 @@
 pub mod attr;
 mod command_subst;
 mod param;
+pub mod phrase;
 pub mod quote_removal;
 mod text;
 mod word;
