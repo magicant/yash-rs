@@ -173,6 +173,8 @@ pub trait Expand {
     ) -> Result<Phrase, Error>;
 }
 
+mod slice;
+
 #[cfg(test)]
 mod tests {
     use super::*;
