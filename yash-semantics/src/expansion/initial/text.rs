@@ -26,6 +26,7 @@ use super::QuickExpand::{self, Interim, Ready};
 use async_trait::async_trait;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
+use yash_syntax::syntax::Unquote;
 
 /// Expands the text unit.
 ///
@@ -103,8 +104,7 @@ impl Expand for TextUnit {
             ]))),
             RawParam { .. } => todo!(),
             BracedParam(_) => todo!(),
-            CommandSubst { .. } => Interim(()),
-            Backquote { .. } => todo!(),
+            CommandSubst { .. } | Backquote { .. } => Interim(()),
             Arith { .. } => todo!(),
         }
     }
@@ -120,7 +120,11 @@ impl Expand for TextUnit {
                 let location = location.clone();
                 super::command_subst::expand(command, location, env).await
             }
-            Backquote { .. } => todo!(),
+            Backquote { content, location } => {
+                let command = content.unquote().0;
+                let location = location.clone();
+                super::command_subst::expand(command, location, env).await
+            }
             Arith { .. } => todo!(),
         }
     }
@@ -267,6 +271,67 @@ mod tests {
             let result = subst.async_expand(&mut env, ()).await;
             let c = AttrChar {
                 value: '-',
+                origin: Origin::SoftExpansion,
+                is_quoted: true,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Char(c)));
+        })
+    }
+
+    #[test]
+    fn backquote_unquoted() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            let mut env = Env::new(&mut env);
+            use yash_syntax::syntax::BackquoteUnit::*;
+            let subst = TextUnit::Backquote {
+                content: vec![
+                    Literal('e'),
+                    Literal('c'),
+                    Literal('h'),
+                    Literal('o'),
+                    Literal(' '),
+                    Backslashed('\\'),
+                    Backslashed('\\'),
+                ],
+                location: Location::dummy(""),
+            };
+            assert_matches!(subst.quick_expand(&mut env), Interim(()));
+            let result = subst.async_expand(&mut env, ()).await;
+            let c = AttrChar {
+                value: '\\',
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Char(c)));
+        })
+    }
+
+    #[test]
+    fn backquote_quoted() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            let mut env = Env::new(&mut env);
+            let mut env = env.begin_quote();
+            use yash_syntax::syntax::BackquoteUnit::*;
+            let subst = TextUnit::Backquote {
+                content: vec![
+                    Literal('e'),
+                    Literal('c'),
+                    Literal('h'),
+                    Literal('o'),
+                    Literal(' '),
+                    Backslashed('\\'),
+                    Backslashed('\\'),
+                ],
+                location: Location::dummy(""),
+            };
+            assert_matches!(subst.quick_expand(&mut env), Interim(()));
+            let result = subst.async_expand(&mut env, ()).await;
+            let c = AttrChar {
+                value: '\\',
                 origin: Origin::SoftExpansion,
                 is_quoted: true,
                 is_quoting: false,
