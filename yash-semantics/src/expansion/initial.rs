@@ -174,6 +174,7 @@ pub trait Expand {
 }
 
 mod slice;
+mod text;
 
 #[cfg(test)]
 mod tests {
