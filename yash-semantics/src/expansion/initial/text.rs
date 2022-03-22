@@ -87,7 +87,20 @@ impl Expand for TextUnit {
                 is_quoted: env.is_quoted,
                 is_quoting: false,
             }))),
-            Backslashed(_) => todo!(),
+            &Backslashed(value) => Ready(Ok(Phrase::Field(vec![
+                AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: env.is_quoted,
+                    is_quoting: true,
+                },
+                AttrChar {
+                    value,
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                },
+            ]))),
             RawParam { .. } => todo!(),
             BracedParam(_) => todo!(),
             CommandSubst { .. } => todo!(),
@@ -99,7 +112,7 @@ impl Expand for TextUnit {
     async fn async_expand(&self, _env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
         match self {
             Literal(_) => unimplemented!("async_expand not expecting Literal"),
-            Backslashed(_) => todo!(),
+            Backslashed(_) => unimplemented!("async_expand not expecting Backslashed"),
             RawParam { .. } => todo!(),
             BracedParam(_) => todo!(),
             CommandSubst { .. } => todo!(),
@@ -167,6 +180,48 @@ mod tests {
                 is_quoting: false,
             };
             assert_eq!(result, Ok(Phrase::Char(c)));
+        });
+    }
+
+    #[test]
+    fn backslashed_unquoted() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        assert_matches!(Backslashed('L').quick_expand(&mut env), Ready(result) => {
+            let bs = AttrChar {
+                value: '\\',
+                origin: Origin::Literal,
+                is_quoted: false,
+                is_quoting: true,
+            };
+            let c = AttrChar {
+                value: 'L',
+                origin: Origin::Literal,
+                is_quoted: true,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
+        });
+    }
+
+    #[test]
+    fn backslashed_quoted() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let mut env = env.begin_quote();
+        assert_matches!(Backslashed('$').quick_expand(&mut env), Ready(result) => {
+            let bs = AttrChar {
+                value: '\\',
+                origin: Origin::Literal,
+                is_quoted: true,
+                is_quoting: true,
+            };
+            let c = AttrChar {
+                value: '$',
+                is_quoting: false,
+                ..bs
+            };
+            assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
         });
     }
 }
