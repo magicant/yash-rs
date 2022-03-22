@@ -431,6 +431,7 @@ pub enum TextUnit {
     BracedParam(Param),
     /// Command substitution of the form `$(...)`.
     CommandSubst {
+        // TODO content should be Rc<str> to avoid cloning before forking
         /// Command string that will be parsed and executed when the command
         /// substitution is expanded.
         content: String,

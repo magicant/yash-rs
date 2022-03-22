@@ -103,19 +103,23 @@ impl Expand for TextUnit {
             ]))),
             RawParam { .. } => todo!(),
             BracedParam(_) => todo!(),
-            CommandSubst { .. } => todo!(),
+            CommandSubst { .. } => Interim(()),
             Backquote { .. } => todo!(),
             Arith { .. } => todo!(),
         }
     }
 
-    async fn async_expand(&self, _env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
+    async fn async_expand(&self, env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
         match self {
             Literal(_) => unimplemented!("async_expand not expecting Literal"),
             Backslashed(_) => unimplemented!("async_expand not expecting Backslashed"),
             RawParam { .. } => todo!(),
             BracedParam(_) => todo!(),
-            CommandSubst { .. } => todo!(),
+            CommandSubst { content, location } => {
+                let command = content.clone();
+                let location = location.clone();
+                super::command_subst::expand(command, location, env).await
+            }
             Backquote { .. } => todo!(),
             Arith { .. } => todo!(),
         }
@@ -150,7 +154,10 @@ impl Expand for Text {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
     use assert_matches::assert_matches;
+    use yash_syntax::source::Location;
 
     #[test]
     fn literal_unquoted() {
@@ -223,5 +230,48 @@ mod tests {
             };
             assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
         });
+    }
+
+    #[test]
+    fn command_subst_unquoted() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            let mut env = Env::new(&mut env);
+            let subst = TextUnit::CommandSubst {
+                content: "echo .".to_string(),
+                location: Location::dummy(""),
+            };
+            assert_matches!(subst.quick_expand(&mut env), Interim(()));
+            let result = subst.async_expand(&mut env, ()).await;
+            let c = AttrChar {
+                value: '.',
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Char(c)));
+        })
+    }
+
+    #[test]
+    fn command_subst_quoted() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            let mut env = Env::new(&mut env);
+            let mut env = env.begin_quote();
+            let subst = TextUnit::CommandSubst {
+                content: "echo -".to_string(),
+                location: Location::dummy(""),
+            };
+            assert_matches!(subst.quick_expand(&mut env), Interim(()));
+            let result = subst.async_expand(&mut env, ()).await;
+            let c = AttrChar {
+                value: '-',
+                origin: Origin::SoftExpansion,
+                is_quoted: true,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Char(c)));
+        })
     }
 }

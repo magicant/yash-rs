@@ -173,6 +173,7 @@ pub trait Expand {
     ) -> Result<Phrase, Error>;
 }
 
+mod command_subst;
 mod slice;
 mod text;
 
