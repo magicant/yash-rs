@@ -174,6 +174,7 @@ pub trait Expand {
 }
 
 mod command_subst;
+mod param;
 mod slice;
 mod text;
 

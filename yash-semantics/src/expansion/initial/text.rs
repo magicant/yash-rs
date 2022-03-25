@@ -19,6 +19,7 @@
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
 use super::super::Error;
+use super::param::ParamRef;
 use super::Env;
 use super::Expand;
 use super::Phrase;
@@ -102,9 +103,9 @@ impl Expand for TextUnit {
                     is_quoting: false,
                 },
             ]))),
-            RawParam { .. } => todo!(),
-            BracedParam(_) => todo!(),
-            CommandSubst { .. } | Backquote { .. } => Interim(()),
+            RawParam { .. } | BracedParam(_) | CommandSubst { .. } | Backquote { .. } => {
+                Interim(())
+            }
             Arith { .. } => todo!(),
         }
     }
@@ -113,8 +114,16 @@ impl Expand for TextUnit {
         match self {
             Literal(_) => unimplemented!("async_expand not expecting Literal"),
             Backslashed(_) => unimplemented!("async_expand not expecting Backslashed"),
-            RawParam { .. } => todo!(),
-            BracedParam(_) => todo!(),
+            RawParam { name, location } => {
+                let modifier = &yash_syntax::syntax::Modifier::None;
+                let param = ParamRef {
+                    name,
+                    modifier,
+                    location,
+                };
+                param.expand(env).await
+            }
+            BracedParam(param) => ParamRef::from(param).expand(env).await,
             CommandSubst { content, location } => {
                 let command = content.clone();
                 let location = location.clone();
@@ -161,7 +170,13 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use assert_matches::assert_matches;
+    use futures_util::FutureExt;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_syntax::source::Location;
+    use yash_syntax::syntax::Modifier;
+    use yash_syntax::syntax::Param;
 
     #[test]
     fn literal_unquoted() {
@@ -234,6 +249,69 @@ mod tests {
             };
             assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
         });
+    }
+
+    #[test]
+    fn raw_param_unquoted() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable {
+                    value: Value::Scalar("x".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let name = "foo".to_string();
+        let location = Location::dummy("");
+        let param = RawParam { name, location };
+        assert_matches!(param.quick_expand(&mut env), Interim(()));
+        let result = param.async_expand(&mut env, ()).now_or_never().unwrap();
+        let c = AttrChar {
+            value: 'x',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
+    }
+
+    #[test]
+    fn braced_param_quoted() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable {
+                    value: Value::Scalar("x".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let mut env = env.begin_quote();
+        let param = BracedParam(Param {
+            name: "foo".to_string(),
+            modifier: Modifier::None,
+            location: Location::dummy(""),
+        });
+        assert_matches!(param.quick_expand(&mut env), Interim(()));
+        let result = param.async_expand(&mut env, ()).now_or_never().unwrap();
+        let c = AttrChar {
+            value: 'x',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
     }
 
     #[test]
