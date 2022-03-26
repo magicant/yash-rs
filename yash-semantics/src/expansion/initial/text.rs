@@ -81,7 +81,7 @@ use yash_syntax::syntax::Unquote;
 impl Expand for TextUnit {
     type Interim = ();
 
-    fn quick_expand(&self, _env: &mut Env<'_>) -> QuickExpand<Self> {
+    fn quick_expand(&self, _env: &mut Env<'_>) -> QuickExpand<()> {
         match self {
             &Literal(value) => Ready(Ok(Phrase::Char(AttrChar {
                 value,
@@ -147,11 +147,8 @@ impl Expand for Text {
     type Interim = <[TextUnit] as Expand>::Interim;
 
     #[inline]
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self> {
-        match self.0.quick_expand(env) {
-            Ready(result) => Ready(result),
-            Interim(interim) => Interim(interim),
-        }
+    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim> {
+        self.0.quick_expand(env)
     }
 
     #[inline]

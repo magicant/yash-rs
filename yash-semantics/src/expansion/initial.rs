@@ -21,6 +21,7 @@
 use super::phrase::Phrase;
 use super::Error;
 use async_trait::async_trait;
+use std::fmt::Debug;
 use yash_env::semantics::ExitStatus;
 
 /// Environment in which initial expansion is performed
@@ -51,20 +52,12 @@ impl<'a> Env<'a> {
 }
 
 /// Return value of [`Expand::quick_expand`].
-pub enum QuickExpand<T: Expand + ?Sized> {
+#[derive(Debug)]
+pub enum QuickExpand<T: Debug> {
     /// Variant returned if the expansion is complete.
     Ready(Result<Phrase, Error>),
     /// Variant returned if the expansion needs to be resumed.
-    Interim(<T as Expand>::Interim),
-}
-
-impl<T: Expand + ?Sized> std::fmt::Debug for QuickExpand<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            QuickExpand::Ready(result) => f.debug_tuple("Ready").field(result).finish(),
-            QuickExpand::Interim(_) => f.debug_struct("Interim").finish_non_exhaustive(),
-        }
-    }
+    Interim(T),
 }
 
 /// Syntactic construct that can be subjected to the word expansion.
@@ -87,7 +80,7 @@ impl<T: Expand + ?Sized> std::fmt::Debug for QuickExpand<T> {
 pub trait Expand {
     /// Data passed from [`quick_expand`](Self::quick_expand) to
     /// [`async_expand`](Self::async_expand).
-    type Interim;
+    type Interim: Debug;
 
     /// Starts the initial expansion.
     ///
@@ -95,7 +88,7 @@ pub trait Expand {
     /// is returned in `QuickExpand::Ready(_)`. Otherwise, the result is
     /// `QuickExpand::Interim(_)` containing interim data that should be passed
     /// to [`async_expand`](Self::async_expand).
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self>;
+    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim>;
 
     /// Continues the initial expansion.
     ///

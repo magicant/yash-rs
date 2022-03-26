@@ -22,27 +22,20 @@ use super::Expand;
 use super::Phrase;
 use super::QuickExpand::{self, Interim, Ready};
 use async_trait::async_trait;
+use std::fmt::Debug;
 
-pub struct SliceExpandInterim<T: Expand> {
+#[derive(Debug)]
+pub struct SliceExpandInterim<T: Debug> {
     phrase: Phrase,
     index: usize,
-    item_interim: <T as Expand>::Interim,
-}
-
-impl<T: Expand> std::fmt::Debug for SliceExpandInterim<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SliceExpandInterim")
-            .field("phrase", &self.phrase)
-            .field("index", &self.index)
-            .finish_non_exhaustive()
-    }
+    item_interim: T,
 }
 
 #[async_trait(?Send)]
 impl<T: Expand> Expand for [T] {
-    type Interim = SliceExpandInterim<T>;
+    type Interim = SliceExpandInterim<<T as Expand>::Interim>;
 
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self> {
+    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim> {
         if self.is_empty() {
             return Ready(Ok(Phrase::one_empty_field()));
         }
@@ -67,7 +60,7 @@ impl<T: Expand> Expand for [T] {
     async fn async_expand(
         &self,
         env: &mut Env<'_>,
-        interim: SliceExpandInterim<T>,
+        interim: Self::Interim,
     ) -> Result<Phrase, Error> {
         let SliceExpandInterim {
             mut phrase,
@@ -125,7 +118,7 @@ mod tests {
         }
     }
 
-    impl std::fmt::Debug for Stub {
+    impl Debug for Stub {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Stub::Quick(_) => "Quick",
@@ -139,7 +132,7 @@ mod tests {
     impl Expand for Stub {
         type Interim = ();
 
-        fn quick_expand(&self, _: &mut Env<'_>) -> QuickExpand<Stub> {
+        fn quick_expand(&self, _: &mut Env<'_>) -> QuickExpand<()> {
             if let Stub::Quick(cell) = self {
                 Ready(
                     cell.take()
