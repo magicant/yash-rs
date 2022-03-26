@@ -125,7 +125,7 @@ where
         .map(|value| AttrChar {
             value,
             origin: Origin::SoftExpansion,
-            is_quoted: env.is_quoted,
+            is_quoted: false,
             is_quoting: false,
         })
         .collect();
@@ -165,27 +165,6 @@ mod tests {
                 value: 'o',
                 origin: Origin::SoftExpansion,
                 is_quoted: false,
-                is_quoting: false,
-            };
-            let k = AttrChar { value: 'k', ..o };
-            assert_eq!(result, Ok(Phrase::Field(vec![o, k])));
-        })
-    }
-
-    #[test]
-    fn quoted_substitution() {
-        in_virtual_system(|mut env, _pid, _state| async move {
-            env.builtins.insert("echo", echo_builtin());
-            let command = "echo ok".to_string();
-            let location = Location::dummy("");
-            let mut env = Env::new(&mut env);
-            let mut env = env.begin_quote();
-            let result = expand(command, location, &mut env).await;
-
-            let o = AttrChar {
-                value: 'o',
-                origin: Origin::SoftExpansion,
-                is_quoted: true,
                 is_quoting: false,
             };
             let k = AttrChar { value: 'k', ..o };

@@ -21,8 +21,6 @@
 use super::phrase::Phrase;
 use super::Error;
 use async_trait::async_trait;
-use std::ops::Deref;
-use std::ops::DerefMut;
 use yash_env::semantics::ExitStatus;
 
 /// Environment in which initial expansion is performed
@@ -39,15 +37,7 @@ pub struct Env<'a> {
     /// When performing a command substitution during expansion, you must set
     /// its exit status to this field.
     pub last_command_subst_exit_status: Option<ExitStatus>,
-
-    /// Whether the currently expanded part is double-quoted
-    ///
-    /// This field affects the behavior of some expansions.
-    ///
-    /// Rather than modifying this flag manually, you should call
-    /// [`begin_quote`](Self::begin_quote) and use [`QuoteGuard`] to ensure the
-    /// flag is cleared when exiting the quote.
-    pub is_quoted: bool,
+    // TODO pub will_split: bool,
 }
 
 impl<'a> Env<'a> {
@@ -56,61 +46,7 @@ impl<'a> Env<'a> {
         Env {
             inner,
             last_command_subst_exit_status: None,
-            is_quoted: false,
         }
-    }
-
-    /// Sets the `is_quoted` flag to `true` and returns a guard that will
-    /// restore it.
-    ///
-    /// Functions that expand a double-quote must call this function before
-    /// expanding the contents of the quote.
-    pub fn begin_quote<'b>(&'b mut self) -> QuoteGuard<'b, 'a> {
-        let was_quoted = self.is_quoted;
-        self.is_quoted = true;
-        QuoteGuard {
-            env: self,
-            was_quoted,
-        }
-    }
-
-    /// Restores the `Env::is_quoted` flag to the original value.
-    pub fn end_quote(guard: QuoteGuard<'_, '_>) {
-        drop(guard)
-    }
-}
-
-/// RAII-style guard for restoring the value of `Env::is_quoted`
-///
-/// [`Env::begin_quote`] returns a `QuoteGuard` object after setting the
-/// [`Env::is_quoted`] flag to `true`. When the guard is dropped or passed to
-/// [`Env::end_quote`], the flag is restored to the value before beginning the
-/// quote.
-///
-/// This struct implements `Deref` and `DerefMut` so you can access the original
-/// `Env` by dereferencing it.
-#[must_use]
-pub struct QuoteGuard<'a, 'b> {
-    env: &'a mut Env<'b>,
-    was_quoted: bool,
-}
-
-impl Drop for QuoteGuard<'_, '_> {
-    fn drop(&mut self) {
-        self.env.is_quoted = self.was_quoted;
-    }
-}
-
-impl<'a> Deref for QuoteGuard<'_, 'a> {
-    type Target = Env<'a>;
-    fn deref(&self) -> &Env<'a> {
-        self.env
-    }
-}
-
-impl<'a> DerefMut for QuoteGuard<'_, 'a> {
-    fn deref_mut(&mut self) -> &mut Env<'a> {
-        self.env
     }
 }
 
@@ -177,24 +113,3 @@ mod command_subst;
 mod param;
 mod slice;
 mod text;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reentrant_quotes() {
-        let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
-        assert!(!env.is_quoted);
-        {
-            let mut first = env.begin_quote();
-            assert!(first.is_quoted);
-            let second = first.begin_quote();
-            assert!(second.is_quoted);
-            Env::end_quote(second);
-            assert!(first.is_quoted);
-        }
-        assert!(!env.is_quoted);
-    }
-}

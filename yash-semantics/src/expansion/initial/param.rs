@@ -67,32 +67,29 @@ impl ParamRef<'_> {
         // TODO concat
         // TODO Length
 
-        Ok(into_phrase(value, env))
+        Ok(into_phrase(value))
     }
 }
 
 /// Converts a value into a phrase.
-fn into_phrase(value: Option<Value>, env: &Env<'_>) -> Phrase {
+fn into_phrase(value: Option<Value>) -> Phrase {
     match value {
         None => Phrase::one_empty_field(),
-        Some(Value::Scalar(value)) => Phrase::Field(to_field(&value, env)),
-        Some(Value::Array(values)) => Phrase::Full(
-            values
-                .into_iter()
-                .map(|value| to_field(&value, env))
-                .collect(),
-        ),
+        Some(Value::Scalar(value)) => Phrase::Field(to_field(&value)),
+        Some(Value::Array(values)) => {
+            Phrase::Full(values.into_iter().map(|value| to_field(&value)).collect())
+        }
     }
 }
 
 /// Converts a string to a `Vec<AttrChar>`.
-fn to_field(value: &str, env: &Env<'_>) -> Vec<AttrChar> {
+fn to_field(value: &str) -> Vec<AttrChar> {
     value
         .chars()
         .map(|c| AttrChar {
             value: c,
             origin: Origin::SoftExpansion,
-            is_quoted: env.is_quoted,
+            is_quoted: false,
             is_quoting: false,
         })
         .collect()
@@ -104,21 +101,15 @@ mod tests {
 
     #[test]
     fn none_into_phrase() {
-        let mut env = yash_env::Env::new_virtual();
-        let env = Env::new(&mut env);
-        let result = into_phrase(None, &env);
-        assert_eq!(result, Phrase::one_empty_field());
+        assert_eq!(into_phrase(None), Phrase::one_empty_field());
     }
 
     #[test]
     fn scalar_into_phrase() {
-        let mut env = yash_env::Env::new_virtual();
-        let env = Env::new(&mut env);
-
-        let result = into_phrase(Some(Value::Scalar("".to_string())), &env);
+        let result = into_phrase(Some(Value::Scalar("".to_string())));
         assert_eq!(result, Phrase::one_empty_field());
 
-        let result = into_phrase(Some(Value::Scalar("foo".to_string())), &env);
+        let result = into_phrase(Some(Value::Scalar("foo".to_string())));
         let f = AttrChar {
             value: 'f',
             origin: Origin::SoftExpansion,
@@ -131,16 +122,13 @@ mod tests {
 
     #[test]
     fn array_into_phrase() {
-        let mut env = yash_env::Env::new_virtual();
-        let env = Env::new(&mut env);
-
-        let result = into_phrase(Some(Value::Array(vec![])), &env);
+        let result = into_phrase(Some(Value::Array(vec![])));
         assert_eq!(result, Phrase::zero_fields());
 
-        let result = into_phrase(
-            Some(Value::Array(vec!["foo".to_string(), "bar".to_string()])),
-            &env,
-        );
+        let result = into_phrase(Some(Value::Array(vec![
+            "foo".to_string(),
+            "bar".to_string(),
+        ])));
         let f = AttrChar {
             value: 'f',
             origin: Origin::SoftExpansion,
@@ -155,39 +143,18 @@ mod tests {
     }
 
     #[test]
-    fn to_field_unquoted() {
-        let mut env = yash_env::Env::new_virtual();
-        let env = Env::new(&mut env);
-
-        let result = to_field("", &env);
+    fn empty_to_field() {
+        let result = to_field("");
         assert_eq!(result, []);
+    }
 
-        let result = to_field("bar", &env);
+    #[test]
+    fn non_empty_to_field() {
+        let result = to_field("bar");
         let b = AttrChar {
             value: 'b',
             origin: Origin::SoftExpansion,
             is_quoted: false,
-            is_quoting: false,
-        };
-        let a = AttrChar { value: 'a', ..b };
-        let r = AttrChar { value: 'r', ..b };
-        assert_eq!(result, [b, a, r]);
-    }
-
-    #[test]
-    fn to_field_quoted() {
-        let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
-        let env = env.begin_quote();
-
-        let result = to_field("", &env);
-        assert_eq!(result, []);
-
-        let result = to_field("bar", &env);
-        let b = AttrChar {
-            value: 'b',
-            origin: Origin::SoftExpansion,
-            is_quoted: true,
             is_quoting: false,
         };
         let a = AttrChar { value: 'a', ..b };
