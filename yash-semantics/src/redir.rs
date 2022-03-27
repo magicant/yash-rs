@@ -56,7 +56,7 @@
 //! file descriptor. When you drop the `RedirGuard`, it undoes the effect to the
 //! file descriptor. See the documentation for [`RedirGuard`] for details.
 
-use crate::expansion::expand_word;
+use crate::expansion::expand_word_new;
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -64,6 +64,7 @@ use std::ffi::NulError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::io::Fd;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
@@ -283,7 +284,10 @@ async fn open_normal<E: Env>(
 }
 
 /// Performs a redirection.
-async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
+async fn perform(
+    env: &mut yash_env::Env,
+    redir: &Redir,
+) -> Result<(SavedFd, Option<ExitStatus>), Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
     let save = match env.dup(target_fd, MIN_SAVE_FD, true) {
@@ -298,22 +302,23 @@ async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
     };
 
     // Prepare an FD from the redirection body
-    let (fd, location) = match &redir.body {
+    let (fd, location, exit_status) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
-            let expansion = expand_word(env, operand).await?;
-            open_normal(env, *operator, expansion).await
+            let (expansion, exit_status) = expand_word_new(env, operand).await?;
+            let (fd, location) = open_normal(env, *operator, expansion).await?;
+            (fd, location, exit_status)
         }
         RedirBody::HereDoc(_) => todo!(),
-    }?;
+    };
 
     if fd != target_fd {
         // Copy the new open file description from `fd` to `target_fd`
-        match env.dup2(fd, target_fd) {
+        match env.system.dup2(fd, target_fd) {
             Ok(new_fd) => assert_eq!(new_fd, target_fd),
             Err(errno) => {
                 // TODO Is it ok to unconditionally close fd?
-                let _: Result<_, _> = env.close(fd);
+                let _: Result<_, _> = env.system.close(fd);
 
                 return Err(Error {
                     cause: ErrorCause::FdNotOverwritten(target_fd, errno),
@@ -323,11 +328,11 @@ async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
         }
 
         // Close `fd`
-        let _: Result<_, _> = env.close(fd);
+        let _: Result<_, _> = env.system.close(fd);
     }
 
     let original = target_fd;
-    Ok(SavedFd { original, save })
+    Ok((SavedFd { original, save }, exit_status))
 }
 
 /// `Env` wrapper for performing redirections.
@@ -348,35 +353,35 @@ async fn perform<E: Env>(env: &mut E, redir: &Redir) -> Result<SavedFd, Error> {
 /// called. That means you need to call `preserve_redirs` explicitly to preserve
 /// the redirections' effect.
 #[derive(Debug)]
-pub struct RedirGuard<'e, E: Env> {
+pub struct RedirGuard<'e> {
     /// Environment in which redirections are performed.
-    env: &'e mut E,
+    env: &'e mut yash_env::Env,
     /// Records of file descriptors that have been modified by redirections.
     saved_fds: Vec<SavedFd>,
 }
 
-impl<E: Env> Deref for RedirGuard<'_, E> {
-    type Target = E;
-    fn deref(&self) -> &E {
+impl Deref for RedirGuard<'_> {
+    type Target = yash_env::Env;
+    fn deref(&self) -> &yash_env::Env {
         self.env
     }
 }
 
-impl<E: Env> DerefMut for RedirGuard<'_, E> {
-    fn deref_mut(&mut self) -> &mut E {
+impl DerefMut for RedirGuard<'_> {
+    fn deref_mut(&mut self) -> &mut yash_env::Env {
         self.env
     }
 }
 
-impl<E: Env> std::ops::Drop for RedirGuard<'_, E> {
+impl std::ops::Drop for RedirGuard<'_> {
     fn drop(&mut self) {
         self.undo_redirs()
     }
 }
 
-impl<'e, E: Env> RedirGuard<'e, E> {
+impl<'e> RedirGuard<'e> {
     /// Creates a new `RedirGuard`.
-    pub fn new(env: &'e mut E) -> Self {
+    pub fn new(env: &'e mut yash_env::Env) -> Self {
         let saved_fds = Vec::new();
         RedirGuard { env, saved_fds }
     }
@@ -384,11 +389,12 @@ impl<'e, E: Env> RedirGuard<'e, E> {
     /// Performs a redirection.
     ///
     /// If successful, this function saves internally a backing copy of the file
-    /// descriptor affected by the redirection.
-    pub async fn perform_redir(&mut self, redir: &Redir) -> Result<(), Error> {
-        let saved_fd = perform(&mut **self, redir).await?;
+    /// descriptor affected by the redirection, and returns the exit status of
+    /// the last command substitution performed during the redirection, if any.
+    pub async fn perform_redir(&mut self, redir: &Redir) -> Result<Option<ExitStatus>, Error> {
+        let (saved_fd, exit_status) = perform(self, redir).await?;
         self.saved_fds.push(saved_fd);
-        Ok(())
+        Ok(exit_status)
     }
 
     /// Performs redirections.
@@ -398,14 +404,16 @@ impl<'e, E: Env> RedirGuard<'e, E> {
     ///
     /// If the redirection fails for an item, the remainders are ignored, but
     /// the effects of the preceding items are not canceled.
-    pub async fn perform_redirs<'a, I>(&mut self, redirs: I) -> Result<(), Error>
+    pub async fn perform_redirs<'a, I>(&mut self, redirs: I) -> Result<Option<ExitStatus>, Error>
     where
         I: IntoIterator<Item = &'a Redir>,
     {
+        let mut exit_status = None;
         for redir in redirs {
-            self.perform_redir(redir).await?;
+            let new_exit_status = self.perform_redir(redir).await?;
+            exit_status = new_exit_status.or(exit_status);
         }
-        Ok(())
+        Ok(exit_status)
     }
 
     /// Undoes the effect of the redirections.
@@ -417,10 +425,10 @@ impl<'e, E: Env> RedirGuard<'e, E> {
         for SavedFd { original, save } in self.saved_fds.drain(..).rev() {
             if let Some(save) = save {
                 assert_ne!(save, original);
-                let _: Result<_, _> = self.env.dup2(save, original);
-                let _: Result<_, _> = self.env.close(save);
+                let _: Result<_, _> = self.env.system.dup2(save, original);
+                let _: Result<_, _> = self.env.system.close(save);
             } else {
-                let _: Result<_, _> = self.env.close(original);
+                let _: Result<_, _> = self.env.system.close(original);
             }
         }
     }

@@ -192,13 +192,13 @@ impl Command for syntax::SimpleCommand {
     }
 }
 
-async fn perform_redirs(
-    env: &mut RedirGuard<'_, ExitStatusAdapter<'_, Env>>,
-    redirs: &[Redir],
-) -> Result {
+async fn perform_redirs(env: &mut RedirGuard<'_>, redirs: &[Redir]) -> Result<Option<ExitStatus>> {
     match env.perform_redirs(&*redirs).await {
-        Ok(()) => Continue(()),
-        Err(e) => e.handle(env).await,
+        Ok(exit_status) => Continue(exit_status),
+        Err(e) => {
+            e.handle(env).await?;
+            Continue(None)
+        }
     }
 }
 
@@ -233,8 +233,8 @@ async fn execute_absent_target(
             Box::pin(async move {
                 let env = &mut ExitStatusAdapter::new(env);
                 let env = &mut RedirGuard::new(env);
-                perform_redirs(env, &*redirs).await?;
-                env.exit_status = env.last_command_subst_exit_status().unwrap_or_default();
+                let exit_status = perform_redirs(env, &*redirs).await?;
+                env.exit_status = exit_status.unwrap_or_default();
                 Continue(())
             })
         });
@@ -304,7 +304,7 @@ async fn execute_function(
     let mut outer = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
     perform_assignments(&mut *outer, assigns, true).await?;
 
-    let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
+    let mut inner = ScopeGuard::push_context(&mut *outer, ContextType::Regular);
 
     // Apply positional parameters
     let mut params = inner.variables.positional_params_mut();
@@ -342,7 +342,7 @@ async fn execute_external_utility(
 
     if path.to_bytes().is_empty() {
         print_error(
-            &mut **env,
+            &mut *env,
             format!("cannot execute external utility {:?}", name.value).into(),
             "utility not found".into(),
             &name.origin,
@@ -386,7 +386,7 @@ async fn execute_external_utility(
         }
         Err(errno) => {
             print_error(
-                &mut **env,
+                &mut *env,
                 format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,
