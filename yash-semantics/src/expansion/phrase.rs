@@ -33,9 +33,12 @@
 //! intact.
 
 use crate::expansion::attr::AttrChar;
+use crate::expansion::attr::Origin;
 use std::iter::FusedIterator;
 use std::ops::Add;
 use std::ops::AddAssign;
+use yash_env::variable::Value;
+use yash_env::variable::VariableSet;
 
 /// Array of fields with optimized data structure
 ///
@@ -245,6 +248,54 @@ impl Phrase {
             }
         }
     }
+
+    /// Joins this phrase into a single field, separated by the first IFS character.
+    ///
+    /// This function joins `self` into a single field, separating each original
+    /// field by the first character of variable `IFS`. If the variable is not
+    /// set, fields are separated by a space. If the variable is set but has an
+    /// empty value, fields are joined without separation.
+    pub fn ifs_join(self, vars: &VariableSet) -> Vec<AttrChar> {
+        match self {
+            Char(c) => vec![c],
+            Field(field) => field,
+            Full(mut fields) => match fields.len() {
+                0 => vec![],
+                1 => fields.swap_remove(0),
+                _ => {
+                    let separator = match vars.get("IFS") {
+                        Some(var) => match &var.value {
+                            Value::Scalar(value) => value.chars().next(),
+                            Value::Array(values) => {
+                                values.first().and_then(|value| value.chars().next())
+                            }
+                        },
+                        None => Some(' '),
+                    }
+                    .map(|c| AttrChar {
+                        value: c,
+                        origin: Origin::SoftExpansion,
+                        is_quoted: false,
+                        is_quoting: false,
+                    });
+
+                    let mut i = fields.into_iter();
+                    let mut result = i.next().unwrap();
+                    result.reserve_exact(
+                        i.as_slice().iter().map(|field| field.len()).sum::<usize>()
+                            + i.as_slice().len(),
+                    );
+                    for field in i {
+                        if let Some(separator) = separator {
+                            result.push(separator);
+                        }
+                        result.extend(field);
+                    }
+                    result
+                }
+            },
+        }
+    }
 }
 
 impl From<AttrChar> for Phrase {
@@ -397,7 +448,8 @@ impl Add for Phrase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expansion::attr::Origin;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Variable;
 
     #[test]
     #[allow(clippy::eq_op)]
@@ -931,4 +983,178 @@ mod tests {
     // See the doc test in Phrase::append
     // #[test]
     // fn append_full_full() {}
+
+    fn dummy_field(chars: &str) -> Vec<AttrChar> {
+        chars
+            .chars()
+            .map(|c| AttrChar {
+                value: c,
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ifs_join_char() {
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let phrase = Char(a);
+        let field = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field, [a]);
+    }
+
+    #[test]
+    fn ifs_join_field() {
+        let field_in = dummy_field("abc");
+        let phrase = Field(field_in.clone());
+        let field_out = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field_out, field_in);
+    }
+
+    #[test]
+    fn ifs_join_full_empty() {
+        let phrase = Full(vec![]);
+        let field = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field, []);
+    }
+
+    #[test]
+    fn ifs_join_full_one() {
+        let field_in = dummy_field("foo");
+        let phrase = Full(vec![field_in.clone()]);
+        let field_out = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field_out, field_in);
+    }
+
+    #[test]
+    fn ifs_join_full_unset_ifs() {
+        let phrase = Full(vec![vec![], vec![]]);
+        let field = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field, dummy_field(" "));
+
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field, dummy_field("foo bar baz"));
+    }
+
+    #[test]
+    fn ifs_join_full_scalar_ifs() {
+        let mut vars = VariableSet::new();
+        vars.assign(
+            Scope::Global,
+            "IFS".to_string(),
+            Variable {
+                value: Value::Scalar("!?".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
+        assert_eq!(field, dummy_field("foo!bar!baz"));
+    }
+
+    #[test]
+    fn ifs_join_full_array_ifs() {
+        let mut vars = VariableSet::new();
+        vars.assign(
+            Scope::Global,
+            "IFS".to_string(),
+            Variable {
+                value: Value::Array(vec!["-+".to_string(), "abc".to_string()]),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
+        assert_eq!(field, dummy_field("foo-bar-baz"));
+    }
+
+    #[test]
+    fn ifs_join_full_empty_scalar_ifs() {
+        let mut vars = VariableSet::new();
+        vars.assign(
+            Scope::Global,
+            "IFS".to_string(),
+            Variable {
+                value: Value::Scalar("".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
+        assert_eq!(field, dummy_field("foobarbaz"));
+    }
+
+    #[test]
+    fn ifs_join_full_empty_array_ifs() {
+        let mut vars = VariableSet::new();
+        vars.assign(
+            Scope::Global,
+            "IFS".to_string(),
+            Variable {
+                value: Value::Array(vec![]),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
+        assert_eq!(field, dummy_field("foobarbaz"));
+
+        vars.assign(
+            Scope::Global,
+            "IFS".to_string(),
+            Variable {
+                value: Value::Array(vec!["".to_string(), "abc".to_string()]),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
+        assert_eq!(field, dummy_field("foobarbaz"));
+    }
 }
