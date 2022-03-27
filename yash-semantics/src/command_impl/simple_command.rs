@@ -203,18 +203,21 @@ async fn perform_redirs(
 }
 
 async fn perform_assignments(
-    env: &mut ExitStatusAdapter<'_, Env>,
+    env: &mut Env,
     assigns: &[Assign],
     export: bool,
-) -> Result {
+) -> Result<Option<ExitStatus>> {
     let scope = if export {
         Scope::Volatile
     } else {
         Scope::Global
     };
-    match crate::assign::perform_assignments(env, assigns, scope, export).await {
-        Ok(()) => Continue(()),
-        Err(error) => error.handle(env).await,
+    match crate::assign::perform_assignments_new(env, assigns, scope, export).await {
+        Ok(exit_status) => Continue(exit_status),
+        Err(error) => {
+            error.handle(env).await?;
+            Continue(None)
+        }
     }
 }
 
@@ -252,9 +255,8 @@ async fn execute_absent_target(
         ExitStatus::SUCCESS
     };
 
-    let env = &mut ExitStatusAdapter::new(env);
-    perform_assignments(env, assigns, false).await?;
-    env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
+    let assignment_exit_status = perform_assignments(env, assigns, false).await?;
+    env.exit_status = assignment_exit_status.unwrap_or(exit_status);
     Continue(())
 }
 
