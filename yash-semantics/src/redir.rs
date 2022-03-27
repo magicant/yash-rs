@@ -56,7 +56,7 @@
 //! file descriptor. When you drop the `RedirGuard`, it undoes the effect to the
 //! file descriptor. See the documentation for [`RedirGuard`] for details.
 
-use crate::expansion::expand_word_new;
+use crate::expansion::expand_word;
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -305,7 +305,7 @@ async fn perform(
     let (fd, location, exit_status) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
-            let (expansion, exit_status) = expand_word_new(env, operand).await?;
+            let (expansion, exit_status) = expand_word(env, operand).await?;
             let (fd, location) = open_normal(env, *operator, expansion).await?;
             (fd, location, exit_status)
         }

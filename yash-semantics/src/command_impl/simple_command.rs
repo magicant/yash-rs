@@ -17,7 +17,7 @@
 //! Implementation of simple command semantics.
 
 use crate::command_search::search;
-use crate::expansion::expand_words_new;
+use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
 use crate::Command;
 use crate::Handle;
@@ -163,7 +163,7 @@ impl Command for syntax::SimpleCommand {
     /// POSIX leaves many aspects of the simple command execution unspecified.
     /// The detail semantics may differ in other shell implementations.
     async fn execute(&self, env: &mut Env) -> Result {
-        let (fields, exit_status) = match expand_words_new(env, &self.words).await {
+        let (fields, exit_status) = match expand_words(env, &self.words).await {
             Ok(result) => result,
             Err(error) => return error.handle(env).await,
         };
@@ -212,7 +212,7 @@ async fn perform_assignments(
     } else {
         Scope::Global
     };
-    match crate::assign::perform_assignments_new(env, assigns, scope, export).await {
+    match crate::assign::perform_assignments(env, assigns, scope, export).await {
         Ok(exit_status) => Continue(exit_status),
         Err(error) => {
             error.handle(env).await?;

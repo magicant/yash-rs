@@ -17,7 +17,6 @@
 //! Assignment.
 
 use crate::expansion::expand_value;
-use crate::expansion::expand_value_new;
 use yash_env::semantics::ExitStatus;
 use yash_env::variable::Variable;
 
@@ -32,39 +31,14 @@ pub use yash_syntax::syntax::Assign;
 ///
 /// This function [expands the value](expand_value) and then
 /// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
-pub async fn perform_assignment<E: Env>(
-    env: &mut E,
-    assign: &Assign,
-    scope: Scope,
-    export: bool,
-) -> Result {
-    let name = assign.name.clone();
-    let value = expand_value(env, &assign.value).await?;
-    let value = Variable {
-        value,
-        last_assigned_location: Some(assign.location.clone()),
-        is_exported: export,
-        read_only_location: None,
-    };
-    env.assign_variable(scope, name, value).map_err(|e| Error {
-        cause: ErrorCause::AssignReadOnly(e),
-        location: assign.location.clone(),
-    })?;
-    Ok(())
-}
-
-/// Performs an assignment.
-///
-/// This function [expands the value](expand_value) and then
-/// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
-pub async fn perform_assignment_new(
+pub async fn perform_assignment(
     env: &mut yash_env::Env,
     assign: &Assign,
     scope: Scope,
     export: bool,
 ) -> Result<Option<ExitStatus>> {
     let name = assign.name.clone();
-    let (value, exit_status) = expand_value_new(env, &assign.value).await?;
+    let (value, exit_status) = expand_value(env, &assign.value).await?;
     let value = Variable {
         value,
         last_assigned_location: Some(assign.location.clone()),
@@ -81,19 +55,7 @@ pub async fn perform_assignment_new(
 /// Performs assignments.
 ///
 /// This function calls [`perform_assignment`] for each [`Assign`].
-pub async fn perform_assignments<E: Env>(
-    env: &mut E,
-    assigns: &[Assign],
-    scope: Scope,
-    export: bool,
-) -> Result {
-    for assign in assigns {
-        perform_assignment(env, assign, scope, export).await?;
-    }
-    Ok(())
-}
-
-pub async fn perform_assignments_new(
+pub async fn perform_assignments(
     env: &mut yash_env::Env,
     assigns: &[Assign],
     scope: Scope,
@@ -101,7 +63,7 @@ pub async fn perform_assignments_new(
 ) -> Result<Option<ExitStatus>> {
     let mut exit_status = None;
     for assign in assigns {
-        let new_exit_status = perform_assignment_new(env, assign, scope, export).await?;
+        let new_exit_status = perform_assignment(env, assign, scope, export).await?;
         exit_status = new_exit_status.or(exit_status);
     }
     Ok(exit_status)
@@ -122,7 +84,7 @@ mod tests {
     fn perform_assignment_new_value() {
         let mut env = Env::new_virtual();
         let a: Assign = "foo=bar".parse().unwrap();
-        let exit_status = perform_assignment_new(&mut env, &a, Scope::Global, false)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -142,13 +104,13 @@ mod tests {
     fn perform_assignment_overwriting() {
         let mut env = Env::new_virtual();
         let a: Assign = "foo=bar".parse().unwrap();
-        let exit_status = perform_assignment_new(&mut env, &a, Scope::Global, false)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false)
             .now_or_never()
             .unwrap()
             .unwrap();
         assert_eq!(exit_status, None);
         let a: Assign = "foo=baz".parse().unwrap();
-        let exit_status = perform_assignment_new(&mut env, &a, Scope::Global, true)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, true)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -178,7 +140,7 @@ mod tests {
             .assign(Scope::Global, "v".to_string(), v)
             .unwrap();
         let a: Assign = "v=new".parse().unwrap();
-        let e = perform_assignment_new(&mut env, &a, Scope::Global, false)
+        let e = perform_assignment(&mut env, &a, Scope::Global, false)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -200,7 +162,7 @@ mod tests {
                 "a=A$(return -n 1)".parse().unwrap(),
                 "b=($(return -n 2))".parse().unwrap(),
             ];
-            let exit_status = perform_assignments_new(&mut env, &assigns, Scope::Global, false)
+            let exit_status = perform_assignments(&mut env, &assigns, Scope::Global, false)
                 .await
                 .unwrap();
             assert_eq!(exit_status, Some(ExitStatus(2)));

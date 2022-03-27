@@ -653,22 +653,11 @@ pub trait ExpandToField {
 /// Expands a word to a field.
 ///
 /// This function performs the initial expansion and quote removal.
-///
-/// To expand multiple words to multiple fields, use [`expand_words`].
-pub async fn expand_word<E: Env>(env: &mut E, word: &Word) -> Result<Field> {
-    // TODO Optimize by taking advantage of MaybeLiteral
-    let field = word.expand_to_field(env).await?;
-    Ok(field.do_quote_removal())
-}
-
-/// Expands a word to a field.
-///
-/// This function performs the initial expansion and quote removal.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
 ///
 /// To expand multiple words to multiple fields, use [`expand_words`].
-pub async fn expand_word_new(
+pub async fn expand_word(
     env: &mut yash_env::Env,
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
@@ -690,37 +679,13 @@ pub async fn expand_word_new(
 
 /// Expands words to fields.
 ///
-/// This function performs all of the initial expansion, multi-field expansion,
-/// and quote removal.
-///
-/// To expand a single word to a single field, use [`expand_word`].
-pub async fn expand_words<'a, E, I>(env: &mut E, words: I) -> Result<Vec<Field>>
-where
-    E: Env,
-    I: IntoIterator<Item = &'a Word>,
-{
-    // TODO Optimize by taking advantage of MaybeLiteral
-
-    let mut fields = Vec::new();
-    for word in words {
-        word.expand_to_fields(env, &mut fields).await?;
-    }
-    // TODO multi-field expansion
-    Ok(fields
-        .into_iter()
-        .map(QuoteRemoval::do_quote_removal)
-        .collect())
-}
-
-/// Expands words to fields.
-///
 /// This function performs the initial expansion and multi-field expansion,
 /// including quote removal.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
 ///
 /// To expand a single word to a single field, use [`expand_word`].
-pub async fn expand_words_new<'a, I: IntoIterator<Item = &'a Word>>(
+pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     env: &mut yash_env::Env,
     words: I,
 ) -> Result<(Vec<Field>, Option<ExitStatus>)> {
@@ -754,41 +719,19 @@ pub async fn expand_words_new<'a, I: IntoIterator<Item = &'a Word>>(
 /// Expands an assignment value.
 ///
 /// This function expands a [`yash_syntax::syntax::Value`] to a
-/// [`yash_env::variable::Value`]. A scalar value is expanded by [`expand_word`]
-/// and an array by [`expand_words`].
-pub async fn expand_value<E: Env>(
-    env: &mut E,
-    value: &yash_syntax::syntax::Value,
-) -> Result<yash_env::variable::Value> {
-    match value {
-        yash_syntax::syntax::Scalar(word) => {
-            let field = expand_word(env, word).await?;
-            Ok(yash_env::variable::Scalar(field.value))
-        }
-        yash_syntax::syntax::Array(words) => {
-            let fields = expand_words(env, words).await?;
-            let fields = fields.into_iter().map(|f| f.value).collect();
-            Ok(yash_env::variable::Array(fields))
-        }
-    }
-}
-
-/// Expands an assignment value.
-///
-/// This function expands a [`yash_syntax::syntax::Value`] to a
 /// [`yash_env::variable::Value`]. A scalar and array value are expanded by
 /// [`expand_word`] and [`expand_words`], respectively.
-pub async fn expand_value_new(
+pub async fn expand_value(
     env: &mut yash_env::Env,
     value: &yash_syntax::syntax::Value,
 ) -> Result<(yash_env::variable::Value, Option<ExitStatus>)> {
     match value {
         yash_syntax::syntax::Scalar(word) => {
-            let (field, exit_status) = expand_word_new(env, word).await?;
+            let (field, exit_status) = expand_word(env, word).await?;
             Ok((yash_env::variable::Scalar(field.value), exit_status))
         }
         yash_syntax::syntax::Array(words) => {
-            let (fields, exit_status) = expand_words_new(env, words).await?;
+            let (fields, exit_status) = expand_words(env, words).await?;
             let fields = fields.into_iter().map(|f| f.value).collect();
             Ok((yash_env::variable::Array(fields), exit_status))
         }
@@ -1054,7 +997,7 @@ mod tests {
     fn expand_value_scalar() {
         let mut env = yash_env::Env::new_virtual();
         let value = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
-        let (result, exit_status) = expand_value_new(&mut env, &value)
+        let (result, exit_status) = expand_value(&mut env, &value)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1068,7 +1011,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let value =
             yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
-        let (result, exit_status) = expand_value_new(&mut env, &value)
+        let (result, exit_status) = expand_value(&mut env, &value)
             .now_or_never()
             .unwrap()
             .unwrap();
