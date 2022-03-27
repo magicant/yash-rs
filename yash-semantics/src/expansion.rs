@@ -661,6 +661,33 @@ pub async fn expand_word<E: Env>(env: &mut E, word: &Word) -> Result<Field> {
     Ok(field.do_quote_removal())
 }
 
+/// Expands a word to a field.
+///
+/// This function performs the initial expansion and quote removal.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
+///
+/// To expand multiple words to multiple fields, use [`expand_words`].
+pub async fn expand_word_new(
+    env: &mut yash_env::Env,
+    word: &Word,
+) -> Result<(Field, Option<ExitStatus>)> {
+    use self::initial::Expand;
+    use self::initial::QuickExpand::*;
+    let mut env = initial::Env::new(env);
+    let phrase = match word.quick_expand(&mut env) {
+        Ready(result) => result?,
+        Interim(interim) => word.async_expand(&mut env, interim).await?,
+    };
+    let chars = phrase.ifs_join(&env.inner.variables);
+    let field = AttrField {
+        chars,
+        origin: word.location.clone(),
+    };
+    let field = field.do_quote_removal();
+    Ok((field, env.last_command_subst_exit_status))
+}
+
 /// Expands words to fields.
 ///
 /// This function performs all of the initial expansion, multi-field expansion,
@@ -685,6 +712,45 @@ where
         .collect())
 }
 
+/// Expands words to fields.
+///
+/// This function performs the initial expansion and multi-field expansion,
+/// including quote removal.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
+///
+/// To expand a single word to a single field, use [`expand_word`].
+pub async fn expand_words_new<'a, I: IntoIterator<Item = &'a Word>>(
+    env: &mut yash_env::Env,
+    words: I,
+) -> Result<(Vec<Field>, Option<ExitStatus>)> {
+    let words = words.into_iter();
+    let mut fields = Vec::with_capacity(words.size_hint().0);
+    let mut env = initial::Env::new(env);
+    for word in words {
+        use self::initial::Expand;
+        use self::initial::QuickExpand::*;
+        let phrase = match word.quick_expand(&mut env) {
+            Ready(result) => result?,
+            Interim(interim) => word.async_expand(&mut env, interim).await?,
+        };
+        fields.extend(phrase.into_iter().map(|chars| AttrField {
+            chars,
+            origin: word.location.clone(),
+        }));
+    }
+
+    // TODO brace expansion
+    // TODO field splitting
+    // TODO pathname expansion (or quote removal and attribute stripping)
+
+    let fields = fields
+        .into_iter()
+        .map(QuoteRemoval::do_quote_removal)
+        .collect();
+    Ok((fields, env.last_command_subst_exit_status))
+}
+
 /// Expands an assignment value.
 ///
 /// This function expands a [`yash_syntax::syntax::Value`] to a
@@ -707,11 +773,33 @@ pub async fn expand_value<E: Env>(
     }
 }
 
+/// Expands an assignment value.
+///
+/// This function expands a [`yash_syntax::syntax::Value`] to a
+/// [`yash_env::variable::Value`]. A scalar and array value are expanded by
+/// [`expand_word`] and [`expand_words`], respectively.
+pub async fn expand_value_new(
+    env: &mut yash_env::Env,
+    value: &yash_syntax::syntax::Value,
+) -> Result<(yash_env::variable::Value, Option<ExitStatus>)> {
+    match value {
+        yash_syntax::syntax::Scalar(word) => {
+            let (field, exit_status) = expand_word_new(env, word).await?;
+            Ok((yash_env::variable::Scalar(field.value), exit_status))
+        }
+        yash_syntax::syntax::Array(words) => {
+            let (fields, exit_status) = expand_words_new(env, words).await?;
+            let fields = fields.into_iter().map(|f| f.value).collect();
+            Ok((yash_env::variable::Array(fields), exit_status))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::num::NonZeroU64;
     use std::rc::Rc;
     use yash_env::variable::Value;
@@ -964,17 +1052,28 @@ mod tests {
 
     #[test]
     fn expand_value_scalar() {
-        let v = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
-        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let mut env = yash_env::Env::new_virtual();
+        let value = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
+        let (result, exit_status) = expand_value_new(&mut env, &value)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         let content = assert_matches!(result, yash_env::variable::Scalar(content) => content);
         assert_eq!(content, r"1\");
+        assert_eq!(exit_status, None);
     }
 
     #[test]
     fn expand_value_array() {
-        let v = yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
-        let result = block_on(expand_value(&mut NullEnv, &v)).unwrap();
+        let mut env = yash_env::Env::new_virtual();
+        let value =
+            yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
+        let (result, exit_status) = expand_value_new(&mut env, &value)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         let content = assert_matches!(result, yash_env::variable::Array(content) => content);
         assert_eq!(content, ["".to_string(), r"2\".to_string()]);
+        assert_eq!(exit_status, None);
     }
 }
