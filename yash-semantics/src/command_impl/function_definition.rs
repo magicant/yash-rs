@@ -16,7 +16,7 @@
 
 //! Implementations of function definition semantics.
 
-use crate::expansion::expand_word;
+use crate::expansion::expand_word_new;
 use crate::expansion::Field;
 use crate::Command;
 use crate::Handle;
@@ -45,8 +45,8 @@ impl Command for syntax::FunctionDefinition {
         let Field {
             value: name,
             origin,
-        } = match expand_word(env, &self.name).await {
-            Ok(field) => field,
+        } = match expand_word_new(env, &self.name).await {
+            Ok((field, _exit_status)) => field,
             Err(error) => return error.handle(env).await,
         };
 
