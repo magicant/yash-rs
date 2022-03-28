@@ -58,7 +58,6 @@
 
 use crate::expansion::expand_word;
 use std::borrow::Cow;
-use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::NulError;
 use std::ops::Deref;
@@ -69,6 +68,7 @@ use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
+use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -205,33 +205,8 @@ impl<'a> From<&'a Error> for Message<'a> {
     }
 }
 
-/// Part of the shell execution environment that provides functionalities for
-/// performing redirections.
-pub trait Env: crate::expansion::Env {
-    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno>;
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno>;
-}
-
-impl Env for yash_env::Env {
-    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno> {
-        self.system.dup(from, to_min, cloexec)
-    }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno> {
-        self.system.open(path, option, mode)
-    }
-}
-
-impl<E: Env> Env for crate::expansion::ExitStatusAdapter<'_, E> {
-    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Errno> {
-        (**self).dup(from, to_min, cloexec)
-    }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> Result<Fd, Errno> {
-        (**self).open(path, option, mode)
-    }
-}
-
 /// Opens a file for redirection.
-fn open_file<E: Env>(env: &mut E, option: OFlag, path: Field) -> Result<(Fd, Location), Error> {
+fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location), Error> {
     let Field { value, origin } = path;
     let path = match CString::new(value) {
         Ok(path) => path,
@@ -250,7 +225,7 @@ fn open_file<E: Env>(env: &mut E, option: OFlag, path: Field) -> Result<(Fd, Loc
         | Mode::S_IROTH
         | Mode::S_IWOTH;
 
-    match env.open(&path, option, mode) {
+    match env.system.open(&path, option, mode) {
         Ok(fd) => Ok((fd, origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
@@ -260,8 +235,8 @@ fn open_file<E: Env>(env: &mut E, option: OFlag, path: Field) -> Result<(Fd, Loc
 }
 
 /// Opens the file for a normal redirection.
-async fn open_normal<E: Env>(
-    env: &mut E,
+async fn open_normal(
+    env: &mut Env,
     operator: RedirOp,
     operand: Field,
 ) -> Result<(Fd, Location), Error> {
@@ -284,13 +259,10 @@ async fn open_normal<E: Env>(
 }
 
 /// Performs a redirection.
-async fn perform(
-    env: &mut yash_env::Env,
-    redir: &Redir,
-) -> Result<(SavedFd, Option<ExitStatus>), Error> {
+async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitStatus>), Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
-    let save = match env.dup(target_fd, MIN_SAVE_FD, true) {
+    let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {
