@@ -184,7 +184,7 @@ impl<'a> From<&'a Error> for Message<'a> {
 }
 
 /// Result of word expansion.
-pub type Result<T = ()> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Expands a word to a field.
 ///
