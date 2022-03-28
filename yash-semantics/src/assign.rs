@@ -19,9 +19,10 @@
 use crate::expansion::expand_value;
 use yash_env::semantics::ExitStatus;
 use yash_env::variable::Variable;
+use yash_env::Env;
 
 #[doc(no_inline)]
-pub use crate::expansion::{Env, Error, ErrorCause, Result};
+pub use crate::expansion::{Error, ErrorCause, Result};
 #[doc(no_inline)]
 pub use yash_env::variable::Scope;
 #[doc(no_inline)]
@@ -32,7 +33,7 @@ pub use yash_syntax::syntax::Assign;
 /// This function [expands the value](expand_value) and then
 /// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
 pub async fn perform_assignment(
-    env: &mut yash_env::Env,
+    env: &mut Env,
     assign: &Assign,
     scope: Scope,
     export: bool,
@@ -45,10 +46,12 @@ pub async fn perform_assignment(
         is_exported: export,
         read_only_location: None,
     };
-    env.assign_variable(scope, name, value).map_err(|e| Error {
-        cause: ErrorCause::AssignReadOnly(e),
-        location: assign.location.clone(),
-    })?;
+    env.variables
+        .assign(scope, name, value)
+        .map_err(|e| Error {
+            cause: ErrorCause::AssignReadOnly(e),
+            location: assign.location.clone(),
+        })?;
     Ok(exit_status)
 }
 
@@ -56,7 +59,7 @@ pub async fn perform_assignment(
 ///
 /// This function calls [`perform_assignment`] for each [`Assign`].
 pub async fn perform_assignments(
-    env: &mut yash_env::Env,
+    env: &mut Env,
     assigns: &[Assign],
     scope: Scope,
     export: bool,
@@ -77,7 +80,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Value;
-    use yash_env::Env;
     use yash_syntax::source::Location;
 
     #[test]
