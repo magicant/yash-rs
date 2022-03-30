@@ -31,6 +31,14 @@ pub struct SliceExpandInterim<T: Debug> {
     item_interim: T,
 }
 
+/// Expands a slice of expandable items.
+///
+/// This implementation is typically used for expanding a word or text. Each
+/// item in the slice is recursively expanded, and the results are merged into
+/// one phrase by [`Phrase::append`].
+///
+/// If the slice has no item, the result is [one empty
+/// field](Phrase::one_empty_field).
 #[async_trait(?Send)]
 impl<T: Expand> Expand for [T] {
     type Interim = SliceExpandInterim<<T as Expand>::Interim>;

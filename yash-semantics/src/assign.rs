@@ -32,6 +32,8 @@ pub use yash_syntax::syntax::Assign;
 ///
 /// This function [expands the value](expand_value) and then
 /// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
+/// The return value is the exit status of the last command substitution
+/// performed during the expansion of the assigned value, if any
 pub async fn perform_assignment(
     env: &mut Env,
     assign: &Assign,
@@ -58,6 +60,8 @@ pub async fn perform_assignment(
 /// Performs assignments.
 ///
 /// This function calls [`perform_assignment`] for each [`Assign`].
+/// The return value is the exit status of the last command substitution
+/// performed during the expansion of the assigned values, if any
 pub async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],

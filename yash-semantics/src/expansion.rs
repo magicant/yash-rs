@@ -16,46 +16,52 @@
 
 //! Word expansion.
 //!
-//! The word expansion involves many kinds of operations grouped into the
-//! categories described below. The [`expand_words`] function carries out all of
-//! them.
+//! The word expansion involves many kinds of operations described below.
+//! The [`expand_words`] function carries out all of them and produces any
+//! number of fields depending on the expanded word. The [`expand_word`]
+//! function omits some of them to ensure that the result is a single field.
 //!
 //! # Initial expansion
 //!
-//! The initial expansion converts a word fragment to attributed characters
-//! ([`AttrChar`]). It may involve the tilde expansion, parameter expansion,
-//! command substitution, and arithmetic expansion performed by the [`Expand`]
-//! implementors.
+//! The [initial expansion](self::initial) is the first step of the word
+//! expansion that evaluates a [`Word`] to a [`Phrase`](self::phrase). It is
+//! performed by recursively calling [`Expand`] implementors' methods. Notable
+//! (sub)expansions that may occur in the initial expansion include the tilde
+//! expansion, parameter expansion, command substitution, and arithmetic
+//! expansion.
 //!
-//! Depending on the context, you can configure the expansion to produce either
-//! a single field or any number of fields. Using `Vec<AttrChar>` as
-//! [`Expansion`] will result in a single field. `Vec<Vec<AttrChar>>` may yield
-//! any number of fields.
-//!
-//! To perform the initial expansion on a text/word fragment that implements
-//! `Expand`, you call [`expand`](Expand::expand) on the text/word instance by
-//! providing an [`Env`] and [`Output`]. You can create the `Output` from an
-//! [`Expansion`] implementor. If successful, the `Expansion` implementor will
-//! contain the result.
-//!
-//! To expand a whole [word](Word), you can instead call a method of
-//! [`ExpandToField`]. It produces [`AttrField`]s instead of `AttrChar` vectors.
+//! A successful initial expansion of a word usually results in a single-field
+//! phrase. Still, it may yield any number of fields if the word contains a
+//! parameter expansion of `$@` or `$*`.
 //!
 //! # Multi-field expansion
 //!
-//! In a context expecting any number of fields, the results of the initial
-//! expansion can be subjected to the multi-field expansion. It consists of the
-//! brace expansion, field splitting, and pathname expansion, performed in this
-//! order. The field splitting includes empty field removal, and the pathname
-//! expansion includes the quote removal described below.
+//! The multi-field expansion is a group of operation steps performed after the
+//! initial expansion to render final multi-field results.
 //!
-//! (TBD: How do users perform multi-field expansion?)
+//! ## Brace expansion
 //!
-//! # Quote removal
+//! The brace expansion produces copies of a field containing a pair of braces.
 //!
-//! The [quote removal](QuoteRemoval) is the last step of the word expansion
-//! that removes quotes from the field. It takes an [`AttrField`] input and
-//! returns a [`Field`].
+//! ## Field splitting
+//!
+//! The field splitting divides a field into smaller parts delimited by a
+//! character contained in `$IFS`. Consequently, this operation removes empty
+//! fields from the results of the previous steps.
+//!
+//! ## Pathname expansion
+//!
+//! The pathname expansion performs pattern matching on the name of existing
+//! files to produce pathnames. This operation is also known as "globbing."
+//!
+//! # Quote removal and attribute stripping
+//!
+//! The [quote removal](self::quote_removal) drops characters quoting other
+//! characters, and the attribute stripping converts [`AttrField`]s into bare
+//! [`Field`]s. In [`expand_words`], the quote removal is performed between the
+//! field splitting and pathname expansion, and the attribute stripping is part
+//! of the pathname expansion. In [`expand_word`], they are carried out as the
+//! last step of the whole expansion.
 
 pub mod attr;
 pub mod initial;
@@ -65,6 +71,7 @@ pub mod quote_removal;
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
+use self::initial::Expand;
 use self::quote_removal::*;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
@@ -188,7 +195,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Expands a word to a field.
 ///
-/// This function performs the initial expansion and quote removal.
+/// This function performs the initial expansion, quote removal, and attribute
+/// stripping.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
 ///
@@ -197,7 +205,6 @@ pub async fn expand_word(
     env: &mut yash_env::Env,
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
-    use self::initial::Expand;
     use self::initial::QuickExpand::*;
     let mut env = initial::Env::new(env);
     let phrase = match word.quick_expand(&mut env) {
@@ -216,7 +223,7 @@ pub async fn expand_word(
 /// Expands words to fields.
 ///
 /// This function performs the initial expansion and multi-field expansion,
-/// including quote removal.
+/// including quote removal and attribute stripping.
 /// The second field of the result tuple is the exit status of the last command
 /// substitution performed during the expansion, if any.
 ///
@@ -229,7 +236,6 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     let mut fields = Vec::with_capacity(words.size_hint().0);
     let mut env = initial::Env::new(env);
     for word in words {
-        use self::initial::Expand;
         use self::initial::QuickExpand::*;
         let phrase = match word.quick_expand(&mut env) {
             Ready(result) => result?,
@@ -257,6 +263,8 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
 /// This function expands a [`yash_syntax::syntax::Value`] to a
 /// [`yash_env::variable::Value`]. A scalar and array value are expanded by
 /// [`expand_word`] and [`expand_words`], respectively.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
 pub async fn expand_value(
     env: &mut yash_env::Env,
     value: &yash_syntax::syntax::Value,

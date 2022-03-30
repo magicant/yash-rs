@@ -17,9 +17,12 @@
 //! Intermediate expansion results
 //!
 //! This module defines some types that represent intermediate results of
-//! expansion.
+//! the expansion.
 //!
-//! TODO Elaborate
+//! An [`AttrChar`] is a character with attributes describing how the character
+//! was derived in the initial expansion. The attributes affect the behavior of
+//! later steps of the expansion. An [`AttrField`] is a string of `AttrChar`s
+//! associated with the location of the originating word.
 
 use yash_syntax::source::Location;
 
@@ -28,11 +31,15 @@ use yash_syntax::source::Location;
 pub enum Origin {
     /// The character appeared literally in the original word.
     Literal,
-    /// The character originates from a tilde expansion or sequencing brace expansion.
+
+    /// The character originates from a tilde expansion or sequencing brace
+    /// expansion.
     ///
     /// This kind of character is treated literally in the pathname expansion.
     HardExpansion,
-    /// The character originates from a parameter expansion, command substitution, or arithmetic expansion.
+
+    /// The character originates from a parameter expansion, command
+    /// substitution, or arithmetic expansion.
     ///
     /// This kind of character is subject to field splitting where applicable.
     SoftExpansion,
