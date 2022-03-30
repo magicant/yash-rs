@@ -25,7 +25,9 @@ use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::Handle;
 use yash_env::io::Fd;
+use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
+use yash_env::system::Errno;
 use yash_env::System;
 use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Location;
@@ -72,6 +74,19 @@ where
             })
         })
         .await;
+
+    expand_common(reader, writer, subshell_result, location, env).await
+}
+
+/// The second half of [`expand`] that does not depend on type parameter `C`.
+async fn expand_common(
+    reader: Fd,
+    writer: Fd,
+    subshell_result: Result<Pid, Errno>,
+    location: Location,
+    env: &mut Env<'_>,
+) -> Result<Phrase, Error> {
+    // See if the subshell has successfully started
     let pid = match subshell_result {
         Ok(pid) => pid,
         Err(errno) => {
