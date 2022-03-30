@@ -36,8 +36,13 @@
 //! See [`VariableSet::positional_params`] and its [mut
 //! variant](VariableSet::positional_params_mut).
 //!
-//! You should use [`ScopeGuard`] to ensure contexts are pushed and popped
-//! correctly. See its documentation for details.
+//! This module provides guards to ensure contexts are pushed and popped
+//! correctly. The push function returns a guard that will pop the context when
+//! dropped. Implementing `Deref` and `DerefMut`, the guard allows access to the
+//! borrowed `VariableSet` or `Env`. [`VariableSet::push_context`] returns a
+//! [`ScopeGuard`] that allows re-borrowing the `VariableSet`.
+//! [`Env::push_context`] returns a [`EnvScopeGuard`] that implements
+//! `DerefMut<Target = Env>`.
 
 use crate::Env;
 use either::{Left, Right};
@@ -47,6 +52,8 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Write;
 use std::hash::Hash;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use yash_syntax::source::Location;
 
 /// Value of a variable.
@@ -450,36 +457,12 @@ impl VariableSet {
             .expect("base context has gone")
             .positional_params
     }
-}
 
-/// Stack for pushing and popping contexts.
-///
-/// Instead of calling methods of `ContextStack` directly, you should use
-/// [`ScopeGuard`] which calls the methods when appropriate for you.
-pub trait ContextStack {
-    /// Pushes a new empty context.
-    fn push_context(&mut self, context_type: ContextType);
-
-    /// Pops the last-pushed context.
-    ///
-    /// This function may panic if there is no context that can be popped.
-    fn pop_context(&mut self);
-}
-
-impl ContextStack for VariableSet {
-    fn push_context(&mut self, context_type: ContextType) {
+    fn push_context_impl(&mut self, context_type: ContextType) {
         self.contexts.push(Context::new(context_type));
     }
 
-    /// Pops the last-pushed context.
-    ///
-    /// This function removes the topmost context from the internal stack of
-    /// contexts in the `VariableSet`, thereby removing all the variables in the
-    /// context.
-    ///
-    /// You cannot pop the base context. This function would __panic__ if you
-    /// tried to do so.
-    fn pop_context(&mut self) {
+    fn pop_context_impl(&mut self) {
         debug_assert!(!self.contexts.is_empty());
         assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
         self.contexts.pop();
@@ -496,66 +479,107 @@ impl ContextStack for VariableSet {
     }
 }
 
-/// This implementation delegates to that for `VariableSet` contained in the
-/// `Env`.
-impl ContextStack for Env {
-    fn push_context(&mut self, context_type: ContextType) {
-        self.variables.push_context(context_type)
-    }
-    fn pop_context(&mut self) {
-        self.variables.pop_context()
-    }
-}
-
 /// RAII-style guard for temporarily retaining a variable context.
 ///
-/// A `ScopeGuard` ensures that a variable context is pushed to and popped from
-/// a stack appropriately. The `ScopeGuard` calls [`VariableSet::push_context`]
-/// when created, and [`VariableSet::pop_context`] when dropped.
+/// The guard object is created by [`VariableSet::push_context`].
 #[derive(Debug)]
 #[must_use = "You must retain ScopeGuard to keep the context alive"]
-pub struct ScopeGuard<'a, S: ContextStack> {
-    stack: &'a mut S,
+pub struct ScopeGuard<'a> {
+    stack: &'a mut VariableSet,
 }
 
-impl<'a, S: ContextStack> ScopeGuard<'a, S> {
-    /// Creates a `ScopeGuard`, pushing a new context to `stack`.
+impl VariableSet {
+    /// Pushes a new empty context to this variable set.
     ///
-    /// This function pushes a new context with the specified type and returns a
-    /// `ScopeGuard` wrapping `stack`. The context will be popped from the stack
-    /// when the `ScopeGuard` is dropped.
-    pub fn push_context(stack: &'a mut S, context_type: ContextType) -> Self {
-        stack.push_context(context_type);
-        ScopeGuard { stack }
+    /// This function returns a scope guard that will pop the context when dropped.
+    #[inline]
+    pub fn push_context(&mut self, context_type: ContextType) -> ScopeGuard<'_> {
+        self.push_context_impl(context_type);
+        ScopeGuard { stack: self }
     }
 
-    /// Pops the topmost context.
-    ///
-    /// This function is equivalent to dropping the `ScopeGuard`, but provides a
-    /// more informative name describing the effect.
-    pub fn pop_context(self) {}
+    /// Pops the topmost context from the variable set.
+    #[inline]
+    pub fn pop_context(guard: ScopeGuard<'_>) {
+        drop(guard)
+    }
 }
 
-impl<S: ContextStack> std::ops::Drop for ScopeGuard<'_, S> {
+impl std::ops::Drop for ScopeGuard<'_> {
     /// Drops the `ScopeGuard`.
     ///
     /// This function [pops](VariableSet::pop_context) the context that was
     /// pushed when creating this `ScopeGuard`.
+    #[inline]
     fn drop(&mut self) {
-        self.stack.pop_context();
+        self.stack.pop_context_impl()
     }
 }
 
-impl<S: ContextStack> std::ops::Deref for ScopeGuard<'_, S> {
-    type Target = S;
-    fn deref(&self) -> &S {
+impl std::ops::Deref for ScopeGuard<'_> {
+    type Target = VariableSet;
+    #[inline]
+    fn deref(&self) -> &VariableSet {
         self.stack
     }
 }
 
-impl<S: ContextStack> std::ops::DerefMut for ScopeGuard<'_, S> {
-    fn deref_mut(&mut self) -> &mut S {
+impl std::ops::DerefMut for ScopeGuard<'_> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut VariableSet {
         self.stack
+    }
+}
+
+/// RAII-style guard that makes sure a context is popped properly
+///
+/// The guard object is created by [`Env::push_context`].
+#[derive(Debug)]
+#[must_use = "The context is popped when the guard is dropped"]
+pub struct EnvScopeGuard<'a> {
+    env: &'a mut Env,
+}
+
+impl Env {
+    /// Pushes a new context to the variable set.
+    ///
+    /// This function is equivalent to
+    /// `self.variables.push_context(context_type)`, but returns an
+    /// `EnvScopeGuard` that allows re-borrowing the `Env`.
+    #[inline]
+    pub fn push_context(&mut self, context_type: ContextType) -> EnvScopeGuard<'_> {
+        self.variables.push_context_impl(context_type);
+        EnvScopeGuard { env: self }
+    }
+
+    /// Pops the topmost context from the variable set.
+    #[inline]
+    pub fn pop_context(guard: EnvScopeGuard<'_>) {
+        drop(guard)
+    }
+}
+
+/// When the guard is dropped, the context that was pushed when creating the
+/// guard is popped.
+impl Drop for EnvScopeGuard<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        self.env.variables.pop_context_impl()
+    }
+}
+
+impl Deref for EnvScopeGuard<'_> {
+    type Target = Env;
+    #[inline]
+    fn deref(&self) -> &Env {
+        self.env
+    }
+}
+
+impl DerefMut for EnvScopeGuard<'_> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Env {
+        self.env
     }
 }
 
@@ -647,11 +671,11 @@ mod tests {
     #[test]
     fn assign_global() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
             .unwrap();
-        variables.pop_context();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("".to_string()));
     }
@@ -659,7 +683,7 @@ mod tests {
     #[test]
     fn assign_local() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
@@ -670,29 +694,29 @@ mod tests {
     #[test]
     fn popping_context_removes_variables() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
             .unwrap();
-        variables.pop_context();
+        variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
     }
 
     #[test]
     fn reassign_global_non_base_context() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("a"))
             .unwrap();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("b"))
             .unwrap();
-        variables.pop_context();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("b".to_string()));
-        variables.pop_context();
+        variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
     }
 
@@ -702,7 +726,7 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
@@ -716,11 +740,11 @@ mod tests {
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
             .unwrap();
-        variables.pop_context();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("0".to_string()));
     }
@@ -728,7 +752,7 @@ mod tests {
     #[test]
     fn volatile_assignment_new() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
             .unwrap();
@@ -742,13 +766,13 @@ mod tests {
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("1".to_string()));
-        variables.pop_context();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("0".to_string()));
     }
@@ -762,7 +786,7 @@ mod tests {
         variables
             .assign(Scope::Global, "foo".to_string(), read_only)
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         let error = variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
             .unwrap_err();
@@ -786,25 +810,25 @@ mod tests {
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context(ContextType::Regular);
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
-        variables.pop_context();
-        variables.pop_context();
-        variables.pop_context();
-        variables.pop_context();
+        variables.pop_context_impl();
+        variables.pop_context_impl();
+        variables.pop_context_impl();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
     }
@@ -812,34 +836,34 @@ mod tests {
     #[test]
     fn local_assignment_pops_existing_volatile_variables() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
             .unwrap();
-        variables.push_context(ContextType::Regular);
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
             .unwrap();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         variables
             .assign(Scope::Local, "foo".to_string(), dummy_variable("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
-        variables.pop_context();
-        variables.pop_context();
-        variables.pop_context();
+        variables.pop_context_impl();
+        variables.pop_context_impl();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
-        variables.pop_context();
+        variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("0".to_string()));
-        variables.pop_context();
+        variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
     }
 
@@ -847,7 +871,7 @@ mod tests {
     #[should_panic(expected = "cannot pop the base context")]
     fn cannot_pop_base_context() {
         let mut variables = VariableSet::new();
-        variables.pop_context();
+        variables.pop_context_impl();
     }
 
     #[test]
@@ -992,7 +1016,7 @@ mod tests {
     #[test]
     fn positional_params_in_second_regular_context() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Regular);
+        variables.push_context_impl(ContextType::Regular);
         assert_eq!(variables.positional_params().value, Array(vec![]));
 
         let v = variables.positional_params_mut();
@@ -1016,7 +1040,7 @@ mod tests {
             values.push("c".to_string());
         });
 
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
         assert_matches!(&variables.positional_params().value, Array(values) => {
             assert_eq!(values.as_ref(), ["a".to_string(), "b".to_string(), "c".to_string()]);
         });
@@ -1025,14 +1049,14 @@ mod tests {
     #[test]
     fn setting_positional_params_in_volatile_context() {
         let mut variables = VariableSet::new();
-        variables.push_context(ContextType::Volatile);
+        variables.push_context_impl(ContextType::Volatile);
 
         let v = variables.positional_params_mut();
         assert_matches!(&mut v.value, Array(values) => {
             values.push("x".to_string());
         });
 
-        variables.pop_context();
+        variables.pop_context_impl();
         assert_matches!(&variables.positional_params().value, Array(values) => {
             assert_eq!(values.as_ref(), ["x".to_string()]);
         });
@@ -1041,7 +1065,24 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = ScopeGuard::push_context(&mut env, ContextType::Regular);
+        let mut guard = env.variables.push_context(ContextType::Regular);
+        guard
+            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .unwrap();
+        guard
+            .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
+            .unwrap();
+        VariableSet::pop_context(guard);
+
+        let variable = env.variables.get("foo").unwrap();
+        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(env.variables.get("bar"), None);
+    }
+
+    #[test]
+    fn env_scope_guard() {
+        let mut env = Env::new_virtual();
+        let mut guard = env.push_context(ContextType::Regular);
         guard
             .variables
             .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
@@ -1050,7 +1091,7 @@ mod tests {
             .variables
             .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
             .unwrap();
-        guard.pop_context();
+        Env::pop_context(guard);
 
         let variable = env.variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("".to_string()));
