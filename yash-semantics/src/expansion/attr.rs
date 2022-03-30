@@ -24,6 +24,7 @@
 //! later steps of the expansion. An [`AttrField`] is a string of `AttrChar`s
 //! associated with the location of the originating word.
 
+use yash_env::semantics::Field;
 use yash_syntax::source::Location;
 
 /// Category of syntactic elements from which expansion originates.
@@ -69,4 +70,20 @@ pub struct AttrField {
     pub chars: Vec<AttrChar>,
     /// Location of the word this field resulted from.
     pub origin: Location,
+}
+
+impl AttrField {
+    /// Convenience function performing [quote removal](super::quote_removal)
+    /// and [attribute stripping](super::attr_strip) at once
+    ///
+    /// This function is a bit more efficient than calling
+    /// [`remove_quotes`](super::quote_removal::remove_quotes) and
+    /// [`strip`](super::attr_strip::Strip::strip) separately.
+    pub fn remove_quotes_and_strip(self) -> Field {
+        use super::attr_strip::Strip;
+        use super::quote_removal::skip_quotes;
+        let value = skip_quotes(self.chars).strip().collect();
+        let origin = self.origin;
+        Field { value, origin }
+    }
 }

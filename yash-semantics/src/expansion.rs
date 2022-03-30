@@ -73,7 +73,6 @@ use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
 use self::initial::Expand;
-use self::quote_removal::*;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
@@ -212,7 +211,7 @@ pub async fn expand_word(
         chars,
         origin: word.location.clone(),
     };
-    let field = field.do_quote_removal();
+    let field = field.remove_quotes_and_strip();
     Ok((field, env.last_command_subst_exit_status))
 }
 
@@ -249,7 +248,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
 
     let fields = fields
         .into_iter()
-        .map(QuoteRemoval::do_quote_removal)
+        .map(AttrField::remove_quotes_and_strip)
         .collect();
     Ok((fields, env.last_command_subst_exit_status))
 }
