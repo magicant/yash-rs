@@ -431,10 +431,13 @@ pub enum TextUnit {
     BracedParam(Param),
     /// Command substitution of the form `$(...)`.
     CommandSubst {
-        // TODO content should be Rc<str> to avoid cloning before forking
         /// Command string that will be parsed and executed when the command
         /// substitution is expanded.
-        content: String,
+        ///
+        /// This value is reference-counted so that the shell does not have to
+        /// clone the entire string when it is passed to a subshell to execute
+        /// the command substitution.
+        content: Rc<str>,
         /// Position of this command substitution in the source code.
         location: Location,
     },
@@ -1519,7 +1522,7 @@ mod tests {
         assert_eq!(raw_param.to_string(), "$PARAM");
 
         let command_subst = CommandSubst {
-            content: r"foo\bar".to_string(),
+            content: r"foo\bar".into(),
             location: Location::dummy(""),
         };
         assert_eq!(command_subst.to_string(), r"$(foo\bar)");
@@ -1562,7 +1565,7 @@ mod tests {
                 location: Location::dummy(""),
             },
             CommandSubst {
-                content: "Y".to_string(),
+                content: "Y".into(),
                 location: Location::dummy(""),
             },
             Backquote {

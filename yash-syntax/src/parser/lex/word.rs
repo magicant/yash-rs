@@ -191,7 +191,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
         assert_matches!(result, Unquoted(CommandSubst { content, location }) => {
-            assert_eq!(content, "");
+            assert_eq!(&*content, "");
             assert_eq!(location.range, 0..3);
         });
 
@@ -475,7 +475,7 @@ mod tests {
         assert_eq!(word.units.len(), 4);
         assert_eq!(word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
         assert_matches!(&word.units[1], WordUnit::Unquoted(TextUnit::CommandSubst { content, location }) => {
-            assert_eq!(content, ":");
+            assert_eq!(&**content, ":");
             assert_eq!(*location.code.value.borrow(), r"0$(:)X\#");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);

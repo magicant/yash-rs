@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `syntax::CommandSubst::content` from `String` to `Rc<str>`
 - `parser::Error` now `non_exhaustive`
 - `parser::Error::UnexpectedToken` renamed to `InvalidCommandToken`
 - `parser::Parser::maybe_compound_list` now returning an `InvalidCommandToken`

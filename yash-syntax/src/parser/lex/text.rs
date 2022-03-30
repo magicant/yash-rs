@@ -351,7 +351,7 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_matches!(result, CommandSubst { content, location } => {
-            assert_eq!(content, "");
+            assert_eq!(&*content, "");
             assert_eq!(location.range, 0..3);
         });
 

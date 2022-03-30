@@ -41,7 +41,7 @@ impl Lexer<'_> {
             None => return Ok(None),
         };
 
-        let content = self.inner_program_boxed().await?;
+        let content = self.inner_program_boxed().await?.into();
 
         if !self.skip_if(|c| c == ')').await? {
             // TODO Return a better error depending on the token id of the next token
@@ -75,7 +75,7 @@ mod tests {
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..12);
-            assert_eq!(content, " foo bar ");
+            assert_eq!(&*content, " foo bar ");
         });
 
         let next = block_on(lexer.location()).unwrap();

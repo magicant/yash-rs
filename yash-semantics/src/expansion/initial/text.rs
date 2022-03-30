@@ -279,7 +279,7 @@ mod tests {
             env.builtins.insert("echo", echo_builtin());
             let mut env = Env::new(&mut env);
             let subst = TextUnit::CommandSubst {
-                content: "echo .".to_string(),
+                content: "echo .".into(),
                 location: Location::dummy(""),
             };
             assert_matches!(subst.quick_expand(&mut env), Interim(()));

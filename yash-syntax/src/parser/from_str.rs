@@ -349,7 +349,7 @@ mod tests {
             assert_eq!(parse.0[0], Literal('a'));
             assert_eq!(parse.0[1], Backslashed('b'));
             assert_matches!(&parse.0[2], CommandSubst { content, .. } => {
-                assert_eq!(content, "c");
+                assert_eq!(&**content, "c");
             });
         })
     }
