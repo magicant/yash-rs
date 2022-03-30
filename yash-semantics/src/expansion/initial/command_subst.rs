@@ -24,7 +24,6 @@ use super::Error;
 use crate::expansion::ErrorCause;
 use crate::read_eval_loop;
 use crate::Handle;
-use std::ops::Deref;
 use yash_env::io::Fd;
 use yash_env::semantics::ExitStatus;
 use yash_env::System;
@@ -35,7 +34,7 @@ use yash_syntax::source::Source;
 /// Performs command substitution
 pub async fn expand<C>(command: C, location: Location, env: &mut Env<'_>) -> Result<Phrase, Error>
 where
-    C: Deref<Target = str> + 'static,
+    C: AsRef<str> + 'static,
 {
     let original = location.clone();
 
@@ -67,7 +66,8 @@ where
                     env.system.close(writer).ok();
                 }
 
-                let mut lexer = Lexer::from_memory(&command, Source::CommandSubst { original });
+                let mut lexer =
+                    Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
                 read_eval_loop(env, &mut lexer).await
             })
         })
