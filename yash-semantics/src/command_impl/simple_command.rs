@@ -18,7 +18,6 @@
 
 use crate::command_search::search;
 use crate::expansion::expand_words;
-use crate::expansion::ExitStatusAdapter;
 use crate::redir::RedirGuard;
 use crate::Command;
 use crate::Handle;
@@ -164,8 +163,8 @@ impl Command for syntax::SimpleCommand {
     /// POSIX leaves many aspects of the simple command execution unspecified.
     /// The detail semantics may differ in other shell implementations.
     async fn execute(&self, env: &mut Env) -> Result {
-        let fields = match expand_words(env, &self.words).await {
-            Ok(fields) => fields,
+        let (fields, exit_status) = match expand_words(env, &self.words).await {
+            Ok(result) => result,
             Err(error) => return error.handle(env).await,
         };
 
@@ -187,34 +186,38 @@ impl Command for syntax::SimpleCommand {
                 }
             }
         } else {
-            execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs)).await
+            let exit_status = exit_status.unwrap_or_default();
+            execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs), exit_status).await
         }
     }
 }
 
-async fn perform_redirs(
-    env: &mut RedirGuard<'_, ExitStatusAdapter<'_, Env>>,
-    redirs: &[Redir],
-) -> Result {
+async fn perform_redirs(env: &mut RedirGuard<'_>, redirs: &[Redir]) -> Result<Option<ExitStatus>> {
     match env.perform_redirs(&*redirs).await {
-        Ok(()) => Continue(()),
-        Err(e) => e.handle(env).await,
+        Ok(exit_status) => Continue(exit_status),
+        Err(e) => {
+            e.handle(env).await?;
+            Continue(None)
+        }
     }
 }
 
 async fn perform_assignments(
-    env: &mut ExitStatusAdapter<'_, Env>,
+    env: &mut Env,
     assigns: &[Assign],
     export: bool,
-) -> Result {
+) -> Result<Option<ExitStatus>> {
     let scope = if export {
         Scope::Volatile
     } else {
         Scope::Global
     };
     match crate::assign::perform_assignments(env, assigns, scope, export).await {
-        Ok(()) => Continue(()),
-        Err(error) => error.handle(env).await,
+        Ok(exit_status) => Continue(exit_status),
+        Err(error) => {
+            error.handle(env).await?;
+            Continue(None)
+        }
     }
 }
 
@@ -222,16 +225,16 @@ async fn execute_absent_target(
     env: &mut Env,
     assigns: &[Assign],
     redirs: Rc<Vec<Redir>>,
+    exit_status: ExitStatus,
 ) -> Result {
     // Perform redirections in a subshell
-    let exit_status = if let Some(redir) = redirs.first() {
+    let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
-                let env = &mut ExitStatusAdapter::new(env);
                 let env = &mut RedirGuard::new(env);
-                perform_redirs(env, &*redirs).await?;
-                env.exit_status = env.last_command_subst_exit_status().unwrap_or_default();
+                let redir_exit_status = perform_redirs(env, &*redirs).await?;
+                env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
         });
@@ -249,12 +252,11 @@ async fn execute_absent_target(
             }
         }
     } else {
-        ExitStatus::SUCCESS
+        exit_status
     };
 
-    let env = &mut ExitStatusAdapter::new(env);
-    perform_assignments(env, assigns, false).await?;
-    env.exit_status = env.last_command_subst_exit_status().unwrap_or(exit_status);
+    let assignment_exit_status = perform_assignments(env, assigns, false).await?;
+    env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
 
@@ -267,7 +269,6 @@ async fn execute_builtin(
 ) -> Result {
     let name = fields.remove(0);
     let env = &mut env.push_frame(Frame::Builtin { name });
-    let env = &mut ExitStatusAdapter::new(&mut **env);
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
@@ -295,14 +296,13 @@ async fn execute_function(
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
-    let env = &mut ExitStatusAdapter::new(env);
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
     let mut outer = ScopeGuard::push_context(&mut **env, ContextType::Volatile);
     perform_assignments(&mut *outer, assigns, true).await?;
 
-    let mut inner = ScopeGuard::push_context(&mut **outer, ContextType::Regular);
+    let mut inner = ScopeGuard::push_context(&mut *outer, ContextType::Regular);
 
     // Apply positional parameters
     let mut params = inner.variables.positional_params_mut();
@@ -331,7 +331,6 @@ async fn execute_external_utility(
     let location = name.origin.clone();
     let args = to_c_strings(fields);
 
-    let env = &mut ExitStatusAdapter::new(env);
     let env = &mut RedirGuard::new(env);
     perform_redirs(env, redirs).await?;
 
@@ -340,7 +339,7 @@ async fn execute_external_utility(
 
     if path.to_bytes().is_empty() {
         print_error(
-            &mut **env,
+            &mut *env,
             format!("cannot execute external utility {:?}", name.value).into(),
             "utility not found".into(),
             &name.origin,
@@ -384,7 +383,7 @@ async fn execute_external_utility(
         }
         Err(errno) => {
             print_error(
-                &mut **env,
+                &mut *env,
                 format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,

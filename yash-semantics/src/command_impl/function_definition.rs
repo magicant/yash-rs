@@ -46,7 +46,7 @@ impl Command for syntax::FunctionDefinition {
             value: name,
             origin,
         } = match expand_word(env, &self.name).await {
-            Ok(field) => field,
+            Ok((field, _exit_status)) => field,
             Err(error) => return error.handle(env).await,
         };
 
