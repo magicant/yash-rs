@@ -89,8 +89,6 @@ pub use yash_env::semantics::Field;
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
-    // TODO Define error cause types
-    Dummy(String),
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
     /// Assignment to a read-only variable.
@@ -104,7 +102,6 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            Dummy(message) => message,
             CommandSubstError(_) => "error performing the command substitution",
             AssignReadOnly(_) => "cannot assign to read-only variable",
         }
@@ -116,7 +113,6 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            Dummy(_) => "".into(),
             CommandSubstError(e) => e.desc().into(),
             AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
         }
@@ -129,7 +125,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            Dummy(_) | CommandSubstError(_) => None,
+            CommandSubstError(_) => None,
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
@@ -142,7 +138,6 @@ impl std::fmt::Display for ErrorCause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
-            Dummy(message) => message.fmt(f),
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
             AssignReadOnly(error) => error.fmt(f),
         }
