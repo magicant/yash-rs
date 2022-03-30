@@ -57,13 +57,14 @@
 //! # Quote removal and attribute stripping
 //!
 //! The [quote removal](self::quote_removal) drops characters quoting other
-//! characters, and the attribute stripping converts [`AttrField`]s into bare
-//! [`Field`]s. In [`expand_words`], the quote removal is performed between the
-//! field splitting and pathname expansion, and the attribute stripping is part
-//! of the pathname expansion. In [`expand_word`], they are carried out as the
-//! last step of the whole expansion.
+//! characters, and the [attribute stripping](self::attr_strip) converts
+//! [`AttrField`]s into bare [`Field`]s. In [`expand_words`], the quote removal
+//! is performed between the field splitting and pathname expansion, and the
+//! attribute stripping is part of the pathname expansion. In [`expand_word`],
+//! they are carried out as the last step of the whole expansion.
 
 pub mod attr;
+pub mod attr_strip;
 pub mod initial;
 pub mod phrase;
 pub mod quote_removal;
