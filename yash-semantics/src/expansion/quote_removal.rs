@@ -14,46 +14,56 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Quote removal.
+//! Quote removal
+//!
+//! The quote removal is a step of the word expansion that removes quotes from
+//! the field. Yash's notion of the quote removal is a bit different from that
+//! of POSIX in that the [attribute stripping](super::attr_strip::Strip) is a
+//! separate operation from the quote removal.
+//!
+//! There are two versions of quote removal implementation.
+//! [`skip_quotes`] wraps an iterator of `AttrChar`s with another iterator that
+//! removes quotes from iteration.
+//! [`remove_quotes`] removes quotes from a mutable vector of `AttrChar`s.
+//!
+//! ```
+//! # use yash_semantics::expansion::attr::{AttrChar, Origin};
+//! # use yash_semantics::expansion::quote_removal::skip_quotes;
+//! let a = AttrChar {
+//!     value: '\\',
+//!     origin: Origin::Literal,
+//!     is_quoted: false,
+//!     is_quoting: true,
+//! };
+//! let b = AttrChar {
+//!     value: 'X',
+//!     origin: Origin::Literal,
+//!     is_quoted: true,
+//!     is_quoting: false,
+//! };
+//! let input = [a, b];
+//! let output = skip_quotes(input).collect::<Vec<_>>();
+//! assert_eq!(output, [b]);
+//! ```
 
 use super::AttrChar;
-use super::AttrField;
-use super::Field;
 
-/// Quote removal.
+/// Performs quote removal on an iterator.
 ///
-/// The quote removal is a step of the word expansion that removes quotes from
-/// the field. The [`do_quote_removal`](Self::do_quote_removal) function
-/// converts an [`AttrChar`] string to a regular string.
-pub trait QuoteRemoval {
-    /// Return type of [`do_quote_removal`](Self::do_quote_removal).
-    type Output;
-
-    /// Performs the quote removal on `self`.
-    ///
-    /// TODO Add a parameter to specify how characters in the result should be
-    /// escaped.
-    fn do_quote_removal(self) -> Self::Output;
+/// This function returns an iterator that skips over quoting characters from
+/// the original iterator.
+pub fn skip_quotes<I>(iter: I) -> impl Iterator<Item = AttrChar>
+where
+    I: IntoIterator<Item = AttrChar>,
+{
+    iter.into_iter().filter(|c| !c.is_quoting)
 }
 
-impl QuoteRemoval for &[AttrChar] {
-    type Output = String;
-    fn do_quote_removal(self) -> String {
-        // TODO Remove quotes correctly
-        self.iter()
-            .filter(|c| !c.is_quoting)
-            .map(|c| c.value)
-            .collect()
-    }
-}
-
-impl QuoteRemoval for AttrField {
-    type Output = Field;
-    fn do_quote_removal(self) -> Field {
-        let AttrField { chars, origin } = self;
-        let value = chars.do_quote_removal();
-        Field { value, origin }
-    }
+/// Performs quote removal on a mutable vector of `AttrChar`s.
+///
+/// This function removes quoting characters from the vector.
+pub fn remove_quotes(chars: &mut Vec<AttrChar>) {
+    chars.retain(|c| !c.is_quoting)
 }
 
 #[cfg(test)]
@@ -62,7 +72,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn quote_removal() {
+    fn test_skip_quotes() {
         let a = AttrChar {
             value: 'a',
             origin: Origin::Literal,
@@ -72,14 +82,14 @@ mod tests {
         let b = AttrChar {
             value: 'b',
             origin: Origin::Literal,
-            is_quoted: true,
-            is_quoting: false,
+            is_quoted: false,
+            is_quoting: true,
         };
         let c = AttrChar {
             value: 'c',
             origin: Origin::Literal,
-            is_quoted: false,
-            is_quoting: true,
+            is_quoted: true,
+            is_quoting: false,
         };
         let d = AttrChar {
             value: 'd',
@@ -88,7 +98,38 @@ mod tests {
             is_quoting: true,
         };
         let input = [a, b, c, d];
-        let result = input.do_quote_removal();
-        assert_eq!(result, "ab");
+        let output = skip_quotes(input).collect::<Vec<_>>();
+        assert_eq!(output, [a, c]);
+    }
+
+    #[test]
+    fn test_remove_quotes() {
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let b = AttrChar {
+            value: 'b',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let c = AttrChar {
+            value: 'c',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let d = AttrChar {
+            value: 'd',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: true,
+        };
+        let mut chars = vec![a, b, c, d];
+        remove_quotes(&mut chars);
+        assert_eq!(chars, [a, c]);
     }
 }

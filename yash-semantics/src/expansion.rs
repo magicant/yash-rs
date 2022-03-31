@@ -57,13 +57,14 @@
 //! # Quote removal and attribute stripping
 //!
 //! The [quote removal](self::quote_removal) drops characters quoting other
-//! characters, and the attribute stripping converts [`AttrField`]s into bare
-//! [`Field`]s. In [`expand_words`], the quote removal is performed between the
-//! field splitting and pathname expansion, and the attribute stripping is part
-//! of the pathname expansion. In [`expand_word`], they are carried out as the
-//! last step of the whole expansion.
+//! characters, and the [attribute stripping](self::attr_strip) converts
+//! [`AttrField`]s into bare [`Field`]s. In [`expand_words`], the quote removal
+//! is performed between the field splitting and pathname expansion, and the
+//! attribute stripping is part of the pathname expansion. In [`expand_word`],
+//! they are carried out as the last step of the whole expansion.
 
 pub mod attr;
+pub mod attr_strip;
 pub mod initial;
 pub mod phrase;
 pub mod quote_removal;
@@ -72,7 +73,6 @@ use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
 use self::initial::Expand;
-use self::quote_removal::*;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
@@ -211,7 +211,7 @@ pub async fn expand_word(
         chars,
         origin: word.location.clone(),
     };
-    let field = field.do_quote_removal();
+    let field = field.remove_quotes_and_strip();
     Ok((field, env.last_command_subst_exit_status))
 }
 
@@ -248,7 +248,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
 
     let fields = fields
         .into_iter()
-        .map(QuoteRemoval::do_quote_removal)
+        .map(AttrField::remove_quotes_and_strip)
         .collect();
     Ok((fields, env.last_command_subst_exit_status))
 }
