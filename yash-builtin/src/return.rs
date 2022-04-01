@@ -78,20 +78,12 @@ use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-
-/// Part of the shell execution environment the return built-in depends on.
-pub trait Env {
-    // TODO Current value of $?
-    // TODO Current execution context (stack trace)
-    // TODO stderr
-}
-
-impl Env for yash_env::Env {}
+use yash_env::Env;
 
 /// Implementation of the return built-in.
 ///
 /// See the [module-level documentation](self) for details.
-pub fn builtin_main_sync<E: Env>(_env: &mut E, args: Vec<Field>) -> Result {
+pub fn builtin_main_sync(_env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Parse arguments correctly
     // TODO Reject returning from an interactive session
     let mut i = args.iter().peekable();
@@ -127,14 +119,9 @@ mod tests {
     use super::*;
     use yash_env::semantics::ExitStatus;
 
-    #[derive(Default)]
-    struct DummyEnv;
-
-    impl Env for DummyEnv {}
-
     #[test]
     fn returns_exit_status_specified_without_n_option() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["42"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(42), Break(Divert::Return)));
@@ -142,7 +129,7 @@ mod tests {
 
     #[test]
     fn returns_exit_status_12_with_n_option() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["-n", "12"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(12), Continue(())));
@@ -150,7 +137,7 @@ mod tests {
 
     #[test]
     fn returns_exit_status_47_with_n_option() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["-n", "47"]);
         let result = builtin_main_sync(&mut env, args);
         assert_eq!(result, (ExitStatus(47), Continue(())));
