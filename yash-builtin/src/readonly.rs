@@ -27,40 +27,10 @@ use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scalar;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
-
-/// Part of the shell execution environment the readonly built-in depends on.
-pub trait Env {
-    /// Gets a reference to the variable with the specified name.
-    #[must_use]
-    fn get_variable(&self, name: &str) -> Option<&Variable>;
-
-    /// Assigns a variable.
-    fn assign_variable(
-        &mut self,
-        scope: Scope,
-        name: String,
-        value: Variable,
-    ) -> std::result::Result<Option<Variable>, ReadOnlyError>;
-
-    // TODO stdout, stderr
-}
-
-impl Env for yash_env::Env {
-    fn get_variable(&self, name: &str) -> Option<&Variable> {
-        self.variables.get(name)
-    }
-    fn assign_variable(
-        &mut self,
-        scope: Scope,
-        name: String,
-        value: Variable,
-    ) -> std::result::Result<Option<Variable>, ReadOnlyError> {
-        self.variables.assign(scope, name, value)
-    }
-}
+use yash_env::Env;
 
 /// Implementation of the readonly built-in.
-pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
+pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print read-only variables if there are no operands
 
@@ -78,7 +48,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
                 is_exported: false,
                 read_only_location: Some(location),
             };
-            match env.assign_variable(Scope::Global, name, value) {
+            match env.variables.assign(Scope::Global, name, value) {
                 Ok(_old_value) => (),
                 Err(ReadOnlyError {
                     name,

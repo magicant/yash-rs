@@ -21,10 +21,7 @@
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::print_error_message;
-use crate::common::BuiltinName;
 use crate::common::Print;
-use crate::common::Stderr;
-use crate::common::Stdout;
 use std::fmt::Write;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
@@ -32,77 +29,14 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::trap::Iter;
-use yash_env::trap::SetTrapError;
-use yash_env::trap::Signal;
 use yash_env::trap::Trap;
-use yash_env::trap::TrapState;
+use yash_env::Env;
 use yash_quote::quote;
-use yash_syntax::source::Location;
-
-/// Part of the shell execution environment the trap built-in depends on.
-pub trait Env: BuiltinName + Stdout + Stderr {
-    /// Returns an iterator for currently configured trap actions.
-    fn iter(&self) -> Iter<'_>;
-
-    /// Returns the trap action for a signal.
-    ///
-    /// This function returns a pair of optional trap states. The first is the
-    /// currently configured trap action, and the second is the action set
-    /// before entering the current subshell environment.
-    ///
-    /// This function does not reflect the initial signal actions the shell
-    /// inherited on startup.
-    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>);
-
-    /// Sets a trap action for a signal.
-    ///
-    /// This function installs a signal handler to the specified underlying
-    /// system.
-    ///
-    /// If `override_ignore` is `false`, you cannot set a trap for a signal that
-    /// has been ignored since the shell startup. An interactive shell should
-    /// set `override_ignore` to `true` to bypass this restriction.
-    ///
-    /// You can never set a trap for `SIGKILL` or `SIGSTOP`.
-    ///
-    /// `origin` should be the location of the command performing this trap
-    /// update. It is only informative: It does not affect the signal handling
-    /// behavior and can be referenced later by [`get_trap`](Self::get_trap).
-    fn set_trap(
-        &mut self,
-        signal: Signal,
-        action: Trap,
-        origin: Location,
-        override_ignore: bool,
-    ) -> std::result::Result<(), SetTrapError>;
-}
-
-impl Env for yash_env::Env {
-    fn iter(&self) -> Iter<'_> {
-        self.traps.iter()
-    }
-
-    fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
-        self.traps.get_trap(signal)
-    }
-
-    fn set_trap(
-        &mut self,
-        signal: Signal,
-        action: Trap,
-        origin: Location,
-        override_ignore: bool,
-    ) -> std::result::Result<(), SetTrapError> {
-        self.traps
-            .set_trap(&mut self.system, signal, action, origin, override_ignore)
-    }
-}
 
 /// Prints the currently configured traps.
-pub async fn print_traps<E: Env>(env: &mut E) -> Result {
+pub async fn print_traps(env: &mut Env) -> Result {
     let mut output = String::new();
-    for (&signal, current, parent) in env.iter() {
+    for (&signal, current, parent) in env.traps.iter() {
         let trap = match (current, parent) {
             (Some(trap), _) => trap,
             (None, Some(trap)) => trap,
@@ -120,7 +54,7 @@ pub async fn print_traps<E: Env>(env: &mut E) -> Result {
 }
 
 /// Implementation of the readonly built-in.
-pub async fn builtin_body<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
+pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, mut operands) = match parse_arguments(&[], Mode::default(), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
@@ -148,7 +82,10 @@ pub async fn builtin_body<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
         _ => Trap::Command(value),
     };
 
-    match env.set_trap(signal, action, origin, false) {
+    match env
+        .traps
+        .set_trap(&mut env.system, signal, action, origin, false)
+    {
         Ok(()) => (ExitStatus::SUCCESS, Continue(())),
         // TODO Print error message
         Err(_) => (ExitStatus::ERROR, Continue(())),
@@ -174,6 +111,7 @@ mod tests {
     use yash_env::io::Fd;
     use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
+    use yash_env::trap::Signal;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
