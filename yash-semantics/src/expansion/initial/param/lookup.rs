@@ -108,7 +108,7 @@ pub fn look_up_special_parameter<'a>(env: &'a mut Env, name: &str) -> Option<Loo
         return None;
     }
     match first {
-        '@' => todo!(),
+        '@' => Some((&env.variables.positional_params().value).into()),
         '*' => todo!(),
         '#' => todo!(),
         '?' => Some(env.exit_status.to_string().into()),
@@ -176,6 +176,20 @@ mod tests {
         assert_eq!(look_up_special_parameter(&mut env, "%"), None);
         assert_eq!(look_up_special_parameter(&mut env, "??"), None);
         assert_eq!(look_up_special_parameter(&mut env, "!?"), None);
+    }
+
+    #[test]
+    fn special_all_positional_parameters_separate() {
+        let mut env = yash_env::Env::new_virtual();
+        let result = look_up_special_parameter(&mut env, "@").unwrap();
+        assert_matches!(result, Lookup::Array(values)
+            if values.as_ref() == [] as [String;0]);
+
+        let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
+        env.variables.positional_params_mut().value = Value::Array(params.clone());
+        let result = look_up_special_parameter(&mut env, "@").unwrap();
+        assert_matches!(result, Lookup::Array(values)
+            if values.as_ref() == params);
     }
 
     #[test]
