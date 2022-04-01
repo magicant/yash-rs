@@ -23,34 +23,16 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_syntax::alias::{AliasSet, HashEntry};
-
-/// Part of the shell execution environment the alias built-in depends on.
-pub trait Env {
-    /// Accesses the alias set in the environment.
-    fn alias_set(&self) -> &AliasSet;
-
-    /// Accesses the alias set in the environment.
-    fn alias_set_mut(&mut self) -> &mut AliasSet;
-    // TODO stdout, stderr
-}
-
-impl Env for yash_env::Env {
-    fn alias_set(&self) -> &AliasSet {
-        &self.aliases
-    }
-    fn alias_set_mut(&mut self) -> &mut AliasSet {
-        &mut self.aliases
-    }
-}
+use yash_env::Env;
+use yash_syntax::alias::HashEntry;
 
 /// Implementation of the alias built-in.
-pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
+pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
     if args.is_empty() {
-        for alias in env.alias_set() {
+        for alias in &env.aliases {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
@@ -63,7 +45,7 @@ pub fn builtin_main_sync<E: Env>(env: &mut E, args: Vec<Field>) -> Result {
             // TODO reject invalid name
             let replacement = value[eq_index + 1..].to_owned();
             let entry = HashEntry::new(name, replacement, false, origin);
-            env.alias_set_mut().replace(entry);
+            env.aliases.replace(entry);
         } else {
             // TODO print alias definition
         }
@@ -89,23 +71,9 @@ mod tests {
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
 
-    #[derive(Default)]
-    struct DummyEnv {
-        aliases: AliasSet,
-    }
-
-    impl Env for DummyEnv {
-        fn alias_set(&self) -> &AliasSet {
-            &self.aliases
-        }
-        fn alias_set_mut(&mut self) -> &mut AliasSet {
-            &mut self.aliases
-        }
-    }
-
     #[test]
     fn builtin_defines_alias() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=bar baz"]);
 
         let result = builtin_main_sync(&mut env, args);
@@ -125,7 +93,7 @@ mod tests {
 
     #[test]
     fn builtin_defines_many_aliases() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["abc=xyz", "yes=no", "ls=ls --color"]);
 
         let result = builtin_main_sync(&mut env, args);
@@ -163,7 +131,7 @@ mod tests {
 
     #[test]
     fn builtin_replaces_alias() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=1"]);
 
         let result = builtin_main_sync(&mut env, args);
@@ -186,7 +154,7 @@ mod tests {
 
     #[test]
     fn builtin_prints_all_aliases() {
-        let mut env = DummyEnv::default();
+        let mut env = Env::new_virtual();
         env.aliases.insert(HashEntry::new(
             "foo".to_string(),
             "bar".to_string(),
