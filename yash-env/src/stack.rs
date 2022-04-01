@@ -37,7 +37,6 @@ use std::ops::DerefMut;
 
 /// Element of runtime execution context stack
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
 pub enum Frame {
     /// Built-in utility
     Builtin {

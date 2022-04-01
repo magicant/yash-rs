@@ -22,6 +22,7 @@ pub mod alias;
 pub mod common;
 pub mod readonly;
 pub mod r#return;
+pub mod set;
 pub mod trap;
 
 #[doc(no_inline)]
@@ -50,6 +51,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: r#return::builtin_main,
+        },
+    ),
+    (
+        "set",
+        Builtin {
+            r#type: Special,
+            execute: set::builtin_main,
         },
     ),
     (
