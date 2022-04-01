@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn empty_slice() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs: [Stub; 0] = [];
         assert_matches!(stubs.quick_expand(&mut env), Ready(result) => {
             assert_eq!(result, Ok(Phrase::one_empty_field()));
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn slice_of_one_quick_item_returning_zero_fields() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [Stub::new_quick(Ok(Phrase::zero_fields()))];
         assert_matches!(stubs.quick_expand(&mut env), Ready(result) => {
             assert_eq!(result, Ok(Phrase::zero_fields()));
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn slice_of_many_quick_items_returning_zero_fields() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [
             Stub::new_quick(Ok(Phrase::zero_fields())),
             Stub::new_quick(Ok(Phrase::zero_fields())),
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn slice_of_many_quick_items_each_returning_one_empty_field() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [
             Stub::new_quick(Ok(Phrase::one_empty_field())),
             Stub::new_quick(Ok(Phrase::one_empty_field())),
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn slice_of_many_quick_items_each_returning_one_non_empty_field() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let a = dummy_attr_char('a');
         let b = dummy_attr_char('b');
         let c = dummy_attr_char('c');
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn slice_of_one_async_item_returning_zero_fields() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [Stub::new_async(Ok(Phrase::zero_fields()))];
         assert_matches!(stubs.quick_expand(&mut env), Interim(interim) => {
             let result = stubs
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn slice_of_many_async_items_returning_zero_fields() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [
             Stub::new_async(Ok(Phrase::zero_fields())),
             Stub::new_async(Ok(Phrase::zero_fields())),
@@ -258,7 +258,7 @@ mod tests {
     #[test]
     fn slice_of_many_async_items_each_returning_one_empty_field() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let stubs = [
             Stub::new_async(Ok(Phrase::one_empty_field())),
             Stub::new_async(Ok(Phrase::one_empty_field())),
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn slice_of_many_async_items_each_returning_one_non_empty_field() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let a = dummy_attr_char('a');
         let b = dummy_attr_char('b');
         let c = dummy_attr_char('c');
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn slice_of_quick_and_async_items() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let a = dummy_attr_char('a');
         let b = dummy_attr_char('b');
         let c = dummy_attr_char('c');

@@ -201,7 +201,7 @@ pub async fn expand_word(
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
     use self::initial::QuickExpand::*;
-    let mut env = initial::Env::new(env);
+    let mut env = initial::Env::new(env, false);
     let phrase = match word.quick_expand(&mut env) {
         Ready(result) => result?,
         Interim(interim) => word.async_expand(&mut env, interim).await?,
@@ -229,7 +229,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
 ) -> Result<(Vec<Field>, Option<ExitStatus>)> {
     let words = words.into_iter();
     let mut fields = Vec::with_capacity(words.size_hint().0);
-    let mut env = initial::Env::new(env);
+    let mut env = initial::Env::new(env, true);
     for word in words {
         use self::initial::QuickExpand::*;
         let phrase = match word.quick_expand(&mut env) {

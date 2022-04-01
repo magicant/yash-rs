@@ -161,7 +161,7 @@ mod tests {
         in_virtual_system(|mut env, _pid, _state| async move {
             let command = "".to_string();
             let location = Location::dummy("");
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             let result = expand(command, location, &mut env).await;
             assert_eq!(result, Ok(Phrase::one_empty_field()));
         })
@@ -173,7 +173,7 @@ mod tests {
             env.builtins.insert("echo", echo_builtin());
             let command = "echo ok".to_string();
             let location = Location::dummy("");
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             let result = expand(command, location, &mut env).await;
 
             let o = AttrChar {
@@ -193,7 +193,7 @@ mod tests {
             env.builtins.insert("echo", echo_builtin());
             let command = "echo 1; echo 2; echo; echo 3; echo; echo".to_string();
             let location = Location::dummy("");
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             let result = expand(command, location, &mut env).await;
             let chars = "1\n2\n\n3"
                 .chars()
@@ -214,7 +214,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
             let command = "return -n 100".to_string();
             let location = Location::dummy("");
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             let result = expand(command, location, &mut env).await;
             assert_eq!(result, Ok(Phrase::one_empty_field()));
             assert_eq!(env.last_command_subst_exit_status, Some(ExitStatus(100)));
@@ -226,7 +226,7 @@ mod tests {
         let command = "".to_string();
         let location = Location::dummy("foo");
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let result = block_on(expand(command, location.clone(), &mut env));
         let cause = ErrorCause::CommandSubstError(Errno::ENOSYS);
         assert_eq!(result, Err(Error { cause, location }));

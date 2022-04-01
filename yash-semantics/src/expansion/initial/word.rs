@@ -99,6 +99,7 @@ impl Expand for WordUnit {
             Unquoted(text_unit) => text_unit.async_expand(env, ()).await,
             SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
             DoubleQuote(text) => {
+                // TODO will_split=false
                 let mut phrase = match text.quick_expand(env) {
                     Ready(result) => result,
                     Interim(interim) => text.async_expand(env, interim).await,
@@ -230,7 +231,7 @@ mod tests {
     #[test]
     fn unquoted() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let unit: WordUnit = "x".parse().unwrap();
         assert_matches!(unit.quick_expand(&mut env), Ready(result) => {
             let c = AttrChar {
@@ -277,7 +278,7 @@ mod tests {
     #[test]
     fn async_double_quote() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let unit = DoubleQuote(Text(vec![TextUnit::Literal('X')]));
         assert_matches!(unit.quick_expand(&mut env), Interim(()));
         let result = unit.async_expand(&mut env, ()).now_or_never().unwrap();

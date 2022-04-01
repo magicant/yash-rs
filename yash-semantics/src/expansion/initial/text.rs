@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn literal() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         assert_matches!(Literal('L').quick_expand(&mut env), Ready(result) => {
             let c = AttrChar {
                 value: 'L',
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn backslashed() {
         let mut env = yash_env::Env::new_virtual();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         assert_matches!(Backslashed('L').quick_expand(&mut env), Ready(result) => {
             let bs = AttrChar {
                 value: '\\',
@@ -226,7 +226,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let name = "foo".to_string();
         let location = Location::dummy("");
         let param = RawParam { name, location };
@@ -256,7 +256,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let mut env = Env::new(&mut env);
+        let mut env = Env::new(&mut env, false);
         let param = BracedParam(Param {
             name: "foo".to_string(),
             modifier: Modifier::None,
@@ -277,7 +277,7 @@ mod tests {
     fn command_subst() {
         in_virtual_system(|mut env, _pid, _state| async move {
             env.builtins.insert("echo", echo_builtin());
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             let subst = TextUnit::CommandSubst {
                 content: "echo .".into(),
                 location: Location::dummy(""),
@@ -298,7 +298,7 @@ mod tests {
     fn backquote() {
         in_virtual_system(|mut env, _pid, _state| async move {
             env.builtins.insert("echo", echo_builtin());
-            let mut env = Env::new(&mut env);
+            let mut env = Env::new(&mut env, false);
             use yash_syntax::syntax::BackquoteUnit::*;
             let subst = TextUnit::Backquote {
                 content: vec![

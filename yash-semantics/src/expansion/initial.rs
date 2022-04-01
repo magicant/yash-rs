@@ -39,15 +39,20 @@ pub struct Env<'a> {
     /// When performing a command substitution during expansion, you must set
     /// its exit status to this field.
     pub last_command_subst_exit_status: Option<ExitStatus>,
-    // TODO pub will_split: bool,
+
+    /// Whether the expansion result will be subjected to field splitting.
+    ///
+    /// This flag will affect the expansion of the `$*` special parameter.
+    pub will_split: bool,
 }
 
 impl<'a> Env<'a> {
     /// Creates a new `Env` instance.
-    pub fn new(inner: &'a mut yash_env::Env) -> Self {
+    pub fn new(inner: &'a mut yash_env::Env, will_split: bool) -> Self {
         Env {
             inner,
             last_command_subst_exit_status: None,
+            will_split,
         }
     }
 }
