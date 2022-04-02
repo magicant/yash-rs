@@ -107,8 +107,7 @@ pub fn look_up_special_parameter<'a>(env: &'a mut Env<'_>, name: &str) -> Option
         return None;
     }
     match first {
-        '@' => Some((&env.inner.variables.positional_params().value).into()),
-        '*' => todo!(),
+        '@' | '*' => Some((&env.inner.variables.positional_params().value).into()),
         '#' => todo!(),
         '?' => Some(env.inner.exit_status.to_string().into()),
         '-' => todo!(),
@@ -207,6 +206,37 @@ mod tests {
             let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
             env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
             let result = look_up_special_parameter(&mut env, "@").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == params);
+        }
+
+        #[test]
+        #[ignore] // TODO expected result: IFS-concat
+        fn asterisk_in_non_splitting_context() {
+            let mut env = yash_env::Env::new_virtual();
+            let mut env = Env::new(&mut env, false);
+            let result = look_up_special_parameter(&mut env, "*").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == [] as [String;0]);
+
+            let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
+            env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
+            let result = look_up_special_parameter(&mut env, "*").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == params);
+        }
+
+        #[test]
+        fn asterisk_in_splitting_context() {
+            let mut env = yash_env::Env::new_virtual();
+            let mut env = Env::new(&mut env, true);
+            let result = look_up_special_parameter(&mut env, "*").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == [] as [String;0]);
+
+            let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
+            env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
+            let result = look_up_special_parameter(&mut env, "*").unwrap();
             assert_matches!(result, Lookup::Array(values)
                 if values.as_ref() == params);
         }
