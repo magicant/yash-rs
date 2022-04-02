@@ -64,7 +64,7 @@ impl ParamRef<'_> {
         // TODO Switch
         // TODO Check for nounset error
         // TODO Trim & Subst
-        // TODO concat
+        // TODO concat values of $* if not in field splitting context
         // TODO Length
 
         Ok(into_phrase(value))

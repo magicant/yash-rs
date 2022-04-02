@@ -107,6 +107,11 @@ pub fn look_up_special_parameter<'a>(env: &'a mut Env<'_>, name: &str) -> Option
         return None;
     }
     match first {
+        // FIXME not to be implemented here. Should concat in ParamRef::expand
+        // '*' if !env.will_split => {
+        //     let values = &env.inner.variables.positional_params().value;
+        //     todo!()
+        // }
         '@' | '*' => Some((&env.inner.variables.positional_params().value).into()),
         '#' => todo!(),
         '?' => Some(env.inner.exit_status.to_string().into()),
@@ -211,24 +216,45 @@ mod tests {
         }
 
         #[test]
-        #[ignore] // TODO expected result: IFS-concat
         fn asterisk_in_non_splitting_context() {
             let mut env = yash_env::Env::new_virtual();
+            env.variables
+                .assign(
+                    Scope::Global,
+                    "IFS".to_string(),
+                    Variable {
+                        value: Value::Scalar("&".to_string()),
+                        last_assigned_location: None,
+                        is_exported: false,
+                        read_only_location: None,
+                    },
+                )
+                .unwrap();
             let mut env = Env::new(&mut env, false);
             let result = look_up_special_parameter(&mut env, "*").unwrap();
-            assert_matches!(result, Lookup::Array(values)
-                if values.as_ref() == [] as [String;0]);
+            assert_matches!(result, Lookup::Scalar(value) if value == "");
 
             let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-            env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
+            env.inner.variables.positional_params_mut().value = Value::Array(params);
             let result = look_up_special_parameter(&mut env, "*").unwrap();
-            assert_matches!(result, Lookup::Array(values)
-                if values.as_ref() == params);
+            assert_matches!(result, Lookup::Scalar(value) if value == "a&foo bar&9");
         }
 
         #[test]
         fn asterisk_in_splitting_context() {
             let mut env = yash_env::Env::new_virtual();
+            env.variables
+                .assign(
+                    Scope::Global,
+                    "IFS".to_string(),
+                    Variable {
+                        value: Value::Scalar("&".to_string()),
+                        last_assigned_location: None,
+                        is_exported: false,
+                        read_only_location: None,
+                    },
+                )
+                .unwrap();
             let mut env = Env::new(&mut env, true);
             let result = look_up_special_parameter(&mut env, "*").unwrap();
             assert_matches!(result, Lookup::Array(values)
