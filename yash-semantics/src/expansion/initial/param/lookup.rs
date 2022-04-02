@@ -20,7 +20,6 @@ use super::*;
 use std::num::IntErrorKind;
 use std::num::NonZeroUsize;
 use yash_env::variable::VariableSet;
-use yash_env::Env;
 
 /// Result of parameter lookup
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -101,20 +100,20 @@ impl Lookup<'_> {
 ///
 /// This function requires a mutable reference to `Env` because it needs to
 /// update an internal flag if `name` is `!`.
-pub fn look_up_special_parameter<'a>(env: &'a mut Env, name: &str) -> Option<Lookup<'a>> {
+pub fn look_up_special_parameter<'a>(env: &'a mut Env<'_>, name: &str) -> Option<Lookup<'a>> {
     let mut chars = name.chars();
     let first = chars.next()?;
     if chars.next().is_some() {
         return None;
     }
     match first {
-        '@' => Some((&env.variables.positional_params().value).into()),
+        '@' => Some((&env.inner.variables.positional_params().value).into()),
         '*' => todo!(),
         '#' => todo!(),
-        '?' => Some(env.exit_status.to_string().into()),
+        '?' => Some(env.inner.exit_status.to_string().into()),
         '-' => todo!(),
-        '$' => Some(env.main_pid.to_string().into()),
-        '!' => Some(env.jobs.expand_last_async_pid().to_string().into()),
+        '$' => Some(env.inner.main_pid.to_string().into()),
+        '!' => Some(env.inner.jobs.expand_last_async_pid().to_string().into()),
         '0' => todo!(),
         _ => None,
     }
@@ -168,6 +167,7 @@ mod tests {
     #[test]
     fn special_unapplicable() {
         let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env, false);
         assert_eq!(look_up_special_parameter(&mut env, ""), None);
         assert_eq!(look_up_special_parameter(&mut env, "00"), None);
         assert_eq!(look_up_special_parameter(&mut env, "1"), None);
@@ -184,12 +184,28 @@ mod tests {
         #[test]
         fn at_in_non_splitting_context() {
             let mut env = yash_env::Env::new_virtual();
+            let mut env = Env::new(&mut env, false);
             let result = look_up_special_parameter(&mut env, "@").unwrap();
             assert_matches!(result, Lookup::Array(values)
                 if values.as_ref() == [] as [String;0]);
 
             let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-            env.variables.positional_params_mut().value = Value::Array(params.clone());
+            env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
+            let result = look_up_special_parameter(&mut env, "@").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == params);
+        }
+
+        #[test]
+        fn at_in_splitting_context() {
+            let mut env = yash_env::Env::new_virtual();
+            let mut env = Env::new(&mut env, true);
+            let result = look_up_special_parameter(&mut env, "@").unwrap();
+            assert_matches!(result, Lookup::Array(values)
+                if values.as_ref() == [] as [String;0]);
+
+            let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
+            env.inner.variables.positional_params_mut().value = Value::Array(params.clone());
             let result = look_up_special_parameter(&mut env, "@").unwrap();
             assert_matches!(result, Lookup::Array(values)
                 if values.as_ref() == params);
@@ -199,10 +215,11 @@ mod tests {
     #[test]
     fn special_exit_status() {
         let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env, false);
         let result = look_up_special_parameter(&mut env, "?").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "0");
 
-        env.exit_status.0 = 49;
+        env.inner.exit_status.0 = 49;
         let result = look_up_special_parameter(&mut env, "?").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "49");
     }
@@ -210,6 +227,7 @@ mod tests {
     #[test]
     fn special_main_pid() {
         let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env, false);
         let result = look_up_special_parameter(&mut env, "$").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "2");
     }
@@ -217,10 +235,11 @@ mod tests {
     #[test]
     fn special_last_async_pid() {
         let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env, false);
         let result = look_up_special_parameter(&mut env, "!").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "0");
 
-        env.jobs.set_last_async_pid(Pid::from_raw(72));
+        env.inner.jobs.set_last_async_pid(Pid::from_raw(72));
         let result = look_up_special_parameter(&mut env, "!").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "72");
     }

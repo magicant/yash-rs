@@ -52,7 +52,7 @@ impl ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let lookup = match lookup::look_up_special_parameter(env.inner, self.name) {
+        let lookup = match lookup::look_up_special_parameter(env, self.name) {
             Some(lookup) => lookup,
             None => lookup::look_up_ordinary_parameter(&env.inner.variables, self.name),
         };
