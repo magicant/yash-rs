@@ -93,6 +93,19 @@ impl Lookup<'_> {
             Lookup::Array(values) => Some(Value::Array(values.into_owned())),
         }
     }
+
+    /// Returns the "length" of the value.
+    ///
+    /// For `Unset`, the length is 0.
+    /// For `Scalar`, the length is the number of characters.
+    /// For `Array`, the length is the number of strings.
+    pub fn len(&self) -> usize {
+        match self {
+            Lookup::Unset => 0,
+            Lookup::Scalar(value) => value.len(),
+            Lookup::Array(values) => values.len(),
+        }
+    }
 }
 
 /// Looks up for a special parameter.
@@ -109,7 +122,10 @@ pub fn look_up_special_parameter<'a>(env: &'a mut Env, name: &str) -> Option<Loo
     }
     match first {
         '@' | '*' => Some((&env.variables.positional_params().value).into()),
-        '#' => todo!(),
+        '#' => {
+            let value = Lookup::from(&env.variables.positional_params().value);
+            Some(value.len().to_string().into())
+        }
         '?' => Some(env.exit_status.to_string().into()),
         '-' => todo!(),
         '$' => Some(env.main_pid.to_string().into()),
@@ -203,6 +219,18 @@ mod tests {
         let result = look_up_special_parameter(&mut env, "*").unwrap();
         assert_matches!(result, Lookup::Array(values)
             if values.as_ref() == params);
+    }
+
+    #[test]
+    fn special_length() {
+        let mut env = yash_env::Env::new_virtual();
+        let result = look_up_special_parameter(&mut env, "#").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "0");
+
+        let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
+        env.variables.positional_params_mut().value = Value::Array(params);
+        let result = look_up_special_parameter(&mut env, "#").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "3");
     }
 
     #[test]
