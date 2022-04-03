@@ -200,8 +200,12 @@ pub async fn expand_word(
     env: &mut yash_env::Env,
     word: &Word,
 ) -> Result<(Field, Option<ExitStatus>)> {
-    use self::initial::QuickExpand::*;
     let mut env = initial::Env::new(env);
+    // It would be technically correct to set `will_split` to false, but it does
+    // not affect the final results because we will join the results anyway.
+    // env.will_split = false;
+
+    use self::initial::QuickExpand::*;
     let phrase = match word.quick_expand(&mut env) {
         Ready(result) => result?,
         Interim(interim) => word.async_expand(&mut env, interim).await?,

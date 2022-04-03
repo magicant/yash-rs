@@ -99,6 +99,7 @@ impl Expand for WordUnit {
             Unquoted(text_unit) => text_unit.async_expand(env, ()).await,
             SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
             DoubleQuote(text) => {
+                // TODO will_split=false
                 let mut phrase = match text.quick_expand(env) {
                     Ready(result) => result,
                     Interim(interim) => text.async_expand(env, interim).await,
