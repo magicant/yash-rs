@@ -494,6 +494,8 @@ impl Unquote for TextUnit {
                 Ok(false)
             }
             BracedParam(param) => param.write_unquoted(w),
+            // We don't remove quotes contained in the commands in command
+            // substitutions. Existing shells disagree with each other.
             CommandSubst { content, .. } => {
                 write!(w, "$({})", content)?;
                 Ok(false)
