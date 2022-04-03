@@ -99,13 +99,13 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
 
-    fn env_with_positional_params_and_ifs() -> yash_env::Env {
+    pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().value =
             Value::Array(vec!["a".to_string(), "c".to_string()]);
@@ -124,7 +124,7 @@ mod tests {
         env
     }
 
-    fn param<N: ToString>(name: N) -> Param {
+    pub fn param<N: ToString>(name: N) -> Param {
         Param {
             name: name.to_string(),
             modifier: Modifier::None,
