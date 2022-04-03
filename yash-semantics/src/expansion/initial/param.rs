@@ -64,10 +64,13 @@ impl ParamRef<'_> {
         // TODO Switch
         // TODO Check for nounset error
         // TODO Trim & Subst
-        // TODO concat
         // TODO Length
 
-        Ok(into_phrase(value))
+        let mut phrase = into_phrase(value);
+        if !env.will_split && self.name == "*" {
+            phrase = Phrase::Field(phrase.ifs_join(&env.inner.variables));
+        }
+        Ok(phrase)
     }
 }
 
@@ -96,8 +99,95 @@ fn to_field(value: &str) -> Vec<AttrChar> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use futures_util::FutureExt;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Variable;
+
+    pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables.positional_params_mut().value =
+            Value::Array(vec!["a".to_string(), "c".to_string()]);
+        env.variables
+            .assign(
+                Scope::Global,
+                "IFS".to_string(),
+                Variable {
+                    value: Value::Scalar("&?!".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env
+    }
+
+    pub fn param<N: ToString>(name: N) -> Param {
+        Param {
+            name: name.to_string(),
+            modifier: Modifier::None,
+            location: Location::dummy(""),
+        }
+    }
+
+    #[test]
+    fn expand_at_no_join_in_non_splitting_context() {
+        let mut env = env_with_positional_params_and_ifs();
+        let param = param("@");
+        let param = ParamRef::from(&param);
+        let mut env = Env::new(&mut env);
+        env.will_split = false;
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let c = AttrChar { value: 'c', ..a };
+        assert_eq!(phrase, Phrase::Full(vec![vec![a], vec![c]]));
+    }
+
+    #[test]
+    fn expand_asterisk_no_join_in_splitting_context() {
+        let mut env = env_with_positional_params_and_ifs();
+        let param = param("*");
+        let param = ParamRef::from(&param);
+        let mut env = Env::new(&mut env);
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let c = AttrChar { value: 'c', ..a };
+        assert_eq!(phrase, Phrase::Full(vec![vec![a], vec![c]]));
+    }
+
+    #[test]
+    fn expand_asterisk_ifs_join_in_non_splitting_context() {
+        let mut env = env_with_positional_params_and_ifs();
+        let param = param("*");
+        let param = ParamRef::from(&param);
+        let mut env = Env::new(&mut env);
+        env.will_split = false;
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        let amp = AttrChar { value: '&', ..a };
+        let c = AttrChar { value: 'c', ..a };
+        assert_eq!(phrase, Phrase::Field(vec![a, amp, c]));
+    }
 
     #[test]
     fn none_into_phrase() {

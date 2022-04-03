@@ -99,10 +99,15 @@ impl Expand for WordUnit {
             Unquoted(text_unit) => text_unit.async_expand(env, ()).await,
             SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
             DoubleQuote(text) => {
-                let mut phrase = match text.quick_expand(env) {
+                let would_split = env.will_split;
+                env.will_split = false;
+                let result = match text.quick_expand(env) {
                     Ready(result) => result,
                     Interim(interim) => text.async_expand(env, interim).await,
-                }?;
+                };
+                env.will_split = would_split;
+
+                let mut phrase = result?;
                 double_quote(&mut phrase);
                 Ok(phrase)
             }
@@ -135,6 +140,8 @@ impl Expand for Word {
 
 #[cfg(test)]
 mod tests {
+    use super::super::param::tests::env_with_positional_params_and_ifs;
+    use super::super::param::tests::param;
     use super::*;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
@@ -294,5 +301,31 @@ mod tests {
             is_quoting: false,
         };
         assert_eq!(result, Ok(Phrase::Field(vec![quote, x, quote])));
+    }
+
+    #[test]
+    fn inside_double_quote_is_non_splitting_context() {
+        let mut env = env_with_positional_params_and_ifs();
+        let mut env = Env::new(&mut env);
+        let unit = DoubleQuote(Text(vec![TextUnit::BracedParam(param("*"))]));
+        assert_matches!(unit.quick_expand(&mut env), Interim(()));
+        let result = unit.async_expand(&mut env, ()).now_or_never().unwrap();
+
+        assert!(env.will_split);
+        let quote = AttrChar {
+            value: '"',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let a = AttrChar {
+            value: 'a',
+            origin: Origin::SoftExpansion,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        let amp = AttrChar { value: '&', ..a };
+        let c = AttrChar { value: 'c', ..a };
+        assert_eq!(result, Ok(Phrase::Field(vec![quote, a, amp, c, quote])));
     }
 }
