@@ -244,6 +244,30 @@ mod tests {
     }
 
     #[test]
+    fn exit_status_inside_trap() {
+        let (mut env, system) = signal_env();
+        for signal in [Signal::SIGUSR1, Signal::SIGUSR2] {
+            env.traps
+                .set_trap(
+                    &mut env.system,
+                    signal,
+                    Trap::Command("echo $?; echo $?".to_string()),
+                    Location::dummy(""),
+                    false,
+                )
+                .unwrap();
+        }
+        env.exit_status = ExitStatus(123);
+        raise_signal(&system, Signal::SIGUSR1);
+        raise_signal(&system, Signal::SIGUSR2);
+        let _ = block_on(run_traps_for_caught_signals(&mut env));
+
+        let state = system.state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(stdout.content, b"123\n0\n123\n0\n");
+    }
+
+    #[test]
     fn exit_from_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGUSR1);
@@ -253,5 +277,4 @@ mod tests {
     }
 
     // TODO exit status on return/exit from trap
-    // TODO $? inside trap
 }
