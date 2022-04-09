@@ -36,6 +36,7 @@ pub mod function;
 pub mod input;
 pub mod io;
 pub mod job;
+pub mod option;
 pub mod semantics;
 pub mod stack;
 pub mod system;
