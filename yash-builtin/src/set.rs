@@ -137,6 +137,8 @@ use yash_env::semantics::Field;
 use yash_env::variable::Array;
 use yash_env::Env;
 
+pub mod arg;
+
 /// Implementation of the set built-in.
 pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Parse options
