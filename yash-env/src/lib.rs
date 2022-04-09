@@ -49,6 +49,7 @@ use self::io::Fd;
 use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
+use self::option::OptionSet;
 use self::semantics::ExitStatus;
 use self::stack::Stack;
 pub use self::system::r#virtual::VirtualSystem;
@@ -109,6 +110,9 @@ pub struct Env {
     /// This PID represents the value of the `$` special parameter.
     pub main_pid: Pid,
 
+    /// Shell option settings.
+    pub options: OptionSet,
+
     /// Runtime execution context stack.
     pub stack: Stack,
 
@@ -136,6 +140,7 @@ impl Env {
             functions: Default::default(),
             jobs: Default::default(),
             main_pid: system.getpid(),
+            options: Default::default(),
             stack: Default::default(),
             traps: Default::default(),
             variables: Default::default(),
@@ -161,6 +166,7 @@ impl Env {
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
             main_pid: self.main_pid,
+            options: self.options,
             stack: self.stack.clone(),
             traps: self.traps.clone(),
             variables: self.variables.clone(),
