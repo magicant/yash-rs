@@ -120,8 +120,8 @@
 //! Many (but not all) shells specially treat `+`, especially when it appears in
 //! place of an option-operand separator. This behavior is not portable either.
 
+use crate::common::print_error_message;
 use crate::common::BuiltinName;
-use std::future::ready;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
@@ -140,29 +140,41 @@ use yash_env::Env;
 pub mod arg;
 
 /// Implementation of the set built-in.
-pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO Parse options
-    // TODO Print existing variables when no arguments are given
+pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+    match arg::parse(args) {
+        Ok(arg::Parse::PrintVariables) => todo!("print existing variables"),
+        Ok(arg::Parse::PrintOptionsHumanReadable) => todo!("print current option settings"),
+        Ok(arg::Parse::PrintOptionsMachineReadable) => todo!("print current option settings"),
+        Ok(arg::Parse::Modify {
+            options,
+            positional_params,
+        }) => {
+            // TODO Modify options
+            drop(options);
 
-    let location = env.builtin_name().origin.clone();
-    let params = env.variables.positional_params_mut();
-    params.value = Array(args.into_iter().map(|f| f.value).collect());
-    params.last_assigned_location = Some(location);
+            // Modify positional parameters
+            if let Some(fields) = positional_params {
+                let location = env.builtin_name().origin.clone();
+                let params = env.variables.positional_params_mut();
+                params.value = Array(fields.into_iter().map(|f| f.value).collect());
+                params.last_assigned_location = Some(location);
+            }
 
-    (ExitStatus::SUCCESS, Continue(()))
+            (ExitStatus::SUCCESS, Continue(()))
+        }
+        Err(error) => print_error_message(env, &error).await,
+    }
 }
 
-/// Asynchronous wrapper of [`builtin_main_sync`].
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(builtin_main_sync(env, args)))
+/// Wrapper of [`builtin_body`] that returns the future in a pinned box.
+pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>> {
+    Box::pin(builtin_body(env, args))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt;
     use yash_env::stack::Frame;
 
     #[test]
@@ -173,7 +185,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Builtin { name });
         let args = Field::dummies(["a", "b", "z"]);
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         let v = env.variables.positional_params();
