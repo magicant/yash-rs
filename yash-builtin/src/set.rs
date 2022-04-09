@@ -149,8 +149,10 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             options,
             positional_params,
         }) => {
-            // TODO Modify options
-            drop(options);
+            // Modify options
+            for (option, state) in options {
+                env.options.set(option, state);
+            }
 
             // Modify positional parameters
             if let Some(fields) = positional_params {
@@ -175,7 +177,23 @@ pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Outpu
 mod tests {
     use super::*;
     use futures_util::FutureExt;
+    use yash_env::option::Option::*;
+    use yash_env::option::OptionSet;
+    use yash_env::option::State::*;
     use yash_env::stack::Frame;
+
+    #[test]
+    fn setting_some_options() {
+        let mut env = Env::new_virtual();
+        let args = Field::dummies(["-a", "-n"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let mut options = OptionSet::default();
+        options.set(AllExport, On);
+        options.set(Exec, Off);
+        assert_eq!(env.options, options);
+    }
 
     #[test]
     fn setting_some_positional_parameters() {
