@@ -83,6 +83,16 @@ pub enum Option {
 
 pub use self::Option::*;
 
+impl Option {
+    /// Whether this option can be modified by the set built-in.
+    ///
+    /// Unmodifiable options can be set only on shell startup.
+    #[must_use]
+    pub fn is_modifiable(self) -> bool {
+        !matches!(self, CmdLine | Interactive | Stdin)
+    }
+}
+
 /// Prints the option name, all in lower case without punctuations.
 impl Display for Option {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

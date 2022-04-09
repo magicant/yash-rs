@@ -64,6 +64,12 @@ pub enum Error {
 
     /// `-o` or `+o` used without an option name
     MissingOptionArgument(Field),
+
+    /// Short option that is not modifiable by the set built-in
+    UnmodifiableShortOption(char, Field),
+
+    /// Long option that is not modifiable by the set built-in
+    UnmodifiableLongOption(Field),
 }
 
 impl Error {
@@ -74,6 +80,8 @@ impl Error {
             Error::UnknownLongOption(field) => field,
             Error::AmbiguousLongOption(field) => field,
             Error::MissingOptionArgument(field) => field,
+            Error::UnmodifiableShortOption(_char, field) => field,
+            Error::UnmodifiableLongOption(field) => field,
         }
     }
 }
@@ -87,6 +95,14 @@ impl Display for Error {
             Error::MissingOptionArgument(field) => {
                 write!(f, "option {:?} missing an argument", field.value)
             }
+            Error::UnmodifiableShortOption(c, _field) => {
+                write!(f, "option {:?} not modifiable by the set built-in", c)
+            }
+            Error::UnmodifiableLongOption(field) => write!(
+                f,
+                "option {:?} not modifiable by the set built-in",
+                field.value
+            ),
         }
     }
 }
@@ -153,19 +169,21 @@ fn try_parse_short<I: Iterator<Item = Field>>(
                 canonicalize(&field.value)
             };
             match parse_long(&name) {
-                Ok((option, state)) => {
+                Ok((option, state)) if option.is_modifiable() => {
                     option_occurrences.push((option, if negate { !state } else { state }));
                     break;
                 }
+                Ok(_) => return Err(Error::UnmodifiableLongOption(field)),
                 Err(NoSuchOption) => return Err(Error::UnknownLongOption(field)),
                 Err(Ambiguous) => return Err(Error::AmbiguousLongOption(field)),
             }
         }
 
         match parse_short(c) {
-            Some((option, state)) => {
+            Some((option, state)) if option.is_modifiable() => {
                 option_occurrences.push((option, if negate { !state } else { state }))
             }
+            Some(_) => return Err(Error::UnmodifiableShortOption(c, field)),
             None => return Err(Error::UnknownShortOption(c, field)),
         }
     }
@@ -196,7 +214,10 @@ fn try_parse_long<I: Iterator<Item = Field>>(
     let result = parse_long(&name);
     let field = args.next().unwrap();
     match result {
-        Ok((option, state)) => Ok(Some((option, if negate { !state } else { state }))),
+        Ok((option, state)) if option.is_modifiable() => {
+            Ok(Some((option, if negate { !state } else { state })))
+        }
+        Ok(_) => Err(Error::UnmodifiableLongOption(field)),
         Err(NoSuchOption) => Err(Error::UnknownLongOption(field)),
         Err(Ambiguous) => Err(Error::AmbiguousLongOption(field)),
     }
@@ -798,6 +819,37 @@ mod tests {
             parse(Field::dummies(["-eo"])),
             Err(Error::MissingOptionArgument(field)) => {
                 assert_eq!(field.value, "-eo");
+            }
+        );
+    }
+
+    #[test]
+    fn unmodifiable_options() {
+        assert_matches!(
+            parse(Field::dummies(["-c"])),
+            Err(Error::UnmodifiableShortOption('c', field)) => {
+                assert_eq!(field.value, "-c");
+            }
+        );
+
+        assert_matches!(
+            parse(Field::dummies(["-ointeract"])),
+            Err(Error::UnmodifiableLongOption(field)) => {
+                assert_eq!(field.value, "-ointeract");
+            }
+        );
+
+        assert_matches!(
+            parse(Field::dummies(["-o", "interact"])),
+            Err(Error::UnmodifiableLongOption(field)) => {
+                assert_eq!(field.value, "interact");
+            }
+        );
+
+        assert_matches!(
+            parse(Field::dummies(["++stdin"])),
+            Err(Error::UnmodifiableLongOption(field)) => {
+                assert_eq!(field.value, "++stdin");
             }
         );
     }
