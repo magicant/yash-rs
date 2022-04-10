@@ -336,6 +336,7 @@ dependencies = [
  "futures-util",
  "yash-env",
  "yash-quote",
+ "yash-semantics",
  "yash-syntax",
 ]
 

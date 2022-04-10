@@ -134,6 +134,7 @@ use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 #[cfg(doc)]
 use yash_env::option::parse_short;
+use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Array;
@@ -155,7 +156,18 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             (env.print(&print).await, Continue(()))
         }
 
-        Ok(arg::Parse::PrintOptionsMachineReadable) => todo!("print current option settings"),
+        Ok(arg::Parse::PrintOptionsMachineReadable) => {
+            let mut print = String::new();
+            for option in yash_env::option::Option::iter() {
+                let skip = if option.is_modifiable() { "" } else { "#" };
+                let flag = match env.options.get(option) {
+                    State::On => '-',
+                    State::Off => '+',
+                };
+                writeln!(print, "{skip}set {flag}o {option}").unwrap();
+            }
+            (env.print(&print).await, Continue(()))
+        }
 
         Ok(arg::Parse::Modify {
             options,
@@ -192,11 +204,15 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
+    use yash_semantics::Command;
+    use yash_syntax::syntax::List;
 
     #[test]
     fn printing_options_human_readable() {
@@ -235,6 +251,47 @@ vi               off
 xtrace           off
 ")
         );
+    }
+
+    #[test]
+    fn printing_options_machine_readable() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Clobber, Off);
+        env.options.set(Verbose, On);
+        let options = env.options;
+
+        let args = Field::dummies(["+o"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        // The output from `set +o` should be parsable
+        let commands: List = {
+            let state = state.borrow();
+            let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+            from_utf8(&file.content).unwrap().parse().unwrap()
+        };
+
+        env.builtins.insert(
+            "set",
+            Builtin {
+                r#type: Special,
+                execute: builtin_main,
+            },
+        );
+        env.options = Default::default();
+
+        // Executing the parsed command should restore the previous options
+        let result = commands.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.options, options);
+
+        // And there should be no errors doing that
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert_eq!(from_utf8(&file.content), Ok(""));
     }
 
     #[test]
