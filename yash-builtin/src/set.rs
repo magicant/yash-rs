@@ -122,6 +122,8 @@
 
 use crate::common::print_error_message;
 use crate::common::BuiltinName;
+use crate::common::Print;
+use std::fmt::Write;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
@@ -143,8 +145,18 @@ pub mod arg;
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     match arg::parse(args) {
         Ok(arg::Parse::PrintVariables) => todo!("print existing variables"),
-        Ok(arg::Parse::PrintOptionsHumanReadable) => todo!("print current option settings"),
+
+        Ok(arg::Parse::PrintOptionsHumanReadable) => {
+            let mut print = String::new();
+            for option in yash_env::option::Option::iter() {
+                let state = env.options.get(option);
+                writeln!(print, "{option:16} {state}").unwrap();
+            }
+            (env.print(&print).await, Continue(()))
+        }
+
         Ok(arg::Parse::PrintOptionsMachineReadable) => todo!("print current option settings"),
+
         Ok(arg::Parse::Modify {
             options,
             positional_params,
@@ -164,6 +176,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
             (ExitStatus::SUCCESS, Continue(()))
         }
+
         Err(error) => print_error_message(env, &error).await,
     }
 }
@@ -177,10 +190,52 @@ pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Outpu
 mod tests {
     use super::*;
     use futures_util::FutureExt;
+    use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
+    use yash_env::VirtualSystem;
+
+    #[test]
+    fn printing_options_human_readable() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(AllExport, On);
+        env.options.set(Unset, Off);
+
+        let args = Field::dummies(["-o"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&file.content),
+            Ok("allexport        on
+clobber          on
+cmdline          off
+errexit          off
+exec             on
+glob             on
+hashondefinition off
+ignoreeof        off
+interactive      off
+log              on
+login            off
+monitor          off
+notify           off
+posixlycorrect   off
+stdin            off
+unset            off
+verbose          off
+vi               off
+xtrace           off
+")
+        );
+    }
 
     #[test]
     fn setting_some_options() {

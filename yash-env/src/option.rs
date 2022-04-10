@@ -291,6 +291,17 @@ pub enum State {
 
 pub use State::*;
 
+/// Converts a state to a string (`on` or `off`).
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            On => "on",
+            Off => "off",
+        };
+        s.fmt(f)
+    }
+}
+
 impl Not for State {
     type Output = Self;
     #[must_use]
