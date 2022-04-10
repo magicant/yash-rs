@@ -218,36 +218,13 @@ impl Default for VariableSet {
 }
 
 /// Choice of a context to which a variable is assigned.
+///
+/// For the meaning of the variants of this enum, see the docs for the functions
+/// that use it: [`VariableSet::assign`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Scope {
-    /// Assigns to as lower a context as possible.
-    ///
-    /// If there is an existing variable in a [regular](ContextType::Regular)
-    /// context, the variable is overwritten by the assignment. Existing
-    /// [volatile](ContextType::Volatile) variables are removed to make the
-    /// target variable visible.
-    ///
-    /// If there is no variable to overwrite, the assignment adds a new variable
-    /// to the base context.
     Global,
-
-    /// Assigns to the topmost regular context.
-    ///
-    /// Any existing variables below the topmost [regular](ContextType::Regular)
-    /// context do not affect this type of assignment. Existing variables above
-    /// the topmost regular context are removed.
-    ///
-    /// If the `VariableSet` only has the base context, the variable is assigned
-    /// to it anyway.
     Local,
-
-    /// Assigns to the topmost volatile context.
-    ///
-    /// This type of assignment requires the topmost context to be
-    /// [volatile](ContextType::Volatile), or the assignment would **panic!**
-    ///
-    /// If an existing read-only variable would fail a `Global` assignment, the
-    /// `Volatile` assignment fails for the same reason.
     Volatile,
 }
 
@@ -298,9 +275,24 @@ impl VariableSet {
     /// existing read-only value, the assignment fails unless the new variable
     /// is a local variable that hides the read-only.
     ///
+    /// The behavior of assignment depends on the `scope`:
+    ///
+    /// - If the scope is `Global`, the assignment overwrites a visible existing
+    ///   variable in a regular context, if any. Existing
+    ///   [volatile](ContextType::Volatile) variables are removed to make the
+    ///   target variable visible. If there is no variable, a new variable is
+    ///   inserted to the base context.
+    /// - If the scope is `Local`, the variable is added to the topmost
+    ///   [regular](ContextType::Regular) context, which may overwrite an
+    ///   existing variable in the target context and hide variables in lower
+    ///   contexts.  Existing [volatile](ContextType::Volatile) variables are
+    ///   removed to make the target variable visible.
+    /// - A `Volatile`-scoped assignment requires the topmost context to be
+    ///   [volatile](ContextType::Volatile); otherwise, the assignment would
+    ///   **panic!** The variable is assigned to the topmost context.
+    ///
     /// Note that this function does not return variables that it removed from
-    /// volatile contexts. (See [`Scope`] for the conditions in which volatile
-    /// variables are removed.)
+    /// volatile contexts to make the assigned variable visible.
     ///
     /// The current implementation assumes that variables in volatile contexts
     /// are not read-only.
