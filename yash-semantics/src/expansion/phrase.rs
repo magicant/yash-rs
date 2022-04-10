@@ -452,7 +452,6 @@ mod tests {
     use yash_env::variable::Variable;
 
     #[test]
-    #[allow(clippy::eq_op)]
     fn partial_eq() {
         let c1 = AttrChar {
             value: 'a',
