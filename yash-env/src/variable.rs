@@ -52,6 +52,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Write;
 use std::hash::Hash;
+use std::iter::FusedIterator;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_syntax::source::Location;
@@ -217,10 +218,10 @@ impl Default for VariableSet {
     }
 }
 
-/// Choice of a context to which a variable is assigned.
+/// Choice of a context to which a variable is assigned or searched for.
 ///
 /// For the meaning of the variants of this enum, see the docs for the functions
-/// that use it: [`VariableSet::assign`].
+/// that use it: [`VariableSet::assign`] and [`VariableSet::iter`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Scope {
     Global,
@@ -248,6 +249,15 @@ impl std::fmt::Display for ReadOnlyError {
 }
 
 impl std::error::Error for ReadOnlyError {}
+
+/// Iterator of variables
+///
+/// [`VariableSet::iter`] returns this iterator.
+#[derive(Clone, Debug)]
+pub struct Iter<'a> {
+    inner: std::collections::hash_map::Iter<'a, String, Vec<VariableInContext>>,
+    min_context_index: usize,
+}
 
 impl VariableSet {
     /// Creates an empty variable set.
@@ -382,6 +392,37 @@ impl VariableSet {
         }
     }
 
+    /// Returns an iterator of variables.
+    ///
+    /// The `scope` parameter chooses variables returned by the iterator:
+    ///
+    /// - `Global`: all variables
+    /// - `Local`: variables in the topmost [regular](ContextType::Regular)
+    ///   context or above.
+    /// - `Volatile`: variables above the topmost
+    ///   [regular](ContextType::Regular) context
+    ///
+    /// In all cases, the iterator ignores variables hidden by another.
+    ///
+    /// The order of iterated variables is unspecified.
+    pub fn iter(&self, scope: Scope) -> Iter {
+        fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
+            contexts
+                .iter()
+                .rposition(|context| context.r#type == ContextType::Regular)
+                .expect("base context has gone")
+        }
+
+        Iter {
+            inner: self.all_variables.iter(),
+            min_context_index: match scope {
+                Scope::Global => 0,
+                Scope::Local => index_of_topmost_regular_context(&self.contexts),
+                Scope::Volatile => index_of_topmost_regular_context(&self.contexts) + 1,
+            },
+        }
+    }
+
     /// Returns environment variables in a new vector of C string.
     #[must_use]
     pub fn env_c_strings(&self) -> Vec<CString> {
@@ -470,6 +511,28 @@ impl VariableSet {
         }
     }
 }
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (&'a str, &'a Variable);
+
+    fn next(&mut self) -> Option<(&'a str, &'a Variable)> {
+        loop {
+            let next = self.inner.next()?;
+            if let Some(variable) = next.1.last() {
+                if variable.context_index >= self.min_context_index {
+                    return Some((next.0, &variable.variable));
+                }
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (_min, max) = self.inner.size_hint();
+        (0, max)
+    }
+}
+
+impl FusedIterator for Iter<'_> {}
 
 /// RAII-style guard for temporarily retaining a variable context.
 ///
@@ -922,6 +985,174 @@ mod tests {
         let new_value = variables.get("foo").unwrap();
         assert_eq!(new_value.value, Scalar("second".to_string()));
         assert!(new_value.is_exported);
+    }
+
+    fn test_iter<F: FnOnce(&VariableSet)>(f: F) {
+        let mut set = VariableSet::new();
+
+        set.assign(
+            Scope::Global,
+            "global".to_string(),
+            Variable {
+                value: Value::Scalar("global value".to_string()),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        set.assign(
+            Scope::Global,
+            "local".to_string(),
+            Variable {
+                value: Value::Scalar("hidden value".to_string()),
+                last_assigned_location: None,
+                is_exported: true,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+
+        let mut set = set.push_context(ContextType::Regular);
+
+        set.assign(
+            Scope::Local,
+            "local".to_string(),
+            Variable {
+                value: Value::Scalar("visible value".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+        set.assign(
+            Scope::Local,
+            "volatile".to_string(),
+            Variable {
+                value: Value::Scalar("hidden value".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+
+        let mut set = set.push_context(ContextType::Volatile);
+
+        set.assign(
+            Scope::Volatile,
+            "volatile".to_string(),
+            Variable {
+                value: Value::Scalar("volatile value".to_string()),
+                last_assigned_location: None,
+                is_exported: false,
+                read_only_location: None,
+            },
+        )
+        .unwrap();
+
+        f(&mut set);
+    }
+
+    #[test]
+    fn iter_global() {
+        test_iter(|set| {
+            let mut v: Vec<_> = set.iter(Scope::Global).collect();
+            v.sort_unstable_by_key(|&(name, _)| name);
+            assert_eq!(
+                v,
+                [
+                    (
+                        "global",
+                        &Variable {
+                            value: Scalar("global value".to_string()),
+                            last_assigned_location: None,
+                            is_exported: true,
+                            read_only_location: None
+                        }
+                    ),
+                    (
+                        "local",
+                        &Variable {
+                            value: Scalar("visible value".to_string()),
+                            last_assigned_location: None,
+                            is_exported: false,
+                            read_only_location: None
+                        }
+                    ),
+                    (
+                        "volatile",
+                        &Variable {
+                            value: Scalar("volatile value".to_string()),
+                            last_assigned_location: None,
+                            is_exported: false,
+                            read_only_location: None
+                        }
+                    )
+                ]
+            );
+        })
+    }
+
+    #[test]
+    fn iter_local() {
+        test_iter(|set| {
+            let mut v: Vec<_> = set.iter(Scope::Local).collect();
+            v.sort_unstable_by_key(|&(name, _)| name);
+            assert_eq!(
+                v,
+                [
+                    (
+                        "local",
+                        &Variable {
+                            value: Scalar("visible value".to_string()),
+                            last_assigned_location: None,
+                            is_exported: false,
+                            read_only_location: None
+                        }
+                    ),
+                    (
+                        "volatile",
+                        &Variable {
+                            value: Scalar("volatile value".to_string()),
+                            last_assigned_location: None,
+                            is_exported: false,
+                            read_only_location: None
+                        }
+                    )
+                ]
+            );
+        })
+    }
+
+    #[test]
+    fn iter_volatile() {
+        test_iter(|set| {
+            let mut v: Vec<_> = set.iter(Scope::Volatile).collect();
+            v.sort_unstable_by_key(|&(name, _)| name);
+            assert_eq!(
+                v,
+                [(
+                    "volatile",
+                    &Variable {
+                        value: Scalar("volatile value".to_string()),
+                        last_assigned_location: None,
+                        is_exported: false,
+                        read_only_location: None
+                    }
+                )]
+            );
+        })
+    }
+
+    #[test]
+    fn iter_size_hint() {
+        test_iter(|set| {
+            assert_eq!(set.iter(Scope::Global).size_hint(), (0, Some(3)));
+            assert_eq!(set.iter(Scope::Local).size_hint(), (0, Some(3)));
+            assert_eq!(set.iter(Scope::Volatile).size_hint(), (0, Some(3)));
+        })
     }
 
     #[test]
