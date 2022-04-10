@@ -48,6 +48,7 @@ use crate::Env;
 use either::{Left, Right};
 use itertools::Itertools;
 use std::borrow::Borrow;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Write;
@@ -92,6 +93,29 @@ impl Value {
         match self {
             Scalar(value) => Left(value.split(':')),
             Array(values) => Right(values.iter().map(String::as_str)),
+        }
+    }
+
+    /// Quotes the value in a format suitable for re-parsing.
+    ///
+    /// See [`yash_quote`] for details of quoting.
+    ///
+    /// ```
+    /// # use yash_env::variable::Value;
+    /// let scalar = Value::Scalar("foo bar".to_string());
+    /// assert_eq!(scalar.quote(), "'foo bar'");
+    /// let array = Value::Array(vec!["1".to_string(), "".to_string(), "'\\'".to_string()]);
+    /// assert_eq!(array.quote(), r#"(1 '' "'\\'")"#);
+    /// ```
+    pub fn quote(&self) -> Cow<str> {
+        match self {
+            Scalar(value) => yash_quote::quote(value),
+            Array(values) => Cow::Owned(format!(
+                "({})",
+                values
+                    .iter()
+                    .format_with(" ", |value, f| f(&yash_quote::quote(value)))
+            )),
         }
     }
 }

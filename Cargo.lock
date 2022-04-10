@@ -353,6 +353,7 @@ dependencies = [
  "futures-util",
  "itertools",
  "nix",
+ "yash-quote",
  "yash-syntax",
 ]
 
