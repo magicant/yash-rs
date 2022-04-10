@@ -40,8 +40,8 @@
 //! correctly. The push function returns a guard that will pop the context when
 //! dropped. Implementing `Deref` and `DerefMut`, the guard allows access to the
 //! borrowed `VariableSet` or `Env`. [`VariableSet::push_context`] returns a
-//! [`ScopeGuard`] that allows re-borrowing the `VariableSet`.
-//! [`Env::push_context`] returns a [`EnvScopeGuard`] that implements
+//! [`ContextGuard`] that allows re-borrowing the `VariableSet`.
+//! [`Env::push_context`] returns a [`EnvContextGuard`] that implements
 //! `DerefMut<Target = Env>`.
 
 use crate::Env;
@@ -483,8 +483,8 @@ impl VariableSet {
 ///
 /// The guard object is created by [`VariableSet::push_context`].
 #[derive(Debug)]
-#[must_use = "You must retain ScopeGuard to keep the context alive"]
-pub struct ScopeGuard<'a> {
+#[must_use = "You must retain ContextGuard to keep the context alive"]
+pub struct ContextGuard<'a> {
     stack: &'a mut VariableSet,
 }
 
@@ -493,30 +493,30 @@ impl VariableSet {
     ///
     /// This function returns a scope guard that will pop the context when dropped.
     #[inline]
-    pub fn push_context(&mut self, context_type: ContextType) -> ScopeGuard<'_> {
+    pub fn push_context(&mut self, context_type: ContextType) -> ContextGuard<'_> {
         self.push_context_impl(context_type);
-        ScopeGuard { stack: self }
+        ContextGuard { stack: self }
     }
 
     /// Pops the topmost context from the variable set.
     #[inline]
-    pub fn pop_context(guard: ScopeGuard<'_>) {
+    pub fn pop_context(guard: ContextGuard<'_>) {
         drop(guard)
     }
 }
 
-impl std::ops::Drop for ScopeGuard<'_> {
-    /// Drops the `ScopeGuard`.
+impl std::ops::Drop for ContextGuard<'_> {
+    /// Drops the `ContextGuard`.
     ///
     /// This function [pops](VariableSet::pop_context) the context that was
-    /// pushed when creating this `ScopeGuard`.
+    /// pushed when creating this `ContextGuard`.
     #[inline]
     fn drop(&mut self) {
         self.stack.pop_context_impl()
     }
 }
 
-impl std::ops::Deref for ScopeGuard<'_> {
+impl std::ops::Deref for ContextGuard<'_> {
     type Target = VariableSet;
     #[inline]
     fn deref(&self) -> &VariableSet {
@@ -524,7 +524,7 @@ impl std::ops::Deref for ScopeGuard<'_> {
     }
 }
 
-impl std::ops::DerefMut for ScopeGuard<'_> {
+impl std::ops::DerefMut for ContextGuard<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut VariableSet {
         self.stack
@@ -536,7 +536,7 @@ impl std::ops::DerefMut for ScopeGuard<'_> {
 /// The guard object is created by [`Env::push_context`].
 #[derive(Debug)]
 #[must_use = "The context is popped when the guard is dropped"]
-pub struct EnvScopeGuard<'a> {
+pub struct EnvContextGuard<'a> {
     env: &'a mut Env,
 }
 
@@ -545,30 +545,30 @@ impl Env {
     ///
     /// This function is equivalent to
     /// `self.variables.push_context(context_type)`, but returns an
-    /// `EnvScopeGuard` that allows re-borrowing the `Env`.
+    /// `EnvContextGuard` that allows re-borrowing the `Env`.
     #[inline]
-    pub fn push_context(&mut self, context_type: ContextType) -> EnvScopeGuard<'_> {
+    pub fn push_context(&mut self, context_type: ContextType) -> EnvContextGuard<'_> {
         self.variables.push_context_impl(context_type);
-        EnvScopeGuard { env: self }
+        EnvContextGuard { env: self }
     }
 
     /// Pops the topmost context from the variable set.
     #[inline]
-    pub fn pop_context(guard: EnvScopeGuard<'_>) {
+    pub fn pop_context(guard: EnvContextGuard<'_>) {
         drop(guard)
     }
 }
 
 /// When the guard is dropped, the context that was pushed when creating the
 /// guard is popped.
-impl Drop for EnvScopeGuard<'_> {
+impl Drop for EnvContextGuard<'_> {
     #[inline]
     fn drop(&mut self) {
         self.env.variables.pop_context_impl()
     }
 }
 
-impl Deref for EnvScopeGuard<'_> {
+impl Deref for EnvContextGuard<'_> {
     type Target = Env;
     #[inline]
     fn deref(&self) -> &Env {
@@ -576,7 +576,7 @@ impl Deref for EnvScopeGuard<'_> {
     }
 }
 
-impl DerefMut for EnvScopeGuard<'_> {
+impl DerefMut for EnvContextGuard<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Env {
         self.env
