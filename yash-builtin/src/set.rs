@@ -138,6 +138,7 @@ use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Array;
+use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
 pub mod arg;
@@ -145,7 +146,18 @@ pub mod arg;
 /// Implementation of the set built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     match arg::parse(args) {
-        Ok(arg::Parse::PrintVariables) => todo!("print existing variables"),
+        Ok(arg::Parse::PrintVariables) => {
+            let mut vars: Vec<_> = env.variables.iter(Global).collect();
+            // TODO apply current locale's collation
+            vars.sort_unstable_by_key(|&(name, _)| name);
+
+            let mut print = String::new();
+            for (name, var) in vars {
+                // TODO skip if the name contains a character inappropriate for a name
+                writeln!(print, "{}={}", name, var.value.quote()).unwrap();
+            }
+            (env.print(&print).await, Continue(()))
+        }
 
         Ok(arg::Parse::PrintOptionsHumanReadable) => {
             let mut print = String::new();
@@ -210,9 +222,69 @@ mod tests {
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_semantics::Command;
     use yash_syntax::syntax::List;
+
+    #[test]
+    fn printing_variables() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable {
+                    value: Value::Scalar("value".to_string()),
+                    last_assigned_location: None,
+                    is_exported: true,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                Scope::Global,
+                "bar".to_string(),
+                Variable {
+                    value: Value::Scalar("Hello, world!".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                Scope::Global,
+                "baz".to_string(),
+                Variable {
+                    value: Value::Array(vec!["one".to_string(), "".to_string()]),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+
+        let args = vec![];
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&file.content),
+            Ok("bar='Hello, world!'
+baz=(one '')
+foo=value
+")
+        );
+    }
 
     #[test]
     fn printing_options_human_readable() {
