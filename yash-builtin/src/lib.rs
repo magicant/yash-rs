@@ -24,6 +24,7 @@ pub mod readonly;
 pub mod r#return;
 pub mod set;
 pub mod trap;
+pub mod wait;
 
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
@@ -31,6 +32,8 @@ pub use yash_env::builtin::*;
 use Type::{Intrinsic, Special};
 
 /// Array of all the implemented built-in utilities.
+///
+/// The array items are ordered alphabetically.
 pub const BUILTINS: &[(&str, Builtin)] = &[
     (
         "alias",
@@ -65,6 +68,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: trap::builtin_main,
+        },
+    ),
+    (
+        "wait",
+        Builtin {
+            r#type: Intrinsic,
+            execute: wait::builtin_main,
         },
     ),
 ];
