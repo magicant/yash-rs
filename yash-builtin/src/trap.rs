@@ -53,7 +53,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
     (env.print(&output).await, Continue(()))
 }
 
-/// Implementation of the readonly built-in.
+/// Implementation of the trap built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, mut operands) = match parse_arguments(&[], Mode::default(), args) {
         Ok(result) => result,
