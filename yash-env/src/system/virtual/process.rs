@@ -353,6 +353,15 @@ pub enum ProcessState {
 }
 
 impl ProcessState {
+    /// Whether the process is not yet terminated.
+    #[must_use]
+    pub fn is_alive(&self) -> bool {
+        match self {
+            ProcessState::Running | ProcessState::Stopped(_) => true,
+            ProcessState::Exited(_) | ProcessState::Signaled(_) => false,
+        }
+    }
+
     /// Converts `ProcessState` to `WaitStatus`.
     #[must_use]
     pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
