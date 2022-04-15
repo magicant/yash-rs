@@ -61,22 +61,73 @@
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::print_error_message;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::future::Future;
+use std::num::ParseIntError;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::Pid;
+use yash_env::job::WaitStatus;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::Env;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 
-// TODO Wait for jobs specified by operands
 // TODO Parse as a job ID if an operand starts with %
 // TODO Treat an unknown job as terminated with exit status 127
 // TODO Treat a suspended job as terminated if it is job-controlled.
 // TODO Interruption by trap
 // TODO Allow interrupting with SIGINT if interactive
+
+enum JobSpecError {
+    ParseInt(Field, ParseIntError),
+    NonPositive(Field),
+}
+
+impl JobSpecError {
+    fn field(&self) -> &Field {
+        match self {
+            JobSpecError::ParseInt(field, _) => field,
+            JobSpecError::NonPositive(field) => field,
+        }
+    }
+}
+
+impl Display for JobSpecError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobSpecError::ParseInt(field, error) => write!(f, "{}: {}", field.value, error),
+            JobSpecError::NonPositive(field) => {
+                write!(f, "{}: non-positive process ID", field.value)
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a JobSpecError> for Message<'a> {
+    fn from(error: &'a JobSpecError) -> Self {
+        let origin = &error.field().origin;
+
+        let mut a = vec![Annotation::new(
+            AnnotationType::Error,
+            error.to_string().into(),
+            origin,
+        )];
+
+        origin.code.source.complement_annotations(&mut a);
+
+        Message {
+            r#type: AnnotationType::Error,
+            title: "invalid job specification".into(),
+            annotations: a,
+        }
+    }
+}
 
 /// Implementation of the wait built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
@@ -96,7 +147,35 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         }
         (ExitStatus::SUCCESS, Continue(()))
     } else {
-        todo!()
+        let mut exit_status = ExitStatus::SUCCESS;
+
+        for job_spec in operands {
+            let pid = match job_spec.value.parse() {
+                Ok(pid) if pid > 0 => pid,
+                Ok(_) => {
+                    return print_error_message(env, &JobSpecError::NonPositive(job_spec)).await
+                }
+                Err(e) => {
+                    return print_error_message(env, &JobSpecError::ParseInt(job_spec, e)).await
+                }
+            };
+
+            match env.wait_for_subshell(Pid::from_raw(pid)).await {
+                Err(Errno::ECHILD) => exit_status = ExitStatus::NOT_FOUND,
+                Err(Errno::EINTR) => todo!("signal interruption"),
+                Ok(WaitStatus::Exited(_pid, exit_status_value)) => {
+                    exit_status = ExitStatus(exit_status_value);
+                }
+                Ok(WaitStatus::Signaled(_pid, _signal, _core_dumped)) => {
+                    todo!("handle signaled job")
+                }
+                Ok(WaitStatus::Stopped(_pid, _signal)) => todo!("handle stopped job"),
+                Ok(WaitStatus::Continued(_pid)) => todo!("handle continued job"),
+                _ => todo!("handle unexpected error"),
+            }
+        }
+
+        (exit_status, Continue(()))
     }
 }
 
@@ -114,7 +193,10 @@ mod tests {
     use crate::tests::in_virtual_system;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::system::r#virtual::ProcessState;
+    use yash_env::VirtualSystem;
 
     #[test]
     fn wait_no_operands_no_jobs() {
@@ -150,5 +232,79 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn wait_some_operands() {
+        in_virtual_system(|mut env, pid, state| async move {
+            let mut pids = Vec::new();
+            for i in 5..=6 {
+                pids.push(
+                    env.start_subshell(move |env| {
+                        Box::pin(async move {
+                            env.exit_status = ExitStatus(i);
+                            Continue(())
+                        })
+                    })
+                    .await
+                    .unwrap(),
+                );
+            }
+
+            let args = pids
+                .iter()
+                .map(|pid| Field::dummy(pid.to_string()))
+                .collect();
+            let result = builtin_body(&mut env, args).await;
+            assert_eq!(result, (ExitStatus(6), Continue(())));
+
+            let state = state.borrow();
+            for (cpid, process) in &state.processes {
+                if *cpid != pid {
+                    assert!(!process.state_has_changed());
+                    assert_matches!(process.state(), ProcessState::Exited(exit_status) => {
+                        assert_ne!(exit_status, ExitStatus::SUCCESS);
+                    });
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn wait_unknown_process_id() {
+        let mut env = Env::new_virtual();
+        let args = Field::dummies(["9999999"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
+    }
+
+    #[test]
+    fn non_numeric_operand() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let args = Field::dummies(["abc"]);
+
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::ERROR, Continue(())));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert_ne!(from_utf8(&file.content).unwrap(), "");
+    }
+
+    #[test]
+    fn non_positive_process_id() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let args = Field::dummies(["0"]);
+
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::ERROR, Continue(())));
+
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        assert_ne!(from_utf8(&file.content).unwrap(), "");
     }
 }
