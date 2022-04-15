@@ -40,7 +40,12 @@
 //!
 //! # Exit status
 //!
-//! TBD
+//! If you specify one or more operands, the built-in returns the exit status of
+//! the job specified by the last operand. If there is no operand, the exit
+//! status is 0.
+//!
+//! If the built-in was interrupted by a signal, the exit status indicates the
+//! signal.
 //!
 //! # Errors
 //!
@@ -49,16 +54,23 @@
 //! # Portability
 //!
 //! The wait built-in is contained in the POSIX standard.
+//!
+//! The exact value of an exit status resulting from a signal is
+//! implementation-dependent.
 
+use crate::common::arg::parse_arguments;
+use crate::common::arg::Mode;
+use crate::common::print_error_message;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
+use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+use yash_env::system::Errno;
 use yash_env::Env;
 
-// TODO Wait for all jobs if there is no operand
 // TODO Wait for jobs specified by operands
 // TODO Parse as a job ID if an operand starts with %
 // TODO Treat an unknown job as terminated with exit status 127
@@ -67,8 +79,25 @@ use yash_env::Env;
 // TODO Allow interrupting with SIGINT if interactive
 
 /// Implementation of the wait built-in.
-pub async fn builtin_body(_env: &mut Env, _args: Vec<Field>) -> Result {
-    (ExitStatus::SUCCESS, Continue(()))
+pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+    let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
+        Ok(result) => result,
+        Err(error) => return print_error_message(env, &error).await,
+    };
+
+    if operands.is_empty() {
+        loop {
+            match env.wait_for_subshell(Pid::from_raw(-1)).await {
+                Err(Errno::ECHILD) => break,
+                Err(Errno::EINTR) => todo!("signal interruption"),
+                Err(_) => todo!("handle unexpected error"),
+                Ok(_) => (),
+            }
+        }
+        (ExitStatus::SUCCESS, Continue(()))
+    } else {
+        todo!()
+    }
 }
 
 /// Wrapper of [`builtin_body`] that returns the future in a pinned box.
@@ -77,4 +106,49 @@ pub fn builtin_main(
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = Result> + '_>> {
     Box::pin(builtin_body(env, args))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::in_virtual_system;
+    use assert_matches::assert_matches;
+    use futures_util::FutureExt;
+    use yash_env::system::r#virtual::ProcessState;
+
+    #[test]
+    fn wait_no_operands_no_jobs() {
+        let mut env = Env::new_virtual();
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+    }
+
+    #[test]
+    fn wait_no_operands_some_jobs() {
+        in_virtual_system(|mut env, pid, state| async move {
+            for i in 1..=2 {
+                env.start_subshell(move |env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(i);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            }
+
+            let result = builtin_body(&mut env, vec![]).await;
+            assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+            let state = state.borrow();
+            for (cpid, process) in &state.processes {
+                if *cpid != pid {
+                    assert!(!process.state_has_changed());
+                    assert_matches!(process.state(), ProcessState::Exited(exit_status) => {
+                        assert_ne!(exit_status, ExitStatus::SUCCESS);
+                    });
+                }
+            }
+        })
+    }
 }

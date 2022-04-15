@@ -78,3 +78,65 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         },
     ),
 ];
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use futures_executor::LocalSpawner;
+    use futures_util::task::LocalSpawnExt;
+    use std::cell::Cell;
+    use std::cell::RefCell;
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::rc::Rc;
+    use yash_env::job::Pid;
+    use yash_env::system::r#virtual::SystemState;
+    use yash_env::Env;
+    use yash_env::VirtualSystem;
+
+    #[derive(Clone, Debug)]
+    pub struct LocalExecutor(pub LocalSpawner);
+
+    impl yash_env::system::r#virtual::Executor for LocalExecutor {
+        fn spawn(
+            &self,
+            task: Pin<Box<dyn Future<Output = ()>>>,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            self.0
+                .spawn_local(task)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        }
+    }
+
+    /// Helper function to perform a test in a virtual system with an executor.
+    pub fn in_virtual_system<F, Fut>(f: F)
+    where
+        F: FnOnce(Env, Pid, Rc<RefCell<SystemState>>) -> Fut,
+        Fut: Future<Output = ()> + 'static,
+    {
+        let system = VirtualSystem::new();
+        let pid = system.process_id;
+        let state = Rc::clone(&system.state);
+        let mut executor = futures_executor::LocalPool::new();
+        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+
+        let env = Env::with_system(Box::new(system));
+        let shared_system = env.system.clone();
+        let task = f(env, pid, Rc::clone(&state));
+        let done = Rc::new(Cell::new(false));
+        let done_2 = Rc::clone(&done);
+
+        executor
+            .spawner()
+            .spawn_local(async move {
+                task.await;
+                done.set(true);
+            })
+            .unwrap();
+
+        while !done_2.get() {
+            executor.run_until_stalled();
+            shared_system.select(false).unwrap();
+            SystemState::select_all(&state);
+        }
+    }
+}
