@@ -255,6 +255,7 @@ impl Env {
             )
                 -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
+        // TODO Revisit to simplify this function type when GAT is stabilized
     {
         let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
