@@ -188,6 +188,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::stack::Frame;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
@@ -276,6 +277,9 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("wait"),
+        });
         let args = Field::dummies(["abc"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
@@ -291,6 +295,9 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("wait"),
+        });
         let args = Field::dummies(["0"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();

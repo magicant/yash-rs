@@ -31,6 +31,8 @@ use yash_env::semantics::Field;
 use yash_env::stack::Frame;
 use yash_env::stack::Stack;
 use yash_env::system::Errno;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
 pub mod arg;
@@ -130,8 +132,9 @@ impl<T: BuiltinName + Stdout + Stderr> Print for T {
 
 /// Prints an error message.
 ///
-/// This function prepares a [`Message`] from the given error and prints it to
-/// the standard error using [`yash_env::io::print_message`].
+/// This function prepares a [`Message`] from the given error, inserts into it
+/// an annotation indicating the [built-in name](BuiltinName::builtin_name), and
+/// prints it to the standard error using [`yash_env::io::print_message`].
 ///
 /// Returns `(ExitStatus::ERROR, ControlFlow::Continue(()))`.
 pub async fn print_error_message<'a, E, F>(
@@ -139,10 +142,20 @@ pub async fn print_error_message<'a, E, F>(
     error: F,
 ) -> (ExitStatus, yash_env::semantics::Result)
 where
-    E: Stderr,
+    E: BuiltinName + Stderr,
     F: Into<Message<'a>> + 'a,
 {
-    yash_env::io::print_message(env, error).await;
+    let builtin_name = env.builtin_name();
+    let invocation_location = builtin_name.origin.clone();
+    let mut message = error.into();
+    message.annotations.push(Annotation::new(
+        AnnotationType::Info,
+        format!("error occurred in the {} built-in", builtin_name.value).into(),
+        &invocation_location,
+    ));
+
+    yash_env::io::print_message(env, message).await;
+
     (ExitStatus::ERROR, Continue(()))
 }
 
