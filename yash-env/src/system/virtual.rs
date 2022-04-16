@@ -476,8 +476,10 @@ impl System for VirtualSystem {
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
             if process.state_has_changed() {
                 Ok(process.take_state().to_wait_status(pid))
-            } else {
+            } else if process.state().is_alive() {
                 Ok(WaitStatus::StillAlive)
+            } else {
+                Err(Errno::ECHILD)
             }
         } else {
             Err(Errno::ECHILD)
