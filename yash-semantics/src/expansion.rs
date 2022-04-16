@@ -79,7 +79,7 @@ use yash_env::system::Errno;
 use yash_env::variable::ReadOnlyError;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Word;
 
@@ -159,28 +159,23 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<'a> From<&'a Error> for Message<'a> {
-    fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation::new(
-            AnnotationType::Error,
-            e.cause.label(),
-            &e.location,
-        )];
+impl MessageBase for Error {
+    fn message_title(&self) -> Cow<str> {
+        self.cause.message().into()
+    }
 
-        e.location.code.source.complement_annotations(&mut a);
+    fn main_annotation(&self) -> Annotation {
+        Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
+    }
 
-        if let Some((location, label)) = e.cause.related_location() {
-            a.push(Annotation::new(
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        if let Some((location, label)) = self.cause.related_location() {
+            // TODO Use Extend::extend_one
+            results.extend(std::iter::once(Annotation::new(
                 AnnotationType::Info,
                 label.into(),
                 location,
-            ));
-        }
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: e.cause.message().into(),
-            annotations: a,
+            )))
         }
     }
 }
@@ -290,6 +285,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
+    use yash_syntax::source::pretty::Message;
     use yash_syntax::source::Code;
     use yash_syntax::source::Source;
 

@@ -72,7 +72,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
@@ -187,21 +187,13 @@ impl From<crate::expansion::Error> for Error {
     }
 }
 
-impl<'a> From<&'a Error> for Message<'a> {
-    fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation::new(
-            AnnotationType::Error,
-            e.cause.label(),
-            &e.location,
-        )];
+impl MessageBase for Error {
+    fn message_title(&self) -> Cow<str> {
+        self.cause.message().into()
+    }
 
-        e.location.code.source.complement_annotations(&mut a);
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: e.cause.message().into(),
-            annotations: a,
-        }
+    fn main_annotation(&self) -> Annotation {
+        Annotation::new(AnnotationType::Error, self.cause.label(), &self.location)
     }
 }
 

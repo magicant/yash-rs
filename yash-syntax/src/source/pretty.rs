@@ -139,6 +139,53 @@ impl super::Source {
     }
 }
 
+/// Helper for constructing a [`Message`]
+///
+/// Thanks to the blanket implementation `impl<'a, T: MessageBase> From<&'a T>
+/// for Message<'a>`, implementors of this trait can be converted to a message
+/// for free.
+pub trait MessageBase {
+    /// Returns the type of the entire message.
+    ///
+    /// The default implementation returns `AnnotationType::Error`.
+    fn message_type(&self) -> AnnotationType {
+        AnnotationType::Error
+    }
+
+    // TODO message tag
+
+    /// Returns the main caption of the message.
+    fn message_title(&self) -> Cow<str>;
+
+    /// Returns an annotation to be the first in the message.
+    fn main_annotation(&self) -> Annotation<'_>;
+
+    /// Adds additional annotations to the given container.
+    ///
+    /// The default implementation does nothing.
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        let _ = results;
+    }
+}
+
+/// Constructs a message based on the message base.
+impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
+    fn from(base: &'a T) -> Self {
+        let main_annotation = base.main_annotation();
+        let main_source = &main_annotation.location.code.source;
+        let mut annotations = vec![main_annotation];
+
+        main_source.complement_annotations(&mut annotations);
+        base.additional_annotations(&mut annotations);
+
+        Message {
+            r#type: base.message_type(),
+            title: base.message_title(),
+            annotations,
+        }
+    }
+}
+
 #[cfg(feature = "annotate-snippets")]
 mod annotate_snippets_support {
     use super::*;

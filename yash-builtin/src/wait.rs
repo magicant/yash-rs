@@ -76,7 +76,7 @@ use yash_env::system::Errno;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 
 // TODO Parse as a job ID if an operand starts with %
 // TODO Treat an unknown job as terminated with exit status 127
@@ -109,23 +109,16 @@ impl Display for JobSpecError {
     }
 }
 
-impl<'a> From<&'a JobSpecError> for Message<'a> {
-    fn from(error: &'a JobSpecError) -> Self {
-        let origin = &error.field().origin;
-
-        let mut a = vec![Annotation::new(
+impl MessageBase for JobSpecError {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        "invalid job specification".into()
+    }
+    fn main_annotation(&self) -> Annotation {
+        Annotation::new(
             AnnotationType::Error,
-            error.to_string().into(),
-            origin,
-        )];
-
-        origin.code.source.complement_annotations(&mut a);
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: "invalid job specification".into(),
-            annotations: a,
-        }
+            self.to_string().into(),
+            &self.field().origin,
+        )
     }
 }
 

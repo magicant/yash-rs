@@ -52,7 +52,7 @@
 use std::iter::Peekable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -322,23 +322,18 @@ impl std::fmt::Display for Error<'_> {
 
 impl std::error::Error for Error<'_> {}
 
-impl<'a> From<&'a Error<'_>> for Message<'a> {
-    fn from(error: &'a Error<'_>) -> Self {
-        let field = error.field();
+impl MessageBase for Error<'_> {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        self.to_string().into()
+    }
 
-        let mut a = vec![Annotation::new(
+    fn main_annotation(&self) -> Annotation<'_> {
+        let field = self.field();
+        Annotation::new(
             AnnotationType::Error,
             field.value.as_str().into(),
             &field.origin,
-        )];
-
-        field.origin.code.source.complement_annotations(&mut a);
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: error.to_string().into(),
-            annotations: a,
-        }
+        )
     }
 }
 

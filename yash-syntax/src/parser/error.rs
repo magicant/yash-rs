@@ -18,7 +18,7 @@
 
 use crate::source::pretty::Annotation;
 use crate::source::pretty::AnnotationType;
-use crate::source::pretty::Message;
+use crate::source::pretty::MessageBase;
 use crate::source::Location;
 use crate::syntax::AndOr;
 use std::borrow::Cow;
@@ -421,35 +421,34 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<'a> From<&'a Error> for Message<'a> {
-    fn from(e: &'a Error) -> Self {
-        let mut a = vec![Annotation::new(
+impl MessageBase for Error {
+    fn message_title(&self) -> Cow<str> {
+        self.cause.message()
+    }
+
+    fn main_annotation(&self) -> Annotation {
+        Annotation::new(
             AnnotationType::Error,
-            e.cause.label().into(),
-            &e.location,
-        )];
+            self.cause.label().into(),
+            &self.location,
+        )
+    }
 
-        e.location.code.source.complement_annotations(&mut a);
-
-        if let Some((location, label)) = e.cause.related_location() {
-            a.push(Annotation::new(
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        // TODO Use Extend::extend_one
+        if let Some((location, label)) = self.cause.related_location() {
+            results.extend(std::iter::once(Annotation::new(
                 AnnotationType::Info,
                 label.into(),
                 location,
-            ));
+            )));
         }
-        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &e.cause {
-            a.push(Annotation::new(
+        if let ErrorCause::Syntax(SyntaxError::BangAfterBar) = &self.cause {
+            results.extend(std::iter::once(Annotation::new(
                 AnnotationType::Help,
                 "surround this in a grouping: `{ ! ...; }`".into(),
-                &e.location,
-            ));
-        }
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: e.cause.message(),
-            annotations: a,
+                &self.location,
+            )));
         }
     }
 }
@@ -457,6 +456,7 @@ impl<'a> From<&'a Error> for Message<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::source::pretty::Message;
     use crate::source::Code;
     use crate::source::Source;
     use std::num::NonZeroU64;

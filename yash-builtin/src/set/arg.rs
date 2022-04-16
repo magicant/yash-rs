@@ -27,7 +27,7 @@ use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 
 /// Parse result
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -109,23 +109,18 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<'a> From<&'a Error> for Message<'a> {
-    fn from(error: &'a Error) -> Self {
-        let field = error.field();
+impl MessageBase for Error {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        self.to_string().into()
+    }
 
-        let mut a = vec![Annotation::new(
+    fn main_annotation(&self) -> Annotation {
+        let field = self.field();
+        Annotation::new(
             AnnotationType::Error,
             field.value.as_str().into(),
             &field.origin,
-        )];
-
-        field.origin.code.source.complement_annotations(&mut a);
-
-        Message {
-            r#type: AnnotationType::Error,
-            title: error.to_string().into(),
-            annotations: a,
-        }
+        )
     }
 }
 

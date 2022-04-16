@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::lex::Operator::is_clause_delimiter`
 - `parser::lex::TokenId::is_clause_delimiter`
 - `impl std::error::Error for parser::Error`
+- `source::pretty::MessageBase`
+   - `impl MessageBase for parser::Error`
+   - `impl<'a, T: MessageBase> From<&'a T> for source::pretty::Message<'a>`
 
 ### Changed
 
@@ -23,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 error if the list is delimited by a token that is not a clause delimiter.
 - Dependency versions
     - `async-trait` 0.1.52 → 0.1.53
+
+### Removed
+
+- `impl<'a> From<&'a parser::Error> for source::pretty::Message<'a>`
 
 ## [0.4.0] - 2022-02-27
 
