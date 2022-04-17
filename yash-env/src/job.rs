@@ -20,6 +20,8 @@
 pub use nix::sys::wait::WaitStatus;
 #[doc(no_inline)]
 pub use nix::unistd::Pid;
+use slab::Slab;
+use std::iter::FusedIterator;
 
 /// Set of one or more processes executing a pipeline
 ///
@@ -67,9 +69,48 @@ impl Job {
     }
 }
 
+/// Iterator of jobs with indices.
+///
+/// Call [`JobSet::iter`] to get an instance of `Iter`.
+#[derive(Clone, Debug)]
+pub struct Iter<'a>(slab::Iter<'a, Job>);
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (usize, &'a Job);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<(usize, &'a Job)> {
+        self.0.next()
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for Iter<'a> {
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<(usize, &'a Job)> {
+        self.0.next_back()
+    }
+}
+
+impl ExactSizeIterator for Iter<'_> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for Iter<'_> {}
+
 /// Collection of jobs.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct JobSet {
+    /// Jobs managed by the shell
+    jobs: Slab<Job>,
+
     /// Process ID of the most recently executed asynchronous command.
     last_async_pid: Pid,
 }
@@ -77,8 +118,45 @@ pub struct JobSet {
 impl Default for JobSet {
     fn default() -> Self {
         JobSet {
+            jobs: Slab::new(),
             last_async_pid: Pid::from_raw(0),
         }
+    }
+}
+
+impl JobSet {
+    /// Adds a job to this job set.
+    ///
+    /// This function returns a unique index assigned to the job.
+    #[inline]
+    pub fn add_job(&mut self, job: Job) -> usize {
+        self.jobs.insert(job)
+    }
+
+    /// Removes a job from this job set.
+    ///
+    /// This function returns the job removed from the job set.
+    /// The result is `None` if there is no job for the index.
+    #[inline]
+    pub fn remove_job(&mut self, index: usize) -> Option<Job> {
+        self.jobs.try_remove(index)
+    }
+
+    /// Returns the job at the specified index.
+    ///
+    /// The result is `None` if there is no job for the index.
+    #[inline]
+    pub fn get_job(&self, index: usize) -> Option<&Job> {
+        self.jobs.get(index)
+    }
+
+    /// Returns an iterator of jobs with indices.
+    ///
+    /// The item type of the returned iterator is `(usize, &Job)`.
+    /// Jobs are iterated in the order of indices.
+    #[inline]
+    pub fn iter(&self) -> Iter {
+        Iter(self.jobs.iter())
     }
 }
 
