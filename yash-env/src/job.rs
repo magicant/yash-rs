@@ -44,9 +44,12 @@ pub struct Job {
     /// Status of the process
     pub status: WaitStatus,
 
-    /*
+    /// Indicator of status change
+    ///
+    /// This flag is true if the `status` has been changed since the status was
+    /// last reported to the user.
     pub status_changed: bool,
-    */
+
     /// String representation of this process
     pub name: String,
     /*
@@ -64,6 +67,7 @@ impl Job {
             pid,
             job_controlled: false,
             status: WaitStatus::StillAlive,
+            status_changed: true,
             name: String::new(),
         }
     }
@@ -158,6 +162,38 @@ impl JobSet {
     pub fn iter(&self) -> Iter {
         Iter(self.jobs.iter())
     }
+
+    /// Finds a job by the process ID.
+    ///
+    /// This function returns the index of the job that contains a process whose
+    /// process ID is `pid`. The result is `None` if no such job is found.
+    pub fn job_index_by_pid(&self, pid: Pid) -> Option<usize> {
+        // TODO Use a hash map to speed up the search
+        self.iter()
+            .filter(|(_, job)| job.pid == pid)
+            .map(|(index, _)| index)
+            .next()
+    }
+}
+
+impl JobSet {
+    /// Updates the status of a job.
+    ///
+    /// The result of a `waitpid` call should be passed to this function.
+    /// It updates the status of the job as indicated by `status`.
+    ///
+    /// Returns the index of the job updated. If `status` describes a process
+    /// not managed in this job set, the result is `None`.
+    pub fn update_job(&mut self, status: WaitStatus) -> Option<usize> {
+        let pid = status.pid()?;
+        let index = self.job_index_by_pid(pid);
+        if let Some(index) = index {
+            let job = &mut self.jobs[index];
+            job.status = status;
+            job.status_changed = true;
+        }
+        index
+    }
 }
 
 impl JobSet {
@@ -194,5 +230,47 @@ impl JobSet {
     /// [`last_async_pid`](Self::last_async_pid).
     pub fn set_last_async_pid(&mut self, pid: Pid) {
         self.last_async_pid = pid;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn job_set_job_index_by_pid() {
+        let mut set = JobSet::default();
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(10)), None);
+
+        let i10 = set.add_job(Job::new(Pid::from_raw(10)));
+        let i20 = set.add_job(Job::new(Pid::from_raw(20)));
+        let i30 = set.add_job(Job::new(Pid::from_raw(30)));
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(10)), Some(i10));
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(20)), Some(i20));
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(30)), Some(i30));
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(40)), None);
+
+        set.remove_job(i10);
+        assert_eq!(set.job_index_by_pid(Pid::from_raw(10)), None);
+    }
+
+    #[test]
+    fn job_set_update_job() {
+        let mut set = JobSet::default();
+        let status = WaitStatus::Exited(Pid::from_raw(20), 15);
+        assert_eq!(set.update_job(status), None);
+
+        let i10 = set.add_job(Job::new(Pid::from_raw(10)));
+        let i20 = set.add_job(Job::new(Pid::from_raw(20)));
+        let i30 = set.add_job(Job::new(Pid::from_raw(30)));
+        assert_eq!(set.get_job(i20).unwrap().status, WaitStatus::StillAlive);
+
+        let i20_2 = set.update_job(status);
+        assert_eq!(i20_2, Some(i20));
+        assert_eq!(set.get_job(i20).unwrap().status, status);
+        // TODO Test the status_updated flag
+
+        assert_eq!(set.get_job(i10).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(set.get_job(i30).unwrap().status, WaitStatus::StillAlive);
     }
 }
