@@ -21,6 +21,52 @@ pub use nix::sys::wait::WaitStatus;
 #[doc(no_inline)]
 pub use nix::unistd::Pid;
 
+/// Set of one or more processes executing a pipeline
+///
+/// In the current implementation, a job contains the process ID of one child
+/// process of the shell. Though there may be more processes involved in the
+/// execution of the pipeline, the shell takes care of only one process of the
+/// job.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Job {
+    /// Process ID
+    pub pid: Pid,
+
+    /// Whether the job is job-controlled.
+    ///
+    /// If the job is job-controlled, the job process runs in its own process
+    /// group.
+    pub job_controlled: bool,
+
+    /// Status of the process
+    pub status: WaitStatus,
+
+    /*
+    pub status_changed: bool,
+    */
+    /// String representation of this process
+    pub name: String,
+    /*
+    pub known_by_user: bool,
+    */
+}
+
+impl Job {
+    /// Creates a new job instance.
+    ///
+    /// This function requires a process ID to initialize the new job. The other
+    /// members of the job are defaulted.
+    pub fn new(pid: Pid) -> Self {
+        Job {
+            pid,
+            job_controlled: false,
+            status: WaitStatus::StillAlive,
+            name: String::new(),
+        }
+    }
+}
+
 /// Collection of jobs.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JobSet {
