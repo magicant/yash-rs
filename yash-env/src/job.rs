@@ -194,6 +194,44 @@ impl JobSet {
         }
         index
     }
+
+    /// Examines a job and optionally clears the `status_changed` flag.
+    ///
+    /// This function passes a reference to the job at the given index to
+    /// function `f`. If `f` returns true, the `status_changed` flag is cleared.
+    ///
+    /// `f` is not called if there is no job at the index.
+    ///
+    /// Note: Use [`report_jobs`](Self::report_jobs) to operate on all jobs in
+    /// the job set.
+    pub fn report_job<F>(&mut self, index: usize, f: F)
+    where
+        F: FnOnce(&Job) -> bool,
+    {
+        if let Some(job) = self.jobs.get_mut(index) {
+            if f(job) {
+                job.status_changed = false;
+            }
+        }
+    }
+
+    /// Iterates over jobs and optionally clears the `status_changed` flag.
+    ///
+    /// This function calls function `f` with a reference to each job in this
+    /// job set. If `f` returns true, the job's `status_changed` flag is
+    /// cleared.
+    ///
+    /// Note: Use [`report_job`](Self::report_job) to operate on a single job.
+    pub fn report_jobs<F>(&mut self, mut f: F)
+    where
+        F: FnMut(usize, &Job) -> bool,
+    {
+        for (index, job) in &mut self.jobs {
+            if f(index, job) {
+                job.status_changed = false;
+            }
+        }
+    }
 }
 
 impl JobSet {
@@ -255,6 +293,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::bool_assert_comparison)]
     fn job_set_update_job() {
         let mut set = JobSet::default();
         let status = WaitStatus::Exited(Pid::from_raw(20), 15);
@@ -265,12 +304,65 @@ mod tests {
         let i30 = set.add_job(Job::new(Pid::from_raw(30)));
         assert_eq!(set.get_job(i20).unwrap().status, WaitStatus::StillAlive);
 
+        set.report_job(i20, |_| true);
+
         let i20_2 = set.update_job(status);
         assert_eq!(i20_2, Some(i20));
         assert_eq!(set.get_job(i20).unwrap().status, status);
-        // TODO Test the status_updated flag
+        assert_eq!(set.get_job(i20).unwrap().status_changed, true);
 
         assert_eq!(set.get_job(i10).unwrap().status, WaitStatus::StillAlive);
         assert_eq!(set.get_job(i30).unwrap().status, WaitStatus::StillAlive);
+    }
+
+    #[test]
+    #[allow(clippy::bool_assert_comparison)]
+    fn job_set_report_job() {
+        let mut set = JobSet::default();
+        set.report_job(0, |_| unreachable!());
+
+        let i5 = set.add_job(Job::new(Pid::from_raw(5)));
+        set.report_job(i5, |job| {
+            assert_eq!(job.status_changed, true);
+            false
+        });
+        assert_eq!(set.get_job(i5).unwrap().status_changed, true);
+        set.report_job(i5, |job| {
+            assert_eq!(job.status_changed, true);
+            true
+        });
+        assert_eq!(set.get_job(i5).unwrap().status_changed, false);
+        set.report_job(i5, |job| {
+            assert_eq!(job.status_changed, false);
+            true
+        });
+        assert_eq!(set.get_job(i5).unwrap().status_changed, false);
+    }
+
+    #[test]
+    #[allow(clippy::bool_assert_comparison)]
+    fn job_set_report_jobs() {
+        let mut set = JobSet::default();
+        set.report_jobs(|_, _| unreachable!());
+
+        let i5 = set.add_job(Job::new(Pid::from_raw(5)));
+        let i7 = set.add_job(Job::new(Pid::from_raw(7)));
+        let i9 = set.add_job(Job::new(Pid::from_raw(9)));
+        let mut args = Vec::new();
+        set.report_jobs(|index, job| {
+            args.push((index, job.pid));
+            index == i7
+        });
+        assert_eq!(
+            args,
+            [
+                (i5, Pid::from_raw(5)),
+                (i7, Pid::from_raw(7)),
+                (i9, Pid::from_raw(9)),
+            ]
+        );
+        assert_eq!(set.get_job(i5).unwrap().status_changed, true);
+        assert_eq!(set.get_job(i7).unwrap().status_changed, false);
+        assert_eq!(set.get_job(i9).unwrap().status_changed, true);
     }
 }
