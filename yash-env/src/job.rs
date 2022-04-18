@@ -143,7 +143,16 @@ impl JobSet {
     /// The result is `None` if there is no job for the index.
     #[inline]
     pub fn remove_job(&mut self, index: usize) -> Option<Job> {
-        self.jobs.try_remove(index)
+        let job = self.jobs.try_remove(index);
+
+        if job.is_some() && self.jobs.is_empty() {
+            // Clearing an already empty slab may seem redundant, but this
+            // operation purges the slab's internal cache of unused indices, so
+            // that jobs added later have indices starting from 0.
+            self.jobs.clear();
+        }
+
+        job
     }
 
     /// Returns the job at the specified index.
@@ -274,6 +283,31 @@ impl JobSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn job_set_add_and_remove_job() {
+        // This test case depends on how Slab reuses the index of removed items.
+        let mut set = JobSet::default();
+
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(10))), 0);
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(11))), 1);
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(12))), 2);
+
+        assert_eq!(set.remove_job(0).unwrap().pid, Pid::from_raw(10));
+        assert_eq!(set.remove_job(1).unwrap().pid, Pid::from_raw(11));
+
+        // Indices are reused in the reverse order of removals.
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(13))), 1);
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(14))), 0);
+
+        assert_eq!(set.remove_job(0).unwrap().pid, Pid::from_raw(14));
+        assert_eq!(set.remove_job(1).unwrap().pid, Pid::from_raw(13));
+        assert_eq!(set.remove_job(2).unwrap().pid, Pid::from_raw(12));
+
+        // Once the job set is empty, indices start from 0 again.
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(13))), 0);
+        assert_eq!(set.add_job(Job::new(Pid::from_raw(14))), 1);
+    }
 
     #[test]
     fn job_set_job_index_by_pid() {
