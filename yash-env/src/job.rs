@@ -53,9 +53,6 @@ pub struct Job {
 
     /// String representation of this process
     pub name: String,
-    /*
-    pub known_by_user: bool,
-    */
 }
 
 impl Job {
@@ -273,24 +270,7 @@ impl JobSet {
     /// This function returns the value that has been set by
     /// [`set_last_async_pid`](Self::set_last_async_pid), or 0 if no value has
     /// been set.
-    ///
-    /// When expanding the special parameter `$!`, you must use
-    /// [`expand_last_async_pid`](Self::expand_last_async_pid) instead of this
-    /// function.
     pub fn last_async_pid(&self) -> Pid {
-        self.last_async_pid
-    }
-
-    /// Returns the process ID of the most recently executed asynchronous
-    /// command.
-    ///
-    /// This function is similar to [`last_async_pid`](Self::last_async_pid),
-    /// but also updates an internal flag so that the asynchronous command is
-    /// not disowned too soon.
-    ///
-    /// TODO Elaborate on automatic disowning
-    pub fn expand_last_async_pid(&mut self) -> Pid {
-        // TODO Keep the async process from being disowned.
         self.last_async_pid
     }
 
