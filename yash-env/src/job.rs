@@ -187,6 +187,18 @@ impl JobSet {
         self.jobs.get(index)
     }
 
+    /// Returns the number of jobs in this job set.
+    #[inline]
+    pub fn job_count(&self) -> usize {
+        self.jobs.len()
+    }
+
+    /// Returns true if this job set contains no jobs.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.job_count() == 0
+    }
+
     /// Returns an iterator of jobs with indices.
     ///
     /// The item type of the returned iterator is `(usize, &Job)`.
