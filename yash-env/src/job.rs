@@ -21,6 +21,7 @@ pub use nix::sys::wait::WaitStatus;
 #[doc(no_inline)]
 pub use nix::unistd::Pid;
 use slab::Slab;
+use std::collections::HashMap;
 use std::iter::FusedIterator;
 
 /// Set of one or more processes executing a pipeline
@@ -115,6 +116,11 @@ pub struct JobSet {
     /// Jobs managed by the shell
     jobs: Slab<Job>,
 
+    /// Map from process IDs to indices of `jobs`
+    ///
+    /// This is a shortcut to quickly find jobs by process ID.
+    pids_to_indices: HashMap<Pid, usize>,
+
     /// Process ID of the most recently executed asynchronous command.
     last_async_pid: Pid,
 }
@@ -123,6 +129,7 @@ impl Default for JobSet {
     fn default() -> Self {
         JobSet {
             jobs: Slab::new(),
+            pids_to_indices: HashMap::new(),
             last_async_pid: Pid::from_raw(0),
         }
     }
@@ -132,25 +139,45 @@ impl JobSet {
     /// Adds a job to this job set.
     ///
     /// This function returns a unique index assigned to the job.
-    #[inline]
+    ///
+    /// If there already is a job that has the same process ID as that of the
+    /// new job, the existing job is silently removed.
     pub fn add_job(&mut self, job: Job) -> usize {
-        self.jobs.insert(job)
+        use std::collections::hash_map::Entry::*;
+        let index = match self.pids_to_indices.entry(job.pid) {
+            Vacant(entry) => {
+                let index = self.jobs.insert(job);
+                entry.insert(index);
+                index
+            }
+            Occupied(entry) => {
+                let index = *entry.get();
+                self.jobs[index] = job;
+                index
+            }
+        };
+        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
+        index
     }
 
     /// Removes a job from this job set.
     ///
     /// This function returns the job removed from the job set.
     /// The result is `None` if there is no job for the index.
-    #[inline]
     pub fn remove_job(&mut self, index: usize) -> Option<Job> {
         let job = self.jobs.try_remove(index);
 
-        if job.is_some() && self.jobs.is_empty() {
-            // Clearing an already empty slab may seem redundant, but this
-            // operation purges the slab's internal cache of unused indices, so
-            // that jobs added later have indices starting from 0.
-            self.jobs.clear();
+        if let Some(job) = &job {
+            self.pids_to_indices.remove(&job.pid);
+
+            if self.jobs.is_empty() {
+                // Clearing an already empty slab may seem redundant, but this
+                // operation purges the slab's internal cache of unused indices,
+                // so that jobs added later have indices starting from 0.
+                self.jobs.clear();
+            }
         }
+        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
 
         job
     }
@@ -177,11 +204,7 @@ impl JobSet {
     /// This function returns the index of the job that contains a process whose
     /// process ID is `pid`. The result is `None` if no such job is found.
     pub fn job_index_by_pid(&self, pid: Pid) -> Option<usize> {
-        // TODO Use a hash map to speed up the search
-        self.iter()
-            .filter(|(_, job)| job.pid == pid)
-            .map(|(index, _)| index)
-            .next()
+        self.pids_to_indices.get(&pid).copied()
     }
 }
 
@@ -307,6 +330,28 @@ mod tests {
         // Once the job set is empty, indices start from 0 again.
         assert_eq!(set.add_job(Job::new(Pid::from_raw(13))), 0);
         assert_eq!(set.add_job(Job::new(Pid::from_raw(14))), 1);
+    }
+
+    #[test]
+    fn job_set_add_job_same_pid() {
+        let mut set = JobSet::default();
+
+        let mut job = Job::new(Pid::from_raw(10));
+        job.name = "first job".to_string();
+        let i_first = set.add_job(job);
+
+        let mut job = Job::new(Pid::from_raw(10));
+        job.name = "second job".to_string();
+        let i_second = set.add_job(job);
+
+        let job = set.get_job(i_second).unwrap();
+        assert_eq!(job.pid, Pid::from_raw(10));
+        assert_eq!(job.name, "second job");
+
+        assert_ne!(
+            set.get_job(i_first).map(|job| job.name.as_str()),
+            Some("first job")
+        );
     }
 
     #[test]
