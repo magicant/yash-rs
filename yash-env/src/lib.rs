@@ -506,11 +506,8 @@ mod tests {
         let system = VirtualSystem::new();
         let mut executor = LocalPool::new();
         let mut env = Env::with_system(Box::new(system));
-        let result = executor.run_until(env.run_in_subshell(|_env| {
-            Box::pin(async {
-                unreachable!("subshell not expected to run");
-            })
-        }));
+        let result = executor
+            .run_until(env.run_in_subshell(|_env| unreachable!("subshell not expected to run")));
         assert_eq!(result, Err(Errno::ENOSYS));
     }
 
