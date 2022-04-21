@@ -65,7 +65,6 @@ use async_trait::async_trait;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::future::ready;
 use std::future::Future;
 use std::ops::ControlFlow::{Break, Continue};
 use std::pin::Pin;
@@ -259,21 +258,18 @@ impl Env {
     {
         let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
-            if let Some(f) = f.take() {
-                Box::pin(async move {
-                    env.traps.enter_subshell(&mut env.system);
-                    match f(env).await {
-                        Continue(()) => (),
-                        Break(divert) => {
-                            if let Some(exit_status) = divert.exit_status() {
-                                env.exit_status = exit_status
-                            }
+            let f = f.take().expect("child process task should run only once");
+            Box::pin(async move {
+                env.traps.enter_subshell(&mut env.system);
+                match f(env).await {
+                    Continue(()) => (),
+                    Break(divert) => {
+                        if let Some(exit_status) = divert.exit_status() {
+                            env.exit_status = exit_status
                         }
                     }
-                })
-            } else {
-                Box::pin(ready(()))
-            }
+                }
+            })
         });
         let mut child = self.system.new_child_process()?;
         let child_pid = child.run(self, task).await;
