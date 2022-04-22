@@ -248,6 +248,9 @@ impl Env {
     /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
     ///   status in `Env`.
     /// - Other `Divert` values are ignored.
+    ///
+    /// This function does not add the created subshell to `self.jobs`. You have
+    /// to do it for yourself.
     pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
     where
         F: for<'a> FnOnce(
@@ -345,6 +348,10 @@ impl Env {
     /// - `pid`: the child whose process ID is `pid`
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
+    /// When [`self.system.wait`](System::wait) returned a new status of the
+    /// target, it is sent to `self.jobs` ([`JobSet::update_job`]) before being
+    /// returned from this function.
+    ///
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
@@ -355,6 +362,10 @@ impl Env {
         loop {
             match self.system.wait(target) {
                 Ok(WaitStatus::StillAlive) => {}
+                Ok(status) => {
+                    self.jobs.update_job(status);
+                    return Ok(status);
+                }
                 result => return result,
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
@@ -377,6 +388,7 @@ impl io::Stderr for Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::job::Job;
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
     use crate::trap::Trap;
@@ -528,6 +540,28 @@ mod tests {
                 .unwrap();
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+        });
+    }
+
+    #[test]
+    fn start_and_wait_for_subshell_with_job_set() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let pid = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(42);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            let mut job = Job::new(pid);
+            job.name = "my job".to_string();
+            let job_index = env.jobs.add_job(job.clone());
+            let result = env.wait_for_subshell(pid).await;
+            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+            job.status = WaitStatus::Exited(pid, 42);
+            assert_eq!(env.jobs.get_job(job_index), Some(&job));
         });
     }
 
