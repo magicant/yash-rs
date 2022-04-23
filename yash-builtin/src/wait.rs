@@ -155,6 +155,12 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                     if let Some((pid, _exit_status)) = to_job_result(status) {
                         if let Some(index) = env.jobs.job_index_by_pid(pid) {
                             env.jobs.remove_job(index);
+                        } else {
+                            // A child process that is not managed in the
+                            // shell's JobSet may happen if the process running
+                            // the shell performed a fork before "exec"ing into
+                            // the shell. Such a process is a child of the shell
+                            // but is not known by the shell.
                         }
                     }
                 }
@@ -175,24 +181,28 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 }
             };
 
-            if let Some(index) = env.jobs.job_index_by_pid(pid) {
-                loop {
+            exit_status = if let Some(index) = env.jobs.job_index_by_pid(pid) {
+                let exit_status = loop {
                     let job = env.jobs.get_job(index).unwrap();
-                    if let Some((_pid, job_exit_status)) = to_job_result(job.status) {
-                        env.jobs.remove_job(index);
-                        exit_status = job_exit_status;
-                        break;
+                    if let Some((_pid, exit_status)) = to_job_result(job.status) {
+                        break exit_status;
                     }
                     match env.wait_for_subshell(Pid::from_raw(-1)).await {
-                        Err(Errno::ECHILD) => todo!("handle ECHILD"),
+                        // When the shell creates a subshell, it inherits jobs
+                        // of the parent shell, but those jobs are not child
+                        // processes of the subshell. The wait built-in invoked
+                        // in the subshell needs to ignore such jobs.
+                        Err(Errno::ECHILD) => break ExitStatus::NOT_FOUND,
                         Err(Errno::EINTR) => todo!("signal interruption"),
                         Err(_) => todo!("handle unexpected error"),
                         Ok(_) => (),
                     }
-                }
+                };
+                env.jobs.remove_job(index);
+                exit_status
             } else {
-                exit_status = ExitStatus::NOT_FOUND;
-            }
+                ExitStatus::NOT_FOUND
+            };
         }
 
         (exit_status, Continue(()))
@@ -361,6 +371,19 @@ mod tests {
         let args = Field::dummies([pid.to_string()]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus(17), Continue(())));
+        assert_eq!(env.jobs.get_job(index), None);
+    }
+
+    #[test]
+    fn wait_some_operands_false_job() {
+        let mut env = Env::new_virtual();
+
+        // Add a running job that is not a proper subshell.
+        let index = env.jobs.add_job(Job::new(Pid::from_raw(19)));
+
+        let args = Field::dummies(["19".to_string()]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
         assert_eq!(env.jobs.get_job(index), None);
     }
 
