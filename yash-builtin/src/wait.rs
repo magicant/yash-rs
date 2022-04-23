@@ -123,13 +123,18 @@ impl MessageBase for JobSpecError {
     }
 }
 
+fn to_job_result(status: WaitStatus) -> Option<(Pid, ExitStatus)> {
+    match status {
+        WaitStatus::Exited(pid, exit_status_value) => Some((pid, ExitStatus(exit_status_value))),
+        WaitStatus::Signaled(_pid, _signal, _core_dumped) => todo!("handle signaled job"),
+        WaitStatus::Stopped(_pid, _signal) => todo!("handle stopped job"),
+        WaitStatus::Continued(_pid) => todo!("handle continued job"),
+        _ => None,
+    }
+}
+
 fn remove_finished_jobs(jobs: &mut JobSet) {
-    jobs.retain_jobs(|_index, job| {
-        !matches!(
-            job.status,
-            WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)
-        )
-    })
+    jobs.retain_jobs(|_index, job| to_job_result(job.status).is_none())
 }
 
 /// Implementation of the wait built-in.
@@ -146,12 +151,13 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 Err(Errno::ECHILD) => break,
                 Err(Errno::EINTR) => todo!("signal interruption"),
                 Err(_) => todo!("handle unexpected error"),
-                Ok(WaitStatus::Exited(pid, _) | WaitStatus::Signaled(pid, _, _)) => {
-                    if let Some(index) = env.jobs.job_index_by_pid(pid) {
-                        env.jobs.remove_job(index);
+                Ok(status) => {
+                    if let Some((pid, _exit_status)) = to_job_result(status) {
+                        if let Some(index) = env.jobs.job_index_by_pid(pid) {
+                            env.jobs.remove_job(index);
+                        }
                     }
                 }
-                Ok(_) => (),
             }
         }
         (ExitStatus::SUCCESS, Continue(()))
@@ -160,7 +166,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
         for job_spec in operands {
             let pid = match job_spec.value.parse() {
-                Ok(pid) if pid > 0 => pid,
+                Ok(pid) if pid > 0 => Pid::from_raw(pid),
                 Ok(_) => {
                     return print_error_message(env, &JobSpecError::NonPositive(job_spec)).await
                 }
@@ -169,18 +175,23 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 }
             };
 
-            match env.wait_for_subshell(Pid::from_raw(pid)).await {
-                Err(Errno::ECHILD) => exit_status = ExitStatus::NOT_FOUND,
-                Err(Errno::EINTR) => todo!("signal interruption"),
-                Ok(WaitStatus::Exited(_pid, exit_status_value)) => {
-                    exit_status = ExitStatus(exit_status_value);
+            if let Some(index) = env.jobs.job_index_by_pid(pid) {
+                loop {
+                    let job = env.jobs.get_job(index).unwrap();
+                    if let Some((_pid, job_exit_status)) = to_job_result(job.status) {
+                        env.jobs.remove_job(index);
+                        exit_status = job_exit_status;
+                        break;
+                    }
+                    match env.wait_for_subshell(Pid::from_raw(-1)).await {
+                        Err(Errno::ECHILD) => todo!("handle ECHILD"),
+                        Err(Errno::EINTR) => todo!("signal interruption"),
+                        Err(_) => todo!("handle unexpected error"),
+                        Ok(_) => (),
+                    }
                 }
-                Ok(WaitStatus::Signaled(_pid, _signal, _core_dumped)) => {
-                    todo!("handle signaled job")
-                }
-                Ok(WaitStatus::Stopped(_pid, _signal)) => todo!("handle stopped job"),
-                Ok(WaitStatus::Continued(_pid)) => todo!("handle continued job"),
-                _ => todo!("handle unexpected error"),
+            } else {
+                exit_status = ExitStatus::NOT_FOUND;
             }
         }
 
@@ -285,20 +296,36 @@ mod tests {
     }
 
     #[test]
-    fn wait_some_operands() {
+    fn wait_some_operands_no_jobs() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            // Start a child process, but don't turn it into a job.
+            let pid = env
+                .start_subshell(|_| Box::pin(futures_util::future::pending()))
+                .await
+                .unwrap();
+
+            let args = Field::dummies([pid.to_string()]);
+            let result = builtin_body(&mut env, args).await;
+            assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
+        })
+    }
+
+    #[test]
+    fn wait_some_operands_some_running_jobs() {
         in_virtual_system(|mut env, pid, state| async move {
             let mut pids = Vec::new();
             for i in 5..=6 {
-                pids.push(
-                    env.start_subshell(move |env| {
+                let pid = env
+                    .start_subshell(move |env| {
                         Box::pin(async move {
                             env.exit_status = ExitStatus(i);
                             Continue(())
                         })
                     })
                     .await
-                    .unwrap(),
-                );
+                    .unwrap();
+                pids.push(pid);
+                env.jobs.add_job(Job::new(pid));
             }
 
             let args = pids
@@ -307,6 +334,7 @@ mod tests {
                 .collect();
             let result = builtin_body(&mut env, args).await;
             assert_eq!(result, (ExitStatus(6), Continue(())));
+            assert_eq!(env.jobs.job_count(), 0);
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
@@ -318,6 +346,22 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn wait_some_operands_some_finished_job() {
+        let mut env = Env::new_virtual();
+
+        // Add a job that has already exited.
+        let pid = Pid::from_raw(7);
+        let mut job = Job::new(pid);
+        job.status = WaitStatus::Exited(pid, 17);
+        let index = env.jobs.add_job(job);
+
+        let args = Field::dummies([pid.to_string()]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus(17), Continue(())));
+        assert_eq!(env.jobs.get_job(index), None);
     }
 
     #[test]
