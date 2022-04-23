@@ -137,6 +137,64 @@ fn remove_finished_jobs(jobs: &mut JobSet) {
     jobs.retain_jobs(|_index, job| to_job_result(job.status).is_none())
 }
 
+async fn wait_for_all_jobs(env: &mut Env) -> ExitStatus {
+    loop {
+        remove_finished_jobs(&mut env.jobs);
+        if env.jobs.is_empty() {
+            break;
+        }
+        match env.wait_for_subshell(Pid::from_raw(-1)).await {
+            // When the shell creates a subshell, it inherits jobs of the
+            // parent shell, but those jobs are not child processes of the
+            // subshell. The wait built-in invoked in the subshell needs to
+            // ignore such jobs.
+            Err(Errno::ECHILD) => break,
+
+            Err(Errno::EINTR) => todo!("signal interruption"),
+            Err(_) => todo!("handle unexpected error"),
+            Ok(_) => (),
+        }
+    }
+    ExitStatus::SUCCESS
+}
+
+async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
+    let mut exit_status = ExitStatus::SUCCESS;
+
+    for job_spec in job_specs {
+        let pid = match job_spec.value.parse() {
+            Ok(pid) if pid > 0 => Pid::from_raw(pid),
+            Ok(_) => return print_error_message(env, &JobSpecError::NonPositive(job_spec)).await,
+            Err(e) => return print_error_message(env, &JobSpecError::ParseInt(job_spec, e)).await,
+        };
+
+        exit_status = if let Some(index) = env.jobs.job_index_by_pid(pid) {
+            let exit_status = loop {
+                let job = env.jobs.get_job(index).unwrap();
+                if let Some((_pid, exit_status)) = to_job_result(job.status) {
+                    break exit_status;
+                }
+                match env.wait_for_subshell(Pid::from_raw(-1)).await {
+                    // When the shell creates a subshell, it inherits jobs of
+                    // the parent shell, but those jobs are not child processes
+                    // of the subshell. The wait built-in invoked in the
+                    // subshell needs to ignore such jobs.
+                    Err(Errno::ECHILD) => break ExitStatus::NOT_FOUND,
+                    Err(Errno::EINTR) => todo!("signal interruption"),
+                    Err(_) => todo!("handle unexpected error"),
+                    Ok(_) => (),
+                }
+            };
+            env.jobs.remove_job(index);
+            exit_status
+        } else {
+            ExitStatus::NOT_FOUND
+        };
+    }
+
+    (exit_status, Continue(()))
+}
+
 /// Implementation of the wait built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
@@ -145,63 +203,10 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     if operands.is_empty() {
-        loop {
-            remove_finished_jobs(&mut env.jobs);
-            if env.jobs.is_empty() {
-                break;
-            }
-            match env.wait_for_subshell(Pid::from_raw(-1)).await {
-                // When the shell creates a subshell, it inherits jobs of the
-                // parent shell, but those jobs are not child processes of the
-                // subshell. The wait built-in invoked in the subshell needs to
-                // ignore such jobs.
-                Err(Errno::ECHILD) => break,
-
-                Err(Errno::EINTR) => todo!("signal interruption"),
-                Err(_) => todo!("handle unexpected error"),
-                Ok(_) => (),
-            }
-        }
-        (ExitStatus::SUCCESS, Continue(()))
-    } else {
-        let mut exit_status = ExitStatus::SUCCESS;
-
-        for job_spec in operands {
-            let pid = match job_spec.value.parse() {
-                Ok(pid) if pid > 0 => Pid::from_raw(pid),
-                Ok(_) => {
-                    return print_error_message(env, &JobSpecError::NonPositive(job_spec)).await
-                }
-                Err(e) => {
-                    return print_error_message(env, &JobSpecError::ParseInt(job_spec, e)).await
-                }
-            };
-
-            exit_status = if let Some(index) = env.jobs.job_index_by_pid(pid) {
-                let exit_status = loop {
-                    let job = env.jobs.get_job(index).unwrap();
-                    if let Some((_pid, exit_status)) = to_job_result(job.status) {
-                        break exit_status;
-                    }
-                    match env.wait_for_subshell(Pid::from_raw(-1)).await {
-                        // When the shell creates a subshell, it inherits jobs
-                        // of the parent shell, but those jobs are not child
-                        // processes of the subshell. The wait built-in invoked
-                        // in the subshell needs to ignore such jobs.
-                        Err(Errno::ECHILD) => break ExitStatus::NOT_FOUND,
-                        Err(Errno::EINTR) => todo!("signal interruption"),
-                        Err(_) => todo!("handle unexpected error"),
-                        Ok(_) => (),
-                    }
-                };
-                env.jobs.remove_job(index);
-                exit_status
-            } else {
-                ExitStatus::NOT_FOUND
-            };
-        }
-
+        let exit_status = wait_for_all_jobs(env).await;
         (exit_status, Continue(()))
+    } else {
+        wait_for_each_job(env, operands).await
     }
 }
 
