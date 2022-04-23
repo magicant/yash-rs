@@ -68,6 +68,7 @@ use std::num::ParseIntError;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
+use yash_env::job::JobSet;
 use yash_env::job::Pid;
 use yash_env::job::WaitStatus;
 use yash_env::semantics::ExitStatus;
@@ -122,6 +123,15 @@ impl MessageBase for JobSpecError {
     }
 }
 
+fn remove_finished_jobs(jobs: &mut JobSet) {
+    jobs.retain_jobs(|_index, job| {
+        !matches!(
+            job.status,
+            WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)
+        )
+    })
+}
+
 /// Implementation of the wait built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
@@ -130,6 +140,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     if operands.is_empty() {
+        remove_finished_jobs(&mut env.jobs);
         while !env.jobs.is_empty() {
             match env.wait_for_subshell(Pid::from_raw(-1)).await {
                 Err(Errno::ECHILD) => break,
@@ -212,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn wait_no_operands_some_jobs() {
+    fn wait_no_operands_some_running_jobs() {
         in_virtual_system(|mut env, pid, state| async move {
             for i in 1..=2 {
                 let pid = env
@@ -244,14 +255,33 @@ mod tests {
     }
 
     #[test]
-    fn wait_no_operands_false_job() {
+    fn wait_no_operands_some_finished_jobs() {
         let mut env = Env::new_virtual();
 
-        // Add a job that is not a proper subshell.
-        env.jobs.add_job(Job::new(Pid::from_raw(1)));
+        // Add a job that has already exited.
+        let pid = Pid::from_raw(10);
+        let mut job = Job::new(pid);
+        job.status = WaitStatus::Exited(pid, 42);
+        let index = env.jobs.add_job(job);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(env.jobs.get_job(index), None);
+    }
+
+    #[test]
+    fn wait_no_operands_false_job() {
+        let mut env = Env::new_virtual();
+
+        // Add a running job that is not a proper subshell.
+        let index = env.jobs.add_job(Job::new(Pid::from_raw(1)));
+
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(
+            env.jobs.get_job(index).unwrap().status,
+            WaitStatus::StillAlive
+        );
     }
 
     #[test]

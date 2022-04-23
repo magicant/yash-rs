@@ -179,6 +179,17 @@ impl JobSet {
         job
     }
 
+    /// Conditionally removes jobs from this job set.
+    ///
+    /// Function `f` is called repeatedly with a job and its index.
+    /// The job is removed if `f` returns false.
+    pub fn retain_jobs<F>(&mut self, mut f: F)
+    where
+        F: FnMut(usize, &Job) -> bool,
+    {
+        self.jobs.retain(|index, job| f(index, job))
+    }
+
     /// Returns the job at the specified index.
     ///
     /// The result is `None` if there is no job for the index.
