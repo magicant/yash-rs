@@ -36,7 +36,8 @@ impl Command for syntax::Command {
     /// Executes the command.
     ///
     /// After executing the command body, this function [runs
-    /// traps](run_traps_for_caught_signals) if any caught signals are pending.
+    /// traps](run_traps_for_caught_signals) if any caught signals are pending,
+    /// and [updates subshell statuses](Env::update_all_subshell_statuses).
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::Command::*;
         let main_result = match self {
@@ -46,6 +47,7 @@ impl Command for syntax::Command {
         };
 
         let trap_result = run_traps_for_caught_signals(env).await;
+        env.update_all_subshell_statuses();
 
         match (main_result, trap_result) {
             (_, Continue(())) => main_result,
