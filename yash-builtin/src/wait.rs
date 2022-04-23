@@ -158,6 +158,27 @@ async fn wait_for_all_jobs(env: &mut Env) -> ExitStatus {
     ExitStatus::SUCCESS
 }
 
+async fn wait_for_job(env: &mut Env, index: usize) -> ExitStatus {
+    let exit_status = loop {
+        let job = env.jobs.get_job(index).unwrap();
+        if let Some((_pid, exit_status)) = to_job_result(job.status) {
+            break exit_status;
+        }
+        match env.wait_for_subshell(Pid::from_raw(-1)).await {
+            // When the shell creates a subshell, it inherits jobs of the parent
+            // shell, but those jobs are not child processes of the subshell.
+            // The wait built-in invoked in the subshell needs to ignore such
+            // jobs.
+            Err(Errno::ECHILD) => break ExitStatus::NOT_FOUND,
+            Err(Errno::EINTR) => todo!("signal interruption"),
+            Err(_) => todo!("handle unexpected error"),
+            Ok(_) => (),
+        }
+    };
+    env.jobs.remove_job(index);
+    exit_status
+}
+
 async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
     let mut exit_status = ExitStatus::SUCCESS;
 
@@ -169,24 +190,7 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
         };
 
         exit_status = if let Some(index) = env.jobs.job_index_by_pid(pid) {
-            let exit_status = loop {
-                let job = env.jobs.get_job(index).unwrap();
-                if let Some((_pid, exit_status)) = to_job_result(job.status) {
-                    break exit_status;
-                }
-                match env.wait_for_subshell(Pid::from_raw(-1)).await {
-                    // When the shell creates a subshell, it inherits jobs of
-                    // the parent shell, but those jobs are not child processes
-                    // of the subshell. The wait built-in invoked in the
-                    // subshell needs to ignore such jobs.
-                    Err(Errno::ECHILD) => break ExitStatus::NOT_FOUND,
-                    Err(Errno::EINTR) => todo!("signal interruption"),
-                    Err(_) => todo!("handle unexpected error"),
-                    Ok(_) => (),
-                }
-            };
-            env.jobs.remove_job(index);
-            exit_status
+            wait_for_job(env, index).await
         } else {
             ExitStatus::NOT_FOUND
         };
