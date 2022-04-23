@@ -145,25 +145,21 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     if operands.is_empty() {
-        remove_finished_jobs(&mut env.jobs);
-        while !env.jobs.is_empty() {
+        loop {
+            remove_finished_jobs(&mut env.jobs);
+            if env.jobs.is_empty() {
+                break;
+            }
             match env.wait_for_subshell(Pid::from_raw(-1)).await {
+                // When the shell creates a subshell, it inherits jobs of the
+                // parent shell, but those jobs are not child processes of the
+                // subshell. The wait built-in invoked in the subshell needs to
+                // ignore such jobs.
                 Err(Errno::ECHILD) => break,
+
                 Err(Errno::EINTR) => todo!("signal interruption"),
                 Err(_) => todo!("handle unexpected error"),
-                Ok(status) => {
-                    if let Some((pid, _exit_status)) = to_job_result(status) {
-                        if let Some(index) = env.jobs.job_index_by_pid(pid) {
-                            env.jobs.remove_job(index);
-                        } else {
-                            // A child process that is not managed in the
-                            // shell's JobSet may happen if the process running
-                            // the shell performed a fork before "exec"ing into
-                            // the shell. Such a process is a child of the shell
-                            // but is not known by the shell.
-                        }
-                    }
-                }
+                Ok(_) => (),
             }
         }
         (ExitStatus::SUCCESS, Continue(()))
@@ -229,6 +225,11 @@ mod tests {
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
+
+    // A child process that is not managed as a job in the shell's JobSet may
+    // happen if the process running the shell performed a fork before "exec"ing
+    // into the shell. Such a process is a child of the shell but is not known
+    // by the shell.
 
     #[test]
     fn wait_no_operands_no_jobs() {
