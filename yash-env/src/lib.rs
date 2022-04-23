@@ -371,6 +371,24 @@ impl Env {
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
     }
+
+    /// Applies all job status updates to jobs in `self.jobs`.
+    ///
+    /// This function calls [`self.system.wait`](System::wait) repeatedly until
+    /// all status updates available are applied to `self.jobs`
+    /// ([`JobSet::update_job`]).
+    ///
+    /// Note that updates of subshells that are not managed in `self.jobs` are
+    /// lost when you call this function.
+    pub fn update_all_subshell_statuses(&mut self) {
+        loop {
+            match self.system.wait(Pid::from_raw(-1)) {
+                Ok(WaitStatus::StillAlive) => break,
+                Ok(status) => self.jobs.update_job(status),
+                Err(_) => break,
+            };
+        }
+    }
 }
 
 #[async_trait(?Send)]
@@ -607,5 +625,96 @@ mod tests {
             let result = env.wait_for_subshell(Pid::from_raw(-1)).await;
             assert_eq!(result, Err(Errno::ECHILD));
         });
+    }
+
+    #[test]
+    fn update_all_subshell_statuses_without_subshells() {
+        let mut env = Env::new_virtual();
+        env.update_all_subshell_statuses();
+    }
+
+    #[test]
+    fn update_all_subshell_statuses_with_subshells() {
+        let system = VirtualSystem::new();
+        let mut executor = futures_executor::LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
+
+        let mut env = Env::with_system(Box::new(system));
+
+        let [(pid_1, job_1), (pid_2, job_2), (_pid_3, job_3)] = executor.run_until(async {
+            // Run a subshell.
+            let pid_1 = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(12);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            // Run another subshell.
+            let pid_2 = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(35);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            // This one will never finish.
+            let pid_3 = env
+                .start_subshell(|_env| Box::pin(futures_util::future::pending()))
+                .await
+                .unwrap();
+            // Yet another subshell. We don't make this into a job.
+            let _ = env
+                .start_subshell(|env| {
+                    Box::pin(async move {
+                        env.exit_status = ExitStatus(100);
+                        Continue(())
+                    })
+                })
+                .await
+                .unwrap();
+            // Create jobs.
+            let job_1 = env.jobs.add_job(Job::new(pid_1));
+            let job_2 = env.jobs.add_job(Job::new(pid_2));
+            let job_3 = env.jobs.add_job(Job::new(pid_3));
+            [(pid_1, job_1), (pid_2, job_2), (pid_3, job_3)]
+        });
+
+        // Let the jobs (except job_3) finish.
+        executor.run_until_stalled();
+
+        // We're not yet updated.
+        assert_eq!(
+            env.jobs.get_job(job_1).unwrap().status,
+            WaitStatus::StillAlive
+        );
+        assert_eq!(
+            env.jobs.get_job(job_2).unwrap().status,
+            WaitStatus::StillAlive
+        );
+        assert_eq!(
+            env.jobs.get_job(job_3).unwrap().status,
+            WaitStatus::StillAlive
+        );
+
+        env.update_all_subshell_statuses();
+
+        // Now we have the results.
+        assert_eq!(
+            env.jobs.get_job(job_1).unwrap().status,
+            WaitStatus::Exited(pid_1, 12)
+        );
+        assert_eq!(
+            env.jobs.get_job(job_2).unwrap().status,
+            WaitStatus::Exited(pid_2, 35)
+        );
+        assert_eq!(
+            env.jobs.get_job(job_3).unwrap().status,
+            WaitStatus::StillAlive
+        );
     }
 }
