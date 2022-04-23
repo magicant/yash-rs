@@ -130,11 +130,16 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     if operands.is_empty() {
-        loop {
+        while !env.jobs.is_empty() {
             match env.wait_for_subshell(Pid::from_raw(-1)).await {
                 Err(Errno::ECHILD) => break,
                 Err(Errno::EINTR) => todo!("signal interruption"),
                 Err(_) => todo!("handle unexpected error"),
+                Ok(WaitStatus::Exited(pid, _) | WaitStatus::Signaled(pid, _, _)) => {
+                    if let Some(index) = env.jobs.job_index_by_pid(pid) {
+                        env.jobs.remove_job(index);
+                    }
+                }
                 Ok(_) => (),
             }
         }
@@ -188,33 +193,43 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::job::Job;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
     #[test]
     fn wait_no_operands_no_jobs() {
-        let mut env = Env::new_virtual();
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        in_virtual_system(|mut env, _pid, _state| async move {
+            // Start a child process, but don't turn it into a job.
+            env.start_subshell(|_| Box::pin(futures_util::future::pending()))
+                .await
+                .unwrap();
+
+            let result = builtin_body(&mut env, vec![]).await;
+            assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        })
     }
 
     #[test]
     fn wait_no_operands_some_jobs() {
         in_virtual_system(|mut env, pid, state| async move {
             for i in 1..=2 {
-                env.start_subshell(move |env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(i);
-                        Continue(())
+                let pid = env
+                    .start_subshell(move |env| {
+                        Box::pin(async move {
+                            env.exit_status = ExitStatus(i);
+                            Continue(())
+                        })
                     })
-                })
-                .await
-                .unwrap();
+                    .await
+                    .unwrap();
+                env.jobs.add_job(Job::new(pid));
             }
 
             let result = builtin_body(&mut env, vec![]).await;
             assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+            assert_eq!(env.jobs.job_count(), 0);
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
@@ -226,6 +241,17 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn wait_no_operands_false_job() {
+        let mut env = Env::new_virtual();
+
+        // Add a job that is not a proper subshell.
+        env.jobs.add_job(Job::new(Pid::from_raw(1)));
+
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
     }
 
     #[test]
