@@ -39,8 +39,9 @@ use yash_syntax::parser::Parser;
 /// If the input source code contains no commands, the exit status is set to
 /// zero.
 ///
-/// [Pending traps are run](run_traps_for_caught_signals) between parsing input
-/// and running commands.
+/// [Pending traps are run](run_traps_for_caught_signals) and [subshell statuses
+/// are updated](Env::update_all_subshell_statuses) between parsing input and
+/// running commands.
 ///
 /// TODO: `Break(Divert::Interrupt(...))` should not end the loop in an
 /// interactive shell
@@ -72,6 +73,7 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
         match parser.command_line().await {
             Ok(Some(command)) => {
                 run_traps_for_caught_signals(env).await?;
+                env.update_all_subshell_statuses();
                 command.execute(env).await?
             }
             Ok(None) => break,

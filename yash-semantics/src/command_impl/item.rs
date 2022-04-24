@@ -21,6 +21,7 @@ use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
+use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -59,12 +60,15 @@ impl Command for syntax::Item {
 }
 
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
-    let and_or = Rc::clone(and_or);
+    let and_or_2 = Rc::clone(and_or);
     let result = env
-        .start_subshell(|env| Box::pin(async move { and_or.execute(env).await }))
+        .start_subshell(|env| Box::pin(async move { and_or_2.execute(env).await }))
         .await;
     match result {
         Ok(pid) => {
+            let mut job = Job::new(pid);
+            job.name = and_or.to_string();
+            env.jobs.add_job(job);
             env.jobs.set_last_async_pid(pid);
             env.exit_status = ExitStatus::SUCCESS;
             Continue(())
@@ -92,6 +96,7 @@ mod tests {
     use futures_executor::block_on;
     use futures_util::task::LocalSpawnExt;
     use std::rc::Rc;
+    use yash_env::job::WaitStatus;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -155,6 +160,27 @@ mod tests {
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
         assert_eq!(stdout.content, "foo\n".as_bytes());
+    }
+
+    #[test]
+    fn item_execute_async_job() {
+        let system = VirtualSystem::new();
+        let mut executor = futures_executor::LocalPool::new();
+        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("return", return_builtin());
+
+        let and_or: syntax::AndOrList = "return  -n  42".parse().unwrap();
+        let item = syntax::Item {
+            and_or: Rc::new(and_or),
+            async_flag: Some(Location::dummy("")),
+        };
+        executor.run_until(item.execute(&mut env));
+
+        let job = env.jobs.get_job(0).unwrap();
+        assert!(job.status_changed);
+        assert_eq!(job.status, WaitStatus::StillAlive);
+        assert_eq!(job.name, "return -n 42");
     }
 
     #[test]
