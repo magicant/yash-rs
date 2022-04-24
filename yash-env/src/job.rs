@@ -15,6 +15,31 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Type definitions for job management.
+//!
+//! A [`JobSet`] manages the state of jobs executed by the shell.
+//! Each [`Job`] in the job set remembers the latest state of the child process
+//! performing the job's task.
+//!
+//! The job set stores jobs in an internal array. The index of a job in the
+//! array never changes once the [job is added](JobSet::add_job) to the job set.
+//! The index of the other jobs does not change when you [remove a
+//! job](JobSet::remove_job). Note that the job set may reuse the index of a
+//! removed job for another job added later.
+//!
+//! When the [wait system call](crate::System::wait) returns a new status of a
+//! child process, the caller should pass it to [`JobSet::update_job`], which
+//! modifies the status of the corresponding job. The `status_updated` flag of
+//! the job is set when the job is updated and should be reset when
+//! [reported](JobSet::report_job).
+//!
+//! The job set remembers the selection of two special jobs called the "current
+//! job" and "previous job." The previous job is chosen automatically, so there
+//! is no function to modify it. You can change the current job by
+//! `JobSet::set_current_job`.
+//!
+//! The [`JobSet::set_last_async_pid`] function remembers the process ID of the
+//! last executed asynchronous command, which will be the value of the `$!`
+//! special parameter.
 
 #[doc(no_inline)]
 pub use nix::sys::wait::WaitStatus;
@@ -108,6 +133,8 @@ impl ExactSizeIterator for Iter<'_> {
 impl FusedIterator for Iter<'_> {}
 
 /// Collection of jobs.
+///
+/// See the [module documentation](self) for details.
 #[derive(Clone, Debug)]
 pub struct JobSet {
     /// Jobs managed by the shell
@@ -223,6 +250,9 @@ impl JobSet {
     ///
     /// This function returns the index of the job that contains a process whose
     /// process ID is `pid`. The result is `None` if no such job is found.
+    ///
+    /// `JobSet` maintains an internal hash map to find the job quickly from the
+    /// process ID.
     pub fn job_index_by_pid(&self, pid: Pid) -> Option<usize> {
         self.pids_to_indices.get(&pid).copied()
     }
@@ -232,7 +262,8 @@ impl JobSet {
     /// Updates the status of a job.
     ///
     /// The result of a `waitpid` call should be passed to this function.
-    /// It updates the status of the job as indicated by `status`.
+    /// It updates the status of the job as indicated by `status`, and sets the
+    /// `status_changed` flag in the job.
     ///
     /// Returns the index of the job updated. If `status` describes a process
     /// not managed in this job set, the result is `None`.
