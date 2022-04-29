@@ -20,6 +20,7 @@
 
 pub mod alias;
 pub mod common;
+pub mod jobs;
 pub mod readonly;
 pub mod r#return;
 pub mod set;
@@ -40,6 +41,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Intrinsic,
             execute: alias::builtin_main,
+        },
+    ),
+    (
+        "jobs",
+        Builtin {
+            r#type: Intrinsic,
+            execute: jobs::builtin_main,
         },
     ),
     (
