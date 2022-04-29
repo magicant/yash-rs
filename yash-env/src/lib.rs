@@ -320,17 +320,19 @@ impl Env {
         // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
 
-        use nix::sys::wait::WaitStatus::*;
-        match self.wait_for_subshell(child_pid).await? {
-            Exited(pid, exit_status) => {
-                assert_eq!(pid, child_pid);
-                Ok(ExitStatus(exit_status))
+        loop {
+            use nix::sys::wait::WaitStatus::*;
+            match self.wait_for_subshell(child_pid).await? {
+                Exited(pid, exit_status) => {
+                    assert_eq!(pid, child_pid);
+                    break Ok(ExitStatus(exit_status));
+                }
+                Signaled(pid, signal, _core_dumped) => {
+                    assert_eq!(pid, child_pid);
+                    break Ok(ExitStatus::from(signal));
+                }
+                _ => (),
             }
-            Signaled(pid, signal, _core_dumped) => {
-                assert_eq!(pid, child_pid);
-                Ok(ExitStatus::from(signal))
-            }
-            _ => todo!(),
         }
     }
 
@@ -526,6 +528,7 @@ mod tests {
     }
 
     // TODO Test case for parent with signaled child
+    // TODO Test case for parent with stopped child
 
     #[test]
     fn run_in_subshell_with_fork_failure() {
