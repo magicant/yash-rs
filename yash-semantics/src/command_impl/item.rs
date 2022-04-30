@@ -68,7 +68,7 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
         Ok(pid) => {
             let mut job = Job::new(pid);
             job.name = and_or.to_string();
-            env.jobs.add_job(job);
+            env.jobs.add(job);
             env.jobs.set_last_async_pid(pid);
             env.exit_status = ExitStatus::SUCCESS;
             Continue(())
@@ -177,7 +177,7 @@ mod tests {
         };
         executor.run_until(item.execute(&mut env));
 
-        let job = env.jobs.get_job(0).unwrap();
+        let job = env.jobs.get(0).unwrap();
         assert!(job.status_changed);
         assert_eq!(job.status, WaitStatus::StillAlive);
         assert_eq!(job.name, "return -n 42");

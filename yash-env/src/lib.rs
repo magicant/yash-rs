@@ -347,8 +347,8 @@ impl Env {
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
     /// When [`self.system.wait`](System::wait) returned a new status of the
-    /// target, it is sent to `self.jobs` ([`JobSet::update_job`]) before being
-    /// returned from this function.
+    /// target, it is sent to `self.jobs` ([`JobSet::update_status`]) before
+    /// being returned from this function.
     ///
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
@@ -361,7 +361,7 @@ impl Env {
             match self.system.wait(target) {
                 Ok(WaitStatus::StillAlive) => {}
                 Ok(status) => {
-                    self.jobs.update_job(status);
+                    self.jobs.update_status(status);
                     return Ok(status);
                 }
                 result => return result,
@@ -374,7 +374,7 @@ impl Env {
     ///
     /// This function calls [`self.system.wait`](System::wait) repeatedly until
     /// all status updates available are applied to `self.jobs`
-    /// ([`JobSet::update_job`]).
+    /// ([`JobSet::update_status`]).
     ///
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
@@ -382,7 +382,7 @@ impl Env {
         loop {
             match self.system.wait(Pid::from_raw(-1)) {
                 Ok(WaitStatus::StillAlive) => break,
-                Ok(status) => self.jobs.update_job(status),
+                Ok(status) => self.jobs.update_status(status),
                 Err(_) => break,
             };
         }
@@ -571,11 +571,11 @@ mod tests {
                 .unwrap();
             let mut job = Job::new(pid);
             job.name = "my job".to_string();
-            let job_index = env.jobs.add_job(job.clone());
+            let job_index = env.jobs.add(job.clone());
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
             job.status = WaitStatus::Exited(pid, 42);
-            assert_eq!(env.jobs.get_job(job_index), Some(&job));
+            assert_eq!(env.jobs.get(job_index), Some(&job));
         });
     }
 
@@ -674,9 +674,9 @@ mod tests {
                 .await
                 .unwrap();
             // Create jobs.
-            let job_1 = env.jobs.add_job(Job::new(pid_1));
-            let job_2 = env.jobs.add_job(Job::new(pid_2));
-            let job_3 = env.jobs.add_job(Job::new(pid_3));
+            let job_1 = env.jobs.add(Job::new(pid_1));
+            let job_2 = env.jobs.add(Job::new(pid_2));
+            let job_3 = env.jobs.add(Job::new(pid_3));
             [(pid_1, job_1), (pid_2, job_2), (pid_3, job_3)]
         });
 
@@ -684,33 +684,21 @@ mod tests {
         executor.run_until_stalled();
 
         // We're not yet updated.
-        assert_eq!(
-            env.jobs.get_job(job_1).unwrap().status,
-            WaitStatus::StillAlive
-        );
-        assert_eq!(
-            env.jobs.get_job(job_2).unwrap().status,
-            WaitStatus::StillAlive
-        );
-        assert_eq!(
-            env.jobs.get_job(job_3).unwrap().status,
-            WaitStatus::StillAlive
-        );
+        assert_eq!(env.jobs.get(job_1).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_2).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
 
         env.update_all_subshell_statuses();
 
         // Now we have the results.
         assert_eq!(
-            env.jobs.get_job(job_1).unwrap().status,
+            env.jobs.get(job_1).unwrap().status,
             WaitStatus::Exited(pid_1, 12)
         );
         assert_eq!(
-            env.jobs.get_job(job_2).unwrap().status,
+            env.jobs.get(job_2).unwrap().status,
             WaitStatus::Exited(pid_2, 35)
         );
-        assert_eq!(
-            env.jobs.get_job(job_3).unwrap().status,
-            WaitStatus::StillAlive
-        );
+        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
     }
 }
