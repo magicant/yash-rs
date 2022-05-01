@@ -323,29 +323,6 @@ impl JobSet {
         job
     }
 
-    /// Conditionally removes jobs from this job set.
-    ///
-    /// Function `f` is called repeatedly with a job and its index.
-    /// The job is removed if `f` returns false.
-    pub fn retain_jobs<F>(&mut self, mut f: F)
-    where
-        F: FnMut(usize, &Job) -> bool,
-    {
-        let max_index = match self.jobs.iter().next_back() {
-            Some((index, _job)) => index,
-            None => return,
-        };
-        for index in 0..=max_index {
-            if let Some(job) = self.get(index) {
-                if !f(index, job) {
-                    self.remove(index);
-                }
-            }
-        }
-
-        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
-    }
-
     /// Returns the job at the specified index.
     ///
     /// The result is `None` if there is no job for the index.
@@ -771,40 +748,6 @@ mod tests {
             set.get(i_first).map(|job| job.name.as_str()),
             Some("first job")
         );
-    }
-
-    #[test]
-    fn job_set_retain_jobs() {
-        let mut set = JobSet::default();
-        set.add(Job::new(Pid::from_raw(4)));
-        set.add(Job::new(Pid::from_raw(5)));
-        set.add(Job::new(Pid::from_raw(6)));
-        set.add(Job::new(Pid::from_raw(7)));
-        set.add(Job::new(Pid::from_raw(8)));
-        set.add(Job::new(Pid::from_raw(9)));
-        set.retain_jobs(|index, job| index != 2 && job.pid != Pid::from_raw(8));
-        let mut pids: Vec<_> = set.iter().map(|(index, job)| (index, job.pid)).collect();
-        pids.sort_unstable();
-        assert_eq!(
-            pids,
-            [
-                (0, Pid::from_raw(4)),
-                (1, Pid::from_raw(5)),
-                (3, Pid::from_raw(7)),
-                (5, Pid::from_raw(9)),
-            ]
-        );
-
-        let mut set = JobSet::default();
-        set.add(Job::new(Pid::from_raw(17)));
-        set.add(Job::new(Pid::from_raw(18)));
-        set.add(Job::new(Pid::from_raw(19)));
-        set.add(Job::new(Pid::from_raw(20)));
-        set.add(Job::new(Pid::from_raw(21)));
-        set.retain_jobs(|_index, job| job.pid.as_raw() % 2 == 0);
-        let mut pids: Vec<_> = set.iter().map(|(index, job)| (index, job.pid)).collect();
-        pids.sort_unstable();
-        assert_eq!(pids, [(1, Pid::from_raw(18)), (3, Pid::from_raw(20))]);
     }
 
     #[test]

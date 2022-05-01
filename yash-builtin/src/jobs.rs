@@ -55,8 +55,8 @@ pub async fn builtin_body(env: &mut Env, _args: Vec<Field>) -> Result {
     });
 
     // Remove terminated jobs
-    env.jobs.retain_jobs(|_, job| {
-        matches!(
+    env.jobs.drain_filter(|_, job| {
+        !matches!(
             job.status,
             WaitStatus::StillAlive | WaitStatus::Continued(_)
         )
