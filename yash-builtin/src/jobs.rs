@@ -34,7 +34,9 @@ pub async fn builtin_body(env: &mut Env, _args: Vec<Field>) -> Result {
     let mut print = String::new();
     let current_job_index = env.jobs.current_job().map(|(index, _)| index);
     let previous_job_index = env.jobs.previous_job().map(|(index, _)| index);
-    env.jobs.report_jobs(|index, job| {
+
+    env.jobs.drain_filter(|index, mut job| {
+        // Add a line of report
         let number = index + 1;
         let mark = if Some(index) == current_job_index {
             '+'
@@ -51,11 +53,10 @@ pub async fn builtin_body(env: &mut Env, _args: Vec<Field>) -> Result {
         };
         let name = &job.name;
         writeln!(print, "[{number}] {mark} {status:10} {name}").unwrap();
-        true
-    });
 
-    // Remove terminated jobs
-    env.jobs.drain_filter(|_, job| {
+        job.status_reported();
+
+        // Remove terminated jobs
         !matches!(
             job.status,
             WaitStatus::StillAlive | WaitStatus::Continued(_)
