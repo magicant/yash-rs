@@ -358,6 +358,18 @@ impl JobSet {
     }
 }
 
+/// Supports indexing operation on `JobSet`.
+impl std::ops::Index<usize> for JobSet {
+    type Output = Job;
+
+    /// Returns a reference to the specified job.
+    ///
+    /// This function will panic if the job does not exist.
+    fn index(&self, index: usize) -> &Job {
+        &self.jobs[index]
+    }
+}
+
 impl JobSet {
     /// Updates the status of a job.
     ///
