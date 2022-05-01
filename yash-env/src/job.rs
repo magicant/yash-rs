@@ -28,7 +28,7 @@
 //!
 //! When the [wait system call](crate::System::wait) returns a new status of a
 //! child process, the caller should pass it to [`JobSet::update_status`], which
-//! modifies the status of the corresponding job. The `status_updated` flag of
+//! modifies the status of the corresponding job. The `status_changed` flag of
 //! the job is set when the job is updated and should be reset when
 //! [reported](JobSet::report_job).
 //!
@@ -48,6 +48,7 @@ pub use nix::unistd::Pid;
 use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
+use std::ops::Deref;
 
 /// Set of one or more processes executing a pipeline
 ///
@@ -97,6 +98,33 @@ impl Job {
 
     fn is_suspended(&self) -> bool {
         matches!(self.status, WaitStatus::Stopped(_, _))
+    }
+}
+
+/// Partially mutable reference to [`Job`].
+///
+/// This struct is a custom reference type for `Job`. It allows resetting the
+/// `status_changed` flag of the referenced job via the
+/// [`status_reported`](Self::status_reported) method, but does not provide any
+/// other mutability. Note that immutable access to the job is possible with the
+/// `Deref` implementation.
+#[derive(Debug, Eq, PartialEq)]
+pub struct JobRefMut<'a>(&'a mut Job);
+
+impl JobRefMut<'_> {
+    /// Clears the `status_changed` flag of the job.
+    ///
+    /// Normally, this method should be called when the shell printed a job
+    /// status report.
+    pub fn status_reported(&mut self) {
+        self.0.status_changed = false
+    }
+}
+
+impl Deref for JobRefMut<'_> {
+    type Target = Job;
+    fn deref(&self) -> &Job {
+        self.0
     }
 }
 
