@@ -128,7 +128,7 @@ impl Deref for JobRefMut<'_> {
     }
 }
 
-/// Iterator of jobs with indices.
+/// Indexed iterator of jobs.
 ///
 /// Call [`JobSet::iter`] to get an instance of `Iter`.
 #[derive(Clone, Debug)]
@@ -163,6 +163,43 @@ impl ExactSizeIterator for Iter<'_> {
 }
 
 impl FusedIterator for Iter<'_> {}
+
+/// Indexed iterator of partially mutable jobs.
+///
+/// Call [`JobSet::iter_mut`] to get an instance of `IterMut`.
+#[derive(Debug)]
+pub struct IterMut<'a>(slab::IterMut<'a, Job>);
+
+impl<'a> Iterator for IterMut<'a> {
+    type Item = (usize, JobRefMut<'a>);
+
+    #[inline]
+    fn next(&mut self) -> Option<(usize, JobRefMut<'a>)> {
+        self.0.next().map(|(index, job)| (index, JobRefMut(job)))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for IterMut<'a> {
+    fn next_back(&mut self) -> Option<(usize, JobRefMut<'a>)> {
+        self.0
+            .next_back()
+            .map(|(index, job)| (index, JobRefMut(job)))
+    }
+}
+
+impl ExactSizeIterator for IterMut<'_> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for IterMut<'_> {}
 
 /// Collection of jobs.
 ///
@@ -337,13 +374,25 @@ impl JobSet {
         self.len() == 0
     }
 
-    /// Returns an iterator of jobs with indices.
+    /// Returns an indexed iterator of jobs.
     ///
     /// The item type of the returned iterator is `(usize, &Job)`.
     /// Jobs are iterated in the order of indices.
     #[inline]
     pub fn iter(&self) -> Iter {
         Iter(self.jobs.iter())
+    }
+
+    /// Returns an indexed iterator of partially mutable jobs.
+    ///
+    /// The item type of the returned iterator is `(usize, JobRefMut)`.
+    /// Note that the iterator does not yield raw mutable references to jobs.
+    /// [`JobRefMut`] allows mutating only part of jobs.
+    ///
+    /// Jobs are iterated in the order of indices.
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut {
+        IterMut(self.jobs.iter_mut())
     }
 
     /// Finds a job by the process ID.
