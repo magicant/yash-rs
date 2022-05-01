@@ -407,6 +407,24 @@ impl JobSet {
     }
 }
 
+impl<'a> IntoIterator for &'a JobSet {
+    type Item = (usize, &'a Job);
+    type IntoIter = Iter<'a>;
+    #[inline(always)]
+    fn into_iter(self) -> Iter<'a> {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut JobSet {
+    type Item = (usize, JobRefMut<'a>);
+    type IntoIter = IterMut<'a>;
+    #[inline(always)]
+    fn into_iter(self) -> IterMut<'a> {
+        self.iter_mut()
+    }
+}
+
 /// Supports indexing operation on `JobSet`.
 impl std::ops::Index<usize> for JobSet {
     type Output = Job;
