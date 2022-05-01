@@ -134,7 +134,7 @@ fn to_job_result(status: WaitStatus) -> Option<(Pid, ExitStatus)> {
 }
 
 fn remove_finished_jobs(jobs: &mut JobSet) {
-    jobs.retain_jobs(|_index, job| to_job_result(job.status).is_none())
+    jobs.drain_filter(|_index, job| to_job_result(job.status).is_some());
 }
 
 async fn wait_for_all_jobs(env: &mut Env) -> ExitStatus {
@@ -160,7 +160,7 @@ async fn wait_for_all_jobs(env: &mut Env) -> ExitStatus {
 
 async fn wait_for_job(env: &mut Env, index: usize) -> ExitStatus {
     let exit_status = loop {
-        let job = env.jobs.get_job(index).unwrap();
+        let job = env.jobs.get(index).unwrap();
         if let Some((_pid, exit_status)) = to_job_result(job.status) {
             break exit_status;
         }
@@ -175,7 +175,7 @@ async fn wait_for_job(env: &mut Env, index: usize) -> ExitStatus {
             Ok(_) => (),
         }
     };
-    env.jobs.remove_job(index);
+    env.jobs.remove(index);
     exit_status
 }
 
@@ -189,7 +189,7 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
             Err(e) => return print_error_message(env, &JobSpecError::ParseInt(job_spec, e)).await,
         };
 
-        exit_status = if let Some(index) = env.jobs.job_index_by_pid(pid) {
+        exit_status = if let Some(index) = env.jobs.find_by_pid(pid) {
             wait_for_job(env, index).await
         } else {
             ExitStatus::NOT_FOUND
@@ -266,12 +266,12 @@ mod tests {
                     })
                     .await
                     .unwrap();
-                env.jobs.add_job(Job::new(pid));
+                env.jobs.add(Job::new(pid));
             }
 
             let result = builtin_body(&mut env, vec![]).await;
             assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-            assert_eq!(env.jobs.job_count(), 0);
+            assert_eq!(env.jobs.len(), 0);
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
@@ -293,11 +293,11 @@ mod tests {
         let pid = Pid::from_raw(10);
         let mut job = Job::new(pid);
         job.status = WaitStatus::Exited(pid, 42);
-        let index = env.jobs.add_job(job);
+        let index = env.jobs.add(job);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        assert_eq!(env.jobs.get_job(index), None);
+        assert_eq!(env.jobs.get(index), None);
     }
 
     #[test]
@@ -305,14 +305,11 @@ mod tests {
         let mut env = Env::new_virtual();
 
         // Add a running job that is not a proper subshell.
-        let index = env.jobs.add_job(Job::new(Pid::from_raw(1)));
+        let index = env.jobs.add(Job::new(Pid::from_raw(1)));
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        assert_eq!(
-            env.jobs.get_job(index).unwrap().status,
-            WaitStatus::StillAlive
-        );
+        assert_eq!(env.jobs.get(index).unwrap().status, WaitStatus::StillAlive);
     }
 
     #[test]
@@ -345,7 +342,7 @@ mod tests {
                     .await
                     .unwrap();
                 pids.push(pid);
-                env.jobs.add_job(Job::new(pid));
+                env.jobs.add(Job::new(pid));
             }
 
             let args = pids
@@ -354,7 +351,7 @@ mod tests {
                 .collect();
             let result = builtin_body(&mut env, args).await;
             assert_eq!(result, (ExitStatus(6), Continue(())));
-            assert_eq!(env.jobs.job_count(), 0);
+            assert_eq!(env.jobs.len(), 0);
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
@@ -376,12 +373,12 @@ mod tests {
         let pid = Pid::from_raw(7);
         let mut job = Job::new(pid);
         job.status = WaitStatus::Exited(pid, 17);
-        let index = env.jobs.add_job(job);
+        let index = env.jobs.add(job);
 
         let args = Field::dummies([pid.to_string()]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus(17), Continue(())));
-        assert_eq!(env.jobs.get_job(index), None);
+        assert_eq!(env.jobs.get(index), None);
     }
 
     #[test]
@@ -389,12 +386,12 @@ mod tests {
         let mut env = Env::new_virtual();
 
         // Add a running job that is not a proper subshell.
-        let index = env.jobs.add_job(Job::new(Pid::from_raw(19)));
+        let index = env.jobs.add(Job::new(Pid::from_raw(19)));
 
         let args = Field::dummies(["19".to_string()]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
-        assert_eq!(env.jobs.get_job(index), None);
+        assert_eq!(env.jobs.get(index), None);
     }
 
     #[test]
