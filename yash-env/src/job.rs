@@ -317,6 +317,14 @@ impl JobSet {
         self.jobs.get(index)
     }
 
+    /// Returns a partially mutable reference to the job at the specified index.
+    ///
+    /// The result is `None` if there is no job for the index.
+    #[inline]
+    pub fn get_mut(&mut self, index: usize) -> Option<JobRefMut> {
+        self.jobs.get_mut(index).map(JobRefMut)
+    }
+
     /// Returns the number of jobs in this job set.
     #[inline]
     pub fn len(&self) -> usize {
