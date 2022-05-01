@@ -370,6 +370,86 @@ impl std::ops::Index<usize> for JobSet {
     }
 }
 
+/// Iterator that conditionally removes jobs from a job set.
+///
+/// Call [`JobSet::drain_filter`] to get an instance of `DrainFilter`.
+#[derive(Debug)]
+pub struct DrainFilter<'a, F>
+where
+    F: FnMut(usize, JobRefMut) -> bool,
+{
+    set: &'a mut JobSet,
+    should_remove: F,
+    next_index: usize,
+    len: usize,
+}
+
+impl<F> Iterator for DrainFilter<'_, F>
+where
+    F: FnMut(usize, JobRefMut) -> bool,
+{
+    type Item = (usize, Job);
+
+    fn next(&mut self) -> Option<(usize, Job)> {
+        while self.len > 0 {
+            let index = self.next_index;
+            self.next_index += 1;
+            if let Some(job) = self.set.get_mut(index) {
+                self.len -= 1;
+                if (self.should_remove)(index, job) {
+                    let job = self.set.remove(index).unwrap();
+                    return Some((index, job));
+                }
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.len))
+    }
+}
+
+impl<F> FusedIterator for DrainFilter<'_, F> where F: FnMut(usize, JobRefMut) -> bool {}
+
+impl<F> Drop for DrainFilter<'_, F>
+where
+    F: FnMut(usize, JobRefMut) -> bool,
+{
+    fn drop(&mut self) {
+        // Ensure all jobs are processed
+        self.for_each(drop)
+    }
+}
+
+impl JobSet {
+    /// Returns an iterator that conditionally modifies and removes jobs.
+    ///
+    /// The iterator uses the `should_remove` function to decide whether to
+    /// remove jobs. The function is called with every index and job reference.
+    /// If the function returns true, the job is removed and yielded from the
+    /// iterator. Otherwise, the job remains in the set.
+    ///
+    /// You can reset the `status_changed` flag of a job
+    /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
+    /// remove it or not.
+    ///
+    /// Note that the `should_remove` function is called for all the remaining
+    /// jobs when the `DrainFilter` is dropped before iterating all jobs.
+    pub fn drain_filter<F>(&mut self, should_remove: F) -> DrainFilter<'_, F>
+    where
+        F: FnMut(usize, JobRefMut) -> bool,
+    {
+        let len = self.len();
+        DrainFilter {
+            set: self,
+            should_remove,
+            next_index: 0,
+            len,
+        }
+    }
+}
+
 impl JobSet {
     /// Updates the status of a job.
     ///
@@ -675,6 +755,61 @@ mod tests {
 
         set.remove(i10);
         assert_eq!(set.find_by_pid(Pid::from_raw(10)), None);
+    }
+
+    #[test]
+    fn job_set_drain_filter_consumed() {
+        let mut set = JobSet::default();
+        let i21 = set.add(Job::new(Pid::from_raw(21)));
+        let i22 = set.add(Job::new(Pid::from_raw(22)));
+        let i23 = set.add(Job::new(Pid::from_raw(23)));
+        let i24 = set.add(Job::new(Pid::from_raw(24)));
+        let i25 = set.add(Job::new(Pid::from_raw(25)));
+        let i26 = set.add(Job::new(Pid::from_raw(26)));
+        set.remove(i23).unwrap();
+
+        let mut i = set.drain_filter(|index, mut job| {
+            assert_ne!(index, i23);
+            if index % 2 == 0 {
+                job.status_reported();
+            }
+            index == 0 || job.pid == Pid::from_raw(26)
+        });
+        let mut j21 = Job::new(Pid::from_raw(21));
+        j21.status_changed = false;
+        assert_eq!(i.next(), Some((i21, j21)));
+        assert_eq!(i.next(), Some((i26, Job::new(Pid::from_raw(26)))));
+        assert_eq!(i.next(), None);
+        assert_eq!(i.next(), None); // The drain filter is fused.
+        drop(i);
+
+        let indices: Vec<usize> = set.iter().map(|(index, _)| index).collect();
+        assert_eq!(indices, [i22, i24, i25]);
+        assert!(!set[i25].status_changed);
+    }
+
+    #[test]
+    fn job_set_drain_filter_unconsumed() {
+        let mut set = JobSet::default();
+        let _i21 = set.add(Job::new(Pid::from_raw(21)));
+        let i22 = set.add(Job::new(Pid::from_raw(22)));
+        let i23 = set.add(Job::new(Pid::from_raw(23)));
+        let i24 = set.add(Job::new(Pid::from_raw(24)));
+        let i25 = set.add(Job::new(Pid::from_raw(25)));
+        let _i26 = set.add(Job::new(Pid::from_raw(26)));
+        set.remove(i23).unwrap();
+
+        let i = set.drain_filter(|index, mut job| {
+            if index % 2 == 0 {
+                job.status_reported();
+            }
+            index == 0 || job.pid == Pid::from_raw(26)
+        });
+        drop(i);
+
+        let indices: Vec<usize> = set.iter().map(|(index, _)| index).collect();
+        assert_eq!(indices, [i22, i24, i25]);
+        assert!(!set[i25].status_changed);
     }
 
     #[test]
