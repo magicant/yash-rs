@@ -660,6 +660,8 @@ impl JobSet {
     }
 }
 
+pub mod id;
+
 #[cfg(test)]
 mod tests {
     use super::*;
