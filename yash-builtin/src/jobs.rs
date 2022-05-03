@@ -32,8 +32,8 @@ use yash_env::Env;
 pub async fn builtin_body(env: &mut Env, _args: Vec<Field>) -> Result {
     // Print jobs.
     let mut print = String::new();
-    let current_job_index = env.jobs.current_job().map(|(index, _)| index);
-    let previous_job_index = env.jobs.previous_job().map(|(index, _)| index);
+    let current_job_index = env.jobs.current_job();
+    let previous_job_index = env.jobs.previous_job();
 
     env.jobs.drain_filter(|index, mut job| {
         // Add a line of report

@@ -193,14 +193,8 @@ impl JobId<'_> {
         }
 
         match *self {
-            JobId::CurrentJob => jobs
-                .current_job()
-                .map(|(index, _)| index)
-                .ok_or(FindError::NotFound),
-            JobId::PreviousJob => jobs
-                .previous_job()
-                .map(|(index, _)| index)
-                .ok_or(FindError::NotFound),
+            JobId::CurrentJob => jobs.current_job().ok_or(FindError::NotFound),
+            JobId::PreviousJob => jobs.previous_job().ok_or(FindError::NotFound),
             JobId::JobNumber(number) => {
                 let index = number.get() - 1;
                 match jobs.get(index) {
@@ -257,7 +251,7 @@ mod tests {
     fn find_unique_current_job() {
         let set = sample_job_set();
         let job_id = JobId::CurrentJob;
-        let current_job_index = set.current_job().unwrap().0;
+        let current_job_index = set.current_job().unwrap();
         assert_eq!(job_id.find(&set), Ok(current_job_index));
     }
 
@@ -265,7 +259,7 @@ mod tests {
     fn find_unique_previous_job() {
         let set = sample_job_set();
         let job_id = JobId::PreviousJob;
-        let previous_job_index = set.previous_job().unwrap().0;
+        let previous_job_index = set.previous_job().unwrap();
         assert_eq!(job_id.find(&set), Ok(previous_job_index));
     }
 

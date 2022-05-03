@@ -250,8 +250,10 @@ impl JobSet {
     /// new job becomes the previous job.
     pub fn add(&mut self, job: Job) -> usize {
         let new_job_is_suspended = job.is_suspended();
-        let ex_current_job_is_suspended = self.current_job().map(|(_, job)| job.is_suspended());
-        let ex_previous_job_is_suspended = self.previous_job().map(|(_, job)| job.is_suspended());
+        let ex_current_job_is_suspended =
+            self.current_job().map(|index| self[index].is_suspended());
+        let ex_previous_job_is_suspended =
+            self.previous_job().map(|index| self[index].is_suspended());
 
         // Add the job to `self.jobs` and `self.pids_to_indices`.
         use std::collections::hash_map::Entry::*;
@@ -531,9 +533,9 @@ impl JobSet {
                     self.previous_job_index = std::mem::replace(&mut self.current_job_index, index);
                 }
             } else if was_suspended && !job.is_suspended() {
-                if let Some((prev_index, prev)) = self.previous_job() {
+                if let Some(prev_index) = self.previous_job() {
                     let previous_job_becomes_current_job =
-                        index == self.current_job_index && prev.is_suspended();
+                        index == self.current_job_index && self[prev_index].is_suspended();
                     if previous_job_becomes_current_job {
                         self.current_job_index = prev_index;
                     }
@@ -582,11 +584,11 @@ impl JobSet {
         Ok(())
     }
 
-    /// Returns the current job.
+    /// Returns the index of the current job.
     ///
     /// If the job set contains at least one job, there is a current job. This
-    /// function returns it with its index. If the job set is empty, the result
-    /// is `None`.
+    /// function returns its index. If the job set is empty, the result is
+    /// `None`.
     ///
     /// If there is any suspended jobs, the current job must be a suspended job.
     /// Running or terminated jobs can be the current job if there is no
@@ -594,16 +596,19 @@ impl JobSet {
     /// as long as the above rules are met.
     ///
     /// See also [`previous_job`](Self::previous_job).
-    pub fn current_job(&self) -> Option<(usize, &Job)> {
-        self.get(self.current_job_index)
-            .map(|job| (self.current_job_index, job))
+    pub fn current_job(&self) -> Option<usize> {
+        if self.jobs.contains(self.current_job_index) {
+            Some(self.current_job_index)
+        } else {
+            None
+        }
     }
 
-    /// Returns the previous job.
+    /// Returns the index of the previous job.
     ///
     /// If the job set contains two or more jobs, there is a previous job. This
-    /// function returns it with the index. If the job set has zero or one job,
-    /// the result is `None`.
+    /// function returns its index. If the job set has zero or one job, the
+    /// result is `None`.
     ///
     /// The previous job is never the same job as the [current
     /// job](Self::current_job).
@@ -614,12 +619,13 @@ impl JobSet {
     ///
     /// You cannot directly select the previous job. When the current job is
     /// selected, the old current job becomes the previous job.
-    pub fn previous_job(&self) -> Option<(usize, &Job)> {
-        if self.previous_job_index == self.current_job_index {
-            None
+    pub fn previous_job(&self) -> Option<usize> {
+        if self.previous_job_index != self.current_job_index
+            && self.jobs.contains(self.previous_job_index)
+        {
+            Some(self.previous_job_index)
         } else {
-            self.get(self.previous_job_index)
-                .map(|job| (self.previous_job_index, job))
+            None
         }
     }
 
@@ -819,9 +825,8 @@ mod tests {
     #[test]
     fn current_and_previous_job_in_job_set_with_one_job() {
         let mut set = JobSet::default();
-        let job = Job::new(Pid::from_raw(10));
-        let i10 = set.add(job.clone());
-        assert_eq!(set.current_job(), Some((i10, &job)));
+        let i10 = set.add(Job::new(Pid::from_raw(10)));
+        assert_eq!(set.current_job(), Some(i10));
         assert_eq!(set.previous_job(), None);
     }
 
@@ -835,15 +840,15 @@ mod tests {
         let running = Job::new(Pid::from_raw(20));
         let i10 = set.add(suspended.clone());
         let i20 = set.add(running.clone());
-        assert_eq!(set.current_job(), Some((i10, &suspended)));
-        assert_eq!(set.previous_job(), Some((i20, &running)));
+        assert_eq!(set.current_job(), Some(i10));
+        assert_eq!(set.previous_job(), Some(i20));
 
         // The order of adding jobs does not matter in this case.
         set = JobSet::default();
-        let i20 = set.add(running.clone());
-        let i10 = set.add(suspended.clone());
-        assert_eq!(set.current_job(), Some((i10, &suspended)));
-        assert_eq!(set.previous_job(), Some((i20, &running)));
+        let i20 = set.add(running);
+        let i10 = set.add(suspended);
+        assert_eq!(set.current_job(), Some(i10));
+        assert_eq!(set.previous_job(), Some(i20));
     }
 
     #[test]
@@ -853,15 +858,15 @@ mod tests {
         let running_2 = Job::new(Pid::from_raw(12));
         set.add(running_1);
         set.add(running_2);
-        let ex_current_job_index = set.current_job().unwrap().0;
-        let ex_previous_job_index = set.previous_job().unwrap().0;
+        let ex_current_job_index = set.current_job().unwrap();
+        let ex_previous_job_index = set.previous_job().unwrap();
         assert_ne!(ex_current_job_index, ex_previous_job_index);
 
         let mut suspended = Job::new(Pid::from_raw(20));
         suspended.status = WaitStatus::Stopped(Pid::from_raw(20), Signal::SIGSTOP);
         let i20 = set.add(suspended);
-        let now_current_job_index = set.current_job().unwrap().0;
-        let now_previous_job_index = set.previous_job().unwrap().0;
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, i20);
         assert_eq!(now_previous_job_index, ex_current_job_index);
     }
@@ -877,8 +882,8 @@ mod tests {
         suspended_1.status = WaitStatus::Stopped(Pid::from_raw(19), Signal::SIGSTOP);
         let i19 = set.add(suspended_1);
 
-        let ex_current_job_index = set.current_job().unwrap().0;
-        let ex_previous_job_index = set.previous_job().unwrap().0;
+        let ex_current_job_index = set.current_job().unwrap();
+        let ex_previous_job_index = set.previous_job().unwrap();
         assert_eq!(ex_current_job_index, i19);
         assert_eq!(ex_previous_job_index, i18);
 
@@ -886,8 +891,8 @@ mod tests {
         suspended_2.status = WaitStatus::Stopped(Pid::from_raw(20), Signal::SIGSTOP);
         let i20 = set.add(suspended_2);
 
-        let now_current_job_index = set.current_job().unwrap().0;
-        let now_previous_job_index = set.previous_job().unwrap().0;
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_current_job_index);
         assert_eq!(now_previous_job_index, i20);
     }
@@ -909,28 +914,29 @@ mod tests {
         set.add(suspended_2);
         set.add(suspended_3);
 
-        let current_job_index_1 = set.current_job().unwrap().0;
-        let previous_job_index_1 = set.previous_job().unwrap().0;
+        let current_job_index_1 = set.current_job().unwrap();
+        let previous_job_index_1 = set.previous_job().unwrap();
         assert_ne!(current_job_index_1, i10);
         assert_ne!(previous_job_index_1, i10);
 
         set.remove(current_job_index_1);
-        let current_job_index_2 = set.current_job().unwrap().0;
-        let (previous_job_index_2, previous_job_2) = set.previous_job().unwrap();
+        let current_job_index_2 = set.current_job().unwrap();
+        let previous_job_index_2 = set.previous_job().unwrap();
         assert_eq!(current_job_index_2, previous_job_index_1);
         assert_ne!(previous_job_index_2, current_job_index_2);
         // The new previous job is chosen from suspended jobs other than the current job.
+        let previous_job_2 = &set[previous_job_index_2];
         assert!(previous_job_2.is_suspended(), "{:?}", previous_job_2);
 
         set.remove(current_job_index_2);
-        let current_job_index_3 = set.current_job().unwrap().0;
-        let previous_job_index_3 = set.previous_job().unwrap().0;
+        let current_job_index_3 = set.current_job().unwrap();
+        let previous_job_index_3 = set.previous_job().unwrap();
         assert_eq!(current_job_index_3, previous_job_index_2);
         // There is no other suspended job, so the new previous job is a running job.
         assert_eq!(previous_job_index_3, i10);
 
         set.remove(current_job_index_3);
-        let current_job_index_4 = set.current_job().unwrap().0;
+        let current_job_index_4 = set.current_job().unwrap();
         assert_eq!(current_job_index_4, i10);
         // No more job to be selected for the previous job.
         assert_eq!(set.previous_job(), None);
@@ -953,17 +959,18 @@ mod tests {
         set.add(suspended_2);
         set.add(suspended_3);
 
-        let ex_current_job_index = set.current_job().unwrap().0;
-        let ex_previous_job_index = set.previous_job().unwrap().0;
+        let ex_current_job_index = set.current_job().unwrap();
+        let ex_previous_job_index = set.previous_job().unwrap();
         assert_ne!(ex_current_job_index, i10);
         assert_ne!(ex_previous_job_index, i10);
 
         set.remove(ex_previous_job_index);
-        let now_current_job_index = set.current_job().unwrap().0;
-        let (now_previous_job_index, now_previous_job) = set.previous_job().unwrap();
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_current_job_index);
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
+        let now_previous_job = &set[now_previous_job_index];
         assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
     }
 
@@ -981,14 +988,14 @@ mod tests {
         set.add(suspended_1);
         set.add(suspended_2);
 
-        let ex_current_job_index = set.current_job().unwrap().0;
-        let ex_previous_job_index = set.previous_job().unwrap().0;
+        let ex_current_job_index = set.current_job().unwrap();
+        let ex_previous_job_index = set.previous_job().unwrap();
         assert_ne!(ex_current_job_index, i10);
         assert_ne!(ex_previous_job_index, i10);
 
         set.remove(ex_previous_job_index);
-        let now_current_job_index = set.current_job().unwrap().0;
-        let now_previous_job_index = set.previous_job().unwrap().0;
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_current_job_index);
         // When there is no suspended job other than the current job,
         // then the new previous job can be any job other than the current.
@@ -1002,10 +1009,10 @@ mod tests {
         let i22 = set.add(Job::new(Pid::from_raw(22)));
 
         assert_eq!(set.set_current_job(i21), Ok(()));
-        assert_eq!(set.current_job().unwrap().0, i21);
+        assert_eq!(set.current_job(), Some(i21));
 
         assert_eq!(set.set_current_job(i22), Ok(()));
-        assert_eq!(set.current_job().unwrap().0, i22);
+        assert_eq!(set.current_job(), Some(i22));
     }
 
     #[test]
@@ -1021,10 +1028,10 @@ mod tests {
         let i22 = set.add(suspended_2);
 
         assert_eq!(set.set_current_job(i21), Ok(()));
-        assert_eq!(set.current_job().unwrap().0, i21);
+        assert_eq!(set.current_job(), Some(i21));
 
         assert_eq!(set.set_current_job(i22), Ok(()));
-        assert_eq!(set.current_job().unwrap().0, i22);
+        assert_eq!(set.current_job(), Some(i22));
     }
 
     #[test]
@@ -1047,7 +1054,7 @@ mod tests {
             set.set_current_job(i20),
             Err(SetCurrentJobError::NotSuspended)
         );
-        assert_eq!(set.current_job().unwrap().0, i10);
+        assert_eq!(set.current_job(), Some(i10));
     }
 
     #[test]
@@ -1055,11 +1062,11 @@ mod tests {
         let mut set = JobSet::default();
         set.add(Job::new(Pid::from_raw(5)));
         set.add(Job::new(Pid::from_raw(6)));
-        let old_current_job_index = set.current_job().unwrap().0;
-        let old_previous_job_index = set.previous_job().unwrap().0;
+        let old_current_job_index = set.current_job().unwrap();
+        let old_previous_job_index = set.previous_job().unwrap();
         set.set_current_job(old_current_job_index).unwrap();
-        let new_current_job_index = set.current_job().unwrap().0;
-        let new_previous_job_index = set.previous_job().unwrap().0;
+        let new_current_job_index = set.current_job().unwrap();
+        let new_previous_job_index = set.previous_job().unwrap();
         assert_eq!(new_current_job_index, old_current_job_index);
         assert_eq!(new_previous_job_index, old_previous_job_index);
     }
@@ -1073,8 +1080,8 @@ mod tests {
         let i10 = set.add(suspended);
         let i20 = set.add(running);
         set.update_status(WaitStatus::Continued(Pid::from_raw(10)));
-        assert_eq!(set.current_job().unwrap().0, i10);
-        assert_eq!(set.previous_job().unwrap().0, i20);
+        assert_eq!(set.current_job(), Some(i10));
+        assert_eq!(set.previous_job(), Some(i20));
     }
 
     #[test]
@@ -1089,8 +1096,8 @@ mod tests {
         set.set_current_job(i10).unwrap();
         set.update_status(WaitStatus::Continued(Pid::from_raw(10)));
         // The current job must be a suspended job, if any.
-        assert_eq!(set.current_job().unwrap().0, i20);
-        assert_eq!(set.previous_job().unwrap().0, i10);
+        assert_eq!(set.current_job(), Some(i20));
+        assert_eq!(set.previous_job(), Some(i10));
     }
 
     #[test]
@@ -1105,15 +1112,16 @@ mod tests {
         set.add(suspended_1);
         set.add(suspended_2);
         set.add(suspended_3);
-        let ex_current_job_pid = set.current_job().unwrap().1.pid;
-        let ex_previous_job_index = set.previous_job().unwrap().0;
+        let ex_current_job_pid = set[set.current_job().unwrap()].pid;
+        let ex_previous_job_index = set.previous_job().unwrap();
 
         set.update_status(WaitStatus::Continued(ex_current_job_pid));
-        let now_current_job_index = set.current_job().unwrap().0;
-        let (now_previous_job_index, now_previous_job) = set.previous_job().unwrap();
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_previous_job_index);
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
+        let now_previous_job = &set[now_previous_job_index];
         assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
     }
 
@@ -1129,15 +1137,16 @@ mod tests {
         set.add(suspended_1);
         set.add(suspended_2);
         set.add(suspended_3);
-        let ex_current_job_index = set.current_job().unwrap().0;
-        let ex_previous_job_pid = set.previous_job().unwrap().1.pid;
+        let ex_current_job_index = set.current_job().unwrap();
+        let ex_previous_job_pid = set[set.previous_job().unwrap()].pid;
 
         set.update_status(WaitStatus::Continued(ex_previous_job_pid));
-        let now_current_job_index = set.current_job().unwrap().0;
-        let (now_previous_job_index, now_previous_job) = set.previous_job().unwrap();
+        let now_current_job_index = set.current_job().unwrap();
+        let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_current_job_index);
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
+        let now_previous_job = &set[now_previous_job_index];
         assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
     }
 
@@ -1156,8 +1165,8 @@ mod tests {
         set.set_current_job(i20).unwrap();
         set.set_current_job(i10).unwrap();
         set.update_status(WaitStatus::Continued(Pid::from_raw(30)));
-        assert_eq!(set.current_job().unwrap().0, i10);
-        assert_eq!(set.previous_job().unwrap().0, i20);
+        assert_eq!(set.current_job(), Some(i10));
+        assert_eq!(set.previous_job(), Some(i20));
     }
 
     #[test]
@@ -1167,8 +1176,8 @@ mod tests {
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i11).unwrap();
         set.update_status(WaitStatus::Stopped(Pid::from_raw(11), Signal::SIGTTOU));
-        assert_eq!(set.current_job().unwrap().0, i11);
-        assert_eq!(set.previous_job().unwrap().0, i12);
+        assert_eq!(set.current_job(), Some(i11));
+        assert_eq!(set.previous_job(), Some(i12));
     }
 
     #[test]
@@ -1178,8 +1187,8 @@ mod tests {
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i11).unwrap();
         set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTOU));
-        assert_eq!(set.current_job().unwrap().0, i12);
-        assert_eq!(set.previous_job().unwrap().0, i11);
+        assert_eq!(set.current_job(), Some(i12));
+        assert_eq!(set.previous_job(), Some(i11));
     }
 
     #[test]
@@ -1190,8 +1199,8 @@ mod tests {
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i10).unwrap();
         set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTIN));
-        assert_eq!(set.current_job().unwrap().0, i12);
-        assert_eq!(set.previous_job().unwrap().0, i10);
+        assert_eq!(set.current_job(), Some(i12));
+        assert_eq!(set.previous_job(), Some(i10));
     }
 
     #[test]
@@ -1202,11 +1211,11 @@ mod tests {
         let mut suspended = Job::new(Pid::from_raw(10));
         suspended.status = WaitStatus::Stopped(Pid::from_raw(10), Signal::SIGTTIN);
         let i10 = set.add(suspended);
-        assert_eq!(set.current_job().unwrap().0, i10);
-        assert_eq!(set.previous_job().unwrap().0, i11);
+        assert_eq!(set.current_job(), Some(i10));
+        assert_eq!(set.previous_job(), Some(i11));
 
         set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTOU));
-        assert_eq!(set.current_job().unwrap().0, i12);
-        assert_eq!(set.previous_job().unwrap().0, i10);
+        assert_eq!(set.current_job(), Some(i12));
+        assert_eq!(set.previous_job(), Some(i10));
     }
 }
