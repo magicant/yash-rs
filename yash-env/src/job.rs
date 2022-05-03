@@ -237,94 +237,6 @@ impl Default for JobSet {
 }
 
 impl JobSet {
-    /// Adds a job to this job set.
-    ///
-    /// This function returns a unique index assigned to the job.
-    ///
-    /// If there already is a job that has the same process ID as that of the
-    /// new job, the existing job is silently removed.
-    ///
-    /// If the new job is suspended and the [current job](Self::current_job) is
-    /// not, the new job becomes the current job. If the new job and the current
-    /// job are suspended but the [previous job](Self::previous_job) is not, the
-    /// new job becomes the previous job.
-    pub fn add(&mut self, job: Job) -> usize {
-        let new_job_is_suspended = job.is_suspended();
-        let ex_current_job_is_suspended =
-            self.current_job().map(|index| self[index].is_suspended());
-        let ex_previous_job_is_suspended =
-            self.previous_job().map(|index| self[index].is_suspended());
-
-        // Add the job to `self.jobs` and `self.pids_to_indices`.
-        use std::collections::hash_map::Entry::*;
-        let index = match self.pids_to_indices.entry(job.pid) {
-            Vacant(entry) => {
-                let index = self.jobs.insert(job);
-                entry.insert(index);
-                index
-            }
-            Occupied(entry) => {
-                let index = *entry.get();
-                self.jobs[index] = job;
-                index
-            }
-        };
-        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
-
-        // Reselect the current and previous job.
-        match ex_current_job_is_suspended {
-            None => self.current_job_index = index,
-            Some(false) if new_job_is_suspended => self.set_current_job(index).unwrap(),
-            Some(_) => match ex_previous_job_is_suspended {
-                None => self.previous_job_index = index,
-                Some(false) if new_job_is_suspended => self.previous_job_index = index,
-                Some(_) => (),
-            },
-        }
-
-        index
-    }
-
-    /// Removes a job from this job set.
-    ///
-    /// This function returns the job removed from the job set.
-    /// The result is `None` if there is no job for the index.
-    ///
-    /// If the removed job is the [current job](Self::current_job), the
-    /// [previous job](Self::previous_job) becomes the current job and another
-    /// job is selected for the new previous job, if any.
-    /// If the removed job is the previous job, another job is selected for the
-    /// new previous job, if any.
-    pub fn remove(&mut self, index: usize) -> Option<Job> {
-        let job = self.jobs.try_remove(index);
-
-        if let Some(job) = &job {
-            // Keep `pids_to_indices` in sync
-            self.pids_to_indices.remove(&job.pid);
-
-            if self.jobs.is_empty() {
-                // Clearing an already empty slab may seem redundant, but this
-                // operation purges the slab's internal cache of unused indices,
-                // so that jobs added later have indices starting from 0.
-                self.jobs.clear();
-            }
-
-            // Reselect the current and previous job
-            let previous_job_becomes_current_job = index == self.current_job_index;
-            if previous_job_becomes_current_job {
-                self.current_job_index = self.previous_job_index;
-            }
-            if previous_job_becomes_current_job || index == self.previous_job_index {
-                self.previous_job_index = self
-                    .any_suspended_job_but_current()
-                    .unwrap_or_else(|| self.any_job_but_current().unwrap_or_default());
-            }
-        }
-        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
-
-        job
-    }
-
     /// Returns the job at the specified index.
     ///
     /// The result is `None` if there is no job for the index.
@@ -469,6 +381,94 @@ where
 }
 
 impl JobSet {
+    /// Adds a job to this job set.
+    ///
+    /// This function returns a unique index assigned to the job.
+    ///
+    /// If there already is a job that has the same process ID as that of the
+    /// new job, the existing job is silently removed.
+    ///
+    /// If the new job is suspended and the [current job](Self::current_job) is
+    /// not, the new job becomes the current job. If the new job and the current
+    /// job are suspended but the [previous job](Self::previous_job) is not, the
+    /// new job becomes the previous job.
+    pub fn add(&mut self, job: Job) -> usize {
+        let new_job_is_suspended = job.is_suspended();
+        let ex_current_job_is_suspended =
+            self.current_job().map(|index| self[index].is_suspended());
+        let ex_previous_job_is_suspended =
+            self.previous_job().map(|index| self[index].is_suspended());
+
+        // Add the job to `self.jobs` and `self.pids_to_indices`.
+        use std::collections::hash_map::Entry::*;
+        let index = match self.pids_to_indices.entry(job.pid) {
+            Vacant(entry) => {
+                let index = self.jobs.insert(job);
+                entry.insert(index);
+                index
+            }
+            Occupied(entry) => {
+                let index = *entry.get();
+                self.jobs[index] = job;
+                index
+            }
+        };
+        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
+
+        // Reselect the current and previous job.
+        match ex_current_job_is_suspended {
+            None => self.current_job_index = index,
+            Some(false) if new_job_is_suspended => self.set_current_job(index).unwrap(),
+            Some(_) => match ex_previous_job_is_suspended {
+                None => self.previous_job_index = index,
+                Some(false) if new_job_is_suspended => self.previous_job_index = index,
+                Some(_) => (),
+            },
+        }
+
+        index
+    }
+
+    /// Removes a job from this job set.
+    ///
+    /// This function returns the job removed from the job set.
+    /// The result is `None` if there is no job for the index.
+    ///
+    /// If the removed job is the [current job](Self::current_job), the
+    /// [previous job](Self::previous_job) becomes the current job and another
+    /// job is selected for the new previous job, if any.
+    /// If the removed job is the previous job, another job is selected for the
+    /// new previous job, if any.
+    pub fn remove(&mut self, index: usize) -> Option<Job> {
+        let job = self.jobs.try_remove(index);
+
+        if let Some(job) = &job {
+            // Keep `pids_to_indices` in sync
+            self.pids_to_indices.remove(&job.pid);
+
+            if self.jobs.is_empty() {
+                // Clearing an already empty slab may seem redundant, but this
+                // operation purges the slab's internal cache of unused indices,
+                // so that jobs added later have indices starting from 0.
+                self.jobs.clear();
+            }
+
+            // Reselect the current and previous job
+            let previous_job_becomes_current_job = index == self.current_job_index;
+            if previous_job_becomes_current_job {
+                self.current_job_index = self.previous_job_index;
+            }
+            if previous_job_becomes_current_job || index == self.previous_job_index {
+                self.previous_job_index = self
+                    .any_suspended_job_but_current()
+                    .unwrap_or_else(|| self.any_job_but_current().unwrap_or_default());
+            }
+        }
+        debug_assert_eq!(self.jobs.len(), self.pids_to_indices.len());
+
+        job
+    }
+
     /// Returns an iterator that conditionally modifies and removes jobs.
     ///
     /// The iterator uses the `should_remove` function to decide whether to
@@ -674,6 +674,23 @@ mod tests {
     use crate::trap::Signal;
 
     #[test]
+    fn job_set_find_by_pid() {
+        let mut set = JobSet::default();
+        assert_eq!(set.find_by_pid(Pid::from_raw(10)), None);
+
+        let i10 = set.add(Job::new(Pid::from_raw(10)));
+        let i20 = set.add(Job::new(Pid::from_raw(20)));
+        let i30 = set.add(Job::new(Pid::from_raw(30)));
+        assert_eq!(set.find_by_pid(Pid::from_raw(10)), Some(i10));
+        assert_eq!(set.find_by_pid(Pid::from_raw(20)), Some(i20));
+        assert_eq!(set.find_by_pid(Pid::from_raw(30)), Some(i30));
+        assert_eq!(set.find_by_pid(Pid::from_raw(40)), None);
+
+        set.remove(i10);
+        assert_eq!(set.find_by_pid(Pid::from_raw(10)), None);
+    }
+
+    #[test]
     fn job_set_add_and_remove() {
         // This test case depends on how Slab reuses the index of removed items.
         let mut set = JobSet::default();
@@ -718,23 +735,6 @@ mod tests {
             set.get(i_first).map(|job| job.name.as_str()),
             Some("first job")
         );
-    }
-
-    #[test]
-    fn job_set_find_by_pid() {
-        let mut set = JobSet::default();
-        assert_eq!(set.find_by_pid(Pid::from_raw(10)), None);
-
-        let i10 = set.add(Job::new(Pid::from_raw(10)));
-        let i20 = set.add(Job::new(Pid::from_raw(20)));
-        let i30 = set.add(Job::new(Pid::from_raw(30)));
-        assert_eq!(set.find_by_pid(Pid::from_raw(10)), Some(i10));
-        assert_eq!(set.find_by_pid(Pid::from_raw(20)), Some(i20));
-        assert_eq!(set.find_by_pid(Pid::from_raw(30)), Some(i30));
-        assert_eq!(set.find_by_pid(Pid::from_raw(40)), None);
-
-        set.remove(i10);
-        assert_eq!(set.find_by_pid(Pid::from_raw(10)), None);
     }
 
     #[test]
