@@ -666,6 +666,7 @@ impl JobSet {
     }
 }
 
+pub mod fmt;
 pub mod id;
 
 #[cfg(test)]
