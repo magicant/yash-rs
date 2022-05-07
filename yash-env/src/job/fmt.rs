@@ -38,7 +38,21 @@
 //! To format a job, you create an instance of [`Report`] and use the `Display`
 //! trait's method (typically by using the `format!` macro).
 //!
-//! TODO Code example
+//! ```
+//! use yash_env::job::{Job, Pid};
+//! use yash_env::job::fmt::{Marker, Report};
+//! let mut job = Job::new(Pid::from_raw(123));
+//! job.name = "sleep 10".to_string();
+//! let report = Report {
+//!     index: 2,
+//!     marker: Marker::None,
+//!     job: &job,
+//! };
+//! let s = format!("{}", report);
+//! assert_eq!(s, "[3]   Running              sleep 10");
+//! let s = format!("{:#}", report);
+//! assert_eq!(s, "[3]     123 Running              sleep 10");
+//! ```
 
 use super::Job;
 use super::WaitStatus;

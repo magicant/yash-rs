@@ -16,7 +16,54 @@
 
 //! Jobs built-in
 //!
-//! TODO Elaborate
+//! The `jobs` built-in reports job status.
+//!
+//! # Syntax
+//!
+//! ```sh
+//! jobs [-lnprst] [job_id…]
+//! ```
+//!
+//! # Semantics
+//!
+//! The "jobs" built-in prints information about jobs the shell is currently
+//! controlling, one line for each job. The results follow the
+//! [format](yash_env::job::fmt) specified by the POSIX.
+//!
+//! When the built-in reports a finished job (either exited or signaled), it
+//! removes the job from the current execution environment.
+//!
+//! # Options
+//!
+//! TODO `-l`, `-n`, `-p`, `-r`, `-s`, `-t`
+//!
+//! # Operands
+//!
+//! Each operand is parsed as a [job ID](yash_env::job::id) that specifies which
+//! job to report. If no operands are given, the built-in prints all jobs.
+//!
+//! # Exit status
+//!
+//! `ExitStatus::SUCCESS` or `ExitStatus::FAILURE` depending on the results
+//!
+//! # Portability
+//!
+//! The current implementation of this built-in removes finished jobs from the
+//! environment after reporting all jobs. This behavior should not be relied
+//! upon. The following script shows a "job not found" error in many other
+//! shells because the built-in removes the job when processing the first
+//! operand so the job is gone when the second is processed:
+//!
+//! ```sh
+//! sleep 0&
+//! jobs %sleep %sleep
+//! ```
+//!
+//! The POSIX standard defines the `-l` and `-p` option. Other options are
+//! non-portable extension.
+//!
+//! A portable job ID must start with a `%`. If an operand does not have a
+//! leading `%`, the built-in assumes one silently, which is not portable.
 
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
