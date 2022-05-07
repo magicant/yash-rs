@@ -73,9 +73,8 @@
 //! The POSIX standard only defines the `-l` and `-p` options. Other options are
 //! non-portable extensions.
 //!
-//! The last specified one takes precedence when you use the `-l` and `-p`
-//! options at once. This behavior can be seen in many shells but should not be
-//! assumed portable.
+//! According to POSIX, the `-p` option takes precedence over the `-l` option.
+//! In many other shells, however, the last specified one is effective.
 //!
 //! A portable job ID must start with a `%`. If an operand does not have a
 //! leading `%`, the built-in assumes one silently, which is not portable.
@@ -107,16 +106,11 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec::new().short('p').long("pgid-only"),
 ];
 
-enum Format {
-    Standard,
-    Verbose,
-    PgidOnly,
-}
-
 struct Accumulator {
     current_job_index: Option<usize>,
     previous_job_index: Option<usize>,
-    format: Format,
+    alternate_format: bool,
+    pgid_only: bool,
     print: String,
     indices_reported: Vec<usize>,
 }
@@ -142,10 +136,12 @@ impl Accumulator {
             job,
         };
 
-        match self.format {
-            Format::Standard => writeln!(self.print, "{}", report),
-            Format::Verbose => writeln!(self.print, "{:#}", report),
-            Format::PgidOnly => writeln!(self.print, "{}", job.pid),
+        if self.pgid_only {
+            writeln!(self.print, "{}", job.pid)
+        } else if self.alternate_format {
+            writeln!(self.print, "{:#}", report)
+        } else {
+            writeln!(self.print, "{}", report)
         }
         .unwrap();
 
@@ -175,16 +171,17 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let mut accumulator = Accumulator {
         current_job_index: env.jobs.current_job(),
         previous_job_index: env.jobs.previous_job(),
-        format: Format::Standard,
+        alternate_format: false,
+        pgid_only: false,
         print: String::new(),
         indices_reported: Vec::new(),
     };
 
-    // Parse options
+    // Apply options
     for option in options {
         match option.spec.get_short() {
-            Some('l') => accumulator.format = Format::Verbose,
-            Some('p') => accumulator.format = Format::PgidOnly,
+            Some('l') => accumulator.alternate_format = true,
+            Some('p') => accumulator.pgid_only = true,
             _ => unreachable!("unhandled option: {:?}", option),
         }
     }
@@ -580,6 +577,28 @@ mod tests {
         env.jobs.add(job);
 
         let args = Field::dummies(["-p"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(from_utf8(&stdout.content), Ok("42\n72\n"));
+    }
+
+    #[test]
+    fn p_option_cancels_l_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+
+        let args = Field::dummies(["-pl"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
