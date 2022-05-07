@@ -67,6 +67,7 @@
 
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
+use crate::common::arg::OptionSpec;
 use crate::common::print_error_message;
 use crate::common::Print;
 use std::fmt::Write;
@@ -86,9 +87,18 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
+const OPTIONS: &[OptionSpec] = &[OptionSpec::new().short('l').long("verbose")];
+
+enum Format {
+    Standard,
+    Verbose,
+    // TODO PgidOnly,
+}
+
 struct Accumulator {
     current_job_index: Option<usize>,
     previous_job_index: Option<usize>,
+    format: Format,
     print: String,
     indices_to_remove: Vec<usize>,
 }
@@ -113,7 +123,10 @@ impl Accumulator {
             },
             job: &job,
         };
-        writeln!(self.print, "{}", report).unwrap();
+        match self.format {
+            Format::Standard => writeln!(self.print, "{}", report).unwrap(),
+            Format::Verbose => writeln!(self.print, "{:#}", report).unwrap(),
+        }
 
         job.status_reported();
 
@@ -137,7 +150,7 @@ fn find_error_message(error: FindError, operand: &Field) -> Message {
 
 /// Implementation of the jobs built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
-    let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
+    let (options, operands) = match parse_arguments(OPTIONS, Mode::default(), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
     };
@@ -145,9 +158,18 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let mut accumulator = Accumulator {
         current_job_index: env.jobs.current_job(),
         previous_job_index: env.jobs.previous_job(),
+        format: Format::Standard,
         print: String::new(),
         indices_to_remove: Vec::new(),
     };
+
+    // Parse options
+    for option in options {
+        match option.spec.get_short() {
+            Some('l') => accumulator.format = Format::Verbose,
+            _ => unreachable!("unhandled option: {:?}", option),
+        }
+    }
 
     if operands.is_empty() {
         // Report all jobs
@@ -435,5 +457,58 @@ mod tests {
         assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
             assert_eq!(status, WaitStatus::Exited(Pid::from_raw(10), 0));
         });
+    }
+
+    #[test]
+    fn l_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+
+        let args = Field::dummies(["-l"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&stdout.content),
+            Ok("[1] -    42 Running              echo first
+[2] +    72 Stopped(SIGSTOP)     echo second
+")
+        );
+    }
+
+    #[test]
+    #[ignore] // TODO Support parsing long option
+    fn verbose_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+
+        let args = Field::dummies(["--verbose", "%?sec"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&stdout.content),
+            Ok("[2] +    72 Stopped(SIGSTOP)     echo second\n")
+        );
     }
 }
