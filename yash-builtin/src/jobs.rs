@@ -29,6 +29,8 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
+use yash_env::job::id::FindError;
+use yash_env::job::JobRefMut;
 use yash_env::job::WaitStatusEx;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -37,6 +39,55 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
+struct Accumulator {
+    current_job_index: Option<usize>,
+    previous_job_index: Option<usize>,
+    print: String,
+    indices_to_remove: Vec<usize>,
+}
+
+impl Accumulator {
+    /// Processes one job.
+    ///
+    /// 1. Formats a job report in `self.print` so it can be printed later.
+    /// 1. Clears the `status_changed` flag of the job.
+    /// 1. Remembers the job index in `self.indices_to_remove` so the job can be
+    ///    removed later.
+    fn report(&mut self, index: usize, mut job: JobRefMut) {
+        use yash_env::job::fmt::{Marker, Report};
+        let report = Report {
+            index,
+            marker: if self.current_job_index == Some(index) {
+                Marker::CurrentJob
+            } else if self.previous_job_index == Some(index) {
+                Marker::PreviousJob
+            } else {
+                Marker::None
+            },
+            job: &job,
+        };
+        writeln!(self.print, "{}", report).unwrap();
+
+        job.status_reported();
+
+        if job.status.is_finished() {
+            self.indices_to_remove.push(index);
+        }
+    }
+}
+
+fn find_error_message(error: FindError, operand: &Field) -> Message {
+    Message {
+        r#type: AnnotationType::Error,
+        title: "cannot report job status".into(),
+        annotations: vec![Annotation::new(
+            AnnotationType::Error,
+            format!("{:?}: {}", &operand.value, error).into(),
+            &operand.origin,
+        )],
+    }
+}
+
 /// Implementation of the jobs built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
@@ -44,82 +95,39 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         Err(error) => return print_error_message(env, &error).await,
     };
 
-    let mut print = String::new();
-    let mut indices_to_remove = Vec::new();
-    let current_job_index = env.jobs.current_job();
-    let previous_job_index = env.jobs.previous_job();
+    let mut accumulator = Accumulator {
+        current_job_index: env.jobs.current_job(),
+        previous_job_index: env.jobs.previous_job(),
+        print: String::new(),
+        indices_to_remove: Vec::new(),
+    };
 
     if operands.is_empty() {
-        env.jobs.drain_filter(|index, mut job| {
-            // Add a line of report
-            use yash_env::job::fmt::{Marker, Report};
-            let report = Report {
-                index,
-                marker: if current_job_index == Some(index) {
-                    Marker::CurrentJob
-                } else if previous_job_index == Some(index) {
-                    Marker::PreviousJob
-                } else {
-                    Marker::None
-                },
-                job: &job,
-            };
-            writeln!(print, "{}", report).unwrap();
-
-            job.status_reported();
-
-            if job.status.is_finished() {
-                indices_to_remove.push(index);
-            }
-            false
-        });
+        // Report all jobs
+        for (index, job) in &mut env.jobs {
+            accumulator.report(index, job)
+        }
     } else {
+        // Report jobs specified by the operands
         for operand in operands {
             let job_id = parse(&operand.value).unwrap_or_else(|_| parse_tail(&operand.value));
             match job_id.find(&env.jobs) {
                 Ok(index) => {
-                    use yash_env::job::fmt::{Marker, Report};
-                    let mut job = env.jobs.get_mut(index).unwrap();
-                    let report = Report {
-                        index,
-                        marker: if current_job_index == Some(index) {
-                            Marker::CurrentJob
-                        } else if previous_job_index == Some(index) {
-                            Marker::PreviousJob
-                        } else {
-                            Marker::None
-                        },
-                        job: &job,
-                    };
-                    writeln!(print, "{}", report).unwrap();
-
-                    job.status_reported();
-
-                    if job.status.is_finished() {
-                        indices_to_remove.push(index);
-                    }
+                    let job = env.jobs.get_mut(index).unwrap();
+                    accumulator.report(index, job)
                 }
                 Err(error) => {
-                    let message = Message {
-                        r#type: AnnotationType::Error,
-                        title: "cannot report job status".into(),
-                        annotations: vec![Annotation::new(
-                            AnnotationType::Error,
-                            format!("{:?}: {}", &operand.value, error).into(),
-                            &operand.origin,
-                        )],
-                    };
-                    print_error_message(env, message).await;
+                    print_error_message(env, find_error_message(error, &operand)).await;
                     return (ExitStatus::FAILURE, Continue(()));
                 }
             }
         }
     }
 
-    let exit_status = env.print(&print).await;
+    let exit_status = env.print(&accumulator.print).await;
 
     if exit_status == ExitStatus::SUCCESS {
-        for index in indices_to_remove {
+        for index in accumulator.indices_to_remove {
             env.jobs.remove(index);
         }
     }
