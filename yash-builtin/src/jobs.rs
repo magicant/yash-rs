@@ -35,7 +35,18 @@
 //!
 //! # Options
 //!
-//! TODO `-l`, `-n`, `-p`, `-r`, `-s`, `-t`
+//! ## Format
+//!
+//! By default, the results are printed in the standard format defined in the
+//! [`yash_env::job::fmt`] module. You can use two options to change the output.
+//!
+//! The **`-l`** (**`--verbose`**) option uses the alternate format, which
+//! inserts the process ID before each job status. The **`-p`**
+//! (**`--pgid-only`**) option only prints the process ID of each job.
+//!
+//! ## Filtering
+//!
+//! TODO `-n`, `-r`, `-s`, `-t`
 //!
 //! # Operands
 //!
@@ -59,8 +70,12 @@
 //! jobs %sleep %sleep
 //! ```
 //!
-//! The POSIX standard defines the `-l` and `-p` option. Other options are
-//! non-portable extension.
+//! The POSIX standard only defines the `-l` and `-p` options. Other options are
+//! non-portable extensions.
+//!
+//! The last specified one takes precedence when you use the `-l` and `-p`
+//! options at once. This behavior can be seen in many shells but should not be
+//! assumed portable.
 //!
 //! A portable job ID must start with a `%`. If an operand does not have a
 //! leading `%`, the built-in assumes one silently, which is not portable.
@@ -87,12 +102,15 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
-const OPTIONS: &[OptionSpec] = &[OptionSpec::new().short('l').long("verbose")];
+const OPTIONS: &[OptionSpec] = &[
+    OptionSpec::new().short('l').long("verbose"),
+    OptionSpec::new().short('p').long("pgid-only"),
+];
 
 enum Format {
     Standard,
     Verbose,
-    // TODO PgidOnly,
+    PgidOnly,
 }
 
 struct Accumulator {
@@ -123,10 +141,14 @@ impl Accumulator {
             },
             job,
         };
+
         match self.format {
-            Format::Standard => writeln!(self.print, "{}", report).unwrap(),
-            Format::Verbose => writeln!(self.print, "{:#}", report).unwrap(),
+            Format::Standard => writeln!(self.print, "{}", report),
+            Format::Verbose => writeln!(self.print, "{:#}", report),
+            Format::PgidOnly => writeln!(self.print, "{}", job.pid),
         }
+        .unwrap();
+
         self.indices_reported.push(index);
     }
 }
@@ -162,6 +184,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     for option in options {
         match option.spec.get_short() {
             Some('l') => accumulator.format = Format::Verbose,
+            Some('p') => accumulator.format = Format::PgidOnly,
             _ => unreachable!("unhandled option: {:?}", option),
         }
     }
@@ -541,5 +564,50 @@ mod tests {
             from_utf8(&stdout.content),
             Ok("[2] +    72 Stopped(SIGSTOP)     echo second\n")
         );
+    }
+
+    #[test]
+    fn p_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+
+        let args = Field::dummies(["-p"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(from_utf8(&stdout.content), Ok("42\n72\n"));
+    }
+
+    #[test]
+    #[ignore] // TODO Support parsing long option
+    fn pgid_only_option() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+
+        let args = Field::dummies(["--pgid-only", "%?sec"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(from_utf8(&stdout.content), Ok("72\n"));
     }
 }
