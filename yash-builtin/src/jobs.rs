@@ -78,7 +78,7 @@ use yash_env::builtin::Result;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
 use yash_env::job::id::FindError;
-use yash_env::job::JobRefMut;
+use yash_env::job::Job;
 use yash_env::job::WaitStatusEx;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -100,7 +100,7 @@ struct Accumulator {
     previous_job_index: Option<usize>,
     format: Format,
     print: String,
-    indices_to_remove: Vec<usize>,
+    indices_reported: Vec<usize>,
 }
 
 impl Accumulator {
@@ -110,7 +110,7 @@ impl Accumulator {
     /// 1. Clears the `status_changed` flag of the job.
     /// 1. Remembers the job index in `self.indices_to_remove` so the job can be
     ///    removed later.
-    fn report(&mut self, index: usize, mut job: JobRefMut) {
+    fn report(&mut self, index: usize, job: &Job) {
         use yash_env::job::fmt::{Marker, Report};
         let report = Report {
             index,
@@ -121,18 +121,13 @@ impl Accumulator {
             } else {
                 Marker::None
             },
-            job: &job,
+            job,
         };
         match self.format {
             Format::Standard => writeln!(self.print, "{}", report).unwrap(),
             Format::Verbose => writeln!(self.print, "{:#}", report).unwrap(),
         }
-
-        job.status_reported();
-
-        if job.status.is_finished() {
-            self.indices_to_remove.push(index);
-        }
+        self.indices_reported.push(index);
     }
 }
 
@@ -160,7 +155,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         previous_job_index: env.jobs.previous_job(),
         format: Format::Standard,
         print: String::new(),
-        indices_to_remove: Vec::new(),
+        indices_reported: Vec::new(),
     };
 
     // Parse options
@@ -173,7 +168,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
     if operands.is_empty() {
         // Report all jobs
-        for (index, job) in &mut env.jobs {
+        for (index, job) in &env.jobs {
             accumulator.report(index, job)
         }
     } else {
@@ -181,10 +176,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         for operand in operands {
             let job_id = parse(&operand.value).unwrap_or_else(|_| parse_tail(&operand.value));
             match job_id.find(&env.jobs) {
-                Ok(index) => {
-                    let job = env.jobs.get_mut(index).unwrap();
-                    accumulator.report(index, job)
-                }
+                Ok(index) => accumulator.report(index, &env.jobs[index]),
                 Err(error) => {
                     print_error_message(env, find_error_message(error, &operand)).await;
                     return (ExitStatus::FAILURE, Continue(()));
@@ -196,8 +188,13 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let exit_status = env.print(&accumulator.print).await;
 
     if exit_status == ExitStatus::SUCCESS {
-        for index in accumulator.indices_to_remove {
-            env.jobs.remove(index);
+        for index in accumulator.indices_reported {
+            let mut job = env.jobs.get_mut(index).unwrap();
+            if job.status.is_finished() {
+                env.jobs.remove(index);
+            } else {
+                job.status_reported();
+            }
         }
     }
 
@@ -457,6 +454,40 @@ mod tests {
         assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
             assert_eq!(status, WaitStatus::Exited(Pid::from_raw(10), 0));
         });
+    }
+
+    #[test]
+    fn report_clears_status_changed_flag() {
+        let mut env = Env::new_virtual();
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        let i42 = env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        let i72 = env.jobs.add(job);
+
+        let args = Field::dummies(["%?sec"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        assert!(env.jobs[i42].status_changed);
+        assert!(!env.jobs[i72].status_changed);
+    }
+
+    #[test]
+    fn status_changed_flag_not_cleared_in_case_of_error() {
+        let mut system = Box::new(VirtualSystem::new());
+        system.current_process_mut().close_fd(Fd::STDOUT);
+        let mut env = Env::with_system(system);
+        let i72 = env.jobs.add(Job::new(Pid::from_raw(72)));
+
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("jobs"),
+        });
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert!(env.jobs[i72].status_changed);
     }
 
     #[test]
