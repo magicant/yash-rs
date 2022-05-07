@@ -27,45 +27,104 @@ use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
+use yash_env::job::id::parse;
+use yash_env::job::id::parse_tail;
 use yash_env::job::WaitStatusEx;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 
 /// Implementation of the jobs built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
-    let (_options, _operands) = match parse_arguments(&[], Mode::default(), args) {
+    let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
     };
 
-    // Print jobs.
     let mut print = String::new();
+    let mut indices_to_remove = Vec::new();
     let current_job_index = env.jobs.current_job();
     let previous_job_index = env.jobs.previous_job();
 
-    env.jobs.drain_filter(|index, mut job| {
-        // Add a line of report
-        use yash_env::job::fmt::{Marker, Report};
-        let report = Report {
-            index,
-            marker: if current_job_index == Some(index) {
-                Marker::CurrentJob
-            } else if previous_job_index == Some(index) {
-                Marker::PreviousJob
-            } else {
-                Marker::None
-            },
-            job: &job,
-        };
-        writeln!(print, "{}", report).unwrap();
+    if operands.is_empty() {
+        env.jobs.drain_filter(|index, mut job| {
+            // Add a line of report
+            use yash_env::job::fmt::{Marker, Report};
+            let report = Report {
+                index,
+                marker: if current_job_index == Some(index) {
+                    Marker::CurrentJob
+                } else if previous_job_index == Some(index) {
+                    Marker::PreviousJob
+                } else {
+                    Marker::None
+                },
+                job: &job,
+            };
+            writeln!(print, "{}", report).unwrap();
 
-        job.status_reported();
+            job.status_reported();
 
-        // Remove terminated jobs
-        job.status.is_finished()
-    });
+            if job.status.is_finished() {
+                indices_to_remove.push(index);
+            }
+            false
+        });
+    } else {
+        for operand in operands {
+            let job_id = parse(&operand.value).unwrap_or_else(|_| parse_tail(&operand.value));
+            match job_id.find(&env.jobs) {
+                Ok(index) => {
+                    use yash_env::job::fmt::{Marker, Report};
+                    let mut job = env.jobs.get_mut(index).unwrap();
+                    let report = Report {
+                        index,
+                        marker: if current_job_index == Some(index) {
+                            Marker::CurrentJob
+                        } else if previous_job_index == Some(index) {
+                            Marker::PreviousJob
+                        } else {
+                            Marker::None
+                        },
+                        job: &job,
+                    };
+                    writeln!(print, "{}", report).unwrap();
 
-    (env.print(&print).await, Continue(()))
+                    job.status_reported();
+
+                    if job.status.is_finished() {
+                        indices_to_remove.push(index);
+                    }
+                }
+                Err(error) => {
+                    let message = Message {
+                        r#type: AnnotationType::Error,
+                        title: "cannot report job status".into(),
+                        annotations: vec![Annotation::new(
+                            AnnotationType::Error,
+                            format!("{:?}: {}", &operand.value, error).into(),
+                            &operand.origin,
+                        )],
+                    };
+                    print_error_message(env, message).await;
+                    return (ExitStatus::FAILURE, Continue(()));
+                }
+            }
+        }
+    }
+
+    let exit_status = env.print(&print).await;
+
+    if exit_status == ExitStatus::SUCCESS {
+        for index in indices_to_remove {
+            env.jobs.remove(index);
+        }
+    }
+
+    (exit_status, Continue(()))
 }
 
 /// Wrapper of [`builtin_body`] that returns the future in a pinned box.
@@ -80,10 +139,11 @@ mod tests {
     use futures_util::future::FutureExt;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::io::Fd;
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
-    use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
 
@@ -168,9 +228,157 @@ mod tests {
         assert_matches!(env.jobs.get(i16), None);
     }
 
-    // TODO specifying job IDs
-    // TODO finished jobs are removed with job ID
-    // TODO specifying job IDs without the initial %
-    // TODO specifying job IDs of non-existing jobs
-    // TODO specifying ambiguous job ID
+    #[test]
+    fn specifying_valid_job_ids() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+        env.jobs.add(Job::new(Pid::from_raw(100)));
+
+        let args = Field::dummies(["%?first", "%2"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&stdout.content),
+            Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
+        );
+    }
+
+    #[test]
+    fn finished_jobs_are_removed_with_job_id() {
+        let mut env = Env::new_virtual();
+
+        // job that will not be removed because it's running
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        let i42 = env.jobs.add(job);
+
+        // job that will be removed because it's finished
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Exited(Pid::from_raw(72), 0);
+        job.name = "echo second".to_string();
+        let i72 = env.jobs.add(job);
+
+        // This one is also finished, but not removed because it's not reported.
+        let mut job = Job::new(Pid::from_raw(102));
+        job.status = WaitStatus::Exited(Pid::from_raw(102), 0);
+        job.name = "echo third".to_string();
+        let i102 = env.jobs.add(job);
+
+        let args = Field::dummies(["%?first", "%?second"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        assert!(env.jobs.get(i42).is_some());
+        assert!(env.jobs.get(i72).is_none());
+        assert!(env.jobs.get(i102).is_some());
+    }
+
+    #[test]
+    fn specifying_job_ids_without_the_initial_percent() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(2));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+        env.jobs.add(Job::new(Pid::from_raw(100)));
+
+        let args = Field::dummies(["?first", "2"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(
+            from_utf8(&stdout.content),
+            Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
+        );
+    }
+
+    #[test]
+    fn specifying_job_ids_of_non_existing_jobs() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        env.jobs.add(Job::new(Pid::from_raw(2)));
+
+        let args = Field::dummies(["%2"]);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("jobs"),
+        });
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(from_utf8(&stdout.content), Ok(""));
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = from_utf8(&stderr.content).unwrap();
+        assert!(stderr.contains("job not found"), "{:?}", stderr);
+    }
+
+    #[test]
+    fn specifying_ambiguous_job_id() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut job = Job::new(Pid::from_raw(42));
+        job.name = "echo first".to_string();
+        env.jobs.add(job);
+        let mut job = Job::new(Pid::from_raw(72));
+        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.name = "echo second".to_string();
+        env.jobs.add(job);
+        env.jobs.add(Job::new(Pid::from_raw(100)));
+
+        let args = Field::dummies(["%?first", "%echo"]);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("jobs"),
+        });
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+
+        let state = state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        assert_eq!(from_utf8(&stdout.content), Ok(""));
+        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = from_utf8(&stderr.content).unwrap();
+        assert!(stderr.contains("ambiguous"), "{:?}", stderr);
+    }
+
+    #[test]
+    fn jobs_not_removed_in_case_of_error() {
+        let mut system = Box::new(VirtualSystem::new());
+        system.current_process_mut().close_fd(Fd::STDOUT);
+        let mut env = Env::with_system(system);
+
+        let mut job = Job::new(Pid::from_raw(10));
+        job.status = WaitStatus::Exited(Pid::from_raw(10), 0);
+        job.name = "exit 0".to_string();
+        let i10 = env.jobs.add(job);
+
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("jobs"),
+        });
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
+            assert_eq!(status, WaitStatus::Exited(Pid::from_raw(10), 0));
+        });
+    }
 }
