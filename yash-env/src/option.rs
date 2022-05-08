@@ -32,6 +32,39 @@ use std::fmt::Formatter;
 use std::ops::Not;
 use std::str::FromStr;
 
+/// State of an option: either enabled or disabled.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum State {
+    /// Enabled.
+    On,
+    /// Disabled.
+    Off,
+}
+
+pub use State::*;
+
+/// Converts a state to a string (`on` or `off`).
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            On => "on",
+            Off => "off",
+        };
+        s.fmt(f)
+    }
+}
+
+impl Not for State {
+    type Output = Self;
+    #[must_use]
+    fn not(self) -> Self {
+        match self {
+            On => Off,
+            Off => On,
+        }
+    }
+}
+
 /// Shell option
 #[derive(Clone, Copy, Debug, EnumSetType, Eq, Hash, PartialEq)]
 #[enumset(no_super_impls)]
@@ -281,39 +314,6 @@ impl Option {
     pub fn iter() -> Iter {
         Iter {
             inner: EnumSet::<Option>::all().iter(),
-        }
-    }
-}
-
-/// State of an option: either enabled or disabled.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum State {
-    /// Enabled.
-    On,
-    /// Disabled.
-    Off,
-}
-
-pub use State::*;
-
-/// Converts a state to a string (`on` or `off`).
-impl Display for State {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            On => "on",
-            Off => "off",
-        };
-        s.fmt(f)
-    }
-}
-
-impl Not for State {
-    type Output = Self;
-    #[must_use]
-    fn not(self) -> Self {
-        match self {
-            On => Off,
-            Off => On,
         }
     }
 }
