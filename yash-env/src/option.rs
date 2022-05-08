@@ -132,6 +132,38 @@ impl Option {
         !matches!(self, CmdLine | Interactive | Stdin)
     }
 
+    /// Returns the single-character option name.
+    ///
+    /// This function returns a short name for the option and the state rendered
+    /// by the name.
+    /// The name can be converted back to `Option` with [`parse_short`].
+    /// Note that the result is `None` for options that do not have a short
+    /// name.
+    #[must_use]
+    pub const fn short_name(self) -> std::option::Option<(char, State)> {
+        match self {
+            AllExport => Some(('a', On)),
+            Clobber => Some(('C', Off)),
+            CmdLine => Some(('c', On)),
+            ErrExit => Some(('e', On)),
+            Exec => Some(('n', Off)),
+            Glob => Some(('f', Off)),
+            HashOnDefinition => Some(('h', On)),
+            IgnoreEof => None,
+            Interactive => Some(('i', On)),
+            Log => None,
+            Login => Some(('l', On)),
+            Monitor => Some(('m', On)),
+            Notify => Some(('b', On)),
+            PosixlyCorrect => None,
+            Stdin => Some(('s', On)),
+            Unset => Some(('u', Off)),
+            Verbose => Some(('v', On)),
+            Vi => None,
+            XTrace => Some(('x', On)),
+        }
+    }
+
     /// Returns the option name, all in lower case without punctuations.
     ///
     /// This function returns a string like `"allexport"` and `"exec"`.
@@ -442,6 +474,20 @@ impl OptionSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_name_round_trip() {
+        for option in EnumSet::<Option>::all() {
+            if let Some((name, state)) = option.short_name() {
+                assert_eq!(parse_short(name), Some((option, state)));
+            }
+        }
+        for name in 'A'..='z' {
+            if let Some((option, state)) = parse_short(name) {
+                assert_eq!(option.short_name(), Some((name, state)));
+            }
+        }
+    }
 
     #[test]
     fn display_and_from_str_round_trip() {
