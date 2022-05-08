@@ -43,14 +43,20 @@ pub enum State {
 
 pub use State::*;
 
+impl State {
+    /// Returns a string describing the state (`"on"` or `"off"`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            On => "on",
+            Off => "off",
+        }
+    }
+}
+
 /// Converts a state to a string (`on` or `off`).
 impl Display for State {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            On => "on",
-            Off => "off",
-        };
-        s.fmt(f)
+        self.as_str().fmt(f)
     }
 }
 
