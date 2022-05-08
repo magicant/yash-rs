@@ -124,7 +124,17 @@ pub fn look_up_special_parameter<'a>(env: &'a Env, name: &str) -> Option<Lookup<
             Some(value.len().to_string().into())
         }
         '?' => Some(env.exit_status.to_string().into()),
-        '-' => todo!(),
+        '-' => {
+            let mut value = String::new();
+            for option in yash_env::option::Option::iter() {
+                if let Some((name, state)) = option.short_name() {
+                    if state == env.options.get(option) {
+                        value.push(name);
+                    }
+                }
+            }
+            Some(value.into())
+        }
         '$' => Some(env.main_pid.to_string().into()),
         '!' => Some(env.jobs.last_async_pid().to_string().into()),
         '0' => todo!(),
@@ -174,6 +184,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::job::Pid;
+    use yash_env::option::OptionSet;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
 
@@ -239,6 +250,25 @@ mod tests {
         env.exit_status.0 = 49;
         let result = look_up_special_parameter(&env, "?").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "49");
+    }
+
+    #[test]
+    fn special_shell_options() {
+        let mut env = yash_env::Env::new_virtual();
+        let result = look_up_special_parameter(&env, "-").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "");
+
+        env.options = OptionSet::empty();
+        let result = look_up_special_parameter(&env, "-").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "Cnfu");
+
+        use yash_env::option::{Option::*, State};
+        env.options = OptionSet::default();
+        env.options.set(AllExport, State::On);
+        env.options.set(Verbose, State::On);
+        env.options.set(Vi, State::On);
+        let result = look_up_special_parameter(&env, "-").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "av");
     }
 
     #[test]
