@@ -17,6 +17,7 @@
 //! Type definitions for command execution.
 
 use nix::sys::signal::Signal;
+use nix::sys::wait::WaitStatus;
 use std::ops::ControlFlow;
 use std::os::raw::c_int;
 use yash_syntax::source::Location;
@@ -103,6 +104,26 @@ impl From<Signal> for ExitStatus {
     /// implementation returns `signal_number + 384`.
     fn from(signal: Signal) -> Self {
         Self::from(signal as c_int + 0x180)
+    }
+}
+
+/// Error returned when a [`WaitStatus`] could not be converted to an
+/// [`ExitStatus`]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StillAliveError;
+
+/// Converts a `WaitStatus` to an `ExitStatus` if the status is `Exited`,
+/// `Signaled`, or `Stopped`.
+impl TryFrom<WaitStatus> for ExitStatus {
+    type Error = StillAliveError;
+    fn try_from(status: WaitStatus) -> std::result::Result<Self, StillAliveError> {
+        match status {
+            WaitStatus::Exited(_, exit_status) => Ok(ExitStatus(exit_status)),
+            WaitStatus::Signaled(_, signal, _) | WaitStatus::Stopped(_, signal) => {
+                Ok(ExitStatus::from(signal))
+            }
+            _ => Err(StillAliveError),
+        }
     }
 }
 
