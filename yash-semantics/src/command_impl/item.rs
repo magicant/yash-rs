@@ -30,27 +30,27 @@ use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
 
+/// Executes the item.
+///
+/// # Synchronous command
+///
+/// If the item's `async_flag` is `None`, this function executes the and-or list
+/// in the item.
+///
+/// # Asynchronous command
+///
+/// If the item has an `async_flag` set, the and-or list is executed
+/// asynchronously in a subshell, whose process ID is [set to the job
+/// set](yash_env::job::JobSet::set_last_async_pid) in the environment.
+///
+/// Since this function finishes before the asynchronous execution finishes, the
+/// exit status does not reflect the results of the and-or list; the exit status
+/// is always 0.
+///
+/// TODO: If the `monitor` option is off, the standard input of the asynchronous
+/// and-or list is implicitly redirected to `/dev/null`.
 #[async_trait(?Send)]
 impl Command for syntax::Item {
-    /// Executes the item.
-    ///
-    /// # Synchronous command
-    ///
-    /// If the item's `async_flag` is `None`, this function executes the and-or
-    /// list in the item.
-    ///
-    /// # Asynchronous command
-    ///
-    /// If the item has an `async_flag` set, the and-or list is executed
-    /// asynchronously in a subshell, whose process ID is [set to the job
-    /// set](yash_env::job::JobSet::set_last_async_pid) in the environment.
-    ///
-    /// Since this function finishes before the asynchronous execution finishes,
-    /// the exit status does not reflect the results of the and-or list; the
-    /// exit status is always 0.
-    ///
-    /// TODO: If the `monitor` option is off, the standard input of the
-    /// asynchronous and-or list is implicitly redirected to `/dev/null`.
     async fn execute(&self, env: &mut Env) -> Result {
         match &self.async_flag {
             None => self.and_or.execute(env).await,

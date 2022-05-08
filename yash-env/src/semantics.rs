@@ -97,11 +97,11 @@ impl From<ExitStatus> for c_int {
     }
 }
 
+/// Converts a signal to the corresponding exit status.
+///
+/// POSIX requires the exit status to be greater than 128. The current
+/// implementation returns `signal_number + 384`.
 impl From<Signal> for ExitStatus {
-    /// Converts a signal to the corresponding exit status.
-    ///
-    /// POSIX requires the exit status to be greater than 128. The current
-    /// implementation returns `signal_number + 384`.
     fn from(signal: Signal) -> Self {
         Self::from(signal as c_int + 0x180)
     }
@@ -127,16 +127,16 @@ impl TryFrom<WaitStatus> for ExitStatus {
     }
 }
 
+/// Converts an exit status to the corresponding signal.
+///
+/// If there is a signal such that
+/// `exit_status == ExitStatus::from(signal)`,
+/// the signal is returned.
+/// The same if the exit status is the lowest 8 bits of such an exit status.
+/// The signal is also returned if the exit status is a signal number itself.
+/// Otherwise, an error is returned.
 impl TryFrom<ExitStatus> for Signal {
     type Error = nix::Error;
-    /// Converts an exit status to the corresponding signal.
-    ///
-    /// If there is a signal such that
-    /// `exit_status == ExitStatus::from(signal)`,
-    /// the signal is returned.
-    /// The same if the exit status is the lowest 8 bits of such an exit status.
-    /// The signal is also returned if the exit status is a signal number
-    /// itself. Otherwise, an error is returned.
     fn try_from(exit_status: ExitStatus) -> nix::Result<Signal> {
         Signal::try_from(exit_status.0 - 0x180)
             .or_else(|_| Signal::try_from(exit_status.0 - 0x80))

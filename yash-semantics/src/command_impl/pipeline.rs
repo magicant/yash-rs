@@ -30,34 +30,33 @@ use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
 
+/// Executes the pipeline.
+///
+/// # Executing commands
+///
+/// If this pipeline contains one command, it is executed in the current shell
+/// execution environment.
+///
+/// If the pipeline has more than one command, all the commands are executed
+/// concurrently. Every command is executed in a new subshell. The standard
+/// output of a command is connected to the standard input of the next command
+/// via a pipe, except for the standard output of the last command and the
+/// standard input of the first command, which are not modified.
+///
+/// If the pipeline has no command, it is a no-op.
+///
+/// # Exit status
+///
+/// The exit status of the pipeline is that of the last command (or zero if no
+/// command). If the pipeline starts with an `!`, the exit status is inverted:
+/// zero becomes one, and non-zero becomes zero.
+///
+/// In POSIX, the expected exit status is unclear when an inverted pipeline
+/// performs a jump as in `! return 42`. The behavior disagrees among existing
+/// shells. This implementation does not invert the exit status when the return
+/// value is `Err(Divert::...)`, which is different from yash 2.
 #[async_trait(?Send)]
 impl Command for syntax::Pipeline {
-    /// Executes the pipeline.
-    ///
-    /// # Executing commands
-    ///
-    /// If this pipeline contains one command, it is executed in the
-    /// current shell execution environment.
-    ///
-    /// If the pipeline has more than one command, all the commands are executed
-    /// concurrently. Every command is executed in a new subshell. The standard
-    /// output of a command is connected to the standard input of the next
-    /// command via a pipe, except for the standard output of the last command
-    /// and the standard input of the first command, which are not modified.
-    ///
-    /// If the pipeline has no command, it is a no-op.
-    ///
-    /// # Exit status
-    ///
-    /// The exit status of the pipeline is that of the last command (or
-    /// zero if no command). If the pipeline starts with an `!`, the exit status
-    /// is inverted: zero becomes one, and non-zero becomes zero.
-    ///
-    /// In POSIX, the expected exit status is unclear when an inverted pipeline
-    /// performs a jump as in `! return 42`. The behavior disagrees among
-    /// existing shells. This implementation does not invert the exit status
-    /// when the return value is `Err(Divert::...)`, which is different from
-    /// yash 2.
     async fn execute(&self, env: &mut Env) -> Result {
         if !self.negation {
             return execute_commands_in_pipeline(env, &self.commands).await;

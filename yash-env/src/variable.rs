@@ -584,11 +584,9 @@ impl VariableSet {
     }
 }
 
+/// When the guard is dropped, the context that was pushed when creating the
+/// guard is [popped](VariableSet::pop_context).
 impl std::ops::Drop for ContextGuard<'_> {
-    /// Drops the `ContextGuard`.
-    ///
-    /// This function [pops](VariableSet::pop_context) the context that was
-    /// pushed when creating this `ContextGuard`.
     #[inline]
     fn drop(&mut self) {
         self.stack.pop_context_impl()
@@ -639,7 +637,7 @@ impl Env {
 }
 
 /// When the guard is dropped, the context that was pushed when creating the
-/// guard is popped.
+/// guard is [popped](VariableSet::pop_context).
 impl Drop for EnvContextGuard<'_> {
     #[inline]
     fn drop(&mut self) {

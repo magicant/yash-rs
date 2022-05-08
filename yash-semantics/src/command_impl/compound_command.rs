@@ -23,18 +23,20 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
+/// Executes the compound command.
 #[async_trait(?Send)]
 impl Command for syntax::FullCompoundCommand {
-    /// Executes the compound command.
     async fn execute(&self, env: &mut Env) -> Result {
         // TODO Open redirections
         self.command.execute(env).await
     }
 }
 
+/// Executes the compound command.
+///
+/// TODO Elaborate
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
-    /// Executes the compound command.
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::CompoundCommand::*;
         match self {

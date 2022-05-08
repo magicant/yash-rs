@@ -70,11 +70,11 @@ pub struct OpenFile {
     pub is_appending: bool,
 }
 
+/// Compares two `OpenFile`s.
+///
+/// Two files are considered equal iff they have the same i-node, readability,
+/// and writability.
 impl PartialEq for OpenFile {
-    /// Compares two `OpenFile`s.
-    ///
-    /// Returns true if the two files are the same i-node and shares the same
-    /// readability and writability.
     fn eq(&self, rhs: &Self) -> bool {
         Rc::ptr_eq(&self.file, &rhs.file)
             && self.is_readable == rhs.is_readable
@@ -198,10 +198,10 @@ pub struct PipeReader {
     pub pipe: Rc<RefCell<Pipe>>,
 }
 
+/// Compares two `PipeReader`s.
+///
+/// Two readers are considered equal iff they reads from the same pipe.
 impl PartialEq for PipeReader {
-    /// Compares two `PipeReader`s.
-    ///
-    /// Returns true if the two readers are reading from the same pipe.
     fn eq(&self, rhs: &Self) -> bool {
         Rc::ptr_eq(&self.pipe, &rhs.pipe)
     }
@@ -251,10 +251,10 @@ pub struct PipeWriter {
     pub pipe: Weak<RefCell<Pipe>>,
 }
 
+/// Compares two `PipeWriter`s.
+///
+/// Two writers are considered equal iff they writes to the same pipe.
 impl PartialEq for PipeWriter {
-    /// Compares two `PipeWriter`s.
-    ///
-    /// Returns true if the two readers are reading from the same pipe.
     fn eq(&self, rhs: &Self) -> bool {
         Weak::ptr_eq(&self.pipe, &rhs.pipe)
     }

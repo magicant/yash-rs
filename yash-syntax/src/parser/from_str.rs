@@ -65,9 +65,9 @@ impl FromStr for Param {
     }
 }
 
+/// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
 impl FromStr for TextUnit {
     type Err = Error;
-    /// Parses a [`TextUnit`] by `lexer.text_unit(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<TextUnit, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
@@ -78,9 +78,9 @@ impl FromStr for TextUnit {
     }
 }
 
+// Parses a text by `lexer.text(|_| false, |_| true)`.
 impl FromStr for Text {
     type Err = Error;
-    // Parses a text by `lexer.text(|_| false, |_| true)`.
     fn from_str(s: &str) -> Result<Text, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         unwrap_ready(lexer.text(|_| false, |_| true))
@@ -99,14 +99,14 @@ impl FromStr for WordUnit {
     }
 }
 
+/// Converts a string to a word.
+///
+/// This implementation does not parse any tilde expansions in the word.
+/// To parse them, you need to call [`Word::parse_tilde_front`] or
+/// [`Word::parse_tilde_everywhere`] on the resultant word.
 impl FromStr for Word {
     type Err = Error;
 
-    /// Converts a string to a word.
-    ///
-    /// This function does not parse any tilde expansions in the word.
-    /// To parse them, you need to call [`Word::parse_tilde_front`] or
-    /// [`Word::parse_tilde_everywhere`] on the resultant word.
     fn from_str(s: &str) -> Result<Word, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let mut lexer = WordLexer {
@@ -126,11 +126,14 @@ impl FromStr for Value {
     }
 }
 
+/// Converts a string to an assignment.
 impl FromStr for Assign {
-    type Err = Option<Error>;
-    /// Converts a string to an assignment.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the string is not an assignment word.
+    /// The error is `None` if the input is a valid word but not an assignment.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<Assign, Option<Error>> {
         let c: SimpleCommand = s.parse()?;
         Ok(c.assigns.into_iter().next()).shift()
@@ -157,13 +160,16 @@ impl FromStr for RedirOp {
     }
 }
 
+/// Converts a string to a redirection.
+///
+/// This implementation does not support parsing a here-document.
 impl FromStr for Redir {
+    /// Optional error value
+    ///
+    /// The error is `None` if the first token is not a redirection operator.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
     type Err = Option<Error>;
-    /// Converts a string to a redirection.
-    ///
-    /// Returns `Err(None)` if the first token is not a redirection operator.
-    ///
-    /// This function does not support parsing a here-document.
+
     fn from_str(s: &str) -> Result<Redir, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -177,14 +183,17 @@ impl FromStr for Redir {
     }
 }
 
+/// Converts a string to a simple command.
+///
+/// This implementation does not support parsing a command that contains a
+/// here-document.
 impl FromStr for SimpleCommand {
+    /// Optional error value
+    ///
+    /// The error is `None` if the first token does not start a simple command.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
     type Err = Option<Error>;
-    /// Converts a string to a simple command.
-    ///
-    /// Returns `Err(None)` if the first token does not start a simple command.
-    ///
-    /// This function does not support parsing a command that contains a
-    /// here-document.
+
     fn from_str(s: &str) -> Result<SimpleCommand, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -200,11 +209,14 @@ impl FromStr for SimpleCommand {
     }
 }
 
+/// Converts a string to a case item.
 impl FromStr for CaseItem {
-    type Err = Option<Error>;
-    /// Converts a string to a case item.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token is `esac`.
+    /// The error is `None` if the first token is `esac`.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<CaseItem, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -215,11 +227,14 @@ impl FromStr for CaseItem {
     }
 }
 
+/// Converts a string to a compound command.
 impl FromStr for CompoundCommand {
-    type Err = Option<Error>;
-    /// Converts a string to a compound command.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token does not start a compound command.
+    /// The error is `None` if the first token does not start a compound command.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<CompoundCommand, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -230,11 +245,14 @@ impl FromStr for CompoundCommand {
     }
 }
 
+/// Converts a string to a compound command.
 impl FromStr for FullCompoundCommand {
-    type Err = Option<Error>;
-    /// Converts a string to a compound command.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token does not start a compound command.
+    /// The error is `None` if the first token does not start a compound command.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<FullCompoundCommand, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -245,11 +263,14 @@ impl FromStr for FullCompoundCommand {
     }
 }
 
+/// Converts a string to a command.
 impl FromStr for Command {
-    type Err = Option<Error>;
-    /// Converts a string to a command.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token does not start a command.
+    /// The error is `None` if the first token does not start a command.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<Command, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -260,11 +281,14 @@ impl FromStr for Command {
     }
 }
 
+/// Converts a string to a pipeline.
 impl FromStr for Pipeline {
-    type Err = Option<Error>;
-    /// Converts a string to a pipeline.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token does not start a pipeline.
+    /// The error is `None` if the first token does not start a pipeline.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<Pipeline, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -282,11 +306,14 @@ impl FromStr for AndOr {
     }
 }
 
+/// Converts a string to an and-or list.
 impl FromStr for AndOrList {
-    type Err = Option<Error>;
-    /// Converts a string to an and-or list.
+    /// Optional error value
     ///
-    /// Returns `Err(None)` if the first token does not start an and-or list.
+    /// The error is `None` if the first token does not start an and-or list.
+    /// A proper error is returned in `Some(_)` in case of a syntax error.
+    type Err = Option<Error>;
+
     fn from_str(s: &str) -> Result<AndOrList, Option<Error>> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();
@@ -299,11 +326,9 @@ impl FromStr for AndOrList {
     }
 }
 
+/// Converts a string to a list.
 impl FromStr for List {
     type Err = Error;
-    /// Converts a string to a list.
-    ///
-    /// Returns `Err(None)` if the first token does not start a list.
     fn from_str(s: &str) -> Result<List, Error> {
         let mut lexer = Lexer::from_memory(s, Source::Unknown);
         let aliases = Default::default();

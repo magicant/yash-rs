@@ -809,8 +809,8 @@ struct FdAwaiter {
     waker: Weak<RefCell<Option<Waker>>>,
 }
 
+/// Wakes the waker when `FdAwaiter` is dropped.
 impl Drop for FdAwaiter {
-    /// Wakes the waker when `FdAwaiter` is dropped.
     fn drop(&mut self) {
         if let Some(waker) = self.waker.upgrade() {
             if let Some(waker) = waker.borrow_mut().take() {
@@ -935,8 +935,8 @@ impl Ord for Timeout {
     }
 }
 
+/// Wakes the waker when `Timeout` is dropped.
 impl Drop for Timeout {
-    /// Wakes the waker when `Timeout` is dropped.
     fn drop(&mut self) {
         if let Some(waker) = self.waker.upgrade() {
             if let Some(waker) = waker.borrow_mut().take() {

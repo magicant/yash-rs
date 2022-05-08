@@ -31,13 +31,13 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
+/// Executes the command.
+///
+/// After executing the command body, the `execute` function [runs
+/// traps](run_traps_for_caught_signals) if any caught signals are pending, and
+/// [updates subshell statuses](Env::update_all_subshell_statuses).
 #[async_trait(?Send)]
 impl Command for syntax::Command {
-    /// Executes the command.
-    ///
-    /// After executing the command body, this function [runs
-    /// traps](run_traps_for_caught_signals) if any caught signals are pending,
-    /// and [updates subshell statuses](Env::update_all_subshell_statuses).
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::Command::*;
         let main_result = match self {
@@ -57,13 +57,13 @@ impl Command for syntax::Command {
     }
 }
 
+/// Executes the list.
+///
+/// The list is executed by executing each item in sequence. If any item results
+/// in a [`Divert`](yash_env::semantics::Divert), the remaining items are not
+/// executed.
 #[async_trait(?Send)]
 impl Command for syntax::List {
-    /// Executes the list.
-    ///
-    /// The list is executed by executing each item in sequence. If any item
-    /// results in a [`Divert`](yash_env::semantics::Divert), the remaining
-    /// items are not executed.
     async fn execute(&self, env: &mut Env) -> Result {
         for item in &self.0 {
             item.execute(env).await?

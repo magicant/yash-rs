@@ -30,16 +30,16 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
+/// Executes the function definition command.
+///
+/// First, the function name is [expanded](expand_word). If the expansion fails,
+/// the execution ends with a non-zero exit status. Next, the environment is
+/// examined for an existing function having the same name.  If there is such a
+/// function that is read-only, the execution ends with a non-zero exit status.
+/// Finally, the function definition is inserted into the environment, and the
+/// execution ends with an exit status of zero.
 #[async_trait(?Send)]
 impl Command for syntax::FunctionDefinition {
-    /// Executes the function definition command.
-    ///
-    /// First, the function name is [expanded](expand_word). If the expansion
-    /// fails, the execution ends with a non-zero exit status. Next, the
-    /// environment is examined for an existing function having the same name.
-    /// If there is such a function that is read-only, the execution ends with a
-    /// non-zero exit status. Finally, the function definition is inserted into
-    /// the environment, and the execution ends with an exit status of zero.
     async fn execute(&self, env: &mut Env) -> Result {
         // Expand the function name
         let Field {

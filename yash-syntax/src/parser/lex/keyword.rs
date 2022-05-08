@@ -87,8 +87,6 @@ impl fmt::Display for Keyword {
 
 impl TryFrom<&str> for Keyword {
     type Error = ();
-    /// Returns the `Keyword` that matches the input string, or `()` if the
-    /// string is not a keyword.
     fn try_from(s: &str) -> Result<Keyword, ()> {
         use Keyword::*;
         match s {
