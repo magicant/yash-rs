@@ -443,12 +443,8 @@ impl OptionSet {
         }
     }
 
-    /// Creates an option set with all options enabled.
-    pub fn all() -> Self {
-        OptionSet {
-            enabled_options: EnumSet::all(),
-        }
-    }
+    // Some options are mutually exclusive, so there is no "all" function that
+    // returns an option set with all options enabled.
 
     /// Returns the current state of the option.
     pub fn get(&self, option: Option) -> State {
@@ -463,6 +459,8 @@ impl OptionSet {
     ///
     /// Some options should not be changed after the shell startup, but that
     /// does not affect the behavior of this function.
+    ///
+    /// TODO: What if an option that is mutually exclusive with another is set?
     pub fn set(&mut self, option: Option, state: State) {
         match state {
             On => self.enabled_options.insert(option),
