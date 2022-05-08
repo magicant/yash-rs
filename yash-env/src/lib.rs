@@ -49,6 +49,7 @@ use self::io::Fd;
 use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
+use self::job::WaitStatusEx;
 use self::option::OptionSet;
 use self::semantics::ExitStatus;
 use self::stack::Stack;
@@ -320,20 +321,9 @@ impl Env {
         // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
 
-        loop {
-            use nix::sys::wait::WaitStatus::*;
-            match self.wait_for_subshell(child_pid).await? {
-                Exited(pid, exit_status) => {
-                    assert_eq!(pid, child_pid);
-                    break Ok(ExitStatus(exit_status));
-                }
-                Signaled(pid, signal, _core_dumped) => {
-                    assert_eq!(pid, child_pid);
-                    break Ok(ExitStatus::from(signal));
-                }
-                _ => (),
-            }
-        }
+        let (awaited_pid, exit_status) = self.wait_for_subshell_to_finish(child_pid).await?;
+        assert_eq!(awaited_pid, child_pid);
+        Ok(exit_status)
     }
 
     /// Waits for a subshell to terminate, suspend, or resume.
@@ -367,6 +357,25 @@ impl Env {
                 result => return result,
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
+        }
+    }
+
+    /// Wait for a subshell to terminate.
+    ///
+    /// This function is similar to
+    /// [`wait_for_subshell`](Self::wait_for_subshell), but returns only when
+    /// the target is finished (either exited or killed by a signal).
+    ///
+    /// Returns the process ID of the awaited process and its exit status.
+    pub async fn wait_for_subshell_to_finish(
+        &mut self,
+        target: Pid,
+    ) -> nix::Result<(Pid, ExitStatus)> {
+        loop {
+            let wait_status = self.wait_for_subshell(target).await?;
+            if wait_status.is_finished() {
+                return Ok((wait_status.pid().unwrap(), wait_status.try_into().unwrap()));
+            }
         }
     }
 

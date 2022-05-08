@@ -106,13 +106,12 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 
     // Await the last command
     for pid in pids {
-        use yash_env::job::WaitStatus::*;
-        env.exit_status = match env.wait_for_subshell(pid).await {
-            Ok(Exited(_pid, exit_status)) => ExitStatus(exit_status),
-            // TODO Report signal if interactive
-            Ok(Signaled(_pid, signal, _core_dumped)) => ExitStatus::from(signal),
-            _ => todo!(),
-        }
+        // TODO Report if the child was signaled and the shell is interactive
+        env.exit_status = env
+            .wait_for_subshell_to_finish(pid)
+            .await
+            .expect("cannot receive exit status of child process")
+            .1;
     }
     Continue(())
 }
