@@ -45,7 +45,8 @@ pub use State::*;
 
 impl State {
     /// Returns a string describing the state (`"on"` or `"off"`).
-    pub fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             On => "on",
             Off => "off",
@@ -127,14 +128,16 @@ impl Option {
     ///
     /// Unmodifiable options can be set only on shell startup.
     #[must_use]
-    pub fn is_modifiable(self) -> bool {
+    pub const fn is_modifiable(self) -> bool {
         !matches!(self, CmdLine | Interactive | Stdin)
     }
 
     /// Returns the option name, all in lower case without punctuations.
     ///
     /// This function returns a string like `"allexport"` and `"exec"`.
-    pub fn long_name(self) -> &'static str {
+    /// The name can be converted back to `Option` with [`parse_long`].
+    #[must_use]
+    pub const fn long_name(self) -> &'static str {
         match self {
             AllExport => "allexport",
             Clobber => "clobber",
@@ -265,7 +268,7 @@ impl FromStr for Option {
 /// option names above. Note that new names may be added in the future and it is
 /// not considered a breaking API change.
 #[must_use]
-pub fn parse_short(name: char) -> std::option::Option<(self::Option, State)> {
+pub const fn parse_short(name: char) -> std::option::Option<(self::Option, State)> {
     match name {
         'a' => Some((AllExport, On)),
         'b' => Some((Notify, On)),
