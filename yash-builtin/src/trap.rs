@@ -55,7 +55,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
 
 /// Implementation of the trap built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
-    let (_options, mut operands) = match parse_arguments(&[], Mode::default(), args) {
+    let (_options, mut operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
     };

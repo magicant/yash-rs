@@ -163,7 +163,7 @@ fn find_error_message(error: FindError, operand: &Field) -> Message {
 
 /// Implementation of the jobs built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
-    let (options, operands) = match parse_arguments(OPTIONS, Mode::default(), args) {
+    let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
     };

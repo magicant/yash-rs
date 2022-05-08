@@ -201,7 +201,7 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
 
 /// Implementation of the wait built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
-    let (_options, operands) = match parse_arguments(&[], Mode::default(), args) {
+    let (_options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
     };

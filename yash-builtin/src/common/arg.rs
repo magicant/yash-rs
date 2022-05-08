@@ -210,13 +210,25 @@ pub struct Mode {
     long_options: bool,
     // TODO options_after_operands
     // TODO negative_integer_operands
-    // TODO rejecting_non_portable_option_specs
+    // TODO non_portable_option_specs
 }
 
 impl Mode {
     /// Returns a new `Mode` with non-portable extensions enabled.
     pub const fn with_extensions() -> Self {
         Mode { long_options: true }
+    }
+
+    /// Convenience initializer
+    ///
+    /// This function returns `Self::default()` or `Self::with_extensions()`
+    /// depending on `env.options.get(PosixlyCorrect)`.
+    pub fn with_env(env: &yash_env::Env) -> Self {
+        use yash_env::option::{Off, On, PosixlyCorrect};
+        match env.options.get(PosixlyCorrect) {
+            On => Self::default(),
+            Off => Self::with_extensions(),
+        }
     }
 
     /// Whether the parser accepts long options or not
