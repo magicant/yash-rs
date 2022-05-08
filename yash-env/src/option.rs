@@ -91,13 +91,12 @@ impl Option {
     pub fn is_modifiable(self) -> bool {
         !matches!(self, CmdLine | Interactive | Stdin)
     }
-}
 
-/// Prints the option name, all in lower case without punctuations.
-impl Display for Option {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        use self::Option::*;
-        let s = match self {
+    /// Returns the option name, all in lower case without punctuations.
+    ///
+    /// This function returns a string like `"allexport"` and `"exec"`.
+    pub fn long_name(self) -> &'static str {
+        match self {
             AllExport => "allexport",
             Clobber => "clobber",
             CmdLine => "cmdline",
@@ -117,8 +116,14 @@ impl Display for Option {
             Verbose => "verbose",
             Vi => "vi",
             XTrace => "xtrace",
-        };
-        s.fmt(f)
+        }
+    }
+}
+
+/// Prints the option name, all in lower case without punctuations.
+impl Display for Option {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.long_name().fmt(f)
     }
 }
 
