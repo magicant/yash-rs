@@ -45,8 +45,8 @@
 //!
 //! ## Field splitting
 //!
-//! The field splitting divides a field into smaller parts delimited by a
-//! character contained in `$IFS`. Consequently, this operation removes empty
+//! The [field splitting](split) divides a field into smaller parts delimited by
+//! a character contained in `$IFS`. Consequently, this operation removes empty
 //! fields from the results of the previous steps.
 //!
 //! ## Pathname expansion
@@ -68,6 +68,7 @@ pub mod attr_strip;
 pub mod initial;
 pub mod phrase;
 pub mod quote_removal;
+pub mod split;
 
 use self::attr::AttrChar;
 use self::attr::AttrField;
