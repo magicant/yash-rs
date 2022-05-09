@@ -75,7 +75,8 @@ use yash_syntax::syntax::Unquote;
 /// - `$` expands to the process ID of the main shell process
 ///   ([`Env::main_pid`](yash_env::Env::main_pid)). Note that this value does
 ///   _not_ change in subshells.
-/// - `0` TODO Elaborate
+/// - `0` expands to the name of the current shell executable or shell script
+///   ([`Env::arg0`](yash_env::Env::arg0)).
 ///
 /// TODO Elaborate on index and modifiers
 #[async_trait(?Send)]

@@ -93,6 +93,11 @@ pub struct Env {
     /// Aliases defined in the environment.
     pub aliases: AliasSet,
 
+    /// Name of the current shell executable or shell script.
+    ///
+    /// Special parameter `0` expands to this value.
+    pub arg0: String,
+
     /// Built-in utilities available in the environment.
     pub builtins: HashMap<&'static str, Builtin>,
 
@@ -135,6 +140,7 @@ impl Env {
     pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
+            arg0: Default::default(),
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
@@ -161,6 +167,7 @@ impl Env {
     pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
         Env {
             aliases: self.aliases.clone(),
+            arg0: self.arg0.clone(),
             builtins: self.builtins.clone(),
             exit_status: self.exit_status,
             functions: self.functions.clone(),

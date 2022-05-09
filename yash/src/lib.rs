@@ -32,7 +32,13 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
 
+    let mut args = std::env::args();
+    if let Some(arg0) = args.next() {
+        env.arg0 = arg0;
+    }
+
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
+
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.
     for (name, value) in std::env::vars() {

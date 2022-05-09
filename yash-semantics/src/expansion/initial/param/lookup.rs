@@ -137,7 +137,7 @@ pub fn look_up_special_parameter<'a>(env: &'a Env, name: &str) -> Option<Lookup<
         }
         '$' => Some(env.main_pid.to_string().into()),
         '!' => Some(env.jobs.last_async_pid().to_string().into()),
-        '0' => todo!(),
+        '0' => Some(env.arg0.as_str().into()),
         _ => None,
     }
 }
@@ -287,6 +287,17 @@ mod tests {
         env.jobs.set_last_async_pid(Pid::from_raw(72));
         let result = look_up_special_parameter(&env, "!").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "72");
+    }
+
+    #[test]
+    fn special_arg0() {
+        let mut env = yash_env::Env::new_virtual();
+        let result = look_up_special_parameter(&env, "0").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "");
+
+        env.arg0 = "foo/bar".to_string();
+        let result = look_up_special_parameter(&env, "0").unwrap();
+        assert_matches!(result, Lookup::Scalar(value) if value == "foo/bar");
     }
 
     #[test]
