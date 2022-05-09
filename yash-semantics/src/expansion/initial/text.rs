@@ -70,7 +70,8 @@ use yash_syntax::syntax::Unquote;
 ///   string). When expanded outside double-quotes, `*` expands the same as `@`.
 ///   (TODO: Elaborate on how that works in this function)
 /// - `#` expands to the number of positional parameters.
-/// - `-` TODO Elaborate
+/// - `-` expands to a string that is a concatenation of the short names of
+///   options matching the current option states in the environment.
 /// - `$` expands to the process ID of the main shell process
 ///   ([`Env::main_pid`](yash_env::Env::main_pid)). Note that this value does
 ///   _not_ change in subshells.
