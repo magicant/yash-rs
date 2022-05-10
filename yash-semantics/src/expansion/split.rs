@@ -34,6 +34,10 @@
 //!
 //! TODO empty-last-field option
 
+mod ifs;
+
+pub use self::ifs::{Class, Ifs};
+
 #[cfg(doc)]
 use super::attr::AttrChar;
 #[cfg(doc)]
