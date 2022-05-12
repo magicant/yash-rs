@@ -45,8 +45,8 @@
 //!
 //! ## Field splitting
 //!
-//! The field splitting divides a field into smaller parts delimited by a
-//! character contained in `$IFS`. Consequently, this operation removes empty
+//! The [field splitting](split) divides a field into smaller parts delimited by
+//! a character contained in `$IFS`. Consequently, this operation removes empty
 //! fields from the results of the previous steps.
 //!
 //! ## Pathname expansion
@@ -68,15 +68,18 @@ pub mod attr_strip;
 pub mod initial;
 pub mod phrase;
 pub mod quote_removal;
+pub mod split;
 
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
 use self::initial::Expand;
+use self::split::Ifs;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_env::variable::ReadOnlyError;
+use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -226,9 +229,11 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     env: &mut yash_env::Env,
     words: I,
 ) -> Result<(Vec<Field>, Option<ExitStatus>)> {
+    let mut env = initial::Env::new(env);
+
+    // initial expansion //
     let words = words.into_iter();
     let mut fields = Vec::with_capacity(words.size_hint().0);
-    let mut env = initial::Env::new(env);
     for word in words {
         use self::initial::QuickExpand::*;
         let phrase = match word.quick_expand(&mut env) {
@@ -242,10 +247,25 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     }
 
     // TODO brace expansion
-    // TODO field splitting
-    // TODO pathname expansion (or quote removal and attribute stripping)
 
-    let fields = fields
+    // field splitting //
+    use yash_env::variable::Value::Scalar;
+    #[rustfmt::skip]
+    let ifs = match env.inner.variables.get("IFS") {
+        Some(&Variable { value: Scalar(ref value), ..  }) => Ifs::new(value),
+        // TODO If the variable is an array, should we ignore it?
+        _ => Ifs::default(),
+    };
+    let mut split_fields = Vec::with_capacity(fields.len());
+    for field in fields {
+        split::split_into(field, &ifs, &mut split_fields);
+    }
+    drop(ifs);
+
+    // TODO pathname expansion
+
+    // quote removal and attribute stripping //
+    let fields = split_fields
         .into_iter()
         .map(AttrField::remove_quotes_and_strip)
         .collect();
@@ -283,6 +303,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::num::NonZeroU64;
     use std::rc::Rc;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
@@ -324,6 +345,69 @@ mod tests {
             "the variable was made read-only here"
         );
         assert_eq!(message.annotations[1].location, &Location::dummy("ROL"));
+    }
+
+    #[test]
+    fn expand_words_performs_field_splitting_possibly_with_default_ifs() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "v".to_string(),
+                Variable {
+                    value: Value::Scalar("foo  bar ".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        let words = &["$v".parse().unwrap()];
+        let result = expand_words(&mut env, words).now_or_never().unwrap();
+        let (fields, exit_status) = result.unwrap();
+        assert_eq!(exit_status, None);
+        assert_matches!(fields.as_slice(), [f1, f2] => {
+            assert_eq!(f1.value, "foo");
+            assert_eq!(f2.value, "bar");
+        });
+    }
+
+    #[test]
+    fn expand_words_performs_field_splitting_with_current_ifs() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "v".to_string(),
+                Variable {
+                    value: Value::Scalar("foo  bar ".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                Scope::Global,
+                "IFS".to_string(),
+                Variable {
+                    value: Value::Scalar(" o".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        let words = &["$v".parse().unwrap()];
+        let result = expand_words(&mut env, words).now_or_never().unwrap();
+        let (fields, exit_status) = result.unwrap();
+        assert_eq!(exit_status, None);
+        assert_matches!(fields.as_slice(), [f1, f2, f3] => {
+            assert_eq!(f1.value, "f");
+            assert_eq!(f2.value, "");
+            assert_eq!(f3.value, "bar");
+        });
     }
 
     #[test]
