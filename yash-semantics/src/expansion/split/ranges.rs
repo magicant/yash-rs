@@ -50,7 +50,8 @@ impl Default for State {
 
 /// Iterator that yields index ranges of separated fields
 ///
-/// This iterator can be created with [`Ifs::ranges`].
+/// This iterator can be created with [`Ifs::ranges`] and is used by
+/// [`split_into`](super::split_into).
 #[derive(Clone, Debug)]
 pub struct Ranges<'a, I: Iterator<Item = AttrChar>> {
     inner: I,

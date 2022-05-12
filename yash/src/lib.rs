@@ -50,6 +50,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         };
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
+    // TODO Ignore unsafe variables such as $IFS
 
     let input = Box::new(Stdin::new(env.system.clone()));
     let line = NonZeroU64::new(1).unwrap();
