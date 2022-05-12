@@ -299,6 +299,9 @@ pub async fn expand_value(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
+    use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::num::NonZeroU64;
@@ -345,6 +348,20 @@ mod tests {
             "the variable was made read-only here"
         );
         assert_eq!(message.annotations[1].location, &Location::dummy("ROL"));
+    }
+
+    #[test]
+    fn expand_words_performs_initial_expansion() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert("return", return_builtin());
+            let words = &["[$(echo echoed; return -n 42)]".parse().unwrap()];
+            let (fields, exit_status) = expand_words(&mut env, words).await.unwrap();
+            assert_eq!(exit_status, Some(ExitStatus(42)));
+            assert_matches!(fields.as_slice(), [f] => {
+                assert_eq!(f.value, "[echoed]");
+            });
+        })
     }
 
     #[test]
@@ -411,6 +428,18 @@ mod tests {
     }
 
     #[test]
+    fn expand_words_performs_quote_removal() {
+        let mut env = yash_env::Env::new_virtual();
+        let words = &["\"foo\"'$v'".parse().unwrap()];
+        let result = expand_words(&mut env, words).now_or_never().unwrap();
+        let (fields, exit_status) = result.unwrap();
+        assert_eq!(exit_status, None);
+        assert_matches!(fields.as_slice(), [f] => {
+            assert_eq!(f.value, "foo$v");
+        });
+    }
+
+    #[test]
     fn expand_value_scalar() {
         let mut env = yash_env::Env::new_virtual();
         let value = yash_syntax::syntax::Scalar(r"1\\".parse().unwrap());
@@ -428,10 +457,8 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let value =
             yash_syntax::syntax::Array(vec!["''".parse().unwrap(), r"2\\".parse().unwrap()]);
-        let (result, exit_status) = expand_value(&mut env, &value)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
+        let result = expand_value(&mut env, &value).now_or_never().unwrap();
+        let (result, exit_status) = result.unwrap();
         let content = assert_matches!(result, yash_env::variable::Array(content) => content);
         assert_eq!(content, ["".to_string(), r"2\".to_string()]);
         assert_eq!(exit_status, None);
