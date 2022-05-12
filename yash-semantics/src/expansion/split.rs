@@ -35,10 +35,10 @@
 //! TODO empty-last-field option
 
 mod ifs;
+mod ranges;
 
 pub use self::ifs::{Class, Ifs};
+pub use self::ranges::Ranges;
 
 #[cfg(doc)]
-use super::attr::AttrChar;
-#[cfg(doc)]
-use super::attr::Origin;
+use super::attr::{AttrChar, Origin};
