@@ -184,7 +184,7 @@ mod tests {
             assert_eq!(
                 env.variables.get("b").unwrap(),
                 &Variable {
-                    value: Value::Array(vec!["".to_string()]),
+                    value: Value::Array(vec![]),
                     last_assigned_location: Some(assigns[1].location.clone()),
                     is_exported: false,
                     read_only_location: None,
