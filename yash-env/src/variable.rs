@@ -70,6 +70,22 @@ pub enum Value {
 pub use Value::*;
 
 impl Value {
+    /// Creates a scalar value.
+    #[must_use]
+    pub fn scalar<S: Into<String>>(value: S) -> Self {
+        Scalar(value.into())
+    }
+
+    /// Creates an array value.
+    #[must_use]
+    pub fn array<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Array(values.into_iter().map(Into::into).collect())
+    }
+
     /// Splits the value by colons.
     ///
     /// If this value is `Scalar`, the value is separated at each occurrence of
@@ -147,6 +163,75 @@ pub struct Variable {
 }
 
 impl Variable {
+    /// Creates a new scalar variable from a string.
+    ///
+    /// The returned variable's `last_assigned_location` and
+    /// `read_only_location` are `None` and `is_exported` is false.
+    /// You should update these fields as necessary before assigning to a
+    /// variable set.
+    #[must_use]
+    pub fn new<S: Into<String>>(value: S) -> Self {
+        Variable {
+            value: Value::scalar(value),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        }
+    }
+
+    /// Creates a new array variable from a string.
+    ///
+    /// The returned variable's `last_assigned_location` and
+    /// `read_only_location` are `None` and `is_exported` is false.
+    /// You should update these fields as necessary before assigning to a
+    /// variable set.
+    #[must_use]
+    pub fn new_array<I, S>(values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Variable {
+            value: Value::array(values),
+            last_assigned_location: None,
+            is_exported: false,
+            read_only_location: None,
+        }
+    }
+
+    /// Sets the last assigned location.
+    ///
+    /// This is a convenience function for doing
+    /// `self.last_assigned_location = Some(location)` in a method chain.
+    #[inline]
+    #[must_use]
+    pub fn set_assigned_location(mut self, location: Location) -> Self {
+        self.last_assigned_location = Some(location);
+        self
+    }
+
+    /// Sets the `is_exported` flag.
+    ///
+    /// This is a convenience function for doing `self.is_exported = true` in a
+    /// method chain.
+    #[inline]
+    #[must_use]
+    pub fn export(mut self) -> Self {
+        self.is_exported = true;
+        self
+    }
+
+    /// Makes the variable read-only.
+    ///
+    /// This is a convenience function for doing
+    /// `self.read_only_location = Some(location)` in a method chain.
+    #[inline]
+    #[must_use]
+    pub fn make_read_only(mut self, location: Location) -> Self {
+        self.read_only_location = Some(location);
+        self
+    }
+
     /// Whether this variable is read-only or not.
     #[must_use]
     pub const fn is_read_only(&self) -> bool {
