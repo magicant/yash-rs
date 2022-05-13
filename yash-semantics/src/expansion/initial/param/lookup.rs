@@ -326,12 +326,7 @@ mod tests {
     #[test]
     fn positional_found() {
         let mut vars = VariableSet::new();
-        *vars.positional_params_mut() = Variable {
-            value: Value::Array(vec!["a".to_string(), "b".to_string()]),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
-        };
+        *vars.positional_params_mut() = Variable::new_array(["a", "b"]);
         let result = look_up_positional_parameter(&vars, "1").unwrap();
         assert_matches!(result, Lookup::Scalar(value) if value == "a");
         let result = look_up_positional_parameter(&vars, "2").unwrap();
@@ -349,26 +344,15 @@ mod tests {
     #[test]
     fn variable_scalar_found() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "x".to_string(),
-            Variable {
-                value: Value::Scalar("foo".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        )
-        .unwrap();
+        vars.assign(Scope::Global, "x".to_string(), Variable::new("foo"))
+            .unwrap();
         vars.assign(
             Scope::Global,
             "PATH".to_string(),
-            Variable {
-                value: Value::Scalar("/bin:/usr/bin".to_string()),
-                last_assigned_location: Some(Location::dummy("assigned")),
-                is_exported: true,
-                read_only_location: Some(Location::dummy("read-only")),
-            },
+            Variable::new("/bin:/usr/bin")
+                .export()
+                .set_assigned_location(Location::dummy("assigned"))
+                .make_read_only(Location::dummy("read-only")),
         )
         .unwrap();
 
@@ -384,23 +368,16 @@ mod tests {
         vars.assign(
             Scope::Global,
             "x".to_string(),
-            Variable {
-                value: Value::Array(Vec::new()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new_array([] as [&str; 0]),
         )
         .unwrap();
         vars.assign(
             Scope::Global,
             "PATH".to_string(),
-            Variable {
-                value: Value::Array(vec!["/bin".to_string(), "/usr/bin".to_string()]),
-                last_assigned_location: Some(Location::dummy("assigned")),
-                is_exported: true,
-                read_only_location: Some(Location::dummy("read-only")),
-            },
+            Variable::new_array(["/bin", "/usr/bin"])
+                .export()
+                .set_assigned_location(Location::dummy("assigned"))
+                .make_read_only(Location::dummy("read-only")),
         )
         .unwrap();
 

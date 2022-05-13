@@ -29,7 +29,6 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use std::ops::ControlFlow::Break;
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value::Scalar;
     use yash_env::variable::Variable;
 
     let mut args = std::env::args();
@@ -42,12 +41,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     // TODO std::env::vars() would panic on broken UTF-8, which should rather be
     // ignored.
     for (name, value) in std::env::vars() {
-        let value = Variable {
-            value: Scalar(value),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        };
+        let value = Variable::new(value).export();
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
     // TODO Ignore unsafe variables such as $IFS

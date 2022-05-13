@@ -191,7 +191,6 @@ mod tests {
     use assert_matches::assert_matches;
     use std::collections::HashSet;
     use yash_env::function::HashEntry as FunctionEntry;
-    use yash_env::variable::Value::{Array, Scalar};
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -357,12 +356,7 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable {
-            value: Scalar("/bin".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new("/bin").export());
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
@@ -391,12 +385,7 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable {
-            value: Scalar("/bin".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new("/bin").export());
         env.executables.insert("/bin/foo".to_string());
 
         let function = FunctionEntry::new(
@@ -415,12 +404,7 @@ mod tests {
     #[test]
     fn external_utility_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable {
-            value: Scalar("/bin".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new("/bin").export());
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
@@ -451,12 +435,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_scalar() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable {
-            value: Scalar("/usr/local/bin:/usr/bin:/bin".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new("/usr/local/bin:/usr/bin:/bin").export());
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -474,16 +453,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_array() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable {
-            value: Array(vec![
-                "/usr/local/bin".to_string(),
-                "/usr/bin".to_string(),
-                "/bin".to_string(),
-            ]),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new_array(["/usr/local/bin", "/usr/bin", "/bin"]).export());
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -501,12 +471,7 @@ mod tests {
     #[test]
     fn empty_string_in_path_names_current_directory() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable {
-            value: Scalar("/x::/y".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        });
+        env.path = Some(Variable::new("/x::/y").export());
         env.executables.insert("foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {

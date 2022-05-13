@@ -97,12 +97,7 @@ mod tests {
         assert_eq!(exit_status, None);
         assert_eq!(
             env.variables.get("foo").unwrap(),
-            &Variable {
-                value: Value::Scalar("bar".to_string()),
-                last_assigned_location: Some(a.location),
-                is_exported: false,
-                read_only_location: None,
-            }
+            &Variable::new("bar").set_assigned_location(a.location)
         );
     }
 
@@ -123,12 +118,9 @@ mod tests {
         assert_eq!(exit_status, None);
         assert_eq!(
             env.variables.get("foo").unwrap(),
-            &Variable {
-                value: Value::Scalar("baz".to_string()),
-                last_assigned_location: Some(a.location),
-                is_exported: true,
-                read_only_location: None,
-            }
+            &Variable::new("baz")
+                .export()
+                .set_assigned_location(a.location)
         );
     }
 
@@ -136,12 +128,7 @@ mod tests {
     fn perform_assignment_read_only() {
         let mut env = Env::new_virtual();
         let location = Location::dummy("read-only location");
-        let v = Variable {
-            value: Value::Scalar("read-only".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(location.clone()),
-        };
+        let v = Variable::new("read-only").make_read_only(location.clone());
         env.variables
             .assign(Scope::Global, "v".to_string(), v)
             .unwrap();
@@ -174,21 +161,12 @@ mod tests {
             assert_eq!(exit_status, Some(ExitStatus(2)));
             assert_eq!(
                 env.variables.get("a").unwrap(),
-                &Variable {
-                    value: Value::Scalar("A".to_string()),
-                    last_assigned_location: Some(assigns[0].location.clone()),
-                    is_exported: false,
-                    read_only_location: None,
-                }
+                &Variable::new("A").set_assigned_location(assigns[0].location.clone())
             );
             assert_eq!(
                 env.variables.get("b").unwrap(),
-                &Variable {
-                    value: Value::Array(vec![]),
-                    last_assigned_location: Some(assigns[1].location.clone()),
-                    is_exported: false,
-                    read_only_location: None,
-                }
+                &Variable::new_array([] as [&str; 0])
+                    .set_assigned_location(assigns[1].location.clone())
             );
         })
     }

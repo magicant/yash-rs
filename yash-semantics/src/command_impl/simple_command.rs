@@ -488,12 +488,7 @@ mod tests {
             .assign(
                 Scope::Global,
                 "a".to_string(),
-                Variable {
-                    value: Value::Scalar("".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: Some(Location::dummy("ROL")),
-                },
+                Variable::new("").make_read_only(Location::dummy("ROL")),
             )
             .unwrap();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
@@ -725,14 +720,12 @@ mod tests {
             origin: Location::dummy("dummy"),
             is_read_only: false,
         })));
-        let variable = Variable {
-            value: Value::Scalar("".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(Location::dummy("readonly")),
-        };
         env.variables
-            .assign(Scope::Global, "x".to_string(), variable)
+            .assign(
+                Scope::Global,
+                "x".to_string(),
+                Variable::new("").make_read_only(Location::dummy("readonly")),
+            )
             .unwrap();
         let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
         let result = block_on(command.execute(&mut env));
@@ -755,25 +748,11 @@ mod tests {
                 .assign(
                     Scope::Global,
                     "env".to_string(),
-                    Variable {
-                        value: Value::Scalar("scalar".to_string()),
-                        last_assigned_location: None,
-                        is_exported: true,
-                        read_only_location: None,
-                    },
+                    Variable::new("scalar").export(),
                 )
                 .unwrap();
             env.variables
-                .assign(
-                    Scope::Global,
-                    "local".to_string(),
-                    Variable {
-                        value: Value::Scalar("ignored".to_string()),
-                        last_assigned_location: None,
-                        is_exported: false,
-                        read_only_location: None,
-                    },
-                )
+                .assign(Scope::Global, "local".to_string(), Variable::new("ignored"))
                 .unwrap();
 
             let command: syntax::SimpleCommand = "var=123 /some/file foo bar".parse().unwrap();

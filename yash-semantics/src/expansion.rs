@@ -307,7 +307,6 @@ mod tests {
     use std::num::NonZeroU64;
     use std::rc::Rc;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
     use yash_syntax::source::Code;
@@ -321,12 +320,7 @@ mod tests {
             source: Source::Unknown,
         });
         let location = Location { code, range: 2..4 };
-        let new_value = Variable {
-            value: Value::Scalar("value".into()),
-            last_assigned_location: Some(Location::dummy("assigned")),
-            is_exported: false,
-            read_only_location: None,
-        };
+        let new_value = Variable::new("value").set_assigned_location(Location::dummy("assigned"));
         let error = Error {
             cause: ErrorCause::AssignReadOnly(ReadOnlyError {
                 name: "var".into(),
@@ -368,16 +362,7 @@ mod tests {
     fn expand_words_performs_field_splitting_possibly_with_default_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "v".to_string(),
-                Variable {
-                    value: Value::Scalar("foo  bar ".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "v".to_string(), Variable::new("foo  bar "))
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();
@@ -393,28 +378,10 @@ mod tests {
     fn expand_words_performs_field_splitting_with_current_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "v".to_string(),
-                Variable {
-                    value: Value::Scalar("foo  bar ".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "v".to_string(), Variable::new("foo  bar "))
             .unwrap();
         env.variables
-            .assign(
-                Scope::Global,
-                "IFS".to_string(),
-                Variable {
-                    value: Value::Scalar(" o".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "IFS".to_string(), Variable::new(" o"))
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();

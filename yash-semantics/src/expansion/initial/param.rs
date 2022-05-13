@@ -110,16 +110,7 @@ pub mod tests {
         env.variables.positional_params_mut().value =
             Value::Array(vec!["a".to_string(), "c".to_string()]);
         env.variables
-            .assign(
-                Scope::Global,
-                "IFS".to_string(),
-                Variable {
-                    value: Value::Scalar("&?!".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "IFS".to_string(), Variable::new("&?!"))
             .unwrap();
         env
     }

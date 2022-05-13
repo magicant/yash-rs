@@ -24,7 +24,6 @@ use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::ReadOnlyError;
-use yash_env::variable::Scalar;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 use yash_env::Env;
@@ -36,19 +35,17 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
 
     for Field { value, origin } in args {
         if let Some(eq_index) = value.find('=') {
-            let name = value[..eq_index].to_owned();
-            // TODO reject invalid name
-            let value = value[eq_index + 1..].to_owned();
-            let location = origin.clone();
-            // TODO Keep the variable exported if already exported
+            let var_value = value[eq_index + 1..].to_owned();
+            let var = Variable::new(var_value)
+                .set_assigned_location(origin.clone())
+                .make_read_only(origin);
             // TODO Apply all-export option
-            let value = Variable {
-                value: Scalar(value),
-                last_assigned_location: Some(origin),
-                is_exported: false,
-                read_only_location: Some(location),
-            };
-            match env.variables.assign(Scope::Global, name, value) {
+
+            let mut name = value;
+            name.truncate(eq_index);
+            // TODO reject invalid name
+
+            match env.variables.assign(Scope::Global, name, var) {
                 Ok(_old_value) => (),
                 Err(ReadOnlyError {
                     name,
@@ -83,6 +80,7 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::variable::Scalar;
     use yash_env::Env;
 
     #[test]

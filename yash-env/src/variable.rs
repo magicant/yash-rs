@@ -286,12 +286,7 @@ impl Context {
     fn new(r#type: ContextType) -> Self {
         Context {
             r#type,
-            positional_params: Variable {
-                value: Array(Vec::default()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            positional_params: Variable::new_array([] as [&str; 0]),
         }
     }
 }
@@ -753,12 +748,7 @@ mod tests {
     #[test]
     fn assign_new_variable_and_get() {
         let mut variables = VariableSet::new();
-        let variable = Variable {
-            value: Scalar("my value".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(Location::dummy("dummy")),
-        };
+        let variable = Variable::new("my value").make_read_only(Location::dummy("dummy"));
         let result = variables
             .assign(Scope::Global, "foo".to_string(), variable.clone())
             .unwrap();
@@ -769,22 +759,12 @@ mod tests {
     #[test]
     fn reassign_variable_and_get() {
         let mut variables = VariableSet::new();
-        let v1 = Variable {
-            value: Scalar("my value".to_string()),
-            last_assigned_location: Some(Location::dummy("dummy")),
-            is_exported: false,
-            read_only_location: None,
-        };
+        let v1 = Variable::new("my value").set_assigned_location(Location::dummy("dummy"));
         variables
             .assign(Scope::Global, "foo".to_string(), v1.clone())
             .unwrap();
 
-        let v2 = Variable {
-            value: Scalar("your value".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(Location::dummy("something")),
-        };
+        let v2 = Variable::new("your value").make_read_only(Location::dummy("something"));
         let result = variables
             .assign(Scope::Global, "foo".to_string(), v2.clone())
             .unwrap();
@@ -796,22 +776,12 @@ mod tests {
     fn assign_to_read_only_variable() {
         let mut variables = VariableSet::new();
         let read_only_location = Location::dummy("read-only");
-        let v1 = Variable {
-            value: Scalar("my value".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(read_only_location.clone()),
-        };
+        let v1 = Variable::new("my value").make_read_only(read_only_location.clone());
         variables
             .assign(Scope::Global, "x".to_string(), v1.clone())
             .unwrap();
 
-        let v2 = Variable {
-            value: Scalar("your value".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: Some(Location::dummy("something")),
-        };
+        let v2 = Variable::new("your value").make_read_only(Location::dummy("something"));
         let error = variables
             .assign(Scope::Global, "x".to_string(), v2.clone())
             .unwrap_err();
@@ -821,21 +791,12 @@ mod tests {
         assert_eq!(variables.get("x"), Some(&v1));
     }
 
-    fn dummy_variable<V: Into<String>>(value: V) -> Variable {
-        Variable {
-            value: Scalar(value.into()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
-        }
-    }
-
     #[test]
     fn assign_global() {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
@@ -847,7 +808,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
+            .assign(Scope::Local, "foo".to_string(), Variable::new(""))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("".to_string()));
@@ -858,7 +819,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable(""))
+            .assign(Scope::Local, "foo".to_string(), Variable::new(""))
             .unwrap();
         variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
@@ -869,11 +830,11 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("a"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("a"))
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable("b"))
+            .assign(Scope::Global, "foo".to_string(), Variable::new("b"))
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
@@ -886,11 +847,11 @@ mod tests {
     fn variable_in_upper_context_hides_lower_variables() {
         let mut variables = VariableSet::new();
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("0"))
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("1"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("1".to_string()));
@@ -900,11 +861,11 @@ mod tests {
     fn variable_is_visible_again_after_popping_upper_variables() {
         let mut variables = VariableSet::new();
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("0"))
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("1"))
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
@@ -916,7 +877,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("0"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("0".to_string()));
@@ -926,11 +887,11 @@ mod tests {
     fn volatile_assignment_hides_existing_variable() {
         let mut variables = VariableSet::new();
         variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Global, "foo".to_string(), Variable::new("0"))
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("1"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("1".to_string()));
@@ -943,14 +904,13 @@ mod tests {
     fn volatile_assignment_fails_with_existing_read_only_variable() {
         let mut variables = VariableSet::new();
         let read_only_location = Location::dummy("ROL");
-        let mut read_only = dummy_variable("0");
-        read_only.read_only_location = Some(read_only_location.clone());
+        let read_only = Variable::new("0").make_read_only(read_only_location.clone());
         variables
             .assign(Scope::Global, "foo".to_string(), read_only)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         let error = variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("1"))
             .unwrap_err();
         assert_eq!(error.name, "foo");
         assert_eq!(error.read_only_location, read_only_location);
@@ -962,7 +922,7 @@ mod tests {
     fn volatile_assignment_panics_without_volatile_context() {
         let mut variables = VariableSet::new();
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("0"))
             .unwrap();
     }
 
@@ -970,20 +930,20 @@ mod tests {
     fn global_assignment_pops_existing_volatile_variables() {
         let mut variables = VariableSet::new();
         variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Global, "foo".to_string(), Variable::new("0"))
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("1"))
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("2"))
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable("9"))
+            .assign(Scope::Global, "foo".to_string(), Variable::new("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
@@ -1000,20 +960,20 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("0"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("0"))
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("1"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("1"))
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Volatile, "foo".to_string(), dummy_variable("2"))
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("2"))
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
-            .assign(Scope::Local, "foo".to_string(), dummy_variable("9"))
+            .assign(Scope::Local, "foo".to_string(), Variable::new("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
         assert_eq!(variable.value, Scalar("9".to_string()));
@@ -1039,21 +999,11 @@ mod tests {
     #[test]
     fn exporting() {
         let mut variables = VariableSet::new();
-        let variable = Variable {
-            value: Scalar("first".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
-        };
+        let variable = Variable::new("first");
         variables
             .assign(Scope::Local, "foo".to_string(), variable)
             .unwrap();
-        let variable = Variable {
-            value: Scalar("second".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        };
+        let variable = Variable::new("second").export();
         let old_value = variables
             .assign(Scope::Local, "foo".to_string(), variable)
             .unwrap()
@@ -1068,23 +1018,12 @@ mod tests {
     #[test]
     fn reexport_on_reassigning_exported_variable() {
         let mut variables = VariableSet::new();
-        let variable = Variable {
-            value: Scalar("first".to_string()),
-            last_assigned_location: None,
-            is_exported: true,
-            read_only_location: None,
-        };
+        let variable = Variable::new("first").export();
         variables
             .assign(Scope::Local, "foo".to_string(), variable)
             .unwrap();
-        let variable = Variable {
-            value: Scalar("second".to_string()),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
-        };
         let old_value = variables
-            .assign(Scope::Local, "foo".to_string(), variable)
+            .assign(Scope::Local, "foo".to_string(), Variable::new("second"))
             .unwrap()
             .unwrap();
         assert_eq!(old_value.value, Scalar("first".to_string()));
@@ -1100,23 +1039,13 @@ mod tests {
         set.assign(
             Scope::Global,
             "global".to_string(),
-            Variable {
-                value: Value::Scalar("global value".to_string()),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
+            Variable::new("global value").export(),
         )
         .unwrap();
         set.assign(
             Scope::Global,
             "local".to_string(),
-            Variable {
-                value: Value::Scalar("hidden value".to_string()),
-                last_assigned_location: None,
-                is_exported: true,
-                read_only_location: None,
-            },
+            Variable::new("hidden value").export(),
         )
         .unwrap();
 
@@ -1125,23 +1054,13 @@ mod tests {
         set.assign(
             Scope::Local,
             "local".to_string(),
-            Variable {
-                value: Value::Scalar("visible value".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new("visible value"),
         )
         .unwrap();
         set.assign(
             Scope::Local,
             "volatile".to_string(),
-            Variable {
-                value: Value::Scalar("hidden value".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new("hidden value"),
         )
         .unwrap();
 
@@ -1150,12 +1069,7 @@ mod tests {
         set.assign(
             Scope::Volatile,
             "volatile".to_string(),
-            Variable {
-                value: Value::Scalar("volatile value".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new("volatile value"),
         )
         .unwrap();
 
@@ -1170,33 +1084,9 @@ mod tests {
             assert_eq!(
                 v,
                 [
-                    (
-                        "global",
-                        &Variable {
-                            value: Scalar("global value".to_string()),
-                            last_assigned_location: None,
-                            is_exported: true,
-                            read_only_location: None
-                        }
-                    ),
-                    (
-                        "local",
-                        &Variable {
-                            value: Scalar("visible value".to_string()),
-                            last_assigned_location: None,
-                            is_exported: false,
-                            read_only_location: None
-                        }
-                    ),
-                    (
-                        "volatile",
-                        &Variable {
-                            value: Scalar("volatile value".to_string()),
-                            last_assigned_location: None,
-                            is_exported: false,
-                            read_only_location: None
-                        }
-                    )
+                    ("global", &Variable::new("global value").export()),
+                    ("local", &Variable::new("visible value")),
+                    ("volatile", &Variable::new("volatile value"))
                 ]
             );
         })
@@ -1210,24 +1100,8 @@ mod tests {
             assert_eq!(
                 v,
                 [
-                    (
-                        "local",
-                        &Variable {
-                            value: Scalar("visible value".to_string()),
-                            last_assigned_location: None,
-                            is_exported: false,
-                            read_only_location: None
-                        }
-                    ),
-                    (
-                        "volatile",
-                        &Variable {
-                            value: Scalar("volatile value".to_string()),
-                            last_assigned_location: None,
-                            is_exported: false,
-                            read_only_location: None
-                        }
-                    )
+                    ("local", &Variable::new("visible value")),
+                    ("volatile", &Variable::new("volatile value"))
                 ]
             );
         })
@@ -1238,18 +1112,7 @@ mod tests {
         test_iter(|set| {
             let mut v: Vec<_> = set.iter(Scope::Volatile).collect();
             v.sort_unstable_by_key(|&(name, _)| name);
-            assert_eq!(
-                v,
-                [(
-                    "volatile",
-                    &Variable {
-                        value: Scalar("volatile value".to_string()),
-                        last_assigned_location: None,
-                        is_exported: false,
-                        read_only_location: None
-                    }
-                )]
-            );
+            assert_eq!(v, [("volatile", &Variable::new("volatile value"))]);
         })
     }
 
@@ -1271,48 +1134,28 @@ mod tests {
             .assign(
                 Scope::Global,
                 "foo".to_string(),
-                Variable {
-                    value: Scalar("FOO".to_string()),
-                    last_assigned_location: None,
-                    is_exported: true,
-                    read_only_location: None,
-                },
+                Variable::new("FOO").export(),
             )
             .unwrap();
         variables
             .assign(
                 Scope::Global,
                 "bar".to_string(),
-                Variable {
-                    value: Array(vec!["BAR".to_string()]),
-                    last_assigned_location: None,
-                    is_exported: true,
-                    read_only_location: None,
-                },
+                Variable::new_array(["BAR"]).export(),
             )
             .unwrap();
         variables
             .assign(
                 Scope::Global,
                 "baz".to_string(),
-                Variable {
-                    value: Array(vec!["1".to_string(), "two".to_string(), "3".to_string()]),
-                    last_assigned_location: None,
-                    is_exported: true,
-                    read_only_location: None,
-                },
+                Variable::new_array(["1", "two", "3"]).export(),
             )
             .unwrap();
         variables
             .assign(
                 Scope::Global,
                 "null".to_string(),
-                Variable {
-                    value: Scalar("not exported".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
+                Variable::new("not exported"),
             )
             .unwrap();
         let mut ss = variables.env_c_strings();
@@ -1397,10 +1240,10 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut guard = env.variables.push_context(ContextType::Regular);
         guard
-            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
             .unwrap();
         guard
-            .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
+            .assign(Scope::Local, "bar".to_string(), Variable::new(""))
             .unwrap();
         VariableSet::pop_context(guard);
 
@@ -1415,11 +1258,11 @@ mod tests {
         let mut guard = env.push_context(ContextType::Regular);
         guard
             .variables
-            .assign(Scope::Global, "foo".to_string(), dummy_variable(""))
+            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
             .unwrap();
         guard
             .variables
-            .assign(Scope::Local, "bar".to_string(), dummy_variable(""))
+            .assign(Scope::Local, "bar".to_string(), Variable::new(""))
             .unwrap();
         Env::pop_context(guard);
 

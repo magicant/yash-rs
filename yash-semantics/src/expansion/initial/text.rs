@@ -171,7 +171,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::Modifier;
@@ -217,16 +216,7 @@ mod tests {
     fn raw_param() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable {
-                    value: Value::Scalar("x".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "foo".to_string(), Variable::new("x"))
             .unwrap();
         let mut env = Env::new(&mut env);
         let name = "foo".to_string();
@@ -247,16 +237,7 @@ mod tests {
     fn braced_param() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable {
-                    value: Value::Scalar("x".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "foo".to_string(), Variable::new("x"))
             .unwrap();
         let mut env = Env::new(&mut env);
         let param = BracedParam(Param {

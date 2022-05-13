@@ -223,7 +223,6 @@ mod tests {
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_semantics::Command;
@@ -238,36 +237,21 @@ mod tests {
             .assign(
                 Scope::Global,
                 "foo".to_string(),
-                Variable {
-                    value: Value::Scalar("value".to_string()),
-                    last_assigned_location: None,
-                    is_exported: true,
-                    read_only_location: None,
-                },
+                Variable::new("value").export(),
             )
             .unwrap();
         env.variables
             .assign(
                 Scope::Global,
                 "bar".to_string(),
-                Variable {
-                    value: Value::Scalar("Hello, world!".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
+                Variable::new("Hello, world!"),
             )
             .unwrap();
         env.variables
             .assign(
                 Scope::Global,
                 "baz".to_string(),
-                Variable {
-                    value: Value::Array(vec!["one".to_string(), "".to_string()]),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
+                Variable::new_array(["one", ""]),
             )
             .unwrap();
 

@@ -173,12 +173,7 @@ pub(crate) mod tests {
                     let name = value[..eq_index].to_owned();
                     // TODO reject invalid name
                     let value = value[eq_index + 1..].to_owned();
-                    let value = Variable {
-                        value: Scalar(value),
-                        last_assigned_location: Some(origin),
-                        is_exported: false,
-                        read_only_location: None,
-                    };
+                    let value = Variable::new(value).set_assigned_location(origin);
                     if let Err(error) = env.variables.assign(Scope::Local, name, value) {
                         unimplemented!("assignment error: {:?}", error);
                     }

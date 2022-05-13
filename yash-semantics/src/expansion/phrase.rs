@@ -1049,17 +1049,8 @@ mod tests {
     #[test]
     fn ifs_join_full_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "IFS".to_string(),
-            Variable {
-                value: Value::Scalar("!?".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        )
-        .unwrap();
+        vars.assign(Scope::Global, "IFS".to_string(), Variable::new("!?"))
+            .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1075,12 +1066,7 @@ mod tests {
         vars.assign(
             Scope::Global,
             "IFS".to_string(),
-            Variable {
-                value: Value::Array(vec!["-+".to_string(), "abc".to_string()]),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new_array(["-+", "abc"]),
         )
         .unwrap();
         let phrase = Full(vec![
@@ -1095,17 +1081,8 @@ mod tests {
     #[test]
     fn ifs_join_full_empty_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "IFS".to_string(),
-            Variable {
-                value: Value::Scalar("".to_string()),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
-        )
-        .unwrap();
+        vars.assign(Scope::Global, "IFS".to_string(), Variable::new(""))
+            .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1121,12 +1098,7 @@ mod tests {
         vars.assign(
             Scope::Global,
             "IFS".to_string(),
-            Variable {
-                value: Value::Array(vec![]),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new_array([] as [&str; 0]),
         )
         .unwrap();
         let phrase = Full(vec![
@@ -1140,12 +1112,7 @@ mod tests {
         vars.assign(
             Scope::Global,
             "IFS".to_string(),
-            Variable {
-                value: Value::Array(vec!["".to_string(), "abc".to_string()]),
-                last_assigned_location: None,
-                is_exported: false,
-                read_only_location: None,
-            },
+            Variable::new_array(["", "abc"]),
         )
         .unwrap();
         let phrase = Full(vec![
