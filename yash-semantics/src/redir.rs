@@ -415,10 +415,12 @@ impl<'e> RedirGuard<'e> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;
@@ -426,7 +428,7 @@ mod tests {
     #[test]
     fn basic_file_in_redirection() {
         let mut file = INode::new();
-        file.content = vec![42, 123, 254];
+        file.body = FileBody::new([42, 123, 254]);
         let system = VirtualSystem::new();
         system
             .state
@@ -447,7 +449,7 @@ mod tests {
     #[test]
     fn moving_fd() {
         let mut file = INode::new();
-        file.content = vec![42, 123, 254];
+        file.body = FileBody::new([42, 123, 254]);
         let system = VirtualSystem::new();
         system
             .state
@@ -480,8 +482,7 @@ mod tests {
             .get("/dev/stdin")
             .unwrap()
             .borrow_mut()
-            .content
-            .push(17);
+            .body = FileBody::new([17]);
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut redir_env = RedirGuard::new(&mut env);
@@ -535,13 +536,13 @@ mod tests {
         let mut state = system.state.borrow_mut();
 
         let mut file = INode::new();
-        file.content = vec![100];
+        file.body = FileBody::new([100]);
         state
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
 
         let mut file = INode::new();
-        file.content = vec![200];
+        file.body = FileBody::new([200]);
         state
             .file_system
             .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
@@ -567,13 +568,13 @@ mod tests {
         let mut state = system.state.borrow_mut();
 
         let mut file = INode::new();
-        file.content = vec![100];
+        file.body = FileBody::new([100]);
         state
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
 
         let mut file = INode::new();
-        file.content = vec![200];
+        file.body = FileBody::new([200]);
         state
             .file_system
             .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
@@ -596,13 +597,13 @@ mod tests {
         let mut state = system.state.borrow_mut();
 
         let mut file = INode::new();
-        file.content = vec![10];
+        file.body = FileBody::new([10]);
         state
             .file_system
             .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
 
         let mut file = INode::new();
-        file.content = vec![20];
+        file.body = FileBody::new([20]);
         state
             .file_system
             .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
@@ -612,8 +613,7 @@ mod tests {
             .get("/dev/stdin")
             .unwrap()
             .borrow_mut()
-            .content
-            .push(30);
+            .body = FileBody::new([30]);
 
         drop(state);
         let mut env = Env::with_system(Box::new(system));
@@ -642,13 +642,15 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_out_truncates_existing_file() {
         let mut file = INode::new();
-        file.content = vec![42, 123, 254];
+        file.body = FileBody::new([42, 123, 254]);
         let file = Rc::new(RefCell::new(file));
         let system = VirtualSystem::new();
         system
@@ -660,7 +662,9 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "3> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
-        assert_eq!(file.borrow().content, []);
+        assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], []);
+        });
     }
 
     #[test]
@@ -675,13 +679,15 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_clobber_by_default_truncates_existing_file() {
         let mut file = INode::new();
-        file.content = vec![42, 123, 254];
+        file.body = FileBody::new([42, 123, 254]);
         let file = Rc::new(RefCell::new(file));
         let system = VirtualSystem::new();
         system
@@ -693,7 +699,9 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "3>| foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
-        assert_eq!(file.borrow().content, []);
+        assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], []);
+        });
     }
 
     // TODO file_clobber_with_noclobber_fails_with_existing_file
@@ -710,13 +718,15 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_append_appends_to_existing_file() {
         let mut file = INode::new();
-        file.content.extend("one\n".as_bytes());
+        file.body = FileBody::new(*b"one\n");
         let file = Rc::new(RefCell::new(file));
         let system = VirtualSystem::new();
         system
@@ -730,7 +740,9 @@ mod tests {
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
 
-        assert_eq!(file.borrow().content, "one\ntwo\n".as_bytes());
+        assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+            assert_eq!(std::str::from_utf8(content), Ok("one\ntwo\n"));
+        });
     }
 
     #[test]
@@ -745,13 +757,15 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [230, 175, 26]);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [230, 175, 26]);
+        });
     }
 
     #[test]
     fn file_in_out_leaves_existing_file_content() {
         let mut file = INode::new();
-        file.content = vec![132, 79, 210];
+        file.body = FileBody::new([132, 79, 210]);
         let system = VirtualSystem::new();
         system
             .state

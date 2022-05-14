@@ -232,6 +232,7 @@ mod tests {
     use std::str::from_utf8;
     use yash_env::job::Job;
     use yash_env::stack::Frame;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
@@ -417,7 +418,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert_ne!(from_utf8(&file.content).unwrap(), "");
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -435,6 +438,8 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert_ne!(from_utf8(&file.content).unwrap(), "");
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 }

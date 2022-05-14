@@ -101,10 +101,13 @@ pub fn read_eval_loop_boxed<'a>(
 mod tests {
     use super::*;
     use crate::tests::{echo_builtin, return_builtin};
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::semantics::Divert;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
@@ -136,7 +139,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "42\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("42\n"));
+        });
     }
 
     #[test]
@@ -151,7 +156,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "1\n2\n3\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
+        });
     }
 
     #[test]
@@ -174,7 +181,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "alias\nok\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("alias\nok\n"));
+        });
     }
 
     #[test]
@@ -188,7 +197,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert!(!file.content.is_empty());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -203,7 +214,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert!(file.content.is_empty(), "stdout={:?}", file.content);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
     }
 
     #[test]
@@ -234,6 +247,8 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, b"USR1\n0\n");
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("USR1\n0\n"));
+        });
     }
 }

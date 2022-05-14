@@ -238,6 +238,7 @@ mod tests {
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
     use yash_env::stack::Frame;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
 
@@ -251,7 +252,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok(""));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
     }
 
     #[test]
@@ -272,10 +275,12 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(
-            from_utf8(&stdout.content),
-            Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-        );
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(
+                from_utf8(content),
+                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
+            );
+        });
     }
 
     #[test]
@@ -342,10 +347,12 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(
-            from_utf8(&stdout.content),
-            Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-        );
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(
+                from_utf8(content),
+                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
+            );
+        });
     }
 
     #[test]
@@ -398,10 +405,12 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(
-            from_utf8(&stdout.content),
-            Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-        );
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(
+                from_utf8(content),
+                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
+            );
+        });
     }
 
     #[test]
@@ -420,10 +429,14 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok(""));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        let stderr = from_utf8(&stderr.content).unwrap();
-        assert!(stderr.contains("job not found"), "{:?}", stderr);
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            let stderr = from_utf8(content).unwrap();
+            assert!(stderr.contains("job not found"), "{:?}", stderr);
+        });
     }
 
     #[test]
@@ -449,10 +462,14 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok(""));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        let stderr = from_utf8(&stderr.content).unwrap();
-        assert!(stderr.contains("ambiguous"), "{:?}", stderr);
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            let stderr = from_utf8(content).unwrap();
+            assert!(stderr.contains("ambiguous"), "{:?}", stderr);
+        });
     }
 
     #[test]
@@ -529,12 +546,14 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(
-            from_utf8(&stdout.content),
-            Ok("[1] -    42 Running              echo first
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(
+                from_utf8(content),
+                Ok("[1] -    42 Running              echo first
 [2] +    72 Stopped(SIGSTOP)     echo second
 ")
-        );
+            );
+        });
     }
 
     #[test]
@@ -557,10 +576,12 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(
-            from_utf8(&stdout.content),
-            Ok("[2] +    72 Stopped(SIGSTOP)     echo second\n")
-        );
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(
+                from_utf8(content),
+                Ok("[2] +    72 Stopped(SIGSTOP)     echo second\n")
+            );
+        });
     }
 
     #[test]
@@ -582,7 +603,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok("42\n72\n"));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("42\n72\n"));
+        });
     }
 
     #[test]
@@ -604,7 +627,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok("42\n72\n"));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("42\n72\n"));
+        });
     }
 
     #[test]
@@ -627,6 +652,8 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(from_utf8(&stdout.content), Ok("72\n"));
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("72\n"));
+        });
     }
 }

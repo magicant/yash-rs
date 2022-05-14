@@ -54,18 +54,58 @@ impl FileSystem {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct INode {
     /// File content.
-    pub content: Vec<u8>,
+    pub body: FileBody,
     /// Access permissions.
     pub permissions: Mode,
-    /// Whether this file is a native binary that can be exec'ed.
-    pub is_native_executable: bool,
     // TODO owner user and group, etc.
 }
 
 impl INode {
     /// Create an empty regular file.
+    ///
+    /// TODO Add file content argument
     pub fn new() -> INode {
         INode::default()
+    }
+}
+
+/// Filetype-specific content of a file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FileBody {
+    /// Regular file
+    Regular {
+        /// File content.
+        content: Vec<u8>,
+        /// Whether this file is a native binary that can be exec'ed.
+        is_native_executable: bool,
+    },
+    Directory {
+        /// Files contained in this directory.
+        ///
+        /// The keys of the hashmap are filenames without any parent directory
+        /// components. The hashmap does not contain "." or "..".
+        files: HashMap<Box<Path>, Rc<RefCell<INode>>>,
+    },
+    // TODO Other filetypes
+}
+
+/// The default file body is an empty regular file.
+impl Default for FileBody {
+    fn default() -> Self {
+        FileBody::Regular {
+            content: Vec::default(),
+            is_native_executable: bool::default(),
+        }
+    }
+}
+
+impl FileBody {
+    /// Creates a regular file body with the given content.
+    pub fn new<T: Into<Vec<u8>>>(bytes: T) -> Self {
+        FileBody::Regular {
+            content: bytes.into(),
+            is_native_executable: false,
+        }
     }
 }
 

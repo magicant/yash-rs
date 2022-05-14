@@ -57,11 +57,14 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -88,7 +91,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "one\ntwo\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
+        });
     }
 
     #[test]
@@ -116,7 +121,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, []);
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
     }
 
     #[test]
@@ -133,7 +140,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "1\n2\n3\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
+        });
     }
 
     #[test]
@@ -151,7 +160,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, []);
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok(""));
+        });
     }
 
     #[test]
@@ -179,7 +190,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "+\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("+\n"));
+        });
     }
 
     #[test]
@@ -199,7 +212,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "one\ntwo\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
+        });
     }
 
     #[test]
@@ -219,7 +234,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "one\ntwo\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
+        });
     }
 
     #[test]
@@ -248,7 +265,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "+\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("+\n"));
+        });
     }
 
     #[test]

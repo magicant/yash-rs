@@ -78,7 +78,9 @@ impl Command for syntax::FunctionDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -159,12 +161,14 @@ mod tests {
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        let stderr = std::str::from_utf8(&stderr.content).unwrap();
-        assert!(
-            stderr.contains("foo"),
-            "The error message should contain the function name: {:?}",
-            stderr
-        );
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            let stderr = std::str::from_utf8(content).unwrap();
+            assert!(
+                stderr.contains("foo"),
+                "The error message should contain the function name: {:?}",
+                stderr
+            );
+        });
     }
 
     #[test]

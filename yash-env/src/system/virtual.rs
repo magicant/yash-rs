@@ -250,7 +250,9 @@ impl System for VirtualSystem {
                 return Err(Errno::EEXIST);
             }
             if option.contains(OFlag::O_TRUNC) {
-                inode.borrow_mut().content.clear();
+                if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                    content.clear();
+                };
             }
             Rc::clone(inode)
         } else {
@@ -502,7 +504,14 @@ impl System for VirtualSystem {
         let fs = &state.file_system;
         if let Some(file) = fs.get(os_path) {
             // TODO Check file permissions
-            if file.borrow().is_native_executable {
+            let is_executable = matches!(
+                &file.borrow().body,
+                FileBody::Regular {
+                    is_native_executable: true,
+                    ..
+                }
+            );
+            if is_executable {
                 // Save arguments in the Process
                 let process = state.processes.get_mut(&self.process_id).unwrap();
                 let path = path.to_owned();
@@ -672,6 +681,7 @@ pub trait Executor: Debug {
 mod tests {
     use super::*;
     use crate::semantics::ExitStatus;
+    use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::ffi::CString;
 
@@ -805,7 +815,9 @@ mod tests {
         system.write(Fd(3), &[42, 123]).unwrap();
         let state = system.state.borrow();
         let file = state.file_system.get("new_file").unwrap().borrow();
-        assert_eq!(file.content, [42, 123]);
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123]);
+        });
     }
 
     #[test]
@@ -1220,8 +1232,11 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: vec![],
+            is_native_executable: true,
+        };
         content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
         system
             .state
@@ -1238,8 +1253,11 @@ mod tests {
         let mut system = VirtualSystem::new();
         let path = PathBuf::from("/some/file");
         let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: vec![],
+            is_native_executable: true,
+        };
         content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
         system
             .state

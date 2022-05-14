@@ -413,6 +413,8 @@ mod tests {
     use std::path::PathBuf;
     use std::pin::Pin;
     use std::rc::Rc;
+    use std::str::from_utf8;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
@@ -428,7 +430,9 @@ mod tests {
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
             let state = state.borrow();
             let file = state.file_system.get("/tmp/foo").unwrap().borrow();
-            assert_eq!(file.content, []);
+            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+                assert_eq!(from_utf8(content), Ok(""));
+            });
         });
     }
 
@@ -453,7 +457,9 @@ mod tests {
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert!(!stderr.content.is_empty());
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -497,7 +503,9 @@ mod tests {
 
         let state = state.borrow();
         let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert!(!stderr.content.is_empty());
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -531,7 +539,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/tmp/file").unwrap().borrow();
-        assert_eq!(file.content, "hello\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("hello\n"));
+        });
     }
 
     #[test]
@@ -557,7 +567,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "v=42\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("v=42\n"));
+        });
     }
 
     #[test]
@@ -622,7 +634,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/tmp/file").unwrap().borrow();
-        assert_eq!(file.content, "ok\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("ok\n"));
+        });
     }
 
     #[test]
@@ -661,7 +675,9 @@ mod tests {
 
         let state = state.borrow();
         let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "bar-baz-\n".as_bytes());
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("bar-baz-\n"));
+        });
     }
 
     #[test]
@@ -684,7 +700,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "42\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("42\n"));
+        });
     }
 
     #[test]
@@ -706,7 +724,9 @@ mod tests {
 
         let state = state.borrow();
         let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "hello\n".as_bytes());
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("hello\n"));
+        });
     }
 
     #[test]
@@ -739,8 +759,11 @@ mod tests {
         in_virtual_system(|mut env, _pid, state| async move {
             let path = PathBuf::from("/some/file");
             let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
             content.permissions.0 |= 0o100;
-            content.is_native_executable = true;
             let content = Rc::new(RefCell::new(content));
             state.borrow_mut().file_system.save(path, content);
 
@@ -788,8 +811,11 @@ mod tests {
         in_virtual_system(|mut env, _pid, state| async move {
             let path = PathBuf::from("/some/file");
             let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
             content.permissions.0 |= 0o100;
-            content.is_native_executable = true;
             let content = Rc::new(RefCell::new(content));
             state.borrow_mut().file_system.save(path, content);
 
@@ -865,7 +891,9 @@ mod tests {
 
             let state = state.borrow();
             let stdout = state.file_system.get("/tmp/file").unwrap().borrow();
-            assert_eq!(stdout.content, []);
+            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+                assert_eq!(from_utf8(content), Ok(""));
+            });
         });
     }
 }
