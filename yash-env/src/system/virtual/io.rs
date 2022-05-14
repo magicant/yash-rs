@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn open_file_read_unreadable() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -355,10 +355,8 @@ mod tests {
 
     #[test]
     fn open_file_read_beyond_file_length() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -378,10 +376,8 @@ mod tests {
 
     #[test]
     fn open_file_read_more_than_content() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -397,10 +393,8 @@ mod tests {
 
     #[test]
     fn open_file_read_less_than_content() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3, 4, 5]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -417,7 +411,7 @@ mod tests {
     #[test]
     fn open_file_write_unwritable() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -430,10 +424,8 @@ mod tests {
 
     #[test]
     fn open_file_write_less_than_content() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3, 4, 5]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -453,10 +445,8 @@ mod tests {
 
     #[test]
     fn open_file_write_more_than_content() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -476,10 +466,8 @@ mod tests {
 
     #[test]
     fn open_file_write_beyond_file_length() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 3,
             is_readable: false,
             is_writable: true,
@@ -499,10 +487,8 @@ mod tests {
 
     #[test]
     fn open_file_write_appending() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -523,7 +509,7 @@ mod tests {
     #[test]
     fn open_file_seek_set() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 3,
             is_readable: true,
             is_writable: true,
@@ -550,7 +536,7 @@ mod tests {
     #[test]
     fn open_file_seek_cur() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 5,
             is_readable: true,
             is_writable: true,
@@ -576,10 +562,8 @@ mod tests {
 
     #[test]
     fn open_file_seek_end() {
-        let mut inode = INode::new();
-        inode.body = FileBody::new([1, 2, 3]);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 2,
             is_readable: true,
             is_writable: true,

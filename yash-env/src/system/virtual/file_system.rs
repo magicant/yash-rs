@@ -61,11 +61,12 @@ pub struct INode {
 }
 
 impl INode {
-    /// Create an empty regular file.
-    ///
-    /// TODO Add file content argument
-    pub fn new() -> INode {
-        INode::default()
+    /// Create a regular file with the given content.
+    pub fn new<T: Into<Vec<u8>>>(bytes: T) -> Self {
+        INode {
+            body: FileBody::new(bytes),
+            permissions: Mode::default(),
+        }
     }
 }
 

@@ -120,7 +120,7 @@ impl VirtualSystem {
         let mut process = Process::with_parent(Pid::from_raw(1));
         let mut set_std_fd = |path, fd| {
             let file_system = &mut state.file_system;
-            let file = Rc::new(RefCell::new(INode::new()));
+            let file = Rc::new(RefCell::new(INode::new([])));
             file_system.save(PathBuf::from(path), Rc::clone(&file));
             let body = FdBody {
                 open_file_description: Rc::new(RefCell::new(OpenFile {
@@ -260,7 +260,7 @@ impl System for VirtualSystem {
                 return Err(Errno::ENOENT);
             }
 
-            let mut inode = INode::new();
+            let mut inode = INode::new([]);
             // TODO Apply umask
             inode.permissions = Mode(mode.bits());
             let inode = Rc::new(RefCell::new(inode));
