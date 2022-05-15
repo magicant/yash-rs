@@ -153,3 +153,30 @@ impl Default for Mode {
         Mode(0o644)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_system_save_and_get_file() {
+        let mut fs = FileSystem::default();
+        let file_1 = Rc::new(RefCell::new(INode::new([12, 34, 56])));
+        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file_1));
+        assert_eq!(old, None);
+
+        let file_2 = Rc::new(RefCell::new(INode::new([98, 76, 54])));
+        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file_2));
+        assert_eq!(old, Some(file_1));
+
+        let result = fs.get("/foo/bar");
+        assert_eq!(result, Some(file_2));
+    }
+
+    #[test]
+    fn file_system_get_non_existent_file() {
+        let fs = FileSystem::default();
+        let result = fs.get("/no_such_file");
+        assert_eq!(result, None);
+    }
+}
