@@ -159,8 +159,8 @@ mod tests {
         assert_eq!(env.functions.len(), 1);
         assert_eq!(env.functions.get("foo").unwrap().0, function);
 
-        let state = state.borrow();
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
         assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
             let stderr = std::str::from_utf8(content).unwrap();
             assert!(

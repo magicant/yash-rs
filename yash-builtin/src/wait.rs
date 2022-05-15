@@ -416,8 +416,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::ERROR, Continue(())));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_ne!(from_utf8(content).unwrap(), "");
         });
@@ -436,8 +436,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::ERROR, Continue(())));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_ne!(from_utf8(content).unwrap(), "");
         });

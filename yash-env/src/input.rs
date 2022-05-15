@@ -102,8 +102,8 @@ mod tests {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
-            let mut file = state.file_system.get("/dev/stdin").unwrap().borrow_mut();
-            file.body = FileBody::new(*b"echo ok\n");
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
@@ -119,8 +119,8 @@ mod tests {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
-            let mut file = state.file_system.get("/dev/stdin").unwrap().borrow_mut();
-            file.body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);

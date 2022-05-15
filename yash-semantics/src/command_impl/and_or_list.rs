@@ -89,8 +89,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
         });
@@ -119,8 +119,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -138,8 +138,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
         });
@@ -158,8 +158,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -188,8 +188,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("+\n"));
         });
@@ -210,8 +210,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
         });
@@ -232,8 +232,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
         });
@@ -263,8 +263,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("+\n"));
         });

@@ -261,8 +261,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -286,8 +286,8 @@ foo=value
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -330,8 +330,8 @@ xtrace           off
 
         // The output from `set +o` should be parsable
         let commands: List = {
-            let state = state.borrow();
-            let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+            let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+            let file = file.borrow();
             assert_matches!(&file.body, FileBody::Regular { content, .. } => {
                 from_utf8(content).unwrap().parse().unwrap()
             })
@@ -353,8 +353,8 @@ xtrace           off
         assert_eq!(env.options, options);
 
         // And there should be no errors doing that
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });

@@ -156,7 +156,8 @@ mod tests {
         assert_eq!(result, Continue(()));
 
         let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -170,7 +171,8 @@ mod tests {
         assert_eq!(result, Continue(()));
 
         let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("trapped\n"));
         });
@@ -185,7 +187,8 @@ mod tests {
         assert_eq!(result, Continue(()));
 
         let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -250,7 +253,8 @@ mod tests {
         let _ = block_on(run_traps_for_caught_signals(&mut env));
 
         let state = system.state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("123\n0\n123\n0\n"));
         });

@@ -250,8 +250,8 @@ mod tests {
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -273,8 +273,8 @@ mod tests {
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -345,8 +345,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -403,8 +403,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -428,11 +428,13 @@ mod tests {
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
 
         let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
         assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
             let stderr = from_utf8(content).unwrap();
             assert!(stderr.contains("job not found"), "{:?}", stderr);
@@ -461,11 +463,13 @@ mod tests {
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
 
         let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = state.file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
         assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
             let stderr = from_utf8(content).unwrap();
             assert!(stderr.contains("ambiguous"), "{:?}", stderr);
@@ -544,8 +548,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -574,8 +578,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(
                 from_utf8(content),
@@ -601,8 +605,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("42\n72\n"));
         });
@@ -625,8 +629,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("42\n72\n"));
         });
@@ -650,8 +654,8 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("72\n"));
         });

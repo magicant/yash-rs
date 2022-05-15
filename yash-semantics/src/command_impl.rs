@@ -115,7 +115,8 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
         let state = system.state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(std::str::from_utf8(content), Ok("main\nUSR1\n"));
         });

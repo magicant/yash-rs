@@ -159,8 +159,8 @@ mod tests {
             .unwrap();
         executor.run_until_stalled();
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
         assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
             assert_eq!(std::str::from_utf8(content), Ok("foo\n"));
         });
@@ -223,8 +223,8 @@ mod tests {
         let result = block_on(item.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::NOEXEC))));
 
-        let state = state.borrow();
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
         assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
             let stderr = std::str::from_utf8(content).unwrap();
             assert!(

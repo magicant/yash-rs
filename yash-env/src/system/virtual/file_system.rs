@@ -20,33 +20,59 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::Path;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 /// Collection of files.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FileSystem(HashMap<PathBuf, Rc<RefCell<INode>>>);
-// TODO should be a link to the root i-node
-// In the current implementation, this hash map stores all files in a flat
-// namespace, without any recursive directory structure.
+pub struct FileSystem {
+    /// Root directory
+    pub root: Rc<RefCell<INode>>,
+}
 
 impl FileSystem {
     /// Saves a file.
     ///
-    /// If there is an existing file at the specified path, it is replaced with
-    /// the new file and returned.
+    /// If there is an existing file at the specified path, this function
+    /// replaces it the new file and returns the old one, regardless of
+    /// permissions.
+    ///
+    /// TODO Reject relative path
     pub fn save(
         &mut self,
-        path: PathBuf,
+        path: Box<Path>,
         content: Rc<RefCell<INode>>,
     ) -> Option<Rc<RefCell<INode>>> {
-        self.0.insert(path, content)
+        fn save_to_directory(
+            files: &mut HashMap<Box<Path>, Rc<RefCell<INode>>>,
+            path: Box<Path>,
+            content: Rc<RefCell<INode>>,
+        ) -> Option<Rc<RefCell<INode>>> {
+            // TODO Create directory structure
+            files.insert(path, content)
+        }
+
+        let root_body = &mut self.root.borrow_mut().body;
+        if let FileBody::Directory { files } = root_body {
+            save_to_directory(files, path, content)
+        } else {
+            let mut files = HashMap::new();
+            let old = save_to_directory(&mut files, path, content);
+            *root_body = FileBody::Directory { files };
+            old
+        }
     }
 
     /// Returns a reference to the existing file at the specified path.
-    pub fn get<P: AsRef<Path>>(&self, path: P) -> Option<&Rc<RefCell<INode>>> {
-        // TODO Return ENOTDIR or ENOENT if not found
-        self.0.get(path.as_ref())
+    ///
+    /// TODO Reject relative path
+    pub fn get<P: AsRef<Path>>(&self, path: P) -> Option<Rc<RefCell<INode>>> {
+        if let FileBody::Directory { files } = &self.root.borrow().body {
+            // TODO Follow directory path
+            // TODO Return ENOTDIR or ENOENT if not found
+            files.get(path.as_ref()).cloned()
+        } else {
+            None
+        }
     }
 }
 

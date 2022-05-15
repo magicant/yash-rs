@@ -336,8 +336,8 @@ mod tests {
     fn pipe_connects_commands_in_pipeline() {
         in_virtual_system(|mut env, _pid, state| async move {
             {
-                let state = state.borrow_mut();
-                let mut file = state.file_system.get("/dev/stdin").unwrap().borrow_mut();
+                let file = state.borrow().file_system.get("/dev/stdin").unwrap();
+                let mut file = file.borrow_mut();
                 file.body = FileBody::new(*b"ok\n");
             }
 
@@ -348,8 +348,8 @@ mod tests {
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-            let state = state.borrow();
-            let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
+            let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+            let stdout = stdout.borrow();
             assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
                 assert_eq!(std::str::from_utf8(content), Ok("ok\n"));
             });

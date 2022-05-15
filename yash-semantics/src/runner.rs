@@ -137,8 +137,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(7));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("42\n"));
         });
@@ -154,8 +154,8 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Continue(()));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
         });
@@ -179,8 +179,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("alias\nok\n"));
         });
@@ -195,8 +195,8 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stderr").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_ne!(from_utf8(content).unwrap(), "");
         });
@@ -212,8 +212,8 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok(""));
         });
@@ -245,8 +245,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("USR1\n0\n"));
         });
