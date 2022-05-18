@@ -19,14 +19,29 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::path::Component;
 use std::path::Path;
 use std::rc::Rc;
 
 /// Collection of files.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileSystem {
     /// Root directory
     pub root: Rc<RefCell<INode>>,
+}
+
+/// The default file system only contains an empty root directory.
+impl Default for FileSystem {
+    fn default() -> Self {
+        FileSystem {
+            root: Rc::new(RefCell::new(INode {
+                body: FileBody::Directory {
+                    files: HashMap::new(),
+                },
+                permissions: Mode(0o755),
+            })),
+        }
+    }
 }
 
 impl FileSystem {
@@ -37,42 +52,99 @@ impl FileSystem {
     /// permissions.
     ///
     /// TODO Reject relative path
-    pub fn save(
+    /// TODO Return correct type of errors
+    pub fn save<P: AsRef<Path>>(
         &mut self,
-        path: Box<Path>,
+        path: P,
         content: Rc<RefCell<INode>>,
     ) -> Option<Rc<RefCell<INode>>> {
-        fn save_to_directory(
-            files: &mut HashMap<Box<Path>, Rc<RefCell<INode>>>,
-            path: Box<Path>,
-            content: Rc<RefCell<INode>>,
-        ) -> Option<Rc<RefCell<INode>>> {
-            // TODO Create directory structure
-            files.insert(path, content)
+        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Box<Path>, Rc<RefCell<INode>>> {
+            match body {
+                FileBody::Directory { files } => files,
+                _ => {
+                    let files = HashMap::new();
+                    *body = FileBody::Directory { files };
+                    match body {
+                        FileBody::Directory { files } => files,
+                        _ => unreachable!(),
+                    }
+                }
+            }
         }
 
-        let root_body = &mut self.root.borrow_mut().body;
-        if let FileBody::Directory { files } = root_body {
-            save_to_directory(files, path, content)
-        } else {
-            let mut files = HashMap::new();
-            let old = save_to_directory(&mut files, path, content);
-            *root_body = FileBody::Directory { files };
-            old
+        fn main(
+            fs: &mut FileSystem,
+            path: &Path,
+            content: Rc<RefCell<INode>>,
+        ) -> Option<Rc<RefCell<INode>>> {
+            let mut components = path.components();
+            let file_name = match components.next_back()? {
+                Component::Normal(name) => name,
+                _ => return None,
+            };
+
+            // Create parent directories
+            let mut node = Rc::clone(&fs.root);
+            for component in components {
+                let name = match component {
+                    Component::Normal(name) => name,
+                    Component::RootDir => continue,
+                    _ => return None,
+                };
+                let mut node_ref = node.borrow_mut();
+                let children = ensure_dir(&mut node_ref.body);
+                use std::collections::hash_map::Entry::*;
+                let child = match children.entry(Box::from(Path::new(name))) {
+                    Occupied(occupied) => Rc::clone(occupied.get()),
+                    Vacant(vacant) => {
+                        let child = Rc::new(RefCell::new(INode {
+                            body: FileBody::Directory {
+                                files: HashMap::new(),
+                            },
+                            permissions: Mode(0o755),
+                        }));
+                        Rc::clone(vacant.insert(child))
+                    }
+                };
+                drop(node_ref);
+                node = child;
+            }
+
+            let mut parent_ref = node.borrow_mut();
+            let children = ensure_dir(&mut parent_ref.body);
+            children.insert(Box::from(Path::new(file_name)), content)
         }
+
+        main(self, path.as_ref(), content)
     }
 
     /// Returns a reference to the existing file at the specified path.
     ///
     /// TODO Reject relative path
+    /// TODO Return correct type of errors
     pub fn get<P: AsRef<Path>>(&self, path: P) -> Option<Rc<RefCell<INode>>> {
-        if let FileBody::Directory { files } = &self.root.borrow().body {
-            // TODO Follow directory path
-            // TODO Return ENOTDIR or ENOENT if not found
-            files.get(path.as_ref()).cloned()
-        } else {
-            None
+        fn main(fs: &FileSystem, path: &Path) -> Option<Rc<RefCell<INode>>> {
+            let components = path.components();
+            let mut node = Rc::clone(&fs.root);
+            for component in components {
+                let name = match component {
+                    Component::Normal(name) => name,
+                    Component::RootDir => continue,
+                    _ => return None,
+                };
+                let node_ref = node.borrow();
+                let children = match &node_ref.body {
+                    FileBody::Directory { files } => files,
+                    _ => return None,
+                };
+                let child = Rc::clone(children.get(Path::new(name))?);
+                drop(node_ref);
+                node = child;
+            }
+            Some(node)
         }
+
+        main(self, path.as_ref())
     }
 }
 
@@ -157,6 +229,14 @@ impl Default for Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+
+    #[test]
+    fn file_system_get_root() {
+        let fs = FileSystem::default();
+        let result = fs.get("/");
+        assert_eq!(result, Some(fs.root));
+    }
 
     #[test]
     fn file_system_save_and_get_file() {
@@ -171,6 +251,25 @@ mod tests {
 
         let result = fs.get("/foo/bar");
         assert_eq!(result, Some(file_2));
+    }
+
+    #[test]
+    fn file_system_save_and_get_directory() {
+        let mut fs = FileSystem::default();
+        let file = Rc::new(RefCell::new(INode::new([12, 34, 56])));
+        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file));
+        assert_eq!(old, None);
+
+        let dir = fs.get("/foo").unwrap();
+        let dir = dir.borrow();
+        assert_eq!(dir.permissions, Mode(0o755));
+        assert_matches!(&dir.body, FileBody::Directory { files } => {
+            let mut i = files.iter();
+            let (name, content) = i.next().unwrap();
+            assert_eq!(name.as_ref(), Path::new("bar"));
+            assert_eq!(content, &file);
+            assert_eq!(i.next(), None);
+        });
     }
 
     #[test]
