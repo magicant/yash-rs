@@ -410,7 +410,6 @@ mod tests {
     use futures_executor::block_on;
     use std::cell::RefCell;
     use std::future::Future;
-    use std::path::Path;
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
@@ -757,7 +756,6 @@ mod tests {
     #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = Box::from(Path::new("/some/file"));
             let mut content = INode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
@@ -765,7 +763,7 @@ mod tests {
             };
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state.borrow_mut().file_system.save("/some/file", content);
 
             env.variables
                 .assign(
@@ -809,7 +807,6 @@ mod tests {
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = Box::from(Path::new("/some/file"));
             let mut content = INode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
@@ -817,7 +814,7 @@ mod tests {
             };
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state.borrow_mut().file_system.save("/some/file", content);
 
             let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;
@@ -840,11 +837,10 @@ mod tests {
     #[test]
     fn simple_command_returns_126_on_exec_failure() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = Box::from(Path::new("/some/file"));
             let mut content = INode::default();
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state.borrow_mut().file_system.save("/some/file", content);
 
             let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
             let result = command.execute(&mut env).await;

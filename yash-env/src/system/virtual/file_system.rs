@@ -242,11 +242,11 @@ mod tests {
     fn file_system_save_and_get_file() {
         let mut fs = FileSystem::default();
         let file_1 = Rc::new(RefCell::new(INode::new([12, 34, 56])));
-        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file_1));
+        let old = fs.save("/foo/bar", Rc::clone(&file_1));
         assert_eq!(old, None);
 
         let file_2 = Rc::new(RefCell::new(INode::new([98, 76, 54])));
-        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file_2));
+        let old = fs.save("/foo/bar", Rc::clone(&file_2));
         assert_eq!(old, Some(file_1));
 
         let result = fs.get("/foo/bar");
@@ -257,7 +257,7 @@ mod tests {
     fn file_system_save_and_get_directory() {
         let mut fs = FileSystem::default();
         let file = Rc::new(RefCell::new(INode::new([12, 34, 56])));
-        let old = fs.save(Box::from(Path::new("/foo/bar")), Rc::clone(&file));
+        let old = fs.save("/foo/bar", Rc::clone(&file));
         assert_eq!(old, None);
 
         let dir = fs.get("/foo").unwrap();
