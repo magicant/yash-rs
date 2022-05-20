@@ -119,7 +119,7 @@ impl VirtualSystem {
         let mut process = Process::with_parent(Pid::from_raw(1));
         let mut set_std_fd = |path, fd| {
             let file = Rc::new(RefCell::new(INode::new([])));
-            state.file_system.save(path, Rc::clone(&file));
+            state.file_system.save(path, Rc::clone(&file)).unwrap();
             let body = FdBody {
                 open_file_description: Rc::new(RefCell::new(OpenFile {
                     file,
@@ -262,7 +262,7 @@ impl System for VirtualSystem {
             // TODO Apply umask
             inode.permissions = Mode(mode.bits());
             let inode = Rc::new(RefCell::new(inode));
-            state.file_system.save(path, Rc::clone(&inode));
+            state.file_system.save(path, Rc::clone(&inode))?;
             inode
         };
 
@@ -703,7 +703,9 @@ mod tests {
         let system = VirtualSystem::new();
         let path = "/some/file";
         let content = Rc::new(RefCell::new(INode::default()));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         assert!(!system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
 
@@ -714,7 +716,9 @@ mod tests {
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
 
@@ -1234,7 +1238,9 @@ mod tests {
         };
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOSYS));
@@ -1251,7 +1257,9 @@ mod tests {
         };
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         let path = CString::new(path).unwrap();
         let args = [CString::new("file").unwrap(), CString::new("bar").unwrap()];
         let envs = [
@@ -1274,7 +1282,9 @@ mod tests {
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOEXEC));

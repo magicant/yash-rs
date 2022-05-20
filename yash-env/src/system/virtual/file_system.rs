@@ -16,6 +16,7 @@
 
 //! File system in a virtual system.
 
+use nix::errno::Errno;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -52,12 +53,11 @@ impl FileSystem {
     /// permissions.
     ///
     /// TODO Reject relative path
-    /// TODO Return correct type of errors
     pub fn save<P: AsRef<Path>>(
         &mut self,
         path: P,
         content: Rc<RefCell<INode>>,
-    ) -> Option<Rc<RefCell<INode>>> {
+    ) -> nix::Result<Option<Rc<RefCell<INode>>>> {
         fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Box<Path>, Rc<RefCell<INode>>> {
             match body {
                 FileBody::Directory { files } => files,
@@ -76,11 +76,11 @@ impl FileSystem {
             fs: &mut FileSystem,
             path: &Path,
             content: Rc<RefCell<INode>>,
-        ) -> Option<Rc<RefCell<INode>>> {
+        ) -> nix::Result<Option<Rc<RefCell<INode>>>> {
             let mut components = path.components();
-            let file_name = match components.next_back()? {
+            let file_name = match components.next_back().ok_or(Errno::ENOENT)? {
                 Component::Normal(name) => name,
-                _ => return None,
+                _ => return Err(Errno::ENOENT),
             };
 
             // Create parent directories
@@ -89,7 +89,7 @@ impl FileSystem {
                 let name = match component {
                     Component::Normal(name) => name,
                     Component::RootDir => continue,
-                    _ => return None,
+                    _ => return Err(Errno::ENOENT),
                 };
                 let mut node_ref = node.borrow_mut();
                 let children = ensure_dir(&mut node_ref.body);
@@ -112,7 +112,7 @@ impl FileSystem {
 
             let mut parent_ref = node.borrow_mut();
             let children = ensure_dir(&mut parent_ref.body);
-            children.insert(Box::from(Path::new(file_name)), content)
+            Ok(children.insert(Box::from(Path::new(file_name)), content))
         }
 
         main(self, path.as_ref(), content)
@@ -243,11 +243,11 @@ mod tests {
         let mut fs = FileSystem::default();
         let file_1 = Rc::new(RefCell::new(INode::new([12, 34, 56])));
         let old = fs.save("/foo/bar", Rc::clone(&file_1));
-        assert_eq!(old, None);
+        assert_eq!(old, Ok(None));
 
         let file_2 = Rc::new(RefCell::new(INode::new([98, 76, 54])));
         let old = fs.save("/foo/bar", Rc::clone(&file_2));
-        assert_eq!(old, Some(file_1));
+        assert_eq!(old, Ok(Some(file_1)));
 
         let result = fs.get("/foo/bar");
         assert_eq!(result, Some(file_2));
@@ -258,7 +258,7 @@ mod tests {
         let mut fs = FileSystem::default();
         let file = Rc::new(RefCell::new(INode::new([12, 34, 56])));
         let old = fs.save("/foo/bar", Rc::clone(&file));
-        assert_eq!(old, None);
+        assert_eq!(old, Ok(None));
 
         let dir = fs.get("/foo").unwrap();
         let dir = dir.borrow();
@@ -270,6 +270,13 @@ mod tests {
             assert_eq!(content, &file);
             assert_eq!(i.next(), None);
         });
+    }
+
+    #[test]
+    fn file_system_save_invalid_name() {
+        let mut fs = FileSystem::default();
+        let old = fs.save("", Rc::default());
+        assert_eq!(old, Err(Errno::ENOENT));
     }
 
     #[test]

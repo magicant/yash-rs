@@ -763,7 +763,11 @@ mod tests {
             };
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save("/some/file", content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             env.variables
                 .assign(
@@ -814,7 +818,11 @@ mod tests {
             };
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save("/some/file", content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;
@@ -840,7 +848,11 @@ mod tests {
             let mut content = INode::default();
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save("/some/file", content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
             let result = command.execute(&mut env).await;
