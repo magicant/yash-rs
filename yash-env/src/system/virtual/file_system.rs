@@ -121,27 +121,26 @@ impl FileSystem {
     /// Returns a reference to the existing file at the specified path.
     ///
     /// TODO Reject relative path
-    /// TODO Return correct type of errors
-    pub fn get<P: AsRef<Path>>(&self, path: P) -> Option<Rc<RefCell<INode>>> {
-        fn main(fs: &FileSystem, path: &Path) -> Option<Rc<RefCell<INode>>> {
+    pub fn get<P: AsRef<Path>>(&self, path: P) -> nix::Result<Rc<RefCell<INode>>> {
+        fn main(fs: &FileSystem, path: &Path) -> nix::Result<Rc<RefCell<INode>>> {
             let components = path.components();
             let mut node = Rc::clone(&fs.root);
             for component in components {
                 let name = match component {
                     Component::Normal(name) => name,
                     Component::RootDir => continue,
-                    _ => return None,
+                    _ => return Err(Errno::ENOENT),
                 };
                 let node_ref = node.borrow();
                 let children = match &node_ref.body {
                     FileBody::Directory { files } => files,
-                    _ => return None,
+                    _ => return Err(Errno::ENOTDIR),
                 };
-                let child = Rc::clone(children.get(Path::new(name))?);
+                let child = Rc::clone(children.get(Path::new(name)).ok_or(Errno::ENOENT)?);
                 drop(node_ref);
                 node = child;
             }
-            Some(node)
+            Ok(node)
         }
 
         main(self, path.as_ref())
@@ -235,7 +234,7 @@ mod tests {
     fn file_system_get_root() {
         let fs = FileSystem::default();
         let result = fs.get("/");
-        assert_eq!(result, Some(fs.root));
+        assert_eq!(result, Ok(fs.root));
     }
 
     #[test]
@@ -250,7 +249,7 @@ mod tests {
         assert_eq!(old, Ok(Some(file_1)));
 
         let result = fs.get("/foo/bar");
-        assert_eq!(result, Some(file_2));
+        assert_eq!(result, Ok(file_2));
     }
 
     #[test]
@@ -283,6 +282,16 @@ mod tests {
     fn file_system_get_non_existent_file() {
         let fs = FileSystem::default();
         let result = fs.get("/no_such_file");
-        assert_eq!(result, None);
+        assert_eq!(result, Err(Errno::ENOENT));
+        let result = fs.get("/no_such_directory/foo");
+        assert_eq!(result, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn file_system_get_not_directory() {
+        let mut fs = FileSystem::default();
+        let _ = fs.save("/file", Rc::default());
+        let result = fs.get("/file/foo");
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 }

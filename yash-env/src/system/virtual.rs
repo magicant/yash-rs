@@ -195,8 +195,8 @@ impl System for VirtualSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         let path = OsStr::from_bytes(path.to_bytes());
         match self.state.borrow().file_system.get(path) {
-            None => false,
-            Some(inode) => inode.borrow().permissions.0 & 0o111 != 0,
+            Err(_) => false,
+            Ok(inode) => inode.borrow().permissions.0 & 0o111 != 0,
         }
     }
 
@@ -243,7 +243,8 @@ impl System for VirtualSystem {
     fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
         let path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
-        let file = if let Some(inode) = state.file_system.get(path) {
+        // TODO Handle Err other than ENOENT
+        let file = if let Ok(inode) = state.file_system.get(path) {
             if option.contains(OFlag::O_EXCL) {
                 return Err(Errno::EEXIST);
             }
@@ -498,30 +499,26 @@ impl System for VirtualSystem {
         let os_path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
-        if let Some(file) = fs.get(os_path) {
-            // TODO Check file permissions
-            let is_executable = matches!(
-                &file.borrow().body,
-                FileBody::Regular {
-                    is_native_executable: true,
-                    ..
-                }
-            );
-            if is_executable {
-                // Save arguments in the Process
-                let process = state.processes.get_mut(&self.process_id).unwrap();
-                let path = path.to_owned();
-                let args = args.to_owned();
-                let envs = envs.to_owned();
-                process.last_exec = Some((path, args, envs));
-
-                Err(Errno::ENOSYS)
-            } else {
-                Err(Errno::ENOEXEC)
+        let file = fs.get(os_path)?;
+        // TODO Check file permissions
+        let is_executable = matches!(
+            &file.borrow().body,
+            FileBody::Regular {
+                is_native_executable: true,
+                ..
             }
+        );
+        if is_executable {
+            // Save arguments in the Process
+            let process = state.processes.get_mut(&self.process_id).unwrap();
+            let path = path.to_owned();
+            let args = args.to_owned();
+            let envs = envs.to_owned();
+            process.last_exec = Some((path, args, envs));
+
+            Err(Errno::ENOSYS)
         } else {
-            // TODO Maybe ENOTDIR
-            Err(Errno::ENOENT)
+            Err(Errno::ENOEXEC)
         }
     }
 }
