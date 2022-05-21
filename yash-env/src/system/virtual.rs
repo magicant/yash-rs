@@ -243,28 +243,27 @@ impl System for VirtualSystem {
     fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
         let path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
-        // TODO Handle Err other than ENOENT
-        let file = if let Ok(inode) = state.file_system.get(path) {
-            if option.contains(OFlag::O_EXCL) {
-                return Err(Errno::EEXIST);
+        let file = match state.file_system.get(path) {
+            Ok(inode) => {
+                if option.contains(OFlag::O_EXCL) {
+                    return Err(Errno::EEXIST);
+                }
+                if option.contains(OFlag::O_TRUNC) {
+                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                        content.clear();
+                    };
+                }
+                inode
             }
-            if option.contains(OFlag::O_TRUNC) {
-                if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
-                    content.clear();
-                };
+            Err(Errno::ENOENT) if option.contains(OFlag::O_CREAT) => {
+                let mut inode = INode::new([]);
+                // TODO Apply umask
+                inode.permissions = Mode(mode.bits());
+                let inode = Rc::new(RefCell::new(inode));
+                state.file_system.save(path, Rc::clone(&inode))?;
+                inode
             }
-            inode
-        } else {
-            if !option.contains(OFlag::O_CREAT) {
-                return Err(Errno::ENOENT);
-            }
-
-            let mut inode = INode::new([]);
-            // TODO Apply umask
-            inode.permissions = Mode(mode.bits());
-            let inode = Rc::new(RefCell::new(inode));
-            state.file_system.save(path, Rc::clone(&inode))?;
-            inode
+            Err(errno) => return Err(errno),
         };
 
         let (is_readable, is_writable) = match option & OFlag::O_ACCMODE {
@@ -923,6 +922,25 @@ mod tests {
         let count = system.read(reader, &mut buffer).unwrap();
         assert_eq!(count, 6);
         assert_eq!(buffer, [1, 2, 3, 4, 5, 6, 0]);
+    }
+
+    #[test]
+    fn open_non_directory_path_prefix() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file
+        let _ = system.open(
+            &CString::new("/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.open(
+            &CString::new("/file/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
     #[test]
