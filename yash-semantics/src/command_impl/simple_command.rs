@@ -410,9 +410,10 @@ mod tests {
     use futures_executor::block_on;
     use std::cell::RefCell;
     use std::future::Future;
-    use std::path::PathBuf;
     use std::pin::Pin;
     use std::rc::Rc;
+    use std::str::from_utf8;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
@@ -426,9 +427,11 @@ mod tests {
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-            let state = state.borrow();
-            let file = state.file_system.get("/tmp/foo").unwrap().borrow();
-            assert_eq!(file.content, []);
+            let file = state.borrow().file_system.get("/tmp/foo").unwrap();
+            let file = file.borrow();
+            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+                assert_eq!(from_utf8(content), Ok(""));
+            });
         });
     }
 
@@ -451,9 +454,11 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
-        let state = state.borrow();
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert!(!stderr.content.is_empty());
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -495,9 +500,11 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
 
-        let state = state.borrow();
-        let stderr = state.file_system.get("/dev/stderr").unwrap().borrow();
-        assert!(!stderr.content.is_empty());
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 
     #[test]
@@ -529,9 +536,11 @@ mod tests {
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
         block_on(command.execute(&mut env));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/tmp/file").unwrap().borrow();
-        assert_eq!(file.content, "hello\n".as_bytes());
+        let file = state.borrow().file_system.get("/tmp/file").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("hello\n"));
+        });
     }
 
     #[test]
@@ -555,9 +564,11 @@ mod tests {
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("v"), None);
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "v=42\n".as_bytes());
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("v=42\n"));
+        });
     }
 
     #[test]
@@ -620,9 +631,11 @@ mod tests {
         let command: syntax::SimpleCommand = "foo >/tmp/file".parse().unwrap();
         block_on(command.execute(&mut env));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/tmp/file").unwrap().borrow();
-        assert_eq!(file.content, "ok\n".as_bytes());
+        let file = state.borrow().file_system.get("/tmp/file").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("ok\n"));
+        });
     }
 
     #[test]
@@ -659,9 +672,11 @@ mod tests {
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
 
-        let state = state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(file.content, "bar-baz-\n".as_bytes());
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("bar-baz-\n"));
+        });
     }
 
     #[test]
@@ -682,9 +697,11 @@ mod tests {
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("x"), None);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "42\n".as_bytes());
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("42\n"));
+        });
     }
 
     #[test]
@@ -704,9 +721,11 @@ mod tests {
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("x"), None);
 
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-        assert_eq!(stdout.content, "hello\n".as_bytes());
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("hello\n"));
+        });
     }
 
     #[test]
@@ -737,12 +756,18 @@ mod tests {
     #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = PathBuf::from("/some/file");
             let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
             content.permissions.0 |= 0o100;
-            content.is_native_executable = true;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             env.variables
                 .assign(
@@ -786,12 +811,18 @@ mod tests {
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = PathBuf::from("/some/file");
             let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
             content.permissions.0 |= 0o100;
-            content.is_native_executable = true;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             let command: syntax::SimpleCommand = "/some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;
@@ -814,11 +845,14 @@ mod tests {
     #[test]
     fn simple_command_returns_126_on_exec_failure() {
         in_virtual_system(|mut env, _pid, state| async move {
-            let path = PathBuf::from("/some/file");
             let mut content = INode::default();
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
-            state.borrow_mut().file_system.save(path, content);
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
 
             let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
             let result = command.execute(&mut env).await;
@@ -863,9 +897,11 @@ mod tests {
             command.execute(&mut env).await;
             assert_eq!(env.variables.get("foo"), None);
 
-            let state = state.borrow();
-            let stdout = state.file_system.get("/tmp/file").unwrap().borrow();
-            assert_eq!(stdout.content, []);
+            let stdout = state.borrow().file_system.get("/tmp/file").unwrap();
+            let stdout = stdout.borrow();
+            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+                assert_eq!(from_utf8(content), Ok(""));
+            });
         });
     }
 }

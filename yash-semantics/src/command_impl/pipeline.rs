@@ -239,6 +239,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::rc::Rc;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
@@ -334,14 +335,11 @@ mod tests {
     #[test]
     fn pipe_connects_commands_in_pipeline() {
         in_virtual_system(|mut env, _pid, state| async move {
-            state
-                .borrow_mut()
-                .file_system
-                .get("/dev/stdin")
-                .unwrap()
-                .borrow_mut()
-                .content
-                .extend("ok\n".as_bytes());
+            {
+                let file = state.borrow().file_system.get("/dev/stdin").unwrap();
+                let mut file = file.borrow_mut();
+                file.body = FileBody::new(*b"ok\n");
+            }
 
             env.builtins.insert("cat", cat_builtin());
 
@@ -350,9 +348,11 @@ mod tests {
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
-            let state = state.borrow();
-            let stdout = state.file_system.get("/dev/stdout").unwrap().borrow();
-            assert_eq!(stdout.content, "ok\n".as_bytes());
+            let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+            let stdout = stdout.borrow();
+            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+                assert_eq!(std::str::from_utf8(content), Ok("ok\n"));
+            });
         });
     }
 

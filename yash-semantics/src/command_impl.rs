@@ -77,9 +77,11 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
     use yash_env::VirtualSystem;
@@ -106,21 +108,18 @@ mod tests {
             .get_mut(&system.process_id)
             .unwrap()
             .raise_signal(Signal::SIGUSR1);
+
         let command: syntax::Command = "echo main".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        assert_eq!(
-            system
-                .state
-                .borrow()
-                .file_system
-                .get("/dev/stdout")
-                .unwrap()
-                .borrow()
-                .content,
-            b"main\nUSR1\n"
-        );
+
+        let state = system.state.borrow();
+        let stdout = state.file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(std::str::from_utf8(content), Ok("main\nUSR1\n"));
+        });
     }
 
     #[test]

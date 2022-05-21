@@ -415,24 +415,22 @@ impl<'e> RedirGuard<'e> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::cell::RefCell;
-    use std::path::PathBuf;
     use std::rc::Rc;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;
 
     #[test]
     fn basic_file_in_redirection() {
-        let mut file = INode::new();
-        file.content = vec![42, 123, 254];
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", file).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3< foo".parse().unwrap();
@@ -446,14 +444,11 @@ mod tests {
 
     #[test]
     fn moving_fd() {
-        let mut file = INode::new();
-        file.content = vec![42, 123, 254];
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", file).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "< foo".parse().unwrap();
@@ -472,16 +467,13 @@ mod tests {
     fn saving_and_undoing_fd() {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-        state
-            .file_system
-            .save(PathBuf::from("file"), Rc::new(RefCell::new(INode::new())));
+        state.file_system.save("file", Rc::default()).unwrap();
         state
             .file_system
             .get("/dev/stdin")
             .unwrap()
             .borrow_mut()
-            .content
-            .push(17);
+            .body = FileBody::new([17]);
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut redir_env = RedirGuard::new(&mut env);
@@ -500,9 +492,7 @@ mod tests {
     fn undoing_without_initial_fd() {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-        state
-            .file_system
-            .save(PathBuf::from("input"), Rc::new(RefCell::new(INode::new())));
+        state.file_system.save("input", Rc::default()).unwrap();
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut redir_env = RedirGuard::new(&mut env);
@@ -533,19 +523,10 @@ mod tests {
     fn multiple_redirections() {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-
-        let mut file = INode::new();
-        file.content = vec![100];
-        state
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
-
-        let mut file = INode::new();
-        file.content = vec![200];
-        state
-            .file_system
-            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
-
+        let file = Rc::new(RefCell::new(INode::new([100])));
+        state.file_system.save("foo", file).unwrap();
+        let file = Rc::new(RefCell::new(INode::new([200])));
+        state.file_system.save("bar", file).unwrap();
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
@@ -565,20 +546,12 @@ mod tests {
     fn later_redirection_wins() {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-
-        let mut file = INode::new();
-        file.content = vec![100];
-        state
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
-
-        let mut file = INode::new();
-        file.content = vec![200];
-        state
-            .file_system
-            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
-
+        let file = Rc::new(RefCell::new(INode::new([100])));
+        state.file_system.save("foo", file).unwrap();
+        let file = Rc::new(RefCell::new(INode::new([200])));
+        state.file_system.save("bar", file).unwrap();
         drop(state);
+
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         block_on(env.perform_redir(&"< foo".parse().unwrap())).unwrap();
@@ -594,27 +567,16 @@ mod tests {
     fn undo_save_conflict() {
         let system = VirtualSystem::new();
         let mut state = system.state.borrow_mut();
-
-        let mut file = INode::new();
-        file.content = vec![10];
-        state
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
-
-        let mut file = INode::new();
-        file.content = vec![20];
-        state
-            .file_system
-            .save(PathBuf::from("bar"), Rc::new(RefCell::new(file)));
-
+        let file = Rc::new(RefCell::new(INode::new([10])));
+        state.file_system.save("foo", file).unwrap();
+        let file = Rc::new(RefCell::new(INode::new([20])));
+        state.file_system.save("bar", file).unwrap();
         state
             .file_system
             .get("/dev/stdin")
             .unwrap()
             .borrow_mut()
-            .content
-            .push(30);
-
+            .body = FileBody::new([30]);
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut redir_env = RedirGuard::new(&mut env);
@@ -640,27 +602,30 @@ mod tests {
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
-        let state = state.borrow();
-        let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        let file = state.borrow().file_system.get("foo").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_out_truncates_existing_file() {
-        let mut file = INode::new();
-        file.content = vec![42, 123, 254];
-        let file = Rc::new(RefCell::new(file));
+        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
+
         let redir = "3> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
-        assert_eq!(file.borrow().content, []);
+
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], []);
+        });
     }
 
     #[test]
@@ -669,31 +634,35 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
+
         let redir = "3>| foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
-        let state = state.borrow();
-        let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        let file = state.borrow().file_system.get("foo").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_clobber_by_default_truncates_existing_file() {
-        let mut file = INode::new();
-        file.content = vec![42, 123, 254];
-        let file = Rc::new(RefCell::new(file));
+        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
+
         let redir = "3>| foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
-        assert_eq!(file.borrow().content, []);
+
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], []);
+        });
     }
 
     // TODO file_clobber_with_noclobber_fails_with_existing_file
@@ -704,33 +673,36 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
+
         let redir = "3>> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
-        let state = state.borrow();
-        let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [42, 123, 57]);
+        let file = state.borrow().file_system.get("foo").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 57]);
+        });
     }
 
     #[test]
     fn file_append_appends_to_existing_file() {
-        let mut file = INode::new();
-        file.content.extend("one\n".as_bytes());
-        let file = Rc::new(RefCell::new(file));
+        let file = Rc::new(RefCell::new(INode::new(*b"one\n")));
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::clone(&file));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
+
         let redir = ">> foo".parse().unwrap();
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
 
-        assert_eq!(file.borrow().content, "one\ntwo\n".as_bytes());
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(std::str::from_utf8(content), Ok("one\ntwo\n"));
+        });
     }
 
     #[test]
@@ -743,21 +715,20 @@ mod tests {
         block_on(env.perform_redir(&redir)).unwrap();
         env.system.write(Fd(3), &[230, 175, 26]).unwrap();
 
-        let state = state.borrow();
-        let file = state.file_system.get("foo").unwrap().borrow();
-        assert_eq!(file.content, [230, 175, 26]);
+        let file = state.borrow().file_system.get("foo").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [230, 175, 26]);
+        });
     }
 
     #[test]
     fn file_in_out_leaves_existing_file_content() {
-        let mut file = INode::new();
-        file.content = vec![132, 79, 210];
         let system = VirtualSystem::new();
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(PathBuf::from("foo"), Rc::new(RefCell::new(file)));
+        let file = Rc::new(RefCell::new(INode::new([132, 79, 210])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", file).unwrap();
+        drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3<> foo".parse().unwrap();

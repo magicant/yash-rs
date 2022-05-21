@@ -25,10 +25,10 @@
 //!
 //! # File system
 //!
-//! Currently, only regular files are supported in virtual systems.
+//! Currently, only regular files and directories are supported.
 //!
-//! Pathname resolution is not yet fully simulated. Currently, files are naively
-//! identified by their full path.
+//! Pathname resolution is not yet fully simulated. Especially, symbolic links
+//! and the `.` and `..` components are not supported.
 //!
 //! # Processes
 //!
@@ -74,7 +74,6 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
@@ -119,9 +118,8 @@ impl VirtualSystem {
         let mut state = SystemState::default();
         let mut process = Process::with_parent(Pid::from_raw(1));
         let mut set_std_fd = |path, fd| {
-            let file_system = &mut state.file_system;
-            let file = Rc::new(RefCell::new(INode::new()));
-            file_system.save(PathBuf::from(path), Rc::clone(&file));
+            let file = Rc::new(RefCell::new(INode::new([])));
+            state.file_system.save(path, Rc::clone(&file)).unwrap();
             let body = FdBody {
                 open_file_description: Rc::new(RefCell::new(OpenFile {
                     file,
@@ -197,8 +195,8 @@ impl System for VirtualSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         let path = OsStr::from_bytes(path.to_bytes());
         match self.state.borrow().file_system.get(path) {
-            None => false,
-            Some(inode) => inode.borrow().permissions.0 & 0o111 != 0,
+            Err(_) => false,
+            Ok(inode) => inode.borrow().permissions.0 & 0o111 != 0,
         }
     }
 
@@ -245,27 +243,27 @@ impl System for VirtualSystem {
     fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
         let path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
-        let file = if let Some(inode) = state.file_system.get(path) {
-            if option.contains(OFlag::O_EXCL) {
-                return Err(Errno::EEXIST);
+        let file = match state.file_system.get(path) {
+            Ok(inode) => {
+                if option.contains(OFlag::O_EXCL) {
+                    return Err(Errno::EEXIST);
+                }
+                if option.contains(OFlag::O_TRUNC) {
+                    if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
+                        content.clear();
+                    };
+                }
+                inode
             }
-            if option.contains(OFlag::O_TRUNC) {
-                inode.borrow_mut().content.clear();
+            Err(Errno::ENOENT) if option.contains(OFlag::O_CREAT) => {
+                let mut inode = INode::new([]);
+                // TODO Apply umask
+                inode.permissions = Mode(mode.bits());
+                let inode = Rc::new(RefCell::new(inode));
+                state.file_system.save(path, Rc::clone(&inode))?;
+                inode
             }
-            Rc::clone(inode)
-        } else {
-            if !option.contains(OFlag::O_CREAT) {
-                return Err(Errno::ENOENT);
-            }
-
-            let mut inode = INode::new();
-            // TODO Apply umask
-            inode.permissions = Mode(mode.bits());
-            let inode = Rc::new(RefCell::new(inode));
-            state
-                .file_system
-                .save(PathBuf::from(path), Rc::clone(&inode));
-            inode
+            Err(errno) => return Err(errno),
         };
 
         let (is_readable, is_writable) = match option & OFlag::O_ACCMODE {
@@ -500,23 +498,26 @@ impl System for VirtualSystem {
         let os_path = OsStr::from_bytes(path.to_bytes());
         let mut state = self.state.borrow_mut();
         let fs = &state.file_system;
-        if let Some(file) = fs.get(os_path) {
-            // TODO Check file permissions
-            if file.borrow().is_native_executable {
-                // Save arguments in the Process
-                let process = state.processes.get_mut(&self.process_id).unwrap();
-                let path = path.to_owned();
-                let args = args.to_owned();
-                let envs = envs.to_owned();
-                process.last_exec = Some((path, args, envs));
-
-                Err(Errno::ENOSYS)
-            } else {
-                Err(Errno::ENOEXEC)
+        let file = fs.get(os_path)?;
+        // TODO Check file permissions
+        let is_executable = matches!(
+            &file.borrow().body,
+            FileBody::Regular {
+                is_native_executable: true,
+                ..
             }
+        );
+        if is_executable {
+            // Save arguments in the Process
+            let process = state.processes.get_mut(&self.process_id).unwrap();
+            let path = path.to_owned();
+            let args = args.to_owned();
+            let envs = envs.to_owned();
+            process.last_exec = Some((path, args, envs));
+
+            Err(Errno::ENOSYS)
         } else {
-            // TODO Maybe ENOTDIR
-            Err(Errno::ENOENT)
+            Err(Errno::ENOEXEC)
         }
     }
 }
@@ -672,6 +673,7 @@ pub trait Executor: Debug {
 mod tests {
     use super::*;
     use crate::semantics::ExitStatus;
+    use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::ffi::CString;
 
@@ -695,20 +697,24 @@ mod tests {
     #[test]
     fn is_executable_file_existing_but_non_executable_file() {
         let system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
+        let path = "/some/file";
         let content = Rc::new(RefCell::new(INode::default()));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         assert!(!system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
 
     #[test]
     fn is_executable_file_with_executable_file() {
         let system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
+        let path = "/some/file";
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system.state.borrow_mut().file_system.save(path, content);
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
         assert!(system.is_executable_file(&CString::new("/some/file").unwrap()));
     }
 
@@ -803,9 +809,11 @@ mod tests {
         assert_eq!(result, Ok(Fd(3)));
 
         system.write(Fd(3), &[42, 123]).unwrap();
-        let state = system.state.borrow();
-        let file = state.file_system.get("new_file").unwrap().borrow();
-        assert_eq!(file.content, [42, 123]);
+        let file = system.state.borrow().file_system.get("new_file").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123]);
+        });
     }
 
     #[test]
@@ -914,6 +922,25 @@ mod tests {
         let count = system.read(reader, &mut buffer).unwrap();
         assert_eq!(count, 6);
         assert_eq!(buffer, [1, 2, 3, 4, 5, 6, 0]);
+    }
+
+    #[test]
+    fn open_non_directory_path_prefix() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file
+        let _ = system.open(
+            &CString::new("/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.open(
+            &CString::new("/file/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 
     #[test]
@@ -1218,17 +1245,18 @@ mod tests {
     #[test]
     fn execve_returns_enosys_for_executable_file() {
         let mut system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
+        let path = "/some/file";
         let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: vec![],
+            is_native_executable: true,
+        };
         content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(path.clone(), content);
-        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+        let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOSYS));
     }
@@ -1236,17 +1264,18 @@ mod tests {
     #[test]
     fn execve_saves_arguments() {
         let mut system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
+        let path = "/some/file";
         let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: vec![],
+            is_native_executable: true,
+        };
         content.permissions.0 |= 0o100;
-        content.is_native_executable = true;
         let content = Rc::new(RefCell::new(content));
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(path.clone(), content);
-        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+        let path = CString::new(path).unwrap();
         let args = [CString::new("file").unwrap(), CString::new("bar").unwrap()];
         let envs = [
             CString::new("foo=FOO").unwrap(),
@@ -1264,16 +1293,14 @@ mod tests {
     #[test]
     fn execve_returns_enoexec_for_non_executable_file() {
         let mut system = VirtualSystem::new();
-        let path = PathBuf::from("/some/file");
+        let path = "/some/file";
         let mut content = INode::default();
         content.permissions.0 |= 0o100;
         let content = Rc::new(RefCell::new(content));
-        system
-            .state
-            .borrow_mut()
-            .file_system
-            .save(path.clone(), content);
-        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+        let path = CString::new(path).unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOEXEC));
     }

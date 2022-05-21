@@ -82,6 +82,7 @@ impl Input for Stdin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
     use futures_executor::block_on;
@@ -101,8 +102,8 @@ mod tests {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
-            let mut file = state.file_system.get("/dev/stdin").unwrap().borrow_mut();
-            file.content.extend("echo ok\n".as_bytes());
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
@@ -118,8 +119,8 @@ mod tests {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
-            let mut file = state.file_system.get("/dev/stdin").unwrap().borrow_mut();
-            file.content.extend("#!/bin/sh\necho ok\nexit".as_bytes());
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);

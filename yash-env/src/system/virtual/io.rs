@@ -16,6 +16,7 @@
 
 //! I/O within a virtual system.
 
+use super::FileBody;
 use super::INode;
 use nix::errno::Errno;
 use nix::libc::off_t;
@@ -104,7 +105,11 @@ impl OpenFileDescription for OpenFile {
             return Err(Errno::EBADF);
         }
         let file = self.file.borrow();
-        let len = file.content.len();
+        let content = match &file.body {
+            FileBody::Regular { content, .. } => content,
+            FileBody::Directory { .. } => return Err(Errno::EISDIR),
+        };
+        let len = content.len();
         if self.offset >= len {
             return Ok(0);
         }
@@ -113,7 +118,7 @@ impl OpenFileDescription for OpenFile {
             buffer = &mut buffer[..limit];
         }
         let count = buffer.len();
-        let src = &file.content[self.offset..][..count];
+        let src = &content[self.offset..][..count];
         buffer.copy_from_slice(src);
         self.offset += count;
         Ok(count)
@@ -124,21 +129,25 @@ impl OpenFileDescription for OpenFile {
             return Err(Errno::EBADF);
         }
         let mut file = self.file.borrow_mut();
-        let len = file.content.len();
+        let content = match &mut file.body {
+            FileBody::Regular { content, .. } => content,
+            FileBody::Directory { .. } => return Err(Errno::EISDIR),
+        };
+        let len = content.len();
         let count = buffer.len();
         if self.is_appending {
             self.offset = len;
         }
         if self.offset > len {
             let zeroes = self.offset - len;
-            file.content.reserve(zeroes + count);
-            file.content.resize_with(self.offset, u8::default);
+            content.reserve(zeroes + count);
+            content.resize_with(self.offset, u8::default);
         }
-        let limit = count.min(file.content.len() - self.offset);
-        let dst = &mut file.content[self.offset..][..limit];
+        let limit = count.min(content.len() - self.offset);
+        let dst = &mut content[self.offset..][..limit];
         dst.copy_from_slice(&buffer[..limit]);
-        file.content.reserve(count - limit);
-        file.content.extend(&buffer[limit..]);
+        content.reserve(count - limit);
+        content.extend(&buffer[limit..]);
         self.offset += count;
         Ok(count)
     }
@@ -148,10 +157,14 @@ impl OpenFileDescription for OpenFile {
     /// The current implementation for `OpenFileDescription` does not support
     /// `Whence::SeekHole` or `Whence::SeekData`.
     fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t> {
+        let len = match &self.file.borrow().body {
+            FileBody::Regular { content, .. } => content.len(),
+            FileBody::Directory { files, .. } => files.len(),
+        };
         let base = match whence {
             Whence::SeekSet => 0,
             Whence::SeekCur => self.offset,
-            Whence::SeekEnd => self.file.borrow().content.len(),
+            Whence::SeekEnd => len,
             #[allow(unreachable_patterns)]
             _ => return Err(Errno::EINVAL),
         };
@@ -323,11 +336,12 @@ impl Eq for FdBody {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn open_file_read_unreadable() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -341,10 +355,8 @@ mod tests {
 
     #[test]
     fn open_file_read_beyond_file_length() {
-        let mut inode = INode::new();
-        inode.content.push(1);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -364,10 +376,8 @@ mod tests {
 
     #[test]
     fn open_file_read_more_than_content() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -383,10 +393,8 @@ mod tests {
 
     #[test]
     fn open_file_read_less_than_content() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3, 4, 5];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: true,
             is_writable: false,
@@ -403,7 +411,7 @@ mod tests {
     #[test]
     fn open_file_write_unwritable() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
             is_writable: false,
@@ -416,10 +424,8 @@ mod tests {
 
     #[test]
     fn open_file_write_less_than_content() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3, 4, 5];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -429,15 +435,18 @@ mod tests {
         let result = open_file.write(&[9, 8, 7]);
         assert_eq!(result, Ok(3));
         assert_eq!(open_file.offset, 4);
-        assert_eq!(open_file.file.borrow().content, [1, 9, 8, 7, 5]);
+        assert_matches!(
+            &open_file.file.borrow().body,
+            FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [1, 9, 8, 7, 5]);
+            }
+        );
     }
 
     #[test]
     fn open_file_write_more_than_content() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -447,15 +456,18 @@ mod tests {
         let result = open_file.write(&[9, 8, 7, 6]);
         assert_eq!(result, Ok(4));
         assert_eq!(open_file.offset, 5);
-        assert_eq!(open_file.file.borrow().content, [1, 9, 8, 7, 6]);
+        assert_matches!(
+            &open_file.file.borrow().body,
+            FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [1, 9, 8, 7, 6]);
+            }
+        );
     }
 
     #[test]
     fn open_file_write_beyond_file_length() {
-        let mut inode = INode::new();
-        inode.content.push(1);
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 3,
             is_readable: false,
             is_writable: true,
@@ -465,15 +477,18 @@ mod tests {
         let result = open_file.write(&[2, 3]);
         assert_eq!(result, Ok(2));
         assert_eq!(open_file.offset, 5);
-        assert_eq!(open_file.file.borrow().content, [1, 0, 0, 2, 3]);
+        assert_matches!(
+            &open_file.file.borrow().body,
+            FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [1, 0, 0, 2, 3]);
+            }
+        );
     }
 
     #[test]
     fn open_file_write_appending() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
             is_writable: true,
@@ -483,13 +498,18 @@ mod tests {
         let result = open_file.write(&[4, 5]);
         assert_eq!(result, Ok(2));
         assert_eq!(open_file.offset, 5);
-        assert_eq!(open_file.file.borrow().content, [1, 2, 3, 4, 5]);
+        assert_matches!(
+            &open_file.file.borrow().body,
+            FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [1, 2, 3, 4, 5]);
+            }
+        );
     }
 
     #[test]
     fn open_file_seek_set() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 3,
             is_readable: true,
             is_writable: true,
@@ -516,7 +536,7 @@ mod tests {
     #[test]
     fn open_file_seek_cur() {
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(INode::new())),
+            file: Rc::new(RefCell::new(INode::new([]))),
             offset: 5,
             is_readable: true,
             is_writable: true,
@@ -542,10 +562,8 @@ mod tests {
 
     #[test]
     fn open_file_seek_end() {
-        let mut inode = INode::new();
-        inode.content = vec![1, 2, 3];
         let mut open_file = OpenFile {
-            file: Rc::new(RefCell::new(inode)),
+            file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 2,
             is_readable: true,
             is_writable: true,
