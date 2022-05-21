@@ -56,9 +56,12 @@ impl Lexer<'_> {
     /// here-document operator represented by the argument and fills
     /// `here_doc.content` with the results. The argument does not have to be
     /// mutable because `here_doc.content` is a `RefCell`. Note that this
-    /// function will panic if `here_doc.content` has been borrowed.
+    /// function will panic if `here_doc.content` has been borrowed, and that
+    /// this function keeps a borrow from `here_doc.content` until the returned
+    /// future resolves to the final result.
     ///
     /// In case of an error, partial results may be left in `here_doc.content`.
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn here_doc_content(&mut self, here_doc: &HereDoc) -> Result<()> {
         fn is_escapable(c: char) -> bool {
             matches!(c, '$' | '`' | '\\')
