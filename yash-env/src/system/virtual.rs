@@ -248,6 +248,11 @@ impl System for VirtualSystem {
                 if option.contains(OFlag::O_EXCL) {
                     return Err(Errno::EEXIST);
                 }
+                if option.contains(OFlag::O_DIRECTORY)
+                    && !matches!(inode.borrow().body, FileBody::Directory { .. })
+                {
+                    return Err(Errno::ENOTDIR);
+                }
                 if option.contains(OFlag::O_TRUNC) {
                     if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
                         content.clear();
@@ -925,6 +930,25 @@ mod tests {
     }
 
     #[test]
+    fn open_directory() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file and its parent directory
+        let _ = system.open(
+            &CString::new("/dir/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.open(
+            &CString::new("/dir").unwrap(),
+            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Ok(Fd(4)));
+    }
+
+    #[test]
     fn open_non_directory_path_prefix() {
         let mut system = VirtualSystem::new();
 
@@ -938,6 +962,25 @@ mod tests {
         let result = system.open(
             &CString::new("/file/file").unwrap(),
             OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+        assert_eq!(result, Err(Errno::ENOTDIR));
+    }
+
+    #[test]
+    fn open_non_directory_file() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file
+        let _ = system.open(
+            &CString::new("/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.open(
+            &CString::new("/file").unwrap(),
+            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
