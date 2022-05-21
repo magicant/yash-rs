@@ -25,10 +25,10 @@
 //!
 //! # File system
 //!
-//! Currently, only regular files are supported in virtual systems.
+//! Currently, only regular files and directories are supported.
 //!
-//! Pathname resolution is not yet fully simulated. Currently, files are naively
-//! identified by their full path.
+//! Pathname resolution is not yet fully simulated. Especially, symbolic links
+//! and the `.` and `..` components are not supported.
 //!
 //! # Processes
 //!
