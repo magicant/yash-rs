@@ -19,6 +19,7 @@
 use nix::errno::Errno;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::path::Component;
 use std::path::Path;
@@ -58,7 +59,7 @@ impl FileSystem {
         path: P,
         content: Rc<RefCell<INode>>,
     ) -> nix::Result<Option<Rc<RefCell<INode>>>> {
-        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Box<Path>, Rc<RefCell<INode>>> {
+        fn ensure_dir(body: &mut FileBody) -> &mut HashMap<Box<OsStr>, Rc<RefCell<INode>>> {
             match body {
                 FileBody::Directory { files } => files,
                 _ => {
@@ -94,7 +95,7 @@ impl FileSystem {
                 let mut node_ref = node.borrow_mut();
                 let children = ensure_dir(&mut node_ref.body);
                 use std::collections::hash_map::Entry::*;
-                let child = match children.entry(Box::from(Path::new(name))) {
+                let child = match children.entry(Box::from(name)) {
                     Occupied(occupied) => Rc::clone(occupied.get()),
                     Vacant(vacant) => {
                         let child = Rc::new(RefCell::new(INode {
@@ -112,7 +113,7 @@ impl FileSystem {
 
             let mut parent_ref = node.borrow_mut();
             let children = ensure_dir(&mut parent_ref.body);
-            Ok(children.insert(Box::from(Path::new(file_name)), content))
+            Ok(children.insert(Box::from(file_name), content))
         }
 
         main(self, path.as_ref(), content)
@@ -136,7 +137,7 @@ impl FileSystem {
                     FileBody::Directory { files } => files,
                     _ => return Err(Errno::ENOTDIR),
                 };
-                let child = Rc::clone(children.get(Path::new(name)).ok_or(Errno::ENOENT)?);
+                let child = Rc::clone(children.get(name).ok_or(Errno::ENOENT)?);
                 drop(node_ref);
                 node = child;
             }
@@ -182,7 +183,7 @@ pub enum FileBody {
         ///
         /// The keys of the hashmap are filenames without any parent directory
         /// components. The hashmap does not contain "." or "..".
-        files: HashMap<Box<Path>, Rc<RefCell<INode>>>,
+        files: HashMap<Box<OsStr>, Rc<RefCell<INode>>>,
     },
     // TODO Other filetypes
 }
