@@ -47,6 +47,7 @@ mod process;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+use super::Dir;
 use super::FdSet;
 use super::SigSet;
 use super::SigmaskHow;
@@ -319,6 +320,17 @@ impl System for VirtualSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.with_open_file_description(fd, |ofd| ofd.write(buffer))
+    }
+
+    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+        todo!()
+    }
+
+    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+        let path = OsStr::from_bytes(path.to_bytes());
+        let inode = self.state.borrow().file_system.get(path)?;
+        let dir = VirtualDir::try_from(&inode.borrow().body)?;
+        Ok(Box::new(dir))
     }
 
     /// Returns `now` in [`SystemState`].

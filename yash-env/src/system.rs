@@ -50,6 +50,7 @@ use std::collections::BinaryHeap;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::Deref;
@@ -137,6 +138,12 @@ pub trait System: Debug {
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Opens a directory for enumerating entries.
+    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
+
+    /// Opens a directory for enumerating entries.
+    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
 
     /// Returns the current time.
     fn now(&self) -> Instant;
@@ -316,6 +323,26 @@ pub trait ChildProcess: Debug {
     // TODO When unsized_fn_params is stabilized,
     // 1. `&mut self` should be `self`
     // 2. `task` should be `FnOnce` rather than `FnMut`
+}
+
+/// Metadata of a file contained in a directory
+///
+/// `DirEntry` objects are enumerated by a [`Dir`] implementor.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct DirEntry<'a> {
+    /// Filename
+    pub name: &'a OsStr,
+}
+
+/// Trait for enumerating directory entries
+///
+/// An implementor of `Dir` may retain a file descriptor (or any other resource
+/// alike) to access the underlying system and obtain entry information. The
+/// file descriptor is released when the implementor object is dropped.
+pub trait Dir: Debug {
+    /// Returns the next directory entry.
+    fn next(&mut self) -> nix::Result<Option<DirEntry>>;
 }
 
 /// System shared by a reference counter.
@@ -595,6 +622,12 @@ impl System for SharedSystem {
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
+    }
+    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+        self.0.borrow().fdopendir(fd)
+    }
+    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+        self.0.borrow().opendir(path)
     }
     fn now(&self) -> Instant {
         self.0.borrow().now()

@@ -17,6 +17,8 @@
 //! Implementation of `System` that actually interacts with the system.
 
 use super::ChildProcess;
+use super::Dir;
+use super::DirEntry;
 use super::Env;
 use super::FdSet;
 use super::SigSet;
@@ -30,6 +32,7 @@ use crate::SignalHandling;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
+use nix::libc::DIR;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
@@ -41,9 +44,12 @@ use nix::unistd::AccessFlags;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::ffi::OsStr;
 use std::future::Future;
 use std::os::raw::c_int;
+use std::os::unix::ffi::OsStrExt;
 use std::pin::Pin;
+use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
@@ -180,6 +186,18 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+        let dir = unsafe { nix::libc::fdopendir(fd.0) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(Box::new(RealDir(dir)))
+    }
+
+    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+        let dir = unsafe { nix::libc::opendir(path.as_ptr()) };
+        let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
+        Ok(Box::new(RealDir(dir)))
     }
 
     fn now(&self) -> Instant {
@@ -325,9 +343,51 @@ impl ChildProcess for RealChildProcess {
     }
 }
 
+/// Implementor of [`Dir`] that iterates on a real directory
+#[derive(Debug)]
+struct RealDir(NonNull<DIR>);
+
+impl Drop for RealDir {
+    fn drop(&mut self) {
+        unsafe {
+            nix::libc::closedir(self.0.as_ptr());
+        }
+    }
+}
+
+impl Dir for RealDir {
+    fn next(&mut self) -> nix::Result<Option<DirEntry>> {
+        Errno::clear();
+        let entry = unsafe { nix::libc::readdir(self.0.as_ptr()) };
+        let errno = Errno::last();
+        match NonNull::new(entry) {
+            None if errno != Errno::UnknownErrno => Err(errno),
+            None => Ok(None),
+            Some(mut entry) => unsafe {
+                let entry = entry.as_mut();
+                let name = CStr::from_ptr(entry.d_name.as_ptr());
+                let name = OsStr::from_bytes(name.to_bytes());
+                Ok(Some(DirEntry { name }))
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn real_system_directory_entries() {
+        let system = unsafe { RealSystem::new() };
+        let path = CString::new(".").unwrap();
+        let mut dir = system.opendir(&path).unwrap();
+        let mut count = 0;
+        while dir.next().unwrap().is_some() {
+            count += 1;
+        }
+        assert!(count > 0);
+    }
 
     // This test depends on static variables.
     #[test]

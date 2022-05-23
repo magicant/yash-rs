@@ -16,6 +16,8 @@
 
 //! File system in a virtual system.
 
+use super::super::Dir;
+use super::super::DirEntry;
 use nix::errno::Errno;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -228,6 +230,65 @@ impl Default for Mode {
     }
 }
 
+/// Implementor of [`Dir`] for virtual file system
+#[derive(Clone, Debug)]
+pub struct VirtualDir<I> {
+    iter: I,
+    current: Rc<OsStr>,
+}
+
+impl<I> VirtualDir<I> {
+    /// Creates a `VirtualDir` that yields entries from an iterator.
+    #[must_use]
+    pub fn new<J>(iter: J) -> Self
+    where
+        J: IntoIterator<IntoIter = I, Item = Rc<OsStr>>,
+    {
+        VirtualDir {
+            iter: iter.into_iter(),
+            current: Rc::from(OsStr::new("")),
+        }
+    }
+}
+
+/// Creates a `VirtualDir` that yields entries of a directory.
+///
+/// This function will fail if the given file body is not a directory.
+impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
+    type Error = Errno;
+    fn try_from(file: &FileBody) -> nix::Result<Self> {
+        if let FileBody::Directory { files } = file {
+            let mut entries = Vec::with_capacity(files.len() + 2);
+            entries.push(Rc::from(OsStr::new(".")));
+            entries.push(Rc::from(OsStr::new("..")));
+            entries.extend(files.keys().cloned());
+            Ok(Self::new(entries.into_iter()))
+        } else {
+            Err(Errno::ENOTDIR)
+        }
+    }
+}
+
+impl<I> Dir for VirtualDir<I>
+where
+    I: Debug,
+    I: Iterator<Item = Rc<OsStr>>,
+{
+    fn next(&mut self) -> nix::Result<Option<DirEntry>> {
+        match self.iter.next() {
+            Some(name) => {
+                self.current = name;
+                let name = &self.current;
+                Ok(Some(DirEntry { name }))
+            }
+            None => {
+                self.current = Rc::from(OsStr::new(""));
+                Ok(None)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,5 +357,52 @@ mod tests {
         let _ = fs.save("/file", Rc::default());
         let result = fs.get("/file/foo");
         assert_eq!(result, Err(Errno::ENOTDIR));
+    }
+
+    #[test]
+    fn empty_virtual_dir() {
+        let mut dir = VirtualDir::new(std::iter::empty());
+        assert_matches!(dir.next(), Ok(None));
+    }
+
+    #[test]
+    fn non_empty_virtual_dir() {
+        let iter = ["foo", "bar"].into_iter().map(|s| Rc::from(OsStr::new(s)));
+        let mut dir = VirtualDir::new(iter);
+        assert_matches!(dir.next(), Ok(Some(entry)) => {
+            assert_eq!(entry.name, "foo");
+        });
+        assert_matches!(dir.next(), Ok(Some(entry)) => {
+            assert_eq!(entry.name, "bar");
+        });
+        assert_matches!(dir.next(), Ok(None));
+    }
+
+    #[test]
+    fn virtual_dir_try_from_file_body_directory() {
+        let files = ["one", "2", "three"]
+            .into_iter()
+            .map(|name| (Rc::from(OsStr::new(name)), Rc::default()))
+            .collect();
+        let file = FileBody::Directory { files };
+        let mut dir = VirtualDir::try_from(&file).unwrap();
+
+        let mut files = Vec::new();
+        while let Some(entry) = dir.next().unwrap() {
+            files.push(entry.name.to_str().unwrap().to_string());
+        }
+        files.sort_unstable();
+        let files: Vec<&str> = files.iter().map(String::as_str).collect();
+        assert_eq!(files, [".", "..", "2", "one", "three"]);
+    }
+
+    #[test]
+    fn virtual_dir_try_from_file_body_non_directory() {
+        let file = FileBody::Regular {
+            content: Default::default(),
+            is_native_executable: false,
+        };
+        let result = VirtualDir::try_from(&file);
+        assert_eq!(result.unwrap_err(), Errno::ENOTDIR);
     }
 }
