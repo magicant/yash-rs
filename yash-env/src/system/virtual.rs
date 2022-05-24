@@ -171,7 +171,7 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
-    pub fn with_open_file_description<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
+    pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
     where
         F: FnOnce(&mut dyn OpenFileDescription) -> nix::Result<R>,
     {
@@ -315,11 +315,11 @@ impl System for VirtualSystem {
     }
 
     fn read(&mut self, fd: Fd, buffer: &mut [u8]) -> nix::Result<usize> {
-        self.with_open_file_description(fd, |ofd| ofd.read(buffer))
+        self.with_open_file_description_mut(fd, |ofd| ofd.read(buffer))
     }
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
-        self.with_open_file_description(fd, |ofd| ofd.write(buffer))
+        self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
 
     fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
