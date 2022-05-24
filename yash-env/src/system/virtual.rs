@@ -336,7 +336,11 @@ impl System for VirtualSystem {
     }
 
     fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
-        todo!()
+        self.with_open_file_description(fd, |ofd| {
+            let inode = ofd.i_node();
+            let dir = VirtualDir::try_from(&inode.borrow().body)?;
+            Ok(Box::new(dir) as Box<dyn Dir>)
+        })
     }
 
     fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {

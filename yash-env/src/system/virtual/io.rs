@@ -54,6 +54,9 @@ pub trait OpenFileDescription: Debug {
 
     /// Moves the file offset and returns the new offset.
     fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t>;
+
+    /// Returns the i-node this open file description is operating on.
+    fn i_node(&self) -> Rc<RefCell<INode>>;
 }
 
 /// State of a file opened for reading and/or writing.
@@ -177,6 +180,10 @@ impl OpenFileDescription for OpenFile {
         self.offset = usize::try_from(new_offset).map_err(|_| Errno::EINVAL)?;
         Ok(new_offset)
     }
+
+    fn i_node(&self) -> Rc<RefCell<INode>> {
+        Rc::clone(&self.file)
+    }
 }
 
 /// Unnamed FIFO byte channel.
@@ -256,6 +263,9 @@ impl OpenFileDescription for PipeReader {
     fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
         Err(Errno::ESPIPE)
     }
+    fn i_node(&self) -> Rc<RefCell<INode>> {
+        todo!("should return a pipe i-node")
+    }
 }
 
 /// Writing end of a [`Pipe`].
@@ -312,6 +322,9 @@ impl OpenFileDescription for PipeWriter {
     }
     fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
         Err(Errno::ESPIPE)
+    }
+    fn i_node(&self) -> Rc<RefCell<INode>> {
+        todo!("should return a pipe i-node")
     }
 }
 
