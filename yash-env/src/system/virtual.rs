@@ -171,6 +171,19 @@ impl VirtualSystem {
     /// Calls the given closure passing the open file description for the FD.
     ///
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
+    pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> nix::Result<R>
+    where
+        F: FnOnce(&dyn OpenFileDescription) -> nix::Result<R>,
+    {
+        let process = self.current_process();
+        let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
+        let ofd = body.open_file_description.borrow();
+        f(&*ofd)
+    }
+
+    /// Calls the given closure passing the open file description for the FD.
+    ///
+    /// Returns `Err(Errno::EBADF)` if the FD is not open.
     pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
     where
         F: FnOnce(&mut dyn OpenFileDescription) -> nix::Result<R>,

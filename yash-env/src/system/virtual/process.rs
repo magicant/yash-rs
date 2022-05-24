@@ -143,6 +143,13 @@ impl Process {
     /// Returns the body for the given FD.
     #[inline]
     #[must_use]
+    pub fn get_fd(&self, fd: Fd) -> Option<&FdBody> {
+        self.fds.get(&fd)
+    }
+
+    /// Returns the body for the given FD.
+    #[inline]
+    #[must_use]
     pub fn get_fd_mut(&mut self, fd: Fd) -> Option<&mut FdBody> {
         self.fds.get_mut(&fd)
     }
