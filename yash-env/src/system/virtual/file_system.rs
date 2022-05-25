@@ -21,6 +21,7 @@ use super::super::DirEntry;
 use nix::errno::Errno;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::path::Component;
@@ -188,6 +189,11 @@ pub enum FileBody {
         files: HashMap<Rc<OsStr>, Rc<RefCell<INode>>>,
         // The hash map contents are reference-counted to allow making cheap
         // copies of them, which is especially handy when traversing entries.
+    },
+    Fifo {
+        content: VecDeque<u8>,
+        readers: usize,
+        writers: usize,
     },
     // TODO Other filetypes
 }

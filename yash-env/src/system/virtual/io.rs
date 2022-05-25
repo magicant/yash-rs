@@ -111,6 +111,7 @@ impl OpenFileDescription for OpenFile {
         let content = match &file.body {
             FileBody::Regular { content, .. } => content,
             FileBody::Directory { .. } => return Err(Errno::EISDIR),
+            FileBody::Fifo { .. } => todo!(),
         };
         let len = content.len();
         if self.offset >= len {
@@ -135,6 +136,7 @@ impl OpenFileDescription for OpenFile {
         let content = match &mut file.body {
             FileBody::Regular { content, .. } => content,
             FileBody::Directory { .. } => return Err(Errno::EISDIR),
+            FileBody::Fifo { .. } => todo!(),
         };
         let len = content.len();
         let count = buffer.len();
@@ -163,6 +165,7 @@ impl OpenFileDescription for OpenFile {
         let len = match &self.file.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
+            FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
         };
         let base = match whence {
             Whence::SeekSet => 0,
