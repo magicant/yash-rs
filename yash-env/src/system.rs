@@ -1092,8 +1092,8 @@ impl AsyncSignal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::Pipe;
     use crate::system::r#virtual::VirtualSystem;
+    use crate::system::r#virtual::PIPE_SIZE;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_util::task::noop_waker;
@@ -1169,26 +1169,26 @@ mod tests {
         state.borrow_mut().processes[&process_id].fds[&writer]
             .open_file_description
             .borrow_mut()
-            .write(&[42; Pipe::PIPE_SIZE])
+            .write(&[42; PIPE_SIZE])
             .unwrap();
 
         let mut context = Context::from_waker(noop_waker_ref());
-        let mut out_buffer = [87; Pipe::PIPE_SIZE];
+        let mut out_buffer = [87; PIPE_SIZE];
         out_buffer[0] = 0;
         out_buffer[1] = 1;
-        out_buffer[Pipe::PIPE_SIZE - 2] = 0xFE;
-        out_buffer[Pipe::PIPE_SIZE - 1] = 0xFF;
+        out_buffer[PIPE_SIZE - 2] = 0xFE;
+        out_buffer[PIPE_SIZE - 1] = 0xFF;
         let mut future = Box::pin(system.write_all(writer, &out_buffer));
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
 
-        let mut in_buffer = [0; Pipe::PIPE_SIZE - 1];
+        let mut in_buffer = [0; PIPE_SIZE - 1];
         state.borrow_mut().processes[&process_id].fds[&reader]
             .open_file_description
             .borrow_mut()
             .read(&mut in_buffer)
             .unwrap();
-        assert_eq!(in_buffer, [42; Pipe::PIPE_SIZE - 1]);
+        assert_eq!(in_buffer, [42; PIPE_SIZE - 1]);
 
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1209,13 +1209,13 @@ mod tests {
             .borrow_mut()
             .read(&mut in_buffer)
             .unwrap();
-        assert_eq!(in_buffer, out_buffer[..Pipe::PIPE_SIZE - 1]);
+        assert_eq!(in_buffer, out_buffer[..PIPE_SIZE - 1]);
         state.borrow_mut().processes[&process_id].fds[&reader]
             .open_file_description
             .borrow_mut()
             .read(&mut in_buffer)
             .unwrap();
-        assert_eq!(in_buffer[..1], out_buffer[Pipe::PIPE_SIZE - 1..]);
+        assert_eq!(in_buffer[..1], out_buffer[PIPE_SIZE - 1..]);
     }
 
     #[test]
@@ -1229,7 +1229,7 @@ mod tests {
         state.borrow_mut().processes[&process_id].fds[&writer]
             .open_file_description
             .borrow_mut()
-            .write(&[0; Pipe::PIPE_SIZE])
+            .write(&[0; PIPE_SIZE])
             .unwrap();
 
         // Even if the pipe is full, empty write succeeds.

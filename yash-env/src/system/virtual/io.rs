@@ -25,6 +25,18 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
+/// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
+///
+/// This value is for the virtual system implementation.
+/// The real system may have a different configuration.
+pub const PIPE_BUF: usize = 512;
+
+/// Maximum number of bytes a pipe can hold at a time.
+///
+/// This value is for the virtual system implementation.
+/// The real system may have a different configuration.
+pub const PIPE_SIZE: usize = PIPE_BUF * 2;
+
 /// Abstract handle to perform I/O with.
 pub trait OpenFileDescription: Debug {
     /// Returns true if you can read from this open file description.
@@ -197,15 +209,15 @@ impl OpenFileDescription for OpenFile {
                     // TODO SIGPIPE
                     return Err(Errno::EPIPE);
                 }
-                let room = Pipe::PIPE_SIZE - content.len();
+                let room = PIPE_SIZE - content.len();
                 if room < buffer.len() {
-                    if room == 0 || buffer.len() <= Pipe::PIPE_BUF {
+                    if room == 0 || buffer.len() <= PIPE_BUF {
                         return Err(Errno::EAGAIN);
                     }
                     buffer = &buffer[..room];
                 }
                 content.extend(buffer);
-                debug_assert!(content.len() <= Pipe::PIPE_SIZE);
+                debug_assert!(content.len() <= PIPE_SIZE);
                 Ok(buffer.len())
             }
             FileBody::Directory { .. } => Err(Errno::EISDIR),
@@ -242,32 +254,6 @@ impl OpenFileDescription for OpenFile {
     fn i_node(&self) -> Rc<RefCell<INode>> {
         Rc::clone(&self.file)
     }
-}
-
-/// Unnamed FIFO byte channel.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Pipe {
-    /// Bytes that have been written to (but not yet read from) the pipe.
-    pub content: Vec<u8>,
-}
-
-impl Pipe {
-    /// Creates a new pipe.
-    pub fn new() -> Pipe {
-        Pipe::default()
-    }
-
-    /// Maximum number of bytes guaranteed to be atomic when writing to a pipe.
-    ///
-    /// This value is for the virtual system implementation.
-    /// The real system may have a different configuration.
-    pub const PIPE_BUF: usize = 512;
-
-    /// Maximum number of bytes a pipe can hold at a time.
-    ///
-    /// This value is for the virtual system implementation.
-    /// The real system may have a different configuration.
-    pub const PIPE_SIZE: usize = Self::PIPE_BUF * 2;
 }
 
 /// State of a file descriptor.
@@ -714,12 +700,12 @@ mod tests {
             is_appending: false,
         };
 
-        open_file.write(&[0; Pipe::PIPE_SIZE]).unwrap();
+        open_file.write(&[0; PIPE_SIZE]).unwrap();
 
         // The pipe is full. No more can be written.
         let result = open_file.write(&[1; 1]);
         assert_eq!(result, Err(Errno::EAGAIN));
-        let result = open_file.write(&[1; Pipe::PIPE_BUF + 1]);
+        let result = open_file.write(&[1; PIPE_BUF + 1]);
         assert_eq!(result, Err(Errno::EAGAIN));
 
         // However, empty write should succeed.
@@ -745,12 +731,12 @@ mod tests {
             is_appending: false,
         };
 
-        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF + 1;
+        const LEN: usize = PIPE_SIZE - PIPE_BUF + 1;
         open_file.write(&[0; LEN]).unwrap();
 
         // The remaining room in the pipe is less than the length we're writing,
         // which is PIPE_BUF. Nothing is written in this case.
-        let result = open_file.write(&[1; Pipe::PIPE_BUF]);
+        let result = open_file.write(&[1; PIPE_BUF]);
         assert_eq!(result, Err(Errno::EAGAIN));
 
         assert_matches!(&file.borrow().body, FileBody::Fifo { content, .. } => {
@@ -775,14 +761,14 @@ mod tests {
             is_appending: false,
         };
 
-        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF;
+        const LEN: usize = PIPE_SIZE - PIPE_BUF;
         open_file.write(&[0; LEN]).unwrap();
 
         // The remaining room in the pipe is less than the length we're writing,
         // which exceeds PIPE_BUF. Only as much as possible is written in this
         // case.
-        let result = open_file.write(&[1; Pipe::PIPE_BUF + 1]);
-        assert_eq!(result, Ok(Pipe::PIPE_BUF));
+        let result = open_file.write(&[1; PIPE_BUF + 1]);
+        assert_eq!(result, Ok(PIPE_BUF));
     }
 
     #[test]
