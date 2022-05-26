@@ -86,6 +86,22 @@ impl PartialEq for OpenFile {
     }
 }
 
+impl Drop for OpenFile {
+    fn drop(&mut self) {
+        if let FileBody::Fifo {
+            readers, writers, ..
+        } = &mut self.file.borrow_mut().body
+        {
+            if self.is_readable {
+                *readers -= 1;
+            }
+            if self.is_writable {
+                *writers -= 1;
+            }
+        }
+    }
+}
+
 impl OpenFileDescription for OpenFile {
     fn is_readable(&self) -> bool {
         self.is_readable
@@ -96,10 +112,16 @@ impl OpenFileDescription for OpenFile {
     }
 
     fn is_ready_for_reading(&self) -> bool {
-        true
+        match &self.file.borrow().body {
+            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Fifo {
+                content, writers, ..
+            } => !self.is_readable || !content.is_empty() || *writers == 0,
+        }
     }
 
     fn is_ready_for_writing(&self) -> bool {
+        // TODO In case of a fifo, check if the fifo is writable and not full
         true
     }
 
@@ -107,54 +129,88 @@ impl OpenFileDescription for OpenFile {
         if !self.is_readable {
             return Err(Errno::EBADF);
         }
-        let file = self.file.borrow();
-        let content = match &file.body {
-            FileBody::Regular { content, .. } => content,
-            FileBody::Directory { .. } => return Err(Errno::EISDIR),
-            FileBody::Fifo { .. } => todo!(),
-        };
-        let len = content.len();
-        if self.offset >= len {
-            return Ok(0);
+        match &mut self.file.borrow_mut().body {
+            FileBody::Regular { content, .. } => {
+                let len = content.len();
+                if self.offset >= len {
+                    return Ok(0);
+                }
+                let limit = len - self.offset;
+                if buffer.len() > limit {
+                    buffer = &mut buffer[..limit];
+                }
+                let count = buffer.len();
+                let src = &content[self.offset..][..count];
+                buffer.copy_from_slice(src);
+                self.offset += count;
+                Ok(count)
+            }
+            FileBody::Fifo {
+                content, writers, ..
+            } => {
+                let limit = content.len();
+                if limit == 0 && *writers > 0 {
+                    return Err(Errno::EAGAIN);
+                }
+                let mut count = 0;
+                for to in buffer {
+                    if let Some(from) = content.pop_front() {
+                        *to = from;
+                        count += 1;
+                    } else {
+                        break;
+                    }
+                }
+                Ok(count)
+            }
+            FileBody::Directory { .. } => Err(Errno::EISDIR),
         }
-        let limit = len - self.offset;
-        if buffer.len() > limit {
-            buffer = &mut buffer[..limit];
-        }
-        let count = buffer.len();
-        let src = &content[self.offset..][..count];
-        buffer.copy_from_slice(src);
-        self.offset += count;
-        Ok(count)
     }
 
-    fn write(&mut self, buffer: &[u8]) -> nix::Result<usize> {
+    fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
         if !self.is_writable {
             return Err(Errno::EBADF);
         }
-        let mut file = self.file.borrow_mut();
-        let content = match &mut file.body {
-            FileBody::Regular { content, .. } => content,
-            FileBody::Directory { .. } => return Err(Errno::EISDIR),
-            FileBody::Fifo { .. } => todo!(),
-        };
-        let len = content.len();
-        let count = buffer.len();
-        if self.is_appending {
-            self.offset = len;
+        match &mut self.file.borrow_mut().body {
+            FileBody::Regular { content, .. } => {
+                let len = content.len();
+                let count = buffer.len();
+                if self.is_appending {
+                    self.offset = len;
+                }
+                if self.offset > len {
+                    let zeroes = self.offset - len;
+                    content.reserve(zeroes + count);
+                    content.resize_with(self.offset, u8::default);
+                }
+                let limit = count.min(content.len() - self.offset);
+                let dst = &mut content[self.offset..][..limit];
+                dst.copy_from_slice(&buffer[..limit]);
+                content.reserve(count - limit);
+                content.extend(&buffer[limit..]);
+                self.offset += count;
+                Ok(count)
+            }
+            FileBody::Fifo {
+                content, readers, ..
+            } => {
+                if *readers == 0 {
+                    // TODO SIGPIPE
+                    return Err(Errno::EPIPE);
+                }
+                let room = Pipe::PIPE_SIZE - content.len();
+                if room < buffer.len() {
+                    if room == 0 || buffer.len() <= Pipe::PIPE_BUF {
+                        return Err(Errno::EAGAIN);
+                    }
+                    buffer = &buffer[..room];
+                }
+                content.extend(buffer);
+                debug_assert!(content.len() <= Pipe::PIPE_SIZE);
+                Ok(buffer.len())
+            }
+            FileBody::Directory { .. } => Err(Errno::EISDIR),
         }
-        if self.offset > len {
-            let zeroes = self.offset - len;
-            content.reserve(zeroes + count);
-            content.resize_with(self.offset, u8::default);
-        }
-        let limit = count.min(content.len() - self.offset);
-        let dst = &mut content[self.offset..][..limit];
-        dst.copy_from_slice(&buffer[..limit]);
-        content.reserve(count - limit);
-        content.extend(&buffer[limit..]);
-        self.offset += count;
-        Ok(count)
     }
 
     /// Moves the file offset and returns the new offset.
@@ -351,11 +407,13 @@ impl Eq for FdBody {}
 
 #[cfg(test)]
 mod tests {
+    use super::super::Mode;
     use super::*;
     use assert_matches::assert_matches;
+    use std::collections::VecDeque;
 
     #[test]
-    fn open_file_read_unreadable() {
+    fn regular_file_read_unreadable() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
@@ -370,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_read_beyond_file_length() {
+    fn regular_file_read_beyond_file_length() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 1,
@@ -391,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_read_more_than_content() {
+    fn regular_file_read_more_than_content() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
@@ -408,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_read_less_than_content() {
+    fn regular_file_read_less_than_content() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
@@ -425,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_write_unwritable() {
+    fn regular_file_write_unwritable() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
@@ -439,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_write_less_than_content() {
+    fn regular_file_write_less_than_content() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
@@ -460,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_write_more_than_content() {
+    fn regular_file_write_more_than_content() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
@@ -481,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_write_beyond_file_length() {
+    fn regular_file_write_beyond_file_length() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 3,
@@ -502,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_write_appending() {
+    fn regular_file_write_appending() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
@@ -523,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_seek_set() {
+    fn regular_file_seek_set() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 3,
@@ -550,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_seek_cur() {
+    fn regular_file_seek_cur() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 5,
@@ -577,7 +635,7 @@ mod tests {
     }
 
     #[test]
-    fn open_file_seek_end() {
+    fn regular_file_seek_end() {
         let mut open_file = OpenFile {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 2,
@@ -604,89 +662,264 @@ mod tests {
     }
 
     #[test]
-    fn pipe_read_write() {
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let mut writer = PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+    fn fifo_reader_drop() {
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
+        }));
+        let open_file = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
         };
-        let mut reader = PipeReader { pipe };
+        drop(open_file);
+
+        assert_matches!(&file.borrow().body, FileBody::Fifo { readers, writers, .. } => {
+            assert_eq!(*readers, 0);
+            assert_eq!(*writers, 1);
+        });
+    }
+
+    #[test]
+    fn fifo_writer_drop() {
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
+        }));
+        let open_file = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
+        drop(open_file);
+
+        assert_matches!(&file.borrow().body, FileBody::Fifo { readers, writers, .. } => {
+            assert_eq!(*readers, 1);
+            assert_eq!(*writers, 0);
+        });
+    }
+
+    #[test]
+    fn fifo_read_empty() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::new(),
+                    readers: 1,
+                    writers: 0,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
+        };
 
         let mut buffer = [100; 5];
-        let result = reader.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EAGAIN));
-
-        let result = writer.write(&[1, 2, 3, 4, 5, 9, 8]);
-        assert_eq!(result, Ok(7));
-
-        let result = reader.read(&mut buffer);
-        assert_eq!(result, Ok(5));
-        assert_eq!(buffer, [1, 2, 3, 4, 5]);
-
-        let result = writer.write(&[0, 1]);
-        assert_eq!(result, Ok(2));
-
-        let result = reader.read(&mut buffer);
-        assert_eq!(result, Ok(4));
-        assert_eq!(buffer[..4], [9, 8, 0, 1]);
-
-        let result = reader.read(&mut buffer);
-        assert_eq!(result, Err(Errno::EAGAIN));
-
-        drop(writer);
-
-        let result = reader.read(&mut buffer);
+        let result = open_file.read(&mut buffer);
         assert_eq!(result, Ok(0));
     }
 
     #[test]
-    fn pipe_write_full() {
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let mut writer = PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+    fn fifo_read_non_empty() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
+                    readers: 1,
+                    writers: 0,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
         };
-        writer.write(&[0; Pipe::PIPE_SIZE]).unwrap();
+
+        let mut buffer = [100; 4];
+        let result = open_file.read(&mut buffer);
+        assert_eq!(result, Ok(4));
+        assert_eq!(buffer, [1, 5, 7, 3]);
+
+        let result = open_file.read(&mut buffer);
+        assert_eq!(result, Ok(3));
+        assert_eq!(buffer[..3], [42, 7, 6]);
+
+        let result = open_file.read(&mut buffer);
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn fifo_read_not_ready() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::new(),
+                    readers: 1,
+                    writers: 1,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
+        };
+
+        let mut buffer = [100; 5];
+        let result = open_file.read(&mut buffer);
+        assert_eq!(result, Err(Errno::EAGAIN));
+    }
+
+    #[test]
+    fn fifo_write_vacant() {
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
+
+        let result = open_file.write(&[1, 1, 2, 3]);
+        assert_eq!(result, Ok(4));
+
+        let result = open_file.write(&[5, 8, 13]);
+        assert_eq!(result, Ok(3));
+
+        assert_matches!(&mut file.borrow_mut().body, FileBody::Fifo { content, .. } => {
+            assert_eq!(content.make_contiguous(), [1, 1, 2, 3, 5, 8, 13]);
+        });
+    }
+
+    #[test]
+    fn fifo_write_full() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::new(),
+                    readers: 1,
+                    writers: 1,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
+
+        open_file.write(&[0; Pipe::PIPE_SIZE]).unwrap();
 
         // The pipe is full. No more can be written.
-        let result = writer.write(&[1; 1]);
+        let result = open_file.write(&[1; 1]);
         assert_eq!(result, Err(Errno::EAGAIN));
-        let result = writer.write(&[1; Pipe::PIPE_BUF + 1]);
+        let result = open_file.write(&[1; Pipe::PIPE_BUF + 1]);
         assert_eq!(result, Err(Errno::EAGAIN));
 
         // However, empty write should succeed.
-        let result = writer.write(&[1; 0]);
+        let result = open_file.write(&[1; 0]);
         assert_eq!(result, Ok(0));
     }
 
     #[test]
-    fn pipe_write_atomic_full() {
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let mut writer = PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+    fn fifo_write_atomic_full() {
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
         };
-        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF + 1;
-        writer.write(&[0; LEN]).unwrap();
 
-        // The remaining room in the pipe is less than the length we're writing
-        // that is PIPE_BUF. Nothing is written in this case.
-        let result = writer.write(&[1; Pipe::PIPE_BUF]);
+        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF + 1;
+        open_file.write(&[0; LEN]).unwrap();
+
+        // The remaining room in the pipe is less than the length we're writing,
+        // which is PIPE_BUF. Nothing is written in this case.
+        let result = open_file.write(&[1; Pipe::PIPE_BUF]);
         assert_eq!(result, Err(Errno::EAGAIN));
 
-        assert_eq!(pipe.borrow().content.len(), LEN);
+        assert_matches!(&file.borrow().body, FileBody::Fifo { content, .. } => {
+            assert_eq!(content.len(), LEN);
+        });
     }
 
     #[test]
-    fn pipe_write_non_atomic_full() {
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let mut writer = PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+    fn fifo_write_non_atomic_full() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::new(),
+                    readers: 1,
+                    writers: 1,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
         };
-        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF;
-        writer.write(&[0; LEN]).unwrap();
 
-        // The remaining room in the pipe is less than the length we're writing
-        // that exceeds PIPE_BUF. Only as much as possible is written in this
+        const LEN: usize = Pipe::PIPE_SIZE - Pipe::PIPE_BUF;
+        open_file.write(&[0; LEN]).unwrap();
+
+        // The remaining room in the pipe is less than the length we're writing,
+        // which exceeds PIPE_BUF. Only as much as possible is written in this
         // case.
-        let result = writer.write(&[1; Pipe::PIPE_BUF + 1]);
+        let result = open_file.write(&[1; Pipe::PIPE_BUF + 1]);
         assert_eq!(result, Ok(Pipe::PIPE_BUF));
+    }
+
+    #[test]
+    fn fifo_write_orphan() {
+        let mut open_file = OpenFile {
+            file: Rc::new(RefCell::new(INode {
+                body: FileBody::Fifo {
+                    content: VecDeque::new(),
+                    readers: 0,
+                    writers: 1,
+                },
+                permissions: Mode::default(),
+            })),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
+
+        let result = open_file.write(&[1; 1]);
+        assert_eq!(result, Err(Errno::EPIPE));
     }
 }
