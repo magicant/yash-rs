@@ -24,7 +24,6 @@ use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
-use std::rc::Weak;
 
 /// Abstract handle to perform I/O with.
 pub trait OpenFileDescription: Debug {
@@ -269,122 +268,6 @@ impl Pipe {
     /// This value is for the virtual system implementation.
     /// The real system may have a different configuration.
     pub const PIPE_SIZE: usize = Self::PIPE_BUF * 2;
-}
-
-/// Reading end of a [`Pipe`].
-#[derive(Clone, Debug)]
-pub struct PipeReader {
-    pub pipe: Rc<RefCell<Pipe>>,
-}
-
-/// Compares two `PipeReader`s.
-///
-/// Two readers are considered equal iff they reads from the same pipe.
-impl PartialEq for PipeReader {
-    fn eq(&self, rhs: &Self) -> bool {
-        Rc::ptr_eq(&self.pipe, &rhs.pipe)
-    }
-}
-
-impl Eq for PipeReader {}
-
-impl OpenFileDescription for PipeReader {
-    fn is_readable(&self) -> bool {
-        true
-    }
-    fn is_writable(&self) -> bool {
-        false
-    }
-    fn is_ready_for_reading(&self) -> bool {
-        let pipe = self.pipe.borrow();
-        !pipe.content.is_empty() || Rc::weak_count(&self.pipe) == 0
-    }
-    fn is_ready_for_writing(&self) -> bool {
-        false
-    }
-    fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
-        let mut pipe = self.pipe.borrow_mut();
-        let limit = pipe.content.len();
-        if limit == 0 && Rc::weak_count(&self.pipe) > 0 {
-            return Err(Errno::EAGAIN);
-        }
-        if buffer.len() > limit {
-            buffer = &mut buffer[..limit];
-        }
-        let count = buffer.len();
-        buffer.copy_from_slice(&pipe.content[..count]);
-        pipe.content.drain(..count);
-        Ok(count)
-    }
-    fn write(&mut self, _buffer: &[u8]) -> nix::Result<usize> {
-        Err(Errno::EBADF)
-    }
-    fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
-        Err(Errno::ESPIPE)
-    }
-    fn i_node(&self) -> Rc<RefCell<INode>> {
-        todo!("should return a pipe i-node")
-    }
-}
-
-/// Writing end of a [`Pipe`].
-#[derive(Clone, Debug)]
-pub struct PipeWriter {
-    pub pipe: Weak<RefCell<Pipe>>,
-}
-
-/// Compares two `PipeWriter`s.
-///
-/// Two writers are considered equal iff they writes to the same pipe.
-impl PartialEq for PipeWriter {
-    fn eq(&self, rhs: &Self) -> bool {
-        Weak::ptr_eq(&self.pipe, &rhs.pipe)
-    }
-}
-
-impl Eq for PipeWriter {}
-
-impl OpenFileDescription for PipeWriter {
-    fn is_readable(&self) -> bool {
-        false
-    }
-    fn is_writable(&self) -> bool {
-        true
-    }
-    fn is_ready_for_reading(&self) -> bool {
-        false
-    }
-    fn is_ready_for_writing(&self) -> bool {
-        // TODO Should depend on whether the pipe is full
-        true
-    }
-    fn read(&mut self, _buffer: &mut [u8]) -> nix::Result<usize> {
-        Err(Errno::EBADF)
-    }
-    fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
-        let pipe = match self.pipe.upgrade() {
-            // TODO SIGPIPE
-            None => return Err(Errno::EPIPE),
-            Some(pipe) => pipe,
-        };
-        let mut pipe = pipe.borrow_mut();
-        let room = Pipe::PIPE_SIZE - pipe.content.len();
-        if room < buffer.len() {
-            if room == 0 || buffer.len() <= Pipe::PIPE_BUF {
-                return Err(Errno::EAGAIN);
-            }
-            buffer = &buffer[..room];
-        }
-        pipe.content.extend(buffer);
-        debug_assert!(pipe.content.len() <= Pipe::PIPE_SIZE);
-        Ok(buffer.len())
-    }
-    fn seek(&mut self, _offset: off_t, _whence: Whence) -> nix::Result<off_t> {
-        Err(Errno::ESPIPE)
-    }
-    fn i_node(&self) -> Rc<RefCell<INode>> {
-        todo!("should return a pipe i-node")
-    }
 }
 
 /// State of a file descriptor.

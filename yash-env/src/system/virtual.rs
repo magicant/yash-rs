@@ -67,6 +67,7 @@ use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -215,18 +216,35 @@ impl System for VirtualSystem {
     }
 
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let writer = Rc::new(RefCell::new(PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
         }));
-        let reader = Rc::new(RefCell::new(PipeReader { pipe }));
+        let reader = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
+        };
+        let writer = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
 
         let reader = FdBody {
-            open_file_description: reader,
+            open_file_description: Rc::new(RefCell::new(reader)),
             cloexec: false,
         };
         let writer = FdBody {
-            open_file_description: writer,
+            open_file_description: Rc::new(RefCell::new(writer)),
             cloexec: false,
         };
 

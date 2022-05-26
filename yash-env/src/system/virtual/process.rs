@@ -384,8 +384,10 @@ impl ProcessState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::io::{Pipe, PipeReader, PipeWriter};
+    use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
+    use crate::system::r#virtual::io::OpenFile;
     use std::cell::RefCell;
+    use std::collections::VecDeque;
     use std::rc::Rc;
 
     #[test]
@@ -413,18 +415,36 @@ mod tests {
 
     fn process_with_pipe() -> (Process, Fd, Fd) {
         let mut process = Process::with_parent(Pid::from_raw(10));
-        let pipe = Rc::new(RefCell::new(Pipe::new()));
-        let writer = Rc::new(RefCell::new(PipeWriter {
-            pipe: Rc::downgrade(&pipe),
+
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
         }));
-        let reader = Rc::new(RefCell::new(PipeReader { pipe }));
+        let reader = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: true,
+            is_writable: false,
+            is_appending: false,
+        };
+        let writer = OpenFile {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
 
         let reader = FdBody {
-            open_file_description: reader,
+            open_file_description: Rc::new(RefCell::new(reader)),
             cloexec: false,
         };
         let writer = FdBody {
-            open_file_description: writer,
+            open_file_description: Rc::new(RefCell::new(writer)),
             cloexec: false,
         };
 
