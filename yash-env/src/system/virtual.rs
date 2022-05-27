@@ -123,7 +123,7 @@ impl VirtualSystem {
             let file = Rc::new(RefCell::new(INode::new([])));
             state.file_system.save(path, Rc::clone(&file)).unwrap();
             let body = FdBody {
-                open_file_description: Rc::new(RefCell::new(OpenFile {
+                open_file_description: Rc::new(RefCell::new(OpenFileDescription {
                     file,
                     offset: 0,
                     is_readable: true,
@@ -174,7 +174,7 @@ impl VirtualSystem {
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
     pub fn with_open_file_description<F, R>(&self, fd: Fd, f: F) -> nix::Result<R>
     where
-        F: FnOnce(&dyn OpenFileDescription) -> nix::Result<R>,
+        F: FnOnce(&OpenFileDescription) -> nix::Result<R>,
     {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
@@ -187,7 +187,7 @@ impl VirtualSystem {
     /// Returns `Err(Errno::EBADF)` if the FD is not open.
     pub fn with_open_file_description_mut<F, R>(&mut self, fd: Fd, f: F) -> nix::Result<R>
     where
-        F: FnOnce(&mut dyn OpenFileDescription) -> nix::Result<R>,
+        F: FnOnce(&mut OpenFileDescription) -> nix::Result<R>,
     {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
@@ -224,14 +224,14 @@ impl System for VirtualSystem {
             },
             permissions: Mode::default(),
         }));
-        let reader = OpenFile {
+        let reader = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: true,
             is_writable: false,
             is_appending: false,
         };
-        let writer = OpenFile {
+        let writer = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: false,
@@ -309,7 +309,7 @@ impl System for VirtualSystem {
             OFlag::O_RDWR => (true, true),
             _ => (false, false),
         };
-        let open_file_description = Rc::new(RefCell::new(OpenFile {
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
             offset: 0,
             is_readable,

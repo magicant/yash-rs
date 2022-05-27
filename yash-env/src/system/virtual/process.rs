@@ -385,7 +385,7 @@ impl ProcessState {
 mod tests {
     use super::*;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
-    use crate::system::r#virtual::io::OpenFile;
+    use crate::system::r#virtual::io::OpenFileDescription;
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::rc::Rc;
@@ -424,14 +424,14 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let reader = OpenFile {
+        let reader = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: true,
             is_writable: false,
             is_appending: false,
         };
-        let writer = OpenFile {
+        let writer = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: false,

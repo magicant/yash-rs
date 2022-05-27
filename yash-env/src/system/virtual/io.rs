@@ -37,42 +37,9 @@ pub const PIPE_BUF: usize = 512;
 /// The real system may have a different configuration.
 pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
-/// Abstract handle to perform I/O with.
-pub trait OpenFileDescription: Debug {
-    /// Returns true if you can read from this open file description.
-    fn is_readable(&self) -> bool;
-
-    /// Returns true if you can write to this open file description.
-    fn is_writable(&self) -> bool;
-
-    /// Returns true if you can read from this open file description without
-    /// blocking.
-    fn is_ready_for_reading(&self) -> bool;
-
-    /// Returns true if you can write to this open file description without
-    /// blocking.
-    fn is_ready_for_writing(&self) -> bool;
-
-    /// Reads from this open file description.
-    ///
-    /// Returns the number of bytes successfully read.
-    fn read(&mut self, buffer: &mut [u8]) -> nix::Result<usize>;
-
-    /// Writes to this open file description.
-    ///
-    /// Returns the number of bytes successfully written.
-    fn write(&mut self, buffer: &[u8]) -> nix::Result<usize>;
-
-    /// Moves the file offset and returns the new offset.
-    fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t>;
-
-    /// Returns the i-node this open file description is operating on.
-    fn i_node(&self) -> Rc<RefCell<INode>>;
-}
-
 /// State of a file opened for reading and/or writing.
 #[derive(Clone, Debug, Eq)]
-pub struct OpenFile {
+pub struct OpenFileDescription {
     /// The file.
     pub file: Rc<RefCell<INode>>,
     /// Position in bytes to perform next I/O operation at.
@@ -85,11 +52,11 @@ pub struct OpenFile {
     pub is_appending: bool,
 }
 
-/// Compares two `OpenFile`s.
+/// Compares two `OpenFileDescription`s.
 ///
 /// Two files are considered equal iff they have the same i-node, readability,
 /// and writability.
-impl PartialEq for OpenFile {
+impl PartialEq for OpenFileDescription {
     fn eq(&self, rhs: &Self) -> bool {
         Rc::ptr_eq(&self.file, &rhs.file)
             && self.is_readable == rhs.is_readable
@@ -97,7 +64,7 @@ impl PartialEq for OpenFile {
     }
 }
 
-impl Drop for OpenFile {
+impl Drop for OpenFileDescription {
     fn drop(&mut self) {
         if let FileBody::Fifo {
             readers, writers, ..
@@ -113,16 +80,23 @@ impl Drop for OpenFile {
     }
 }
 
-impl OpenFileDescription for OpenFile {
-    fn is_readable(&self) -> bool {
+impl OpenFileDescription {
+    /// Returns true if you can read from this open file description.
+    #[must_use]
+    pub fn is_readable(&self) -> bool {
         self.is_readable
     }
 
-    fn is_writable(&self) -> bool {
+    /// Returns true if you can write to this open file description.
+    #[must_use]
+    pub fn is_writable(&self) -> bool {
         self.is_writable
     }
 
-    fn is_ready_for_reading(&self) -> bool {
+    /// Returns true if you can read from this open file description without
+    /// blocking.
+    #[must_use]
+    pub fn is_ready_for_reading(&self) -> bool {
         match &self.file.borrow().body {
             FileBody::Regular { .. } | FileBody::Directory { .. } => true,
             FileBody::Fifo {
@@ -131,12 +105,18 @@ impl OpenFileDescription for OpenFile {
         }
     }
 
-    fn is_ready_for_writing(&self) -> bool {
+    /// Returns true if you can write to this open file description without
+    /// blocking.
+    #[must_use]
+    pub fn is_ready_for_writing(&self) -> bool {
         // TODO In case of a fifo, check if the fifo is writable and not full
         true
     }
 
-    fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
+    /// Reads from this open file description.
+    ///
+    /// Returns the number of bytes successfully read.
+    pub fn read(&mut self, mut buffer: &mut [u8]) -> nix::Result<usize> {
         if !self.is_readable {
             return Err(Errno::EBADF);
         }
@@ -178,7 +158,10 @@ impl OpenFileDescription for OpenFile {
         }
     }
 
-    fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
+    /// Writes to this open file description.
+    ///
+    /// Returns the number of bytes successfully written.
+    pub fn write(&mut self, mut buffer: &[u8]) -> nix::Result<usize> {
         if !self.is_writable {
             return Err(Errno::EBADF);
         }
@@ -228,7 +211,7 @@ impl OpenFileDescription for OpenFile {
     ///
     /// The current implementation for `OpenFileDescription` does not support
     /// `Whence::SeekHole` or `Whence::SeekData`.
-    fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t> {
+    pub fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t> {
         let len = match &self.file.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
@@ -251,7 +234,9 @@ impl OpenFileDescription for OpenFile {
         Ok(new_offset)
     }
 
-    fn i_node(&self) -> Rc<RefCell<INode>> {
+    /// Returns the i-node this open file description is operating on.
+    #[must_use]
+    pub fn i_node(&self) -> Rc<RefCell<INode>> {
         Rc::clone(&self.file)
     }
 }
@@ -260,7 +245,7 @@ impl OpenFileDescription for OpenFile {
 #[derive(Clone, Debug)]
 pub struct FdBody {
     /// Underlying open file description.
-    pub open_file_description: Rc<RefCell<dyn OpenFileDescription>>,
+    pub open_file_description: Rc<RefCell<OpenFileDescription>>,
     /// True if this FD has the CLOEXEC flag set.
     pub cloexec: bool,
 }
@@ -283,7 +268,7 @@ mod tests {
 
     #[test]
     fn regular_file_read_unreadable() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
@@ -298,7 +283,7 @@ mod tests {
 
     #[test]
     fn regular_file_read_beyond_file_length() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 1,
             is_readable: true,
@@ -319,7 +304,7 @@ mod tests {
 
     #[test]
     fn regular_file_read_more_than_content() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: true,
@@ -336,7 +321,7 @@ mod tests {
 
     #[test]
     fn regular_file_read_less_than_content() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: true,
@@ -353,7 +338,7 @@ mod tests {
 
     #[test]
     fn regular_file_write_unwritable() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 0,
             is_readable: false,
@@ -367,7 +352,7 @@ mod tests {
 
     #[test]
     fn regular_file_write_less_than_content() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3, 4, 5]))),
             offset: 1,
             is_readable: false,
@@ -388,7 +373,7 @@ mod tests {
 
     #[test]
     fn regular_file_write_more_than_content() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
@@ -409,7 +394,7 @@ mod tests {
 
     #[test]
     fn regular_file_write_beyond_file_length() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1]))),
             offset: 3,
             is_readable: false,
@@ -430,7 +415,7 @@ mod tests {
 
     #[test]
     fn regular_file_write_appending() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 1,
             is_readable: false,
@@ -451,7 +436,7 @@ mod tests {
 
     #[test]
     fn regular_file_seek_set() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 3,
             is_readable: true,
@@ -478,7 +463,7 @@ mod tests {
 
     #[test]
     fn regular_file_seek_cur() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([]))),
             offset: 5,
             is_readable: true,
@@ -505,7 +490,7 @@ mod tests {
 
     #[test]
     fn regular_file_seek_end() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode::new([1, 2, 3]))),
             offset: 2,
             is_readable: true,
@@ -540,7 +525,7 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let open_file = OpenFile {
+        let open_file = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: true,
@@ -565,7 +550,7 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let open_file = OpenFile {
+        let open_file = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: false,
@@ -582,7 +567,7 @@ mod tests {
 
     #[test]
     fn fifo_read_empty() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
@@ -604,7 +589,7 @@ mod tests {
 
     #[test]
     fn fifo_read_non_empty() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::from([1, 5, 7, 3, 42, 7, 6]),
@@ -634,7 +619,7 @@ mod tests {
 
     #[test]
     fn fifo_read_not_ready() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
@@ -664,7 +649,7 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: false,
@@ -685,7 +670,7 @@ mod tests {
 
     #[test]
     fn fifo_write_full() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
@@ -723,7 +708,7 @@ mod tests {
             },
             permissions: Mode::default(),
         }));
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::clone(&file),
             offset: 0,
             is_readable: false,
@@ -746,7 +731,7 @@ mod tests {
 
     #[test]
     fn fifo_write_non_atomic_full() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
@@ -773,7 +758,7 @@ mod tests {
 
     #[test]
     fn fifo_write_orphan() {
-        let mut open_file = OpenFile {
+        let mut open_file = OpenFileDescription {
             file: Rc::new(RefCell::new(INode {
                 body: FileBody::Fifo {
                     content: VecDeque::new(),
