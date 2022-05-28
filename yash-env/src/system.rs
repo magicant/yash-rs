@@ -74,6 +74,7 @@ use std::time::Instant;
 /// with asynchronous methods.
 pub trait System: Debug {
     /// Whether there is an executable file at the specified path.
+    #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
 
     /// Creates an unnamed pipe.
@@ -146,6 +147,7 @@ pub trait System: Debug {
     fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
 
     /// Returns the current time.
+    #[must_use]
     fn now(&self) -> Instant;
 
     /// Gets and/or sets the signal blocking mask.
@@ -244,6 +246,7 @@ pub trait System: Debug {
     ) -> nix::Result<c_int>;
 
     /// Returns the process ID of the current process.
+    #[must_use]
     fn getpid(&self) -> Pid;
 
     /// Creates a new child process.

@@ -137,6 +137,7 @@ impl Env {
     /// Members of the new environments are default-constructed except that:
     /// - `main_pid` is initialized as `system.getpid()`
     /// - `system` is initialized as `SharedSystem::new(system)`
+    #[must_use]
     pub fn with_system(system: Box<dyn System>) -> Env {
         Env {
             aliases: Default::default(),
@@ -155,6 +156,7 @@ impl Env {
     }
 
     /// Creates a new environment with a default-constructed [`VirtualSystem`].
+    #[must_use]
     pub fn new_virtual() -> Env {
         Env::with_system(Box::new(VirtualSystem::default()))
     }
@@ -164,6 +166,7 @@ impl Env {
     /// The application-managed parts of the environment are cloned normally.
     /// The system-managed parts are replaced with the provided `System`
     /// instance.
+    #[must_use]
     pub fn clone_with_system(&self, system: Box<dyn System>) -> Env {
         Env {
             aliases: self.aliases.clone(),
