@@ -38,7 +38,7 @@ pub const PIPE_BUF: usize = 512;
 pub const PIPE_SIZE: usize = PIPE_BUF * 2;
 
 /// State of a file opened for reading and/or writing.
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug)]
 pub struct OpenFileDescription {
     /// The file.
     pub file: Rc<RefCell<INode>>,
@@ -50,18 +50,6 @@ pub struct OpenFileDescription {
     pub is_writable: bool,
     /// Whether this file is opened for appending.
     pub is_appending: bool,
-}
-
-/// Compares two `OpenFileDescription`s.
-///
-/// Two files are considered equal iff they have the same i-node, readability,
-/// and writability.
-impl PartialEq for OpenFileDescription {
-    fn eq(&self, rhs: &Self) -> bool {
-        Rc::ptr_eq(&self.file, &rhs.file)
-            && self.is_readable == rhs.is_readable
-            && self.is_writable == rhs.is_writable
-    }
 }
 
 impl Drop for OpenFileDescription {
