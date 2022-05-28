@@ -109,8 +109,12 @@ impl OpenFileDescription {
     /// blocking.
     #[must_use]
     pub fn is_ready_for_writing(&self) -> bool {
-        // TODO In case of a fifo, check if the fifo is writable and not full
-        true
+        match &self.file.borrow().body {
+            FileBody::Regular { .. } | FileBody::Directory { .. } => true,
+            FileBody::Fifo {
+                content, readers, ..
+            } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
+        }
     }
 
     /// Reads from this open file description.
@@ -563,6 +567,41 @@ mod tests {
             assert_eq!(*readers, 1);
             assert_eq!(*writers, 0);
         });
+    }
+
+    #[test]
+    fn fifo_is_ready_for_writing() {
+        let file = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: VecDeque::new(),
+                readers: 1,
+                writers: 1,
+            },
+            permissions: Mode::default(),
+        }));
+        let mut open_file = OpenFileDescription {
+            file: Rc::clone(&file),
+            offset: 0,
+            is_readable: false,
+            is_writable: true,
+            is_appending: false,
+        };
+
+        assert!(open_file.is_ready_for_writing());
+
+        let buffer = [42; PIPE_SIZE - PIPE_BUF];
+        let result = open_file.write(&buffer);
+        assert_eq!(result, Ok(PIPE_SIZE - PIPE_BUF));
+        assert!(open_file.is_ready_for_writing());
+
+        let result = open_file.write(&[123]);
+        assert_eq!(result, Ok(1));
+        assert!(!open_file.is_ready_for_writing());
+
+        assert_matches!(&mut file.borrow_mut().body, FileBody::Fifo { readers, .. } => {
+            *readers = 0;
+        });
+        assert!(open_file.is_ready_for_writing());
     }
 
     #[test]
