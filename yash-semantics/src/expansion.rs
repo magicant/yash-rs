@@ -65,6 +65,7 @@
 
 pub mod attr;
 pub mod attr_strip;
+pub mod glob;
 pub mod initial;
 pub mod phrase;
 pub mod quote_removal;
