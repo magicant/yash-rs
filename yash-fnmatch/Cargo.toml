@@ -1,0 +1,19 @@
+[package]
+name = "yash-fnmatch"
+version = "0.1.0"
+authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
+edition = "2021"
+rust-version = "1.56.0"
+description = "Pattern matching for globbing in yash"
+# documentation = "https://yash.osdn.jp/doc/"
+# readme = "README.md"
+# homepage = "https://yash.osdn.jp/"
+repository = "https://github.com/magicant/yash-rs"
+license = "MIT OR Apache-2.0"
+# license-file = "../LICENSE"
+keywords = ["posix", "shell"]
+categories = ["command-line-utilities"]
+publish = false
+
+[dependencies]
+regex = "1.5.6"

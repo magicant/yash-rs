@@ -18,6 +18,7 @@
 
 pub use yash_builtin as builtin;
 pub use yash_env as env;
+pub use yash_fnmatch as fnmatch;
 pub use yash_quote as quote;
 pub use yash_semantics as semantics;
 #[doc(no_inline)]

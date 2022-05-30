@@ -22,6 +22,7 @@ futures-executor = "0.3.21"
 futures-util = "0.3.21"
 yash-builtin = { path = "../yash-builtin", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
+yash-fnmatch = { path = "../yash-fnmatch", version = "0.1.0" }
 yash-quote = { path = "../yash-quote", version = "1.0.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.4.0", features = ["annotate-snippets"] }

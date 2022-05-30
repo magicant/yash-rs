@@ -16,7 +16,8 @@
 
 //! Pathname expansion
 //!
-//! Pathname expansion (a.k.a. globbing) scans directories and produces pathnames matching the input field.
+//! Pathname expansion (a.k.a. globbing) scans directories and produces
+//! pathnames matching the input field.
 //!
 //! # Pattern syntax
 //!
@@ -27,7 +28,8 @@
 //! - `*`
 //! - Character classes (a set of characters enclosed in brackets)
 //!
-//! Refer to the [`fnmatch`] crate for pattern syntax and semantics details.
+//! Refer to the [`yash-fnmatch`](yash_fnmatch) crate for pattern syntax and
+//! semantics details.
 //!
 //! # Directory scanning
 //!
