@@ -79,6 +79,7 @@ pub enum Error {
 #[derive(Clone, Debug)]
 #[must_use = "creating a pattern without doing pattern matching is nonsense"]
 pub struct Pattern {
+    pattern: String,
     config: Config,
 }
 
@@ -97,13 +98,13 @@ impl Pattern {
     }
 
     /// Creates a pattern with a specified configuration.
-    pub fn with_config<I>(_pattern: I, config: Config) -> Self
+    pub fn with_config<I>(pattern: I, config: Config) -> Self
     where
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        // TODO parse _pattern
-        Pattern { config }
+        let pattern = pattern.into_iter().map(|(c, _)| c).collect();
+        Pattern { pattern, config }
     }
 
     /// Returns the configuration for this pattern.
@@ -115,9 +116,8 @@ impl Pattern {
 
     /// Tests whether this pattern matches the given text.
     #[must_use]
-    pub fn is_match(&self, _text: &str) -> bool {
-        // TODO examine _text
-        true
+    pub fn is_match(&self, text: &str) -> bool {
+        text.contains(&self.pattern)
     }
 }
 
@@ -171,5 +171,27 @@ mod tests {
         assert!(p.is_match("a"));
         assert!(p.is_match("."));
         assert!(p.is_match("*"));
+    }
+
+    #[test]
+    fn single_character_pattern() {
+        let p = Pattern::new(without_escape("a"));
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("aa"));
+        assert!(!p.is_match("b"));
+        assert!(p.is_match("ab"));
+        assert!(p.is_match("ba"));
+    }
+
+    #[test]
+    fn double_character_pattern() {
+        let p = Pattern::new(without_escape("in"));
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("i"));
+        assert!(!p.is_match("n"));
+        assert!(p.is_match("bin"));
+        assert!(p.is_match("inn"));
+        assert!(!p.is_match("nit"));
     }
 }
