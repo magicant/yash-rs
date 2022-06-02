@@ -75,11 +75,18 @@ pub enum Error {
     RegexError(regex::Error),
 }
 
+/// Main part of compiled pattern
+#[derive(Clone, Debug)]
+enum Body {
+    /// Literal string pattern
+    Literal(String),
+}
+
 /// Compiled globbing pattern
 #[derive(Clone, Debug)]
 #[must_use = "creating a pattern without doing pattern matching is nonsense"]
 pub struct Pattern {
-    pattern: String,
+    body: Body,
     config: Config,
 }
 
@@ -103,8 +110,9 @@ impl Pattern {
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let pattern = pattern.into_iter().map(|(c, _)| c).collect();
-        Pattern { pattern, config }
+        let s = pattern.into_iter().map(|(c, _)| c).collect();
+        let body = Body::Literal(s);
+        Pattern { body, config }
     }
 
     /// Returns the configuration for this pattern.
@@ -117,7 +125,9 @@ impl Pattern {
     /// Tests whether this pattern matches the given text.
     #[must_use]
     pub fn is_match(&self, text: &str) -> bool {
-        text.contains(&self.pattern)
+        match &self.body {
+            Body::Literal(s) => text.contains(s),
+        }
     }
 }
 
