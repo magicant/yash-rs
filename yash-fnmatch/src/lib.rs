@@ -85,6 +85,45 @@ enum Body {
     Regex(Regex),
 }
 
+/// Converts a globbing pattern to a literal string.
+///
+/// If the pattern contains a non-literal character, the result is
+/// `Err(some_string)` where the string value is unspecified. The string can be
+/// reused for any purpose.
+fn to_literal<I>(pattern: I) -> Result<String, String>
+where
+    I: Iterator<Item = (char, CharKind)>,
+{
+    let mut result = String::new();
+    result.reserve(pattern.size_hint().0);
+    for (c, _) in pattern {
+        match c {
+            '?' => return Err(result),
+            // TODO '*'
+            // TODO bracket expression
+            _ => result.push(c),
+        }
+    }
+    Ok(result)
+}
+
+/// Converts a globbing pattern to a regular expression.
+///
+/// The result is appended to `result`.
+fn to_regex<I>(pattern: I, result: &mut String)
+where
+    I: Iterator<Item = (char, CharKind)> + Clone,
+{
+    for (c, _) in pattern {
+        match c {
+            '?' => result.push('.'),
+            // TODO '*'
+            // TODO bracket expression
+            _ => result.push(c),
+        }
+    }
+}
+
 /// Compiled globbing pattern
 #[derive(Clone, Debug)]
 #[must_use = "creating a pattern without doing pattern matching is nonsense"]
@@ -114,13 +153,15 @@ impl Pattern {
         <I as IntoIterator>::IntoIter: Clone,
     {
         let pattern = pattern.into_iter();
-        if pattern.clone().any(|(c, _)| c == '?') {
-            // TODO multiline option
-            let body = Body::Regex(Regex::new(".").unwrap());
-            return Pattern { body, config };
-        }
-        let s = pattern.map(|(c, _)| c).collect();
-        let body = Body::Literal(s);
+        let body = match to_literal(pattern.clone()) {
+            Ok(literal) => Body::Literal(literal),
+            Err(mut regex) => {
+                regex.clear();
+                to_regex(pattern, &mut regex);
+                // TODO multiline option
+                Body::Regex(Regex::new(&regex).unwrap())
+            }
+        };
         Pattern { body, config }
     }
 
@@ -141,48 +182,11 @@ impl Pattern {
     }
 }
 
-/*
-/// Pattern builder
-#[derive(Clone, Debug, Default)]
-pub struct Builder {}
-
-impl Builder {
-    /// Creates a new builder.
-    #[must_use]
-    pub fn new() -> Self {
-        Builder::default()
-    }
-
-    /// Build a new pattern.
-    pub fn build(&self) -> Result<Pattern, Error> {
-        todo!()
-    }
-
-    /// Sets whether the pattern matches only at the beginning.
-    pub fn anchor_begin(&mut self, yes: bool) -> &mut Builder {
-        todo!()
-    }
-
-    /// Sets whether the pattern matches only at the end.
-    pub fn anchor_end(&mut self, yes: bool) -> &mut Builder {
-        todo!()
-    }
-
-    /// Sets whether a leading period has to be matched explicitly.
-    pub fn match_period(&mut self, yes: bool) -> &mut Builder {
-        todo!()
-    }
-
-    /// Sets whether the pattern should match case-insensitively.
-    pub fn case_insensitive(&mut self, yes: bool) -> &mut Builder {
-        todo!()
-    }
-}
-*/
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO test match ranges
 
     #[test]
     fn empty_pattern() {
@@ -221,6 +225,16 @@ mod tests {
         assert!(!p.is_match(""));
         assert!(p.is_match("i"));
         assert!(p.is_match("yes"));
+    }
+
+    #[test]
+    fn any_single_character_pattern_combined() {
+        let p = Pattern::new(without_escape("a?c"));
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("ab"));
+        assert!(!p.is_match("ac"));
+        assert!(!p.is_match("bc"));
+        assert!(p.is_match("abc"));
     }
 
     #[test]
