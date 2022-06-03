@@ -85,28 +85,6 @@ enum Body {
     Regex(Regex),
 }
 
-/// Converts a globbing pattern to a literal string.
-///
-/// If the pattern contains a non-literal character, the result is
-/// `Err(some_string)` where the string value is unspecified. The string can be
-/// reused for any purpose.
-fn to_literal<I>(pattern: I) -> Result<String, String>
-where
-    I: Iterator<Item = (char, CharKind)>,
-{
-    let mut result = String::new();
-    result.reserve(pattern.size_hint().0);
-    for (c, _) in pattern {
-        match c {
-            '?' => return Err(result),
-            // TODO '*'
-            // TODO bracket expression
-            _ => result.push(c),
-        }
-    }
-    Ok(result)
-}
-
 /// Converts a globbing pattern to a regular expression.
 ///
 /// The result is appended to `result`.
@@ -114,6 +92,7 @@ fn to_regex<I>(pattern: I, result: &mut String)
 where
     I: Iterator<Item = (char, CharKind)> + Clone,
 {
+    // TODO multiline option
     for (c, _) in pattern {
         match c {
             '?' => result.push('.'),
@@ -121,6 +100,29 @@ where
             // TODO bracket expression
             _ => result.push(c),
         }
+    }
+}
+
+impl Body {
+    fn new<I>(pattern: I, _config: Config) -> Self
+    where
+        I: Iterator<Item = (char, CharKind)> + Clone,
+    {
+        let mut chars = String::new();
+        chars.reserve(pattern.size_hint().0);
+        for (c, _) in pattern.clone() {
+            match c {
+                '?' => {
+                    chars.clear();
+                    to_regex(pattern, &mut chars);
+                    return Body::Regex(Regex::new(&chars).unwrap());
+                }
+                // TODO '*'
+                // TODO bracket expression
+                _ => chars.push(c),
+            }
+        }
+        Body::Literal(chars)
     }
 }
 
@@ -152,16 +154,7 @@ impl Pattern {
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let pattern = pattern.into_iter();
-        let body = match to_literal(pattern.clone()) {
-            Ok(literal) => Body::Literal(literal),
-            Err(mut regex) => {
-                regex.clear();
-                to_regex(pattern, &mut regex);
-                // TODO multiline option
-                Body::Regex(Regex::new(&regex).unwrap())
-            }
-        };
+        let body = Body::new(pattern.into_iter(), config);
         Pattern { body, config }
     }
 
@@ -171,6 +164,8 @@ impl Pattern {
     pub fn config(&self) -> Config {
         self.config
     }
+
+    // TODO is_literal
 
     /// Tests whether this pattern matches the given text.
     #[must_use]
