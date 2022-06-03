@@ -30,6 +30,7 @@
 
 mod char_iter;
 pub use char_iter::*;
+use regex::bytes::Regex;
 
 /// Configuration for a pattern
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -80,6 +81,8 @@ pub enum Error {
 enum Body {
     /// Literal string pattern
     Literal(String),
+    /// Compiled regular expression
+    Regex(Regex),
 }
 
 /// Compiled globbing pattern
@@ -110,7 +113,13 @@ impl Pattern {
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let s = pattern.into_iter().map(|(c, _)| c).collect();
+        let pattern = pattern.into_iter();
+        if pattern.clone().any(|(c, _)| c == '?') {
+            // TODO multiline option
+            let body = Body::Regex(Regex::new(".").unwrap());
+            return Pattern { body, config };
+        }
+        let s = pattern.map(|(c, _)| c).collect();
         let body = Body::Literal(s);
         Pattern { body, config }
     }
@@ -127,6 +136,7 @@ impl Pattern {
     pub fn is_match(&self, text: &str) -> bool {
         match &self.body {
             Body::Literal(s) => text.contains(s),
+            Body::Regex(regex) => regex.is_match(text.as_bytes()),
         }
     }
 }
@@ -204,4 +214,32 @@ mod tests {
         assert!(p.is_match("inn"));
         assert!(!p.is_match("nit"));
     }
+
+    #[test]
+    fn any_single_character_pattern() {
+        let p = Pattern::new(without_escape("?"));
+        assert!(!p.is_match(""));
+        assert!(p.is_match("i"));
+        assert!(p.is_match("yes"));
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn single_character_bracket_expression_pattern() {
+        let p = Pattern::new(without_escape("[a]"));
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(!p.is_match("[a]"));
+    }
+
+    // TODO multi_character_bracket_expression_pattern
+    // TODO special_characters_in_bracket_expression
+    // TODO character_range_in_bracket_expression
+    // TODO bracket_expression_complement
+    // TODO collating_symbol_in_bracket_expression
+    // TODO equivalence_class_in_bracket_expression
+    // TODO character_class_in_bracket_expression
+
+    // TODO Config
+    // TODO CharKind
 }
