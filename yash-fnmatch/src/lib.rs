@@ -97,7 +97,7 @@ where
     for (c, _) in pattern {
         match c {
             '?' => result.push('.'),
-            // TODO '*'
+            '*' => result.push_str(".*"),
             // TODO bracket expression
             _ => result.push(c),
         }
@@ -113,12 +113,11 @@ impl Body {
         chars.reserve(pattern.size_hint().0);
         for (c, _) in pattern.clone() {
             match c {
-                '?' => {
+                '?' | '*' => {
                     chars.clear();
                     to_regex(pattern, &mut chars);
                     return Body::Regex(Regex::new(&chars).unwrap());
                 }
-                // TODO '*'
                 // TODO bracket expression
                 _ => chars.push(c),
             }
@@ -287,6 +286,38 @@ mod tests {
         assert_eq!(p.find("ac"), None);
         assert_eq!(p.find("bc"), None);
         assert_eq!(p.find("abc"), Some(0..3));
+    }
+
+    #[test]
+    fn any_multi_character_pattern() {
+        let p = Pattern::new(without_escape("*"));
+        assert_eq!(p.as_literal(), None);
+
+        assert!(p.is_match(""));
+        assert!(p.is_match("i"));
+        assert!(p.is_match("yes"));
+
+        assert_eq!(p.find(""), Some(0..0));
+        assert_eq!(p.find("i"), Some(0..1));
+        assert_eq!(p.find("yes"), Some(0..3));
+    }
+
+    #[test]
+    fn any_multi_character_pattern_combined() {
+        let p = Pattern::new(without_escape("a*b"));
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("ab"));
+        assert!(p.is_match("aabb"));
+        assert!(p.is_match("lambda"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("ab"), Some(0..2));
+        assert_eq!(p.find("aabb"), Some(0..4));
+        assert_eq!(p.find("lambda"), Some(1..4));
     }
 
     #[test]
