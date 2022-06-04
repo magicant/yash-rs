@@ -136,7 +136,7 @@ impl Body {
                     bracket = Bracket::Open;
                     chars.push(c);
                 }
-                ']' => {
+                ']' if bracket == Bracket::Open => {
                     bracket = Bracket::Closed;
                     chars.push(c);
                 }
@@ -347,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn unmatched_bracket() {
+    fn unmatched_bracket_1() {
         let p = Pattern::new(without_escape("[a")).unwrap();
         assert_eq!(p.as_literal(), Some("[a"));
 
@@ -358,6 +358,34 @@ mod tests {
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), None);
         assert_eq!(p.find("[a]"), Some(0..2));
+    }
+
+    #[test]
+    fn unmatched_bracket_2() {
+        let p = Pattern::new(without_escape("a]")).unwrap();
+        assert_eq!(p.as_literal(), Some("a]"));
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("[a]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("[a]"), Some(1..3));
+    }
+
+    #[test]
+    fn unmatched_bracket_3() {
+        let p = Pattern::new(without_escape("][")).unwrap();
+        assert_eq!(p.as_literal(), Some("]["));
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("]["));
+        assert!(p.is_match("[][]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("]["), Some(0..2));
+        assert_eq!(p.find("[][]"), Some(1..3));
     }
 
     #[test]
