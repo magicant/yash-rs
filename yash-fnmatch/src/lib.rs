@@ -77,6 +77,12 @@ pub enum Error {
     RegexError(regex::Error),
 }
 
+impl From<regex::Error> for Error {
+    fn from(error: regex::Error) -> Self {
+        Error::RegexError(error)
+    }
+}
+
 /// Main part of compiled pattern
 #[derive(Clone, Debug)]
 enum Body {
@@ -105,7 +111,7 @@ where
 }
 
 impl Body {
-    fn new<I>(pattern: I, _config: Config) -> Self
+    fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
         I: Iterator<Item = (char, CharKind)> + Clone,
     {
@@ -116,13 +122,12 @@ impl Body {
                 '?' | '*' | '[' => {
                     chars.clear();
                     to_regex(pattern, &mut chars);
-                    // TODO Should not unwrap, return Err
-                    return Body::Regex(Regex::new(&chars).unwrap());
+                    return Ok(Body::Regex(Regex::new(&chars)?));
                 }
                 _ => chars.push(c),
             }
         }
-        Body::Literal(chars)
+        Ok(Body::Literal(chars))
     }
 }
 
@@ -140,7 +145,7 @@ pub struct Pattern {
 impl Pattern {
     /// Creates a pattern with defaulted configuration.
     #[inline]
-    pub fn new<I>(pattern: I) -> Self
+    pub fn new<I>(pattern: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
@@ -149,13 +154,13 @@ impl Pattern {
     }
 
     /// Creates a pattern with a specified configuration.
-    pub fn with_config<I>(pattern: I, config: Config) -> Self
+    pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (char, CharKind)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let body = Body::new(pattern.into_iter(), config);
-        Pattern { body, config }
+        let body = Body::new(pattern.into_iter(), config)?;
+        Ok(Pattern { body, config })
     }
 
     /// Returns the configuration for this pattern.
@@ -202,7 +207,7 @@ mod tests {
 
     #[test]
     fn empty_pattern() {
-        let p = Pattern::new(without_escape(""));
+        let p = Pattern::new(without_escape("")).unwrap();
         assert_eq!(p.as_literal(), Some(""));
 
         assert!(p.is_match(""));
@@ -218,7 +223,7 @@ mod tests {
 
     #[test]
     fn single_character_pattern() {
-        let p = Pattern::new(without_escape("a"));
+        let p = Pattern::new(without_escape("a")).unwrap();
         assert_eq!(p.as_literal(), Some("a"));
 
         assert!(!p.is_match(""));
@@ -238,7 +243,7 @@ mod tests {
 
     #[test]
     fn double_character_pattern() {
-        let p = Pattern::new(without_escape("in"));
+        let p = Pattern::new(without_escape("in")).unwrap();
         assert_eq!(p.as_literal(), Some("in"));
 
         assert!(!p.is_match(""));
@@ -258,7 +263,7 @@ mod tests {
 
     #[test]
     fn any_single_character_pattern() {
-        let p = Pattern::new(without_escape("?"));
+        let p = Pattern::new(without_escape("?")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
@@ -272,7 +277,7 @@ mod tests {
 
     #[test]
     fn any_single_character_pattern_combined() {
-        let p = Pattern::new(without_escape("a?c"));
+        let p = Pattern::new(without_escape("a?c")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
@@ -290,7 +295,7 @@ mod tests {
 
     #[test]
     fn any_multi_character_pattern() {
-        let p = Pattern::new(without_escape("*"));
+        let p = Pattern::new(without_escape("*")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(p.is_match(""));
@@ -304,7 +309,7 @@ mod tests {
 
     #[test]
     fn any_multi_character_pattern_combined() {
-        let p = Pattern::new(without_escape("a*b"));
+        let p = Pattern::new(without_escape("a*b")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
@@ -324,7 +329,7 @@ mod tests {
 
     #[test]
     fn single_character_bracket_expression_pattern() {
-        let p = Pattern::new(without_escape("[a]"));
+        let p = Pattern::new(without_escape("[a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
