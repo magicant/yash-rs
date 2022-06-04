@@ -31,6 +31,7 @@
 mod char_iter;
 pub use char_iter::*;
 use regex::bytes::Regex;
+use std::ops::Range;
 
 /// Configuration for a pattern
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -165,7 +166,18 @@ impl Pattern {
         self.config
     }
 
-    // TODO is_literal
+    /// Returns the only string that matches the pattern, if any.
+    ///
+    /// If the pattern is made up only of literal characters, this function
+    /// returns the characters as a string. If the pattern contains any `?`,
+    /// `*`, or bracket expression, the result is `None`.
+    #[must_use]
+    pub fn as_literal(&self) -> Option<&str> {
+        match &self.body {
+            Body::Literal(s) => Some(s),
+            Body::Regex(_) => None,
+        }
+    }
 
     /// Tests whether this pattern matches the given text.
     #[must_use]
@@ -175,61 +187,106 @@ impl Pattern {
             Body::Regex(regex) => regex.is_match(text.as_bytes()),
         }
     }
+
+    #[must_use]
+    pub fn find(&self, text: &str) -> Option<Range<usize>> {
+        match &self.body {
+            Body::Literal(s) => text.find(s).map(|pos| pos..pos + s.len()),
+            Body::Regex(regex) => regex.find(text.as_bytes()).map(|m| m.range()),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // TODO test match ranges
-
     #[test]
     fn empty_pattern() {
         let p = Pattern::new(without_escape(""));
+        assert_eq!(p.as_literal(), Some(""));
+
         assert!(p.is_match(""));
         assert!(p.is_match("a"));
         assert!(p.is_match("."));
         assert!(p.is_match("*"));
+
+        assert_eq!(p.find(""), Some(0..0));
+        assert_eq!(p.find("a"), Some(0..0));
+        assert_eq!(p.find("."), Some(0..0));
+        assert_eq!(p.find("*"), Some(0..0));
     }
 
     #[test]
     fn single_character_pattern() {
         let p = Pattern::new(without_escape("a"));
+        assert_eq!(p.as_literal(), Some("a"));
+
         assert!(!p.is_match(""));
         assert!(p.is_match("a"));
         assert!(p.is_match("aa"));
         assert!(!p.is_match("b"));
         assert!(p.is_match("ab"));
         assert!(p.is_match("ba"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("aa"), Some(0..1));
+        assert_eq!(p.find("b"), None);
+        assert_eq!(p.find("ab"), Some(0..1));
+        assert_eq!(p.find("ba"), Some(1..2));
     }
 
     #[test]
     fn double_character_pattern() {
         let p = Pattern::new(without_escape("in"));
+        assert_eq!(p.as_literal(), Some("in"));
+
         assert!(!p.is_match(""));
         assert!(!p.is_match("i"));
         assert!(!p.is_match("n"));
         assert!(p.is_match("bin"));
         assert!(p.is_match("inn"));
         assert!(!p.is_match("nit"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("i"), None);
+        assert_eq!(p.find("n"), None);
+        assert_eq!(p.find("bin"), Some(1..3));
+        assert_eq!(p.find("inn"), Some(0..2));
+        assert_eq!(p.find("nit"), None);
     }
 
     #[test]
     fn any_single_character_pattern() {
         let p = Pattern::new(without_escape("?"));
+        assert_eq!(p.as_literal(), None);
+
         assert!(!p.is_match(""));
         assert!(p.is_match("i"));
         assert!(p.is_match("yes"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("i"), Some(0..1));
+        assert_eq!(p.find("yes"), Some(0..1));
     }
 
     #[test]
     fn any_single_character_pattern_combined() {
         let p = Pattern::new(without_escape("a?c"));
+        assert_eq!(p.as_literal(), None);
+
         assert!(!p.is_match(""));
         assert!(!p.is_match("ab"));
         assert!(!p.is_match("ac"));
         assert!(!p.is_match("bc"));
         assert!(p.is_match("abc"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("ab"), None);
+        assert_eq!(p.find("ac"), None);
+        assert_eq!(p.find("bc"), None);
+        assert_eq!(p.find("abc"), Some(0..3));
     }
 
     #[test]
