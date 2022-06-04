@@ -402,7 +402,24 @@ mod tests {
         assert_eq!(p.find("[a]"), Some(1..2));
     }
 
-    // TODO multi_character_bracket_expression_pattern
+    #[test]
+    fn multi_character_bracket_expression_pattern() {
+        let p = Pattern::new(without_escape("[abc]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("b"));
+        assert!(p.is_match("c"));
+        assert!(!p.is_match("d"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("b"), Some(0..1));
+        assert_eq!(p.find("c"), Some(0..1));
+        assert_eq!(p.find("d"), None);
+    }
+
     // TODO special_characters_in_bracket_expression
     // TODO character_range_in_bracket_expression
     // TODO bracket_expression_complement
