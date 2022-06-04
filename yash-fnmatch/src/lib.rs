@@ -113,12 +113,12 @@ impl Body {
         chars.reserve(pattern.size_hint().0);
         for (c, _) in pattern.clone() {
             match c {
-                '?' | '*' => {
+                '?' | '*' | '[' => {
                     chars.clear();
                     to_regex(pattern, &mut chars);
+                    // TODO Should not unwrap, return Err
                     return Body::Regex(Regex::new(&chars).unwrap());
                 }
-                // TODO bracket expression
                 _ => chars.push(c),
             }
         }
@@ -320,13 +320,20 @@ mod tests {
         assert_eq!(p.find("lambda"), Some(1..4));
     }
 
+    // TODO unmatched_bracket
+
     #[test]
-    #[ignore] // TODO
     fn single_character_bracket_expression_pattern() {
         let p = Pattern::new(without_escape("[a]"));
+        assert_eq!(p.as_literal(), None);
+
         assert!(!p.is_match(""));
         assert!(p.is_match("a"));
-        assert!(!p.is_match("[a]"));
+        assert!(p.is_match("[a]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("[a]"), Some(1..2));
     }
 
     // TODO multi_character_bracket_expression_pattern
