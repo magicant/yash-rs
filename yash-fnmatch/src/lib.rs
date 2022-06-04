@@ -115,17 +115,38 @@ impl Body {
     where
         I: Iterator<Item = (char, CharKind)> + Clone,
     {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum Bracket {
+            None,
+            Open,
+            Closed,
+        }
+
         let mut chars = String::new();
         chars.reserve(pattern.size_hint().0);
+        let mut bracket = Bracket::None;
         for (c, _) in pattern.clone() {
             match c {
-                '?' | '*' | '[' => {
+                '?' | '*' => {
                     chars.clear();
                     to_regex(pattern, &mut chars);
                     return Ok(Body::Regex(Regex::new(&chars)?));
                 }
+                '[' => {
+                    bracket = Bracket::Open;
+                    chars.push(c);
+                }
+                ']' => {
+                    bracket = Bracket::Closed;
+                    chars.push(c);
+                }
                 _ => chars.push(c),
             }
+        }
+        if bracket == Bracket::Closed {
+            chars.clear();
+            to_regex(pattern, &mut chars);
+            return Ok(Body::Regex(Regex::new(&chars)?));
         }
         Ok(Body::Literal(chars))
     }
@@ -325,7 +346,19 @@ mod tests {
         assert_eq!(p.find("lambda"), Some(1..4));
     }
 
-    // TODO unmatched_bracket
+    #[test]
+    fn unmatched_bracket() {
+        let p = Pattern::new(without_escape("[a")).unwrap();
+        assert_eq!(p.as_literal(), Some("[a"));
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("[a]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("[a]"), Some(0..2));
+    }
 
     #[test]
     fn single_character_bracket_expression_pattern() {
