@@ -83,6 +83,7 @@ impl From<regex::Error> for Error {
     }
 }
 
+// TODO Consider moving to a submodule
 /// Main part of compiled pattern
 #[derive(Clone, Debug)]
 enum Body {
@@ -103,7 +104,7 @@ where
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum Bracket {
         None,
-        Open,
+        Open { empty: bool },
         Closed,
     }
 
@@ -113,16 +114,21 @@ where
         match c {
             '?' => result.push('.'),
             '*' => result.push_str(".*"),
-            '[' => {
-                bracket = Bracket::Open;
+            '[' | '&' | '~' if matches!(bracket, Bracket::Open { .. }) => {
+                // TODO bracket = Bracket::Open { empty: false };
+                result.push('\\');
                 result.push(c);
             }
-            ']' if bracket == Bracket::Open => {
+            '[' => {
+                bracket = Bracket::Open { empty: true };
+                result.push(c);
+            }
+            ']' if bracket == Bracket::Open { empty: false } => {
                 bracket = Bracket::Closed;
                 result.push(c);
             }
-            '&' | '~' if bracket == Bracket::Open => {
-                result.push('\\');
+            _ if bracket == Bracket::Open { empty: true } => {
+                bracket = Bracket::Open { empty: false };
                 result.push(c);
             }
             _ => result.push(c),
@@ -142,6 +148,10 @@ impl Body {
             Closed,
         }
 
+        // TODO Probably we should try to convert the pattern to a regex before
+        // checking if it is literal. The regex converter should check if there
+        // is a non-literal character in the pattern during the conversion. By
+        // doing so, we can omit this pre-checking loop.
         let mut chars = String::new();
         chars.reserve(pattern.size_hint().0);
         let mut bracket = Bracket::None;
@@ -408,6 +418,8 @@ mod tests {
         assert_eq!(p.find("[][]"), Some(1..3));
     }
 
+    // TODO unmatched_bracket_4 "[]"
+
     #[test]
     fn single_character_bracket_expression_pattern() {
         let p = Pattern::new(without_escape("[a]")).unwrap();
@@ -470,6 +482,24 @@ mod tests {
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("b"), Some(0..1));
         assert_eq!(p.find("~"), Some(0..1));
+    }
+
+    // TODO ?, * in bracket expression
+
+    #[test]
+    fn brackets_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[]a[]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("["));
+        assert!(p.is_match("]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("["), Some(0..1));
+        assert_eq!(p.find("]"), Some(0..1));
     }
 
     // TODO character_range_in_bracket_expression
