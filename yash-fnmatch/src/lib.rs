@@ -144,7 +144,7 @@ impl Body {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         enum Bracket {
             None,
-            Open,
+            Open { empty: bool },
             Closed,
         }
 
@@ -162,12 +162,16 @@ impl Body {
                     to_regex(pattern, &mut chars);
                     return Ok(Body::Regex(Regex::new(&chars)?));
                 }
-                '[' => {
-                    bracket = Bracket::Open;
+                '[' if !matches!(bracket, Bracket::Open { .. }) => {
+                    bracket = Bracket::Open { empty: true };
                     chars.push(c);
                 }
-                ']' if bracket == Bracket::Open => {
+                ']' if bracket == Bracket::Open { empty: false } => {
                     bracket = Bracket::Closed;
+                    chars.push(c);
+                }
+                _ if bracket == Bracket::Open { empty: true } => {
+                    bracket = Bracket::Open { empty: false };
                     chars.push(c);
                 }
                 _ => chars.push(c),
@@ -418,7 +422,19 @@ mod tests {
         assert_eq!(p.find("[][]"), Some(1..3));
     }
 
-    // TODO unmatched_bracket_4 "[]"
+    #[test]
+    fn unmatched_bracket_4() {
+        let p = Pattern::new(without_escape("[]")).unwrap();
+        assert_eq!(p.as_literal(), Some("[]"));
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("[]"));
+        assert!(p.is_match("][]["));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("[]"), Some(0..2));
+        assert_eq!(p.find("][]["), Some(1..3));
+    }
 
     #[test]
     fn single_character_bracket_expression_pattern() {
