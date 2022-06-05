@@ -98,7 +98,7 @@ enum Body {
 /// The result is appended to `result`.
 fn to_regex<I>(pattern: I, result: &mut String)
 where
-    I: Iterator<Item = (char, CharKind)> + Clone,
+    I: Iterator<Item = (char, PatternChar)> + Clone,
 {
     // TODO Refactor duplicate enum Bracket
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,7 +139,7 @@ where
 impl Body {
     fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
-        I: Iterator<Item = (char, CharKind)> + Clone,
+        I: Iterator<Item = (char, PatternChar)> + Clone,
     {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         enum Bracket {
@@ -202,7 +202,7 @@ impl Pattern {
     #[inline]
     pub fn new<I>(pattern: I) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = (char, CharKind)>,
+        I: IntoIterator<Item = (char, PatternChar)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
         Self::with_config(pattern, Config::default())
@@ -211,7 +211,7 @@ impl Pattern {
     /// Creates a pattern with a specified configuration.
     pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = (char, CharKind)>,
+        I: IntoIterator<Item = (char, PatternChar)>,
         <I as IntoIterator>::IntoIter: Clone,
     {
         let body = Body::new(pattern.into_iter(), config)?;
@@ -315,6 +315,8 @@ mod tests {
         assert_eq!(p.find("inn"), Some(0..2));
         assert_eq!(p.find("nit"), None);
     }
+
+    // TODO characters that need escaping when converted to a regex
 
     #[test]
     fn any_single_character_pattern() {
@@ -525,5 +527,5 @@ mod tests {
     // TODO character_class_in_bracket_expression
 
     // TODO Config
-    // TODO CharKind
+    // TODO PatternChar Normal vs Literal
 }

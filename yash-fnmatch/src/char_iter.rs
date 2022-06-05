@@ -3,16 +3,23 @@
 
 use std::str::Chars;
 
-/// Type of characters appearing in patterns
+/// Character appearing in patterns
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum CharKind {
+pub enum PatternChar {
     /// Normal pattern character
+    ///
+    /// `?`, `*`, `[` and `]` have special meaning in a pattern. Other `Normal`
+    /// characters are the same as `Literal`.
     Normal,
-    /// Quoted character, which is always regarded as a literal character
-    Quoted,
+
+    /// Literal pattern character
+    ///
+    /// A literal character always matches itself.
+    /// `?`, `*`, `[` and `]` lose special meaning when regarded literal.
+    Literal,
 }
 
-use CharKind::*;
+use PatternChar::*;
 
 /// TODO TBD
 #[derive(Clone, Debug)]
@@ -21,11 +28,11 @@ pub struct WithEscape<'a> {
 }
 
 impl Iterator for WithEscape<'_> {
-    type Item = (char, CharKind);
-    fn next(&mut self) -> Option<(char, CharKind)> {
+    type Item = (char, PatternChar);
+    fn next(&mut self) -> Option<(char, PatternChar)> {
         match self.chars.next() {
             None => None,
-            Some('\\') => self.chars.next().map(|c| (c, Quoted)),
+            Some('\\') => self.chars.next().map(|c| (c, Literal)),
             Some(c) => Some((c, Normal)),
         }
     }
@@ -45,8 +52,8 @@ pub struct WithoutEscape<'a> {
 }
 
 impl Iterator for WithoutEscape<'_> {
-    type Item = (char, CharKind);
-    fn next(&mut self) -> Option<(char, CharKind)> {
+    type Item = (char, PatternChar);
+    fn next(&mut self) -> Option<(char, PatternChar)> {
         self.chars.next().map(|c| (c, Normal))
     }
 }
@@ -65,7 +72,7 @@ mod tests {
     #[test]
     fn with_escape_as_iterator() {
         let v: Vec<_> = with_escape(r"a\bc").collect();
-        assert_eq!(v.as_slice(), [('a', Normal), ('b', Quoted), ('c', Normal)]);
+        assert_eq!(v.as_slice(), [('a', Normal), ('b', Literal), ('c', Normal)]);
     }
 
     #[test]
