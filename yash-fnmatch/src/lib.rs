@@ -99,12 +99,32 @@ fn to_regex<I>(pattern: I, result: &mut String)
 where
     I: Iterator<Item = (char, CharKind)> + Clone,
 {
+    // TODO Refactor duplicate enum Bracket
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum Bracket {
+        None,
+        Open,
+        Closed,
+    }
+
     // TODO multiline option
+    let mut bracket = Bracket::None;
     for (c, _) in pattern {
         match c {
             '?' => result.push('.'),
             '*' => result.push_str(".*"),
-            // TODO bracket expression
+            '[' => {
+                bracket = Bracket::Open;
+                result.push(c);
+            }
+            ']' if bracket == Bracket::Open => {
+                bracket = Bracket::Closed;
+                result.push(c);
+            }
+            '&' | '~' if bracket == Bracket::Open => {
+                result.push('\\');
+                result.push(c);
+            }
             _ => result.push(c),
         }
     }
@@ -420,7 +440,38 @@ mod tests {
         assert_eq!(p.find("d"), None);
     }
 
-    // TODO special_characters_in_bracket_expression
+    #[test]
+    fn ampersand_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[a&&b]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("b"));
+        assert!(p.is_match("&"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("b"), Some(0..1));
+        assert_eq!(p.find("&"), Some(0..1));
+    }
+
+    #[test]
+    fn tilde_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[a~~b]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("b"));
+        assert!(p.is_match("~"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("b"), Some(0..1));
+        assert_eq!(p.find("~"), Some(0..1));
+    }
+
     // TODO character_range_in_bracket_expression
     // TODO bracket_expression_complement
     // TODO collating_symbol_in_bracket_expression
