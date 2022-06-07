@@ -98,7 +98,7 @@ enum Body {
 /// The result is appended to `result`.
 fn to_regex<I>(pattern: I, result: &mut String)
 where
-    I: Iterator<Item = (char, PatternChar)> + Clone,
+    I: Iterator<Item = PatternChar> + Clone,
 {
     // TODO Refactor duplicate enum Bracket
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -110,28 +110,28 @@ where
 
     // TODO multiline option
     let mut bracket = Bracket::None;
-    for (c, _) in pattern {
-        match c {
+    for pc in pattern {
+        match pc.char_value() {
             '?' => result.push('.'),
             '*' => result.push_str(".*"),
-            '[' | '&' | '~' if matches!(bracket, Bracket::Open { .. }) => {
+            c @ ('[' | '&' | '~') if matches!(bracket, Bracket::Open { .. }) => {
                 // TODO bracket = Bracket::Open { empty: false };
                 result.push('\\');
                 result.push(c);
             }
             '[' => {
                 bracket = Bracket::Open { empty: true };
-                result.push(c);
+                result.push('[');
             }
             ']' if bracket == Bracket::Open { empty: false } => {
                 bracket = Bracket::Closed;
-                result.push(c);
+                result.push(']');
             }
-            _ if bracket == Bracket::Open { empty: true } => {
+            c if bracket == Bracket::Open { empty: true } => {
                 bracket = Bracket::Open { empty: false };
                 result.push(c);
             }
-            _ => result.push(c),
+            c => result.push(c),
         }
     }
 }
@@ -139,7 +139,7 @@ where
 impl Body {
     fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
-        I: Iterator<Item = (char, PatternChar)> + Clone,
+        I: Iterator<Item = PatternChar> + Clone,
     {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         enum Bracket {
@@ -155,8 +155,8 @@ impl Body {
         let mut chars = String::new();
         chars.reserve(pattern.size_hint().0);
         let mut bracket = Bracket::None;
-        for (c, _) in pattern.clone() {
-            match c {
+        for pc in pattern.clone() {
+            match pc.char_value() {
                 '?' | '*' => {
                     chars.clear();
                     to_regex(pattern, &mut chars);
@@ -164,17 +164,17 @@ impl Body {
                 }
                 '[' if !matches!(bracket, Bracket::Open { .. }) => {
                     bracket = Bracket::Open { empty: true };
-                    chars.push(c);
+                    chars.push('[');
                 }
                 ']' if bracket == Bracket::Open { empty: false } => {
                     bracket = Bracket::Closed;
-                    chars.push(c);
+                    chars.push(']');
                 }
-                _ if bracket == Bracket::Open { empty: true } => {
+                c if bracket == Bracket::Open { empty: true } => {
                     bracket = Bracket::Open { empty: false };
                     chars.push(c);
                 }
-                _ => chars.push(c),
+                c => chars.push(c),
             }
         }
         if bracket == Bracket::Closed {
@@ -202,7 +202,7 @@ impl Pattern {
     #[inline]
     pub fn new<I>(pattern: I) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = (char, PatternChar)>,
+        I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
         Self::with_config(pattern, Config::default())
@@ -211,7 +211,7 @@ impl Pattern {
     /// Creates a pattern with a specified configuration.
     pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = (char, PatternChar)>,
+        I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
         let body = Body::new(pattern.into_iter(), config)?;

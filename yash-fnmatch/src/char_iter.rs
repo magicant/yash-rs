@@ -10,16 +10,28 @@ pub enum PatternChar {
     ///
     /// `?`, `*`, `[` and `]` have special meaning in a pattern. Other `Normal`
     /// characters are the same as `Literal`.
-    Normal,
+    Normal(char),
 
     /// Literal pattern character
     ///
     /// A literal character always matches itself.
     /// `?`, `*`, `[` and `]` lose special meaning when regarded literal.
-    Literal,
+    Literal(char),
 }
 
 use PatternChar::*;
+
+impl PatternChar {
+    /// Returns the character value.
+    #[inline]
+    #[must_use]
+    pub const fn char_value(self) -> char {
+        match self {
+            Normal(c) => c,
+            Literal(c) => c,
+        }
+    }
+}
 
 /// TODO TBD
 #[derive(Clone, Debug)]
@@ -28,12 +40,12 @@ pub struct WithEscape<'a> {
 }
 
 impl Iterator for WithEscape<'_> {
-    type Item = (char, PatternChar);
-    fn next(&mut self) -> Option<(char, PatternChar)> {
+    type Item = PatternChar;
+    fn next(&mut self) -> Option<PatternChar> {
         match self.chars.next() {
             None => None,
-            Some('\\') => self.chars.next().map(|c| (c, Literal)),
-            Some(c) => Some((c, Normal)),
+            Some('\\') => self.chars.next().map(Literal),
+            Some(c) => Some(Normal(c)),
         }
     }
 }
@@ -52,9 +64,9 @@ pub struct WithoutEscape<'a> {
 }
 
 impl Iterator for WithoutEscape<'_> {
-    type Item = (char, PatternChar);
-    fn next(&mut self) -> Option<(char, PatternChar)> {
-        self.chars.next().map(|c| (c, Normal))
+    type Item = PatternChar;
+    fn next(&mut self) -> Option<PatternChar> {
+        self.chars.next().map(Normal)
     }
 }
 
@@ -72,7 +84,7 @@ mod tests {
     #[test]
     fn with_escape_as_iterator() {
         let v: Vec<_> = with_escape(r"a\bc").collect();
-        assert_eq!(v.as_slice(), [('a', Normal), ('b', Literal), ('c', Normal)]);
+        assert_eq!(v.as_slice(), [Normal('a'), Literal('b'), Normal('c')]);
     }
 
     #[test]
@@ -80,7 +92,7 @@ mod tests {
         let v: Vec<_> = without_escape(r"a\bc").collect();
         assert_eq!(
             v.as_slice(),
-            [('a', Normal), ('\\', Normal), ('b', Normal), ('c', Normal)]
+            [Normal('a'), Normal('\\'), Normal('b'), Normal('c')]
         );
     }
 }
