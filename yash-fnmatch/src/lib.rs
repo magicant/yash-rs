@@ -93,49 +93,6 @@ enum Body {
     Regex(Regex),
 }
 
-/// Converts a globbing pattern to a regular expression.
-///
-/// The result is appended to `result`.
-fn to_regex<I>(pattern: I, result: &mut String)
-where
-    I: Iterator<Item = PatternChar> + Clone,
-{
-    // TODO Refactor duplicate enum Bracket
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    enum Bracket {
-        None,
-        Open { empty: bool },
-        Closed,
-    }
-
-    // TODO multiline option
-    let mut bracket = Bracket::None;
-    for pc in pattern {
-        match pc.char_value() {
-            '?' => result.push('.'),
-            '*' => result.push_str(".*"),
-            c @ ('[' | '&' | '~') if matches!(bracket, Bracket::Open { .. }) => {
-                // TODO bracket = Bracket::Open { empty: false };
-                result.push('\\');
-                result.push(c);
-            }
-            '[' => {
-                bracket = Bracket::Open { empty: true };
-                result.push('[');
-            }
-            ']' if bracket == Bracket::Open { empty: false } => {
-                bracket = Bracket::Closed;
-                result.push(']');
-            }
-            c if bracket == Bracket::Open { empty: true } => {
-                bracket = Bracket::Open { empty: false };
-                result.push(c);
-            }
-            c => result.push(c),
-        }
-    }
-}
-
 impl Body {
     fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
@@ -148,41 +105,52 @@ impl Body {
             Closed,
         }
 
-        // TODO Probably we should try to convert the pattern to a regex before
-        // checking if it is literal. The regex converter should check if there
-        // is a non-literal character in the pattern during the conversion. By
-        // doing so, we can omit this pre-checking loop.
-        let mut chars = String::new();
-        chars.reserve(pattern.size_hint().0);
+        // TODO multiline option
+        let mut literal = true;
         let mut bracket = Bracket::None;
+        let mut regex = String::new();
         for pc in pattern.clone() {
             match pc.char_value() {
-                '?' | '*' => {
-                    chars.clear();
-                    to_regex(pattern, &mut chars);
-                    return Ok(Body::Regex(Regex::new(&chars)?));
+                '?' => {
+                    literal = false;
+                    regex.push('.');
                 }
-                '[' if !matches!(bracket, Bracket::Open { .. }) => {
+                '*' => {
+                    literal = false;
+                    regex.push_str(".*");
+                }
+                c @ ('[' | '&' | '~') if matches!(bracket, Bracket::Open { .. }) => {
+                    // TODO bracket = Bracket::Open { empty: false };
+                    regex.push('\\');
+                    regex.push(c);
+                }
+                '[' => {
                     bracket = Bracket::Open { empty: true };
-                    chars.push('[');
+                    regex.push('[');
                 }
                 ']' if bracket == Bracket::Open { empty: false } => {
+                    literal = false;
                     bracket = Bracket::Closed;
-                    chars.push(']');
+                    regex.push(']');
                 }
                 c if bracket == Bracket::Open { empty: true } => {
                     bracket = Bracket::Open { empty: false };
-                    chars.push(c);
+                    regex.push(c);
                 }
-                c => chars.push(c),
+                c => regex.push(c),
             }
         }
-        if bracket == Bracket::Closed {
+
+        if literal {
+            // let chars = pattern.map(PatternChar::char_value).collect();
+            // Reuse the capacity of `regex`
+            let mut chars = regex;
             chars.clear();
-            to_regex(pattern, &mut chars);
-            return Ok(Body::Regex(Regex::new(&chars)?));
+            chars.extend(pattern.map(PatternChar::char_value));
+            Ok(Body::Literal(chars))
+        } else {
+            Ok(Body::Regex(Regex::new(&regex)?))
         }
-        Ok(Body::Literal(chars))
     }
 }
 
