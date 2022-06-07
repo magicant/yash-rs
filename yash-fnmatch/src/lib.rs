@@ -133,6 +133,9 @@ impl Body {
                     bracket = Bracket::Closed;
                     regex.push(']');
                 }
+                '!' if bracket == Bracket::Open { empty: true } => {
+                    regex.push('^');
+                }
                 c if bracket == Bracket::Open { empty: true } => {
                     bracket = Bracket::Open { empty: false };
                     regex.push(c);
@@ -489,7 +492,63 @@ mod tests {
     }
 
     // TODO character_range_in_bracket_expression
-    // TODO bracket_expression_complement
+
+    #[test]
+    fn bracket_expression_complement() {
+        let p = Pattern::new(without_escape("[!ab]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(!p.is_match("b"));
+        assert!(p.is_match("c"));
+        assert!(p.is_match("!"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("b"), None);
+        assert_eq!(p.find("c"), Some(0..1));
+        assert_eq!(p.find("!"), Some(0..1));
+        assert_eq!(p.find("abc"), Some(2..3));
+    }
+
+    #[test]
+    fn exclamation_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[ab!]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("b"));
+        assert!(!p.is_match("c"));
+        assert!(p.is_match("!"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("b"), Some(0..1));
+        assert_eq!(p.find("c"), None);
+        assert_eq!(p.find("!"), Some(0..1));
+    }
+
+    #[test]
+    #[ignore] // TODO
+    fn exclamation_in_bracket_expression_complement() {
+        let p = Pattern::new(without_escape("[!!]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("!"));
+        assert!(p.is_match("a"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("!"), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("!x!"), Some(1..2));
+    }
+
+    // TODO [^]a]
+    // TODO [^xxx]
+
     // TODO collating_symbol_in_bracket_expression
     // TODO equivalence_class_in_bracket_expression
     // TODO character_class_in_bracket_expression
