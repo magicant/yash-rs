@@ -489,6 +489,7 @@ mod tests {
     }
 
     // TODO ?, * in bracket expression
+    // TODO characters that need escaping when converted to a regex
 
     #[test]
     fn brackets_in_bracket_expression() {
@@ -560,8 +561,45 @@ mod tests {
         assert_eq!(p.find("!x!"), Some(1..2));
     }
 
-    // TODO [^]a]
-    // TODO [^xxx]
+    #[test]
+    fn bracket_in_bracket_expression_complement() {
+        let p = Pattern::new(without_escape("[!]a]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("!"));
+        assert!(!p.is_match("]"));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("b"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("!"), Some(0..1));
+        assert_eq!(p.find("]"), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("abc"), Some(1..2));
+    }
+
+    #[test]
+    fn caret_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[^]a]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("^"));
+        assert!(!p.is_match("]"));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("b"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("^"), Some(0..1));
+        assert_eq!(p.find("]"), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("abc"), Some(1..2));
+
+        let p = Pattern::new(without_escape("[^^]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+        assert!(!p.is_match("^"));
+    }
 
     // TODO collating_symbol_in_bracket_expression
     // TODO equivalence_class_in_bracket_expression
