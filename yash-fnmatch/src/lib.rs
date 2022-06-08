@@ -101,7 +101,7 @@ impl Body {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         enum Bracket {
             None,
-            Open { empty: bool },
+            Open { empty: bool, complement: bool },
             Closed,
         }
 
@@ -125,19 +125,34 @@ impl Body {
                     regex.push(c);
                 }
                 '[' => {
-                    bracket = Bracket::Open { empty: true };
+                    bracket = Bracket::Open {
+                        empty: true,
+                        complement: false,
+                    };
                     regex.push('[');
                 }
-                ']' if bracket == Bracket::Open { empty: false } => {
+                ']' if matches!(bracket, Bracket::Open { empty: false, .. }) => {
                     literal = false;
                     bracket = Bracket::Closed;
                     regex.push(']');
                 }
-                '!' if bracket == Bracket::Open { empty: true } => {
+                '!' if bracket
+                    == Bracket::Open {
+                        empty: true,
+                        complement: false,
+                    } =>
+                {
+                    bracket = Bracket::Open {
+                        empty: true,
+                        complement: true,
+                    };
                     regex.push('^');
                 }
-                c if bracket == Bracket::Open { empty: true } => {
-                    bracket = Bracket::Open { empty: false };
+                c if matches!(bracket, Bracket::Open { empty: true, .. }) => {
+                    bracket = Bracket::Open {
+                        empty: false,
+                        complement: false,
+                    };
                     regex.push(c);
                 }
                 c => regex.push(c),
@@ -531,7 +546,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn exclamation_in_bracket_expression_complement() {
         let p = Pattern::new(without_escape("[!!]")).unwrap();
         assert_eq!(p.as_literal(), None);
