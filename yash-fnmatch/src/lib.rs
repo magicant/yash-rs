@@ -94,22 +94,51 @@ enum Body {
 }
 
 impl Body {
+    /// Parses a pattern into a body.
     fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-        enum Bracket {
-            None,
-            Open { empty: bool, complement: bool },
-            Closed,
+        /// Parses a bracket expression (except the initial '[').
+        ///
+        /// If successful, returns an iterator that yields characters following
+        /// the bracket expression. Returns `None` and leaves `regex` broken if
+        /// the bracket expression is not closed.
+        fn bracket<I>(mut pattern: I, regex: &mut String) -> Option<I>
+        where
+            I: Iterator<Item = PatternChar>,
+        {
+            let mut empty = true;
+            let mut complement = false;
+            while let Some(pc) = pattern.next() {
+                match pc.char_value() {
+                    ']' if !empty => {
+                        regex.push(']');
+                        return Some(pattern);
+                    }
+                    c @ ('[' | ']' | '&' | '~') => {
+                        regex.push('\\');
+                        regex.push(c);
+                        // TODO empty = false;
+                    }
+                    '!' if empty && !complement => {
+                        regex.push('^');
+                        complement = true;
+                    }
+                    c => {
+                        regex.push(c);
+                        empty = false;
+                    }
+                }
+            }
+            None
         }
 
         // TODO multiline option
         let mut literal = true;
-        let mut bracket = Bracket::None;
         let mut regex = String::new();
-        for pc in pattern.clone() {
+        let mut i = pattern.clone();
+        while let Some(pc) = i.next() {
             match pc.char_value() {
                 '?' => {
                     literal = false;
@@ -119,41 +148,17 @@ impl Body {
                     literal = false;
                     regex.push_str(".*");
                 }
-                c @ ('[' | '&' | '~') if matches!(bracket, Bracket::Open { .. }) => {
-                    // TODO bracket = Bracket::Open { empty: false };
-                    regex.push('\\');
-                    regex.push(c);
-                }
                 '[' => {
-                    bracket = Bracket::Open {
-                        empty: true,
-                        complement: false,
-                    };
+                    let old_len = regex.len();
                     regex.push('[');
-                }
-                ']' if matches!(bracket, Bracket::Open { empty: false, .. }) => {
-                    literal = false;
-                    bracket = Bracket::Closed;
-                    regex.push(']');
-                }
-                '!' if bracket
-                    == Bracket::Open {
-                        empty: true,
-                        complement: false,
-                    } =>
-                {
-                    bracket = Bracket::Open {
-                        empty: true,
-                        complement: true,
-                    };
-                    regex.push('^');
-                }
-                c if matches!(bracket, Bracket::Open { empty: true, .. }) => {
-                    bracket = Bracket::Open {
-                        empty: false,
-                        complement: false,
-                    };
-                    regex.push(c);
+                    if let Some(j) = bracket(i.clone(), &mut regex) {
+                        i = j;
+                        literal = false;
+                    } else {
+                        regex.truncate(old_len);
+                        regex.push('\\');
+                        regex.push('[');
+                    }
                 }
                 c => regex.push(c),
             }
@@ -425,6 +430,20 @@ mod tests {
     }
 
     #[test]
+    fn unmatched_bracket_after_another_bracket() {
+        let p = Pattern::new(without_escape("[a][")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(!p.is_match("["));
+        assert!(p.is_match("a["));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("]]a[[a][]"), Some(2..4));
+    }
+
+    #[test]
     fn single_character_bracket_expression_pattern() {
         let p = Pattern::new(without_escape("[a]")).unwrap();
         assert_eq!(p.as_literal(), None);
@@ -528,6 +547,7 @@ mod tests {
     }
 
     // TODO [a-b-c]
+    // TODO [+--.]
 
     #[test]
     fn bracket_expression_complement() {
