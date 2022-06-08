@@ -489,7 +489,7 @@ mod tests {
     }
 
     // TODO ?, * in bracket expression
-    // TODO characters that need escaping when converted to a regex
+    // TODO characters that need escaping in bracket expression
 
     #[test]
     fn brackets_in_bracket_expression() {
@@ -507,7 +507,27 @@ mod tests {
         assert_eq!(p.find("]"), Some(0..1));
     }
 
-    // TODO character_range_in_bracket_expression
+    #[test]
+    fn character_range() {
+        let p = Pattern::new(without_escape("[3-5]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("2"));
+        assert!(p.is_match("3"));
+        assert!(p.is_match("4"));
+        assert!(p.is_match("5"));
+        assert!(!p.is_match("6"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("2"), None);
+        assert_eq!(p.find("3"), Some(0..1));
+        assert_eq!(p.find("5"), Some(0..1));
+        assert_eq!(p.find("6"), None);
+        assert_eq!(p.find("02468"), Some(2..3));
+    }
+
+    // TODO [a-b-c]
 
     #[test]
     fn bracket_expression_complement() {
