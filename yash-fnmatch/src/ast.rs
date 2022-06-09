@@ -46,16 +46,20 @@ impl Bracket {
                     bracket.complement = true
                 }
                 '-' => {
-                    if let Some(end) = i.next() {
-                        match bracket.atoms.pop() {
-                            Some(BracketAtom::Char(start)) => {
-                                let end = end.char_value();
-                                bracket.atoms.push(BracketAtom::Range(start..=end));
+                    if let Some(last) = bracket.atoms.pop() {
+                        if let Some(end) = i.next() {
+                            match last {
+                                BracketAtom::Char(start) => {
+                                    let end = end.char_value();
+                                    bracket.atoms.push(BracketAtom::Range(start..=end));
+                                }
+                                _ => todo!(),
                             }
-                            _ => todo!(),
+                        } else {
+                            todo!()
                         }
                     } else {
-                        todo!()
+                        bracket.atoms.push(BracketAtom::Char('-'));
                     }
                 }
                 c => bracket.atoms.push(BracketAtom::Char(c)),
@@ -314,8 +318,40 @@ mod tests {
         );
     }
 
-    // TODO dash_at_start_of_bracket_expression
-    // TODO dash_at_end_of_bracket_expression
+    #[test]
+    fn dash_at_start_of_bracket_expression() {
+        let ast = Ast::new(without_escape("[-a]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![BracketAtom::Char('-'), BracketAtom::Char('a')]
+            })]
+        );
+
+        let ast = Ast::new(without_escape("[!-b]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char('-'), BracketAtom::Char('b')]
+            })]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn dash_at_end_of_bracket_expression() {
+        let ast = Ast::new(without_escape("[5-]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![BracketAtom::Char('5'), BracketAtom::Char('-')]
+            })]
+        );
+    }
+
     // TODO ambiguous_character_range
     // TODO double_dash_at_start_of_bracket_expression
     // TODO double_dash_at_end_of_bracket_expression
