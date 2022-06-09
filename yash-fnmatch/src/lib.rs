@@ -111,6 +111,7 @@ impl Body {
             let mut empty = true;
             let mut complement = false;
             while let Some(pc) = pattern.next() {
+                // TODO Treat PatternChar::Literal
                 match pc.char_value() {
                     ']' if !empty => {
                         regex.push(']');
@@ -124,6 +125,13 @@ impl Body {
                     '!' if empty && !complement => {
                         regex.push('^');
                         complement = true;
+                    }
+                    '-' => {
+                        let mut last = regex.chars();
+                        if last.next_back() == Some('-') && last.next_back() != Some('\\') {
+                            regex.push('\\');
+                        }
+                        regex.push('-');
                     }
                     c => {
                         regex.push(c);
@@ -250,6 +258,8 @@ impl Pattern {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO Reduce excessive combinations of is_match and find
 
     #[test]
     fn empty_pattern() {
@@ -546,8 +556,26 @@ mod tests {
         assert_eq!(p.find("02468"), Some(2..3));
     }
 
+    // TODO [-a]
+    // TODO [a-]
     // TODO [a-b-c]
-    // TODO [+--.]
+
+    #[test]
+    fn double_dash_in_bracket_expression() {
+        // This bracket expression should be parsed as a union of the character
+        // range between '+' and '-', and a single dot.
+        let p = Pattern::new(without_escape("[+--.]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("+"));
+        assert!(p.is_match(","));
+        assert!(p.is_match("-"));
+        assert!(p.is_match("."));
+    }
+
+    // TODO double_dash_at_start_of_bracket_expression
+    // TODO double_dash_at_end_of_bracket_expression
 
     #[test]
     fn bracket_expression_complement() {
