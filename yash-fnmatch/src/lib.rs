@@ -28,7 +28,9 @@
 //!
 //! [`fnmatch-regex`]: https://crates.io/crates/fnmatch-regex
 
+pub mod ast;
 mod char_iter;
+
 pub use char_iter::*;
 use regex::bytes::Regex;
 use regex_syntax::ast::ClassAsciiKind;
