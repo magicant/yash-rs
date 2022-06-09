@@ -31,6 +31,7 @@
 mod char_iter;
 pub use char_iter::*;
 use regex::bytes::Regex;
+use regex_syntax::ast::ClassAsciiKind;
 use std::ops::Range;
 
 /// Configuration for a pattern
@@ -73,6 +74,12 @@ pub struct Config {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Character class with an undefined name.
+    ///
+    /// The associated value is the name that caused the error.
+    /// An example of this error is `[[:nothing:]]`.
+    UndefinedCharacterClass(String),
+
     /// Error in underlying regular expression processing
     RegexError(regex::Error),
 }
@@ -82,6 +89,8 @@ impl From<regex::Error> for Error {
         Error::RegexError(error)
     }
 }
+
+// impl Error for Error
 
 // TODO Consider moving to a submodule
 /// Main part of compiled pattern
@@ -107,7 +116,7 @@ impl Body {
         /// If successful, returns an iterator that yields characters following
         /// the closing bracket. Returns `None` and leaves `regex` broken if
         /// the inner bracket expression is not valid.
-        fn inner_bracket<I>(mut pattern: I, regex: &mut String) -> Option<I>
+        fn inner_bracket<I>(mut pattern: I, regex: &mut String) -> Result<Option<I>, Error>
         where
             I: Iterator<Item = PatternChar>,
         {
@@ -117,32 +126,38 @@ impl Body {
                         regex.push(pc.char_value());
                         if regex.ends_with(".]") {
                             regex.truncate(regex.len() - 2);
-                            return Some(pattern);
+                            return Ok(Some(pattern));
                         }
                     }
-                    None
+                    Ok(None)
                 }
                 Some(PatternChar::Normal('=')) => {
                     while let Some(pc) = pattern.next() {
                         regex.push(pc.char_value());
                         if regex.ends_with("=]") {
                             regex.truncate(regex.len() - 2);
-                            return Some(pattern);
+                            return Ok(Some(pattern));
                         }
                     }
-                    None
+                    Ok(None)
                 }
                 Some(PatternChar::Normal(':')) => {
                     regex.push_str("[:");
+                    let old_len = regex.len();
                     while let Some(pc) = pattern.next() {
                         regex.push(pc.char_value());
-                        if regex.ends_with(":]") {
-                            return Some(pattern);
+                        if regex.len() - old_len >= 2 && regex.ends_with(":]") {
+                            let name = &regex[old_len..regex.len() - 2];
+                            return if ClassAsciiKind::from_name(name).is_some() {
+                                Ok(Some(pattern))
+                            } else {
+                                Err(Error::UndefinedCharacterClass(name.to_string()))
+                            };
                         }
                     }
-                    None
+                    Ok(None)
                 }
-                _ => None,
+                _ => Ok(None),
             }
         }
 
@@ -151,7 +166,7 @@ impl Body {
         /// If successful, returns an iterator that yields characters following
         /// the bracket expression. Returns `None` and leaves `regex` broken if
         /// the bracket expression is not closed.
-        fn bracket<I>(mut pattern: I, regex: &mut String) -> Option<I>
+        fn bracket<I>(mut pattern: I, regex: &mut String) -> Result<Option<I>, Error>
         where
             I: Iterator<Item = PatternChar> + Clone,
         {
@@ -162,11 +177,11 @@ impl Body {
                 match pc.char_value() {
                     ']' if !empty => {
                         regex.push(']');
-                        return Some(pattern);
+                        return Ok(Some(pattern));
                     }
                     '[' => {
                         let old_len = regex.len();
-                        if let Some(i) = inner_bracket(pattern.clone(), regex) {
+                        if let Some(i) = inner_bracket(pattern.clone(), regex)? {
                             pattern = i;
                         } else {
                             regex.truncate(old_len);
@@ -199,7 +214,7 @@ impl Body {
                     }
                 }
             }
-            None
+            Ok(None)
         }
 
         // TODO multiline option
@@ -219,7 +234,7 @@ impl Body {
                 '[' => {
                     let old_len = regex.len();
                     regex.push('[');
-                    if let Some(j) = bracket(i.clone(), &mut regex) {
+                    if let Some(j) = bracket(i.clone(), &mut regex)? {
                         i = j;
                         literal = false;
                     } else {
@@ -318,6 +333,7 @@ impl Pattern {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn empty_pattern() {
@@ -898,6 +914,12 @@ mod tests {
         assert_eq!(p.find("="), None);
         assert_eq!(p.find(":"), None);
         assert_eq!(p.find("[A]"), Some(1..2));
+    }
+
+    #[test]
+    fn undefined_character_class() {
+        let e = Pattern::new(without_escape("[[:foo_bar:]]")).unwrap_err();
+        assert_matches!(e, Error::UndefinedCharacterClass(name) if name == "foo_bar");
     }
 
     // TODO Combinations of inner bracket expressions
