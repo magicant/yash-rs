@@ -12,6 +12,8 @@ use crate::PatternChar;
 pub enum Atom {
     /// Literal character
     Char(char),
+    /// Pattern that matches a single character (`?`)
+    AnyChar,
 }
 
 /// Abstract syntax tree for a whole pattern
@@ -39,7 +41,10 @@ impl Ast {
     {
         let atoms = pattern
             .into_iter()
-            .map(|pc| Atom::Char(pc.char_value()))
+            .map(|pc| match pc.char_value() {
+                '?' => Atom::AnyChar,
+                c => Atom::Char(c),
+            })
             .collect();
         Ok(Ast { atoms })
     }
@@ -70,4 +75,12 @@ mod tests {
         let ast = Ast::new(without_escape("in")).unwrap();
         assert_eq!(ast.atoms, [Atom::Char('i'), Atom::Char('n')]);
     }
+
+    #[test]
+    fn any_single_character_pattern() {
+        let ast = Ast::new(without_escape("?")).unwrap();
+        assert_eq!(ast.atoms, [Atom::AnyChar]);
+    }
+
+    // TODO PatternChar Normal vs Literal
 }
