@@ -39,7 +39,9 @@ impl Bracket {
         while let Some(pc) = i.next() {
             match pc.char_value() {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
-                '!' if !bracket.complement && bracket.atoms.is_empty() => bracket.complement = true,
+                '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
+                    bracket.complement = true
+                }
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
@@ -254,8 +256,35 @@ mod tests {
         );
     }
 
-    // TODO bracket_expression_complement_with_caret
-    // TODO    [^]a] [^^]
+    #[test]
+    fn bracket_expression_complement_with_caret() {
+        let ast = Ast::new(without_escape("[^34]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char('3'), BracketAtom::Char('4')]
+            })]
+        );
+
+        let ast = Ast::new(without_escape("[^]a]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char(']'), BracketAtom::Char('a')]
+            })]
+        );
+
+        let ast = Ast::new(without_escape("[^^]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char('^')]
+            })]
+        );
+    }
 
     // TODO character range
     // TODO dash_at_start_of_bracket_expression
