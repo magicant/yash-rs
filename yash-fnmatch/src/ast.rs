@@ -14,6 +14,8 @@ pub enum Atom {
     Char(char),
     /// Pattern that matches a single character (`?`)
     AnyChar,
+    /// Pattern that matches any string (`*`)
+    AnyString,
 }
 
 /// Abstract syntax tree for a whole pattern
@@ -43,6 +45,7 @@ impl Ast {
             .into_iter()
             .map(|pc| match pc.char_value() {
                 '?' => Atom::AnyChar,
+                '*' => Atom::AnyString,
                 c => Atom::Char(c),
             })
             .collect();
@@ -77,9 +80,15 @@ mod tests {
     }
 
     #[test]
-    fn any_single_character_pattern() {
+    fn any_character_pattern() {
         let ast = Ast::new(without_escape("?")).unwrap();
         assert_eq!(ast.atoms, [Atom::AnyChar]);
+    }
+
+    #[test]
+    fn any_string_pattern() {
+        let ast = Ast::new(without_escape("*")).unwrap();
+        assert_eq!(ast.atoms, [Atom::AnyString]);
     }
 
     // TODO PatternChar Normal vs Literal
