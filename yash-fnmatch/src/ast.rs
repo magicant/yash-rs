@@ -38,7 +38,7 @@ impl Bracket {
         };
         while let Some(pc) = i.next() {
             match pc.char_value() {
-                ']' => return Ok(Some((bracket, i))),
+                ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
@@ -160,7 +160,13 @@ mod tests {
     // TODO unmatched bracket [a
     // TODO unmatched bracket a]
     // TODO unmatched bracket ][
-    // TODO unmatched bracket []
+
+    #[test]
+    fn empty_bracket_expression() {
+        let ast = Ast::new(without_escape("[]")).unwrap();
+        assert_eq!(ast.atoms, [Atom::Char('['), Atom::Char(']')]);
+    }
+
     // TODO unmatched bracket after another bracket [a][a
 
     #[test]
@@ -186,6 +192,22 @@ mod tests {
                     BracketAtom::Char('x'),
                     BracketAtom::Char('y'),
                     BracketAtom::Char('z'),
+                ]
+            })]
+        );
+    }
+
+    #[test]
+    fn brackets_in_bracket_expression() {
+        let ast = Ast::new(without_escape("[]a[]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![
+                    BracketAtom::Char(']'),
+                    BracketAtom::Char('a'),
+                    BracketAtom::Char('['),
                 ]
             })]
         );
