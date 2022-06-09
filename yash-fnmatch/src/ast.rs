@@ -39,6 +39,7 @@ impl Bracket {
         while let Some(pc) = i.next() {
             match pc.char_value() {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
+                '!' => bracket.complement = true,
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
@@ -213,5 +214,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn bracket_expression_complement_with_exclamation() {
+        let ast = Ast::new(without_escape("[!12]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char('1'), BracketAtom::Char('2')]
+            })]
+        );
+    }
+
+    // TODO exclamation_in_bracket_expression
+    // TODO exclamation_in_bracket_expression_complement
+    // TODO bracket_expression_complement_with_caret
+    // TODO    [^]a] [^^]
+
+    // TODO character range
+    // TODO dash_at_start_of_bracket_expression
+    // TODO dash_at_end_of_bracket_expression
+    // TODO ambiguous_character_range
+    // TODO double_dash_at_start_of_bracket_expression
+    // TODO double_dash_at_end_of_bracket_expression
+
+    // TODO single_character_collating_symbol
+    // TODO multi_character_collating_symbol
+    // TODO single_character_equivalence_class
+    // TODO multi_character_equivalence_class
+
+    // TODO character_class_alnum
+    // TODO character_class_alpha
+    // TODO character_class_blank
+    // TODO character_class_cntrl
+    // TODO character_class_digit
+    // TODO character_class_graph
+    // TODO character_class_lower
+    // TODO character_class_print
+    // TODO character_class_punct
+    // TODO character_class_space
+    // TODO character_class_upper
+    // TODO character_class_xdigit
+    // TODO undefined_character_class
+
+    // TODO Config
     // TODO PatternChar Normal vs Literal
 }
