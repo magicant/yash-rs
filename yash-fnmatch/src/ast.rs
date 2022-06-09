@@ -32,17 +32,14 @@ impl Bracket {
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
-        if let Some(pc) = i.next() {
-            if let Some(pc2) = i.next() {
-                if pc2.char_value() == ']' {
-                    return Ok(Some((
-                        Bracket {
-                            complement: false,
-                            atoms: vec![BracketAtom::Char(pc.char_value())],
-                        },
-                        i,
-                    )));
-                }
+        let mut bracket = Bracket {
+            complement: false,
+            atoms: Vec::new(),
+        };
+        while let Some(pc) = i.next() {
+            match pc.char_value() {
+                ']' => return Ok(Some((bracket, i))),
+                c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
         Ok(None)
@@ -174,6 +171,22 @@ mod tests {
             [Atom::Bracket(Bracket {
                 complement: false,
                 atoms: vec![BracketAtom::Char('a')]
+            })]
+        );
+    }
+
+    #[test]
+    fn multi_character_bracket_expression_pattern() {
+        let ast = Ast::new(without_escape("[xyz]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![
+                    BracketAtom::Char('x'),
+                    BracketAtom::Char('y'),
+                    BracketAtom::Char('z'),
+                ]
             })]
         );
     }
