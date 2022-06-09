@@ -37,13 +37,11 @@ impl Ast {
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        if let Some(pc) = pattern.into_iter().next() {
-            Ok(Ast {
-                atoms: vec![Atom::Char(pc.char_value())],
-            })
-        } else {
-            Ok(Self::default())
-        }
+        let atoms = pattern
+            .into_iter()
+            .map(|pc| Atom::Char(pc.char_value()))
+            .collect();
+        Ok(Ast { atoms })
     }
 }
 
@@ -65,5 +63,11 @@ mod tests {
 
         let ast = Ast::new(without_escape("0")).unwrap();
         assert_eq!(ast.atoms, [Atom::Char('0')]);
+    }
+
+    #[test]
+    fn double_character_pattern() {
+        let ast = Ast::new(without_escape("in")).unwrap();
+        assert_eq!(ast.atoms, [Atom::Char('i'), Atom::Char('n')]);
     }
 }
