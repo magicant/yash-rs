@@ -99,6 +99,33 @@ impl Body {
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
+        /// Parses an inner bracket expression (except the initial '[').
+        ///
+        /// This function parses a collating symbol, equivalence class, or
+        /// character class.
+        ///
+        /// If successful, returns an iterator that yields characters following
+        /// the closing bracket. Returns `None` and leaves `regex` broken if
+        /// the inner bracket expression is not valid.
+        fn inner_bracket<I>(mut pattern: I, regex: &mut String) -> Option<I>
+        where
+            I: Iterator<Item = PatternChar>,
+        {
+            match pattern.next() {
+                Some(PatternChar::Normal('.')) => {
+                    while let Some(pc) = pattern.next() {
+                        regex.push(pc.char_value());
+                        if regex.ends_with(".]") {
+                            regex.truncate(regex.len() - 2);
+                            return Some(pattern);
+                        }
+                    }
+                    None
+                }
+                _ => None,
+            }
+        }
+
         /// Parses a bracket expression (except the initial '[').
         ///
         /// If successful, returns an iterator that yields characters following
@@ -106,7 +133,7 @@ impl Body {
         /// the bracket expression is not closed.
         fn bracket<I>(mut pattern: I, regex: &mut String) -> Option<I>
         where
-            I: Iterator<Item = PatternChar>,
+            I: Iterator<Item = PatternChar> + Clone,
         {
             let mut empty = true;
             let mut complement = false;
@@ -117,7 +144,18 @@ impl Body {
                         regex.push(']');
                         return Some(pattern);
                     }
-                    c @ ('[' | ']' | '&' | '~') => {
+                    '[' => {
+                        let old_len = regex.len();
+                        if let Some(i) = inner_bracket(pattern.clone(), regex) {
+                            pattern = i;
+                        } else {
+                            regex.truncate(old_len);
+                            regex.push('\\');
+                            regex.push('[');
+                        }
+                        empty = false;
+                    }
+                    c @ (']' | '&' | '~') => {
                         regex.push('\\');
                         regex.push(c);
                         // TODO empty = false;
@@ -637,7 +675,19 @@ mod tests {
         assert!(!p.is_match("^"));
     }
 
-    // TODO collating_symbol_in_bracket_expression
+    #[test]
+    fn single_character_collating_symbol() {
+        let p = Pattern::new(without_escape("[[.a.]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), None);
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find("[a]"), Some(1..2));
+    }
+
+    // TODO multi_character_collating_symbol
     // TODO equivalence_class_in_bracket_expression
     // TODO character_class_in_bracket_expression
 
