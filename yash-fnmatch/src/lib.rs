@@ -261,8 +261,6 @@ impl Pattern {
 mod tests {
     use super::*;
 
-    // TODO Reduce excessive combinations of is_match and find
-
     #[test]
     fn empty_pattern() {
         let p = Pattern::new(without_escape("")).unwrap();
@@ -326,10 +324,6 @@ mod tests {
         let p = Pattern::new(without_escape("?")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("i"));
-        assert!(p.is_match("yes"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("i"), Some(0..1));
         assert_eq!(p.find("yes"), Some(0..1));
@@ -339,12 +333,6 @@ mod tests {
     fn any_single_character_pattern_combined() {
         let p = Pattern::new(without_escape("a?c")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("ab"));
-        assert!(!p.is_match("ac"));
-        assert!(!p.is_match("bc"));
-        assert!(p.is_match("abc"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("ab"), None);
@@ -358,10 +346,6 @@ mod tests {
         let p = Pattern::new(without_escape("*")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(p.is_match(""));
-        assert!(p.is_match("i"));
-        assert!(p.is_match("yes"));
-
         assert_eq!(p.find(""), Some(0..0));
         assert_eq!(p.find("i"), Some(0..1));
         assert_eq!(p.find("yes"), Some(0..3));
@@ -371,12 +355,6 @@ mod tests {
     fn any_multi_character_pattern_combined() {
         let p = Pattern::new(without_escape("a*b")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("a"));
-        assert!(p.is_match("ab"));
-        assert!(p.is_match("aabb"));
-        assert!(p.is_match("lambda"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), None);
@@ -390,10 +368,6 @@ mod tests {
         let p = Pattern::new(without_escape("[a")).unwrap();
         assert_eq!(p.as_literal(), Some("[a"));
 
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("a"));
-        assert!(p.is_match("[a]"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), None);
         assert_eq!(p.find("[a]"), Some(0..2));
@@ -403,10 +377,6 @@ mod tests {
     fn unmatched_bracket_2() {
         let p = Pattern::new(without_escape("a]")).unwrap();
         assert_eq!(p.as_literal(), Some("a]"));
-
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("a"));
-        assert!(p.is_match("[a]"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), None);
@@ -418,10 +388,6 @@ mod tests {
         let p = Pattern::new(without_escape("][")).unwrap();
         assert_eq!(p.as_literal(), Some("]["));
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("]["));
-        assert!(p.is_match("[][]"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("]["), Some(0..2));
         assert_eq!(p.find("[][]"), Some(1..3));
@@ -431,10 +397,6 @@ mod tests {
     fn unmatched_bracket_4() {
         let p = Pattern::new(without_escape("[]")).unwrap();
         assert_eq!(p.as_literal(), Some("[]"));
-
-        assert!(!p.is_match(""));
-        assert!(p.is_match("[]"));
-        assert!(p.is_match("][]["));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("[]"), Some(0..2));
@@ -446,12 +408,10 @@ mod tests {
         let p = Pattern::new(without_escape("[a][")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("a"));
-        assert!(!p.is_match("["));
-        assert!(p.is_match("a["));
-
         assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("["), None);
+        assert_eq!(p.find("a["), Some(0..2));
         assert_eq!(p.find("]]a[[a][]"), Some(2..4));
     }
 
@@ -459,10 +419,6 @@ mod tests {
     fn single_character_bracket_expression_pattern() {
         let p = Pattern::new(without_escape("[a]")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("[a]"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
@@ -473,12 +429,6 @@ mod tests {
     fn multi_character_bracket_expression_pattern() {
         let p = Pattern::new(without_escape("[abc]")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("b"));
-        assert!(p.is_match("c"));
-        assert!(!p.is_match("d"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
@@ -492,11 +442,6 @@ mod tests {
         let p = Pattern::new(without_escape("[a&&b]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("b"));
-        assert!(p.is_match("&"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("b"), Some(0..1));
@@ -507,11 +452,6 @@ mod tests {
     fn tilde_in_bracket_expression() {
         let p = Pattern::new(without_escape("[a~~b]")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("b"));
-        assert!(p.is_match("~"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
@@ -527,11 +467,6 @@ mod tests {
         let p = Pattern::new(without_escape("[]a[]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("["));
-        assert!(p.is_match("]"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("["), Some(0..1));
@@ -543,16 +478,10 @@ mod tests {
         let p = Pattern::new(without_escape("[3-5]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("2"));
-        assert!(p.is_match("3"));
-        assert!(p.is_match("4"));
-        assert!(p.is_match("5"));
-        assert!(!p.is_match("6"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("2"), None);
         assert_eq!(p.find("3"), Some(0..1));
+        assert_eq!(p.find("4"), Some(0..1));
         assert_eq!(p.find("5"), Some(0..1));
         assert_eq!(p.find("6"), None);
         assert_eq!(p.find("02468"), Some(2..3));
@@ -564,11 +493,11 @@ mod tests {
         let p = Pattern::new(without_escape("[-0]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("-"));
-        assert!(!p.is_match("."));
-        assert!(p.is_match("0"));
-        assert!(!p.is_match("1"));
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find("0"), Some(0..1));
+        assert_eq!(p.find("1"), None);
     }
 
     #[test]
@@ -577,11 +506,11 @@ mod tests {
         let p = Pattern::new(without_escape("[+-]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("+"));
-        assert!(!p.is_match(","));
-        assert!(p.is_match("-"));
-        assert!(!p.is_match("."));
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("+"), Some(0..1));
+        assert_eq!(p.find(","), None);
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), None);
     }
 
     #[test]
@@ -591,13 +520,13 @@ mod tests {
 
         // POSIX leaves the expected results unspecified.
         // The results below depend on the current behavior of the regex crate.
-        assert!(!p.is_match("1"));
-        assert!(p.is_match("2"));
-        assert!(p.is_match("3"));
-        assert!(p.is_match("4"));
-        assert!(!p.is_match("5"));
-        assert!(p.is_match("6"));
-        assert!(!p.is_match("7"));
+        assert_eq!(p.find("1"), None);
+        assert_eq!(p.find("2"), Some(0..1));
+        assert_eq!(p.find("3"), Some(0..1));
+        assert_eq!(p.find("4"), Some(0..1));
+        assert_eq!(p.find("5"), None);
+        assert_eq!(p.find("6"), Some(0..1));
+        assert_eq!(p.find("7"), None);
     }
 
     #[test]
@@ -607,11 +536,11 @@ mod tests {
         let p = Pattern::new(without_escape("[+--.]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("+"));
-        assert!(p.is_match(","));
-        assert!(p.is_match("-"));
-        assert!(p.is_match("."));
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("+"), Some(0..1));
+        assert_eq!(p.find(","), Some(0..1));
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), Some(0..1));
     }
 
     #[test]
@@ -621,11 +550,11 @@ mod tests {
         let p = Pattern::new(without_escape("[--0]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("-"));
-        assert!(p.is_match("."));
-        assert!(p.is_match("0"));
-        assert!(!p.is_match("1"));
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find("0"), Some(0..1));
+        assert_eq!(p.find("1"), None);
     }
 
     #[test]
@@ -635,23 +564,17 @@ mod tests {
         let p = Pattern::new(without_escape("[+--]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("+"));
-        assert!(p.is_match(","));
-        assert!(p.is_match("-"));
-        assert!(!p.is_match("."));
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("+"), Some(0..1));
+        assert_eq!(p.find(","), Some(0..1));
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), None);
     }
 
     #[test]
     fn bracket_expression_complement() {
         let p = Pattern::new(without_escape("[!ab]")).unwrap();
         assert_eq!(p.as_literal(), None);
-
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("a"));
-        assert!(!p.is_match("b"));
-        assert!(p.is_match("c"));
-        assert!(p.is_match("!"));
 
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), None);
@@ -666,12 +589,6 @@ mod tests {
         let p = Pattern::new(without_escape("[ab!]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("a"));
-        assert!(p.is_match("b"));
-        assert!(!p.is_match("c"));
-        assert!(p.is_match("!"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("b"), Some(0..1));
@@ -684,10 +601,6 @@ mod tests {
         let p = Pattern::new(without_escape("[!!]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(!p.is_match("!"));
-        assert!(p.is_match("a"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("!"), None);
         assert_eq!(p.find("a"), Some(0..1));
@@ -699,16 +612,11 @@ mod tests {
         let p = Pattern::new(without_escape("[!]a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("!"));
-        assert!(!p.is_match("]"));
-        assert!(!p.is_match("a"));
-        assert!(p.is_match("b"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("!"), Some(0..1));
         assert_eq!(p.find("]"), None);
         assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("b"), Some(0..1));
         assert_eq!(p.find("abc"), Some(1..2));
     }
 
@@ -717,16 +625,11 @@ mod tests {
         let p = Pattern::new(without_escape("[^]a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
-        assert!(!p.is_match(""));
-        assert!(p.is_match("^"));
-        assert!(!p.is_match("]"));
-        assert!(!p.is_match("a"));
-        assert!(p.is_match("b"));
-
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("^"), Some(0..1));
         assert_eq!(p.find("]"), None);
         assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("b"), Some(0..1));
         assert_eq!(p.find("abc"), Some(1..2));
 
         let p = Pattern::new(without_escape("[^^]")).unwrap();
