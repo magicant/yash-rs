@@ -132,6 +132,16 @@ impl Body {
                     }
                     None
                 }
+                Some(PatternChar::Normal(':')) => {
+                    regex.push_str("[:");
+                    while let Some(pc) = pattern.next() {
+                        regex.push(pc.char_value());
+                        if regex.ends_with(":]") {
+                            return Some(pattern);
+                        }
+                    }
+                    None
+                }
                 _ => None,
             }
         }
@@ -712,7 +722,185 @@ mod tests {
     }
 
     // TODO multi_character_equivalence_class
-    // TODO character_class_in_bracket_expression
+
+    #[test]
+    fn character_class_alnum() {
+        let p = Pattern::new(without_escape("[[:alnum:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), Some(0..1));
+        assert_eq!(p.find("7"), Some(0..1));
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(":"), None);
+        assert_eq!(p.find("[A]"), Some(1..2));
+    }
+
+    #[test]
+    fn character_class_alpha() {
+        let p = Pattern::new(without_escape("[[:alpha:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), Some(0..1));
+        assert_eq!(p.find("7"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(":"), None);
+        assert_eq!(p.find("[A]"), Some(1..2));
+    }
+
+    #[test]
+    fn character_class_blank() {
+        let p = Pattern::new(without_escape("[[:blank:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(" "), Some(0..1));
+        assert_eq!(p.find("\t"), Some(0..1));
+        assert_eq!(p.find("\n"), None);
+        assert_eq!(p.find("\r"), None);
+        assert_eq!(p.find("[A]"), None);
+    }
+
+    #[test]
+    fn character_class_cntrl() {
+        let p = Pattern::new(without_escape("[[:cntrl:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(" "), None);
+        assert_eq!(p.find("\t"), Some(0..1));
+        assert_eq!(p.find("\n"), Some(0..1));
+        assert_eq!(p.find("\r"), Some(0..1));
+        assert_eq!(p.find("[A]"), None);
+    }
+
+    #[test]
+    fn character_class_digit() {
+        let p = Pattern::new(without_escape("[[:digit:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("x"), None);
+        assert_eq!(p.find("7"), Some(0..1));
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(":"), None);
+        assert_eq!(p.find("[A]"), None);
+    }
+
+    #[test]
+    fn character_class_graph() {
+        let p = Pattern::new(without_escape("[[:graph:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), Some(0..1));
+        assert_eq!(p.find("7"), Some(0..1));
+        assert_eq!(p.find("="), Some(0..1));
+        assert_eq!(p.find(":"), Some(0..1));
+        assert_eq!(p.find(" "), None);
+        assert_eq!(p.find("\t"), None);
+        assert_eq!(p.find("[A]"), Some(0..1));
+    }
+
+    #[test]
+    fn character_class_lower() {
+        let p = Pattern::new(without_escape("[[:lower:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("A"), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), Some(0..1));
+        assert_eq!(p.find("7"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find("\t"), None);
+        assert_eq!(p.find("[a]"), Some(1..2));
+    }
+
+    #[test]
+    fn character_class_print() {
+        let p = Pattern::new(without_escape("[[:print:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), Some(0..1));
+        assert_eq!(p.find("7"), Some(0..1));
+        assert_eq!(p.find("="), Some(0..1));
+        assert_eq!(p.find(":"), Some(0..1));
+        assert_eq!(p.find(" "), Some(0..1));
+        assert_eq!(p.find("\t"), None);
+        assert_eq!(p.find("[A]"), Some(0..1));
+    }
+
+    #[test]
+    fn character_class_punct() {
+        let p = Pattern::new(without_escape("[[:punct:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("x"), None);
+        assert_eq!(p.find("7"), None);
+        assert_eq!(p.find("="), Some(0..1));
+        assert_eq!(p.find(":"), Some(0..1));
+        assert_eq!(p.find("[A]"), Some(0..1));
+    }
+
+    #[test]
+    fn character_class_space() {
+        let p = Pattern::new(without_escape("[[:space:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(" "), Some(0..1));
+        assert_eq!(p.find("\t"), Some(0..1));
+        assert_eq!(p.find("\n"), Some(0..1));
+        assert_eq!(p.find("\r"), Some(0..1));
+        assert_eq!(p.find("[A]"), None);
+    }
+
+    #[test]
+    fn character_class_upper() {
+        let p = Pattern::new(without_escape("[[:upper:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("A"), Some(0..1));
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("X"), Some(0..1));
+        assert_eq!(p.find("7"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find("\t"), None);
+        assert_eq!(p.find("[A]"), Some(1..2));
+    }
+
+    #[test]
+    fn character_class_xdigit() {
+        let p = Pattern::new(without_escape("[[:xdigit:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), None);
+        assert_eq!(p.find("7"), Some(0..1));
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find(":"), None);
+        assert_eq!(p.find("[A]"), Some(1..2));
+    }
+
+    // TODO Combinations of inner bracket expressions
 
     // TODO Config
     // TODO PatternChar Normal vs Literal
