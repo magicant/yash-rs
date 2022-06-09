@@ -122,6 +122,16 @@ impl Body {
                     }
                     None
                 }
+                Some(PatternChar::Normal('=')) => {
+                    while let Some(pc) = pattern.next() {
+                        regex.push(pc.char_value());
+                        if regex.ends_with("=]") {
+                            regex.truncate(regex.len() - 2);
+                            return Some(pattern);
+                        }
+                    }
+                    None
+                }
                 _ => None,
             }
         }
@@ -688,7 +698,20 @@ mod tests {
     }
 
     // TODO multi_character_collating_symbol
-    // TODO equivalence_class_in_bracket_expression
+
+    #[test]
+    fn single_character_equivalence_class() {
+        let p = Pattern::new(without_escape("[[=a=]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("x"), None);
+        assert_eq!(p.find("="), None);
+        assert_eq!(p.find("[a]"), Some(1..2));
+    }
+
+    // TODO multi_character_equivalence_class
     // TODO character_class_in_bracket_expression
 
     // TODO Config
