@@ -39,7 +39,7 @@ impl Bracket {
         while let Some(pc) = i.next() {
             match pc.char_value() {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
-                '!' => bracket.complement = true,
+                '!' if !bracket.complement => bracket.complement = true,
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
@@ -226,8 +226,35 @@ mod tests {
         );
     }
 
-    // TODO exclamation_in_bracket_expression
-    // TODO exclamation_in_bracket_expression_complement
+    #[test]
+    #[ignore]
+    fn exclamation_in_bracket_expression() {
+        let ast = Ast::new(without_escape("[12!]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![
+                    BracketAtom::Char('1'),
+                    BracketAtom::Char('2'),
+                    BracketAtom::Char('!'),
+                ]
+            })]
+        );
+    }
+
+    #[test]
+    fn exclamation_in_bracket_expression_complement() {
+        let ast = Ast::new(without_escape("[!!]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: true,
+                atoms: vec![BracketAtom::Char('!')]
+            })]
+        );
+    }
+
     // TODO bracket_expression_complement_with_caret
     // TODO    [^]a] [^^]
 
