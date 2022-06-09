@@ -128,10 +128,12 @@ impl Body {
                     }
                     '-' => {
                         let mut last = regex.chars();
-                        if last.next_back() == Some('-') && last.next_back() != Some('\\') {
+                        if empty || last.next_back() == Some('-') && last.next_back() != Some('\\')
+                        {
                             regex.push('\\');
                         }
                         regex.push('-');
+                        empty = false;
                     }
                     c => {
                         regex.push(c);
@@ -574,7 +576,20 @@ mod tests {
         assert!(p.is_match("."));
     }
 
-    // TODO double_dash_at_start_of_bracket_expression
+    #[test]
+    fn double_dash_at_start_of_bracket_expression() {
+        // This bracket expression should be parsed as the character range
+        // between '-' and '0'.
+        let p = Pattern::new(without_escape("[--0]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("-"));
+        assert!(p.is_match("."));
+        assert!(p.is_match("0"));
+        assert!(!p.is_match("1"));
+    }
+
     // TODO double_dash_at_end_of_bracket_expression
 
     #[test]
