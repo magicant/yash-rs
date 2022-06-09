@@ -6,12 +6,15 @@
 use crate::Config;
 use crate::Error;
 use crate::PatternChar;
+use std::ops::RangeInclusive;
 
 /// Bracket expression component
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BracketAtom {
     /// Literal character
     Char(char),
+    /// Character range
+    Range(RangeInclusive<char>),
 }
 
 /// Bracket expression
@@ -41,6 +44,19 @@ impl Bracket {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
                 '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
                     bracket.complement = true
+                }
+                '-' => {
+                    if let Some(end) = i.next() {
+                        match bracket.atoms.pop() {
+                            Some(BracketAtom::Char(start)) => {
+                                let end = end.char_value();
+                                bracket.atoms.push(BracketAtom::Range(start..=end));
+                            }
+                            _ => todo!(),
+                        }
+                    } else {
+                        todo!()
+                    }
                 }
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
@@ -286,7 +302,18 @@ mod tests {
         );
     }
 
-    // TODO character range
+    #[test]
+    fn character_range() {
+        let ast = Ast::new(without_escape("[a-z]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![BracketAtom::Range('a'..='z')]
+            })]
+        );
+    }
+
     // TODO dash_at_start_of_bracket_expression
     // TODO dash_at_end_of_bracket_expression
     // TODO ambiguous_character_range
@@ -297,6 +324,8 @@ mod tests {
     // TODO multi_character_collating_symbol
     // TODO single_character_equivalence_class
     // TODO multi_character_equivalence_class
+
+    // TODO collating_symbol_in_character_range
 
     // TODO character_class_alnum
     // TODO character_class_alpha
