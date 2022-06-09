@@ -558,9 +558,47 @@ mod tests {
         assert_eq!(p.find("02468"), Some(2..3));
     }
 
-    // TODO [-a]
-    // TODO [a-]
-    // TODO [a-b-c]
+    #[test]
+    fn dash_at_start_of_bracket_expression() {
+        // This bracket expression should match only '-' and '0'.
+        let p = Pattern::new(without_escape("[-0]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("-"));
+        assert!(!p.is_match("."));
+        assert!(p.is_match("0"));
+        assert!(!p.is_match("1"));
+    }
+
+    #[test]
+    fn dash_at_end_of_bracket_expression() {
+        // This bracket expression should match only '+' and '-'.
+        let p = Pattern::new(without_escape("[+-]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("+"));
+        assert!(!p.is_match(","));
+        assert!(p.is_match("-"));
+        assert!(!p.is_match("."));
+    }
+
+    #[test]
+    fn ambiguous_character_range() {
+        let p = Pattern::new(without_escape("[2-4-6]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        // POSIX leaves the expected results unspecified.
+        // The results below depend on the current behavior of the regex crate.
+        assert!(!p.is_match("1"));
+        assert!(p.is_match("2"));
+        assert!(p.is_match("3"));
+        assert!(p.is_match("4"));
+        assert!(!p.is_match("5"));
+        assert!(p.is_match("6"));
+        assert!(!p.is_match("7"));
+    }
 
     #[test]
     fn double_dash_in_bracket_expression() {
@@ -590,7 +628,19 @@ mod tests {
         assert!(!p.is_match("1"));
     }
 
-    // TODO double_dash_at_end_of_bracket_expression
+    #[test]
+    fn double_dash_at_end_of_bracket_expression() {
+        // This bracket expression should be parsed as the character range
+        // between '+' and '-'.
+        let p = Pattern::new(without_escape("[+--]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("+"));
+        assert!(p.is_match(","));
+        assert!(p.is_match("-"));
+        assert!(!p.is_match("."));
+    }
 
     #[test]
     fn bracket_expression_complement() {
