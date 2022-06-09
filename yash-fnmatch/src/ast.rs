@@ -32,12 +32,18 @@ impl Ast {
     }
 
     /// Creates a pattern with a specified configuration.
-    pub fn with_config<I>(_pattern: I, _config: Config) -> Result<Self, Error>
+    pub fn with_config<I>(pattern: I, _config: Config) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        Ok(Self::default())
+        if let Some(pc) = pattern.into_iter().next() {
+            Ok(Ast {
+                atoms: vec![Atom::Char(pc.char_value())],
+            })
+        } else {
+            Ok(Self::default())
+        }
     }
 }
 
@@ -50,5 +56,14 @@ mod tests {
     fn empty_pattern() {
         let ast = Ast::new(without_escape("")).unwrap();
         assert_eq!(ast.atoms, []);
+    }
+
+    #[test]
+    fn single_character_pattern() {
+        let ast = Ast::new(without_escape("a")).unwrap();
+        assert_eq!(ast.atoms, [Atom::Char('a')]);
+
+        let ast = Ast::new(without_escape("0")).unwrap();
+        assert_eq!(ast.atoms, [Atom::Char('0')]);
     }
 }
