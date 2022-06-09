@@ -33,6 +33,7 @@ pub use char_iter::*;
 use regex::bytes::Regex;
 use regex_syntax::ast::ClassAsciiKind;
 use std::ops::Range;
+use thiserror::Error;
 
 /// Configuration for a pattern
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -71,26 +72,21 @@ pub struct Config {
 }
 
 /// Error that may happen in building a pattern.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
     /// Character class with an undefined name.
     ///
     /// The associated value is the name that caused the error.
-    /// An example of this error is `[[:nothing:]]`.
+    /// For example, the pattern `[[:nothing:]]` will produce
+    /// `Error::UndefinedCharacterClass("nothing".to_string())`.
+    #[error("undefined character class [:{0}:]")]
     UndefinedCharacterClass(String),
 
     /// Error in underlying regular expression processing
-    RegexError(regex::Error),
+    #[error(transparent)]
+    RegexError(#[from] regex::Error),
 }
-
-impl From<regex::Error> for Error {
-    fn from(error: regex::Error) -> Self {
-        Error::RegexError(error)
-    }
-}
-
-// impl Error for Error
 
 // TODO Consider moving to a submodule
 /// Main part of compiled pattern
