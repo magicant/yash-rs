@@ -39,7 +39,7 @@ impl Bracket {
         while let Some(pc) = i.next() {
             match pc.char_value() {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
-                '!' if !bracket.complement => bracket.complement = true,
+                '!' if !bracket.complement && bracket.atoms.is_empty() => bracket.complement = true,
                 c => bracket.atoms.push(BracketAtom::Char(c)),
             }
         }
@@ -227,7 +227,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn exclamation_in_bracket_expression() {
         let ast = Ast::new(without_escape("[12!]")).unwrap();
         assert_eq!(
