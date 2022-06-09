@@ -40,6 +40,7 @@ impl Bracket {
             atoms: Vec::new(),
         };
         while let Some(pc) = i.next() {
+            // TODO Check PatternChar type
             match pc.char_value() {
                 ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
                 '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
@@ -47,16 +48,22 @@ impl Bracket {
                 }
                 '-' => {
                     if let Some(last) = bracket.atoms.pop() {
-                        if let Some(end) = i.next() {
-                            match last {
+                        match i.next() {
+                            // TODO Check PatternChar type
+                            Some(close) if close.char_value() == ']' => {
+                                bracket.atoms.push(last);
+                                bracket.atoms.push(BracketAtom::Char('-'));
+                                return Ok(Some((bracket, i)));
+                            }
+                            Some(end) => match last {
                                 BracketAtom::Char(start) => {
+                                    // TODO Check PatternChar type
                                     let end = end.char_value();
                                     bracket.atoms.push(BracketAtom::Range(start..=end));
                                 }
                                 _ => todo!(),
-                            }
-                        } else {
-                            todo!()
+                            },
+                            _ => todo!(),
                         }
                     } else {
                         bracket.atoms.push(BracketAtom::Char('-'));
@@ -88,6 +95,7 @@ impl Atom {
         I: Iterator<Item = PatternChar> + Clone,
     {
         if let Some(pc) = i.next() {
+            // TODO Check PatternChar type
             let atom = match pc.char_value() {
                 '?' => Atom::AnyChar,
                 '*' => Atom::AnyString,
@@ -340,7 +348,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn dash_at_end_of_bracket_expression() {
         let ast = Ast::new(without_escape("[5-]")).unwrap();
         assert_eq!(
