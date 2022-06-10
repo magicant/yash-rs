@@ -46,30 +46,24 @@ impl Bracket {
                 '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
                     bracket.complement = true
                 }
-                '-' => {
-                    if let Some(last) = bracket.atoms.pop() {
-                        match i.next() {
-                            // TODO Check PatternChar type
-                            Some(close) if close.char_value() == ']' => {
-                                bracket.atoms.push(last);
-                                bracket.atoms.push(BracketAtom::Char('-'));
-                                return Ok(Some((bracket, i)));
-                            }
-                            Some(end) => match last {
-                                BracketAtom::Char(start) => {
-                                    // TODO Check PatternChar type
-                                    let end = end.char_value();
-                                    bracket.atoms.push(BracketAtom::Range(start..=end));
-                                }
-                                _ => todo!(),
-                            },
-                            _ => todo!(),
+                c => match bracket.atoms.pop() {
+                    Some(dash @ BracketAtom::Char('-')) => match bracket.atoms.pop() {
+                        Some(BracketAtom::Char(start)) => {
+                            bracket.atoms.push(BracketAtom::Range(start..=c));
                         }
-                    } else {
-                        bracket.atoms.push(BracketAtom::Char('-'));
+                        None => {
+                            bracket.atoms.push(dash);
+                            bracket.atoms.push(BracketAtom::Char(c));
+                        }
+                        _ => todo!(),
+                    },
+                    last => {
+                        if let Some(last) = last {
+                            bracket.atoms.push(last);
+                        }
+                        bracket.atoms.push(BracketAtom::Char(c));
                     }
-                }
-                c => bracket.atoms.push(BracketAtom::Char(c)),
+                },
             }
         }
         Ok(None)
