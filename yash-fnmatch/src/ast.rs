@@ -46,22 +46,16 @@ impl Bracket {
                 '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
                     bracket.complement = true
                 }
-                c => match bracket.atoms.pop() {
-                    Some(dash @ BracketAtom::Char('-')) => match bracket.atoms.pop() {
-                        Some(BracketAtom::Char(start)) => {
-                            bracket.atoms.push(BracketAtom::Range(start..=c));
+                c => match (bracket.atoms.pop(), bracket.atoms.pop()) {
+                    (Some(BracketAtom::Char('-')), Some(BracketAtom::Char(start))) => {
+                        bracket.atoms.push(BracketAtom::Range(start..=c));
+                    }
+                    (last_1, last_2) => {
+                        if let Some(last_2) = last_2 {
+                            bracket.atoms.push(last_2);
                         }
-                        last => {
-                            if let Some(last) = last {
-                                bracket.atoms.push(last);
-                            }
-                            bracket.atoms.push(dash);
-                            bracket.atoms.push(BracketAtom::Char(c));
-                        }
-                    },
-                    last => {
-                        if let Some(last) = last {
-                            bracket.atoms.push(last);
+                        if let Some(last_1) = last_1 {
+                            bracket.atoms.push(last_1);
                         }
                         bracket.atoms.push(BracketAtom::Char(c));
                     }
