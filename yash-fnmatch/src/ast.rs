@@ -51,11 +51,13 @@ impl Bracket {
                         Some(BracketAtom::Char(start)) => {
                             bracket.atoms.push(BracketAtom::Range(start..=c));
                         }
-                        None => {
+                        last => {
+                            if let Some(last) = last {
+                                bracket.atoms.push(last);
+                            }
                             bracket.atoms.push(dash);
                             bracket.atoms.push(BracketAtom::Char(c));
                         }
-                        _ => todo!(),
                     },
                     last => {
                         if let Some(last) = last {
@@ -353,7 +355,22 @@ mod tests {
         );
     }
 
-    // TODO ambiguous_character_range
+    #[test]
+    fn ambiguous_character_range() {
+        let ast = Ast::new(without_escape("[2-4-6-8]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![
+                    BracketAtom::Range('2'..='4'),
+                    BracketAtom::Char('-'),
+                    BracketAtom::Range('6'..='8'),
+                ]
+            })]
+        );
+    }
+
     // TODO double_dash_at_start_of_bracket_expression
     // TODO double_dash_at_end_of_bracket_expression
 
