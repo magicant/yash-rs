@@ -365,8 +365,29 @@ mod tests {
         );
     }
 
-    // TODO double_dash_at_start_of_bracket_expression
-    // TODO double_dash_at_end_of_bracket_expression
+    #[test]
+    fn double_dash_at_start_of_bracket_expression() {
+        let ast = Ast::new(without_escape("[--0]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![BracketAtom::Range('-'..='0')]
+            })]
+        );
+    }
+
+    #[test]
+    fn double_dash_at_end_of_bracket_expression() {
+        let ast = Ast::new(without_escape("[+--]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                atoms: vec![BracketAtom::Range('+'..='-')]
+            })]
+        );
+    }
 
     // TODO single_character_collating_symbol
     // TODO multi_character_collating_symbol
