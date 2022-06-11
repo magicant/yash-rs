@@ -12,6 +12,15 @@ use std::fmt::Write;
 const SPECIAL_CHARS: &str = r"\.+*?()|[]{}^$";
 
 impl BracketAtom {
+    fn matches_multi_character(&self) -> bool {
+        match self {
+            BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
+                value.len() > 1
+            }
+            _ => false,
+        }
+    }
+
     fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             BracketAtom::Char(c) => {
@@ -42,6 +51,13 @@ impl BracketAtom {
 }
 
 impl BracketItem {
+    fn matches_multi_character(&self) -> bool {
+        match self {
+            BracketItem::Atom(a) => a.matches_multi_character(),
+            BracketItem::Range(_) => false,
+        }
+    }
+
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             BracketItem::Atom(a) => a.fmt_regex(config, regex),
@@ -51,16 +67,34 @@ impl BracketItem {
 }
 
 impl Bracket {
+    fn matches_multi_character(&self) -> bool {
+        self.items.iter().any(BracketItem::matches_multi_character)
+    }
+
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         // TODO self.complement
         if self.items.is_empty() {
             return Err(Error);
         }
-        regex.write_char('[')?;
-        self.items
-            .iter()
-            .try_for_each(|item| item.fmt_regex(config, regex))?;
-        regex.write_char(']')
+        if self.matches_multi_character() {
+            regex.write_str("(?:")?;
+            // let mut first = true;
+            for item in &self.items {
+                // if first {
+                //     first = false;
+                // } else {
+                //     regex.write_char('|')?;
+                // }
+                item.fmt_regex(config, regex)?;
+            }
+            regex.write_char(')')
+        } else {
+            regex.write_char('[')?;
+            for item in &self.items {
+                item.fmt_regex(config, regex)?;
+            }
+            regex.write_char(']')
+        }
     }
 }
 
@@ -190,7 +224,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn multi_character_collating_symbol() {
         let bracket = Bracket {
             complement: false,
@@ -201,7 +234,7 @@ mod tests {
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
-        assert_eq!(regex, "ch");
+        assert_eq!(regex, "(?:ch)");
     }
 
     #[test]
@@ -219,7 +252,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn multi_character_equivalence_class() {
         let bracket = Bracket {
             complement: false,
@@ -230,7 +262,7 @@ mod tests {
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
-        assert_eq!(regex, "ij");
+        assert_eq!(regex, "(?:ij)");
     }
 
     #[test]
