@@ -87,6 +87,32 @@ impl From<RangeInclusive<BracketAtom>> for BracketItem {
     }
 }
 
+/// Converts the last three items into a range if applicable.
+fn make_range(items: &mut Vec<BracketItem>) {
+    use BracketAtom::*;
+    use BracketItem::*;
+
+    if let Some(i1) = items.pop() {
+        if let Atom(end) = i1 {
+            if let Some(i2) = items.pop() {
+                if let Atom(Char('-')) = i2 {
+                    if let Some(i3) = items.pop() {
+                        if let Atom(start) = i3 {
+                            items.push(Range(start..=end));
+                            return;
+                        }
+                        items.push(i3);
+                    }
+                }
+                items.push(i2);
+            }
+            items.push(Atom(end));
+        } else {
+            items.push(i1);
+        }
+    }
+}
+
 /// Bracket expression
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Bracket {
@@ -132,21 +158,9 @@ impl Bracket {
                         bracket.items.push(Atom(Char('[')));
                     }
                 }
-                c => match (bracket.items.pop(), bracket.items.pop()) {
-                    (Some(Atom(Char('-'))), Some(Atom(start))) => {
-                        bracket.items.push(Range(start..=Char(c)));
-                    }
-                    (last_1, last_2) => {
-                        if let Some(last_2) = last_2 {
-                            bracket.items.push(last_2);
-                        }
-                        if let Some(last_1) = last_1 {
-                            bracket.items.push(last_1);
-                        }
-                        bracket.items.push(Atom(Char(c)));
-                    }
-                },
+                c => bracket.items.push(Atom(Char(c))),
             }
+            make_range(&mut bracket.items);
         }
         Ok(None)
     }
@@ -577,8 +591,6 @@ mod tests {
         );
     }
 
-    // TODO collating_symbol_in_character_range
-
     // TODO character_class_alnum
     // TODO character_class_alpha
     // TODO character_class_blank
@@ -592,6 +604,21 @@ mod tests {
     // TODO character_class_upper
     // TODO character_class_xdigit
     // TODO undefined_character_class
+
+    #[test]
+    fn inner_brackets_in_character_range() {
+        let ast = Ast::new(without_escape("[[.ch.]-[=x=]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Range(
+                    BracketAtom::CollatingSymbol("ch".to_string())
+                        ..=BracketAtom::EquivalenceClass("x".to_string())
+                )]
+            })]
+        );
+    }
 
     // TODO Config
     // TODO PatternChar Normal vs Literal
