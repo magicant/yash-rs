@@ -36,7 +36,9 @@ impl ToRegex for BracketAtom {
                 }
                 regex.write_char(*c)
             }
-            BracketAtom::CollatingSymbol(value) => regex.write_str(value),
+            BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
+                regex.write_str(value)
+            }
             _ => todo!(),
         }
     }
@@ -188,6 +190,20 @@ mod tests {
     }
 
     // TODO multi_character_collating_symbol
+
+    #[test]
+    fn single_character_equivalence_class() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                "a".to_string(),
+            ))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[a]");
+    }
 
     // TODO Config
 }
