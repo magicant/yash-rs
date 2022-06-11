@@ -13,11 +13,44 @@ use std::ops::RangeInclusive;
 pub enum BracketAtom {
     /// Literal character
     Char(char),
+    /// Collating symbol (`[.x.]`)
+    CollatingSymbol(String),
 }
 
 impl From<char> for BracketAtom {
     fn from(c: char) -> Self {
         BracketAtom::Char(c)
+    }
+}
+
+impl BracketAtom {
+    /// Parses an inner bracket expression (except the initial '[').
+    ///
+    /// This function parses a collating symbol, equivalence class, or character
+    /// class.
+    ///
+    /// If successful, returns the result as well as an iterator that yields
+    /// characters following the closing bracket. Returns `Ok(None)` if the
+    /// inner bracket expression is not valid.
+    fn parse_inner<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
+    where
+        I: Iterator<Item = PatternChar>,
+    {
+        match i.next() {
+            // TODO Check PatternChar type
+            Some(pc) if pc.char_value() == '.' => {
+                let mut value = String::new();
+                while let Some(pc) = i.next() {
+                    value.push(pc.char_value());
+                    if value.ends_with(".]") {
+                        value.truncate(value.len() - 2);
+                        return Ok(Some((BracketAtom::CollatingSymbol(value), i)));
+                    }
+                }
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -55,6 +88,11 @@ pub struct Bracket {
 }
 
 impl Bracket {
+    /// Parses a bracket expression (except the initial '[').
+    ///
+    /// If successful, returns the result as well as an iterator that yields
+    /// characters following the bracket expression. Returns `Ok(None)` if a
+    /// bracket expression is not found.
     fn parse<I>(mut i: I, _config: Config) -> Result<Option<(Self, I)>, Error>
     where
         I: Iterator<Item = PatternChar> + Clone,
@@ -72,6 +110,14 @@ impl Bracket {
                 ']' if !bracket.items.is_empty() => return Ok(Some((bracket, i))),
                 '!' | '^' if !bracket.complement && bracket.items.is_empty() => {
                     bracket.complement = true
+                }
+                '[' => {
+                    if let Some((atom, j)) = BracketAtom::parse_inner(i.clone())? {
+                        bracket.items.push(atom.into());
+                        i = j;
+                    } else {
+                        bracket.items.push(Atom(Char('[')));
+                    }
                 }
                 c => match (bracket.items.pop(), bracket.items.pop()) {
                     (Some(Atom(Char('-'))), Some(Atom(start))) => {
@@ -441,13 +487,44 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn single_character_collating_symbol() {
         let ast = Ast::new(without_escape("[[.a.]]")).unwrap();
-        unimplemented!();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::CollatingSymbol(
+                    "a".to_string()
+                ))]
+            })]
+        );
+
+        let ast = Ast::new(without_escape("[[.].]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::CollatingSymbol(
+                    "]".to_string()
+                ))]
+            })]
+        );
     }
 
-    // TODO multi_character_collating_symbol
+    #[test]
+    fn multi_character_collating_symbol() {
+        let ast = Ast::new(without_escape("[[.ch.]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::CollatingSymbol(
+                    "ch".to_string()
+                ))]
+            })]
+        );
+    }
+
     // TODO single_character_equivalence_class
     // TODO multi_character_equivalence_class
 
