@@ -39,7 +39,20 @@ impl ToRegex for BracketAtom {
             BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
                 regex.write_str(value)
             }
-            _ => todo!(),
+            BracketAtom::CharClass(ClassAsciiKind::Alnum) => regex.write_str("[:alnum:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Alpha) => regex.write_str("[:alpha:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Ascii) => regex.write_str("[:ascii:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Blank) => regex.write_str("[:blank:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Cntrl) => regex.write_str("[:cntrl:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Digit) => regex.write_str("[:digit:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Graph) => regex.write_str("[:graph:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Lower) => regex.write_str("[:lower:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Print) => regex.write_str("[:print:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Punct) => regex.write_str("[:punct:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Space) => regex.write_str("[:space:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Upper) => regex.write_str("[:upper:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Word) => regex.write_str("[:word:]"),
+            BracketAtom::CharClass(ClassAsciiKind::Xdigit) => regex.write_str("[:xdigit:]"),
         }
     }
 }
@@ -189,7 +202,20 @@ mod tests {
         assert_eq!(regex, "[x]");
     }
 
-    // TODO multi_character_collating_symbol
+    #[test]
+    #[ignore]
+    fn multi_character_collating_symbol() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::CollatingSymbol(
+                "ch".to_string(),
+            ))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "ch");
+    }
 
     #[test]
     fn single_character_equivalence_class() {
@@ -203,6 +229,51 @@ mod tests {
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "[a]");
+    }
+
+    #[test]
+    #[ignore]
+    fn multi_character_equivalence_class() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                "ij".to_string(),
+            ))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "ij");
+    }
+
+    #[test]
+    fn character_class() {
+        let cases = [
+            ("alnum", ClassAsciiKind::Alnum),
+            ("alpha", ClassAsciiKind::Alpha),
+            ("ascii", ClassAsciiKind::Ascii),
+            ("blank", ClassAsciiKind::Blank),
+            ("cntrl", ClassAsciiKind::Cntrl),
+            ("digit", ClassAsciiKind::Digit),
+            ("graph", ClassAsciiKind::Graph),
+            ("lower", ClassAsciiKind::Lower),
+            ("print", ClassAsciiKind::Print),
+            ("punct", ClassAsciiKind::Punct),
+            ("space", ClassAsciiKind::Space),
+            ("upper", ClassAsciiKind::Upper),
+            ("word", ClassAsciiKind::Word),
+            ("xdigit", ClassAsciiKind::Xdigit),
+        ];
+        for (name, class) in cases {
+            let bracket = Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::CharClass(class))],
+            };
+            let atoms = vec![Atom::Bracket(bracket)];
+            let ast = Ast { atoms };
+            let regex = ast.to_regex(&Config::default()).unwrap();
+            assert_eq!(regex, format!("[[:{name}:]]"));
+        }
     }
 
     // TODO Config
