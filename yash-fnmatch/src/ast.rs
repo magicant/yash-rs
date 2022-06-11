@@ -6,6 +6,7 @@
 use crate::Config;
 use crate::Error;
 use crate::PatternChar;
+use regex_syntax::ast::ClassAsciiKind;
 use std::ops::RangeInclusive;
 
 /// Bracket expression component
@@ -17,6 +18,8 @@ pub enum BracketAtom {
     CollatingSymbol(String),
     /// Equivalence Class (`[=x=]`)
     EquivalenceClass(String),
+    /// Character class (`[:digit:]`)
+    CharClass(ClassAsciiKind),
 }
 
 impl From<char> for BracketAtom {
@@ -58,6 +61,21 @@ impl BracketAtom {
                     if value.ends_with("=]") {
                         value.truncate(value.len() - 2);
                         return Ok(Some((BracketAtom::EquivalenceClass(value), i)));
+                    }
+                }
+                Ok(None)
+            }
+            Some(pc) if pc.char_value() == ':' => {
+                let mut name = String::new();
+                while let Some(pc) = i.next() {
+                    name.push(pc.char_value());
+                    if name.ends_with(":]") {
+                        name.truncate(name.len() - 2);
+                        return if let Some(class) = ClassAsciiKind::from_name(&name) {
+                            Ok(Some((BracketAtom::CharClass(class), i)))
+                        } else {
+                            Err(Error::UndefinedCharacterClass(name))
+                        };
                     }
                 }
                 Ok(None)
@@ -244,6 +262,7 @@ impl Ast {
 mod tests {
     use super::*;
     use crate::without_escape;
+    use assert_matches::assert_matches;
 
     #[test]
     fn empty_pattern() {
@@ -591,19 +610,42 @@ mod tests {
         );
     }
 
-    // TODO character_class_alnum
-    // TODO character_class_alpha
-    // TODO character_class_blank
-    // TODO character_class_cntrl
-    // TODO character_class_digit
-    // TODO character_class_graph
-    // TODO character_class_lower
-    // TODO character_class_print
-    // TODO character_class_punct
-    // TODO character_class_space
-    // TODO character_class_upper
-    // TODO character_class_xdigit
-    // TODO undefined_character_class
+    #[test]
+    fn character_classes() {
+        let cases = [
+            ("alnum", ClassAsciiKind::Alnum),
+            ("alpha", ClassAsciiKind::Alpha),
+            ("ascii", ClassAsciiKind::Ascii),
+            ("blank", ClassAsciiKind::Blank),
+            ("cntrl", ClassAsciiKind::Cntrl),
+            ("digit", ClassAsciiKind::Digit),
+            ("graph", ClassAsciiKind::Graph),
+            ("lower", ClassAsciiKind::Lower),
+            ("print", ClassAsciiKind::Print),
+            ("punct", ClassAsciiKind::Punct),
+            ("space", ClassAsciiKind::Space),
+            ("upper", ClassAsciiKind::Upper),
+            ("word", ClassAsciiKind::Word),
+            ("xdigit", ClassAsciiKind::Xdigit),
+        ];
+        for (name, kind) in cases {
+            let pattern = format!("[[:{name}:]]");
+            let ast = Ast::new(without_escape(&pattern)).unwrap();
+            assert_eq!(
+                ast.atoms,
+                [Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![BracketItem::Atom(BracketAtom::CharClass(kind))]
+                })]
+            );
+        }
+    }
+
+    #[test]
+    fn undefined_character_class() {
+        let e = Ast::new(without_escape("[[:foo_bar:]]")).unwrap_err();
+        assert_matches!(e, Error::UndefinedCharacterClass(name) if name == "foo_bar");
+    }
 
     #[test]
     fn inner_brackets_in_character_range() {
