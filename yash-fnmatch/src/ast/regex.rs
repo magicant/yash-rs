@@ -27,10 +27,40 @@ pub trait ToRegex {
     }
 }
 
+impl ToRegex for BracketAtom {
+    fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
+        match self {
+            BracketAtom::Char(c) => {
+                if *c == '-' || SPECIAL_CHARS.contains(*c) {
+                    regex.write_char('\\')?;
+                }
+                regex.write_char(*c)
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl ToRegex for BracketItem {
+    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
+        match self {
+            BracketItem::Atom(a) => a.fmt_regex(config, regex),
+            _ => todo!(),
+        }
+    }
+}
+
 impl ToRegex for Bracket {
-    fn fmt_regex(&self, _config: &Config, _regex: &mut dyn Write) -> Result {
+    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         // TODO self.complement
-        Err(Error)
+        if self.items.is_empty() {
+            return Err(Error);
+        }
+        regex.write_char('[')?;
+        self.items
+            .iter()
+            .try_for_each(|item| item.fmt_regex(config, regex))?;
+        regex.write_char(']')
     }
 }
 
@@ -108,6 +138,38 @@ mod tests {
         let ast = Ast { atoms };
         let result = ast.to_regex(&Config::default());
         assert_eq!(result, Err(Error));
+    }
+
+    #[test]
+    fn bracket_with_chars() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![
+                BracketItem::Atom(BracketAtom::Char('a')),
+                BracketItem::Atom(BracketAtom::Char('n')),
+                BracketItem::Atom(BracketAtom::Char('d')),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[and]");
+    }
+
+    #[test]
+    fn bracket_with_chars_that_needs_escaping() {
+        let bracket = Bracket {
+            complement: false,
+            items: SPECIAL_CHARS
+                .chars()
+                .chain(std::iter::once('-'))
+                .map(|c| BracketItem::Atom(BracketAtom::Char(c)))
+                .collect(),
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, r"[\\\.\+\*\?\(\)\|\[\]\{\}\^\$\-]");
     }
 
     // TODO Config
