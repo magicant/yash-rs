@@ -25,9 +25,20 @@ pub trait ToRegex {
     }
 }
 
-impl ToRegex for Ast {
+impl ToRegex for Atom {
     fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
-        Ok(())
+        match self {
+            Atom::Char(c) => regex.write_char(*c),
+            _ => todo!(),
+        }
+    }
+}
+
+impl ToRegex for Ast {
+    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
+        self.atoms
+            .iter()
+            .try_for_each(|atom| atom.fmt_regex(config, regex))
     }
 }
 
@@ -43,14 +54,19 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn char_pattern() {
-        let ast = Ast {
-            atoms: vec![Atom::Char('a')],
-        };
+        let atoms = vec![Atom::Char('a')];
+        let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default());
         assert_eq!(regex, "a");
+
+        let atoms = vec![Atom::Char('1'), Atom::Char('9')];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default());
+        assert_eq!(regex, "19");
     }
+
+    // TODO Characters that should be escaped
 
     // TODO any_patterns
 
