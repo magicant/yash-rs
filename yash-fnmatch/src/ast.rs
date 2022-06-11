@@ -42,8 +42,7 @@ impl BracketAtom {
         I: Iterator<Item = PatternChar>,
     {
         match i.next() {
-            // TODO Check PatternChar type
-            Some(pc) if pc.char_value() == '.' => {
+            Some(PatternChar::Normal('.')) => {
                 let mut value = String::new();
                 while let Some(pc) = i.next() {
                     value.push(pc.char_value());
@@ -54,7 +53,7 @@ impl BracketAtom {
                 }
                 Ok(None)
             }
-            Some(pc) if pc.char_value() == '=' => {
+            Some(PatternChar::Normal('=')) => {
                 let mut value = String::new();
                 while let Some(pc) = i.next() {
                     value.push(pc.char_value());
@@ -65,7 +64,7 @@ impl BracketAtom {
                 }
                 Ok(None)
             }
-            Some(pc) if pc.char_value() == ':' => {
+            Some(PatternChar::Normal(':')) => {
                 let mut name = String::new();
                 while let Some(pc) = i.next() {
                     name.push(pc.char_value());
@@ -557,6 +556,27 @@ mod tests {
     }
 
     #[test]
+    fn escapes_in_bracket_expression() {
+        let ast = Ast::new(with_escape(r"[\!\[.a.]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [
+                Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![
+                        BracketItem::Atom(BracketAtom::Char('!')),
+                        BracketItem::Atom(BracketAtom::Char('[')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                    ]
+                }),
+                Atom::Char(']')
+            ]
+        );
+    }
+
+    #[test]
     fn single_character_collating_symbol() {
         let ast = Ast::new(without_escape("[[.a.]]")).unwrap();
         assert_eq!(
@@ -593,6 +613,29 @@ mod tests {
                 ))]
             })]
         );
+    }
+
+    #[test]
+    fn escapes_in_collating_symbol() {
+        let ast = Ast::new(with_escape(r"[[\.a.]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [
+                Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![
+                        BracketItem::Atom(BracketAtom::Char('[')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                    ]
+                }),
+                Atom::Char(']')
+            ]
+        );
+
+        // TODO [[.a\.]]
+        // TODO [[.a.\]]
     }
 
     #[test]
@@ -635,6 +678,29 @@ mod tests {
     }
 
     #[test]
+    fn escapes_in_equivalence_class() {
+        let ast = Ast::new(with_escape(r"[[\=a=]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [
+                Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![
+                        BracketItem::Atom(BracketAtom::Char('[')),
+                        BracketItem::Atom(BracketAtom::Char('=')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char('=')),
+                    ]
+                }),
+                Atom::Char(']')
+            ]
+        );
+
+        // TODO [[=a\=]]
+        // TODO [[=a=\]]
+    }
+
+    #[test]
     fn character_classes() {
         let cases = [
             ("alnum", ClassAsciiKind::Alnum),
@@ -672,6 +738,33 @@ mod tests {
     }
 
     #[test]
+    fn escapes_in_character_class() {
+        let ast = Ast::new(with_escape(r"[[\:alpha:]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [
+                Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![
+                        BracketItem::Atom(BracketAtom::Char('[')),
+                        BracketItem::Atom(BracketAtom::Char(':')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char('l')),
+                        BracketItem::Atom(BracketAtom::Char('p')),
+                        BracketItem::Atom(BracketAtom::Char('h')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char(':')),
+                    ]
+                }),
+                Atom::Char(']')
+            ]
+        );
+
+        // TODO [[=a\=]]
+        // TODO [[=a=\]]
+    }
+
+    #[test]
     fn inner_brackets_in_character_range() {
         let ast = Ast::new(without_escape("[[.ch.]-[=x=]]")).unwrap();
         assert_eq!(
@@ -683,27 +776,6 @@ mod tests {
                         ..=BracketAtom::EquivalenceClass("x".to_string())
                 )]
             })]
-        );
-    }
-
-    #[test]
-    fn escapes_in_bracket_expression() {
-        let ast = Ast::new(with_escape(r"[\!\[.a.]]")).unwrap();
-        assert_eq!(
-            ast.atoms,
-            [
-                Atom::Bracket(Bracket {
-                    complement: false,
-                    items: vec![
-                        BracketItem::Atom(BracketAtom::Char('!')),
-                        BracketItem::Atom(BracketAtom::Char('[')),
-                        BracketItem::Atom(BracketAtom::Char('.')),
-                        BracketItem::Atom(BracketAtom::Char('a')),
-                        BracketItem::Atom(BracketAtom::Char('.')),
-                    ]
-                }),
-                Atom::Char(']')
-            ]
         );
     }
 
