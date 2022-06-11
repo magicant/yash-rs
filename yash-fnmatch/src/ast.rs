@@ -4,7 +4,9 @@
 //! Abstract syntax tree for globbing patterns
 
 mod parse;
+mod regex;
 
+pub use self::regex::ToRegex;
 use crate::Error;
 use crate::PatternChar;
 use regex_syntax::ast::ClassAsciiKind;
