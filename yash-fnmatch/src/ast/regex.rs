@@ -58,7 +58,7 @@ impl BracketAtom {
                 let c = value.chars().next().ok_or(Error)?;
                 BracketAtom::fmt_regex_char(c, regex)
             }
-            _ => todo!(),
+            BracketAtom::CharClass(_) => Err(Error),
         }
     }
 }
@@ -295,7 +295,30 @@ mod tests {
         assert_eq!(regex, "[c-ia-s]");
     }
 
-    // TODO equivalence_class_in_range
+    #[test]
+    fn character_class_in_range() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Range(
+                BracketAtom::CharClass(ClassAsciiKind::Graph)..=BracketAtom::Char(' '),
+            )],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let result = ast.to_regex(&Config::default());
+        assert_eq!(result, Err(Error));
+
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Range(
+                BracketAtom::Char('a')..=BracketAtom::CharClass(ClassAsciiKind::Print),
+            )],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let result = ast.to_regex(&Config::default());
+        assert_eq!(result, Err(Error));
+    }
 
     #[test]
     fn single_character_collating_symbol() {
