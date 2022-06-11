@@ -4,7 +4,6 @@
 //! AST parser
 
 use super::*;
-use crate::Config;
 use crate::Error;
 use crate::PatternChar;
 use regex_syntax::ast::ClassAsciiKind;
@@ -100,7 +99,7 @@ impl Bracket {
     /// If successful, returns the result as well as an iterator that yields
     /// characters following the bracket expression. Returns `Ok(None)` if a
     /// bracket expression is not found.
-    fn parse<I>(mut i: I, _config: Config) -> Result<Option<(Self, I)>, Error>
+    fn parse<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
@@ -138,7 +137,7 @@ impl Bracket {
 }
 
 impl Atom {
-    pub fn parse<I>(mut i: I, config: Config) -> Result<Option<(Self, I)>, Error>
+    pub fn parse<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
@@ -147,7 +146,7 @@ impl Atom {
                 PatternChar::Normal('?') => Atom::AnyChar,
                 PatternChar::Normal('*') => Atom::AnyString,
                 PatternChar::Normal('[') => {
-                    if let Some((bracket, j)) = Bracket::parse(i.clone(), config)? {
+                    if let Some((bracket, j)) = Bracket::parse(i.clone())? {
                         i = j;
                         Atom::Bracket(bracket)
                     } else {

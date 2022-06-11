@@ -5,7 +5,6 @@
 
 mod parse;
 
-use crate::Config;
 use crate::Error;
 use crate::PatternChar;
 use regex_syntax::ast::ClassAsciiKind;
@@ -84,25 +83,16 @@ pub struct Ast {
 }
 
 impl Ast {
-    /// Creates a pattern with defaulted configuration.
+    /// Creates a pattern.
     #[inline]
     pub fn new<I>(pattern: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        Self::with_config(pattern, Config::default())
-    }
-
-    /// Creates a pattern with a specified configuration.
-    pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
-    where
-        I: IntoIterator<Item = PatternChar>,
-        <I as IntoIterator>::IntoIter: Clone,
-    {
         let mut atoms = Vec::new();
         let mut i = pattern.into_iter();
-        while let Some((atom, j)) = Atom::parse(i, config)? {
+        while let Some((atom, j)) = Atom::parse(i)? {
             atoms.push(atom);
             i = j;
         }
