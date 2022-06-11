@@ -149,12 +149,17 @@ impl Atom {
 }
 
 impl Ast {
+    /// Writes the AST as a regular expression.
+    pub fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
+        self.atoms
+            .iter()
+            .try_for_each(|atom| atom.fmt_regex(config, regex))
+    }
+
     /// Converts the AST to a regular expression.
     pub fn to_regex(&self, config: &Config) -> std::result::Result<String, Error> {
         let mut regex = String::new();
-        for atom in &self.atoms {
-            atom.fmt_regex(config, &mut regex)?;
-        }
+        self.fmt_regex(config, &mut regex)?;
         Ok(regex)
     }
 }
