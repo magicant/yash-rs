@@ -12,6 +12,13 @@ use std::fmt::Write;
 const SPECIAL_CHARS: &str = r"\.+*?()|[]{}^$";
 
 impl BracketAtom {
+    fn fmt_regex_char(c: char, regex: &mut dyn Write) -> Result {
+        if c == '-' || SPECIAL_CHARS.contains(c) {
+            regex.write_char('\\')?;
+        }
+        regex.write_char(c)
+    }
+
     fn matches_multi_character(&self) -> bool {
         match self {
             BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
@@ -23,12 +30,7 @@ impl BracketAtom {
 
     fn fmt_regex(&self, regex: &mut dyn Write) -> Result {
         match self {
-            BracketAtom::Char(c) => {
-                if *c == '-' || SPECIAL_CHARS.contains(*c) {
-                    regex.write_char('\\')?;
-                }
-                regex.write_char(*c)
-            }
+            BracketAtom::Char(c) => BracketAtom::fmt_regex_char(*c, regex),
             BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
                 regex.write_str(value)
             }
@@ -51,12 +53,7 @@ impl BracketAtom {
 
     fn fmt_regex_single(&self, regex: &mut dyn Write) -> Result {
         match self {
-            BracketAtom::Char(c) => {
-                if *c == '-' || SPECIAL_CHARS.contains(*c) {
-                    regex.write_char('\\')?;
-                }
-                regex.write_char(*c)
-            }
+            BracketAtom::Char(c) => BracketAtom::fmt_regex_char(*c, regex),
             _ => todo!(),
         }
     }
