@@ -19,11 +19,10 @@ pub trait ToRegex {
     /// Converts this pattern to a regular expression.
     ///
     /// The result is returned as a string.
-    fn to_regex(&self, config: &Config) -> String {
+    fn to_regex(&self, config: &Config) -> std::result::Result<String, std::fmt::Error> {
         let mut regex = String::new();
-        self.fmt_regex(config, &mut regex)
-            .expect("write should not fail");
-        regex
+        self.fmt_regex(config, &mut regex)?;
+        Ok(regex)
     }
 }
 
@@ -58,7 +57,7 @@ mod tests {
     #[test]
     fn empty_pattern() {
         let ast = Ast { atoms: vec![] };
-        let regex = ast.to_regex(&Config::default());
+        let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "");
     }
 
@@ -66,12 +65,12 @@ mod tests {
     fn char_pattern() {
         let atoms = vec![Atom::Char('a')];
         let ast = Ast { atoms };
-        let regex = ast.to_regex(&Config::default());
+        let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "a");
 
         let atoms = vec![Atom::Char('1'), Atom::Char('9')];
         let ast = Ast { atoms };
-        let regex = ast.to_regex(&Config::default());
+        let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "19");
     }
 
@@ -79,7 +78,7 @@ mod tests {
     fn characters_that_needs_escaping() {
         let atoms = SPECIAL_CHARS.chars().map(Atom::Char).collect();
         let ast = Ast { atoms };
-        let regex = ast.to_regex(&Config::default());
+        let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, r"\\\.\+\*\?\(\)\|\[\]\{\}\^\$");
     }
 
@@ -87,7 +86,7 @@ mod tests {
     fn any_patterns() {
         let atoms = vec![Atom::AnyChar, Atom::AnyString, Atom::AnyChar];
         let ast = Ast { atoms };
-        let regex = ast.to_regex(&Config::default());
+        let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "..*.");
     }
 
