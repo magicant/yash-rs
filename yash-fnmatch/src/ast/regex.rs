@@ -72,17 +72,20 @@ impl Bracket {
     }
 
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
-        // TODO self.complement
         if self.items.is_empty() {
             return Err(Error);
         }
         if !self.matches_multi_character() {
             regex.write_char('[')?;
+            if self.complement {
+                regex.write_char('^')?;
+            }
             for item in &self.items {
                 item.fmt_regex(config, regex)?;
             }
             regex.write_char(']')
         } else {
+            // TODO self.complement
             regex.write_str("(?:")?;
             let mut first = true;
             for item in &self.items {
@@ -300,6 +303,23 @@ mod tests {
             let regex = ast.to_regex(&Config::default()).unwrap();
             assert_eq!(regex, format!("[[:{name}:]]"));
         }
+    }
+
+    #[test]
+    fn bracket_expression_complement() {
+        let bracket = Bracket {
+            complement: true,
+            items: vec![
+                BracketItem::Atom(BracketAtom::CollatingSymbol("s".to_string())),
+                BracketItem::Atom(BracketAtom::Char('a')),
+                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Digit)),
+                BracketItem::Atom(BracketAtom::EquivalenceClass("x".to_string())),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[^sa[:digit:]x]");
     }
 
     #[test]
