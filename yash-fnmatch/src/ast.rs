@@ -203,11 +203,10 @@ impl Atom {
         I: Iterator<Item = PatternChar> + Clone,
     {
         if let Some(pc) = i.next() {
-            // TODO Check PatternChar type
-            let atom = match pc.char_value() {
-                '?' => Atom::AnyChar,
-                '*' => Atom::AnyString,
-                '[' => {
+            let atom = match pc {
+                PatternChar::Normal('?') => Atom::AnyChar,
+                PatternChar::Normal('*') => Atom::AnyString,
+                PatternChar::Normal('[') => {
                     if let Some((bracket, j)) = Bracket::parse(i.clone(), config)? {
                         i = j;
                         Atom::Bracket(bracket)
@@ -215,7 +214,7 @@ impl Atom {
                         Atom::Char('[')
                     }
                 }
-                c => Atom::Char(c),
+                c => Atom::Char(c.char_value()),
             };
             Ok(Some((atom, i)))
         } else {
@@ -261,6 +260,7 @@ impl Ast {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::with_escape;
     use crate::without_escape;
     use assert_matches::assert_matches;
 
@@ -297,6 +297,12 @@ mod tests {
         assert_eq!(ast.atoms, [Atom::AnyString]);
     }
 
+    #[test]
+    fn escaped_any_patterns() {
+        let ast = Ast::new(with_escape(r"\?\*")).unwrap();
+        assert_eq!(ast.atoms, [Atom::Char('?'), Atom::Char('*')]);
+    }
+
     // TODO unmatched bracket [a
     // TODO unmatched bracket a]
     // TODO unmatched bracket ][
@@ -305,6 +311,15 @@ mod tests {
     fn empty_bracket_expression() {
         let ast = Ast::new(without_escape("[]")).unwrap();
         assert_eq!(ast.atoms, [Atom::Char('['), Atom::Char(']')]);
+    }
+
+    #[test]
+    fn escaped_bracket_expression() {
+        let ast = Ast::new(with_escape(r"\[a]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Char('['), Atom::Char('a'), Atom::Char(']')]
+        );
     }
 
     // TODO unmatched bracket after another bracket [a][a
