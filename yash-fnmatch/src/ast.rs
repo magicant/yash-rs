@@ -15,6 +15,8 @@ pub enum BracketAtom {
     Char(char),
     /// Collating symbol (`[.x.]`)
     CollatingSymbol(String),
+    /// Equivalence Class (`[=x=]`)
+    EquivalenceClass(String),
 }
 
 impl From<char> for BracketAtom {
@@ -45,6 +47,17 @@ impl BracketAtom {
                     if value.ends_with(".]") {
                         value.truncate(value.len() - 2);
                         return Ok(Some((BracketAtom::CollatingSymbol(value), i)));
+                    }
+                }
+                Ok(None)
+            }
+            Some(pc) if pc.char_value() == '=' => {
+                let mut value = String::new();
+                while let Some(pc) = i.next() {
+                    value.push(pc.char_value());
+                    if value.ends_with("=]") {
+                        value.truncate(value.len() - 2);
+                        return Ok(Some((BracketAtom::EquivalenceClass(value), i)));
                     }
                 }
                 Ok(None)
@@ -525,8 +538,44 @@ mod tests {
         );
     }
 
-    // TODO single_character_equivalence_class
-    // TODO multi_character_equivalence_class
+    #[test]
+    fn single_character_equivalence_class() {
+        let ast = Ast::new(without_escape("[[=a=]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                    "a".to_string()
+                ))]
+            })]
+        );
+
+        let ast = Ast::new(without_escape("[[=]=]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                    "]".to_string()
+                ))]
+            })]
+        );
+    }
+
+    #[test]
+    fn multi_character_equivalence_class() {
+        let ast = Ast::new(without_escape("[[=ch=]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Bracket(Bracket {
+                complement: false,
+                items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                    "ch".to_string()
+                ))]
+            })]
+        );
+    }
 
     // TODO collating_symbol_in_character_range
 
