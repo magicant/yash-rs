@@ -11,23 +11,7 @@ use std::fmt::Write;
 
 const SPECIAL_CHARS: &str = r"\.+*?()|[]{}^$";
 
-pub trait ToRegex {
-    /// Converts this pattern to a regular expression.
-    ///
-    /// The result is written to `regex`.
-    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result;
-
-    /// Converts this pattern to a regular expression.
-    ///
-    /// The result is returned as a string.
-    fn to_regex(&self, config: &Config) -> std::result::Result<String, Error> {
-        let mut regex = String::new();
-        self.fmt_regex(config, &mut regex)?;
-        Ok(regex)
-    }
-}
-
-impl ToRegex for BracketAtom {
+impl BracketAtom {
     fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             BracketAtom::Char(c) => {
@@ -57,7 +41,7 @@ impl ToRegex for BracketAtom {
     }
 }
 
-impl ToRegex for BracketItem {
+impl BracketItem {
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             BracketItem::Atom(a) => a.fmt_regex(config, regex),
@@ -66,7 +50,7 @@ impl ToRegex for BracketItem {
     }
 }
 
-impl ToRegex for Bracket {
+impl Bracket {
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         // TODO self.complement
         if self.items.is_empty() {
@@ -80,7 +64,7 @@ impl ToRegex for Bracket {
     }
 }
 
-impl ToRegex for Atom {
+impl Atom {
     fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             Atom::Char(c) => {
@@ -96,11 +80,14 @@ impl ToRegex for Atom {
     }
 }
 
-impl ToRegex for Ast {
-    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
-        self.atoms
-            .iter()
-            .try_for_each(|atom| atom.fmt_regex(config, regex))
+impl Ast {
+    /// Converts the AST to a regular expression.
+    pub fn to_regex(&self, config: &Config) -> std::result::Result<String, Error> {
+        let mut regex = String::new();
+        for atom in &self.atoms {
+            atom.fmt_regex(config, &mut regex)?;
+        }
+        Ok(regex)
     }
 }
 
