@@ -36,6 +36,8 @@ impl ToRegex for Atom {
                 }
                 regex.write_char(*c)
             }
+            Atom::AnyChar => regex.write_char('.'),
+            Atom::AnyString => regex.write_str(".*"),
             _ => todo!(),
         }
     }
@@ -81,7 +83,13 @@ mod tests {
         assert_eq!(regex, r"\\\.\+\*\?\(\)\|\[\]\{\}\^\$");
     }
 
-    // TODO any_patterns
+    #[test]
+    fn any_patterns() {
+        let atoms = vec![Atom::AnyChar, Atom::AnyString, Atom::AnyChar];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default());
+        assert_eq!(regex, "..*.");
+    }
 
     // TODO Config
 }
