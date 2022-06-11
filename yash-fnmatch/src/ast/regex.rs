@@ -54,6 +54,10 @@ impl BracketAtom {
     fn fmt_regex_single(&self, regex: &mut dyn Write) -> Result {
         match self {
             BracketAtom::Char(c) => BracketAtom::fmt_regex_char(*c, regex),
+            BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
+                let c = value.chars().next().ok_or(Error)?;
+                BracketAtom::fmt_regex_char(c, regex)
+            }
             _ => todo!(),
         }
     }
@@ -253,7 +257,45 @@ mod tests {
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, r"[a-z2-4\[-\]]");
+
+        let bracket = Bracket {
+            complement: false,
+            items: vec![
+                BracketItem::Range(
+                    BracketAtom::CollatingSymbol("A".to_string())
+                        ..=BracketAtom::CollatingSymbol("Z".to_string()),
+                ),
+                BracketItem::Range(
+                    BracketAtom::EquivalenceClass("3".to_string())
+                        ..=BracketAtom::EquivalenceClass("5".to_string()),
+                ),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[A-Z3-5]");
+
+        let bracket = Bracket {
+            complement: false,
+            items: vec![
+                BracketItem::Range(
+                    BracketAtom::CollatingSymbol("ch".to_string())
+                        ..=BracketAtom::CollatingSymbol("ij".to_string()),
+                ),
+                BracketItem::Range(
+                    BracketAtom::EquivalenceClass("a".to_string())
+                        ..=BracketAtom::EquivalenceClass("s".to_string()),
+                ),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[c-ia-s]");
     }
+
+    // TODO equivalence_class_in_range
 
     #[test]
     fn single_character_collating_symbol() {
