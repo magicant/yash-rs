@@ -8,6 +8,8 @@ use crate::Config;
 use std::fmt::Result;
 use std::fmt::Write;
 
+const SPECIAL_CHARS: &str = r"\.+*?()|[]{}^$";
+
 pub trait ToRegex {
     /// Converts this pattern to a regular expression.
     ///
@@ -28,7 +30,12 @@ pub trait ToRegex {
 impl ToRegex for Atom {
     fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
         match self {
-            Atom::Char(c) => regex.write_char(*c),
+            Atom::Char(c) => {
+                if SPECIAL_CHARS.contains(*c) {
+                    regex.write_char('\\')?;
+                }
+                regex.write_char(*c)
+            }
             _ => todo!(),
         }
     }
@@ -66,7 +73,13 @@ mod tests {
         assert_eq!(regex, "19");
     }
 
-    // TODO Characters that should be escaped
+    #[test]
+    fn characters_that_needs_escaping() {
+        let atoms = SPECIAL_CHARS.chars().map(Atom::Char).collect();
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default());
+        assert_eq!(regex, r"\\\.\+\*\?\(\)\|\[\]\{\}\^\$");
+    }
 
     // TODO any_patterns
 
