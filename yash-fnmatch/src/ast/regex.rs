@@ -84,8 +84,7 @@ impl Bracket {
                 item.fmt_regex(config, regex)?;
             }
             regex.write_char(']')
-        } else {
-            // TODO self.complement
+        } else if !self.complement {
             regex.write_str("(?:")?;
             let mut first = true;
             for item in &self.items {
@@ -104,6 +103,14 @@ impl Bracket {
                 }
             }
             regex.write_char(')')
+        } else {
+            regex.write_str("[^")?;
+            for item in &self.items {
+                if !item.matches_multi_character() {
+                    item.fmt_regex(config, regex)?;
+                }
+            }
+            regex.write_char(']')
         }
     }
 }
@@ -339,7 +346,22 @@ mod tests {
         assert_eq!(regex, "(?:ch|[a]|[[:space:]]|ij)");
     }
 
-    // TODO complex_bracket_expression_complement
+    #[test]
+    fn complex_bracket_expression_complement() {
+        let bracket = Bracket {
+            complement: true,
+            items: vec![
+                BracketItem::Atom(BracketAtom::CollatingSymbol("ch".to_string())),
+                BracketItem::Atom(BracketAtom::Char('a')),
+                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Space)),
+                BracketItem::Atom(BracketAtom::EquivalenceClass("ij".to_string())),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "[^a[:space:]]");
+    }
 
     // TODO Config
 }
