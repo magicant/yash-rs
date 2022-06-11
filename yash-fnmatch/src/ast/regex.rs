@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::Config;
+use std::fmt::Error;
 use std::fmt::Result;
 use std::fmt::Write;
 
@@ -19,15 +20,22 @@ pub trait ToRegex {
     /// Converts this pattern to a regular expression.
     ///
     /// The result is returned as a string.
-    fn to_regex(&self, config: &Config) -> std::result::Result<String, std::fmt::Error> {
+    fn to_regex(&self, config: &Config) -> std::result::Result<String, Error> {
         let mut regex = String::new();
         self.fmt_regex(config, &mut regex)?;
         Ok(regex)
     }
 }
 
+impl ToRegex for Bracket {
+    fn fmt_regex(&self, _config: &Config, _regex: &mut dyn Write) -> Result {
+        // TODO self.complement
+        Err(Error)
+    }
+}
+
 impl ToRegex for Atom {
-    fn fmt_regex(&self, _config: &Config, regex: &mut dyn Write) -> Result {
+    fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         match self {
             Atom::Char(c) => {
                 if SPECIAL_CHARS.contains(*c) {
@@ -37,7 +45,7 @@ impl ToRegex for Atom {
             }
             Atom::AnyChar => regex.write_char('.'),
             Atom::AnyString => regex.write_str(".*"),
-            _ => todo!(),
+            Atom::Bracket(bracket) => bracket.fmt_regex(config, regex),
         }
     }
 }
@@ -88,6 +96,18 @@ mod tests {
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "..*.");
+    }
+
+    #[test]
+    fn empty_bracket() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let result = ast.to_regex(&Config::default());
+        assert_eq!(result, Err(Error));
     }
 
     // TODO Config
