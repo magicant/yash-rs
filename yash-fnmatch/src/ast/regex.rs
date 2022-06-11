@@ -76,24 +76,31 @@ impl Bracket {
         if self.items.is_empty() {
             return Err(Error);
         }
-        if self.matches_multi_character() {
-            regex.write_str("(?:")?;
-            // let mut first = true;
-            for item in &self.items {
-                // if first {
-                //     first = false;
-                // } else {
-                //     regex.write_char('|')?;
-                // }
-                item.fmt_regex(config, regex)?;
-            }
-            regex.write_char(')')
-        } else {
+        if !self.matches_multi_character() {
             regex.write_char('[')?;
             for item in &self.items {
                 item.fmt_regex(config, regex)?;
             }
             regex.write_char(']')
+        } else {
+            regex.write_str("(?:")?;
+            let mut first = true;
+            for item in &self.items {
+                if first {
+                    first = false;
+                } else {
+                    regex.write_char('|')?;
+                }
+
+                if !item.matches_multi_character() {
+                    regex.write_char('[')?;
+                    item.fmt_regex(config, regex)?;
+                    regex.write_char(']')?;
+                } else {
+                    item.fmt_regex(config, regex)?;
+                }
+            }
+            regex.write_char(')')
         }
     }
 }
@@ -294,6 +301,25 @@ mod tests {
             assert_eq!(regex, format!("[[:{name}:]]"));
         }
     }
+
+    #[test]
+    fn complex_bracket_expression() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![
+                BracketItem::Atom(BracketAtom::CollatingSymbol("ch".to_string())),
+                BracketItem::Atom(BracketAtom::Char('a')),
+                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Space)),
+                BracketItem::Atom(BracketAtom::EquivalenceClass("ij".to_string())),
+            ],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let regex = ast.to_regex(&Config::default()).unwrap();
+        assert_eq!(regex, "(?:ch|[a]|[[:space:]]|ij)");
+    }
+
+    // TODO complex_bracket_expression_complement
 
     // TODO Config
 }
