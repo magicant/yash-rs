@@ -162,13 +162,16 @@ impl Bracket {
             items: Vec::new(),
         };
         while let Some(pc) = i.next() {
-            // TODO Check PatternChar type
-            match pc.char_value() {
-                ']' if !bracket.items.is_empty() => return Ok(Some((bracket, i))),
-                '!' | '^' if !bracket.complement && bracket.items.is_empty() => {
+            match pc {
+                PatternChar::Normal(']') if !bracket.items.is_empty() => {
+                    return Ok(Some((bracket, i)))
+                }
+                PatternChar::Normal('!' | '^')
+                    if !bracket.complement && bracket.items.is_empty() =>
+                {
                     bracket.complement = true
                 }
-                '[' => {
+                PatternChar::Normal('[') => {
                     if let Some((atom, j)) = BracketAtom::parse_inner(i.clone())? {
                         bracket.items.push(atom.into());
                         i = j;
@@ -176,7 +179,7 @@ impl Bracket {
                         bracket.items.push(Atom(Char('[')));
                     }
                 }
-                c => bracket.items.push(Atom(Char(c))),
+                c => bracket.items.push(Atom(Char(c.char_value()))),
             }
             make_range(&mut bracket.items);
         }
@@ -316,6 +319,12 @@ mod tests {
     #[test]
     fn escaped_bracket_expression() {
         let ast = Ast::new(with_escape(r"\[a]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [Atom::Char('['), Atom::Char('a'), Atom::Char(']')]
+        );
+
+        let ast = Ast::new(with_escape(r"[a\]")).unwrap();
         assert_eq!(
             ast.atoms,
             [Atom::Char('['), Atom::Char('a'), Atom::Char(']')]
@@ -674,6 +683,27 @@ mod tests {
                         ..=BracketAtom::EquivalenceClass("x".to_string())
                 )]
             })]
+        );
+    }
+
+    #[test]
+    fn escapes_in_bracket_expression() {
+        let ast = Ast::new(with_escape(r"[\!\[.a.]]")).unwrap();
+        assert_eq!(
+            ast.atoms,
+            [
+                Atom::Bracket(Bracket {
+                    complement: false,
+                    items: vec![
+                        BracketItem::Atom(BracketAtom::Char('!')),
+                        BracketItem::Atom(BracketAtom::Char('[')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                        BracketItem::Atom(BracketAtom::Char('a')),
+                        BracketItem::Atom(BracketAtom::Char('.')),
+                    ]
+                }),
+                Atom::Char(']')
+            ]
         );
     }
 
