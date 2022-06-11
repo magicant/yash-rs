@@ -13,8 +13,32 @@ use std::ops::RangeInclusive;
 pub enum BracketAtom {
     /// Literal character
     Char(char),
+}
+
+impl From<char> for BracketAtom {
+    fn from(c: char) -> Self {
+        BracketAtom::Char(c)
+    }
+}
+
+/// Bracket expression component
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BracketItem {
+    /// Atom
+    Atom(BracketAtom),
     /// Character range
-    Range(RangeInclusive<char>),
+    Range(RangeInclusive<BracketAtom>),
+}
+
+impl<T: Into<BracketAtom>> From<T> for BracketItem {
+    fn from(value: T) -> Self {
+        BracketItem::Atom(value.into())
+    }
+}
+impl From<RangeInclusive<BracketAtom>> for BracketItem {
+    fn from(range: RangeInclusive<BracketAtom>) -> Self {
+        BracketItem::Range(range)
+    }
 }
 
 /// Bracket expression
@@ -27,7 +51,7 @@ pub struct Bracket {
     pub complement: bool,
 
     /// Content of the bracket expression
-    pub atoms: Vec<BracketAtom>,
+    pub items: Vec<BracketItem>,
 }
 
 impl Bracket {
@@ -35,29 +59,32 @@ impl Bracket {
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
+        use BracketAtom::*;
+        use BracketItem::*;
+
         let mut bracket = Bracket {
             complement: false,
-            atoms: Vec::new(),
+            items: Vec::new(),
         };
         while let Some(pc) = i.next() {
             // TODO Check PatternChar type
             match pc.char_value() {
-                ']' if !bracket.atoms.is_empty() => return Ok(Some((bracket, i))),
-                '!' | '^' if !bracket.complement && bracket.atoms.is_empty() => {
+                ']' if !bracket.items.is_empty() => return Ok(Some((bracket, i))),
+                '!' | '^' if !bracket.complement && bracket.items.is_empty() => {
                     bracket.complement = true
                 }
-                c => match (bracket.atoms.pop(), bracket.atoms.pop()) {
-                    (Some(BracketAtom::Char('-')), Some(BracketAtom::Char(start))) => {
-                        bracket.atoms.push(BracketAtom::Range(start..=c));
+                c => match (bracket.items.pop(), bracket.items.pop()) {
+                    (Some(Atom(Char('-'))), Some(Atom(start))) => {
+                        bracket.items.push(Range(start..=Char(c)));
                     }
                     (last_1, last_2) => {
                         if let Some(last_2) = last_2 {
-                            bracket.atoms.push(last_2);
+                            bracket.items.push(last_2);
                         }
                         if let Some(last_1) = last_1 {
-                            bracket.atoms.push(last_1);
+                            bracket.items.push(last_1);
                         }
-                        bracket.atoms.push(BracketAtom::Char(c));
+                        bracket.items.push(Atom(Char(c)));
                     }
                 },
             }
@@ -197,7 +224,7 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Char('a')]
+                items: vec![BracketItem::Atom(BracketAtom::Char('a'))]
             })]
         );
     }
@@ -209,10 +236,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![
-                    BracketAtom::Char('x'),
-                    BracketAtom::Char('y'),
-                    BracketAtom::Char('z'),
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('x')),
+                    BracketItem::Atom(BracketAtom::Char('y')),
+                    BracketItem::Atom(BracketAtom::Char('z')),
                 ]
             })]
         );
@@ -225,10 +252,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![
-                    BracketAtom::Char(']'),
-                    BracketAtom::Char('a'),
-                    BracketAtom::Char('['),
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char(']')),
+                    BracketItem::Atom(BracketAtom::Char('a')),
+                    BracketItem::Atom(BracketAtom::Char('[')),
                 ]
             })]
         );
@@ -241,7 +268,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char('1'), BracketAtom::Char('2')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('1')),
+                    BracketItem::Atom(BracketAtom::Char('2')),
+                ]
             })]
         );
     }
@@ -253,10 +283,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![
-                    BracketAtom::Char('1'),
-                    BracketAtom::Char('2'),
-                    BracketAtom::Char('!'),
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('1')),
+                    BracketItem::Atom(BracketAtom::Char('2')),
+                    BracketItem::Atom(BracketAtom::Char('!')),
                 ]
             })]
         );
@@ -269,7 +299,7 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char('!')]
+                items: vec![BracketItem::Atom(BracketAtom::Char('!'))]
             })]
         );
     }
@@ -281,7 +311,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char('3'), BracketAtom::Char('4')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('3')),
+                    BracketItem::Atom(BracketAtom::Char('4')),
+                ]
             })]
         );
 
@@ -290,7 +323,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char(']'), BracketAtom::Char('a')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char(']')),
+                    BracketItem::Atom(BracketAtom::Char('a')),
+                ]
             })]
         );
 
@@ -299,7 +335,7 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char('^')]
+                items: vec![BracketItem::Atom(BracketAtom::Char('^'))]
             })]
         );
     }
@@ -311,7 +347,9 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Range('a'..='z')]
+                items: vec![BracketItem::Range(
+                    BracketAtom::Char('a')..=BracketAtom::Char('z')
+                )]
             })]
         );
     }
@@ -323,7 +361,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Char('-'), BracketAtom::Char('a')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('-')),
+                    BracketItem::Atom(BracketAtom::Char('a')),
+                ]
             })]
         );
 
@@ -332,7 +373,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: true,
-                atoms: vec![BracketAtom::Char('-'), BracketAtom::Char('b')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('-')),
+                    BracketItem::Atom(BracketAtom::Char('b')),
+                ]
             })]
         );
     }
@@ -344,7 +388,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Char('5'), BracketAtom::Char('-')]
+                items: vec![
+                    BracketItem::Atom(BracketAtom::Char('5')),
+                    BracketItem::Atom(BracketAtom::Char('-')),
+                ]
             })]
         );
     }
@@ -356,10 +403,10 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![
-                    BracketAtom::Range('2'..='4'),
-                    BracketAtom::Char('-'),
-                    BracketAtom::Range('6'..='8'),
+                items: vec![
+                    BracketItem::Range(BracketAtom::Char('2')..=BracketAtom::Char('4')),
+                    BracketItem::Atom(BracketAtom::Char('-')),
+                    BracketItem::Range(BracketAtom::Char('6')..=BracketAtom::Char('8')),
                 ]
             })]
         );
@@ -372,7 +419,9 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Range('-'..='0')]
+                items: vec![BracketItem::Range(
+                    BracketAtom::Char('-')..=BracketAtom::Char('0')
+                )]
             })]
         );
     }
@@ -384,12 +433,20 @@ mod tests {
             ast.atoms,
             [Atom::Bracket(Bracket {
                 complement: false,
-                atoms: vec![BracketAtom::Range('+'..='-')]
+                items: vec![BracketItem::Range(
+                    BracketAtom::Char('+')..=BracketAtom::Char('-')
+                )]
             })]
         );
     }
 
-    // TODO single_character_collating_symbol
+    #[test]
+    #[ignore] // TODO
+    fn single_character_collating_symbol() {
+        let ast = Ast::new(without_escape("[[.a.]]")).unwrap();
+        unimplemented!();
+    }
+
     // TODO multi_character_collating_symbol
     // TODO single_character_equivalence_class
     // TODO multi_character_equivalence_class
