@@ -11,10 +11,11 @@ use std::fmt::Write;
 type Result = std::result::Result<(), Error>;
 
 const SPECIAL_CHARS: &str = r"\.+*?()|[]{}^$";
+const BRACKET_SPECIAL_CHARS: &str = "-&~";
 
 impl BracketAtom {
     fn fmt_regex_char(c: char, regex: &mut dyn Write) -> Result {
-        if c == '-' || SPECIAL_CHARS.contains(c) {
+        if BRACKET_SPECIAL_CHARS.contains(c) || SPECIAL_CHARS.contains(c) {
             regex.write_char('\\').unwrap();
         }
         regex.write_char(c).unwrap();
@@ -244,14 +245,14 @@ mod tests {
             complement: false,
             items: SPECIAL_CHARS
                 .chars()
-                .chain(std::iter::once('-'))
+                .chain(BRACKET_SPECIAL_CHARS.chars())
                 .map(|c| BracketItem::Atom(BracketAtom::Char(c)))
                 .collect(),
         };
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
-        assert_eq!(regex, r"[\\\.\+\*\?\(\)\|\[\]\{\}\^\$\-]");
+        assert_eq!(regex, r"[\\\.\+\*\?\(\)\|\[\]\{\}\^\$\-\&\~]");
     }
 
     #[test]
