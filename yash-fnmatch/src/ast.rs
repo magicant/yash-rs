@@ -91,12 +91,24 @@ impl Ast {
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let mut atoms = Vec::new();
-        let mut i = pattern.into_iter();
-        while let Some((atom, j)) = Atom::parse(i)? {
-            atoms.push(atom);
-            i = j;
+        fn inner<I>(mut i: I) -> Result<Ast, Error>
+        where
+            I: Iterator<Item = PatternChar> + Clone,
+        {
+            let mut atoms = Vec::new();
+            while let Some((atom, j)) = Atom::parse(i)? {
+                atoms.push(atom);
+                i = j;
+            }
+            Ok(Ast { atoms })
         }
-        Ok(Ast { atoms })
+
+        inner(pattern.into_iter())
+    }
+
+    /// Tests whether this pattern is completely literal.
+    #[must_use]
+    pub fn is_literal(&self) -> bool {
+        self.atoms.iter().all(|atom| matches!(atom, Atom::Char(_)))
     }
 }

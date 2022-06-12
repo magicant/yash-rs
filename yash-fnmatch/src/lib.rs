@@ -31,7 +31,8 @@
 pub mod ast;
 mod char_iter;
 
-pub use char_iter::*;
+use self::ast::Ast;
+pub use self::char_iter::*;
 use regex::bytes::Regex;
 use regex_syntax::ast::ClassAsciiKind;
 use std::ops::Range;
@@ -120,164 +121,6 @@ enum Body {
     Regex(Regex),
 }
 
-impl Body {
-    /// Parses a pattern into a body.
-    fn new<I>(pattern: I, _config: Config) -> Result<Self, Error>
-    where
-        I: Iterator<Item = PatternChar> + Clone,
-    {
-        /// Parses an inner bracket expression (except the initial '[').
-        ///
-        /// This function parses a collating symbol, equivalence class, or
-        /// character class.
-        ///
-        /// If successful, returns an iterator that yields characters following
-        /// the closing bracket. Returns `None` and leaves `regex` broken if
-        /// the inner bracket expression is not valid.
-        fn inner_bracket<I>(mut pattern: I, regex: &mut String) -> Result<Option<I>, Error>
-        where
-            I: Iterator<Item = PatternChar>,
-        {
-            match pattern.next() {
-                Some(PatternChar::Normal('.')) => {
-                    while let Some(pc) = pattern.next() {
-                        regex.push(pc.char_value());
-                        if regex.ends_with(".]") {
-                            regex.truncate(regex.len() - 2);
-                            return Ok(Some(pattern));
-                        }
-                    }
-                    Ok(None)
-                }
-                Some(PatternChar::Normal('=')) => {
-                    while let Some(pc) = pattern.next() {
-                        regex.push(pc.char_value());
-                        if regex.ends_with("=]") {
-                            regex.truncate(regex.len() - 2);
-                            return Ok(Some(pattern));
-                        }
-                    }
-                    Ok(None)
-                }
-                Some(PatternChar::Normal(':')) => {
-                    regex.push_str("[:");
-                    let old_len = regex.len();
-                    while let Some(pc) = pattern.next() {
-                        regex.push(pc.char_value());
-                        if regex.len() - old_len >= 2 && regex.ends_with(":]") {
-                            let name = &regex[old_len..regex.len() - 2];
-                            return if ClassAsciiKind::from_name(name).is_some() {
-                                Ok(Some(pattern))
-                            } else {
-                                Err(Error::UndefinedCharClass(name.to_string()))
-                            };
-                        }
-                    }
-                    Ok(None)
-                }
-                _ => Ok(None),
-            }
-        }
-
-        /// Parses a bracket expression (except the initial '[').
-        ///
-        /// If successful, returns an iterator that yields characters following
-        /// the bracket expression. Returns `None` and leaves `regex` broken if
-        /// the bracket expression is not closed.
-        fn bracket<I>(mut pattern: I, regex: &mut String) -> Result<Option<I>, Error>
-        where
-            I: Iterator<Item = PatternChar> + Clone,
-        {
-            let mut empty = true;
-            let mut complement = false;
-            while let Some(pc) = pattern.next() {
-                // TODO Treat PatternChar::Literal
-                match pc.char_value() {
-                    ']' if !empty => {
-                        regex.push(']');
-                        return Ok(Some(pattern));
-                    }
-                    '[' => {
-                        let old_len = regex.len();
-                        if let Some(i) = inner_bracket(pattern.clone(), regex)? {
-                            pattern = i;
-                        } else {
-                            regex.truncate(old_len);
-                            regex.push('\\');
-                            regex.push('[');
-                        }
-                        empty = false;
-                    }
-                    c @ (']' | '&' | '~') => {
-                        regex.push('\\');
-                        regex.push(c);
-                        // TODO empty = false;
-                    }
-                    '!' if empty && !complement => {
-                        regex.push('^');
-                        complement = true;
-                    }
-                    '-' => {
-                        let mut last = regex.chars();
-                        if empty || last.next_back() == Some('-') && last.next_back() != Some('\\')
-                        {
-                            regex.push('\\');
-                        }
-                        regex.push('-');
-                        empty = false;
-                    }
-                    c => {
-                        regex.push(c);
-                        empty = false;
-                    }
-                }
-            }
-            Ok(None)
-        }
-
-        // TODO multiline option
-        let mut literal = true;
-        let mut regex = String::new();
-        let mut i = pattern.clone();
-        while let Some(pc) = i.next() {
-            match pc.char_value() {
-                '?' => {
-                    literal = false;
-                    regex.push('.');
-                }
-                '*' => {
-                    literal = false;
-                    regex.push_str(".*");
-                }
-                '[' => {
-                    let old_len = regex.len();
-                    regex.push('[');
-                    if let Some(j) = bracket(i.clone(), &mut regex)? {
-                        i = j;
-                        literal = false;
-                    } else {
-                        regex.truncate(old_len);
-                        regex.push('\\');
-                        regex.push('[');
-                    }
-                }
-                c => regex.push(c),
-            }
-        }
-
-        if literal {
-            // let chars = pattern.map(PatternChar::char_value).collect();
-            // Reuse the capacity of `regex`
-            let mut chars = regex;
-            chars.clear();
-            chars.extend(pattern.map(PatternChar::char_value));
-            Ok(Body::Literal(chars))
-        } else {
-            Ok(Body::Regex(Regex::new(&regex)?))
-        }
-    }
-}
-
 /// Compiled globbing pattern
 #[derive(Clone, Debug)]
 #[must_use = "creating a pattern without doing pattern matching is nonsense"]
@@ -306,8 +149,21 @@ impl Pattern {
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        let body = Body::new(pattern.into_iter(), config)?;
-        Ok(Pattern { body, config })
+        fn inner<I>(i: I, config: Config) -> Result<Pattern, Error>
+        where
+            I: Iterator<Item = PatternChar> + Clone,
+        {
+            let ast = Ast::new(i.clone())?;
+            let body = if ast.is_literal() {
+                Body::Literal(i.map(PatternChar::char_value).collect())
+            } else {
+                let regex_pattern = ast.to_regex(&config)?;
+                Body::Regex(Regex::new(&regex_pattern)?)
+            };
+            Ok(Pattern { body, config })
+        }
+
+        inner(pattern.into_iter(), config)
     }
 
     /// Returns the configuration for this pattern.
