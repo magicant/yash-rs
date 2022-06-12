@@ -74,16 +74,36 @@ pub struct Config {
 }
 
 /// Error that may happen in building a pattern.
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
-    /// Character class with an undefined name.
+    /// Empty bracket expression
+    ///
+    /// This error should not occur in any pattern that was parsed from a
+    /// string. It may happen only when converting a hand-crafted AST to a
+    /// regular expression.
+    #[error("empty bracket expression")]
+    EmptyBracket,
+
+    /// Empty collating symbol or equivalence class
+    #[error("empty collating symbol")]
+    EmptyCollatingSymbol,
+
+    /// Character class with an undefined name
     ///
     /// The associated value is the name that caused the error.
     /// For example, the pattern `[[:nothing:]]` will produce
     /// `Error::UndefinedCharacterClass("nothing".to_string())`.
     #[error("undefined character class [:{0}:]")]
     UndefinedCharacterClass(String),
+
+    /// Character class used as a range bound
+    ///
+    /// The associated value is the name that caused the error.
+    /// For example, the pattern `[[:digit:]-0]` will produce
+    /// `Error::CharacterClassInRange(ClassAsciiKind::Digit)`.
+    #[error("character class {0:?} used as range bound")]
+    CharacterClassInRange(ClassAsciiKind),
 
     /// Error in underlying regular expression processing
     #[error(transparent)]
