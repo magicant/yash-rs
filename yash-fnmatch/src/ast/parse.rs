@@ -56,7 +56,7 @@ impl BracketAtom {
                         return if let Some(class) = ClassAsciiKind::from_name(&name) {
                             Ok(Some((BracketAtom::CharClass(class), i)))
                         } else {
-                            Err(Error::UndefinedCharacterClass(name))
+                            Err(Error::UndefinedCharClass(name))
                         };
                     }
                 }
@@ -689,7 +689,7 @@ mod tests {
     #[test]
     fn undefined_character_class() {
         let e = Ast::new(without_escape("[[:foo_bar:]]")).unwrap_err();
-        assert_matches!(e, Error::UndefinedCharacterClass(name) if name == "foo_bar");
+        assert_matches!(e, Error::UndefinedCharClass(name) if name == "foo_bar");
     }
 
     #[test]

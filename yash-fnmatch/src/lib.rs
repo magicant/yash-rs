@@ -93,17 +93,17 @@ pub enum Error {
     ///
     /// The associated value is the name that caused the error.
     /// For example, the pattern `[[:nothing:]]` will produce
-    /// `Error::UndefinedCharacterClass("nothing".to_string())`.
+    /// `Error::UndefinedCharClass("nothing".to_string())`.
     #[error("undefined character class [:{0}:]")]
-    UndefinedCharacterClass(String),
+    UndefinedCharClass(String),
 
     /// Character class used as a range bound
     ///
     /// The associated value is the name that caused the error.
     /// For example, the pattern `[[:digit:]-0]` will produce
-    /// `Error::CharacterClassInRange(ClassAsciiKind::Digit)`.
+    /// `Error::CharClassInRange(ClassAsciiKind::Digit)`.
     #[error("character class {0:?} used as range bound")]
-    CharacterClassInRange(ClassAsciiKind),
+    CharClassInRange(ClassAsciiKind),
 
     /// Error in underlying regular expression processing
     #[error(transparent)]
@@ -169,7 +169,7 @@ impl Body {
                             return if ClassAsciiKind::from_name(name).is_some() {
                                 Ok(Some(pattern))
                             } else {
-                                Err(Error::UndefinedCharacterClass(name.to_string()))
+                                Err(Error::UndefinedCharClass(name.to_string()))
                             };
                         }
                     }
@@ -937,7 +937,7 @@ mod tests {
     #[test]
     fn undefined_character_class() {
         let e = Pattern::new(without_escape("[[:foo_bar:]]")).unwrap_err();
-        assert_matches!(e, Error::UndefinedCharacterClass(name) if name == "foo_bar");
+        assert_matches!(e, Error::UndefinedCharClass(name) if name == "foo_bar");
     }
 
     // TODO Combinations of inner bracket expressions

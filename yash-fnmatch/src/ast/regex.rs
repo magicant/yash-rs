@@ -62,7 +62,7 @@ impl BracketAtom {
                 let c = value.chars().next().ok_or(Error::EmptyCollatingSymbol)?;
                 BracketAtom::fmt_regex_char(c, regex)
             }
-            BracketAtom::CharClass(name) => Err(Error::CharacterClassInRange(name.clone())),
+            BracketAtom::CharClass(name) => Err(Error::CharClassInRange(name.clone())),
         }
     }
 }
@@ -317,10 +317,7 @@ mod tests {
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let result = ast.to_regex(&Config::default());
-        assert_eq!(
-            result,
-            Err(Error::CharacterClassInRange(ClassAsciiKind::Graph))
-        );
+        assert_eq!(result, Err(Error::CharClassInRange(ClassAsciiKind::Graph)));
 
         let bracket = Bracket {
             complement: false,
@@ -331,10 +328,7 @@ mod tests {
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let result = ast.to_regex(&Config::default());
-        assert_eq!(
-            result,
-            Err(Error::CharacterClassInRange(ClassAsciiKind::Print))
-        );
+        assert_eq!(result, Err(Error::CharClassInRange(ClassAsciiKind::Print)));
     }
 
     #[test]
