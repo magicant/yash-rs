@@ -40,18 +40,19 @@ use thiserror::Error;
 
 /// Configuration for a pattern
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub struct Config {
     /// Whether the pattern matches only at the beginning of text
     ///
     /// For example, the pattern `in` matches the text `begin` iff
     /// `anchor_begin` is `false`.
-    anchor_begin: bool,
+    pub anchor_begin: bool,
 
     /// Whether the pattern matches only at the end of text
     ///
     /// For example, the pattern `mat` matches the text `match` iff `anchor_end`
     /// is `false`.
-    anchor_end: bool,
+    pub anchor_end: bool,
 
     /// Whether a leading period has to be matched explicitly
     ///
@@ -62,16 +63,16 @@ pub struct Config {
     /// the filename `.foo.txt`.
     ///
     /// When `match_period` is `false`, the above restriction does not apply.
-    match_period: bool,
+    pub match_period: bool,
 
     /// Whether the pattern matches shortest part of text
     ///
     /// When matching the pattern `a*a` against the text `banana`, for example,
     /// the shortest match will be `ana` while the longest `anana`.
-    shortest_match: bool,
+    pub shortest_match: bool,
 
     /// Whether the pattern should match case-insensitively
-    case_insensitive: bool,
+    pub case_insensitive: bool,
 }
 
 /// Error that may happen in building a pattern.
@@ -190,7 +191,13 @@ impl Pattern {
     #[must_use]
     pub fn is_match(&self, text: &str) -> bool {
         match &self.body {
-            Body::Literal(s) => text.contains(s),
+            Body::Literal(s) => {
+                if self.config.anchor_begin {
+                    text.starts_with(s)
+                } else {
+                    text.contains(s)
+                }
+            }
             Body::Regex(regex) => regex.is_match(text.as_bytes()),
         }
     }
@@ -198,7 +205,13 @@ impl Pattern {
     #[must_use]
     pub fn find(&self, text: &str) -> Option<Range<usize>> {
         match &self.body {
-            Body::Literal(s) => text.find(s).map(|pos| pos..pos + s.len()),
+            Body::Literal(s) => {
+                if self.config.anchor_begin {
+                    text.starts_with(s).then(|| 0..s.len())
+                } else {
+                    text.find(s).map(|pos| pos..pos + s.len())
+                }
+            }
             Body::Regex(regex) => regex.find(text.as_bytes()).map(|m| m.range()),
         }
     }
@@ -860,6 +873,48 @@ mod tests {
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("*?[a]"), Some(0..5));
         assert_eq!(p.find("aaa"), None);
+    }
+
+    #[test]
+    fn literal_with_anchor_begin() {
+        let config = Config {
+            anchor_begin: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        assert_eq!(p.as_literal(), Some("a"));
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(!p.is_match(".a"));
+        assert!(p.is_match("a."));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find(".a"), None);
+        assert_eq!(p.find("a."), Some(0..1));
+    }
+
+    #[test]
+    fn non_literal_with_anchor_begin() {
+        let config = Config {
+            anchor_begin: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("a?"), config).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("a"));
+        assert!(p.is_match("as"));
+        assert!(p.is_match("apple"));
+        assert!(!p.is_match("bass"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), None);
+        assert_eq!(p.find("as"), Some(0..2));
+        assert_eq!(p.find("apple"), Some(0..2));
+        assert_eq!(p.find("bass"), None);
     }
 
     // TODO Config

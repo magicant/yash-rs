@@ -158,6 +158,10 @@ impl Atom {
 impl Ast {
     /// Writes the AST as a regular expression.
     pub fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
+        if config.anchor_begin {
+            regex.write_str(r"\A").unwrap();
+        }
+
         self.atoms
             .iter()
             .try_for_each(|atom| atom.fmt_regex(config, regex))
@@ -467,6 +471,18 @@ mod tests {
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "[^a[:space:]]");
+    }
+
+    #[test]
+    fn anchor_begin() {
+        let atoms = vec![Atom::Char('a'), Atom::AnyChar];
+        let ast = Ast { atoms };
+        let config = Config {
+            anchor_begin: true,
+            ..Config::default()
+        };
+        let regex = ast.to_regex(&config).unwrap();
+        assert_eq!(regex, r"\Aa.");
     }
 
     // TODO Config
