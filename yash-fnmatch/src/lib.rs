@@ -265,7 +265,15 @@ mod tests {
         assert_eq!(p.find("nit"), None);
     }
 
-    // TODO characters that need escaping when converted to a regex
+    #[test]
+    fn characters_that_needs_escaping() {
+        let p = Pattern::new(without_escape(r".\+()][{}^$-?")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(r".\+()][{}^$-X"), Some(0..13));
+        assert_eq!(p.find(r".\+()][{}^$-Y"), Some(0..13));
+        assert_eq!(p.find(r".\+()][{}^$-"), None);
+    }
 
     #[test]
     fn any_single_character_pattern() {
@@ -407,8 +415,17 @@ mod tests {
         assert_eq!(p.find("~"), Some(0..1));
     }
 
-    // TODO ?, * in bracket expression
-    // TODO characters that need escaping in bracket expression
+    #[test]
+    fn characters_that_needs_escaping_in_bracket_expression() {
+        let p = Pattern::new(without_escape("[.?*-][&|~^][][]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(".&["), Some(0..3));
+        assert_eq!(p.find("?|["), Some(0..3));
+        assert_eq!(p.find("*~]"), Some(0..3));
+        assert_eq!(p.find("-^]"), Some(0..3));
+        assert_eq!(p.find("?&]"), Some(0..3));
+    }
 
     #[test]
     fn brackets_in_bracket_expression() {
@@ -597,7 +614,18 @@ mod tests {
         assert_eq!(p.find("[a]"), Some(1..2));
     }
 
-    // TODO multi_character_collating_symbol
+    #[test]
+    fn multi_character_collating_symbol() {
+        let p = Pattern::new(without_escape("[[.ch.]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("c"), None);
+        assert_eq!(p.find("h"), None);
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find("ch"), Some(0..2));
+        assert_eq!(p.find("[ch]"), Some(1..3));
+    }
 
     #[test]
     fn single_character_equivalence_class() {
@@ -611,7 +639,18 @@ mod tests {
         assert_eq!(p.find("[a]"), Some(1..2));
     }
 
-    // TODO multi_character_equivalence_class
+    #[test]
+    fn multi_character_equivalence_class() {
+        let p = Pattern::new(without_escape("[[=ij=]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("i"), None);
+        assert_eq!(p.find("j"), None);
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find("ij"), Some(0..2));
+        assert_eq!(p.find("[ij]"), Some(1..3));
+    }
 
     #[test]
     fn character_class_alnum() {
@@ -796,8 +835,32 @@ mod tests {
         assert_matches!(e, Error::UndefinedCharClass(name) if name == "foo_bar");
     }
 
-    // TODO Combinations of inner bracket expressions
+    #[test]
+    fn combinations_of_inner_bracket_expressions() {
+        let p = Pattern::new(without_escape("[][.-.]-[=0=][:blank:]]")).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("]"), Some(0..1));
+        assert_eq!(p.find("-"), Some(0..1));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find("/"), Some(0..1));
+        assert_eq!(p.find("0"), Some(0..1));
+        assert_eq!(p.find("1"), None);
+        assert_eq!(p.find(" "), Some(0..1));
+        assert_eq!(p.find("\t"), Some(0..1));
+        assert_eq!(p.find("["), None);
+    }
+
+    #[test]
+    fn escaped_pattern() {
+        let p = Pattern::new(with_escape(r"\*\?\[a]")).unwrap();
+        assert_eq!(p.as_literal(), Some("*?[a]"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("*?[a]"), Some(0..5));
+        assert_eq!(p.find("aaa"), None);
+    }
 
     // TODO Config
-    // TODO PatternChar Normal vs Literal
 }
