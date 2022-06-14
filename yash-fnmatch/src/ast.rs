@@ -111,4 +111,9 @@ impl Ast {
     pub fn is_literal(&self) -> bool {
         self.atoms.iter().all(|atom| matches!(atom, Atom::Char(_)))
     }
+
+    #[must_use]
+    pub fn starts_with_literal_dot(&self) -> bool {
+        self.atoms.first() == Some(&Atom::Char('.'))
+    }
 }

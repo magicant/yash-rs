@@ -56,14 +56,14 @@ pub struct Config {
 
     /// Whether a leading period has to be matched explicitly
     ///
-    /// When `match_period` is `true`, a leading period in the text, if any,
+    /// When `literal_period` is `true`, a leading period in the text, if any,
     /// must be matched by a literal period in the pattern. In other words, a
     /// wildcard pattern (`*` or `?`) or bracket expression (`[...]`) does not
     /// match a leading period. For example, the pattern `*.txt` does not match
     /// the filename `.foo.txt`.
     ///
-    /// When `match_period` is `false`, the above restriction does not apply.
-    pub match_period: bool,
+    /// When `literal_period` is `false`, the above restriction does not apply.
+    pub literal_period: bool,
 
     /// Whether the pattern matches shortest part of text
     ///
@@ -119,7 +119,10 @@ enum Body {
     /// Literal string pattern
     Literal(String),
     /// Compiled regular expression
-    Regex(Regex),
+    Regex {
+        regex: Regex,
+        starts_with_literal_dot: bool,
+    },
 }
 
 /// Compiled globbing pattern
@@ -158,8 +161,10 @@ impl Pattern {
             let body = if ast.is_literal() {
                 Body::Literal(i.map(PatternChar::char_value).collect())
             } else {
-                let regex_pattern = ast.to_regex(&config)?;
-                Body::Regex(Regex::new(&regex_pattern)?)
+                Body::Regex {
+                    regex: Regex::new(&ast.to_regex(&config)?)?,
+                    starts_with_literal_dot: ast.starts_with_literal_dot(),
+                }
             };
             Ok(Pattern { body, config })
         }
@@ -183,7 +188,7 @@ impl Pattern {
     pub fn as_literal(&self) -> Option<&str> {
         match &self.body {
             Body::Literal(s) => Some(s),
-            Body::Regex(_) => None,
+            Body::Regex { .. } => None,
         }
     }
 
@@ -197,7 +202,15 @@ impl Pattern {
                 (false, true) => text.ends_with(s),
                 (true, true) => text == s,
             },
-            Body::Regex(regex) => regex.is_match(text.as_bytes()),
+            Body::Regex {
+                regex,
+                starts_with_literal_dot,
+            } => {
+                let reject_initial_dot =
+                    self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
+                let at_index = if reject_initial_dot { 1 } else { 0 };
+                regex.is_match_at(text.as_bytes(), at_index)
+            }
         }
     }
 
@@ -210,7 +223,15 @@ impl Pattern {
                 (false, true) => text.ends_with(s).then(|| text.len() - s.len()..text.len()),
                 (true, true) => (text == s).then(|| 0..s.len()),
             },
-            Body::Regex(regex) => regex.find(text.as_bytes()).map(|m| m.range()),
+            Body::Regex {
+                regex,
+                starts_with_literal_dot,
+            } => {
+                let reject_initial_dot =
+                    self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
+                let at_index = if reject_initial_dot { 1 } else { 0 };
+                regex.find_at(text.as_bytes(), at_index).map(|m| m.range())
+            }
         }
     }
 }
@@ -995,6 +1016,79 @@ mod tests {
         assert_eq!(p.find("in"), None);
         assert_eq!(p.find("out"), Some(0..3));
         assert_eq!(p.find("from"), None);
+    }
+
+    #[test]
+    fn initial_period_with_literal_period() {
+        let config = Config {
+            literal_period: true,
+            ..Config::default()
+        };
+
+        let p = Pattern::with_config(without_escape("?"), config).unwrap();
+        assert!(!p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find(".."), Some(1..2));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape("*"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), Some(1..1));
+        assert_eq!(p.find(".."), Some(1..2));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape("[.a]"), config).unwrap();
+        assert!(!p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), None);
+        assert_eq!(p.find(".."), Some(1..2));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape(".*"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find(".."), Some(0..2));
+    }
+
+    #[test]
+    fn initial_period_without_literal_period() {
+        let config = Config::default();
+
+        let p = Pattern::with_config(without_escape("?"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find(".."), Some(0..1));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape("*"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find(".."), Some(0..2));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape("[.a]"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert!(p.is_match("a"));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find(".."), Some(0..1));
+        assert_eq!(p.find("a"), Some(0..1));
+
+        let p = Pattern::with_config(without_escape(".*"), config).unwrap();
+        assert!(p.is_match("."));
+        assert!(p.is_match(".."));
+        assert_eq!(p.find("."), Some(0..1));
+        assert_eq!(p.find(".."), Some(0..2));
     }
 
     // TODO other config
