@@ -191,15 +191,12 @@ impl Pattern {
     #[must_use]
     pub fn is_match(&self, text: &str) -> bool {
         match &self.body {
-            Body::Literal(s) => {
-                if self.config.anchor_begin {
-                    text.starts_with(s)
-                } else if self.config.anchor_end {
-                    text.ends_with(s)
-                } else {
-                    text.contains(s)
-                }
-            }
+            Body::Literal(s) => match (self.config.anchor_begin, self.config.anchor_end) {
+                (false, false) => text.contains(s),
+                (true, false) => text.starts_with(s),
+                (false, true) => text.ends_with(s),
+                (true, true) => text == s,
+            },
             Body::Regex(regex) => regex.is_match(text.as_bytes()),
         }
     }
@@ -207,15 +204,12 @@ impl Pattern {
     #[must_use]
     pub fn find(&self, text: &str) -> Option<Range<usize>> {
         match &self.body {
-            Body::Literal(s) => {
-                if self.config.anchor_begin {
-                    text.starts_with(s).then(|| 0..s.len())
-                } else if self.config.anchor_end {
-                    text.ends_with(s).then(|| text.len() - s.len()..text.len())
-                } else {
-                    text.find(s).map(|pos| pos..pos + s.len())
-                }
-            }
+            Body::Literal(s) => match (self.config.anchor_begin, self.config.anchor_end) {
+                (false, false) => text.find(s).map(|pos| pos..pos + s.len()),
+                (true, false) => text.starts_with(s).then(|| 0..s.len()),
+                (false, true) => text.ends_with(s).then(|| text.len() - s.len()..text.len()),
+                (true, true) => (text == s).then(|| 0..s.len()),
+            },
             Body::Regex(regex) => regex.find(text.as_bytes()).map(|m| m.range()),
         }
     }
@@ -963,6 +957,45 @@ mod tests {
         assert_eq!(p.find("beginning"), None);
     }
 
-    // TODO anchor both
+    #[test]
+    fn literal_with_anchor_both() {
+        let config = Config {
+            anchor_begin: true,
+            anchor_end: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        assert_eq!(p.as_literal(), Some("a"));
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(!p.is_match("..a"));
+        assert!(!p.is_match("a.."));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("..a"), None);
+        assert_eq!(p.find("a.."), None);
+    }
+
+    #[test]
+    fn non_literal_with_anchor_both() {
+        let config = Config {
+            anchor_begin: true,
+            anchor_end: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("???"), config).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match("in"));
+        assert!(p.is_match("out"));
+        assert!(!p.is_match("from"));
+
+        assert_eq!(p.find("in"), None);
+        assert_eq!(p.find("out"), Some(0..3));
+        assert_eq!(p.find("from"), None);
+    }
+
     // TODO other config
 }

@@ -503,6 +503,18 @@ mod tests {
         assert_eq!(regex, r"a.\z");
     }
 
-    // TODO anchor both
+    #[test]
+    fn anchor_both() {
+        let atoms = vec![Atom::Char('1'), Atom::AnyChar, Atom::Char('9')];
+        let ast = Ast { atoms };
+        let config = Config {
+            anchor_begin: true,
+            anchor_end: true,
+            ..Config::default()
+        };
+        let regex = ast.to_regex(&config).unwrap();
+        assert_eq!(regex, r"\A1.9\z");
+    }
+
     // TODO other config
 }
