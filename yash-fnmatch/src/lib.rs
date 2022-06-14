@@ -194,6 +194,8 @@ impl Pattern {
             Body::Literal(s) => {
                 if self.config.anchor_begin {
                     text.starts_with(s)
+                } else if self.config.anchor_end {
+                    text.ends_with(s)
                 } else {
                     text.contains(s)
                 }
@@ -208,6 +210,8 @@ impl Pattern {
             Body::Literal(s) => {
                 if self.config.anchor_begin {
                     text.starts_with(s).then(|| 0..s.len())
+                } else if self.config.anchor_end {
+                    text.ends_with(s).then(|| text.len() - s.len()..text.len())
                 } else {
                     text.find(s).map(|pos| pos..pos + s.len())
                 }
@@ -917,5 +921,48 @@ mod tests {
         assert_eq!(p.find("bass"), None);
     }
 
-    // TODO Config
+    #[test]
+    fn literal_with_anchor_end() {
+        let config = Config {
+            anchor_end: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        assert_eq!(p.as_literal(), Some("a"));
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a"));
+        assert!(p.is_match("..a"));
+        assert!(!p.is_match("a.."));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.find("..a"), Some(2..3));
+        assert_eq!(p.find("a.."), None);
+    }
+
+    #[test]
+    fn non_literal_with_anchor_end() {
+        let config = Config {
+            anchor_end: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("?n"), config).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(!p.is_match("n"));
+        assert!(p.is_match("in"));
+        assert!(p.is_match("begin"));
+        assert!(!p.is_match("beginning"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("n"), None);
+        assert_eq!(p.find("in"), Some(0..2));
+        assert_eq!(p.find("begin"), Some(3..5));
+        assert_eq!(p.find("beginning"), None);
+    }
+
+    // TODO anchor both
+    // TODO other config
 }

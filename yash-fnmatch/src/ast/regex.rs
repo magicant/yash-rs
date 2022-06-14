@@ -164,7 +164,13 @@ impl Ast {
 
         self.atoms
             .iter()
-            .try_for_each(|atom| atom.fmt_regex(config, regex))
+            .try_for_each(|atom| atom.fmt_regex(config, regex))?;
+
+        if config.anchor_end {
+            regex.write_str(r"\z").unwrap();
+        }
+
+        Ok(())
     }
 
     /// Converts the AST to a regular expression.
@@ -485,5 +491,18 @@ mod tests {
         assert_eq!(regex, r"\Aa.");
     }
 
-    // TODO Config
+    #[test]
+    fn anchor_end() {
+        let atoms = vec![Atom::Char('a'), Atom::AnyChar];
+        let ast = Ast { atoms };
+        let config = Config {
+            anchor_end: true,
+            ..Config::default()
+        };
+        let regex = ast.to_regex(&config).unwrap();
+        assert_eq!(regex, r"a.\z");
+    }
+
+    // TODO anchor both
+    // TODO other config
 }
