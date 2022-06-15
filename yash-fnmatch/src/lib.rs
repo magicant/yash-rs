@@ -167,10 +167,10 @@ impl Pattern {
             let body = if ast.is_literal() {
                 Body::Literal(i.map(PatternChar::char_value).collect())
             } else {
-                // TODO multiline mode
                 Body::Regex {
                     regex: RegexBuilder::new(&ast.to_regex(&config)?)
                         .case_insensitive(config.case_insensitive)
+                        .dot_matches_new_line(true)
                         .swap_greed(config.shortest_match)
                         .build()?,
                     starts_with_literal_dot: ast.starts_with_literal_dot(),
@@ -315,6 +315,17 @@ mod tests {
         assert_eq!(p.find(r".\+()][{}^$-X"), Some(0..13));
         assert_eq!(p.find(r".\+()][{}^$-Y"), Some(0..13));
         assert_eq!(p.find(r".\+()][{}^$-"), None);
+    }
+
+    #[test]
+    fn matching_newline() {
+        let p = Pattern::new(without_escape("a\nb")).unwrap();
+        assert_eq!(p.as_literal(), Some("a\nb"));
+        assert_eq!(p.find("a\nb"), Some(0..3));
+
+        let p = Pattern::new(without_escape("a?b")).unwrap();
+        assert_eq!(p.as_literal(), None);
+        assert_eq!(p.find("a\nb"), Some(0..3));
     }
 
     #[test]
