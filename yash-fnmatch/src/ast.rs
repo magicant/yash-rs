@@ -22,6 +22,7 @@ pub enum BracketAtom {
     EquivalenceClass(String),
     /// Character class (`[:digit:]`)
     CharClass(ClassAsciiKind),
+    // TODO Avoid exposing the type from the external crate regex_syntax
 }
 
 impl From<char> for BracketAtom {

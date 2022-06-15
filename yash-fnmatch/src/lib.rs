@@ -34,6 +34,7 @@ mod char_iter;
 use self::ast::Ast;
 pub use self::char_iter::*;
 use regex::bytes::Regex;
+use regex::bytes::RegexBuilder;
 use regex_syntax::ast::ClassAsciiKind;
 use std::ops::Range;
 use thiserror::Error;
@@ -161,8 +162,11 @@ impl Pattern {
             let body = if ast.is_literal() {
                 Body::Literal(i.map(PatternChar::char_value).collect())
             } else {
+                // TODO multiline mode
                 Body::Regex {
-                    regex: Regex::new(&ast.to_regex(&config)?)?,
+                    regex: RegexBuilder::new(&ast.to_regex(&config)?)
+                        .swap_greed(config.shortest_match)
+                        .build()?,
                     starts_with_literal_dot: ast.starts_with_literal_dot(),
                 }
             };
@@ -1089,6 +1093,25 @@ mod tests {
         assert!(p.is_match(".."));
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..2));
+    }
+
+    #[test]
+    fn non_literal_with_shortest_match() {
+        let p = Pattern::with_config(without_escape("1*9"), Config::default()).unwrap();
+        assert!(p.is_match("19"));
+        assert!(p.is_match("1999"));
+        assert_eq!(p.find("19"), Some(0..2));
+        assert_eq!(p.find("1999"), Some(0..4));
+
+        let config = Config {
+            shortest_match: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("1*9"), config).unwrap();
+        assert!(p.is_match("19"));
+        assert!(p.is_match("1999"));
+        assert_eq!(p.find("19"), Some(0..2));
+        assert_eq!(p.find("1999"), Some(0..2));
     }
 
     // TODO other config

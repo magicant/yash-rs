@@ -157,6 +157,9 @@ impl Atom {
 
 impl Ast {
     /// Writes the AST as a regular expression.
+    ///
+    /// Only the `anchor_begin` and `anchor_end` options in `config` affect the
+    /// results. The other options are ignored.
     pub fn fmt_regex(&self, config: &Config, regex: &mut dyn Write) -> Result {
         if config.anchor_begin {
             regex.write_str(r"\A").unwrap();
@@ -174,6 +177,9 @@ impl Ast {
     }
 
     /// Converts the AST to a regular expression.
+    ///
+    /// Only the `anchor_begin` and `anchor_end` options in `config` affect the
+    /// results. The other options are ignored.
     pub fn to_regex(&self, config: &Config) -> std::result::Result<String, Error> {
         let mut regex = String::new();
         self.fmt_regex(config, &mut regex)?;
