@@ -73,6 +73,11 @@ pub struct Config {
     pub shortest_match: bool,
 
     /// Whether the pattern should match case-insensitively
+    ///
+    /// For patterns that are literal (i.e., [`Pattern::as_literal`] returns
+    /// `Some(literal)`), this flag is ignored.
+    /// For non-literal patterns, the "simple" case folding rules defined by
+    /// Unicode are applied to allow case-insensitive matches.
     pub case_insensitive: bool,
 }
 
@@ -165,6 +170,7 @@ impl Pattern {
                 // TODO multiline mode
                 Body::Regex {
                     regex: RegexBuilder::new(&ast.to_regex(&config)?)
+                        .case_insensitive(config.case_insensitive)
                         .swap_greed(config.shortest_match)
                         .build()?,
                     starts_with_literal_dot: ast.starts_with_literal_dot(),
@@ -1114,5 +1120,23 @@ mod tests {
         assert_eq!(p.find("1999"), Some(0..2));
     }
 
-    // TODO other config
+    #[test]
+    fn non_literal_with_case_insensitive() {
+        let config = Config {
+            case_insensitive: true,
+            ..Config::default()
+        };
+        let p = Pattern::with_config(without_escape("a?z"), config).unwrap();
+        assert_eq!(p.as_literal(), None);
+
+        assert!(!p.is_match(""));
+        assert!(p.is_match("a-z"));
+        assert!(p.is_match("A-Z"));
+        assert!(!p.is_match("b&b"));
+
+        assert_eq!(p.find(""), None);
+        assert_eq!(p.find("a-z"), Some(0..3));
+        assert_eq!(p.find("A-Z"), Some(0..3));
+        assert_eq!(p.find("b&b"), None);
+    }
 }

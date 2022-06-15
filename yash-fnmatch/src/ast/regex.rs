@@ -521,6 +521,4 @@ mod tests {
         let regex = ast.to_regex(&config).unwrap();
         assert_eq!(regex, r"\A1.9\z");
     }
-
-    // TODO other config
 }
