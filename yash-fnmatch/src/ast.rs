@@ -8,7 +8,6 @@ mod regex;
 
 use crate::Error;
 use crate::PatternChar;
-use regex_syntax::ast::ClassAsciiKind;
 use std::ops::RangeInclusive;
 
 /// Bracket expression component
@@ -16,13 +15,12 @@ use std::ops::RangeInclusive;
 pub enum BracketAtom {
     /// Literal character
     Char(char),
-    /// Collating symbol (`[.x.]`)
+    /// Collating symbol (e.g. `[.x.]`)
     CollatingSymbol(String),
-    /// Equivalence Class (`[=x=]`)
+    /// Equivalence Class (e.g. `[=x=]`)
     EquivalenceClass(String),
-    /// Character class (`[:digit:]`)
-    CharClass(ClassAsciiKind),
-    // TODO Avoid exposing the type from the external crate regex_syntax
+    /// Character class (e.g. `[:digit:]`)
+    CharClass(String),
 }
 
 impl From<char> for BracketAtom {

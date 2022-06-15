@@ -6,7 +6,6 @@
 use super::*;
 use crate::Error;
 use crate::PatternChar;
-use regex_syntax::ast::ClassAsciiKind;
 
 impl BracketAtom {
     /// Parses an inner bracket expression (except the initial '[').
@@ -18,6 +17,7 @@ impl BracketAtom {
     /// characters following the closing bracket. Returns `Ok(None)` if the
     /// inner bracket expression is not valid.
     fn parse_inner<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
+    // TODO Just return Option
     where
         I: Iterator<Item = PatternChar>,
     {
@@ -52,12 +52,8 @@ impl BracketAtom {
                     value.push(pc);
                     if value.ends_with(&[PatternChar::Normal(':'), PatternChar::Normal(']')]) {
                         value.truncate(value.len() - 2);
-                        let name: String = value.into_iter().map(PatternChar::char_value).collect();
-                        return if let Some(class) = ClassAsciiKind::from_name(&name) {
-                            Ok(Some((BracketAtom::CharClass(class), i)))
-                        } else {
-                            Err(Error::UndefinedCharClass(name))
-                        };
+                        let class = value.into_iter().map(PatternChar::char_value).collect();
+                        return Ok(Some((BracketAtom::CharClass(class), i)));
                     }
                 }
                 Ok(None)
@@ -167,7 +163,6 @@ mod tests {
     use super::*;
     use crate::with_escape;
     use crate::without_escape;
-    use assert_matches::assert_matches;
 
     #[test]
     fn empty_pattern() {
@@ -658,38 +653,20 @@ mod tests {
     #[test]
     fn character_classes() {
         let cases = [
-            ("alnum", ClassAsciiKind::Alnum),
-            ("alpha", ClassAsciiKind::Alpha),
-            ("ascii", ClassAsciiKind::Ascii),
-            ("blank", ClassAsciiKind::Blank),
-            ("cntrl", ClassAsciiKind::Cntrl),
-            ("digit", ClassAsciiKind::Digit),
-            ("graph", ClassAsciiKind::Graph),
-            ("lower", ClassAsciiKind::Lower),
-            ("print", ClassAsciiKind::Print),
-            ("punct", ClassAsciiKind::Punct),
-            ("space", ClassAsciiKind::Space),
-            ("upper", ClassAsciiKind::Upper),
-            ("word", ClassAsciiKind::Word),
-            ("xdigit", ClassAsciiKind::Xdigit),
+            "alnum", "alpha", "ascii", "blank", "cntrl", "digit", "graph", "lower", "print",
+            "punct", "space", "upper", "word", "xdigit",
         ];
-        for (name, kind) in cases {
-            let pattern = format!("[[:{name}:]]");
+        for class in cases {
+            let pattern = format!("[[:{class}:]]");
             let ast = Ast::new(without_escape(&pattern)).unwrap();
             assert_eq!(
                 ast.atoms,
                 [Atom::Bracket(Bracket {
                     complement: false,
-                    items: vec![BracketItem::Atom(BracketAtom::CharClass(kind))]
+                    items: vec![BracketItem::Atom(BracketAtom::CharClass(class.to_string()))]
                 })]
             );
         }
-    }
-
-    #[test]
-    fn undefined_character_class() {
-        let e = Ast::new(without_escape("[[:foo_bar:]]")).unwrap_err();
-        assert_matches!(e, Error::UndefinedCharClass(name) if name == "foo_bar");
     }
 
     #[test]

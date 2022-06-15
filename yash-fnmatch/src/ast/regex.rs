@@ -6,6 +6,7 @@
 use super::*;
 use crate::Config;
 use crate::Error;
+use regex_syntax::ast::ClassAsciiKind;
 use std::fmt::Write;
 
 type Result = std::result::Result<(), Error>;
@@ -37,20 +38,13 @@ impl BracketAtom {
             BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
                 regex.write_str(value)
             }
-            BracketAtom::CharClass(ClassAsciiKind::Alnum) => regex.write_str("[:alnum:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Alpha) => regex.write_str("[:alpha:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Ascii) => regex.write_str("[:ascii:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Blank) => regex.write_str("[:blank:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Cntrl) => regex.write_str("[:cntrl:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Digit) => regex.write_str("[:digit:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Graph) => regex.write_str("[:graph:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Lower) => regex.write_str("[:lower:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Print) => regex.write_str("[:print:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Punct) => regex.write_str("[:punct:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Space) => regex.write_str("[:space:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Upper) => regex.write_str("[:upper:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Word) => regex.write_str("[:word:]"),
-            BracketAtom::CharClass(ClassAsciiKind::Xdigit) => regex.write_str("[:xdigit:]"),
+            BracketAtom::CharClass(class) => {
+                if ClassAsciiKind::from_name(class).is_some() {
+                    regex.write_fmt(format_args!("[:{class}:]"))
+                } else {
+                    return Err(Error::UndefinedCharClass(class.clone()));
+                }
+            }
         }
         .unwrap();
         Ok(())
@@ -63,7 +57,7 @@ impl BracketAtom {
                 let c = value.chars().next().ok_or(Error::EmptyCollatingSymbol)?;
                 BracketAtom::fmt_regex_char(c, regex)
             }
-            BracketAtom::CharClass(name) => Err(Error::CharClassInRange(name.clone())),
+            BracketAtom::CharClass(class) => Err(Error::CharClassInRange(class.clone())),
         }
     }
 }
@@ -190,6 +184,7 @@ impl Ast {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn empty_pattern() {
@@ -328,24 +323,24 @@ mod tests {
         let bracket = Bracket {
             complement: false,
             items: vec![BracketItem::Range(
-                BracketAtom::CharClass(ClassAsciiKind::Graph)..=BracketAtom::Char(' '),
+                BracketAtom::CharClass("graph".to_string())..=BracketAtom::Char(' '),
             )],
         };
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let result = ast.to_regex(&Config::default());
-        assert_eq!(result, Err(Error::CharClassInRange(ClassAsciiKind::Graph)));
+        assert_eq!(result, Err(Error::CharClassInRange("graph".to_string())));
 
         let bracket = Bracket {
             complement: false,
             items: vec![BracketItem::Range(
-                BracketAtom::Char('a')..=BracketAtom::CharClass(ClassAsciiKind::Print),
+                BracketAtom::Char('a')..=BracketAtom::CharClass("print".to_string()),
             )],
         };
         let atoms = vec![Atom::Bracket(bracket)];
         let ast = Ast { atoms };
         let result = ast.to_regex(&Config::default());
-        assert_eq!(result, Err(Error::CharClassInRange(ClassAsciiKind::Print)));
+        assert_eq!(result, Err(Error::CharClassInRange("print".to_string())));
     }
 
     #[test]
@@ -407,31 +402,31 @@ mod tests {
     #[test]
     fn character_class() {
         let cases = [
-            ("alnum", ClassAsciiKind::Alnum),
-            ("alpha", ClassAsciiKind::Alpha),
-            ("ascii", ClassAsciiKind::Ascii),
-            ("blank", ClassAsciiKind::Blank),
-            ("cntrl", ClassAsciiKind::Cntrl),
-            ("digit", ClassAsciiKind::Digit),
-            ("graph", ClassAsciiKind::Graph),
-            ("lower", ClassAsciiKind::Lower),
-            ("print", ClassAsciiKind::Print),
-            ("punct", ClassAsciiKind::Punct),
-            ("space", ClassAsciiKind::Space),
-            ("upper", ClassAsciiKind::Upper),
-            ("word", ClassAsciiKind::Word),
-            ("xdigit", ClassAsciiKind::Xdigit),
+            "alnum", "alpha", "ascii", "blank", "cntrl", "digit", "graph", "lower", "print",
+            "punct", "space", "upper", "word", "xdigit",
         ];
-        for (name, class) in cases {
+        for class in cases {
             let bracket = Bracket {
                 complement: false,
-                items: vec![BracketItem::Atom(BracketAtom::CharClass(class))],
+                items: vec![BracketItem::Atom(BracketAtom::CharClass(class.to_string()))],
             };
             let atoms = vec![Atom::Bracket(bracket)];
             let ast = Ast { atoms };
             let regex = ast.to_regex(&Config::default()).unwrap();
-            assert_eq!(regex, format!("[[:{name}:]]"));
+            assert_eq!(regex, format!("[[:{class}:]]"));
         }
+    }
+
+    #[test]
+    fn undefined_character_class() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::CharClass("xxx".to_string()))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let e = ast.to_regex(&Config::default()).unwrap_err();
+        assert_matches!(e, Error::UndefinedCharClass(class) if class == "xxx");
     }
 
     #[test]
@@ -441,7 +436,7 @@ mod tests {
             items: vec![
                 BracketItem::Atom(BracketAtom::CollatingSymbol("s".to_string())),
                 BracketItem::Atom(BracketAtom::Char('a')),
-                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Digit)),
+                BracketItem::Atom(BracketAtom::CharClass("digit".to_string())),
                 BracketItem::Atom(BracketAtom::EquivalenceClass("x".to_string())),
             ],
         };
@@ -458,7 +453,7 @@ mod tests {
             items: vec![
                 BracketItem::Atom(BracketAtom::CollatingSymbol("ch".to_string())),
                 BracketItem::Atom(BracketAtom::Char('a')),
-                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Space)),
+                BracketItem::Atom(BracketAtom::CharClass("space".to_string())),
                 BracketItem::Atom(BracketAtom::EquivalenceClass("ij".to_string())),
             ],
         };
@@ -475,7 +470,7 @@ mod tests {
             items: vec![
                 BracketItem::Atom(BracketAtom::CollatingSymbol("ch".to_string())),
                 BracketItem::Atom(BracketAtom::Char('a')),
-                BracketItem::Atom(BracketAtom::CharClass(ClassAsciiKind::Space)),
+                BracketItem::Atom(BracketAtom::CharClass("space".to_string())),
                 BracketItem::Atom(BracketAtom::EquivalenceClass("ij".to_string())),
             ],
         };

@@ -35,7 +35,6 @@ use self::ast::Ast;
 pub use self::char_iter::*;
 use regex::bytes::Regex;
 use regex::bytes::RegexBuilder;
-use regex_syntax::ast::ClassAsciiKind;
 use std::ops::Range;
 use thiserror::Error;
 
@@ -109,9 +108,9 @@ pub enum Error {
     ///
     /// The associated value is the name that caused the error.
     /// For example, the pattern `[[:digit:]-0]` will produce
-    /// `Error::CharClassInRange(ClassAsciiKind::Digit)`.
-    #[error("character class {0:?} used as range bound")]
-    CharClassInRange(ClassAsciiKind),
+    /// `Error::CharClassInRange("digit".to_string())`.
+    #[error("character class [:{0}:] used as range bound")]
+    CharClassInRange(String),
 
     /// Error in underlying regular expression processing
     #[error(transparent)]
