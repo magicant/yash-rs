@@ -1,6 +1,8 @@
 // This file is part of yash, an extended POSIX shell.
 // Copyright (C) 2022 WATANABE Yuki
 
+#[cfg(doc)]
+use crate::Pattern;
 use std::str::Chars;
 
 /// Character appearing in patterns
@@ -33,7 +35,7 @@ impl PatternChar {
     }
 }
 
-/// TODO TBD
+/// Iterator returned by [`with_escape`]
 #[derive(Clone, Debug)]
 pub struct WithEscape<'a> {
     chars: Chars<'a>,
@@ -50,14 +52,28 @@ impl Iterator for WithEscape<'_> {
     }
 }
 
-/// TODO TBD
+/// Adapts an escaped string for input to [`Pattern::new`].
+///
+/// This function returns an iterator suitable to be passed to [`Pattern::new`]
+/// and other parsing functions. Backslashes in the string act as escape
+/// characters.
+///
+/// ```
+/// # use yash_fnmatch::{ast::{Ast, Atom}, with_escape};
+/// // The backslash escapes the asterisk, which is parsed as a literal
+/// // character rather than a wildcard pattern.
+/// let ast = Ast::new(with_escape(r"\*")).unwrap();
+/// assert_eq!(ast.atoms, [Atom::Char('*')]);
+/// ```
+///
+/// Compare [`without_escape`], which ignores backslash escapes.
 #[must_use]
 pub fn with_escape(pattern: &str) -> WithEscape {
     let chars = pattern.chars();
     WithEscape { chars }
 }
 
-/// TODO TBD
+/// Iterator returned by [`without_escape`]
 #[derive(Clone, Debug)]
 pub struct WithoutEscape<'a> {
     chars: Chars<'a>,
@@ -70,7 +86,21 @@ impl Iterator for WithoutEscape<'_> {
     }
 }
 
-/// TODO TBD
+/// Adapts a literal string for input to [`Pattern::new`].
+///
+/// This function returns an iterator suitable to be passed to [`Pattern::new`]
+/// and other parsing functions. Backslashes in the string do not act as escape
+/// characters.
+///
+/// ```
+/// # use yash_fnmatch::{ast::{Ast, Atom}, without_escape};
+/// // The backslash just matches a backslash itself.
+/// // The asterisk works as a wildcard pattern.
+/// let ast = Ast::new(without_escape(r"\*")).unwrap();
+/// assert_eq!(ast.atoms, [Atom::Char('\\'), Atom::AnyString]);
+/// ```
+///
+/// Compare [`with_escape`], which handles backslash escapes.
 #[must_use]
 pub fn without_escape(pattern: &str) -> WithoutEscape {
     let chars = pattern.chars();
