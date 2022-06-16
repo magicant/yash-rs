@@ -112,7 +112,7 @@ impl Ast {
     }
 
     #[must_use]
-    pub fn starts_with_literal_dot(&self) -> bool {
+    pub(crate) fn starts_with_literal_dot(&self) -> bool {
         self.atoms.first() == Some(&Atom::Char('.'))
     }
 }
