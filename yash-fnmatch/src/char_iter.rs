@@ -62,7 +62,7 @@ impl Iterator for WithEscape<'_> {
 /// # use yash_fnmatch::{ast::{Ast, Atom}, with_escape};
 /// // The backslash escapes the asterisk, which is parsed as a literal
 /// // character rather than a wildcard pattern.
-/// let ast = Ast::new(with_escape(r"\*")).unwrap();
+/// let ast = Ast::new(with_escape(r"\*"));
 /// assert_eq!(ast.atoms, [Atom::Char('*')]);
 /// ```
 ///
@@ -96,7 +96,7 @@ impl Iterator for WithoutEscape<'_> {
 /// # use yash_fnmatch::{ast::{Ast, Atom}, without_escape};
 /// // The backslash just matches a backslash itself.
 /// // The asterisk works as a wildcard pattern.
-/// let ast = Ast::new(without_escape(r"\*")).unwrap();
+/// let ast = Ast::new(without_escape(r"\*"));
 /// assert_eq!(ast.atoms, [Atom::Char('\\'), Atom::AnyString]);
 /// ```
 ///

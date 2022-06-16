@@ -4,7 +4,6 @@
 //! AST parser
 
 use super::*;
-use crate::Error;
 use crate::PatternChar;
 
 impl BracketAtom {
@@ -16,8 +15,7 @@ impl BracketAtom {
     /// If successful, returns the result as well as an iterator that yields
     /// characters following the closing bracket. Returns `Ok(None)` if the
     /// inner bracket expression is not valid.
-    fn parse_inner<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
-    // TODO Just return Option
+    fn parse_inner<I>(mut i: I) -> Option<(Self, I)>
     where
         I: Iterator<Item = PatternChar>,
     {
@@ -29,10 +27,9 @@ impl BracketAtom {
                     if value.ends_with(&[PatternChar::Normal('.'), PatternChar::Normal(']')]) {
                         value.truncate(value.len() - 2);
                         let value = value.into_iter().map(PatternChar::char_value).collect();
-                        return Ok(Some((BracketAtom::CollatingSymbol(value), i)));
+                        return Some((BracketAtom::CollatingSymbol(value), i));
                     }
                 }
-                Ok(None)
             }
             Some(PatternChar::Normal('=')) => {
                 let mut value = Vec::new();
@@ -41,10 +38,9 @@ impl BracketAtom {
                     if value.ends_with(&[PatternChar::Normal('='), PatternChar::Normal(']')]) {
                         value.truncate(value.len() - 2);
                         let value = value.into_iter().map(PatternChar::char_value).collect();
-                        return Ok(Some((BracketAtom::EquivalenceClass(value), i)));
+                        return Some((BracketAtom::EquivalenceClass(value), i));
                     }
                 }
-                Ok(None)
             }
             Some(PatternChar::Normal(':')) => {
                 let mut value = Vec::new();
@@ -53,13 +49,13 @@ impl BracketAtom {
                     if value.ends_with(&[PatternChar::Normal(':'), PatternChar::Normal(']')]) {
                         value.truncate(value.len() - 2);
                         let class = value.into_iter().map(PatternChar::char_value).collect();
-                        return Ok(Some((BracketAtom::CharClass(class), i)));
+                        return Some((BracketAtom::CharClass(class), i));
                     }
                 }
-                Ok(None)
             }
-            _ => Ok(None),
+            _ => (),
         }
+        None
     }
 }
 
@@ -95,7 +91,7 @@ impl Bracket {
     /// If successful, returns the result as well as an iterator that yields
     /// characters following the bracket expression. Returns `Ok(None)` if a
     /// bracket expression is not found.
-    fn parse<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
+    fn parse<I>(mut i: I) -> Option<(Self, I)>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
@@ -108,16 +104,14 @@ impl Bracket {
         };
         while let Some(pc) = i.next() {
             match pc {
-                PatternChar::Normal(']') if !bracket.items.is_empty() => {
-                    return Ok(Some((bracket, i)))
-                }
+                PatternChar::Normal(']') if !bracket.items.is_empty() => return Some((bracket, i)),
                 PatternChar::Normal('!' | '^')
                     if !bracket.complement && bracket.items.is_empty() =>
                 {
                     bracket.complement = true
                 }
                 PatternChar::Normal('[') => {
-                    if let Some((atom, j)) = BracketAtom::parse_inner(i.clone())? {
+                    if let Some((atom, j)) = BracketAtom::parse_inner(i.clone()) {
                         bracket.items.push(atom.into());
                         i = j;
                     } else {
@@ -128,21 +122,21 @@ impl Bracket {
             }
             make_range(&mut bracket.items);
         }
-        Ok(None)
+        None
     }
 }
 
 impl Atom {
-    pub fn parse<I>(mut i: I) -> Result<Option<(Self, I)>, Error>
+    pub fn parse<I>(mut i: I) -> Option<(Self, I)>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
-        if let Some(pc) = i.next() {
+        i.next().map(|pc| {
             let atom = match pc {
                 PatternChar::Normal('?') => Atom::AnyChar,
                 PatternChar::Normal('*') => Atom::AnyString,
                 PatternChar::Normal('[') => {
-                    if let Some((bracket, j)) = Bracket::parse(i.clone())? {
+                    if let Some((bracket, j)) = Bracket::parse(i.clone()) {
                         i = j;
                         Atom::Bracket(bracket)
                     } else {
@@ -151,10 +145,8 @@ impl Atom {
                 }
                 c => Atom::Char(c.char_value()),
             };
-            Ok(Some((atom, i)))
-        } else {
-            Ok(None)
-        }
+            (atom, i)
+        })
     }
 }
 
@@ -166,58 +158,58 @@ mod tests {
 
     #[test]
     fn empty_pattern() {
-        let ast = Ast::new(without_escape("")).unwrap();
+        let ast = Ast::new(without_escape(""));
         assert_eq!(ast.atoms, []);
     }
 
     #[test]
     fn single_character_pattern() {
-        let ast = Ast::new(without_escape("a")).unwrap();
+        let ast = Ast::new(without_escape("a"));
         assert_eq!(ast.atoms, [Atom::Char('a')]);
 
-        let ast = Ast::new(without_escape("0")).unwrap();
+        let ast = Ast::new(without_escape("0"));
         assert_eq!(ast.atoms, [Atom::Char('0')]);
     }
 
     #[test]
     fn double_character_pattern() {
-        let ast = Ast::new(without_escape("in")).unwrap();
+        let ast = Ast::new(without_escape("in"));
         assert_eq!(ast.atoms, [Atom::Char('i'), Atom::Char('n')]);
     }
 
     #[test]
     fn any_character_pattern() {
-        let ast = Ast::new(without_escape("?")).unwrap();
+        let ast = Ast::new(without_escape("?"));
         assert_eq!(ast.atoms, [Atom::AnyChar]);
     }
 
     #[test]
     fn any_string_pattern() {
-        let ast = Ast::new(without_escape("*")).unwrap();
+        let ast = Ast::new(without_escape("*"));
         assert_eq!(ast.atoms, [Atom::AnyString]);
     }
 
     #[test]
     fn escaped_any_patterns() {
-        let ast = Ast::new(with_escape(r"\?\*")).unwrap();
+        let ast = Ast::new(with_escape(r"\?\*"));
         assert_eq!(ast.atoms, [Atom::Char('?'), Atom::Char('*')]);
     }
 
     #[test]
     fn empty_bracket_expression() {
-        let ast = Ast::new(without_escape("[]")).unwrap();
+        let ast = Ast::new(without_escape("[]"));
         assert_eq!(ast.atoms, [Atom::Char('['), Atom::Char(']')]);
     }
 
     #[test]
     fn escaped_bracket_expression() {
-        let ast = Ast::new(with_escape(r"\[a]")).unwrap();
+        let ast = Ast::new(with_escape(r"\[a]"));
         assert_eq!(
             ast.atoms,
             [Atom::Char('['), Atom::Char('a'), Atom::Char(']')]
         );
 
-        let ast = Ast::new(with_escape(r"[a\]")).unwrap();
+        let ast = Ast::new(with_escape(r"[a\]"));
         assert_eq!(
             ast.atoms,
             [Atom::Char('['), Atom::Char('a'), Atom::Char(']')]
@@ -226,7 +218,7 @@ mod tests {
 
     #[test]
     fn single_character_bracket_expression_pattern() {
-        let ast = Ast::new(without_escape("[a]")).unwrap();
+        let ast = Ast::new(without_escape("[a]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -238,7 +230,7 @@ mod tests {
 
     #[test]
     fn multi_character_bracket_expression_pattern() {
-        let ast = Ast::new(without_escape("[xyz]")).unwrap();
+        let ast = Ast::new(without_escape("[xyz]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -254,7 +246,7 @@ mod tests {
 
     #[test]
     fn brackets_in_bracket_expression() {
-        let ast = Ast::new(without_escape("[]a[]")).unwrap();
+        let ast = Ast::new(without_escape("[]a[]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -270,7 +262,7 @@ mod tests {
 
     #[test]
     fn bracket_expression_complement_with_exclamation() {
-        let ast = Ast::new(without_escape("[!12]")).unwrap();
+        let ast = Ast::new(without_escape("[!12]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -285,7 +277,7 @@ mod tests {
 
     #[test]
     fn exclamation_in_bracket_expression() {
-        let ast = Ast::new(without_escape("[12!]")).unwrap();
+        let ast = Ast::new(without_escape("[12!]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -301,7 +293,7 @@ mod tests {
 
     #[test]
     fn exclamation_in_bracket_expression_complement() {
-        let ast = Ast::new(without_escape("[!!]")).unwrap();
+        let ast = Ast::new(without_escape("[!!]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -313,7 +305,7 @@ mod tests {
 
     #[test]
     fn bracket_expression_complement_with_caret() {
-        let ast = Ast::new(without_escape("[^34]")).unwrap();
+        let ast = Ast::new(without_escape("[^34]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -325,7 +317,7 @@ mod tests {
             })]
         );
 
-        let ast = Ast::new(without_escape("[^]a]")).unwrap();
+        let ast = Ast::new(without_escape("[^]a]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -337,7 +329,7 @@ mod tests {
             })]
         );
 
-        let ast = Ast::new(without_escape("[^^]")).unwrap();
+        let ast = Ast::new(without_escape("[^^]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -349,7 +341,7 @@ mod tests {
 
     #[test]
     fn character_range() {
-        let ast = Ast::new(without_escape("[a-z]")).unwrap();
+        let ast = Ast::new(without_escape("[a-z]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -363,7 +355,7 @@ mod tests {
 
     #[test]
     fn dash_at_start_of_bracket_expression() {
-        let ast = Ast::new(without_escape("[-a]")).unwrap();
+        let ast = Ast::new(without_escape("[-a]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -375,7 +367,7 @@ mod tests {
             })]
         );
 
-        let ast = Ast::new(without_escape("[!-b]")).unwrap();
+        let ast = Ast::new(without_escape("[!-b]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -390,7 +382,7 @@ mod tests {
 
     #[test]
     fn dash_at_end_of_bracket_expression() {
-        let ast = Ast::new(without_escape("[5-]")).unwrap();
+        let ast = Ast::new(without_escape("[5-]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -405,7 +397,7 @@ mod tests {
 
     #[test]
     fn ambiguous_character_range() {
-        let ast = Ast::new(without_escape("[2-4-6-8]")).unwrap();
+        let ast = Ast::new(without_escape("[2-4-6-8]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -421,7 +413,7 @@ mod tests {
 
     #[test]
     fn double_dash_at_start_of_bracket_expression() {
-        let ast = Ast::new(without_escape("[--0]")).unwrap();
+        let ast = Ast::new(without_escape("[--0]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -435,7 +427,7 @@ mod tests {
 
     #[test]
     fn double_dash_at_end_of_bracket_expression() {
-        let ast = Ast::new(without_escape("[+--]")).unwrap();
+        let ast = Ast::new(without_escape("[+--]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -449,7 +441,7 @@ mod tests {
 
     #[test]
     fn escapes_in_bracket_expression() {
-        let ast = Ast::new(with_escape(r"[\!\[.a.]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[\!\[.a.]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -470,7 +462,7 @@ mod tests {
 
     #[test]
     fn single_character_collating_symbol() {
-        let ast = Ast::new(without_escape("[[.a.]]")).unwrap();
+        let ast = Ast::new(without_escape("[[.a.]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -481,7 +473,7 @@ mod tests {
             })]
         );
 
-        let ast = Ast::new(without_escape("[[.].]]")).unwrap();
+        let ast = Ast::new(without_escape("[[.].]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -495,7 +487,7 @@ mod tests {
 
     #[test]
     fn multi_character_collating_symbol() {
-        let ast = Ast::new(without_escape("[[.ch.]]")).unwrap();
+        let ast = Ast::new(without_escape("[[.ch.]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -509,7 +501,7 @@ mod tests {
 
     #[test]
     fn escapes_in_collating_symbol() {
-        let ast = Ast::new(with_escape(r"[[\.a.]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[\.a.]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -526,7 +518,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[.a\.]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[.a\.]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -543,7 +535,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[.a.\]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[.a.\]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -561,7 +553,7 @@ mod tests {
 
     #[test]
     fn single_character_equivalence_class() {
-        let ast = Ast::new(without_escape("[[=a=]]")).unwrap();
+        let ast = Ast::new(without_escape("[[=a=]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -572,7 +564,7 @@ mod tests {
             })]
         );
 
-        let ast = Ast::new(without_escape("[[=]=]]")).unwrap();
+        let ast = Ast::new(without_escape("[[=]=]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -586,7 +578,7 @@ mod tests {
 
     #[test]
     fn multi_character_equivalence_class() {
-        let ast = Ast::new(without_escape("[[=ch=]]")).unwrap();
+        let ast = Ast::new(without_escape("[[=ch=]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -600,7 +592,7 @@ mod tests {
 
     #[test]
     fn escapes_in_equivalence_class() {
-        let ast = Ast::new(with_escape(r"[[\=a=]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[\=a=]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -617,7 +609,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[=a\=]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[=a\=]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -634,7 +626,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[=a=\]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[=a=\]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -658,7 +650,7 @@ mod tests {
         ];
         for class in cases {
             let pattern = format!("[[:{class}:]]");
-            let ast = Ast::new(without_escape(&pattern)).unwrap();
+            let ast = Ast::new(without_escape(&pattern));
             assert_eq!(
                 ast.atoms,
                 [Atom::Bracket(Bracket {
@@ -671,7 +663,7 @@ mod tests {
 
     #[test]
     fn escapes_in_character_class() {
-        let ast = Ast::new(with_escape(r"[[\:alpha:]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[\:alpha:]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -692,7 +684,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[:alpha\:]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[:alpha\:]]"));
         assert_eq!(
             ast.atoms,
             [
@@ -713,7 +705,7 @@ mod tests {
             ]
         );
 
-        let ast = Ast::new(with_escape(r"[[:alpha:\]]")).unwrap();
+        let ast = Ast::new(with_escape(r"[[:alpha:\]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {
@@ -735,7 +727,7 @@ mod tests {
 
     #[test]
     fn inner_brackets_in_character_range() {
-        let ast = Ast::new(without_escape("[[.ch.]-[=x=]]")).unwrap();
+        let ast = Ast::new(without_escape("[[.ch.]-[=x=]]"));
         assert_eq!(
             ast.atoms,
             [Atom::Bracket(Bracket {

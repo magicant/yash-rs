@@ -162,7 +162,7 @@ impl Pattern {
         where
             I: Iterator<Item = PatternChar> + Clone,
         {
-            let ast = Ast::new(i.clone())?;
+            let ast = Ast::new(i.clone());
             let body = if ast.is_literal() {
                 Body::Literal(i.map(PatternChar::char_value).collect())
             } else {

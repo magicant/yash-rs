@@ -6,7 +6,6 @@
 mod parse;
 mod regex;
 
-use crate::Error;
 use crate::PatternChar;
 use std::ops::RangeInclusive;
 
@@ -85,21 +84,21 @@ pub struct Ast {
 impl Ast {
     /// Creates a pattern.
     #[inline]
-    pub fn new<I>(pattern: I) -> Result<Self, Error>
+    pub fn new<I>(pattern: I) -> Self
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        fn inner<I>(mut i: I) -> Result<Ast, Error>
+        fn inner<I>(mut i: I) -> Ast
         where
             I: Iterator<Item = PatternChar> + Clone,
         {
             let mut atoms = Vec::new();
-            while let Some((atom, j)) = Atom::parse(i)? {
+            while let Some((atom, j)) = Atom::parse(i) {
                 atoms.push(atom);
                 i = j;
             }
-            Ok(Ast { atoms })
+            Ast { atoms }
         }
 
         inner(pattern.into_iter())
