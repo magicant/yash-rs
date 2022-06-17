@@ -26,6 +26,14 @@
 //! `yash-fnmatch` crate tries to support the POSIX specification as much as
 //! possible rather than introducing unique (non-portable) functionalities.
 //!
+//! # Example
+//!
+//! ```
+//! use yash_fnmatch::{Pattern, without_escape};
+//! let p = Pattern::new(without_escape("r*g")).unwrap();
+//! assert_eq!(p.find("string"), Some(2..6));
+//! ```
+//!
 //! [`fnmatch-regex`]: https://crates.io/crates/fnmatch-regex
 
 pub mod ast;
@@ -219,6 +227,10 @@ impl Pattern {
         }
     }
 
+    /// Returns the index range where this pattern matches in the given text.
+    ///
+    /// If `self` matches (part of) `text`, this function returns the index
+    /// range of the first match. Otherwise, the result is `None`.
     #[must_use]
     pub fn find(&self, text: &str) -> Option<Range<usize>> {
         match &self.body {

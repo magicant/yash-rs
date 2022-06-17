@@ -6,12 +6,15 @@ use crate::Pattern;
 use std::str::Chars;
 
 /// Character appearing in patterns
+///
+/// The [`with_escape`] and [`without_escape`] functions return an iterator that
+/// yields pattern characters.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PatternChar {
     /// Normal pattern character
     ///
-    /// `?`, `*`, `[` and `]` have special meaning in a pattern. Other `Normal`
-    /// characters are the same as `Literal`.
+    /// `?`, `*`, `[` and `]` have special meaning when used in a pattern. Other
+    /// `Normal` characters are the same as `Literal`.
     Normal(char),
 
     /// Literal pattern character

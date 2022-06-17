@@ -82,7 +82,7 @@ pub struct Ast {
 }
 
 impl Ast {
-    /// Creates a pattern.
+    /// Parses a pattern string into an AST.
     #[inline]
     pub fn new<I>(pattern: I) -> Self
     where

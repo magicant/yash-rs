@@ -127,7 +127,7 @@ impl Bracket {
 }
 
 impl Atom {
-    pub fn parse<I>(mut i: I) -> Option<(Self, I)>
+    pub(crate) fn parse<I>(mut i: I) -> Option<(Self, I)>
     where
         I: Iterator<Item = PatternChar> + Clone,
     {
