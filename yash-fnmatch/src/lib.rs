@@ -146,43 +146,45 @@ pub struct Pattern {
 }
 
 impl Pattern {
-    /// Creates a pattern with defaulted configuration.
+    /// Compiles a pattern with defaulted configuration.
     #[inline]
     pub fn new<I>(pattern: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        Self::with_config(pattern, Config::default())
+        Self::from_ast(&Ast::new(pattern))
     }
 
-    /// Creates a pattern with a specified configuration.
+    /// Compiles a pattern with a specified configuration.
     pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
     {
-        fn inner<I>(i: I, config: Config) -> Result<Pattern, Error>
-        where
-            I: Iterator<Item = PatternChar> + Clone,
-        {
-            let ast = Ast::new(i);
-            let body = if let Some(literal) = ast.to_literal() {
-                Body::Literal(literal)
-            } else {
-                Body::Regex {
-                    regex: RegexBuilder::new(&ast.to_regex(&config)?)
-                        .case_insensitive(config.case_insensitive)
-                        .dot_matches_new_line(true)
-                        .swap_greed(config.shortest_match)
-                        .build()?,
-                    starts_with_literal_dot: ast.starts_with_literal_dot(),
-                }
-            };
-            Ok(Pattern { body, config })
-        }
+        Self::from_ast_and_config(&Ast::new(pattern), config)
+    }
 
-        inner(pattern.into_iter(), config)
+    /// Compiles a pattern from the given AST with defaulted configuration.
+    pub fn from_ast(ast: &Ast) -> Result<Self, Error> {
+        Self::from_ast_and_config(ast, Config::default())
+    }
+
+    /// Compiles a pattern from the given AST.
+    pub fn from_ast_and_config(ast: &Ast, config: Config) -> Result<Self, Error> {
+        let body = if let Some(literal) = ast.to_literal() {
+            Body::Literal(literal)
+        } else {
+            Body::Regex {
+                regex: RegexBuilder::new(&ast.to_regex(&config)?)
+                    .case_insensitive(config.case_insensitive)
+                    .dot_matches_new_line(true)
+                    .swap_greed(config.shortest_match)
+                    .build()?,
+                starts_with_literal_dot: ast.starts_with_literal_dot(),
+            }
+        };
+        Ok(Pattern { body, config })
     }
 
     /// Returns the configuration for this pattern.
