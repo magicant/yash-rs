@@ -30,7 +30,7 @@
 //!
 //! ```
 //! use yash_fnmatch::{Pattern, without_escape};
-//! let p = Pattern::new(without_escape("r*g")).unwrap();
+//! let p = Pattern::parse(without_escape("r*g")).unwrap();
 //! assert_eq!(p.find("string"), Some(2..6));
 //! ```
 //!
@@ -148,7 +148,7 @@ pub struct Pattern {
 impl Pattern {
     /// Compiles a pattern with defaulted configuration.
     #[inline]
-    pub fn new<I>(pattern: I) -> Result<Self, Error>
+    pub fn parse<I>(pattern: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
@@ -157,7 +157,7 @@ impl Pattern {
     }
 
     /// Compiles a pattern with a specified configuration.
-    pub fn with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
+    pub fn parse_with_config<I>(pattern: I, config: Config) -> Result<Self, Error>
     where
         I: IntoIterator<Item = PatternChar>,
         <I as IntoIterator>::IntoIter: Clone,
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn empty_pattern() {
-        let p = Pattern::new(without_escape("")).unwrap();
+        let p = Pattern::parse(without_escape("")).unwrap();
         assert_eq!(p.as_literal(), Some(""));
 
         assert!(p.is_match(""));
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn single_character_pattern() {
-        let p = Pattern::new(without_escape("a")).unwrap();
+        let p = Pattern::parse(without_escape("a")).unwrap();
         assert_eq!(p.as_literal(), Some("a"));
 
         assert!(!p.is_match(""));
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn double_character_pattern() {
-        let p = Pattern::new(without_escape("in")).unwrap();
+        let p = Pattern::parse(without_escape("in")).unwrap();
         assert_eq!(p.as_literal(), Some("in"));
 
         assert!(!p.is_match(""));
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn characters_that_needs_escaping() {
-        let p = Pattern::new(without_escape(r".\+()][{}^$-?")).unwrap();
+        let p = Pattern::parse(without_escape(r".\+()][{}^$-?")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(r".\+()][{}^$-X"), Some(0..13));
@@ -328,18 +328,18 @@ mod tests {
 
     #[test]
     fn matching_newline() {
-        let p = Pattern::new(without_escape("a\nb")).unwrap();
+        let p = Pattern::parse(without_escape("a\nb")).unwrap();
         assert_eq!(p.as_literal(), Some("a\nb"));
         assert_eq!(p.find("a\nb"), Some(0..3));
 
-        let p = Pattern::new(without_escape("a?b")).unwrap();
+        let p = Pattern::parse(without_escape("a?b")).unwrap();
         assert_eq!(p.as_literal(), None);
         assert_eq!(p.find("a\nb"), Some(0..3));
     }
 
     #[test]
     fn any_single_character_pattern() {
-        let p = Pattern::new(without_escape("?")).unwrap();
+        let p = Pattern::parse(without_escape("?")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn any_single_character_pattern_combined() {
-        let p = Pattern::new(without_escape("a?c")).unwrap();
+        let p = Pattern::parse(without_escape("a?c")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn any_multi_character_pattern() {
-        let p = Pattern::new(without_escape("*")).unwrap();
+        let p = Pattern::parse(without_escape("*")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), Some(0..0));
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn any_multi_character_pattern_combined() {
-        let p = Pattern::new(without_escape("a*b")).unwrap();
+        let p = Pattern::parse(without_escape("a*b")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn unmatched_bracket_1() {
-        let p = Pattern::new(without_escape("[a")).unwrap();
+        let p = Pattern::parse(without_escape("[a")).unwrap();
         assert_eq!(p.as_literal(), Some("[a"));
 
         assert_eq!(p.find(""), None);
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn unmatched_bracket_2() {
-        let p = Pattern::new(without_escape("a]")).unwrap();
+        let p = Pattern::parse(without_escape("a]")).unwrap();
         assert_eq!(p.as_literal(), Some("a]"));
 
         assert_eq!(p.find(""), None);
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn unmatched_bracket_3() {
-        let p = Pattern::new(without_escape("][")).unwrap();
+        let p = Pattern::parse(without_escape("][")).unwrap();
         assert_eq!(p.as_literal(), Some("]["));
 
         assert_eq!(p.find(""), None);
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn unmatched_bracket_4() {
-        let p = Pattern::new(without_escape("[]")).unwrap();
+        let p = Pattern::parse(without_escape("[]")).unwrap();
         assert_eq!(p.as_literal(), Some("[]"));
 
         assert_eq!(p.find(""), None);
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn unmatched_bracket_after_another_bracket() {
-        let p = Pattern::new(without_escape("[a][")).unwrap();
+        let p = Pattern::parse(without_escape("[a][")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn single_character_bracket_expression_pattern() {
-        let p = Pattern::new(without_escape("[a]")).unwrap();
+        let p = Pattern::parse(without_escape("[a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn multi_character_bracket_expression_pattern() {
-        let p = Pattern::new(without_escape("[abc]")).unwrap();
+        let p = Pattern::parse(without_escape("[abc]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn ampersand_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[a&&b]")).unwrap();
+        let p = Pattern::parse(without_escape("[a&&b]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn tilde_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[a~~b]")).unwrap();
+        let p = Pattern::parse(without_escape("[a~~b]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn characters_that_needs_escaping_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[.?*-][&|~^][][]")).unwrap();
+        let p = Pattern::parse(without_escape("[.?*-][&|~^][][]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(".&["), Some(0..3));
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn brackets_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[]a[]")).unwrap();
+        let p = Pattern::parse(without_escape("[]a[]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn character_range() {
-        let p = Pattern::new(without_escape("[3-5]")).unwrap();
+        let p = Pattern::parse(without_escape("[3-5]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn dash_at_start_of_bracket_expression() {
         // This bracket expression should match only '-' and '0'.
-        let p = Pattern::new(without_escape("[-0]")).unwrap();
+        let p = Pattern::parse(without_escape("[-0]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn dash_at_end_of_bracket_expression() {
         // This bracket expression should match only '+' and '-'.
-        let p = Pattern::new(without_escape("[+-]")).unwrap();
+        let p = Pattern::parse(without_escape("[+-]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn ambiguous_character_range() {
-        let p = Pattern::new(without_escape("[2-4-6]")).unwrap();
+        let p = Pattern::parse(without_escape("[2-4-6]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         // POSIX leaves the expected results unspecified.
@@ -560,7 +560,7 @@ mod tests {
     fn double_dash_in_bracket_expression() {
         // This bracket expression should be parsed as a union of the character
         // range between '+' and '-', and a single dot.
-        let p = Pattern::new(without_escape("[+--.]")).unwrap();
+        let p = Pattern::parse(without_escape("[+--.]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -574,7 +574,7 @@ mod tests {
     fn double_dash_at_start_of_bracket_expression() {
         // This bracket expression should be parsed as the character range
         // between '-' and '0'.
-        let p = Pattern::new(without_escape("[--0]")).unwrap();
+        let p = Pattern::parse(without_escape("[--0]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -588,7 +588,7 @@ mod tests {
     fn double_dash_at_end_of_bracket_expression() {
         // This bracket expression should be parsed as the character range
         // between '+' and '-'.
-        let p = Pattern::new(without_escape("[+--]")).unwrap();
+        let p = Pattern::parse(without_escape("[+--]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -600,7 +600,7 @@ mod tests {
 
     #[test]
     fn bracket_expression_complement() {
-        let p = Pattern::new(without_escape("[!ab]")).unwrap();
+        let p = Pattern::parse(without_escape("[!ab]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn exclamation_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[ab!]")).unwrap();
+        let p = Pattern::parse(without_escape("[ab!]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -625,7 +625,7 @@ mod tests {
 
     #[test]
     fn exclamation_in_bracket_expression_complement() {
-        let p = Pattern::new(without_escape("[!!]")).unwrap();
+        let p = Pattern::parse(without_escape("[!!]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -636,7 +636,7 @@ mod tests {
 
     #[test]
     fn bracket_in_bracket_expression_complement() {
-        let p = Pattern::new(without_escape("[!]a]")).unwrap();
+        let p = Pattern::parse(without_escape("[!]a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -649,7 +649,7 @@ mod tests {
 
     #[test]
     fn caret_in_bracket_expression() {
-        let p = Pattern::new(without_escape("[^]a]")).unwrap();
+        let p = Pattern::parse(without_escape("[^]a]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -659,14 +659,14 @@ mod tests {
         assert_eq!(p.find("b"), Some(0..1));
         assert_eq!(p.find("abc"), Some(1..2));
 
-        let p = Pattern::new(without_escape("[^^]")).unwrap();
+        let p = Pattern::parse(without_escape("[^^]")).unwrap();
         assert_eq!(p.as_literal(), None);
         assert!(!p.is_match("^"));
     }
 
     #[test]
     fn single_character_collating_symbol() {
-        let p = Pattern::new(without_escape("[[.a.]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[.a.]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn multi_character_collating_symbol() {
-        let p = Pattern::new(without_escape("[[.ch.]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[.ch.]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -691,7 +691,7 @@ mod tests {
 
     #[test]
     fn single_character_equivalence_class() {
-        let p = Pattern::new(without_escape("[[=a=]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[=a=]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn multi_character_equivalence_class() {
-        let p = Pattern::new(without_escape("[[=ij=]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[=ij=]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -716,7 +716,7 @@ mod tests {
 
     #[test]
     fn character_class_alnum() {
-        let p = Pattern::new(without_escape("[[:alnum:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:alnum:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn character_class_alpha() {
-        let p = Pattern::new(without_escape("[[:alpha:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:alpha:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -744,7 +744,7 @@ mod tests {
 
     #[test]
     fn character_class_blank() {
-        let p = Pattern::new(without_escape("[[:blank:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:blank:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn character_class_cntrl() {
-        let p = Pattern::new(without_escape("[[:cntrl:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:cntrl:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -774,7 +774,7 @@ mod tests {
 
     #[test]
     fn character_class_digit() {
-        let p = Pattern::new(without_escape("[[:digit:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:digit:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn character_class_graph() {
-        let p = Pattern::new(without_escape("[[:graph:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:graph:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn character_class_lower() {
-        let p = Pattern::new(without_escape("[[:lower:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:lower:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -819,7 +819,7 @@ mod tests {
 
     #[test]
     fn character_class_print() {
-        let p = Pattern::new(without_escape("[[:print:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:print:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -835,7 +835,7 @@ mod tests {
 
     #[test]
     fn character_class_punct() {
-        let p = Pattern::new(without_escape("[[:punct:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:punct:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -849,7 +849,7 @@ mod tests {
 
     #[test]
     fn character_class_space() {
-        let p = Pattern::new(without_escape("[[:space:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:space:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn character_class_upper() {
-        let p = Pattern::new(without_escape("[[:upper:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:upper:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -879,7 +879,7 @@ mod tests {
 
     #[test]
     fn character_class_xdigit() {
-        let p = Pattern::new(without_escape("[[:xdigit:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[[:xdigit:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -893,13 +893,13 @@ mod tests {
 
     #[test]
     fn undefined_character_class() {
-        let e = Pattern::new(without_escape("[[:foo_bar:]]")).unwrap_err();
+        let e = Pattern::parse(without_escape("[[:foo_bar:]]")).unwrap_err();
         assert_matches!(e, Error::UndefinedCharClass(name) if name == "foo_bar");
     }
 
     #[test]
     fn combinations_of_inner_bracket_expressions() {
-        let p = Pattern::new(without_escape("[][.-.]-[=0=][:blank:]]")).unwrap();
+        let p = Pattern::parse(without_escape("[][.-.]-[=0=][:blank:]]")).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert_eq!(p.find(""), None);
@@ -916,7 +916,7 @@ mod tests {
 
     #[test]
     fn escaped_pattern() {
-        let p = Pattern::new(with_escape(r"\*\?\[a]")).unwrap();
+        let p = Pattern::parse(with_escape(r"\*\?\[a]")).unwrap();
         assert_eq!(p.as_literal(), Some("*?[a]"));
 
         assert_eq!(p.find(""), None);
@@ -930,7 +930,7 @@ mod tests {
             anchor_begin: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("a"), config).unwrap();
         assert_eq!(p.as_literal(), Some("a"));
 
         assert!(!p.is_match(""));
@@ -950,7 +950,7 @@ mod tests {
             anchor_begin: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("a?"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("a?"), config).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
@@ -972,7 +972,7 @@ mod tests {
             anchor_end: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("a"), config).unwrap();
         assert_eq!(p.as_literal(), Some("a"));
 
         assert!(!p.is_match(""));
@@ -992,7 +992,7 @@ mod tests {
             anchor_end: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("?n"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("?n"), config).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));
@@ -1015,7 +1015,7 @@ mod tests {
             anchor_end: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("a"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("a"), config).unwrap();
         assert_eq!(p.as_literal(), Some("a"));
 
         assert!(!p.is_match(""));
@@ -1036,7 +1036,7 @@ mod tests {
             anchor_end: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("???"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("???"), config).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match("in"));
@@ -1055,7 +1055,7 @@ mod tests {
             ..Config::default()
         };
 
-        let p = Pattern::with_config(without_escape("?"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("?"), config).unwrap();
         assert!(!p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1063,7 +1063,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape("*"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1071,7 +1071,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape("[.a]"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("[.a]"), config).unwrap();
         assert!(!p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1079,7 +1079,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape(".*"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape(".*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert_eq!(p.find("."), Some(0..1));
@@ -1090,7 +1090,7 @@ mod tests {
     fn initial_period_without_literal_period() {
         let config = Config::default();
 
-        let p = Pattern::with_config(without_escape("?"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("?"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1098,7 +1098,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(0..1));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape("*"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1106,7 +1106,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(0..2));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape("[.a]"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("[.a]"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert!(p.is_match("a"));
@@ -1114,7 +1114,7 @@ mod tests {
         assert_eq!(p.find(".."), Some(0..1));
         assert_eq!(p.find("a"), Some(0..1));
 
-        let p = Pattern::with_config(without_escape(".*"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape(".*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert_eq!(p.find("."), Some(0..1));
@@ -1123,7 +1123,7 @@ mod tests {
 
     #[test]
     fn non_literal_with_shortest_match() {
-        let p = Pattern::with_config(without_escape("1*9"), Config::default()).unwrap();
+        let p = Pattern::parse_with_config(without_escape("1*9"), Config::default()).unwrap();
         assert!(p.is_match("19"));
         assert!(p.is_match("1999"));
         assert_eq!(p.find("19"), Some(0..2));
@@ -1133,7 +1133,7 @@ mod tests {
             shortest_match: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("1*9"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("1*9"), config).unwrap();
         assert!(p.is_match("19"));
         assert!(p.is_match("1999"));
         assert_eq!(p.find("19"), Some(0..2));
@@ -1146,7 +1146,7 @@ mod tests {
             case_insensitive: true,
             ..Config::default()
         };
-        let p = Pattern::with_config(without_escape("a?z"), config).unwrap();
+        let p = Pattern::parse_with_config(without_escape("a?z"), config).unwrap();
         assert_eq!(p.as_literal(), None);
 
         assert!(!p.is_match(""));

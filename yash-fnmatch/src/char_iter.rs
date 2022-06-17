@@ -55,11 +55,11 @@ impl Iterator for WithEscape<'_> {
     }
 }
 
-/// Adapts an escaped string for input to [`Pattern::new`].
+/// Adapts an escaped string for input to a parser.
 ///
-/// This function returns an iterator suitable to be passed to [`Pattern::new`]
-/// and other parsing functions. Backslashes in the string act as escape
-/// characters.
+/// This function returns an iterator suitable to be passed to
+/// [`Pattern::parse`] and other parsing functions.
+/// Backslashes in the string act as escape characters.
 ///
 /// ```
 /// # use yash_fnmatch::{ast::{Ast, Atom}, with_escape};
@@ -89,11 +89,11 @@ impl Iterator for WithoutEscape<'_> {
     }
 }
 
-/// Adapts a literal string for input to [`Pattern::new`].
+/// Adapts a literal string for input to a parser.
 ///
-/// This function returns an iterator suitable to be passed to [`Pattern::new`]
-/// and other parsing functions. Backslashes in the string do not act as escape
-/// characters.
+/// This function returns an iterator suitable to be passed to
+/// [`Pattern::parse`] and other parsing functions.
+/// Backslashes in the string do not act as escape characters.
 ///
 /// ```
 /// # use yash_fnmatch::{ast::{Ast, Atom}, without_escape};
