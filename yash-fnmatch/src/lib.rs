@@ -117,7 +117,6 @@ pub enum Error {
     RegexError(#[from] regex::Error),
 }
 
-// TODO Consider moving to a submodule
 /// Main part of compiled pattern
 #[derive(Clone, Debug)]
 enum Body {
@@ -137,9 +136,6 @@ pub struct Pattern {
     body: Body,
     config: Config,
 }
-
-// TODO impl Display for Pattern
-// TODO impl FromStr for Pattern
 
 impl Pattern {
     /// Creates a pattern with defaulted configuration.
