@@ -207,6 +207,19 @@ impl Pattern {
         }
     }
 
+    /// Returns the only string that matches the pattern, if any.
+    ///
+    /// If the pattern is made up only of literal characters, this function
+    /// returns the characters as a string. If the pattern contains any `?`,
+    /// `*`, or bracket expression, the result is `None`.
+    #[must_use]
+    pub fn into_literal(self) -> Option<String> {
+        match self.body {
+            Body::Literal(s) => Some(s),
+            Body::Regex { .. } => None,
+        }
+    }
+
     /// Tests whether this pattern matches the given text.
     #[must_use]
     pub fn is_match(&self, text: &str) -> bool {
