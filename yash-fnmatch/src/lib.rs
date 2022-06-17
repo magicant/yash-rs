@@ -14,7 +14,7 @@
 //!     - Complement (`[!...]`)
 //!     - Collating symbols (e.g. `[.ch.]`)
 //!     - Equivalence classes (e.g. `[=a=]`)
-//!     - Character classes (`[:alpha:]`)
+//!     - Character classes (e.g. `[:alpha:]`)
 //!
 //! The current implementation does not support any locale-specific
 //! characteristics. Especially, collating symbols and equivalent classes only
@@ -158,9 +158,9 @@ impl Pattern {
         where
             I: Iterator<Item = PatternChar> + Clone,
         {
-            let ast = Ast::new(i.clone());
-            let body = if ast.is_literal() {
-                Body::Literal(i.map(PatternChar::char_value).collect())
+            let ast = Ast::new(i);
+            let body = if let Some(literal) = ast.to_literal() {
+                Body::Literal(literal)
             } else {
                 Body::Regex {
                     regex: RegexBuilder::new(&ast.to_regex(&config)?)

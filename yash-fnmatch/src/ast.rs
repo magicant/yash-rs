@@ -105,9 +105,38 @@ impl Ast {
     }
 
     /// Tests whether this pattern is completely literal.
+    ///
+    /// This function returns true iff all the atoms are `Atom::Char(_)`.
+    ///
+    /// ```
+    /// # use yash_fnmatch::{ast::{Ast, Atom}, without_escape};
+    /// assert!(Ast::new(without_escape("abc")).is_literal());
+    /// assert!(!Ast::new(without_escape("a*c")).is_literal());
+    /// ```
     #[must_use]
     pub fn is_literal(&self) -> bool {
         self.atoms.iter().all(|atom| matches!(atom, Atom::Char(_)))
+    }
+
+    /// Returns a matching string if this pattern is literal.
+    ///
+    /// If `self` is [literal](Self::is_literal), this function returns a string
+    /// matched by the pattern. Otherwise, the result is `None`.
+    ///
+    /// ```
+    /// # use yash_fnmatch::{ast::{Ast, Atom}, without_escape};
+    /// assert_eq!(Ast::new(without_escape("abc")).to_literal(), Some("abc".to_string()));
+    /// assert_eq!(Ast::new(without_escape("a*c")).to_literal(), None);
+    /// ```
+    #[must_use]
+    pub fn to_literal(&self) -> Option<String> {
+        self.atoms
+            .iter()
+            .map(|atom| match atom {
+                Atom::Char(c) => Some(*c),
+                _ => None,
+            })
+            .collect()
     }
 
     #[must_use]
