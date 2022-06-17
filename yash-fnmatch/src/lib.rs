@@ -188,8 +188,8 @@ impl Pattern {
     /// Returns the configuration for this pattern.
     #[inline]
     #[must_use]
-    pub fn config(&self) -> Config {
-        self.config
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Returns the only string that matches the pattern, if any.
