@@ -17,7 +17,7 @@ publish = false
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", features = ["color"] }
-async-trait = "0.1.53"
+async-trait = "0.1.56"
 futures-executor = "0.3.21"
 futures-util = "0.3.21"
 yash-builtin = { path = "../yash-builtin", version = "0.1.0" }
