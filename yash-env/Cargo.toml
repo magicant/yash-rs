@@ -17,7 +17,7 @@ publish = false
 
 [dependencies]
 annotate-snippets = "0.9.1"
-async-trait = "0.1.53"
+async-trait = "0.1.56"
 either = "1.6.1"
 enumset = "1.0.10"
 futures-util = "0.3.21"

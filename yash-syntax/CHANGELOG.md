@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::Parser::maybe_compound_list` now returning an `InvalidCommandToken`
 error if the list is delimited by a token that is not a clause delimiter.
 - Dependency versions
-    - `async-trait` 0.1.52 → 0.1.53
+    - `async-trait` 0.1.52 → 0.1.56
 
 ### Removed
 
