@@ -50,6 +50,7 @@
 //! matching at all, the result is the input intact.
 
 use super::attr::AttrField;
+use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -66,13 +67,14 @@ pub struct Glob<'a> {
     ///
     /// [generator]: https://github.com/rust-lang/rust/issues/43122
     env: PhantomData<&'a mut Env>,
+
+    inner: Once<Field>,
 }
 
 impl Iterator for Glob<'_> {
     type Item = Field;
     fn next(&mut self) -> Option<Field> {
-        // TODO
-        None
+        self.inner.next()
     }
 }
 
@@ -80,6 +82,53 @@ impl Iterator for Glob<'_> {
 ///
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
-pub fn glob(_env: &mut Env, _field: AttrField) -> Glob {
-    Glob { env: PhantomData }
+pub fn glob(_env: &mut Env, field: AttrField) -> Glob {
+    Glob {
+        env: PhantomData,
+        inner: std::iter::once(field.remove_quotes_and_strip()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::expansion::{AttrChar, Origin};
+    use yash_syntax::source::Location;
+
+    fn dummy_attr_field(s: &str) -> AttrField {
+        let chars = s
+            .chars()
+            .map(|c| AttrChar {
+                value: c,
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            })
+            .collect();
+        let origin = Location::dummy("");
+        AttrField { chars, origin }
+    }
+
+    #[test]
+    fn literal_field() {
+        let mut env = Env::new_virtual();
+        let f = dummy_attr_field("abc");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "abc");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn quoting_characters_are_removed() {
+        let mut env = Env::new_virtual();
+        let mut f = dummy_attr_field("aXbcYde");
+        f.chars[1].is_quoting = true;
+        f.chars[4].is_quoting = true;
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "abcde");
+        assert_eq!(i.next(), None);
+    }
+
+    // TODO AttrChar::is_quoted
+    // TODO Origin::HardExpansion is literal
 }
