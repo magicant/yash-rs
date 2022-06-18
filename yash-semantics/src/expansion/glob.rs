@@ -26,7 +26,7 @@
 //!
 //! - `?`
 //! - `*`
-//! - Character classes (a set of characters enclosed in brackets)
+//! - Bracket expression (a set of characters enclosed in brackets)
 //!
 //! Refer to the [`yash-fnmatch`](yash_fnmatch) crate for pattern syntax and
 //! semantics details.
@@ -48,3 +48,38 @@
 //!
 //! If the input field contains no non-literal elements subject to pattern
 //! matching at all, the result is the input intact.
+
+use super::attr::AttrField;
+use std::marker::PhantomData;
+use yash_env::semantics::Field;
+use yash_env::Env;
+
+/// Iterator that provides results of parameter expansion
+///
+/// This iterator is created with the [`glob`] function.
+pub struct Glob<'a> {
+    /// Dummy to allow retaining a mutable reference to `Env` in the future
+    ///
+    /// The current [`glob`] implementation pre-computes all results before
+    /// returning a `Glob`. The future implementation may optimize by using a
+    /// [generator], which will need a real reference to `Env`.
+    ///
+    /// [generator]: https://github.com/rust-lang/rust/issues/43122
+    env: PhantomData<&'a mut Env>,
+}
+
+impl Iterator for Glob<'_> {
+    type Item = Field;
+    fn next(&mut self) -> Option<Field> {
+        // TODO
+        None
+    }
+}
+
+/// Performs parameter expansion.
+///
+/// This function returns an iterator that yields fields resulting from the
+/// expansion.
+pub fn glob(_env: &mut Env, _field: AttrField) -> Glob {
+    Glob { env: PhantomData }
+}
