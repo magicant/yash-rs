@@ -1,28 +1,24 @@
 [package]
-name = "yash-semantics"
+name = "yash-fnmatch"
 version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
-rust-version = "1.56.0"
-description = "Yash shell language semantics"
+rust-version = "1.58.0"
+description = "Pattern matching for globbing in yash"
 # documentation = "https://yash.osdn.jp/doc/"
 # readme = "README.md"
 # homepage = "https://yash.osdn.jp/"
 repository = "https://github.com/magicant/yash-rs"
-license = "GPL-3.0-or-later"
+license = "MIT OR Apache-2.0"
 # license-file = "../LICENSE"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-async-trait = "0.1.53"
-yash-env = { path = "../yash-env", version = "0.1.0" }
-yash-fnmatch = { path = "../yash-fnmatch", version = "0.1.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.4.0" }
+regex = "1.5.6"
+regex-syntax = "0.6.26"
+thiserror = "1.0.31"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-futures-executor = "0.3.21"
-futures-util = "0.3.21"
-itertools = "0.10.3"
