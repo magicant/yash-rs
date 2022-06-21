@@ -50,10 +50,15 @@
 //! matching at all, the result is the input intact.
 
 use super::attr::AttrField;
+use std::ffi::CStr;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_env::System;
+use yash_fnmatch::Config;
+use yash_fnmatch::Pattern;
+use yash_fnmatch::PatternChar;
 
 /// Iterator that provides results of parameter expansion
 ///
@@ -82,10 +87,56 @@ impl Iterator for Glob<'_> {
 ///
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
-pub fn glob(_env: &mut Env, field: AttrField) -> Glob {
-    Glob {
-        env: PhantomData,
-        inner: std::iter::once(field.remove_quotes_and_strip()),
+pub fn glob(env: &mut Env, field: AttrField) -> Glob {
+    let chars = field.chars.into_iter().filter_map(|c| {
+        if c.is_quoting {
+            None
+        } else {
+            // TODO c.is_quoted
+            Some(PatternChar::Normal(c.value))
+        }
+    });
+    let mut config = Config::default();
+    config.anchor_begin = true;
+    config.anchor_end = true;
+    config.literal_period = true;
+    // TODO Handle parse_with_config error
+    let pattern = Pattern::parse_with_config(chars, config).unwrap();
+    match pattern.into_literal() {
+        Ok(literal) => Glob {
+            env: PhantomData,
+            inner: std::iter::once(Field {
+                value: literal,
+                origin: field.origin,
+            }),
+        },
+        Err(pattern) => {
+            // TODO Open correct directory rather than "/"
+            // TODO Handle opendir error
+            let mut dir = env
+                .system
+                .opendir(CStr::from_bytes_with_nul(b"/\0").unwrap())
+                .unwrap();
+            while let Ok(entry) = dir.next() {
+                // TODO Handle when there is no more file
+                let entry = entry.unwrap();
+
+                // TODO Return all matches
+                // TODO Handle name.as_str error
+                let name = entry.name.to_str().unwrap();
+                if pattern.is_match(name) {
+                    // TODO Handle non-UTF8 string
+                    return Glob {
+                        env: PhantomData,
+                        inner: std::iter::once(Field {
+                            value: name.to_owned(),
+                            origin: field.origin,
+                        }),
+                    };
+                }
+            }
+            todo!("Handle dir.next error")
+        }
     }
 }
 
@@ -107,6 +158,16 @@ mod tests {
             .collect();
         let origin = Location::dummy("");
         AttrField { chars, origin }
+    }
+
+    fn create_dummy_file(env: &mut Env, path: &str) {
+        use yash_env::system::{Mode, OFlag};
+        let path = std::ffi::CString::new(path).unwrap();
+        let fd = env
+            .system
+            .open(&path, OFlag::O_RDWR | OFlag::O_CREAT, Mode::all())
+            .unwrap();
+        env.system.close(fd).unwrap();
     }
 
     #[test]
@@ -131,4 +192,19 @@ mod tests {
 
     // TODO AttrChar::is_quoted
     // TODO Origin::HardExpansion is literal
+
+    #[test]
+    fn single_component_pattern_single_match() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.exe");
+        create_dummy_file(&mut env, "foo.txt");
+        let f = dummy_attr_field("*.txt");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next(), None);
+    }
+
+    // TODO single_component_pattern_no_match
+    // TODO single_component_pattern_many_matches
+    // TODO multi_component_patterns
 }

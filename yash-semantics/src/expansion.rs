@@ -51,8 +51,9 @@
 //!
 //! ## Pathname expansion
 //!
-//! The pathname expansion performs pattern matching on the name of existing
-//! files to produce pathnames. This operation is also known as "globbing."
+//! The [pathname expansion](mod@glob) performs pattern matching on the name of
+//! existing files to produce pathnames. This operation is also known as
+//! "globbing."
 //!
 //! # Quote removal and attribute stripping
 //!
