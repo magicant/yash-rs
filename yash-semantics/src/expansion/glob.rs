@@ -88,7 +88,7 @@ impl Iterator for Glob<'_> {
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
-    let chars = field.chars.into_iter().filter_map(|c| {
+    let chars = field.chars.iter().filter_map(|c| {
         if c.is_quoting {
             None
         } else {
@@ -119,7 +119,15 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
                 .unwrap();
             while let Ok(entry) = dir.next() {
                 // TODO Handle when there is no more file
-                let entry = entry.unwrap();
+                let entry = match entry {
+                    Some(entry) => entry,
+                    None => {
+                        return Glob {
+                            env: PhantomData,
+                            inner: std::iter::once(field.remove_quotes_and_strip()),
+                        }
+                    }
+                };
 
                 // TODO Return all matches
                 // TODO Handle name.as_str error
@@ -194,6 +202,16 @@ mod tests {
     // TODO Origin::HardExpansion is literal
 
     #[test]
+    fn single_component_pattern_no_match() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.exe");
+        let f = dummy_attr_field("*.txt");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "*.txt");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
     fn single_component_pattern_single_match() {
         let mut env = Env::new_virtual();
         create_dummy_file(&mut env, "foo.exe");
@@ -204,7 +222,6 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO single_component_pattern_no_match
     // TODO single_component_pattern_many_matches
     // TODO multi_component_patterns
 }
