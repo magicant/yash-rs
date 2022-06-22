@@ -67,6 +67,12 @@ enum Inner {
     Many(std::vec::IntoIter<Field>),
 }
 
+impl From<Field> for Inner {
+    fn from(field: Field) -> Self {
+        Inner::One(std::iter::once(field))
+    }
+}
+
 /// Iterator that provides results of parameter expansion
 ///
 /// This iterator is created with the [`glob`] function.
@@ -128,13 +134,13 @@ fn to_pattern(field: &AttrField) -> Option<Pattern> {
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     let pattern = match to_pattern(&field) {
         Some(pattern) => pattern,
-        None => return Glob::from(Inner::One(std::iter::once(field.remove_quotes_and_strip()))),
+        None => return Glob::from(Inner::from(field.remove_quotes_and_strip())),
     };
     match pattern.into_literal() {
-        Ok(literal) => Glob::from(Inner::One(std::iter::once(Field {
+        Ok(literal) => Glob::from(Inner::from(Field {
             value: literal,
             origin: field.origin,
-        }))),
+        })),
         Err(pattern) => {
             // TODO Open correct directory rather than "/"
             // TODO Handle opendir error
@@ -148,7 +154,7 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
                     Some(entry) => entry,
                     None => {
                         return Glob::from(if paths.is_empty() {
-                            Inner::One(std::iter::once(field.remove_quotes_and_strip()))
+                            Inner::from(field.remove_quotes_and_strip())
                         } else {
                             paths.sort_unstable_by(|a, b| a.value.cmp(&b.value));
                             Inner::Many(paths.into_iter())
