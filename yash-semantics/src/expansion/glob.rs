@@ -84,6 +84,15 @@ pub struct Glob<'a> {
     inner: Inner,
 }
 
+impl From<Inner> for Glob<'_> {
+    fn from(inner: Inner) -> Self {
+        Glob {
+            env: PhantomData,
+            inner,
+        }
+    }
+}
+
 impl Iterator for Glob<'_> {
     type Item = Field;
     fn next(&mut self) -> Option<Field> {
@@ -119,21 +128,13 @@ fn to_pattern(field: &AttrField) -> Option<Pattern> {
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     let pattern = match to_pattern(&field) {
         Some(pattern) => pattern,
-        None => {
-            return Glob {
-                env: PhantomData,
-                inner: Inner::One(std::iter::once(field.remove_quotes_and_strip())),
-            }
-        }
+        None => return Glob::from(Inner::One(std::iter::once(field.remove_quotes_and_strip()))),
     };
     match pattern.into_literal() {
-        Ok(literal) => Glob {
-            env: PhantomData,
-            inner: Inner::One(std::iter::once(Field {
-                value: literal,
-                origin: field.origin,
-            })),
-        },
+        Ok(literal) => Glob::from(Inner::One(std::iter::once(Field {
+            value: literal,
+            origin: field.origin,
+        }))),
         Err(pattern) => {
             // TODO Open correct directory rather than "/"
             // TODO Handle opendir error
@@ -146,15 +147,12 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
                 let entry = match entry {
                     Some(entry) => entry,
                     None => {
-                        return Glob {
-                            env: PhantomData,
-                            inner: if paths.is_empty() {
-                                Inner::One(std::iter::once(field.remove_quotes_and_strip()))
-                            } else {
-                                paths.sort_unstable_by(|a, b| a.value.cmp(&b.value));
-                                Inner::Many(paths.into_iter())
-                            },
-                        };
+                        return Glob::from(if paths.is_empty() {
+                            Inner::One(std::iter::once(field.remove_quotes_and_strip()))
+                        } else {
+                            paths.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+                            Inner::Many(paths.into_iter())
+                        });
                     }
                 };
 
