@@ -94,11 +94,8 @@ impl Iterator for Glob<'_> {
     }
 }
 
-/// Performs parameter expansion.
-///
-/// This function returns an iterator that yields fields resulting from the
-/// expansion.
-pub fn glob(env: &mut Env, field: AttrField) -> Glob {
+/// Converts a field to a glob pattern.
+fn to_pattern(field: &AttrField) -> Option<Pattern> {
     let chars = field.chars.iter().filter_map(|c| {
         if c.is_quoting {
             None
@@ -112,8 +109,16 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     config.anchor_begin = true;
     config.anchor_end = true;
     config.literal_period = true;
-    // TODO Handle parse_with_config error
-    let pattern = Pattern::parse_with_config(chars, config).unwrap();
+    Pattern::parse_with_config(chars, config).ok()
+}
+
+/// Performs parameter expansion.
+///
+/// This function returns an iterator that yields fields resulting from the
+/// expansion.
+pub fn glob(env: &mut Env, field: AttrField) -> Glob {
+    // TODO Handle to_pattern error
+    let pattern = to_pattern(&field).unwrap();
     match pattern.into_literal() {
         Ok(literal) => Glob {
             env: PhantomData,
