@@ -50,6 +50,7 @@
 //! matching at all, the result is the input intact.
 
 use super::attr::AttrField;
+use super::attr::Origin;
 use std::ffi::CStr;
 use std::iter::Once;
 use std::marker::PhantomData;
@@ -101,7 +102,7 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     let chars = field.chars.iter().filter_map(|c| {
         if c.is_quoting {
             None
-        } else if c.is_quoted {
+        } else if c.is_quoted || c.origin == Origin::HardExpansion {
             Some(PatternChar::Literal(c.value))
         } else {
             Some(PatternChar::Normal(c.value))
@@ -221,7 +222,16 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO Origin::HardExpansion is literal
+    #[test]
+    fn characters_from_hard_expansion_do_not_expand() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.exe");
+        let mut f = dummy_attr_field("foo.*");
+        f.chars[4].origin = Origin::HardExpansion;
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo.*");
+        assert_eq!(i.next(), None);
+    }
 
     #[test]
     fn single_component_pattern_no_match() {
