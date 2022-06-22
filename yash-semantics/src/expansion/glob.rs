@@ -60,9 +60,16 @@ use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;
 
+#[derive(Debug)]
+enum Inner {
+    One(Once<Field>),
+    Many(std::vec::IntoIter<Field>),
+}
+
 /// Iterator that provides results of parameter expansion
 ///
 /// This iterator is created with the [`glob`] function.
+#[derive(Debug)]
 pub struct Glob<'a> {
     /// Dummy to allow retaining a mutable reference to `Env` in the future
     ///
@@ -73,13 +80,16 @@ pub struct Glob<'a> {
     /// [generator]: https://github.com/rust-lang/rust/issues/43122
     env: PhantomData<&'a mut Env>,
 
-    inner: Once<Field>,
+    inner: Inner,
 }
 
 impl Iterator for Glob<'_> {
     type Item = Field;
     fn next(&mut self) -> Option<Field> {
-        self.inner.next()
+        match &mut self.inner {
+            Inner::One(once) => once.next(),
+            Inner::Many(many) => many.next(),
+        }
     }
 }
 
@@ -105,10 +115,10 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     match pattern.into_literal() {
         Ok(literal) => Glob {
             env: PhantomData,
-            inner: std::iter::once(Field {
+            inner: Inner::One(std::iter::once(Field {
                 value: literal,
                 origin: field.origin,
-            }),
+            })),
         },
         Err(pattern) => {
             // TODO Open correct directory rather than "/"
@@ -117,30 +127,31 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
                 .system
                 .opendir(CStr::from_bytes_with_nul(b"/\0").unwrap())
                 .unwrap();
+            let mut paths: Vec<Field> = Vec::new();
             while let Ok(entry) = dir.next() {
-                // TODO Handle when there is no more file
                 let entry = match entry {
                     Some(entry) => entry,
                     None => {
                         return Glob {
                             env: PhantomData,
-                            inner: std::iter::once(field.remove_quotes_and_strip()),
-                        }
+                            inner: if paths.is_empty() {
+                                Inner::One(std::iter::once(field.remove_quotes_and_strip()))
+                            } else {
+                                paths.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+                                Inner::Many(paths.into_iter())
+                            },
+                        };
                     }
                 };
 
-                // TODO Return all matches
                 // TODO Handle name.as_str error
                 let name = entry.name.to_str().unwrap();
                 if pattern.is_match(name) {
                     // TODO Handle non-UTF8 string
-                    return Glob {
-                        env: PhantomData,
-                        inner: std::iter::once(Field {
-                            value: name.to_owned(),
-                            origin: field.origin,
-                        }),
-                    };
+                    paths.push(Field {
+                        value: name.to_owned(),
+                        origin: field.origin.clone(),
+                    });
                 }
             }
             todo!("Handle dir.next error")
@@ -222,6 +233,17 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO single_component_pattern_many_matches
+    #[test]
+    fn single_component_pattern_many_matches() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.exe");
+        create_dummy_file(&mut env, "foo.txt");
+        let f = dummy_attr_field("foo.*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo.exe");
+        assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next(), None);
+    }
+
     // TODO multi_component_patterns
 }

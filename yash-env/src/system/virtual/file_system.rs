@@ -268,6 +268,13 @@ impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
             entries.push(Rc::from(OsStr::new(".")));
             entries.push(Rc::from(OsStr::new("..")));
             entries.extend(files.keys().cloned());
+
+            // You should not pose any assumption on the order of entries.
+            // Here, we deliberately disorder the entries.
+            let entry = entries.pop().unwrap();
+            let i = entries.len() / 2;
+            entries.insert(i, entry);
+
             Ok(Self::new(entries.into_iter()))
         } else {
             Err(Errno::ENOTDIR)
