@@ -101,8 +101,9 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
     let chars = field.chars.iter().filter_map(|c| {
         if c.is_quoting {
             None
+        } else if c.is_quoted {
+            Some(PatternChar::Literal(c.value))
         } else {
-            // TODO c.is_quoted
             Some(PatternChar::Normal(c.value))
         }
     });
@@ -209,7 +210,17 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO AttrChar::is_quoted
+    #[test]
+    fn quoted_characters_do_not_expand() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.exe");
+        let mut f = dummy_attr_field("foo.*");
+        f.chars[4].is_quoted = true;
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo.*");
+        assert_eq!(i.next(), None);
+    }
+
     // TODO Origin::HardExpansion is literal
 
     #[test]
