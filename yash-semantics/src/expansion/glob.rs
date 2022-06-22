@@ -117,8 +117,15 @@ fn to_pattern(field: &AttrField) -> Option<Pattern> {
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
-    // TODO Handle to_pattern error
-    let pattern = to_pattern(&field).unwrap();
+    let pattern = match to_pattern(&field) {
+        Some(pattern) => pattern,
+        None => {
+            return Glob {
+                env: PhantomData,
+                inner: Inner::One(std::iter::once(field.remove_quotes_and_strip())),
+            }
+        }
+    };
     match pattern.into_literal() {
         Ok(literal) => Glob {
             env: PhantomData,
@@ -272,4 +279,14 @@ mod tests {
     }
 
     // TODO multi_component_patterns
+
+    #[test]
+    fn invalid_pattern_remains_intact() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "foo.txt");
+        let f = dummy_attr_field("*[[:wrong:]]*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "*[[:wrong:]]*");
+        assert_eq!(i.next(), None);
+    }
 }
