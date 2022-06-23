@@ -49,9 +49,10 @@
 //! If the input field contains no non-literal elements subject to pattern
 //! matching at all, the result is the input intact.
 
+use super::attr::AttrChar;
 use super::attr::AttrField;
 use super::attr::Origin;
-use std::ffi::CStr;
+use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::semantics::Field;
@@ -60,6 +61,7 @@ use yash_env::System;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_fnmatch::PatternChar;
+use yash_syntax::source::Location;
 
 #[derive(Debug)]
 enum Inner {
@@ -110,8 +112,8 @@ impl Iterator for Glob<'_> {
 }
 
 /// Converts a field to a glob pattern.
-fn to_pattern(field: &AttrField) -> Option<Pattern> {
-    let chars = field.chars.iter().filter_map(|c| {
+fn to_pattern(field: &[AttrChar]) -> Option<Pattern> {
+    let chars = field.iter().filter_map(|c| {
         if c.is_quoting {
             None
         } else if c.is_quoted || c.origin == Origin::HardExpansion {
@@ -127,54 +129,113 @@ fn to_pattern(field: &AttrField) -> Option<Pattern> {
     Pattern::parse_with_config(chars, config).ok()
 }
 
+fn remove_quotes_and_strip(chars: &[AttrChar]) -> impl Iterator<Item = char> + '_ {
+    use super::attr_strip::Strip;
+    use super::quote_removal::skip_quotes;
+    skip_quotes(chars.iter().copied()).strip()
+}
+
+#[derive(Debug)]
+struct SearchEnv<'e> {
+    env: &'e mut Env,
+    prefix: String,
+    origin: Location,
+    results: Vec<Field>,
+}
+
+impl SearchEnv<'_> {
+    /// Recursively searches directories for matching pathnames.
+    fn search_dir(&mut self, suffix: &[AttrChar]) {
+        let (this, new_suffix) = match suffix.iter().position(|c| c.value == '/') {
+            None => (suffix, None),
+            Some(index) => (&suffix[..index], Some(&suffix[index + 1..])),
+        };
+
+        match to_pattern(this).map(Pattern::into_literal) {
+            None => {
+                self.push_component(new_suffix, |prefix| {
+                    prefix.extend(remove_quotes_and_strip(this))
+                });
+            }
+            Some(Ok(literal)) => {
+                self.push_component(new_suffix, |prefix| prefix.push_str(&literal));
+            }
+            Some(Err(pattern)) => {
+                let dir_path = if self.prefix.is_empty() {
+                    // TODO CString::new(".")
+                    CString::new("/").unwrap()
+                } else {
+                    // TODO What if prefix contains a nul byte?
+                    CString::new(self.prefix.as_str()).unwrap()
+                };
+
+                // TODO Handle opendir error
+                let mut dir = self.env.system.opendir(&dir_path).unwrap();
+                while let Ok(Some(entry)) = dir.next() {
+                    // TODO Handle name.as_str error
+                    let name = entry.name.to_str().unwrap();
+                    if pattern.is_match(name) {
+                        self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Pushes a pathname component to `prefix` and start processing the next suffix
+    /// component.
+    fn push_component<F>(&mut self, suffix: Option<&[AttrChar]>, push: F)
+    where
+        F: FnOnce(&mut String),
+    {
+        let old_prefix_len = self.prefix.len();
+        push(&mut self.prefix);
+
+        match suffix {
+            None => {
+                // TODO Ensure the resulting path names an existing file if
+                // `component` comes from a literal rather than a directory entry
+                self.results.push(Field {
+                    value: self.prefix.clone(),
+                    origin: self.origin.clone(),
+                });
+            }
+            Some(suffix) => {
+                self.prefix.push('/');
+                self.search_dir(suffix);
+            }
+        }
+
+        self.prefix.truncate(old_prefix_len);
+    }
+}
+
 /// Performs parameter expansion.
 ///
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
-    let pattern = match to_pattern(&field) {
-        Some(pattern) => pattern,
-        None => return Glob::from(Inner::from(field.remove_quotes_and_strip())),
-    };
-    match pattern.into_literal() {
-        Ok(literal) => Glob::from(Inner::from(Field {
-            value: literal,
-            origin: field.origin,
-        })),
-        Err(pattern) => {
-            // TODO Open correct directory rather than "/"
-            // TODO Handle opendir error
-            let mut dir = env
-                .system
-                .opendir(CStr::from_bytes_with_nul(b"/\0").unwrap())
-                .unwrap();
-            let mut paths: Vec<Field> = Vec::new();
-            while let Ok(entry) = dir.next() {
-                let entry = match entry {
-                    Some(entry) => entry,
-                    None => {
-                        return Glob::from(if paths.is_empty() {
-                            Inner::from(field.remove_quotes_and_strip())
-                        } else {
-                            paths.sort_unstable_by(|a, b| a.value.cmp(&b.value));
-                            Inner::Many(paths.into_iter())
-                        });
-                    }
-                };
+    // TODO Quick check for *, ?, [ containment
 
-                // TODO Handle name.as_str error
-                let name = entry.name.to_str().unwrap();
-                if pattern.is_match(name) {
-                    // TODO Handle non-UTF8 string
-                    paths.push(Field {
-                        value: name.to_owned(),
-                        origin: field.origin.clone(),
-                    });
-                }
-            }
-            todo!("Handle dir.next error")
-        }
-    }
+    let mut search_env = SearchEnv {
+        env,
+        prefix: String::with_capacity(1024 /*nix::libc::PATH_MAX*/),
+        origin: field.origin,
+        results: Vec::new(),
+    };
+    search_env.search_dir(&field.chars);
+
+    let mut results = search_env.results;
+    Glob::from(if results.is_empty() {
+        let field = AttrField {
+            chars: field.chars,
+            origin: search_env.origin,
+        };
+        Inner::from(field.remove_quotes_and_strip())
+    } else {
+        results.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        Inner::Many(results.into_iter())
+    })
 }
 
 #[cfg(test)]
@@ -279,6 +340,18 @@ mod tests {
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo.exe");
         assert_eq!(i.next().unwrap().value, "foo.txt");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn absolute_path_single_component_pattern_many_matches() {
+        let mut env = Env::new_virtual();
+        create_dummy_file(&mut env, "/foo.exe");
+        create_dummy_file(&mut env, "/foo.txt");
+        let f = dummy_attr_field("/foo.*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "/foo.exe");
+        assert_eq!(i.next().unwrap().value, "/foo.txt");
         assert_eq!(i.next(), None);
     }
 
