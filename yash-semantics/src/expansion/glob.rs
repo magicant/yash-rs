@@ -241,7 +241,11 @@ pub fn glob(env: &mut Env, field: AttrField) -> Glob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expansion::{AttrChar, Origin};
+    use crate::expansion::AttrChar;
+    use crate::expansion::Origin;
+    use std::path::Path;
+    use std::rc::Rc;
+    use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
     fn dummy_attr_field(s: &str) -> AttrField {
@@ -258,14 +262,18 @@ mod tests {
         AttrField { chars, origin }
     }
 
-    fn create_dummy_file(env: &mut Env, path: &str) {
-        use yash_env::system::{Mode, OFlag};
-        let path = std::ffi::CString::new(path).unwrap();
-        let fd = env
-            .system
-            .open(&path, OFlag::O_RDWR | OFlag::O_CREAT, Mode::all())
-            .unwrap();
-        env.system.close(fd).unwrap();
+    fn env_with_dummy_files<I, P>(paths: I) -> Env
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        for path in paths {
+            state.file_system.save(path, Rc::default()).unwrap();
+        }
+        drop(state);
+        Env::with_system(Box::new(system))
     }
 
     #[test]
@@ -290,8 +298,7 @@ mod tests {
 
     #[test]
     fn quoted_characters_do_not_expand() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.exe");
+        let mut env = env_with_dummy_files(["foo.exe"]);
         let mut f = dummy_attr_field("foo.*");
         f.chars[4].is_quoted = true;
         let mut i = glob(&mut env, f);
@@ -301,8 +308,7 @@ mod tests {
 
     #[test]
     fn characters_from_hard_expansion_do_not_expand() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.exe");
+        let mut env = env_with_dummy_files(["foo.exe"]);
         let mut f = dummy_attr_field("foo.*");
         f.chars[4].origin = Origin::HardExpansion;
         let mut i = glob(&mut env, f);
@@ -312,8 +318,7 @@ mod tests {
 
     #[test]
     fn single_component_pattern_no_match() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.exe");
+        let mut env = env_with_dummy_files(["foo.exe"]);
         let f = dummy_attr_field("*.txt");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "*.txt");
@@ -322,9 +327,7 @@ mod tests {
 
     #[test]
     fn single_component_pattern_single_match() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.exe");
-        create_dummy_file(&mut env, "foo.txt");
+        let mut env = env_with_dummy_files(["foo.exe", "foo.txt"]);
         let f = dummy_attr_field("*.txt");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo.txt");
@@ -333,9 +336,7 @@ mod tests {
 
     #[test]
     fn single_component_pattern_many_matches() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.exe");
-        create_dummy_file(&mut env, "foo.txt");
+        let mut env = env_with_dummy_files(["foo.exe", "foo.txt"]);
         let f = dummy_attr_field("foo.*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo.exe");
@@ -345,9 +346,7 @@ mod tests {
 
     #[test]
     fn absolute_path_single_component_pattern_many_matches() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "/foo.exe");
-        create_dummy_file(&mut env, "/foo.txt");
+        let mut env = env_with_dummy_files(["/foo.exe", "/foo.txt"]);
         let f = dummy_attr_field("/foo.*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "/foo.exe");
@@ -359,8 +358,7 @@ mod tests {
 
     #[test]
     fn invalid_pattern_remains_intact() {
-        let mut env = Env::new_virtual();
-        create_dummy_file(&mut env, "foo.txt");
+        let mut env = env_with_dummy_files(["foo.txt"]);
         let f = dummy_attr_field("*[[:wrong:]]*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "*[[:wrong:]]*");
