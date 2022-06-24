@@ -354,7 +354,23 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO multi_component_patterns
+    #[test]
+    fn multi_component_pattern_ending_with_pattern() {
+        let mut env = env_with_dummy_files([
+            "a/a/a/a", "a/a/a/b", "a/a/a/no", "a/a/b/a", "a/b/a/a", "a/b/a/b", "a/b/a/no",
+            "a/no/a/a", "b/a/a/a",
+        ]);
+        let f = dummy_attr_field("a/?/a/?");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "a/a/a/a");
+        assert_eq!(i.next().unwrap().value, "a/a/a/b");
+        assert_eq!(i.next().unwrap().value, "a/b/a/a");
+        assert_eq!(i.next().unwrap().value, "a/b/a/b");
+        assert_eq!(i.next(), None);
+    }
+
+    // TODO multi_component_pattern_ending_with_literal
+    // TODO multi_component_pattern_with_adjacent_slashes
 
     #[test]
     fn invalid_pattern_remains_intact() {
@@ -364,4 +380,6 @@ mod tests {
         assert_eq!(i.next().unwrap().value, "*[[:wrong:]]*");
         assert_eq!(i.next(), None);
     }
+
+    // TODO slash_between_brackets "[a/b]"
 }
