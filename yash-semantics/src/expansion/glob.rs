@@ -56,6 +56,8 @@ use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::semantics::Field;
+use yash_env::system::Mode;
+use yash_env::system::OFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_fnmatch::Config;
@@ -182,6 +184,21 @@ impl SearchEnv<'_> {
         }
     }
 
+    fn file_exists(&mut self) -> bool {
+        // TODO Use "stat" rather than "open" and "close". O_PATH is
+        // Linux-specific and non-portable.
+        let path = match CString::new(self.prefix.as_str()) {
+            Ok(path) => path,
+            Err(_) => return false,
+        };
+        let fd = self.env.system.open(&path, OFlag::O_PATH, Mode::empty());
+        let file_exists = fd.is_ok();
+        if let Ok(fd) = fd {
+            let _ = self.env.system.close(fd);
+        }
+        file_exists
+    }
+
     /// Pushes a pathname component to `prefix` and start processing the next suffix
     /// component.
     fn push_component<F>(&mut self, suffix: Option<&[AttrChar]>, push: F)
@@ -193,12 +210,14 @@ impl SearchEnv<'_> {
 
         match suffix {
             None => {
-                // TODO Ensure the resulting path names an existing file if
-                // `component` comes from a literal rather than a directory entry
-                self.results.push(Field {
-                    value: self.prefix.clone(),
-                    origin: self.origin.clone(),
-                });
+                // TODO Don't need to check the file existence if the last path
+                // component comes from a directory entry
+                if self.file_exists() {
+                    self.results.push(Field {
+                        value: self.prefix.clone(),
+                        origin: self.origin.clone(),
+                    });
+                }
             }
             Some(suffix) => {
                 self.prefix.push('/');
@@ -369,7 +388,27 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO multi_component_pattern_ending_with_literal
+    #[test]
+    fn multi_component_pattern_ending_with_literal() {
+        let mut env = env_with_dummy_files([
+            "/a/a/a/a",
+            "/a/a/a/b",
+            "/a/a/b/a",
+            "/a/a/no/a",
+            "/a/b/a/a",
+            "/b/a/a/a",
+            "/b/a/b/b",
+            "/no/a",
+        ]);
+        let f = dummy_attr_field("/?/a/?/a");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "/a/a/a/a");
+        assert_eq!(i.next().unwrap().value, "/a/a/b/a");
+        assert_eq!(i.next().unwrap().value, "/b/a/a/a");
+        assert_eq!(i.next(), None);
+    }
+
+    // TODO multi_component_pattern_ending_with_slash
     // TODO multi_component_pattern_with_adjacent_slashes
 
     #[test]
