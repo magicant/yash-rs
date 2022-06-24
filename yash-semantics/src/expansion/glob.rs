@@ -171,13 +171,13 @@ impl SearchEnv<'_> {
                     CString::new(self.prefix.as_str()).unwrap()
                 };
 
-                // TODO Handle opendir error
-                let mut dir = self.env.system.opendir(&dir_path).unwrap();
-                while let Ok(Some(entry)) = dir.next() {
-                    // TODO Handle name.as_str error
-                    let name = entry.name.to_str().unwrap();
-                    if pattern.is_match(name) {
-                        self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
+                    while let Ok(Some(entry)) = dir.next() {
+                        // TODO Handle name.as_str error
+                        let name = entry.name.to_str().unwrap();
+                        if pattern.is_match(name) {
+                            self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                        }
                     }
                 }
             }
@@ -398,6 +398,9 @@ mod tests {
             "/a/b/a/a",
             "/b/a/a/a",
             "/b/a/b/b",
+            "/b/a/c",
+            "/b/a/no",
+            "/c/a",
             "/no/a",
         ]);
         let f = dummy_attr_field("/?/a/?/a");
