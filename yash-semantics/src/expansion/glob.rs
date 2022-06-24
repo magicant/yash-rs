@@ -411,7 +411,16 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO multi_component_pattern_ending_with_slash
+    #[test]
+    fn multi_component_pattern_ending_with_slash() {
+        let mut env = env_with_dummy_files(["a/a/_", "a/b/_", "a/c"]);
+        let f = dummy_attr_field("a/*/");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "a/a/");
+        assert_eq!(i.next().unwrap().value, "a/b/");
+        assert_eq!(i.next(), None);
+    }
+
     // TODO multi_component_pattern_with_adjacent_slashes
 
     #[test]
