@@ -308,6 +308,8 @@ where
     }
 }
 
+// TODO impl Drop for VirtualDir: close backing file descriptor
+
 #[cfg(test)]
 mod tests {
     use super::*;
