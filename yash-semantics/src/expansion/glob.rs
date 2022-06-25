@@ -164,8 +164,7 @@ impl SearchEnv<'_> {
             }
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
-                    // TODO CString::new(".")
-                    CString::new("/").unwrap()
+                    CString::new(".").unwrap()
                 } else {
                     // TODO What if prefix contains a nul byte?
                     CString::new(self.prefix.as_str()).unwrap()
