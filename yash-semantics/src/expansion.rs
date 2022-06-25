@@ -51,8 +51,9 @@
 //!
 //! ## Pathname expansion
 //!
-//! The pathname expansion performs pattern matching on the name of existing
-//! files to produce pathnames. This operation is also known as "globbing."
+//! The [pathname expansion](mod@glob) performs pattern matching on the name of
+//! existing files to produce pathnames. This operation is also known as
+//! "globbing."
 //!
 //! # Quote removal and attribute stripping
 //!
@@ -74,6 +75,7 @@ pub mod split;
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
+use self::glob::glob;
 use self::initial::Expand;
 use self::split::Ifs;
 use std::borrow::Cow;
@@ -263,13 +265,11 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     }
     drop(ifs);
 
-    // TODO pathname expansion
-
-    // quote removal and attribute stripping //
-    let fields = split_fields
-        .into_iter()
-        .map(AttrField::remove_quotes_and_strip)
-        .collect();
+    // pathname expansion (including quote removal and attribute stripping) //
+    let mut fields = Vec::with_capacity(split_fields.len());
+    for field in split_fields {
+        fields.extend(glob(env.inner, field));
+    }
     Ok((fields, env.last_command_subst_exit_status))
 }
 

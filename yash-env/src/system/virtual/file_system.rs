@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::os::unix::ffi::OsStrExt;
 use std::path::Component;
 use std::path::Path;
 use std::rc::Rc;
@@ -143,6 +144,11 @@ impl FileSystem {
                 let child = Rc::clone(children.get(name).ok_or(Errno::ENOENT)?);
                 drop(node_ref);
                 node = child;
+            }
+            if path.as_os_str().as_bytes().ends_with(b"/")
+                && !matches!(&node.borrow().body, FileBody::Directory { .. })
+            {
+                return Err(Errno::ENOTDIR);
             }
             Ok(node)
         }
@@ -268,6 +274,13 @@ impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
             entries.push(Rc::from(OsStr::new(".")));
             entries.push(Rc::from(OsStr::new("..")));
             entries.extend(files.keys().cloned());
+
+            // You should not pose any assumption on the order of entries.
+            // Here, we deliberately disorder the entries.
+            let entry = entries.pop().unwrap();
+            let i = entries.len() / 2;
+            entries.insert(i, entry);
+
             Ok(Self::new(entries.into_iter()))
         } else {
             Err(Errno::ENOTDIR)
@@ -361,6 +374,8 @@ mod tests {
     fn file_system_get_not_directory() {
         let mut fs = FileSystem::default();
         let _ = fs.save("/file", Rc::default());
+        let result = fs.get("/file/");
+        assert_eq!(result, Err(Errno::ENOTDIR));
         let result = fs.get("/file/foo");
         assert_eq!(result, Err(Errno::ENOTDIR));
     }

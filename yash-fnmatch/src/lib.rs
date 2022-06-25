@@ -211,12 +211,11 @@ impl Pattern {
     ///
     /// If the pattern is made up only of literal characters, this function
     /// returns the characters as a string. If the pattern contains any `?`,
-    /// `*`, or bracket expression, the result is `None`.
-    #[must_use]
-    pub fn into_literal(self) -> Option<String> {
+    /// `*`, or bracket expression, the result is `Err(self)`.
+    pub fn into_literal(self) -> Result<String, Self> {
         match self.body {
-            Body::Literal(s) => Some(s),
-            Body::Regex { .. } => None,
+            Body::Literal(s) => Ok(s),
+            Body::Regex { .. } => Err(self),
         }
     }
 
