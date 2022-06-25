@@ -41,8 +41,8 @@ mod char_iter;
 
 use self::ast::Ast;
 pub use self::char_iter::*;
-use regex::bytes::Regex;
-use regex::bytes::RegexBuilder;
+use regex::Regex;
+use regex::RegexBuilder;
 use std::ops::Range;
 use thiserror::Error;
 
@@ -236,7 +236,7 @@ impl Pattern {
                 let reject_initial_dot =
                     self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
                 let at_index = if reject_initial_dot { 1 } else { 0 };
-                regex.is_match_at(text.as_bytes(), at_index)
+                regex.is_match_at(text, at_index)
             }
         }
     }
@@ -261,7 +261,7 @@ impl Pattern {
                 let reject_initial_dot =
                     self.config.literal_period && !starts_with_literal_dot && text.starts_with('.');
                 let at_index = if reject_initial_dot { 1 } else { 0 };
-                regex.find_at(text.as_bytes(), at_index).map(|m| m.range())
+                regex.find_at(text, at_index).map(|m| m.range())
             }
         }
     }
