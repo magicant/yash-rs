@@ -421,7 +421,15 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO multi_component_pattern_with_adjacent_slashes
+    #[test]
+    fn multi_component_pattern_with_adjacent_slashes() {
+        let mut env = env_with_dummy_files(["a/b", "b/a"]);
+        let f = dummy_attr_field("?//?");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "a//b");
+        assert_eq!(i.next().unwrap().value, "b//a");
+        assert_eq!(i.next(), None);
+    }
 
     #[test]
     fn invalid_pattern_remains_intact() {
@@ -432,5 +440,12 @@ mod tests {
         assert_eq!(i.next(), None);
     }
 
-    // TODO slash_between_brackets "[a/b]"
+    #[test]
+    fn slash_between_brackets() {
+        let mut env = env_with_dummy_files(["abd", "a/d"]);
+        let f = dummy_attr_field("a[b/c]d");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "a[b/c]d");
+        assert_eq!(i.next(), None);
+    }
 }
