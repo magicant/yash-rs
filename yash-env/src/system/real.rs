@@ -188,13 +188,13 @@ impl System for RealSystem {
         }
     }
 
-    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::fdopendir(fd.0) };
         let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
     }
 
-    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
         let dir = unsafe { nix::libc::opendir(path.as_ptr()) };
         let dir = NonNull::new(dir).ok_or_else(Errno::last)?;
         Ok(Box::new(RealDir(dir)))
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn real_system_directory_entries() {
-        let system = unsafe { RealSystem::new() };
+        let mut system = unsafe { RealSystem::new() };
         let path = CString::new(".").unwrap();
         let mut dir = system.opendir(&path).unwrap();
         let mut count = 0;

@@ -141,10 +141,10 @@ pub trait System: Debug {
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
 
     /// Opens a directory for enumerating entries.
-    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
+    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
 
     /// Opens a directory for enumerating entries.
-    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
+    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>>;
 
     /// Returns the current time.
     #[must_use]
@@ -626,11 +626,11 @@ impl System for SharedSystem {
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
     }
-    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
-        self.0.borrow().fdopendir(fd)
+    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+        self.0.borrow_mut().fdopendir(fd)
     }
-    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
-        self.0.borrow().opendir(path)
+    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+        self.0.borrow_mut().opendir(path)
     }
     fn now(&self) -> Instant {
         self.0.borrow().now()

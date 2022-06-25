@@ -367,7 +367,7 @@ impl System for VirtualSystem {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
     }
 
-    fn fdopendir(&self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
+    fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
         self.with_open_file_description(fd, |ofd| {
             let inode = ofd.i_node();
             let dir = VirtualDir::try_from(&inode.borrow().body)?;
@@ -375,11 +375,14 @@ impl System for VirtualSystem {
         })
     }
 
-    fn opendir(&self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
-        let path = OsStr::from_bytes(path.to_bytes());
-        let inode = self.state.borrow().file_system.get(path)?;
-        let dir = VirtualDir::try_from(&inode.borrow().body)?;
-        Ok(Box::new(dir))
+    fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
+        // TODO Should use O_SEARCH, but currently it is only supported on netbsd
+        let fd = self.open(
+            path,
+            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+            nix::sys::stat::Mode::empty(),
+        )?;
+        self.fdopendir(fd)
     }
 
     /// Returns `now` in [`SystemState`].
@@ -742,6 +745,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::ffi::CString;
+    use std::ffi::OsString;
 
     impl Executor for futures_executor::LocalSpawner {
         fn spawn(
@@ -1080,6 +1084,33 @@ mod tests {
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn opendir_default_working_directory() {
+        // The default working directory is the root directory.
+        let mut system = VirtualSystem::new();
+
+        let _ = system.open(
+            &CString::new("/dir/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::all(),
+        );
+
+        let mut dir = system.opendir(&CString::new("./dir").unwrap()).unwrap();
+        let mut files = Vec::new();
+        while let Some(entry) = dir.next().unwrap() {
+            files.push(entry.name.to_os_string());
+        }
+        files.sort_unstable();
+        assert_eq!(
+            files[..],
+            [
+                OsString::from("."),
+                OsString::from(".."),
+                OsString::from("file")
+            ]
+        );
     }
 
     #[test]
