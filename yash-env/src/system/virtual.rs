@@ -63,6 +63,7 @@ use crate::System;
 use async_trait::async_trait;
 use nix::errno::Errno;
 use nix::fcntl::OFlag;
+use std::borrow::Cow;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -76,6 +77,8 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
@@ -194,6 +197,17 @@ impl VirtualSystem {
         let mut ofd = body.open_file_description.borrow_mut();
         f(&mut *ofd)
     }
+
+    fn resolve_relative_path<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
+        if path.is_absolute() {
+            Cow::Borrowed(path)
+        } else {
+            // TODO Support changing the current working directory
+            let mut rebased = PathBuf::from("/");
+            rebased.push(path);
+            Cow::Owned(rebased)
+        }
+    }
 }
 
 impl Default for VirtualSystem {
@@ -273,9 +287,9 @@ impl System for VirtualSystem {
     }
 
     fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
-        let path = OsStr::from_bytes(path.to_bytes());
+        let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
         let mut state = self.state.borrow_mut();
-        let file = match state.file_system.get(path) {
+        let file = match state.file_system.get(&path) {
             Ok(inode) => {
                 if option.contains(OFlag::O_EXCL) {
                     return Err(Errno::EEXIST);
@@ -297,7 +311,7 @@ impl System for VirtualSystem {
                 // TODO Apply umask
                 inode.permissions = Mode(mode.bits());
                 let inode = Rc::new(RefCell::new(inode));
-                state.file_system.save(path, Rc::clone(&inode))?;
+                state.file_system.save(&path, Rc::clone(&inode))?;
                 inode
             }
             Err(errno) => return Err(errno),
@@ -1031,6 +1045,29 @@ mod tests {
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
+    }
+
+    #[test]
+    fn open_default_working_directory() {
+        // The default working directory is the root directory.
+        let mut system = VirtualSystem::new();
+
+        let writer = system.open(
+            &CString::new("/dir/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::all(),
+        );
+        system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
+
+        let reader = system.open(
+            &CString::new("./dir/file").unwrap(),
+            OFlag::O_RDONLY,
+            nix::sys::stat::Mode::empty(),
+        );
+        let mut buffer = [0; 10];
+        let count = system.read(reader.unwrap(), &mut buffer).unwrap();
+        assert_eq!(count, 4);
+        assert_eq!(buffer[0..4], [1, 2, 3, 42]);
     }
 
     #[test]
