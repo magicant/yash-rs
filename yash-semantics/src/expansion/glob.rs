@@ -165,9 +165,10 @@ impl SearchEnv<'_> {
             Some(Err(pattern)) => {
                 let dir_path = if self.prefix.is_empty() {
                     CString::new(".").unwrap()
+                } else if let Ok(dir_path) = CString::new(self.prefix.as_str()) {
+                    dir_path
                 } else {
-                    // TODO What if prefix contains a nul byte?
-                    CString::new(self.prefix.as_str()).unwrap()
+                    return;
                 };
 
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
@@ -445,6 +446,15 @@ mod tests {
         let f = dummy_attr_field("a[b/c]d");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "a[b/c]d");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn nul_byte_in_literal_followed_by_pattern() {
+        let mut env = env_with_dummy_files(["x", "y/y"]);
+        let f = dummy_attr_field("\0/*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "\0/*");
         assert_eq!(i.next(), None);
     }
 }
