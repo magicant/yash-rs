@@ -47,8 +47,12 @@ mod process;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+use super::AtFlags;
 use super::Dir;
+use super::Errno;
 use super::FdSet;
+use super::FileStat;
+use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
@@ -61,8 +65,6 @@ use crate::Env;
 use crate::SignalHandling;
 use crate::System;
 use async_trait::async_trait;
-use nix::errno::Errno;
-use nix::fcntl::OFlag;
 use std::borrow::Cow;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -217,6 +219,10 @@ impl Default for VirtualSystem {
 }
 
 impl System for VirtualSystem {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+        Err(Errno::ENOENT)
+    }
+
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -756,6 +762,19 @@ mod tests {
             self.spawn_local(task)
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
         }
+    }
+
+    #[test]
+    fn stat_non_existent_file() {
+        let system = VirtualSystem::new();
+        assert_matches!(
+            system.fstatat(
+                Fd(0),
+                &CString::new("/no/such/file").unwrap(),
+                AtFlags::empty()
+            ),
+            Err(Errno::ENOENT)
+        );
     }
 
     #[test]
