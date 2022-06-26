@@ -173,10 +173,10 @@ impl SearchEnv<'_> {
 
                 if let Ok(mut dir) = self.env.system.opendir(&dir_path) {
                     while let Ok(Some(entry)) = dir.next() {
-                        // TODO Handle name.as_str error
-                        let name = entry.name.to_str().unwrap();
-                        if pattern.is_match(name) {
-                            self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                        if let Some(name) = entry.name.to_str() {
+                            if pattern.is_match(name) {
+                                self.push_component(new_suffix, |prefix| prefix.push_str(name));
+                            }
                         }
                     }
                 }
@@ -262,6 +262,8 @@ mod tests {
     use super::*;
     use crate::expansion::AttrChar;
     use crate::expansion::Origin;
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
     use std::path::Path;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
@@ -455,6 +457,15 @@ mod tests {
         let f = dummy_attr_field("\0/*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "\0/*");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn broken_utf8_byte_in_directory_entry_name() {
+        let mut env = env_with_dummy_files([OsStr::from_bytes(b"foo/\xFF")]);
+        let f = dummy_attr_field("foo/*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo/*");
         assert_eq!(i.next(), None);
     }
 }
