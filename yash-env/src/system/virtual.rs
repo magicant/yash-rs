@@ -65,6 +65,7 @@ use crate::Env;
 use crate::SignalHandling;
 use crate::System;
 use async_trait::async_trait;
+use nix::sys::stat::SFlag;
 use std::borrow::Cow;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -77,6 +78,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::mem::MaybeUninit;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -210,6 +212,19 @@ impl VirtualSystem {
             Cow::Owned(rebased)
         }
     }
+
+    fn resolve_existing_file(
+        &self,
+        _dir_fd: Fd,
+        path: &Path,
+        _flags: AtFlags,
+    ) -> nix::Result<Rc<RefCell<INode>>> {
+        // TODO Resolve relative to dir_fd
+        // TODO Support AT_FDCWD
+        // TODO AtFlags::AT_SYMLINK_NOFOLLOW
+        let path = self.resolve_relative_path(path);
+        self.state.borrow().file_system.get(&path)
+    }
 }
 
 impl Default for VirtualSystem {
@@ -219,8 +234,25 @@ impl Default for VirtualSystem {
 }
 
 impl System for VirtualSystem {
+    /// Retrieves metadata of a file.
+    ///
+    /// The current implementation fills only the following values of the
+    /// returned `FileStat`:
+    ///
+    /// - `st_mode`
+    /// - `st_size`
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
-        Err(Errno::ENOENT)
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let inode = self.resolve_existing_file(dir_fd, path, flags)?;
+        let inode = &*inode.borrow();
+        let (type_flag, size) = match &inode.body {
+            FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
+            _ => todo!("unsupported file type: {:?}", inode.body),
+        };
+        let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
+        result.st_mode = type_flag.bits() | inode.permissions.0;
+        result.st_size = size as _;
+        Ok(result)
     }
 
     /// Tests whether the specified file is executable or not.
@@ -765,7 +797,7 @@ mod tests {
     }
 
     #[test]
-    fn stat_non_existent_file() {
+    fn fstatat_non_existent_file() {
         let system = VirtualSystem::new();
         assert_matches!(
             system.fstatat(
@@ -775,6 +807,27 @@ mod tests {
             ),
             Err(Errno::ENOENT)
         );
+    }
+
+    #[test]
+    fn fstatat_regular_file() {
+        let system = VirtualSystem::new();
+        let path = "/some/file";
+        let content = Rc::new(RefCell::new(INode::new([1, 2, 3, 42, 100])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+
+        let stat = system
+            .fstatat(
+                Fd(0),
+                &CString::new("/some/file").unwrap(),
+                AtFlags::empty(),
+            )
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
+        assert_eq!(stat.st_size, 5);
+        // TODO Other stat properties
     }
 
     #[test]
