@@ -248,7 +248,7 @@ impl System for VirtualSystem {
         let (type_flag, size) = match &inode.body {
             FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
             FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
-            _ => todo!("unsupported file type: {:?}", inode.body),
+            FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
         };
         let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
         result.st_mode = type_flag.bits() | inode.permissions.0;
@@ -847,7 +847,32 @@ mod tests {
         // TODO Other stat properties
     }
 
-    // TODO fstatat_for_fifo
+    #[test]
+    fn fstatat_fifo() {
+        let system = VirtualSystem::new();
+        let path = "/some/fifo";
+        let content = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: [17; 42].into(),
+                readers: 0,
+                writers: 0,
+            },
+            permissions: Mode::default(),
+        }));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+
+        let stat = system
+            .fstatat(
+                Fd(0),
+                &CString::new("/some/fifo").unwrap(),
+                AtFlags::empty(),
+            )
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().0);
+        assert_eq!(stat.st_size, 42);
+    }
 
     #[test]
     fn is_executable_file_non_existing_file() {
