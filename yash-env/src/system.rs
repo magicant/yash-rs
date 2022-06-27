@@ -298,6 +298,12 @@ pub trait System: Debug {
     ) -> nix::Result<Infallible>;
 }
 
+/// Sentinel for the current working directory
+///
+/// This value can be passed to system calls named "*at" such as
+/// [`System::fstatat`].
+pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
+
 /// How to handle a signal.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SignalHandling {

@@ -56,8 +56,8 @@ use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
 use yash_env::semantics::Field;
-use yash_env::system::Mode;
-use yash_env::system::OFlag;
+use yash_env::system::AtFlags;
+use yash_env::system::AT_FDCWD;
 use yash_env::Env;
 use yash_env::System;
 use yash_fnmatch::Config;
@@ -185,18 +185,14 @@ impl SearchEnv<'_> {
     }
 
     fn file_exists(&mut self) -> bool {
-        // TODO Use "stat" rather than "open" and "close". O_PATH is
-        // Linux-specific and non-portable.
         let path = match CString::new(self.prefix.as_str()) {
             Ok(path) => path,
             Err(_) => return false,
         };
-        let fd = self.env.system.open(&path, OFlag::O_PATH, Mode::empty());
-        let file_exists = fd.is_ok();
-        if let Ok(fd) = fd {
-            let _ = self.env.system.close(fd);
-        }
-        file_exists
+        self.env
+            .system
+            .fstatat(AT_FDCWD, &path, AtFlags::empty())
+            .is_ok()
     }
 
     /// Pushes a pathname component to `prefix` and start processing the next suffix
