@@ -16,6 +16,7 @@
 
 //! Implementation of simple command semantics.
 
+use super::perform_redirs;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
@@ -183,16 +184,6 @@ impl Command for syntax::SimpleCommand {
         } else {
             let exit_status = exit_status.unwrap_or_default();
             execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs), exit_status).await
-        }
-    }
-}
-
-async fn perform_redirs(env: &mut RedirGuard<'_>, redirs: &[Redir]) -> Result<Option<ExitStatus>> {
-    match env.perform_redirs(&*redirs).await {
-        Ok(exit_status) => Continue(exit_status),
-        Err(e) => {
-            e.handle(env).await?;
-            Continue(None)
         }
     }
 }

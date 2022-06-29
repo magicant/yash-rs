@@ -24,9 +24,12 @@ mod pipeline;
 mod simple_command;
 
 use super::Command;
+use crate::redir::RedirGuard;
 use crate::trap::run_traps_for_caught_signals;
+use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
@@ -69,6 +72,23 @@ impl Command for syntax::List {
             item.execute(env).await?
         }
         Continue(())
+    }
+}
+
+/// Utility for performing redirections
+async fn perform_redirs(
+    env: &mut RedirGuard<'_>,
+    redirs: &[syntax::Redir],
+) -> Result<Option<ExitStatus>> {
+    match env.perform_redirs(&*redirs).await {
+        Ok(exit_status) => Continue(exit_status),
+        Err(e) => {
+            e.handle(env).await?;
+            // TODO Apply the correct Consequences of Shell Errors:
+            // Depending on the context, the redirection error should interrupt
+            // the currently executing command or shell.
+            Continue(None)
+        }
     }
 }
 
