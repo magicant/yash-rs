@@ -31,6 +31,8 @@ use futures_util::task::Poll;
 #[doc(no_inline)]
 pub use nix::errno::Errno;
 #[doc(no_inline)]
+pub use nix::fcntl::AtFlags;
+#[doc(no_inline)]
 pub use nix::fcntl::OFlag;
 #[doc(no_inline)]
 pub use nix::sys::select::FdSet;
@@ -38,6 +40,8 @@ pub use nix::sys::select::FdSet;
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
+#[doc(no_inline)]
+pub use nix::sys::stat::FileStat;
 #[doc(no_inline)]
 pub use nix::sys::stat::Mode;
 #[doc(no_inline)]
@@ -73,6 +77,9 @@ use std::time::Instant;
 /// is [`SharedSystem`], which wraps a `System` instance to extend the interface
 /// with asynchronous methods.
 pub trait System: Debug {
+    /// Retrieves metadata of a file.
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat>;
+
     /// Whether there is an executable file at the specified path.
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
@@ -290,6 +297,12 @@ pub trait System: Debug {
         envs: &[CString],
     ) -> nix::Result<Infallible>;
 }
+
+/// Sentinel for the current working directory
+///
+/// This value can be passed to system calls named "*at" such as
+/// [`System::fstatat`].
+pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
 
 /// How to handle a signal.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -593,6 +606,9 @@ impl SharedSystem {
 }
 
 impl System for SharedSystem {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+        self.0.borrow().fstatat(dir_fd, path, flags)
+    }
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }

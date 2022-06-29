@@ -228,7 +228,7 @@ impl FileBody {
 ///
 /// The `Default` mode is `0o644`, not `0o000`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub struct Mode(pub u32);
+pub struct Mode(pub nix::sys::stat::mode_t);
 
 impl Debug for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

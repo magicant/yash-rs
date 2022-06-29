@@ -16,11 +16,16 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+use super::AtFlags;
 use super::ChildProcess;
 use super::Dir;
 use super::DirEntry;
 use super::Env;
+use super::Errno;
 use super::FdSet;
+use super::FileStat;
+use super::Mode;
+use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
@@ -30,15 +35,12 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::SignalHandling;
 use async_trait::async_trait;
-use nix::errno::Errno;
-use nix::fcntl::OFlag;
 use nix::libc::DIR;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
 use nix::sys::stat::stat;
-use nix::sys::stat::Mode;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
@@ -120,6 +122,10 @@ impl RealSystem {
 }
 
 impl System for RealSystem {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+        nix::sys::stat::fstatat(dir_fd.0, path, flags)
+    }
+
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
     }

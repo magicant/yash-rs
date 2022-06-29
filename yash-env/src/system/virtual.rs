@@ -47,8 +47,12 @@ mod process;
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+use super::AtFlags;
 use super::Dir;
+use super::Errno;
 use super::FdSet;
+use super::FileStat;
+use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
@@ -61,8 +65,7 @@ use crate::Env;
 use crate::SignalHandling;
 use crate::System;
 use async_trait::async_trait;
-use nix::errno::Errno;
-use nix::fcntl::OFlag;
+use nix::sys::stat::SFlag;
 use std::borrow::Cow;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -75,6 +78,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::mem::MaybeUninit;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -208,6 +212,19 @@ impl VirtualSystem {
             Cow::Owned(rebased)
         }
     }
+
+    fn resolve_existing_file(
+        &self,
+        _dir_fd: Fd,
+        path: &Path,
+        _flags: AtFlags,
+    ) -> nix::Result<Rc<RefCell<INode>>> {
+        // TODO Resolve relative to dir_fd
+        // TODO Support AT_FDCWD
+        // TODO AtFlags::AT_SYMLINK_NOFOLLOW
+        let path = self.resolve_relative_path(path);
+        self.state.borrow().file_system.get(&path)
+    }
 }
 
 impl Default for VirtualSystem {
@@ -217,6 +234,28 @@ impl Default for VirtualSystem {
 }
 
 impl System for VirtualSystem {
+    /// Retrieves metadata of a file.
+    ///
+    /// The current implementation fills only the following values of the
+    /// returned `FileStat`:
+    ///
+    /// - `st_mode`
+    /// - `st_size`
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let inode = self.resolve_existing_file(dir_fd, path, flags)?;
+        let inode = &*inode.borrow();
+        let (type_flag, size) = match &inode.body {
+            FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
+            FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
+            FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
+        };
+        let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
+        result.st_mode = type_flag.bits() | inode.permissions.0;
+        result.st_size = size as _;
+        Ok(result)
+    }
+
     /// Tests whether the specified file is executable or not.
     ///
     /// The current implementation only checks if the file has any executable
@@ -756,6 +795,83 @@ mod tests {
             self.spawn_local(task)
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
         }
+    }
+
+    #[test]
+    fn fstatat_non_existent_file() {
+        let system = VirtualSystem::new();
+        assert_matches!(
+            system.fstatat(
+                Fd(0),
+                &CString::new("/no/such/file").unwrap(),
+                AtFlags::empty()
+            ),
+            Err(Errno::ENOENT)
+        );
+    }
+
+    #[test]
+    fn fstatat_regular_file() {
+        let system = VirtualSystem::new();
+        let path = "/some/file";
+        let content = Rc::new(RefCell::new(INode::new([1, 2, 3, 42, 100])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+
+        let stat = system
+            .fstatat(
+                Fd(0),
+                &CString::new("/some/file").unwrap(),
+                AtFlags::empty(),
+            )
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
+        assert_eq!(stat.st_size, 5);
+        // TODO Other stat properties
+    }
+
+    #[test]
+    fn fstatat_directory() {
+        let system = VirtualSystem::new();
+        let path = "/some/file";
+        let content = Rc::new(RefCell::new(INode::new([])));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+
+        let stat = system
+            .fstatat(Fd(0), &CString::new("/some/").unwrap(), AtFlags::empty())
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFDIR.bits() | 0o755);
+        // TODO Other stat properties
+    }
+
+    #[test]
+    fn fstatat_fifo() {
+        let system = VirtualSystem::new();
+        let path = "/some/fifo";
+        let content = Rc::new(RefCell::new(INode {
+            body: FileBody::Fifo {
+                content: [17; 42].into(),
+                readers: 0,
+                writers: 0,
+            },
+            permissions: Mode::default(),
+        }));
+        let mut state = system.state.borrow_mut();
+        state.file_system.save(path, content).unwrap();
+        drop(state);
+
+        let stat = system
+            .fstatat(
+                Fd(0),
+                &CString::new("/some/fifo").unwrap(),
+                AtFlags::empty(),
+            )
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().0);
+        assert_eq!(stat.st_size, 42);
     }
 
     #[test]
