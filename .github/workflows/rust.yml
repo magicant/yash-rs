@@ -8,21 +8,34 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_TERM_VERBOSE: true
 
 jobs:
-  build:
-
+  check:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --verbose
-    - name: Run tests (with annotate-snippets)
-      run: cargo test --verbose
-    - name: Run tests (without annotate-snippets)
-      run: cargo test --verbose --package yash-syntax
-    - name: Lint
-      run: cargo clippy --all-targets --all-features -- -D warnings
-    - name: Check format
-      run: cargo fmt -- --check
+      run: cargo build
+    - name: Run basic tests
+      run: ./check.sh -v
+  extra:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run extra tests
+      run: |
+        cargo install cargo-tomlfmt
+        ./check-extra.sh -v
+  msrv:
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos-10.15]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run tests with MSRV
+      run: |
+        rustup toolchain install nightly 1.56.0 1.58.0
+        ./check-msrv.sh -v
