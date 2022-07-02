@@ -55,7 +55,7 @@ impl Command for syntax::CompoundCommand {
         use syntax::CompoundCommand::*;
         match self {
             Grouping(list) => list.execute(env).await,
-            Subshell(list) => subshell::execute(env, list).await,
+            Subshell { body, location } => subshell::execute(env, body, location).await,
             // TODO execute for loop
             // TODO execute while/until loop
             // TODO execute case

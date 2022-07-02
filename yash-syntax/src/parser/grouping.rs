@@ -85,7 +85,10 @@ impl Parser<'_, '_> {
             return Err(Error { cause, location });
         }
 
-        Ok(CompoundCommand::Subshell(list))
+        Ok(CompoundCommand::Subshell {
+            body: list,
+            location: open.word.location,
+        })
     }
 }
 
@@ -196,8 +199,12 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Subshell(list) => {
-            assert_eq!(list.to_string(), ":");
+        assert_matches!(result, CompoundCommand::Subshell { body, location } => {
+            assert_eq!(body.to_string(), ":");
+            assert_eq!(*location.code.value.borrow(), "(:)");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.range, 0..1);
         });
     }
 
@@ -208,8 +215,12 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Subshell(list) => {
-            assert_eq!(list.to_string(), "foo& bar");
+        assert_matches!(result, CompoundCommand::Subshell { body, location } => {
+            assert_eq!(body.to_string(), "foo& bar");
+            assert_eq!(*location.code.value.borrow(), "( foo& bar; )");
+            assert_eq!(location.code.start_line_number.get(), 1);
+            assert_eq!(location.code.source, Source::Unknown);
+            assert_eq!(location.range, 0..1);
         });
     }
 

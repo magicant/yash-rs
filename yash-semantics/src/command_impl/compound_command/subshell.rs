@@ -20,10 +20,11 @@ use crate::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
 use yash_env::Env;
+use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute(env: &mut Env, list: &List) -> Result {
+pub async fn execute(env: &mut Env, list: &List, _location: &Location) -> Result {
     let list = list.clone(); // TODO Avoid cloning the entire list
     let result = env
         .run_in_subshell(|sub_env| Box::pin(async move { list.execute(sub_env).await }))
