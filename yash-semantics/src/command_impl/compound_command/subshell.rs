@@ -17,14 +17,17 @@
 //! Semantics of subshell compound commands
 
 use crate::Command;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::io::print_error;
+use yash_env::semantics::Divert;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute(env: &mut Env, list: &List, _location: &Location) -> Result {
+pub async fn execute(env: &mut Env, list: &List, location: &Location) -> Result {
     let list = list.clone(); // TODO Avoid cloning the entire list
     let result = env
         .run_in_subshell(|sub_env| Box::pin(async move { list.execute(sub_env).await }))
@@ -34,7 +37,16 @@ pub async fn execute(env: &mut Env, list: &List, _location: &Location) -> Result
             env.exit_status = exit_status;
             Continue(())
         }
-        Err(_) => todo!(),
+        Err(errno) => {
+            print_error(
+                env,
+                "cannot start subshell".into(),
+                errno.desc().into(),
+                location,
+            )
+            .await;
+            Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
+        }
     }
 }
 
@@ -45,9 +57,11 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
+    use futures_util::FutureExt;
+    use std::rc::Rc;
     use std::str::from_utf8;
-    use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
+    use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
     #[test]
@@ -68,5 +82,23 @@ mod tests {
                 assert_eq!(from_utf8(content), Ok("bar\n"));
             });
         })
+    }
+
+    #[test]
+    fn error_starting_subshell() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
     }
 }
