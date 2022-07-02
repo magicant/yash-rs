@@ -1015,7 +1015,7 @@ pub enum CompoundCommand {
     /// List as a command.
     Grouping(List),
     /// Command for executing commands in a subshell.
-    Subshell { body: List, location: Location },
+    Subshell { body: Rc<List>, location: Location },
     /// For loop.
     For {
         name: Word,

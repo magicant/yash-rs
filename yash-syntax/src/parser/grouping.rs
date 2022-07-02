@@ -24,6 +24,7 @@ use super::lex::Keyword::{CloseBrace, OpenBrace};
 use super::lex::Operator::{CloseParen, OpenParen};
 use super::lex::TokenId::{Operator, Token};
 use crate::syntax::CompoundCommand;
+use std::rc::Rc;
 
 impl Parser<'_, '_> {
     /// Parses a normal grouping.
@@ -86,7 +87,7 @@ impl Parser<'_, '_> {
         }
 
         Ok(CompoundCommand::Subshell {
-            body: list,
+            body: Rc::new(list),
             location: open.word.location,
         })
     }

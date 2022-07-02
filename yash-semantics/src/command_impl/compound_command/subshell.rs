@@ -18,6 +18,7 @@
 
 use crate::Command;
 use std::ops::ControlFlow::{Break, Continue};
+use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -27,10 +28,9 @@ use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
-pub async fn execute(env: &mut Env, list: &List, location: &Location) -> Result {
-    let list = list.clone(); // TODO Avoid cloning the entire list
+pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
     let result = env
-        .run_in_subshell(|sub_env| Box::pin(async move { list.execute(sub_env).await }))
+        .run_in_subshell(|sub_env| Box::pin(async move { body.execute(sub_env).await }))
         .await;
     match result {
         Ok(exit_status) => {
