@@ -1015,7 +1015,7 @@ pub enum CompoundCommand {
     /// List as a command.
     Grouping(List),
     /// Command for executing commands in a subshell.
-    Subshell(List),
+    Subshell { body: Rc<List>, location: Location },
     /// For loop.
     For {
         name: Word,
@@ -1043,7 +1043,7 @@ impl fmt::Display for CompoundCommand {
         use CompoundCommand::*;
         match self {
             Grouping(list) => write!(f, "{{ {:#} }}", list),
-            Subshell(list) => write!(f, "({})", list),
+            Subshell { body, .. } => write!(f, "({})", body),
             For { name, values, body } => {
                 write!(f, "for {}", name)?;
                 if let Some(values) = values {

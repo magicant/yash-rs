@@ -16,6 +16,8 @@
 
 //! Implementation of the compound command semantics.
 
+mod subshell;
+
 use super::perform_redirs;
 use super::Command;
 use crate::redir::RedirGuard;
@@ -37,6 +39,15 @@ impl Command for syntax::FullCompoundCommand {
 
 /// Executes the compound command.
 ///
+/// # Grouping
+///
+/// A grouping is executed by running the contained list.
+///
+/// # Subshell
+///
+/// A subshell is executed by running the contained list in a
+/// [subshell](Env::run_in_subshell).
+///
 /// TODO Elaborate
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
@@ -44,12 +55,12 @@ impl Command for syntax::CompoundCommand {
         use syntax::CompoundCommand::*;
         match self {
             Grouping(list) => list.execute(env).await,
+            Subshell { body, location } => subshell::execute(env, body.clone(), location).await,
+            // TODO execute for loop
+            // TODO execute while/until loop
+            // TODO execute case
+            // TODO execute if
             _ => {
-                // TODO execute subshell
-                // TODO execute for loop
-                // TODO execute while/until loop
-                // TODO execute case
-                // TODO execute if
                 env.print_error(&format!("Not implemented: {}\n", self))
                     .await;
                 Continue(())
