@@ -17,6 +17,6 @@ Many features are still yet to be implemented.
 
 Yash is distributed under [GPLv3](yash/LICENSE-GPL).
 
-Exceptionally, you can reuse the `yash-quote` crate in your software
-under the [MIT License](yash-quote/LICENSE-MIT) or
-[Apache License 2.0](yash-quote/LICENSE-Apache), whichever at your option.
+Exceptionally, you can reuse the `yash-fnmatch` and `yash-quote` crate in your
+software under the [MIT License](yash-quote/LICENSE-MIT) or [Apache License
+2.0](yash-quote/LICENSE-Apache), whichever at your option.
