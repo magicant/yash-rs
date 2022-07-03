@@ -16,6 +16,7 @@
 
 //! Implementation of the compound command semantics.
 
+mod for_loop;
 mod subshell;
 
 use super::perform_redirs;
@@ -48,6 +49,13 @@ impl Command for syntax::FullCompoundCommand {
 /// A subshell is executed by running the contained list in a
 /// [subshell](Env::run_in_subshell).
 ///
+/// # For loop
+///
+/// Executing a for loop starts with expanding the `name` and `values`. If
+/// `values` is `None`, it expands to the current positional parameters. Each
+/// field resulting from the expansion is assigned to the variable `name`, and
+/// in turn, `body` is executed.
+///
 /// TODO Elaborate
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
@@ -56,7 +64,7 @@ impl Command for syntax::CompoundCommand {
         match self {
             Grouping(list) => list.execute(env).await,
             Subshell { body, location } => subshell::execute(env, body.clone(), location).await,
-            // TODO execute for loop
+            For { name, values, body } => for_loop::execute(env, name, values, body).await,
             // TODO execute while/until loop
             // TODO execute case
             // TODO execute if
