@@ -16,6 +16,7 @@
 
 //! Execution of the for loop
 
+use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax::List;
@@ -28,17 +29,60 @@ pub async fn execute(
     _values: &Option<Vec<Word>>,
     _body: &List,
 ) -> Result {
-    todo!()
+    Continue(())
 }
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
+    use crate::tests::echo_builtin;
+    use crate::Command;
+    use assert_matches::assert_matches;
+    use futures_util::FutureExt;
+    use std::rc::Rc;
+    use std::str::from_utf8;
+    use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::FileBody;
+    use yash_env::variable::Value::Array;
+    use yash_env::VirtualSystem;
+    use yash_syntax::syntax::CompoundCommand;
 
-    // TODO without_words_without_positional_parameters
-    // TODO without_words_with_one_positional_parameters
+    #[test]
+    fn without_words_without_positional_parameters() {
+        let mut env = Env::new_virtual();
+        let command: CompoundCommand = "for v do unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+    }
+
+    #[test]
+    #[ignore]
+    fn without_words_with_one_positional_parameters() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.variables.positional_params_mut().value = Array(vec!["foo".to_string()]);
+        let command: CompoundCommand = "for v do echo :$v:; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), ":foo:\n");
+        });
+    }
+
     // TODO without_words_with_many_positional_parameters
     // TODO with_one_word
     // TODO with_many_words
     // TODO with empty body
+    // TODO break_for_loop
+    // TODO break_outer_loop
+    // TODO continue_for_loop
+    // TODO continue_outer_loop
 }
