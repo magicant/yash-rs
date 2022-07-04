@@ -43,20 +43,20 @@ pub async fn execute(
         Array(ref values) => values.clone(),
     };
 
-    if let Some(value) = values.into_iter().next() {
+    for value in values {
         let var = Variable {
             value: Scalar(value),
-            last_assigned_location: Some(name.origin),
+            last_assigned_location: Some(name.origin.clone()),
             is_exported: false,
             read_only_location: None,
         };
         env.variables
-            .assign(Scope::Global, name.value, var)
+            .assign(Scope::Global, name.value.clone(), var)
             .expect("TODO: handle assignment error");
-        body.execute(env).await
-    } else {
-        Continue(())
+        body.execute(env).await?;
     }
+
+    Continue(())
 }
 
 #[cfg(test)]
@@ -102,7 +102,26 @@ mod tests {
         });
     }
 
-    // TODO without_words_with_many_positional_parameters
+    #[test]
+    fn without_words_with_many_positional_parameters() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.variables.positional_params_mut().value =
+            Array(vec!["1".to_string(), "2".to_string(), "three".to_string()]);
+        let command: CompoundCommand = "for foo do echo :$foo:; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), ":1:\n:2:\n:three:\n");
+        });
+    }
+
     // TODO with_one_word
     // TODO with_many_words
     // TODO with empty body
