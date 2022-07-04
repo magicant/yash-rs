@@ -16,20 +16,47 @@
 
 //! Execution of the for loop
 
+use crate::expansion::expand_word;
+use crate::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
+use yash_env::variable::Scope;
+use yash_env::variable::Value::{Array, Scalar};
+use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
 
 /// Executes the for loop.
 pub async fn execute(
-    _env: &mut Env,
-    _name: &Word,
+    env: &mut Env,
+    name: &Word,
     _values: &Option<Vec<Word>>,
-    _body: &List,
+    body: &List,
 ) -> Result {
-    Continue(())
+    let (name, _) = expand_word(env, name)
+        .await
+        .expect("TODO: handle expansion error");
+
+    let values = match env.variables.positional_params().value {
+        Scalar(ref value) => vec![value.clone()],
+        Array(ref values) => values.clone(),
+    };
+
+    if let Some(value) = values.into_iter().next() {
+        let var = Variable {
+            value: Scalar(value),
+            last_assigned_location: Some(name.origin),
+            is_exported: false,
+            read_only_location: None,
+        };
+        env.variables
+            .assign(Scope::Global, name.value, var)
+            .expect("TODO: handle assignment error");
+        body.execute(env).await
+    } else {
+        Continue(())
+    }
 }
 
 #[cfg(test)]
@@ -43,7 +70,6 @@ mod tests {
     use std::str::from_utf8;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::variable::Value::Array;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -58,7 +84,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn without_words_with_one_positional_parameters() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -85,4 +110,7 @@ mod tests {
     // TODO break_outer_loop
     // TODO continue_for_loop
     // TODO continue_outer_loop
+    // TODO expansion_error_in_name
+    // TODO expansion_error_in_words
+    // TODO assignment_error_with_read_only_variable
 }
