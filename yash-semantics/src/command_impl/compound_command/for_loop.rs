@@ -19,6 +19,7 @@
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
 use crate::Command;
+use crate::Handle;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
@@ -36,9 +37,10 @@ pub async fn execute(
     values: &Option<Vec<Word>>,
     body: &List,
 ) -> Result {
-    let (name, _) = expand_word(env, name)
-        .await
-        .expect("TODO: handle expansion error");
+    let (name, _) = match expand_word(env, name).await {
+        Ok(word) => word,
+        Err(error) => return error.handle(env).await,
+    };
 
     let values = if let Some(words) = values {
         expand_words(env, words)
@@ -84,8 +86,10 @@ mod tests {
     use crate::Command;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
@@ -181,7 +185,30 @@ mod tests {
     // TODO break_outer_loop
     // TODO continue_for_loop
     // TODO continue_outer_loop
-    // TODO expansion_error_in_name
+
+    #[test]
+    fn expansion_error_in_name() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for $() do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), "");
+        });
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
+    }
+
     // TODO expansion_error_in_words
     // TODO assignment_error_with_read_only_variable
 }
