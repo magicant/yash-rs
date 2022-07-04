@@ -17,8 +17,10 @@
 //! Execution of the for loop
 
 use crate::expansion::expand_word;
+use crate::expansion::expand_words;
 use crate::Command;
 use std::ops::ControlFlow::Continue;
+use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
@@ -31,22 +33,38 @@ use yash_syntax::syntax::Word;
 pub async fn execute(
     env: &mut Env,
     name: &Word,
-    _values: &Option<Vec<Word>>,
+    values: &Option<Vec<Word>>,
     body: &List,
 ) -> Result {
     let (name, _) = expand_word(env, name)
         .await
         .expect("TODO: handle expansion error");
 
-    let values = match env.variables.positional_params().value {
-        Scalar(ref value) => vec![value.clone()],
-        Array(ref values) => values.clone(),
+    let values = if let Some(words) = values {
+        expand_words(env, words)
+            .await
+            .expect("TODO: handle expansion error")
+            .0
+    } else {
+        match env.variables.positional_params().value {
+            Scalar(ref value) => vec![Field {
+                value: value.clone(),
+                origin: name.origin,
+            }],
+            Array(ref values) => values
+                .iter()
+                .map(|value| Field {
+                    value: value.clone(),
+                    origin: name.origin.clone(),
+                })
+                .collect(),
+        }
     };
 
-    for value in values {
+    for Field { value, origin } in values {
         let var = Variable {
             value: Scalar(value),
-            last_assigned_location: Some(name.origin.clone()),
+            last_assigned_location: Some(origin),
             is_exported: false,
             read_only_location: None,
         };
@@ -122,8 +140,42 @@ mod tests {
         });
     }
 
-    // TODO with_one_word
-    // TODO with_many_words
+    #[test]
+    fn with_one_word() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for v in 1; do echo :$v:; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), ":1:\n");
+        });
+    }
+
+    #[test]
+    fn with_many_words() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for v in baz bar foo; do echo +$v+; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), "+baz+\n+bar+\n+foo+\n");
+        });
+    }
+
     // TODO with empty body
     // TODO break_for_loop
     // TODO break_outer_loop
