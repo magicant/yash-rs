@@ -16,6 +16,8 @@
 
 //! Execution of the for loop
 
+use crate::assign::Error;
+use crate::assign::ErrorCause;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
 use crate::Command;
@@ -51,7 +53,7 @@ pub async fn execute(
         match env.variables.positional_params().value {
             Scalar(ref value) => vec![Field {
                 value: value.clone(),
-                origin: name.origin,
+                origin: name.origin.clone(),
             }],
             Array(ref values) => values
                 .iter()
@@ -70,10 +72,15 @@ pub async fn execute(
             is_exported: false,
             read_only_location: None,
         };
-        env.variables
-            .assign(Scope::Global, name.value.clone(), var)
-            .expect("TODO: handle assignment error");
-        body.execute(env).await?;
+        match env.variables.assign(Scope::Global, name.value.clone(), var) {
+            Ok(_) => body.execute(env).await?,
+            Err(error) => {
+                let cause = ErrorCause::AssignReadOnly(error);
+                let location = name.origin;
+                let error = Error { cause, location };
+                return error.handle(env).await;
+            }
+        };
     }
 
     Continue(())
@@ -93,6 +100,7 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
+    use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
 
     #[test]
@@ -232,5 +240,38 @@ mod tests {
         });
     }
 
-    // TODO assignment_error_with_read_only_variable
+    #[test]
+    fn assignment_error_with_read_only_variable() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.variables
+            .assign(
+                Scope::Global,
+                "x".to_string(),
+                Variable {
+                    value: Scalar("".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: Some(Location::dummy("")),
+                },
+            )
+            .unwrap();
+        let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), "");
+        });
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
+    }
 }
