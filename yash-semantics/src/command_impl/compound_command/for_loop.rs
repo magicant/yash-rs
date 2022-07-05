@@ -43,10 +43,10 @@ pub async fn execute(
     };
 
     let values = if let Some(words) = values {
-        expand_words(env, words)
-            .await
-            .expect("TODO: handle expansion error")
-            .0
+        match expand_words(env, words).await {
+            Ok((fields, _)) => fields,
+            Err(error) => return error.handle(env).await,
+        }
     } else {
         match env.variables.positional_params().value {
             Scalar(ref value) => vec![Field {
@@ -209,6 +209,28 @@ mod tests {
         });
     }
 
-    // TODO expansion_error_in_words
+    #[test]
+    fn expansion_error_in_words() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for x in $(); do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content).unwrap(), "");
+        });
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            assert_ne!(from_utf8(content).unwrap(), "");
+        });
+    }
+
     // TODO assignment_error_with_read_only_variable
 }
