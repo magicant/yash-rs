@@ -393,6 +393,8 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::local_builtin;
@@ -444,12 +446,7 @@ mod tests {
         let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -490,12 +487,7 @@ mod tests {
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -554,12 +546,7 @@ mod tests {
         let command: syntax::SimpleCommand = "v=42 local v".parse().unwrap();
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("v"), None);
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("v=42\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "v=42\n"));
     }
 
     #[test]
@@ -662,12 +649,7 @@ mod tests {
         let command: syntax::SimpleCommand = "foo bar baz".parse().unwrap();
         let result = block_on(command.execute(&mut env));
         assert_eq!(result, Continue(()));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("bar-baz-\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "bar-baz-\n"));
     }
 
     #[test]
@@ -687,12 +669,7 @@ mod tests {
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("x"), None);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("42\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
     }
 
     #[test]
@@ -711,12 +688,7 @@ mod tests {
         let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
         block_on(command.execute(&mut env));
         assert_eq!(env.variables.get("x"), None);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("hello\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "hello\n"));
     }
 
     #[test]

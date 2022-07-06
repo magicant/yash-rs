@@ -55,16 +55,14 @@ impl Command for AndOrList {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -88,12 +86,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
     }
 
     #[test]
@@ -118,12 +111,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -137,12 +125,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n3\n"));
     }
 
     #[test]
@@ -157,12 +140,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -187,12 +165,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("+\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+\n"));
     }
 
     #[test]
@@ -209,12 +182,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
     }
 
     #[test]
@@ -231,12 +199,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("one\ntwo\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
     }
 
     #[test]
@@ -262,12 +225,7 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("+\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+\n"));
     }
 
     #[test]

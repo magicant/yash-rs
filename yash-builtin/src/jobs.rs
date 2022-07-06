@@ -229,16 +229,16 @@ pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Outpu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use futures_util::future::FutureExt;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::io::Fd;
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
     use yash_env::stack::Frame;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
 
@@ -249,12 +249,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -272,14 +267,11 @@ mod tests {
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+        assert_stdout(&state, |stdout| {
             assert_eq!(
-                from_utf8(content),
-                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-            );
+                stdout,
+                "[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n"
+            )
         });
     }
 
@@ -344,14 +336,11 @@ mod tests {
         let args = Field::dummies(["%?first", "%2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+        assert_stdout(&state, |stdout| {
             assert_eq!(
-                from_utf8(content),
-                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-            );
+                stdout,
+                "[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n"
+            )
         });
     }
 
@@ -402,14 +391,11 @@ mod tests {
         let args = Field::dummies(["?first", "2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+        assert_stdout(&state, |stdout| {
             assert_eq!(
-                from_utf8(content),
-                Ok("[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n")
-            );
+                stdout,
+                "[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n"
+            )
         });
     }
 
@@ -426,18 +412,9 @@ mod tests {
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
-
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
-        let stderr = state.file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            let stderr = from_utf8(content).unwrap();
-            assert!(stderr.contains("job not found"), "{:?}", stderr);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("job not found"), "{:?}", stderr)
         });
     }
 
@@ -461,18 +438,9 @@ mod tests {
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
-
-        let state = state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
-        let stderr = state.file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            let stderr = from_utf8(content).unwrap();
-            assert!(stderr.contains("ambiguous"), "{:?}", stderr);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("ambiguous"), "{:?}", stderr)
         });
     }
 
@@ -547,16 +515,13 @@ mod tests {
         let args = Field::dummies(["-l"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+        assert_stdout(&state, |stdout| {
             assert_eq!(
-                from_utf8(content),
-                Ok("[1] -    42 Running              echo first
+                stdout,
+                "[1] -    42 Running              echo first
 [2] +    72 Stopped(SIGSTOP)     echo second
-")
-            );
+"
+            )
         });
     }
 
@@ -577,14 +542,8 @@ mod tests {
         let args = Field::dummies(["--verbose", "%?sec"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(
-                from_utf8(content),
-                Ok("[2] +    72 Stopped(SIGSTOP)     echo second\n")
-            );
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "[2] +    72 Stopped(SIGSTOP)     echo second\n")
         });
     }
 
@@ -604,12 +563,7 @@ mod tests {
         let args = Field::dummies(["-p"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("42\n72\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n72\n"));
     }
 
     #[test]
@@ -628,12 +582,7 @@ mod tests {
         let args = Field::dummies(["-pl"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("42\n72\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n72\n"));
     }
 
     #[test]
@@ -653,11 +602,6 @@ mod tests {
         let args = Field::dummies(["--pgid-only", "%?sec"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("72\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "72\n"));
     }
 }

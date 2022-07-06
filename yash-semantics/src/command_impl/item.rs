@@ -90,15 +90,15 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::tests::LocalExecutor;
-    use assert_matches::assert_matches;
     use futures_executor::block_on;
     use futures_util::task::LocalSpawnExt;
     use std::rc::Rc;
     use yash_env::job::WaitStatus;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -159,11 +159,7 @@ mod tests {
             .unwrap();
         executor.run_until_stalled();
 
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(std::str::from_utf8(content), Ok("foo\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "foo\n"));
     }
 
     #[test]
@@ -222,16 +218,12 @@ mod tests {
         };
         let result = block_on(item.execute(&mut env));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::NOEXEC))));
-
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            let stderr = std::str::from_utf8(content).unwrap();
+        assert_stderr(&state, |stderr| {
             assert!(
                 stderr.contains("asynchronous"),
                 "unexpected error message: {:?}",
                 stderr
-            );
+            )
         });
     }
 }

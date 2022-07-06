@@ -53,14 +53,13 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::rc::Rc;
-    use std::str::from_utf8;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -73,14 +72,8 @@ mod tests {
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus(123));
-
             assert_eq!(env.variables.get("foo"), None);
-
-            let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-            let stdout = stdout.borrow();
-            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-                assert_eq!(from_utf8(content), Ok("bar\n"));
-            });
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "bar\n"));
         })
     }
 
@@ -94,11 +87,6 @@ mod tests {
         let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 }

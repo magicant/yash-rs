@@ -105,14 +105,13 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use futures_executor::block_on;
     use futures_util::future::FutureExt;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::io::Fd;
     use yash_env::stack::Frame;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::SignalHandling;
     use yash_env::trap::Signal;
     use yash_env::Env;
@@ -174,11 +173,7 @@ mod tests {
 
         let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -191,11 +186,7 @@ mod tests {
 
         let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("trap -- echo INT\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "trap -- echo INT\n"));
     }
 
     #[test]
@@ -210,10 +201,8 @@ mod tests {
 
         let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("trap -- echo INT\ntrap -- 'echo t' TERM\n"));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
         });
     }
 
@@ -231,11 +220,7 @@ mod tests {
 
         let result = block_on(builtin_body(&mut *env, vec![]));
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -251,10 +236,8 @@ mod tests {
 
         let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("trap -- echo INT\ntrap -- '' TERM\n"));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "trap -- echo INT\ntrap -- '' TERM\n")
         });
     }
 
@@ -273,10 +256,8 @@ mod tests {
 
         let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("trap -- ls QUIT\ntrap -- '' TERM\n"));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "trap -- ls QUIT\ntrap -- '' TERM\n")
         });
     }
 }

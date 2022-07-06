@@ -89,6 +89,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use assert_matches::assert_matches;
     use futures_executor::LocalSpawner;
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
@@ -96,7 +97,9 @@ pub(crate) mod tests {
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::job::Pid;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::Env;
     use yash_env::VirtualSystem;
@@ -146,5 +149,29 @@ pub(crate) mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
+    }
+
+    /// Helper function for asserting on the content of /dev/stdout.
+    pub fn assert_stdout<F, T>(state: &RefCell<SystemState>, f: F) -> T
+    where
+        F: FnOnce(&str) -> T,
+    {
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            f(from_utf8(content).unwrap())
+        })
+    }
+
+    /// Helper function for asserting on the content of /dev/stderr.
+    pub fn assert_stderr<F, T>(state: &RefCell<SystemState>, f: F) -> T
+    where
+        F: FnOnce(&str) -> T,
+    {
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            f(from_utf8(content).unwrap())
+        })
     }
 }

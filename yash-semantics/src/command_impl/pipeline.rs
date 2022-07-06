@@ -233,6 +233,7 @@ impl PipeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stdout;
     use crate::tests::cat_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
@@ -347,12 +348,7 @@ mod tests {
             let result = pipeline.execute(&mut env).await;
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-            let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-            let stdout = stdout.borrow();
-            assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-                assert_eq!(std::str::from_utf8(content), Ok("ok\n"));
-            });
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "ok\n"));
         });
     }
 

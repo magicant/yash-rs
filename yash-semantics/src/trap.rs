@@ -95,6 +95,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
@@ -102,12 +103,10 @@ mod tests {
     use std::future::Future;
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
-    use std::str::from_utf8;
     use yash_env::builtin::Builtin;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
     use yash_env::VirtualSystem;
@@ -154,13 +153,7 @@ mod tests {
         let (mut env, system) = signal_env();
         let result = block_on(run_traps_for_caught_signals(&mut env));
         assert_eq!(result, Continue(()));
-
-        let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -169,13 +162,7 @@ mod tests {
         raise_signal(&system, Signal::SIGINT);
         let result = block_on(run_traps_for_caught_signals(&mut env));
         assert_eq!(result, Continue(()));
-
-        let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("trapped\n"));
-        });
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "trapped\n"));
     }
 
     #[test]
@@ -185,13 +172,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Trap);
         let result = block_on(run_traps_for_caught_signals(&mut env));
         assert_eq!(result, Continue(()));
-
-        let state = system.state.borrow();
-        let file = state.file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
 
     // TODO still allow reentrance if in subshell in trap
@@ -251,12 +232,8 @@ mod tests {
         raise_signal(&system, Signal::SIGUSR1);
         raise_signal(&system, Signal::SIGUSR2);
         let _ = block_on(run_traps_for_caught_signals(&mut env));
-
-        let state = system.state.borrow();
-        let stdout = state.file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("123\n0\n123\n0\n"));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "123\n0\n123\n0\n")
         });
     }
 

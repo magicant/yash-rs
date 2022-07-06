@@ -213,17 +213,16 @@ pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Outpu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use futures_util::FutureExt;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
@@ -260,17 +259,8 @@ mod tests {
         let args = vec![];
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(
-                from_utf8(content),
-                Ok("bar='Hello, world!'
-baz=(one '')
-foo=value
-")
-            );
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "bar='Hello, world!'\nbaz=(one '')\nfoo=value\n")
         });
     }
 
@@ -285,13 +275,10 @@ foo=value
         let args = Field::dummies(["-o"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+        assert_stdout(&state, |stdout| {
             assert_eq!(
-                from_utf8(content),
-                Ok("allexport        on
+                stdout,
+                "allexport        on
 clobber          on
 cmdline          off
 errexit          off
@@ -310,8 +297,8 @@ unset            off
 verbose          off
 vi               off
 xtrace           off
-")
-            );
+"
+            )
         });
     }
 
@@ -329,13 +316,7 @@ xtrace           off
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         // The output from `set +o` should be parsable
-        let commands: List = {
-            let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-            let file = file.borrow();
-            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-                from_utf8(content).unwrap().parse().unwrap()
-            })
-        };
+        let commands: List = assert_stdout(&state, |stdout| stdout.parse().unwrap());
 
         env.builtins.insert(
             "set",
@@ -353,11 +334,7 @@ xtrace           off
         assert_eq!(env.options, options);
 
         // And there should be no errors doing that
-        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     #[test]

@@ -65,6 +65,7 @@ pub use runner::read_eval_loop_boxed;
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use assert_matches::assert_matches;
     use futures_executor::LocalSpawner;
     use futures_util::task::LocalSpawnExt;
     use itertools::Itertools;
@@ -75,6 +76,7 @@ pub(crate) mod tests {
     use std::ops::ControlFlow::{Break, Continue};
     use std::pin::Pin;
     use std::rc::Rc;
+    use std::str::from_utf8;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::{Intrinsic, Special};
     use yash_env::io::Fd;
@@ -82,6 +84,7 @@ pub(crate) mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
     use yash_env::variable::Scalar;
@@ -135,6 +138,30 @@ pub(crate) mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
+    }
+
+    /// Helper function for asserting on the content of /dev/stdout.
+    pub fn assert_stdout<F, T>(state: &RefCell<SystemState>, f: F) -> T
+    where
+        F: FnOnce(&str) -> T,
+    {
+        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let stdout = stdout.borrow();
+        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
+            f(from_utf8(content).unwrap())
+        })
+    }
+
+    /// Helper function for asserting on the content of /dev/stderr.
+    pub fn assert_stderr<F, T>(state: &RefCell<SystemState>, f: F) -> T
+    where
+        F: FnOnce(&str) -> T,
+    {
+        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
+        let stderr = stderr.borrow();
+        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
+            f(from_utf8(content).unwrap())
+        })
     }
 
     fn return_builtin_main(

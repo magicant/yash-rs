@@ -89,16 +89,15 @@ pub async fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::Command;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
@@ -125,11 +124,7 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), ":foo:\n");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ":foo:\n"));
     }
 
     #[test]
@@ -145,11 +140,7 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), ":1:\n:2:\n:three:\n");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ":1:\n:2:\n:three:\n"));
     }
 
     #[test]
@@ -163,11 +154,7 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), ":1:\n");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ":1:\n"));
     }
 
     #[test]
@@ -181,11 +168,7 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), "+baz+\n+bar+\n+foo+\n");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+baz+\n+bar+\n+foo+\n"));
     }
 
     // TODO with empty body
@@ -204,17 +187,8 @@ mod tests {
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), "");
-        });
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -227,17 +201,8 @@ mod tests {
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), "");
-        });
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -262,16 +227,7 @@ mod tests {
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let stdout = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let stdout = stdout.borrow();
-        assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content).unwrap(), "");
-        });
-        let stderr = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let stderr = stderr.borrow();
-        assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 }

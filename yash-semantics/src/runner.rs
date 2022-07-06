@@ -100,14 +100,14 @@ pub fn read_eval_loop_boxed<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{echo_builtin, return_builtin};
-    use assert_matches::assert_matches;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
+    use crate::tests::echo_builtin;
+    use crate::tests::return_builtin;
     use futures_executor::block_on;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
-    use std::str::from_utf8;
     use yash_env::semantics::Divert;
-    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
@@ -136,12 +136,7 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(7));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("42\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
     }
 
     #[test]
@@ -153,12 +148,7 @@ mod tests {
         let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Continue(()));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("1\n2\n3\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n3\n"));
     }
 
     #[test]
@@ -178,12 +168,7 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("alias\nok\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "alias\nok\n"));
     }
 
     #[test]
@@ -194,12 +179,7 @@ mod tests {
         let mut lexer = Lexer::from_memory(";;", Source::Unknown);
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let file = state.borrow().file_system.get("/dev/stderr").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_ne!(from_utf8(content).unwrap(), "");
-        });
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
     #[test]
@@ -211,12 +191,7 @@ mod tests {
         let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok(""));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
@@ -244,11 +219,6 @@ mod tests {
         let result = block_on(read_eval_loop(&mut env, &mut lexer));
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(from_utf8(content), Ok("USR1\n0\n"));
-        });
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "USR1\n0\n"));
     }
 }
