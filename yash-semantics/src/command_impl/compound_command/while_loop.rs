@@ -24,8 +24,8 @@ use yash_syntax::syntax::List;
 
 /// Executes the while loop.
 pub async fn execute_while(env: &mut Env, condition: &List, _body: &List) -> Result {
-    // TODO handle Err
-    let _ = condition.execute(env).await;
+    // TODO Handle break and continue
+    condition.execute(env).await?;
     env.exit_status = ExitStatus::SUCCESS;
     Continue(())
 }
@@ -43,7 +43,9 @@ mod tests {
     use crate::tests::return_builtin;
     use crate::Command;
     use futures_util::FutureExt;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -63,5 +65,20 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "15\n"));
+    }
+
+    #[test]
+    fn return_from_while_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let command: CompoundCommand = "while return 36; echo X; do echo Y; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(36));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 }
