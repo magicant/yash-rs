@@ -27,8 +27,8 @@ pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Resu
     // TODO Handle break and continue
     condition.execute(env).await?;
     if env.exit_status == ExitStatus::SUCCESS {
-        // TODO Handle Err
-        let _ = body.execute(env).await;
+        // TODO Handle break and continue
+        body.execute(env).await?;
     }
     env.exit_status = ExitStatus::SUCCESS;
     Continue(())
@@ -100,5 +100,20 @@ mod tests {
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(36));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn return_from_while_body() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let command: CompoundCommand = "while echo A; do return 42; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(42));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "A\n"));
     }
 }
