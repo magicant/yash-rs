@@ -29,8 +29,10 @@ pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Resu
     if env.exit_status == ExitStatus::SUCCESS {
         // TODO Handle break and continue
         body.execute(env).await?;
+    } else {
+        env.exit_status = ExitStatus::SUCCESS;
     }
-    env.exit_status = ExitStatus::SUCCESS;
+    // TODO loop
     Continue(())
 }
 
@@ -78,12 +80,12 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
-        let command = "while return -n $?; do echo body; return -n 1; done";
+        let command = "while return -n $?0; do echo body; return -n 7; done";
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.exit_status, ExitStatus(7));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "body\n"));
     }
 
