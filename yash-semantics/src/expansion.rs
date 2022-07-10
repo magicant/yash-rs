@@ -75,8 +75,10 @@ pub mod split;
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
+use self::attr_strip::Strip;
 use self::glob::glob;
 use self::initial::Expand;
+use self::quote_removal::skip_quotes;
 use self::split::Ifs;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
@@ -87,6 +89,7 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Text;
 use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
@@ -189,6 +192,32 @@ impl MessageBase for Error {
 /// Result of word expansion.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Expands a text to a string.
+///
+/// This function performs the initial expansion, quote removal, and attribute
+/// stripping.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
+pub async fn expand_text(
+    env: &mut yash_env::Env,
+    text: &Text,
+) -> Result<(String, Option<ExitStatus>)> {
+    let mut env = initial::Env::new(env);
+    // It would be technically correct to set `will_split` to false, but it does
+    // not affect the final results because we will join the results anyway.
+    // env.will_split = false;
+
+    use self::initial::QuickExpand::*;
+    let phrase = match text.quick_expand(&mut env) {
+        Ready(result) => result?,
+        Interim(interim) => text.async_expand(&mut env, interim).await?,
+    };
+
+    let chars = phrase.ifs_join(&env.inner.variables);
+    let result = skip_quotes(chars).strip().collect();
+    Ok((result, env.last_command_subst_exit_status))
+}
+
 /// Expands a word to a field.
 ///
 /// This function performs the initial expansion, quote removal, and attribute
@@ -211,11 +240,11 @@ pub async fn expand_word(
         Ready(result) => result?,
         Interim(interim) => word.async_expand(&mut env, interim).await?,
     };
+
     let chars = phrase.ifs_join(&env.inner.variables);
-    let field = AttrField {
-        chars,
-        origin: word.location.clone(),
-    };
+    let origin = word.location.clone();
+    let field = AttrField { chars, origin };
+
     let field = field.remove_quotes_and_strip();
     Ok((field, env.last_command_subst_exit_status))
 }

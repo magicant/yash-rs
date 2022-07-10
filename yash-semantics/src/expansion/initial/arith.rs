@@ -17,29 +17,23 @@
 //! Arithmetic expansion
 
 use super::super::attr::AttrChar;
-use super::super::attr::AttrField;
 use super::super::attr::Origin;
 use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
-use super::Expand;
-use super::QuickExpand::{Interim, Ready};
+use crate::expansion::expand_text;
 use yash_arith::eval;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Text;
 
-pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Result<Phrase, Error> {
-    // TODO Extract expand_text function
-    let phrase = match text.quick_expand(env) {
-        Ready(result) => result?,
-        Interim(interim) => text.async_expand(env, interim).await?,
-    };
-    let chars = phrase.ifs_join(&env.inner.variables);
-    let origin = location.clone();
-    let field = AttrField { chars, origin };
-    let expression = field.remove_quotes_and_strip();
+pub async fn expand(text: &Text, _location: &Location, env: &mut Env<'_>) -> Result<Phrase, Error> {
+    let (expression, _exit_status) = expand_text(env.inner, text).await?;
+    // TODO Handle exit status
+
+    let result = eval(&expression);
+
     // TODO Test this
-    match eval(&expression.value) {
+    match result {
         Ok(value) => {
             let value = value.to_string();
             let chars = value
