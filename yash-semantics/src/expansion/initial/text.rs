@@ -105,10 +105,11 @@ impl Expand for TextUnit {
                     is_quoting: false,
                 },
             ]))),
-            RawParam { .. } | BracedParam(_) | CommandSubst { .. } | Backquote { .. } => {
-                Interim(())
-            }
-            Arith { .. } => todo!(),
+            RawParam { .. }
+            | BracedParam(_)
+            | CommandSubst { .. }
+            | Backquote { .. }
+            | Arith { .. } => Interim(()),
         }
     }
 
@@ -136,7 +137,7 @@ impl Expand for TextUnit {
                 let location = location.clone();
                 super::command_subst::expand(command, location, env).await
             }
-            Arith { .. } => todo!(),
+            Arith { content, location } => super::arith::expand(content, location, env).await,
         }
     }
 }
@@ -305,5 +306,24 @@ mod tests {
             };
             assert_eq!(result, Ok(Phrase::Char(c)));
         })
+    }
+
+    #[test]
+    fn arithmetic() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let arith = TextUnit::Arith {
+            content: "0".parse().unwrap(),
+            location: Location::dummy(""),
+        };
+        assert_matches!(arith.quick_expand(&mut env), Interim(()));
+        let result = arith.async_expand(&mut env, ()).now_or_never().unwrap();
+        let c = AttrChar {
+            value: '0',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
     }
 }
