@@ -55,12 +55,14 @@ pub async fn expand(text: &Text, _location: &Location, env: &mut Env<'_>) -> Res
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::ErrorCause;
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::Errno;
 
     #[test]
     fn successful_inner_text_expansion() {
@@ -110,5 +112,16 @@ mod tests {
         assert_eq!(env.last_command_subst_exit_status, Some(ExitStatus(123)));
     }
 
-    // TODO error_in_inner_text_expansion
+    #[test]
+    fn error_in_inner_text_expansion() {
+        let text = "$(x)".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let result = expand(&text, &location, &mut env).now_or_never().unwrap();
+        let e = result.unwrap_err();
+        assert_eq!(e.cause, ErrorCause::CommandSubstError(Errno::ENOSYS));
+        assert_eq!(*e.location.code.value.borrow(), "$(x)");
+        assert_eq!(e.location.range, 0..4);
+    }
 }
