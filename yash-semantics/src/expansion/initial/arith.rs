@@ -27,8 +27,10 @@ use yash_syntax::source::Location;
 use yash_syntax::syntax::Text;
 
 pub async fn expand(text: &Text, _location: &Location, env: &mut Env<'_>) -> Result<Phrase, Error> {
-    let (expression, _exit_status) = expand_text(env.inner, text).await?;
-    // TODO Handle exit status
+    let (expression, exit_status) = expand_text(env.inner, text).await?;
+    if exit_status.is_some() {
+        env.last_command_subst_exit_status = exit_status;
+    }
 
     let result = eval(&expression);
 
@@ -53,9 +55,12 @@ pub async fn expand(text: &Text, _location: &Location, env: &mut Env<'_>) -> Res
 
 #[cfg(test)]
 mod tests {
-    use futures_util::FutureExt;
-
     use super::*;
+    use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
+    use crate::tests::return_builtin;
+    use futures_util::FutureExt;
+    use yash_env::semantics::ExitStatus;
 
     #[test]
     fn successful_inner_text_expansion() {
@@ -71,8 +76,39 @@ mod tests {
             is_quoting: false,
         };
         assert_eq!(result, Ok(Phrase::Char(c)));
+        assert_eq!(env.last_command_subst_exit_status, None);
     }
 
-    // TODO non_zero_exit_status_from_inner_text_expansion
+    #[test]
+    fn non_zero_exit_status_from_inner_text_expansion() {
+        in_virtual_system(|mut env, _, _| async move {
+            let text = "$(echo 0; return -n 63)".parse().unwrap();
+            let location = Location::dummy("my location");
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert("return", return_builtin());
+            let mut env = Env::new(&mut env);
+            let result = expand(&text, &location, &mut env).await;
+            let c = AttrChar {
+                value: '0',
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: false,
+            };
+            assert_eq!(result, Ok(Phrase::Char(c)));
+            assert_eq!(env.last_command_subst_exit_status, Some(ExitStatus(63)));
+        })
+    }
+
+    #[test]
+    fn exit_status_is_kept_if_inner_text_expansion_contains_no_command_substitution() {
+        let text = "0".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        env.last_command_subst_exit_status = Some(ExitStatus(123));
+        let _ = expand(&text, &location, &mut env).now_or_never().unwrap();
+        assert_eq!(env.last_command_subst_exit_status, Some(ExitStatus(123)));
+    }
+
     // TODO error_in_inner_text_expansion
 }
