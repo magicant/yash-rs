@@ -50,3 +50,29 @@ pub async fn expand(text: &Text, _location: &Location, env: &mut Env<'_>) -> Res
         Err(error) => todo!("handle error: {}", error),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use futures_util::FutureExt;
+
+    use super::*;
+
+    #[test]
+    fn successful_inner_text_expansion() {
+        let text = "0".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let result = expand(&text, &location, &mut env).now_or_never().unwrap();
+        let c = AttrChar {
+            value: '0',
+            origin: Origin::SoftExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
+    }
+
+    // TODO non_zero_exit_status_from_inner_text_expansion
+    // TODO error_in_inner_text_expansion
+}
