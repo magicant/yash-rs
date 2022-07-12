@@ -67,9 +67,11 @@ impl std::error::Error for Error {}
 
 // TODO Variable environment
 /// Performs arithmetic expansion
-pub fn eval(_expression: &str) -> Result<Value, Error> {
-    // TODO Implement arithmetic expansion
-    Ok(Value::Integer(0))
+pub fn eval(expression: &str) -> Result<Value, Error> {
+    let i = expression
+        .parse()
+        .expect("todo: handle expressions that are not integral constants");
+    Ok(Value::Integer(i))
 }
 
 #[cfg(test)]
@@ -77,8 +79,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = eval("0");
-        assert_eq!(result, Ok(Value::Integer(0)));
+    fn decimal_integer_constants() {
+        assert_eq!(eval("0"), Ok(Value::Integer(0)));
+        assert_eq!(eval("1"), Ok(Value::Integer(1)));
+        assert_eq!(eval("42"), Ok(Value::Integer(42)));
     }
+
+    // TODO Octal integer constants
+    // TODO Hexadecimal integer constants
+    // TODO Float constants
+    // TODO Variables (integers, floats, infinities, & NaNs)
+    // TODO Operators
 }
