@@ -371,6 +371,7 @@ dependencies = [
  "async-trait",
  "futures-executor",
  "futures-util",
+ "yash-arith",
  "yash-builtin",
  "yash-env",
  "yash-fnmatch",
@@ -378,6 +379,10 @@ dependencies = [
  "yash-semantics",
  "yash-syntax",
 ]
+
+[[package]]
+name = "yash-arith"
+version = "0.1.0"
 
 [[package]]
 name = "yash-builtin"
@@ -434,6 +439,7 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "itertools",
+ "yash-arith",
  "yash-env",
  "yash-fnmatch",
  "yash-syntax",

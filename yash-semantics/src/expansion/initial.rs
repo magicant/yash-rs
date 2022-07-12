@@ -111,6 +111,7 @@ pub trait Expand {
     ) -> Result<Phrase, Error>;
 }
 
+mod arith;
 mod command_subst;
 mod param;
 mod slice;
