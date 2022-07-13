@@ -55,6 +55,9 @@ pub enum Source {
     /// Command substitution.
     CommandSubst { original: Location },
 
+    /// Arithmetic expansion.
+    Arith { original: Location },
+
     /// Trap command.
     Trap {
         /// Trap condition name, typically the signal name.
@@ -132,6 +135,7 @@ impl Source {
             Stdin => "<stdin>",
             Alias { .. } => "<alias>",
             CommandSubst { .. } => "<command_substitution>",
+            Arith { .. } => "<arith>",
             Trap { condition, .. } => condition,
         }
     }

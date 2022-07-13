@@ -55,9 +55,9 @@ impl Display for ErrorCause {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Error {
     /// Cause of the error
-    cause: ErrorCause,
+    pub cause: ErrorCause,
     /// Range of the substring in the evaluated expression string where the error occurred
-    location: Range<usize>,
+    pub location: Range<usize>,
 }
 
 impl Display for Error {
