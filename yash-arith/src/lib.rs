@@ -39,12 +39,15 @@ impl Display for Value {
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause {
-    // TODO Error cause variants
+    /// A value expression contains an invalid character.
+    InvalidCharacterInValue,
 }
 
 impl Display for ErrorCause {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorCause::InvalidCharacterInValue => "invalid character in value".fmt(f),
+        }
     }
 }
 
@@ -68,13 +71,16 @@ impl std::error::Error for Error {}
 // TODO Variable environment
 /// Performs arithmetic expansion
 pub fn eval(expression: &str) -> Result<Value, Error> {
-    let i = if expression.starts_with('0') {
+    if expression.starts_with('0') {
         i64::from_str_radix(expression, 8)
     } else {
         expression.parse()
     }
-    .expect("todo: handle expressions that are not integral constants");
-    Ok(Value::Integer(i))
+    .map(Value::Integer)
+    .map_err(|_| Error {
+        cause: ErrorCause::InvalidCharacterInValue,
+        location: 0..expression.len(),
+    })
 }
 
 #[cfg(test)]
@@ -95,7 +101,24 @@ mod tests {
         assert_eq!(eval("0123"), Ok(Value::Integer(0o123)));
     }
 
-    // TODO Malformed octal integer constants
+    #[test]
+    fn invalid_digit_in_octal_constant() {
+        assert_eq!(
+            eval("08"),
+            Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..2,
+            })
+        );
+        assert_eq!(
+            eval("0192"),
+            Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..4,
+            })
+        );
+    }
+
     // TODO Hexadecimal integer constants
     // TODO Float constants
     // TODO Variables (integers, floats, infinities, & NaNs)
