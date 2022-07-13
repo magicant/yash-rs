@@ -68,9 +68,12 @@ impl std::error::Error for Error {}
 // TODO Variable environment
 /// Performs arithmetic expansion
 pub fn eval(expression: &str) -> Result<Value, Error> {
-    let i = expression
-        .parse()
-        .expect("todo: handle expressions that are not integral constants");
+    let i = if expression.starts_with('0') {
+        i64::from_str_radix(expression, 8)
+    } else {
+        expression.parse()
+    }
+    .expect("todo: handle expressions that are not integral constants");
     Ok(Value::Integer(i))
 }
 
@@ -80,12 +83,19 @@ mod tests {
 
     #[test]
     fn decimal_integer_constants() {
-        assert_eq!(eval("0"), Ok(Value::Integer(0)));
         assert_eq!(eval("1"), Ok(Value::Integer(1)));
         assert_eq!(eval("42"), Ok(Value::Integer(42)));
     }
 
-    // TODO Octal integer constants
+    #[test]
+    fn octal_integer_constants() {
+        assert_eq!(eval("0"), Ok(Value::Integer(0)));
+        assert_eq!(eval("01"), Ok(Value::Integer(1)));
+        assert_eq!(eval("07"), Ok(Value::Integer(7)));
+        assert_eq!(eval("0123"), Ok(Value::Integer(0o123)));
+    }
+
+    // TODO Malformed octal integer constants
     // TODO Hexadecimal integer constants
     // TODO Float constants
     // TODO Variables (integers, floats, infinities, & NaNs)
