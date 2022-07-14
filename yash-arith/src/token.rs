@@ -55,7 +55,11 @@ impl Iterator for Tokens<'_> {
             .find(char::is_whitespace) // TODO Should delimit at an operator
             .unwrap_or(source.len());
         let token_source = &source[..end_of_token];
-        let parse = if source.starts_with('0') {
+        let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
+            i64::from_str_radix(token_source, 0x10)
+        } else if let Some(token_source) = token_source.strip_prefix("0x") {
+            i64::from_str_radix(token_source, 0x10)
+        } else if source.starts_with('0') {
             i64::from_str_radix(token_source, 8)
         } else {
             token_source.parse()
@@ -154,7 +158,47 @@ mod tests {
         // TODO Test with spaces
     }
 
-    // TODO Hexadecimal integer constants
+    #[test]
+    fn hexadecimal_integer_constants() {
+        assert_eq!(
+            Tokens::new("0x0").next(),
+            Some(Ok(Token::Term(Term::Value(Value::Integer(0x0)))))
+        );
+        assert_eq!(
+            Tokens::new("0X1").next(),
+            Some(Ok(Token::Term(Term::Value(Value::Integer(0x1)))))
+        );
+        assert_eq!(
+            Tokens::new("0x19Af").next(),
+            Some(Ok(Token::Term(Term::Value(Value::Integer(0x19AF)))))
+        );
+    }
+
+    #[test]
+    fn broken_hexadecimal_integer_constants() {
+        assert_eq!(
+            Tokens::new("0x").next(),
+            Some(Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("0xG").next(),
+            Some(Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..3,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("0x1z2").next(),
+            Some(Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..5,
+            }))
+        );
+    }
+
     // TODO Float constants
     // TODO Variables
 
