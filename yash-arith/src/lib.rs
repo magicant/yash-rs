@@ -38,10 +38,11 @@ impl Display for Value {
 
 /// Intermediate result of evaluating part of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Term {
+pub enum Term<'a> {
     /// Value
     Value(Value),
-    // TODO Variable
+    /// Variable
+    Variable(&'a str),
 }
 
 /// Cause of an arithmetic expansion error

@@ -23,9 +23,9 @@ use super::Value;
 
 /// Atomic lexical element of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Token {
+pub enum Token<'a> {
     /// Term
-    Term(Term),
+    Term(Term<'a>),
     // TODO Operators
 }
 
@@ -43,10 +43,10 @@ impl<'a> Tokens<'a> {
     }
 }
 
-impl Iterator for Tokens<'_> {
-    type Item = Result<Token, Error>;
+impl<'a> Iterator for Tokens<'a> {
+    type Item = Result<Token<'a>, Error>;
 
-    fn next(&mut self) -> Option<Result<Token, Error>> {
+    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
         let source = self.source[self.index..].trim_start();
         if source.is_empty() {
             return None;
