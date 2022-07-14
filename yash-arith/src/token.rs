@@ -48,33 +48,38 @@ impl<'a> Iterator for Tokens<'a> {
 
     fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
         let source = self.source[self.index..].trim_start();
-        if source.is_empty() {
-            return None;
-        }
-        let token_len = source
-            .find(char::is_whitespace) // TODO Should delimit at an operator
-            .unwrap_or(source.len());
-        let token_source = &source[..token_len];
-        let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
-            i64::from_str_radix(token_source, 0x10)
-        } else if let Some(token_source) = token_source.strip_prefix("0x") {
-            i64::from_str_radix(token_source, 0x10)
-        } else if source.starts_with('0') {
-            i64::from_str_radix(token_source, 8)
-        } else {
-            token_source.parse()
-        };
         let start_of_token = self.source.len() - source.len();
-        let end_of_token = start_of_token + token_len;
-        match parse {
-            Ok(i) => {
-                self.index = end_of_token;
-                Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
+        if source.chars().next()?.is_ascii_digit() {
+            let token_len = source
+                .find(char::is_whitespace) // TODO Should delimit at an operator
+                .unwrap_or(source.len());
+            let token_source = &source[..token_len];
+            let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
+                i64::from_str_radix(token_source, 0x10)
+            } else if let Some(token_source) = token_source.strip_prefix("0x") {
+                i64::from_str_radix(token_source, 0x10)
+            } else if source.starts_with('0') {
+                i64::from_str_radix(token_source, 8)
+            } else {
+                token_source.parse()
+            };
+            let end_of_token = start_of_token + token_len;
+            match parse {
+                Ok(i) => {
+                    self.index = end_of_token;
+                    Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
+                }
+                Err(_) => Some(Err(Error {
+                    cause: ErrorCause::InvalidNumericConstant,
+                    location: start_of_token..end_of_token,
+                })),
             }
-            Err(_) => Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
-                location: start_of_token..end_of_token,
-            })),
+        } else {
+            let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
+            let token_len = source.len() - remainder.len();
+            // TODO What if token_len is 0
+            self.index = start_of_token + token_len;
+            Some(Ok(Token::Term(Term::Variable(&source[..token_len]))))
         }
     }
 }
@@ -200,7 +205,22 @@ mod tests {
     }
 
     // TODO Float constants
-    // TODO Variables
+
+    #[test]
+    fn variables() {
+        assert_eq!(
+            Tokens::new("abc").next(),
+            Some(Ok(Token::Term(Term::Variable("abc"))))
+        );
+        assert_eq!(
+            Tokens::new("foo_BAR").next(),
+            Some(Ok(Token::Term(Term::Variable("foo_BAR"))))
+        );
+        assert_eq!(
+            Tokens::new("a1B2c").next(),
+            Some(Ok(Token::Term(Term::Variable("a1B2c"))))
+        );
+    }
 
     #[test]
     fn space_around_token() {
@@ -220,15 +240,12 @@ mod tests {
 
     #[test]
     fn parsing_two_tokens() {
-        let mut tokens = Tokens::new(" 123  0456 ");
+        let mut tokens = Tokens::new(" 123  foo ");
         assert_eq!(
             tokens.next(),
             Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
         );
-        assert_eq!(
-            tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o456)))))
-        );
+        assert_eq!(tokens.next(), Some(Ok(Token::Term(Term::Variable("foo")))));
         assert_eq!(tokens.next(), None);
     }
 
