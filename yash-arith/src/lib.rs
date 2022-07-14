@@ -36,6 +36,14 @@ impl Display for Value {
     }
 }
 
+/// Intermediate result of evaluating part of an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Term {
+    /// Value
+    Value(Value),
+    // TODO Variable
+}
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause {
@@ -68,19 +76,20 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+mod token;
+
+use token::Token;
+use token::Tokens;
+
 // TODO Variable environment
 /// Performs arithmetic expansion
 pub fn eval(expression: &str) -> Result<Value, Error> {
-    if expression.starts_with('0') {
-        i64::from_str_radix(expression, 8)
-    } else {
-        expression.parse()
+    let mut tokens = Tokens::new(expression);
+    match tokens.next() {
+        Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
+        Some(Err(error)) => Err(error),
+        other => todo!("handle token {:?}", other),
     }
-    .map(Value::Integer)
-    .map_err(|_| Error {
-        cause: ErrorCause::InvalidCharacterInValue,
-        location: 0..expression.len(),
-    })
 }
 
 #[cfg(test)]
@@ -119,8 +128,14 @@ mod tests {
         );
     }
 
-    // TODO Hexadecimal integer constants
-    // TODO Float constants
+    #[test]
+    fn space_around_token() {
+        assert_eq!(eval(" 12"), Ok(Value::Integer(12)));
+        assert_eq!(eval("12 "), Ok(Value::Integer(12)));
+        assert_eq!(eval("\n 123 \t"), Ok(Value::Integer(123)));
+        // TODO Test with more complex expressions
+    }
+
     // TODO Variables (integers, floats, infinities, & NaNs)
     // TODO Operators
 }
