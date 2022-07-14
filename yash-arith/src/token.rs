@@ -70,7 +70,7 @@ impl Iterator for Tokens<'_> {
                 Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
             }
             Err(_) => Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..self.source.len(), // TODO Return correct range
             })),
         }
@@ -98,14 +98,14 @@ mod tests {
         assert_eq!(
             Tokens::new("1a").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("123_456").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..7,
             }))
         );
@@ -137,21 +137,21 @@ mod tests {
         assert_eq!(
             Tokens::new("08").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("0192").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..4,
             }))
         );
         assert_eq!(
             Tokens::new("0ab").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..3,
             }))
         );
@@ -179,21 +179,21 @@ mod tests {
         assert_eq!(
             Tokens::new("0x").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("0xG").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..3,
             }))
         );
         assert_eq!(
             Tokens::new("0x1z2").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..5,
             }))
         );

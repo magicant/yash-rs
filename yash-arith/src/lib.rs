@@ -48,13 +48,13 @@ pub enum Term {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause {
     /// A value expression contains an invalid character.
-    InvalidCharacterInValue,
+    InvalidNumericConstant,
 }
 
 impl Display for ErrorCause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorCause::InvalidCharacterInValue => "invalid character in value".fmt(f),
+            ErrorCause::InvalidNumericConstant => "invalid numeric constant".fmt(f),
         }
     }
 }
@@ -115,14 +115,14 @@ mod tests {
         assert_eq!(
             eval("08"),
             Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..2,
             })
         );
         assert_eq!(
             eval("0192"),
             Err(Error {
-                cause: ErrorCause::InvalidCharacterInValue,
+                cause: ErrorCause::InvalidNumericConstant,
                 location: 0..4,
             })
         );

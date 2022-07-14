@@ -150,7 +150,7 @@ mod tests {
         let e = result.unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::ArithError(yash_arith::ErrorCause::InvalidCharacterInValue)
+            ErrorCause::ArithError(yash_arith::ErrorCause::InvalidNumericConstant)
         );
         assert_eq!(*e.location.code.value.borrow(), "09");
         assert_eq!(e.location.code.source, Source::Arith { original: location });
