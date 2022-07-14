@@ -47,18 +47,29 @@ impl Iterator for Tokens<'_> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Result<Token, Error>> {
-        let source = self.source.trim();
-        if source.starts_with('0') {
-            i64::from_str_radix(source, 8)
-        } else {
-            source.parse()
+        let source = self.source[self.index..].trim_start();
+        if source.is_empty() {
+            return None;
         }
-        .map(|i| Token::Term(Term::Value(Value::Integer(i))))
-        .map_err(|_| Error {
-            cause: ErrorCause::InvalidCharacterInValue,
-            location: 0..self.source.len(),
-        })
-        .into()
+        let end_of_token = source
+            .find(char::is_whitespace) // TODO Should delimit at an operator
+            .unwrap_or(source.len());
+        let token_source = &source[..end_of_token];
+        let parse = if source.starts_with('0') {
+            i64::from_str_radix(token_source, 8)
+        } else {
+            token_source.parse()
+        };
+        match parse {
+            Ok(i) => {
+                self.index = self.source.len() - (source.len() - end_of_token);
+                Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
+            }
+            Err(_) => Some(Err(Error {
+                cause: ErrorCause::InvalidCharacterInValue,
+                location: 0..self.source.len(), // TODO Return correct range
+            })),
+        }
     }
 }
 
@@ -162,4 +173,20 @@ mod tests {
             Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
         );
     }
+
+    #[test]
+    fn parsing_two_tokens() {
+        let mut tokens = Tokens::new(" 123  0456 ");
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
+        );
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token::Term(Term::Value(Value::Integer(0o456)))))
+        );
+        assert_eq!(tokens.next(), None);
+    }
+
+    // TODO parsing_many_tokens "10.0e+3+0"
 }
