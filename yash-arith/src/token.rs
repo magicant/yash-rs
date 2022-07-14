@@ -51,10 +51,10 @@ impl Iterator for Tokens<'_> {
         if source.is_empty() {
             return None;
         }
-        let end_of_token = source
+        let token_len = source
             .find(char::is_whitespace) // TODO Should delimit at an operator
             .unwrap_or(source.len());
-        let token_source = &source[..end_of_token];
+        let token_source = &source[..token_len];
         let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
             i64::from_str_radix(token_source, 0x10)
         } else if let Some(token_source) = token_source.strip_prefix("0x") {
@@ -64,14 +64,16 @@ impl Iterator for Tokens<'_> {
         } else {
             token_source.parse()
         };
+        let start_of_token = self.source.len() - source.len();
+        let end_of_token = start_of_token + token_len;
         match parse {
             Ok(i) => {
-                self.index = self.source.len() - (source.len() - end_of_token);
+                self.index = end_of_token;
                 Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
             }
             Err(_) => Some(Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
-                location: 0..self.source.len(), // TODO Return correct range
+                location: start_of_token..end_of_token,
             })),
         }
     }
@@ -103,13 +105,12 @@ mod tests {
             }))
         );
         assert_eq!(
-            Tokens::new("123_456").next(),
+            Tokens::new("  123_456 ").next(),
             Some(Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
-                location: 0..7,
+                location: 2..9,
             }))
         );
-        // TODO Test with spaces
     }
 
     #[test]
@@ -142,10 +143,10 @@ mod tests {
             }))
         );
         assert_eq!(
-            Tokens::new("0192").next(),
+            Tokens::new(" 0192 ").next(),
             Some(Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
-                location: 0..4,
+                location: 1..5,
             }))
         );
         assert_eq!(
@@ -155,7 +156,6 @@ mod tests {
                 location: 0..3,
             }))
         );
-        // TODO Test with spaces
     }
 
     #[test]
@@ -184,10 +184,10 @@ mod tests {
             }))
         );
         assert_eq!(
-            Tokens::new("0xG").next(),
+            Tokens::new(" 0xG ").next(),
             Some(Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
-                location: 0..3,
+                location: 1..4,
             }))
         );
         assert_eq!(
