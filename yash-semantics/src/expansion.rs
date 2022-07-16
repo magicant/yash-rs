@@ -123,7 +123,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(e) => e.desc().into(),
-            AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
+            AssignReadOnly(e) => e.to_string().into(),
         }
     }
 
