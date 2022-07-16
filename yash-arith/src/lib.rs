@@ -77,14 +77,15 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+mod env;
 mod token;
 
+pub use env::Env;
 use token::Token;
 use token::Tokens;
 
-// TODO Variable environment
 /// Performs arithmetic expansion
-pub fn eval(expression: &str) -> Result<Value, Error> {
+pub fn eval<E: Env>(expression: &str, _env: &mut E) -> Result<Value, Error> {
     let mut tokens = Tokens::new(expression);
     match tokens.next() {
         Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
@@ -96,32 +97,36 @@ pub fn eval(expression: &str) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn decimal_integer_constants() {
-        assert_eq!(eval("1"), Ok(Value::Integer(1)));
-        assert_eq!(eval("42"), Ok(Value::Integer(42)));
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("42", env), Ok(Value::Integer(42)));
     }
 
     #[test]
     fn octal_integer_constants() {
-        assert_eq!(eval("0"), Ok(Value::Integer(0)));
-        assert_eq!(eval("01"), Ok(Value::Integer(1)));
-        assert_eq!(eval("07"), Ok(Value::Integer(7)));
-        assert_eq!(eval("0123"), Ok(Value::Integer(0o123)));
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("01", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("07", env), Ok(Value::Integer(7)));
+        assert_eq!(eval("0123", env), Ok(Value::Integer(0o123)));
     }
 
     #[test]
     fn invalid_digit_in_octal_constant() {
+        let env = &mut HashMap::new();
         assert_eq!(
-            eval("08"),
+            eval("08", env),
             Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
                 location: 0..2,
             })
         );
         assert_eq!(
-            eval("0192"),
+            eval("0192", env),
             Err(Error {
                 cause: ErrorCause::InvalidNumericConstant,
                 location: 0..4,
@@ -131,9 +136,10 @@ mod tests {
 
     #[test]
     fn space_around_token() {
-        assert_eq!(eval(" 12"), Ok(Value::Integer(12)));
-        assert_eq!(eval("12 "), Ok(Value::Integer(12)));
-        assert_eq!(eval("\n 123 \t"), Ok(Value::Integer(123)));
+        let env = &mut HashMap::new();
+        assert_eq!(eval(" 12", env), Ok(Value::Integer(12)));
+        assert_eq!(eval("12 ", env), Ok(Value::Integer(12)));
+        assert_eq!(eval("\n 123 \t", env), Ok(Value::Integer(123)));
         // TODO Test with more complex expressions
     }
 

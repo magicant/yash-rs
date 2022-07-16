@@ -1,0 +1,62 @@
+// This file is part of yash, an extended POSIX shell.
+// Copyright (C) 2022 WATANABE Yuki
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//! Variable environment
+
+use std::collections::{BTreeMap, HashMap};
+use std::convert::Infallible;
+
+/// Interface for accessing variables during evaluation
+pub trait Env {
+    /// Object returned on an assignment error
+    type AssignVariableError;
+
+    /// Returns the value of the specified variable.
+    fn get_variable(&self, name: &str) -> Option<&str>;
+
+    /// Assigns a new value to the specified variable.
+    fn assign_variable(
+        &mut self,
+        name: &str,
+        value: String,
+    ) -> Result<(), Self::AssignVariableError>;
+}
+
+impl Env for HashMap<String, String> {
+    type AssignVariableError = Infallible;
+
+    fn get_variable(&self, name: &str) -> Option<&str> {
+        self.get(name).map(String::as_str)
+    }
+
+    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), Infallible> {
+        self.insert(name.to_owned(), value);
+        Ok(())
+    }
+}
+
+impl Env for BTreeMap<String, String> {
+    type AssignVariableError = Infallible;
+
+    fn get_variable(&self, name: &str) -> Option<&str> {
+        self.get(name).map(String::as_str)
+    }
+
+    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), Infallible> {
+        self.insert(name.to_owned(), value);
+        Ok(())
+    }
+}

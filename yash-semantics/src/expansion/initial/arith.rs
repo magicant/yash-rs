@@ -16,8 +16,6 @@
 
 //! Arithmetic expansion
 
-use std::rc::Rc;
-
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
 use super::super::phrase::Phrase;
@@ -25,11 +23,42 @@ use super::super::ErrorCause;
 use super::Env;
 use super::Error;
 use crate::expansion::expand_text;
+use std::rc::Rc;
 use yash_arith::eval;
+use yash_env::variable::ReadOnlyError;
+use yash_env::variable::Scope::Global;
+use yash_env::variable::Value::Scalar;
+use yash_env::variable::Variable;
+use yash_env::variable::VariableSet;
 use yash_syntax::source::Code;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
 use yash_syntax::syntax::Text;
+
+struct VarEnv<'a>(&'a mut VariableSet);
+
+impl<'a> yash_arith::Env for VarEnv<'a> {
+    type AssignVariableError = ReadOnlyError;
+
+    #[rustfmt::skip]
+    fn get_variable(&self, name: &str) -> Option<&str> {
+        if let Some(Variable { value: Scalar(value), .. }) = self.0.get(name) {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), ReadOnlyError> {
+        let value = Variable {
+            value: Scalar(value),
+            last_assigned_location: None, // TODO Provide correct location
+            is_exported: false,
+            read_only_location: None,
+        };
+        self.0.assign(Global, name.to_owned(), value).map(drop)
+    }
+}
 
 pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Result<Phrase, Error> {
     let (expression, exit_status) = expand_text(env.inner, text).await?;
@@ -37,7 +66,7 @@ pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Resu
         env.last_command_subst_exit_status = exit_status;
     }
 
-    let result = eval(&expression);
+    let result = eval(&expression, &mut VarEnv(&mut env.inner.variables));
 
     match result {
         Ok(value) => {
