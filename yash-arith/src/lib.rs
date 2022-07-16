@@ -45,51 +45,75 @@ pub enum Term<'a> {
     Variable(&'a str),
 }
 
+mod token;
+
+use token::Token;
+pub use token::TokenError;
+use token::Tokens;
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ErrorCause {
-    /// A value expression contains an invalid character.
-    InvalidNumericConstant,
+pub enum ErrorCause<E> {
+    /// Error in tokenization
+    TokenError(TokenError),
+    /// Error assigning a variable value.
+    AssignVariableError(E),
 }
 
-impl Display for ErrorCause {
+impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorCause::InvalidNumericConstant => "invalid numeric constant".fmt(f),
+            ErrorCause::TokenError(e) => e.fmt(f),
+            ErrorCause::AssignVariableError(e) => e.fmt(f),
         }
+    }
+}
+
+impl<E> From<TokenError> for ErrorCause<E> {
+    fn from(e: TokenError) -> Self {
+        ErrorCause::TokenError(e)
     }
 }
 
 /// Description of an error that occurred during expansion
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Error {
+pub struct Error<E> {
     /// Cause of the error
-    pub cause: ErrorCause,
+    pub cause: ErrorCause<E>,
     /// Range of the substring in the evaluated expression string where the error occurred
     pub location: Range<usize>,
 }
 
-impl Display for Error {
+impl<E: Display> Display for Error<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.cause.fmt(f)
     }
 }
 
-impl std::error::Error for Error {}
+impl<E: std::fmt::Debug + Display> std::error::Error for Error<E> {}
+
+impl<E> From<token::Error> for Error<E> {
+    fn from(e: token::Error) -> Self {
+        Error {
+            cause: e.cause.into(),
+            location: e.location,
+        }
+    }
+}
 
 mod env;
-mod token;
 
 pub use env::Env;
-use token::Token;
-use token::Tokens;
 
 /// Performs arithmetic expansion
-pub fn eval<E: Env>(expression: &str, _env: &mut E) -> Result<Value, Error> {
+pub fn eval<E: Env>(
+    expression: &str,
+    _env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression);
     match tokens.next() {
         Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
-        Some(Err(error)) => Err(error),
+        Some(Err(error)) => Err(error.into()),
         other => todo!("handle token {:?}", other),
     }
 }
@@ -121,14 +145,14 @@ mod tests {
         assert_eq!(
             eval("08", env),
             Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
                 location: 0..2,
             })
         );
         assert_eq!(
             eval("0192", env),
             Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
                 location: 0..4,
             })
         );

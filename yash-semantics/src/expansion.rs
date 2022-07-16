@@ -101,7 +101,7 @@ pub enum ErrorCause {
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
     /// Error while evaluating an arithmetic expansion.
-    ArithError(yash_arith::ErrorCause),
+    ArithError(yash_arith::ErrorCause<ReadOnlyError>),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }

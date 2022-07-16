@@ -105,6 +105,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
+    use yash_arith::TokenError;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
 
@@ -179,7 +180,7 @@ mod tests {
         let e = result.unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::ArithError(yash_arith::ErrorCause::InvalidNumericConstant)
+            ErrorCause::ArithError(TokenError::InvalidNumericConstant.into())
         );
         assert_eq!(*e.location.code.value.borrow(), "09");
         assert_eq!(e.location.code.source, Source::Arith { original: location });

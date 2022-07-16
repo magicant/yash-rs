@@ -16,10 +16,10 @@
 
 //! Tokenization
 
-use super::Error;
-use super::ErrorCause;
 use super::Term;
 use super::Value;
+use std::fmt::Display;
+use std::ops::Range;
 
 /// Atomic lexical element of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -27,6 +27,30 @@ pub enum Token<'a> {
     /// Term
     Term(Term<'a>),
     // TODO Operators
+}
+
+/// Cause of a tokenization error
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum TokenError {
+    /// A value expression contains an invalid character.
+    InvalidNumericConstant,
+}
+
+impl Display for TokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenError::InvalidNumericConstant => "invalid numeric constant".fmt(f),
+        }
+    }
+}
+
+/// Description of an error that occurred during expansion
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Error {
+    /// Cause of the error
+    pub cause: TokenError,
+    /// Range of the substring in the evaluated expression string where the error occurred
+    pub location: Range<usize>,
 }
 
 /// Iterator extracting tokens from a string
@@ -70,7 +94,7 @@ impl<'a> Iterator for Tokens<'a> {
                     Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
                 }
                 Err(_) => Some(Err(Error {
-                    cause: ErrorCause::InvalidNumericConstant,
+                    cause: TokenError::InvalidNumericConstant,
                     location: start_of_token..end_of_token,
                 })),
             }
@@ -105,14 +129,14 @@ mod tests {
         assert_eq!(
             Tokens::new("1a").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("  123_456 ").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 2..9,
             }))
         );
@@ -143,21 +167,21 @@ mod tests {
         assert_eq!(
             Tokens::new("08").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new(" 0192 ").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 1..5,
             }))
         );
         assert_eq!(
             Tokens::new("0ab").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 0..3,
             }))
         );
@@ -184,21 +208,21 @@ mod tests {
         assert_eq!(
             Tokens::new("0x").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new(" 0xG ").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 1..4,
             }))
         );
         assert_eq!(
             Tokens::new("0x1z2").next(),
             Some(Err(Error {
-                cause: ErrorCause::InvalidNumericConstant,
+                cause: TokenError::InvalidNumericConstant,
                 location: 0..5,
             }))
         );
