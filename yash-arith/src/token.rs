@@ -21,12 +21,19 @@ use super::Value;
 use std::fmt::Display;
 use std::ops::Range;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Operator {
+    /// `+`
+    Plus,
+}
+
 /// Value of a token
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TokenValue<'a> {
     /// Term
     Term(Term<'a>),
-    // TODO Operators
+    /// Operator
+    Operator(Operator),
 }
 
 /// Atomic lexical element of an expression
@@ -114,15 +121,27 @@ impl<'a> Iterator for Tokens<'a> {
         } else {
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
-            // TODO What if token_len is 0
-            let token = &source[..token_len];
-            let end_of_token = start_of_token + token_len;
-            let location = start_of_token..end_of_token;
-            self.index = end_of_token;
-            Some(Ok(Token {
-                value: TokenValue::Term(Term::Variable(token)),
-                location,
-            }))
+            if token_len > 0 {
+                let token = &source[..token_len];
+                let end_of_token = start_of_token + token_len;
+                let location = start_of_token..end_of_token;
+                self.index = end_of_token;
+                Some(Ok(Token {
+                    value: TokenValue::Term(Term::Variable(token)),
+                    location,
+                }))
+            } else {
+                let mut chars = source.chars();
+                match chars.next() {
+                    Some('+') => {
+                        let value = TokenValue::Operator(Operator::Plus);
+                        let location = start_of_token..(start_of_token + 1);
+                        self.index = location.end;
+                        Some(Ok(Token { value, location }))
+                    }
+                    _ => todo!("unrecognized expression {:?}", source),
+                }
+            }
         }
     }
 }
@@ -298,6 +317,17 @@ mod tests {
                 value: TokenValue::Term(Term::Variable("a1B2c")),
                 location: 0..5,
             }))
+        );
+    }
+
+    #[test]
+    fn operators() {
+        assert_eq!(
+            Tokens::new("+").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 0..1
+            })),
         );
     }
 

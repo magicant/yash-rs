@@ -143,6 +143,11 @@ pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::Ass
             location,
         })) => expand_variable(name, &location, env),
 
+        Some(Ok(Token {
+            value: TokenValue::Operator(_op),
+            location: _,
+        })) => todo!("handle orphan operator"),
+
         Some(Err(error)) => Err(error.into()),
         None => todo!("handle missing token"),
     }
