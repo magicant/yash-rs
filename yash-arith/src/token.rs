@@ -102,8 +102,12 @@ impl<'a> Iterator for Tokens<'a> {
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
             // TODO What if token_len is 0
-            self.index = start_of_token + token_len;
-            Some(Ok(Token::Term(Term::Variable(&source[..token_len]))))
+            let end_of_token = start_of_token + token_len;
+            self.index = end_of_token;
+            Some(Ok(Token::Term(Term::Variable {
+                name: &source[..token_len],
+                location: start_of_token..end_of_token,
+            })))
         }
     }
 }
@@ -234,15 +238,24 @@ mod tests {
     fn variables() {
         assert_eq!(
             Tokens::new("abc").next(),
-            Some(Ok(Token::Term(Term::Variable("abc"))))
+            Some(Ok(Token::Term(Term::Variable {
+                name: "abc",
+                location: 0..3
+            })))
         );
         assert_eq!(
             Tokens::new("foo_BAR").next(),
-            Some(Ok(Token::Term(Term::Variable("foo_BAR"))))
+            Some(Ok(Token::Term(Term::Variable {
+                name: "foo_BAR",
+                location: 0..7
+            })))
         );
         assert_eq!(
             Tokens::new("a1B2c").next(),
-            Some(Ok(Token::Term(Term::Variable("a1B2c"))))
+            Some(Ok(Token::Term(Term::Variable {
+                name: "a1B2c",
+                location: 0..5
+            })))
         );
     }
 
@@ -269,7 +282,13 @@ mod tests {
             tokens.next(),
             Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
         );
-        assert_eq!(tokens.next(), Some(Ok(Token::Term(Term::Variable("foo")))));
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token::Term(Term::Variable {
+                name: "foo",
+                location: 6..9
+            })))
+        );
         assert_eq!(tokens.next(), None);
     }
 

@@ -42,7 +42,12 @@ pub enum Term<'a> {
     /// Value
     Value(Value),
     /// Variable
-    Variable(&'a str),
+    Variable {
+        /// Variable name
+        name: &'a str,
+        /// Range of the substring in the evaluated expression where the variable occurs
+        location: Range<usize>,
+    },
 }
 
 mod token;
@@ -106,7 +111,11 @@ mod env;
 pub use env::Env;
 
 /// Expands a variable to its value.
-fn expand_variable<E: Env>(name: &str, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
+fn expand_variable<E: Env>(
+    name: &str,
+    _location: &Range<usize>,
+    env: &E,
+) -> Result<Value, Error<E::AssignVariableError>> {
     match env.get_variable(name) {
         Some(value) => Ok(Value::Integer(
             value.parse().expect("todo: handle invalid value"),
@@ -120,7 +129,9 @@ pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::Ass
     let mut tokens = Tokens::new(expression);
     match tokens.next() {
         Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
-        Some(Ok(Token::Term(Term::Variable(variable)))) => expand_variable(variable, env),
+        Some(Ok(Token::Term(Term::Variable { name, location }))) => {
+            expand_variable(name, &location, env)
+        }
         Some(Err(error)) => Err(error.into()),
         None => todo!("handle missing token"),
     }
