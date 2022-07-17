@@ -61,6 +61,8 @@ use token::Tokens;
 pub enum ErrorCause<E> {
     /// Error in tokenization
     TokenError(TokenError),
+    /// A variable value that is not a valid number
+    InvalidVariableValue(String),
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
@@ -69,6 +71,9 @@ impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorCause::TokenError(e) => e.fmt(f),
+            ErrorCause::InvalidVariableValue(v) => {
+                write!(f, "variable value {:?} cannot be parsed as a number", v)
+            }
             ErrorCause::AssignVariableError(e) => e.fmt(f),
         }
     }
@@ -113,13 +118,17 @@ pub use env::Env;
 /// Expands a variable to its value.
 fn expand_variable<E: Env>(
     name: &str,
-    _location: &Range<usize>,
+    location: &Range<usize>,
     env: &E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match env.get_variable(name) {
-        Some(value) => Ok(Value::Integer(
-            value.parse().expect("todo: handle invalid value"),
-        )),
+        Some(value) => match value.parse() {
+            Ok(number) => Ok(Value::Integer(number)),
+            Err(_) => Err(Error {
+                cause: ErrorCause::InvalidVariableValue(value.to_string()),
+                location: location.clone(),
+            }),
+        },
         None => Ok(Value::Integer(0)),
     }
 }
@@ -203,5 +212,36 @@ mod tests {
     }
 
     // TODO Variables (floats, infinities, & NaNs)
+
+    #[test]
+    #[ignore]
+    fn invalid_variable_value() {
+        let env = &mut HashMap::new();
+        env.insert("foo".to_string(), "".to_string());
+        env.insert("bar".to_string(), "*".to_string());
+        env.insert("oops".to_string(), "foo".to_string());
+        assert_eq!(
+            eval("foo", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("".to_string()),
+                location: 0..3,
+            })
+        );
+        assert_eq!(
+            eval("bar", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("*".to_string()),
+                location: 0..3,
+            })
+        );
+        assert_eq!(
+            eval("  oops ", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("foo".to_string()),
+                location: 2..5,
+            })
+        );
+    }
+
     // TODO Operators
 }
