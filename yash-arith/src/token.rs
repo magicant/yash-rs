@@ -91,7 +91,7 @@ impl<'a> Iterator for Tokens<'a> {
         let start_of_token = self.source.len() - source.len();
         if source.chars().next()?.is_ascii_digit() {
             let token_len = source
-                .find(char::is_whitespace) // TODO Should delimit at an operator
+                .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
                 .unwrap_or(source.len());
             let token_source = &source[..token_len];
             let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
@@ -376,5 +376,31 @@ mod tests {
         assert_eq!(tokens.next(), None);
     }
 
-    // TODO parsing_many_tokens "10.0e+3+0"
+    #[test]
+    fn parsing_many_tokens() {
+        // TODO "10.0e+3+0"
+        let mut tokens = Tokens::new(" 10+0 ");
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(10))),
+                location: 1..3,
+            })),
+        );
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 3..4,
+            })),
+        );
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 4..5,
+            })),
+        );
+        assert_eq!(tokens.next(), None);
+    }
 }
