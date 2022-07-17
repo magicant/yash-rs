@@ -105,16 +105,24 @@ mod env;
 
 pub use env::Env;
 
+/// Expands a variable to its value.
+fn expand_variable<E: Env>(name: &str, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
+    match env.get_variable(name) {
+        Some(value) => Ok(Value::Integer(
+            value.parse().expect("todo: handle invalid value"),
+        )),
+        None => todo!("handle unset variable"),
+    }
+}
+
 /// Performs arithmetic expansion
-pub fn eval<E: Env>(
-    expression: &str,
-    _env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression);
     match tokens.next() {
         Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
+        Some(Ok(Token::Term(Term::Variable(variable)))) => expand_variable(variable, env),
         Some(Err(error)) => Err(error.into()),
-        other => todo!("handle token {:?}", other),
+        None => todo!("handle missing token"),
     }
 }
 
@@ -167,6 +175,15 @@ mod tests {
         // TODO Test with more complex expressions
     }
 
-    // TODO Variables (integers, floats, infinities, & NaNs)
+    #[test]
+    fn integer_variable() {
+        let env = &mut HashMap::new();
+        env.insert("foo".to_string(), "42".to_string());
+        env.insert("bar".to_string(), "123".to_string());
+        assert_eq!(eval("foo", env), Ok(Value::Integer(42)));
+        assert_eq!(eval("bar", env), Ok(Value::Integer(123)));
+    }
+
+    // TODO Variables (unset, floats, infinities, & NaNs)
     // TODO Operators
 }
