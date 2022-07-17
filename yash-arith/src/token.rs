@@ -21,12 +21,21 @@ use super::Value;
 use std::fmt::Display;
 use std::ops::Range;
 
-/// Atomic lexical element of an expression
+/// Value of a token
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Token<'a> {
+pub enum TokenValue<'a> {
     /// Term
     Term(Term<'a>),
     // TODO Operators
+}
+
+/// Atomic lexical element of an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Token<'a> {
+    /// Value of the token
+    pub value: TokenValue<'a>,
+    /// Range of the substring where the token occurs in the parsed expression
+    pub location: Range<usize>,
 }
 
 /// Cause of a tokenization error
@@ -88,26 +97,32 @@ impl<'a> Iterator for Tokens<'a> {
                 token_source.parse()
             };
             let end_of_token = start_of_token + token_len;
+            let location = start_of_token..end_of_token;
             match parse {
                 Ok(i) => {
                     self.index = end_of_token;
-                    Some(Ok(Token::Term(Term::Value(Value::Integer(i)))))
+                    Some(Ok(Token {
+                        value: TokenValue::Term(Term::Value(Value::Integer(i))),
+                        location,
+                    }))
                 }
                 Err(_) => Some(Err(Error {
                     cause: TokenError::InvalidNumericConstant,
-                    location: start_of_token..end_of_token,
+                    location,
                 })),
             }
         } else {
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
             // TODO What if token_len is 0
+            let token = &source[..token_len];
             let end_of_token = start_of_token + token_len;
+            let location = start_of_token..end_of_token;
             self.index = end_of_token;
-            Some(Ok(Token::Term(Term::Variable {
-                name: &source[..token_len],
-                location: start_of_token..end_of_token,
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable(token)),
+                location,
+            }))
         }
     }
 }
@@ -120,11 +135,17 @@ mod tests {
     fn decimal_integer_constants() {
         assert_eq!(
             Tokens::new("1").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            }))
         );
         assert_eq!(
             Tokens::new("42").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(42))),
+                location: 0..2,
+            }))
         );
     }
 
@@ -150,19 +171,31 @@ mod tests {
     fn octal_integer_constants() {
         assert_eq!(
             Tokens::new("0").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 0..1,
+            }))
         );
         assert_eq!(
             Tokens::new("01").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..2,
+            }))
         );
         assert_eq!(
             Tokens::new("07").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(7)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(7))),
+                location: 0..2,
+            }))
         );
         assert_eq!(
             Tokens::new("0123").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o123))),
+                location: 0..4,
+            }))
         );
     }
 
@@ -195,15 +228,24 @@ mod tests {
     fn hexadecimal_integer_constants() {
         assert_eq!(
             Tokens::new("0x0").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x0))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("0X1").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x1))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("0x19Af").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x19AF)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x19AF))),
+                location: 0..6,
+            }))
         );
     }
 
@@ -238,24 +280,24 @@ mod tests {
     fn variables() {
         assert_eq!(
             Tokens::new("abc").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "abc",
-                location: 0..3
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable("abc")),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("foo_BAR").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "foo_BAR",
-                location: 0..7
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable("foo_BAR")),
+                location: 0..7,
+            }))
         );
         assert_eq!(
             Tokens::new("a1B2c").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "a1B2c",
-                location: 0..5
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable("a1B2c")),
+                location: 0..5,
+            }))
         );
     }
 
@@ -263,15 +305,24 @@ mod tests {
     fn space_around_token() {
         assert_eq!(
             Tokens::new(" 42").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(42))),
+                location: 1..3,
+            }))
         );
         assert_eq!(
             Tokens::new("042 ").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o42))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("\t 123 \n").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(123))),
+                location: 2..5,
+            }))
         );
     }
 
@@ -280,14 +331,17 @@ mod tests {
         let mut tokens = Tokens::new(" 123  foo ");
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(123))),
+                location: 1..4,
+            })),
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "foo",
-                location: 6..9
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable("foo")),
+                location: 6..9,
+            })),
         );
         assert_eq!(tokens.next(), None);
     }

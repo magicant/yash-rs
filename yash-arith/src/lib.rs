@@ -42,18 +42,14 @@ pub enum Term<'a> {
     /// Value
     Value(Value),
     /// Variable
-    Variable {
-        /// Variable name
-        name: &'a str,
-        /// Range of the substring in the evaluated expression where the variable occurs
-        location: Range<usize>,
-    },
+    Variable(&'a str),
 }
 
 mod token;
 
 use token::Token;
 pub use token::TokenError;
+use token::TokenValue;
 use token::Tokens;
 
 /// Cause of an arithmetic expansion error
@@ -137,10 +133,16 @@ fn expand_variable<E: Env>(
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression);
     match tokens.next() {
-        Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
-        Some(Ok(Token::Term(Term::Variable { name, location }))) => {
-            expand_variable(name, &location, env)
-        }
+        Some(Ok(Token {
+            value: TokenValue::Term(Term::Value(value)),
+            location: _,
+        })) => Ok(value),
+
+        Some(Ok(Token {
+            value: TokenValue::Term(Term::Variable(name)),
+            location,
+        })) => expand_variable(name, &location, env),
+
         Some(Err(error)) => Err(error.into()),
         None => todo!("handle missing token"),
     }
