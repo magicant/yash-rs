@@ -111,7 +111,7 @@ fn expand_variable<E: Env>(name: &str, env: &E) -> Result<Value, Error<E::Assign
         Some(value) => Ok(Value::Integer(
             value.parse().expect("todo: handle invalid value"),
         )),
-        None => todo!("handle unset variable"),
+        None => Ok(Value::Integer(0)),
     }
 }
 
@@ -176,6 +176,13 @@ mod tests {
     }
 
     #[test]
+    fn unset_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("foo", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("bar", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
     fn integer_variable() {
         let env = &mut HashMap::new();
         env.insert("foo".to_string(), "42".to_string());
@@ -184,6 +191,6 @@ mod tests {
         assert_eq!(eval("bar", env), Ok(Value::Integer(123)));
     }
 
-    // TODO Variables (unset, floats, infinities, & NaNs)
+    // TODO Variables (floats, infinities, & NaNs)
     // TODO Operators
 }
