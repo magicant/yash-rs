@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - Unreleased
 
+### Added
+
+- `source::Source::Arith`
+
 ### Changed
 
 - `syntax::CompoundCommand::Subshell` from a tuple variant `Subshell(List)`

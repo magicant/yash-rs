@@ -112,6 +112,14 @@ impl super::Source {
                     original,
                 )));
             }
+            Arith { original } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    "arithmetic expansion appeared here".into(),
+                    original,
+                )));
+            }
             Trap { origin, .. } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation::new(

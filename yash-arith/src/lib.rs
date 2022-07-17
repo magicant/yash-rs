@@ -36,49 +36,212 @@ impl Display for Value {
     }
 }
 
-/// Cause of an arithmetic expansion error
+/// Intermediate result of evaluating part of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ErrorCause {
-    // TODO Error cause variants
+pub enum Term<'a> {
+    /// Value
+    Value(Value),
+    /// Variable
+    Variable {
+        /// Variable name
+        name: &'a str,
+        /// Range of the substring in the evaluated expression where the variable occurs
+        location: Range<usize>,
+    },
 }
 
-impl Display for ErrorCause {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
+mod token;
+
+use token::Token;
+pub use token::TokenError;
+use token::Tokens;
+
+/// Cause of an arithmetic expansion error
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ErrorCause<E> {
+    /// Error in tokenization
+    TokenError(TokenError),
+    /// A variable value that is not a valid number
+    InvalidVariableValue(String),
+    /// Error assigning a variable value.
+    AssignVariableError(E),
+}
+
+impl<E: Display> Display for ErrorCause<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorCause::TokenError(e) => e.fmt(f),
+            ErrorCause::InvalidVariableValue(v) => {
+                write!(f, "variable value {:?} cannot be parsed as a number", v)
+            }
+            ErrorCause::AssignVariableError(e) => e.fmt(f),
+        }
+    }
+}
+
+impl<E> From<TokenError> for ErrorCause<E> {
+    fn from(e: TokenError) -> Self {
+        ErrorCause::TokenError(e)
     }
 }
 
 /// Description of an error that occurred during expansion
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Error {
+pub struct Error<E> {
     /// Cause of the error
-    cause: ErrorCause,
+    pub cause: ErrorCause<E>,
     /// Range of the substring in the evaluated expression string where the error occurred
-    location: Range<usize>,
+    pub location: Range<usize>,
 }
 
-impl Display for Error {
+impl<E: Display> Display for Error<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.cause.fmt(f)
     }
 }
 
-impl std::error::Error for Error {}
+impl<E: std::fmt::Debug + Display> std::error::Error for Error<E> {}
 
-// TODO Variable environment
+impl<E> From<token::Error> for Error<E> {
+    fn from(e: token::Error) -> Self {
+        Error {
+            cause: e.cause.into(),
+            location: e.location,
+        }
+    }
+}
+
+mod env;
+
+pub use env::Env;
+
+/// Expands a variable to its value.
+fn expand_variable<E: Env>(
+    name: &str,
+    location: &Range<usize>,
+    env: &E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    match env.get_variable(name) {
+        Some(value) => match value.parse() {
+            Ok(number) => Ok(Value::Integer(number)),
+            Err(_) => Err(Error {
+                cause: ErrorCause::InvalidVariableValue(value.to_string()),
+                location: location.clone(),
+            }),
+        },
+        None => Ok(Value::Integer(0)),
+    }
+}
+
 /// Performs arithmetic expansion
-pub fn eval(_expression: &str) -> Result<Value, Error> {
-    // TODO Implement arithmetic expansion
-    Ok(Value::Integer(0))
+pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
+    let mut tokens = Tokens::new(expression);
+    match tokens.next() {
+        Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
+        Some(Ok(Token::Term(Term::Variable { name, location }))) => {
+            expand_variable(name, &location, env)
+        }
+        Some(Err(error)) => Err(error.into()),
+        None => todo!("handle missing token"),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
-    fn it_works() {
-        let result = eval("0");
-        assert_eq!(result, Ok(Value::Integer(0)));
+    fn decimal_integer_constants() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("42", env), Ok(Value::Integer(42)));
     }
+
+    #[test]
+    fn octal_integer_constants() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("01", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("07", env), Ok(Value::Integer(7)));
+        assert_eq!(eval("0123", env), Ok(Value::Integer(0o123)));
+    }
+
+    #[test]
+    fn invalid_digit_in_octal_constant() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("08", env),
+            Err(Error {
+                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
+                location: 0..2,
+            })
+        );
+        assert_eq!(
+            eval("0192", env),
+            Err(Error {
+                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
+                location: 0..4,
+            })
+        );
+    }
+
+    #[test]
+    fn space_around_token() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval(" 12", env), Ok(Value::Integer(12)));
+        assert_eq!(eval("12 ", env), Ok(Value::Integer(12)));
+        assert_eq!(eval("\n 123 \t", env), Ok(Value::Integer(123)));
+        // TODO Test with more complex expressions
+    }
+
+    #[test]
+    fn unset_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("foo", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("bar", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
+    fn integer_variable() {
+        let env = &mut HashMap::new();
+        env.insert("foo".to_string(), "42".to_string());
+        env.insert("bar".to_string(), "123".to_string());
+        assert_eq!(eval("foo", env), Ok(Value::Integer(42)));
+        assert_eq!(eval("bar", env), Ok(Value::Integer(123)));
+    }
+
+    // TODO Variables (floats, infinities, & NaNs)
+
+    #[test]
+    #[ignore]
+    fn invalid_variable_value() {
+        let env = &mut HashMap::new();
+        env.insert("foo".to_string(), "".to_string());
+        env.insert("bar".to_string(), "*".to_string());
+        env.insert("oops".to_string(), "foo".to_string());
+        assert_eq!(
+            eval("foo", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("".to_string()),
+                location: 0..3,
+            })
+        );
+        assert_eq!(
+            eval("bar", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("*".to_string()),
+                location: 0..3,
+            })
+        );
+        assert_eq!(
+            eval("  oops ", env),
+            Err(Error {
+                cause: ErrorCause::InvalidVariableValue("foo".to_string()),
+                location: 2..5,
+            })
+        );
+    }
+
+    // TODO Operators
 }

@@ -100,6 +100,8 @@ pub use yash_env::semantics::Field;
 pub enum ErrorCause {
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
+    /// Error while evaluating an arithmetic expansion.
+    ArithError(yash_arith::ErrorCause<ReadOnlyError>),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }
@@ -112,6 +114,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(_) => "error performing the command substitution",
+            ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
         }
     }
@@ -123,6 +126,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(e) => e.desc().into(),
+            ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
         }
     }
@@ -134,7 +138,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            CommandSubstError(_) => None,
+            CommandSubstError(_) | ArithError(_) => None,
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
@@ -148,6 +152,7 @@ impl std::fmt::Display for ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
+            ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
         }
     }
