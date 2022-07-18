@@ -63,6 +63,8 @@ pub enum ErrorCause<E> {
     InvalidVariableValue(String),
     /// Result out of bounds
     Overflow,
+    /// Division by zero
+    DivisionByZero,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
@@ -76,6 +78,7 @@ impl<E: Display> Display for ErrorCause<E> {
                 write!(f, "variable value {:?} cannot be parsed as a number", v)
             }
             Overflow => "overflow".fmt(f),
+            DivisionByZero => "division by zero".fmt(f),
             AssignVariableError(e) => e.fmt(f),
         }
     }
@@ -199,6 +202,16 @@ fn eval_binary<E: Env>(
             Operator::Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
             Operator::Asterisk => {
                 Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?)
+            }
+            Operator::Slash => {
+                if rhs == 0 {
+                    return Err(Error {
+                        cause: ErrorCause::DivisionByZero,
+                        location,
+                    });
+                } else {
+                    Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
+                }
             }
         };
     }
@@ -370,6 +383,42 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn division_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("6/2", env), Ok(Value::Integer(3)));
+        assert_eq!(eval(" 120 / 24 ", env), Ok(Value::Integer(5)));
+        assert_eq!(eval(" 120/10/5 ", env), Ok(Value::Integer(2)));
+    }
+
+    #[test]
+    fn division_by_zero() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("0/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("10/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 2..3,
+            })
+        );
+    }
+
+    // TODO overflow_in_division
 
     #[test]
     fn combining_operators_of_same_precedence() {
