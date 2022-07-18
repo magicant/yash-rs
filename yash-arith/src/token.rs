@@ -27,6 +27,8 @@ pub enum Operator {
     Plus,
     /// `-`
     Minus,
+    /// `*`
+    Asterisk,
 }
 
 /// Value of a token
@@ -97,6 +99,7 @@ impl<'a> Iterator for Tokens<'a> {
             None => return None,
             Some('+') => (Ok(TokenValue::Operator(Operator::Plus)), 1),
             Some('-') => (Ok(TokenValue::Operator(Operator::Minus)), 1),
+            Some('*') => (Ok(TokenValue::Operator(Operator::Asterisk)), 1),
             Some(c) if c.is_alphanumeric() => {
                 let remainder =
                     source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
@@ -323,6 +326,13 @@ mod tests {
             Tokens::new("-").next(),
             Some(Ok(Token {
                 value: TokenValue::Operator(Operator::Minus),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("*").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Asterisk),
                 location: 0..1
             })),
         );

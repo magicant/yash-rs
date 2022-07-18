@@ -179,6 +179,9 @@ pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::Ass
                     Operator::Minus => {
                         Value::Integer(lhs.checked_sub(rhs).expect("todo: handle overflow"))
                     }
+                    Operator::Asterisk => {
+                        Value::Integer(lhs.checked_mul(rhs).expect("todo: handle overflow"))
+                    }
                 };
             }
 
@@ -303,6 +306,14 @@ mod tests {
         assert_eq!(eval("2-1", env), Ok(Value::Integer(1)));
         assert_eq!(eval(" 42 - 15 ", env), Ok(Value::Integer(27)));
         assert_eq!(eval(" 10 - 7 - 5 ", env), Ok(Value::Integer(-2)));
+    }
+
+    #[test]
+    fn multiplication_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("3*6", env), Ok(Value::Integer(18)));
+        assert_eq!(eval(" 5 * 11 ", env), Ok(Value::Integer(55)));
+        assert_eq!(eval(" 2 * 3 * 4 ", env), Ok(Value::Integer(24)));
     }
 
     #[test]
