@@ -89,60 +89,47 @@ impl<'a> Iterator for Tokens<'a> {
     fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
         let source = self.source[self.index..].trim_start();
         let start_of_token = self.source.len() - source.len();
-        if source.chars().next()?.is_ascii_digit() {
-            let token_len = source
-                .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-                .unwrap_or(source.len());
-            let token_source = &source[..token_len];
-            let parse = if let Some(token_source) = token_source.strip_prefix("0X") {
-                i64::from_str_radix(token_source, 0x10)
-            } else if let Some(token_source) = token_source.strip_prefix("0x") {
-                i64::from_str_radix(token_source, 0x10)
-            } else if source.starts_with('0') {
-                i64::from_str_radix(token_source, 8)
-            } else {
-                token_source.parse()
-            };
-            let end_of_token = start_of_token + token_len;
-            let location = start_of_token..end_of_token;
-            match parse {
-                Ok(i) => {
-                    self.index = end_of_token;
-                    Some(Ok(Token {
-                        value: TokenValue::Term(Term::Value(Value::Integer(i))),
-                        location,
-                    }))
-                }
-                Err(_) => Some(Err(Error {
-                    cause: TokenError::InvalidNumericConstant,
-                    location,
-                })),
-            }
-        } else {
-            let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
-            let token_len = source.len() - remainder.len();
-            if token_len > 0 {
+
+        let mut chars = source.chars();
+        let (result, token_len) = match chars.next() {
+            None => return None,
+            Some('+') => (Ok(TokenValue::Operator(Operator::Plus)), 1),
+            Some(c) if c.is_alphanumeric() => {
+                let remainder =
+                    source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
+                let token_len = source.len() - remainder.len();
                 let token = &source[..token_len];
-                let end_of_token = start_of_token + token_len;
-                let location = start_of_token..end_of_token;
-                self.index = end_of_token;
-                Some(Ok(Token {
-                    value: TokenValue::Term(Term::Variable(token)),
-                    location,
-                }))
-            } else {
-                let mut chars = source.chars();
-                match chars.next() {
-                    Some('+') => {
-                        let value = TokenValue::Operator(Operator::Plus);
-                        let location = start_of_token..(start_of_token + 1);
-                        self.index = location.end;
-                        Some(Ok(Token { value, location }))
+                let result = if c.is_ascii_digit() {
+                    let parse = if let Some(token_source) = token.strip_prefix("0X") {
+                        i64::from_str_radix(token_source, 0x10)
+                    } else if let Some(token_source) = token.strip_prefix("0x") {
+                        i64::from_str_radix(token_source, 0x10)
+                    } else if source.starts_with('0') {
+                        i64::from_str_radix(token, 0o10)
+                    } else {
+                        token.parse()
+                    };
+                    match parse {
+                        Ok(i) => Ok(TokenValue::Term(Term::Value(Value::Integer(i)))),
+                        Err(_) => Err(TokenError::InvalidNumericConstant),
                     }
-                    _ => todo!("unrecognized expression {:?}", source),
-                }
+                } else {
+                    Ok(TokenValue::Term(Term::Variable(token)))
+                };
+                (result, token_len)
             }
-        }
+            Some(c) => todo!("unrecognized character {:?}", c),
+        };
+
+        assert!(token_len > 0, "token should not be empty");
+        let end_of_token = start_of_token + token_len;
+        let location = start_of_token..end_of_token;
+        self.index = end_of_token;
+
+        Some(match result {
+            Ok(value) => Ok(Token { value, location }),
+            Err(cause) => Err(Error { cause, location }),
+        })
     }
 }
 
