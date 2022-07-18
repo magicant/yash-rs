@@ -203,8 +203,21 @@ fn eval_binary<E: Env>(
             Greater => Value::Integer((lhs > rhs) as _),
             LessEqual => Value::Integer((lhs <= rhs) as _),
             GreaterEqual => Value::Integer((lhs >= rhs) as _),
-            LessLess => todo!(),
-            GreaterGreater => todo!(),
+            LessLess => {
+                let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
+                let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
+                if result >> rhs != lhs {
+                    return Err(Error {
+                        cause: ErrorCause::Overflow,
+                        location,
+                    });
+                }
+                Value::Integer(result)
+            }
+            GreaterGreater => Value::Integer(unwrap_or_overflow(
+                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
+                location,
+            )?),
             Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
             Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
             Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
@@ -361,6 +374,47 @@ mod tests {
         assert_eq!(eval(" 2 >= 1 ", env), Ok(Value::Integer(1)));
         assert_eq!(eval(" 5 >= 5 ", env), Ok(Value::Integer(1)));
         assert_eq!(eval(" 3 >= 3 >= 3 ", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
+    fn bit_shift_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("5<<3", env), Ok(Value::Integer(40)));
+        assert_eq!(eval(" 3 << 5 ", env), Ok(Value::Integer(96)));
+        assert_eq!(eval(" 2 << 2 << 2 ", env), Ok(Value::Integer(32)));
+
+        assert_eq!(eval("64>>3", env), Ok(Value::Integer(8)));
+        assert_eq!(eval(" 63 >> 3 ", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 2 >> 2 >> 2 ", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
+    fn overflow_in_bit_shifting() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0x4000000000000000<<1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 18..20,
+            })
+        );
+        assert_eq!(
+            eval("0<<1000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
+        // TODO 1 << -1
+
+        assert_eq!(
+            eval("0>>1000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
+        // TODO 1 >> -1
     }
 
     #[test]
