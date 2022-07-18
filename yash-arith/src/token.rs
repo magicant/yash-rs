@@ -24,6 +24,12 @@ use std::ops::Range;
 /// Operator
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
+    /// `|`
+    Bar,
+    /// `^`
+    Caret,
+    /// `&`
+    And,
     /// `==`
     EqualEqual,
     /// `!=`
@@ -60,6 +66,9 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
+            Bar => 4,
+            Caret => 5,
+            And => 6,
             EqualEqual | BangEqual => 7,
             Less | LessEqual | Greater | GreaterEqual => 8,
             LessLess | GreaterGreater => 9,
@@ -135,6 +144,9 @@ impl<'a> Iterator for Tokens<'a> {
         let mut chars = source.chars();
         let (result, token_len) = match chars.next() {
             None => return None,
+            Some('|') => (Ok(TokenValue::Operator(Operator::Bar)), 1),
+            Some('^') => (Ok(TokenValue::Operator(Operator::Caret)), 1),
+            Some('&') => (Ok(TokenValue::Operator(Operator::And)), 1),
             Some('=') => match chars.next() {
                 Some('=') => (Ok(TokenValue::Operator(Operator::EqualEqual)), 2),
                 c => todo!("unrecognized character {:?}", c),
@@ -373,6 +385,27 @@ mod tests {
 
     #[test]
     fn operators() {
+        assert_eq!(
+            Tokens::new("|").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Bar),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("^").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Caret),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("&").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::And),
+                location: 0..1
+            })),
+        );
         assert_eq!(
             Tokens::new("==").next(),
             Some(Ok(Token {

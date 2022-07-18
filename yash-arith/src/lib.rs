@@ -199,6 +199,9 @@ fn eval_binary<E: Env>(
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
         use Operator::*;
         value = match op {
+            Bar => Value::Integer(lhs | rhs),
+            Caret => Value::Integer(lhs ^ rhs),
+            And => Value::Integer(lhs & rhs),
             EqualEqual => Value::Integer((lhs == rhs) as _),
             BangEqual => Value::Integer((lhs != rhs) as _),
             Less => Value::Integer((lhs < rhs) as _),
@@ -352,6 +355,25 @@ mod tests {
                 location: 2..5,
             })
         );
+    }
+
+    #[test]
+    fn bitwise_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("3|5", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 5 | 3 ", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 10 | 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" 7 | 14 | 28 ", env), Ok(Value::Integer(31)));
+
+        assert_eq!(eval("3^5", env), Ok(Value::Integer(6)));
+        assert_eq!(eval(" 5 ^ 3 ", env), Ok(Value::Integer(6)));
+        assert_eq!(eval(" 10 ^ 10 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 7 ^ 14 ^ 28 ", env), Ok(Value::Integer(21)));
+
+        assert_eq!(eval("3&5", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 & 3 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 10 & 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" 7 & 14 & 28 ", env), Ok(Value::Integer(4)));
     }
 
     #[test]
