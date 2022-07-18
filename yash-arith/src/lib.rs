@@ -61,18 +61,22 @@ pub enum ErrorCause<E> {
     TokenError(TokenError),
     /// A variable value that is not a valid number
     InvalidVariableValue(String),
+    /// Result out of bounds
+    Overflow,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
 
 impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ErrorCause::*;
         match self {
-            ErrorCause::TokenError(e) => e.fmt(f),
-            ErrorCause::InvalidVariableValue(v) => {
+            TokenError(e) => e.fmt(f),
+            InvalidVariableValue(v) => {
                 write!(f, "variable value {:?} cannot be parsed as a number", v)
             }
-            ErrorCause::AssignVariableError(e) => e.fmt(f),
+            Overflow => "overflow".fmt(f),
+            AssignVariableError(e) => e.fmt(f),
         }
     }
 }
@@ -159,6 +163,13 @@ fn eval_leaf<E: Env>(
     }
 }
 
+fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
+    result.ok_or(Error {
+        cause: ErrorCause::Overflow,
+        location,
+    })
+}
+
 /// Evaluates an expression that may contain binary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
@@ -179,15 +190,15 @@ fn eval_binary<E: Env>(
         if precedence < min_precedence {
             break;
         }
-        tokens.next();
 
+        let location = tokens.next().unwrap().unwrap().location;
         let rhs = eval_binary(tokens, precedence + 1, env)?;
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
         value = match op {
-            Operator::Plus => Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow")),
-            Operator::Minus => Value::Integer(lhs.checked_sub(rhs).expect("todo: handle overflow")),
+            Operator::Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+            Operator::Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
             Operator::Asterisk => {
-                Value::Integer(lhs.checked_mul(rhs).expect("todo: handle overflow"))
+                Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?)
             }
         };
     }
@@ -309,6 +320,18 @@ mod tests {
     }
 
     #[test]
+    fn overflow_in_addition() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("9223372036854775807+1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 19..20,
+            })
+        );
+    }
+
+    #[test]
     fn subtraction_operator() {
         let env = &mut HashMap::new();
         assert_eq!(eval("2-1", env), Ok(Value::Integer(1)));
@@ -317,11 +340,35 @@ mod tests {
     }
 
     #[test]
+    fn overflow_in_subtraction() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0-9223372036854775807-2", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 21..22,
+            })
+        );
+    }
+
+    #[test]
     fn multiplication_operator() {
         let env = &mut HashMap::new();
         assert_eq!(eval("3*6", env), Ok(Value::Integer(18)));
         assert_eq!(eval(" 5 * 11 ", env), Ok(Value::Integer(55)));
         assert_eq!(eval(" 2 * 3 * 4 ", env), Ok(Value::Integer(24)));
+    }
+
+    #[test]
+    fn overflow_in_multiplication() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0x100000000 * 0x80000000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 12..13,
+            })
+        );
     }
 
     #[test]
