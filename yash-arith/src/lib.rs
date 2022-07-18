@@ -199,6 +199,8 @@ fn eval_binary<E: Env>(
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
         use Operator::*;
         value = match op {
+            EqualEqual => Value::Integer((lhs == rhs) as _),
+            BangEqual => Value::Integer((lhs != rhs) as _),
             Less => Value::Integer((lhs < rhs) as _),
             Greater => Value::Integer((lhs > rhs) as _),
             LessEqual => Value::Integer((lhs <= rhs) as _),
@@ -350,6 +352,20 @@ mod tests {
                 location: 2..5,
             })
         );
+    }
+
+    #[test]
+    fn equality_comparison_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1==2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 == 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 == 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 1 == 2 == 2 ", env), Ok(Value::Integer(0)));
+
+        assert_eq!(eval("1!=2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 != 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 != 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 != 1 != 2 ", env), Ok(Value::Integer(1)));
     }
 
     #[test]
