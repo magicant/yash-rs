@@ -25,6 +25,8 @@ use std::ops::Range;
 pub enum Operator {
     /// `+`
     Plus,
+    /// `-`
+    Minus,
 }
 
 /// Value of a token
@@ -94,6 +96,7 @@ impl<'a> Iterator for Tokens<'a> {
         let (result, token_len) = match chars.next() {
             None => return None,
             Some('+') => (Ok(TokenValue::Operator(Operator::Plus)), 1),
+            Some('-') => (Ok(TokenValue::Operator(Operator::Minus)), 1),
             Some(c) if c.is_alphanumeric() => {
                 let remainder =
                     source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
@@ -316,6 +319,13 @@ mod tests {
                 location: 0..1
             })),
         );
+        assert_eq!(
+            Tokens::new("-").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Minus),
+                location: 0..1
+            })),
+        );
     }
 
     #[test]
@@ -386,6 +396,33 @@ mod tests {
             Some(Ok(Token {
                 value: TokenValue::Term(Term::Value(Value::Integer(0))),
                 location: 4..5,
+            })),
+        );
+        assert_eq!(tokens.next(), None);
+    }
+
+    #[test]
+    fn parsing_adjacent_operators() {
+        let mut tokens = Tokens::new("+-0");
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 0..1,
+            })),
+        );
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Minus),
+                location: 1..2,
+            })),
+        );
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 2..3,
             })),
         );
         assert_eq!(tokens.next(), None);

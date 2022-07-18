@@ -167,12 +167,19 @@ pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::Ass
     while let Some(token) = tokens.next().transpose()? {
         match token {
             Token {
-                value: TokenValue::Operator(Operator::Plus),
+                value: TokenValue::Operator(op),
                 location: _,
             } => {
                 let rhs = eval_leaf(&mut tokens, env)?;
                 let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
-                value = Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow"));
+                value = match op {
+                    Operator::Plus => {
+                        Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow"))
+                    }
+                    Operator::Minus => {
+                        Value::Integer(lhs.checked_sub(rhs).expect("todo: handle overflow"))
+                    }
+                };
             }
 
             Token {
@@ -288,6 +295,20 @@ mod tests {
         assert_eq!(eval("1+2", env), Ok(Value::Integer(3)));
         assert_eq!(eval(" 12 + 34 ", env), Ok(Value::Integer(46)));
         assert_eq!(eval(" 3 + 16 + 5 ", env), Ok(Value::Integer(24)));
+    }
+
+    #[test]
+    fn subtraction_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2-1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 42 - 15 ", env), Ok(Value::Integer(27)));
+        assert_eq!(eval(" 10 - 7 - 5 ", env), Ok(Value::Integer(-2)));
+    }
+
+    #[test]
+    fn combining_operators_of_same_precedence() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2+5-3", env), Ok(Value::Integer(4)));
     }
 
     // TODO Operators
