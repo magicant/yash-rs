@@ -328,7 +328,6 @@ mod tests {
     // TODO Variables (floats, infinities, & NaNs)
 
     #[test]
-    #[ignore]
     fn invalid_variable_value() {
         let env = &mut HashMap::new();
         env.insert("foo".to_string(), "".to_string());
@@ -352,7 +351,7 @@ mod tests {
             eval("  oops ", env),
             Err(Error {
                 cause: ErrorCause::InvalidVariableValue("foo".to_string()),
-                location: 2..5,
+                location: 2..6,
             })
         );
     }
