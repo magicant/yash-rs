@@ -32,6 +32,8 @@ pub enum Operator {
     Asterisk,
     /// `/`
     Slash,
+    /// `%`
+    Percent,
 }
 
 impl Operator {
@@ -43,7 +45,7 @@ impl Operator {
         use Operator::*;
         match self {
             Plus | Minus => 10,
-            Asterisk | Slash => 11,
+            Asterisk | Slash | Percent => 11,
         }
     }
 }
@@ -118,6 +120,7 @@ impl<'a> Iterator for Tokens<'a> {
             Some('-') => (Ok(TokenValue::Operator(Operator::Minus)), 1),
             Some('*') => (Ok(TokenValue::Operator(Operator::Asterisk)), 1),
             Some('/') => (Ok(TokenValue::Operator(Operator::Slash)), 1),
+            Some('%') => (Ok(TokenValue::Operator(Operator::Percent)), 1),
             Some(c) if c.is_alphanumeric() => {
                 let remainder =
                     source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
@@ -358,6 +361,13 @@ mod tests {
             Tokens::new("/").next(),
             Some(Ok(Token {
                 value: TokenValue::Operator(Operator::Slash),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("%").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Percent),
                 location: 0..1
             })),
         );

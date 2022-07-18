@@ -213,6 +213,16 @@ fn eval_binary<E: Env>(
                     Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
                 }
             }
+            Operator::Percent => {
+                if rhs == 0 {
+                    return Err(Error {
+                        cause: ErrorCause::DivisionByZero,
+                        location,
+                    });
+                } else {
+                    Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
+                }
+            }
         };
     }
 
@@ -419,6 +429,42 @@ mod tests {
     }
 
     // TODO overflow_in_division
+
+    #[test]
+    fn remainder_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("6%2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 17 % 5 ", env), Ok(Value::Integer(2)));
+        assert_eq!(eval(" 42 % 11 % 5 ", env), Ok(Value::Integer(4)));
+    }
+
+    #[test]
+    fn remainder_by_zero() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("0%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("10%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 2..3,
+            })
+        );
+    }
+
+    // TODO overflow_in_remainder
 
     #[test]
     fn combining_operators_of_same_precedence() {
