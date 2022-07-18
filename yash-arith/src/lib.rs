@@ -47,6 +47,7 @@ pub enum Term<'a> {
 
 mod token;
 
+use token::Operator;
 use token::Token;
 pub use token::TokenError;
 use token::TokenValue;
@@ -129,28 +130,59 @@ fn expand_variable<E: Env>(
     }
 }
 
+/// Evaluates a leaf expression.
+///
+/// A leaf expression is a constant number, variable, or parenthesized
+/// expression, optionally modified by a unary operator.
+fn eval_leaf<E: Env>(
+    tokens: &mut Tokens,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    match tokens.next().transpose()? {
+        Some(Token {
+            value: TokenValue::Term(Term::Value(value)),
+            location: _,
+        }) => Ok(value),
+
+        Some(Token {
+            value: TokenValue::Term(Term::Variable(name)),
+            location,
+        }) => expand_variable(name, &location, env),
+
+        Some(Token {
+            value: TokenValue::Operator(_op),
+            location: _,
+        }) => todo!("handle orphan operator"),
+
+        None => todo!("handle missing token"),
+    }
+}
+
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression);
-    match tokens.next() {
-        Some(Ok(Token {
-            value: TokenValue::Term(Term::Value(value)),
-            location: _,
-        })) => Ok(value),
 
-        Some(Ok(Token {
-            value: TokenValue::Term(Term::Variable(name)),
-            location,
-        })) => expand_variable(name, &location, env),
+    let mut value = eval_leaf(&mut tokens, env)?;
 
-        Some(Ok(Token {
-            value: TokenValue::Operator(_op),
-            location: _,
-        })) => todo!("handle orphan operator"),
+    while let Some(token) = tokens.next().transpose()? {
+        match token {
+            Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: _,
+            } => {
+                let rhs = eval_leaf(&mut tokens, env)?;
+                let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+                value = Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow"));
+            }
 
-        Some(Err(error)) => Err(error.into()),
-        None => todo!("handle missing token"),
+            Token {
+                value: TokenValue::Term(_),
+                location: _,
+            } => todo!("handle orphan term"),
+        }
     }
+
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -248,6 +280,14 @@ mod tests {
                 location: 2..5,
             })
         );
+    }
+
+    #[test]
+    fn addition_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1+2", env), Ok(Value::Integer(3)));
+        assert_eq!(eval(" 12 + 34 ", env), Ok(Value::Integer(46)));
+        assert_eq!(eval(" 3 + 16 + 5 ", env), Ok(Value::Integer(24)));
     }
 
     // TODO Operators
