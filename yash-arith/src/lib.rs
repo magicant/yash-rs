@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 use std::fmt::Display;
+use std::iter::Peekable;
 use std::ops::Range;
 
 /// Result of arithmetic expansion
@@ -135,7 +136,7 @@ fn expand_variable<E: Env>(
 /// A leaf expression is a constant number, variable, or parenthesized
 /// expression, optionally modified by a unary operator.
 fn eval_leaf<E: Env>(
-    tokens: &mut Tokens,
+    tokens: &mut Peekable<Tokens>,
     env: &mut E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
@@ -158,40 +159,47 @@ fn eval_leaf<E: Env>(
     }
 }
 
-/// Performs arithmetic expansion
-pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
-    let mut tokens = Tokens::new(expression);
+/// Evaluates an expression that may contain binary operators.
+///
+/// This function consumes binary operators with precedence equal to or greater
+/// than the given minimum precedence.
+fn eval_binary<E: Env>(
+    tokens: &mut Peekable<Tokens>,
+    min_precedence: u8,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    let mut value = eval_leaf(tokens, env)?;
 
-    let mut value = eval_leaf(&mut tokens, env)?;
-
-    while let Some(token) = tokens.next().transpose()? {
-        match token {
-            Token {
-                value: TokenValue::Operator(op),
-                location: _,
-            } => {
-                let rhs = eval_leaf(&mut tokens, env)?;
-                let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
-                value = match op {
-                    Operator::Plus => {
-                        Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow"))
-                    }
-                    Operator::Minus => {
-                        Value::Integer(lhs.checked_sub(rhs).expect("todo: handle overflow"))
-                    }
-                    Operator::Asterisk => {
-                        Value::Integer(lhs.checked_mul(rhs).expect("todo: handle overflow"))
-                    }
-                };
-            }
-
-            Token {
-                value: TokenValue::Term(_),
-                location: _,
-            } => todo!("handle orphan term"),
+    while let Some(&Ok(Token {
+        value: TokenValue::Operator(op),
+        location: _,
+    })) = tokens.peek()
+    {
+        let precedence = op.precedence();
+        if precedence < min_precedence {
+            break;
         }
+        tokens.next();
+
+        let rhs = eval_binary(tokens, precedence + 1, env)?;
+        let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+        value = match op {
+            Operator::Plus => Value::Integer(lhs.checked_add(rhs).expect("todo: handle overflow")),
+            Operator::Minus => Value::Integer(lhs.checked_sub(rhs).expect("todo: handle overflow")),
+            Operator::Asterisk => {
+                Value::Integer(lhs.checked_mul(rhs).expect("todo: handle overflow"))
+            }
+        };
     }
 
+    Ok(value)
+}
+
+/// Performs arithmetic expansion
+pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
+    let mut tokens = Tokens::new(expression).peekable();
+    let value = eval_binary(&mut tokens, 0, env)?;
+    assert_eq!(tokens.next(), None, "todo: handle orphan term");
     Ok(value)
 }
 
@@ -320,6 +328,13 @@ mod tests {
     fn combining_operators_of_same_precedence() {
         let env = &mut HashMap::new();
         assert_eq!(eval("2+5-3", env), Ok(Value::Integer(4)));
+    }
+
+    #[test]
+    fn combining_operators_of_different_precedences() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2+3*4", env), Ok(Value::Integer(14)));
+        assert_eq!(eval("2*3+4", env), Ok(Value::Integer(10)));
     }
 
     // TODO Operators

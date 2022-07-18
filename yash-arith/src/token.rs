@@ -21,6 +21,7 @@ use super::Value;
 use std::fmt::Display;
 use std::ops::Range;
 
+/// Operator
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
     /// `+`
@@ -29,6 +30,20 @@ pub enum Operator {
     Minus,
     /// `*`
     Asterisk,
+}
+
+impl Operator {
+    /// Returns the precedence of the operator.
+    ///
+    /// If the operator acts as both a unary and binary operator, the result is
+    /// the precedence as a binary operator.
+    pub fn precedence(self) -> u8 {
+        use Operator::*;
+        match self {
+            Plus | Minus => 10,
+            Asterisk => 11,
+        }
+    }
 }
 
 /// Value of a token
