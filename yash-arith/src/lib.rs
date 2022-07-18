@@ -197,13 +197,18 @@ fn eval_binary<E: Env>(
         let location = tokens.next().unwrap().unwrap().location;
         let rhs = eval_binary(tokens, precedence + 1, env)?;
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+        use Operator::*;
         value = match op {
-            Operator::Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
-            Operator::Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
-            Operator::Asterisk => {
-                Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?)
-            }
-            Operator::Slash => {
+            Less => Value::Integer((lhs < rhs) as _),
+            Greater => Value::Integer((lhs > rhs) as _),
+            LessEqual => Value::Integer((lhs <= rhs) as _),
+            GreaterEqual => Value::Integer((lhs >= rhs) as _),
+            LessLess => todo!(),
+            GreaterGreater => todo!(),
+            Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+            Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
+            Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
+            Slash => {
                 if rhs == 0 {
                     return Err(Error {
                         cause: ErrorCause::DivisionByZero,
@@ -213,7 +218,7 @@ fn eval_binary<E: Env>(
                     Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
                 }
             }
-            Operator::Percent => {
+            Percent => {
                 if rhs == 0 {
                     return Err(Error {
                         cause: ErrorCause::DivisionByZero,
@@ -332,6 +337,30 @@ mod tests {
                 location: 2..5,
             })
         );
+    }
+
+    #[test]
+    fn inequality_comparison_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1<2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 < 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 < 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 3 < 3 < 3 ", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("1<=2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 <= 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 <= 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 3 <= 3 <= 3 ", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("1>2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 > 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 > 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 3 > 3 > 3 ", env), Ok(Value::Integer(0)));
+
+        assert_eq!(eval("1>=2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 >= 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 >= 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 3 >= 3 >= 3 ", env), Ok(Value::Integer(0)));
     }
 
     #[test]

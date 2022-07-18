@@ -24,6 +24,18 @@ use std::ops::Range;
 /// Operator
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
+    /// `<`
+    Less,
+    /// `<=`
+    LessEqual,
+    /// `<<`
+    LessLess,
+    /// `>`
+    Greater,
+    /// `>=`
+    GreaterEqual,
+    /// `>>`
+    GreaterGreater,
     /// `+`
     Plus,
     /// `-`
@@ -44,6 +56,8 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
+            Less | LessEqual | Greater | GreaterEqual => 8,
+            LessLess | GreaterGreater => 9,
             Plus | Minus => 10,
             Asterisk | Slash | Percent => 11,
         }
@@ -116,6 +130,16 @@ impl<'a> Iterator for Tokens<'a> {
         let mut chars = source.chars();
         let (result, token_len) = match chars.next() {
             None => return None,
+            Some('<') => match chars.next() {
+                Some('=') => (Ok(TokenValue::Operator(Operator::LessEqual)), 2),
+                Some('<') => (Ok(TokenValue::Operator(Operator::LessLess)), 2),
+                _ => (Ok(TokenValue::Operator(Operator::Less)), 1),
+            },
+            Some('>') => match chars.next() {
+                Some('=') => (Ok(TokenValue::Operator(Operator::GreaterEqual)), 2),
+                Some('>') => (Ok(TokenValue::Operator(Operator::GreaterGreater)), 2),
+                _ => (Ok(TokenValue::Operator(Operator::Greater)), 1),
+            },
             Some('+') => (Ok(TokenValue::Operator(Operator::Plus)), 1),
             Some('-') => (Ok(TokenValue::Operator(Operator::Minus)), 1),
             Some('*') => (Ok(TokenValue::Operator(Operator::Asterisk)), 1),
@@ -336,6 +360,48 @@ mod tests {
 
     #[test]
     fn operators() {
+        assert_eq!(
+            Tokens::new("<").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Less),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("<=").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::LessEqual),
+                location: 0..2
+            })),
+        );
+        assert_eq!(
+            Tokens::new("<<").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::LessLess),
+                location: 0..2
+            })),
+        );
+        assert_eq!(
+            Tokens::new(">").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Greater),
+                location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new(">=").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::GreaterEqual),
+                location: 0..2
+            })),
+        );
+        assert_eq!(
+            Tokens::new(">>").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::GreaterGreater),
+                location: 0..2
+            })),
+        );
         assert_eq!(
             Tokens::new("+").next(),
             Some(Ok(Token {
