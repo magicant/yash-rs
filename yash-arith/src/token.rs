@@ -26,10 +26,14 @@ use std::ops::Range;
 pub enum Operator {
     /// `|`
     Bar,
+    /// `||`
+    BarBar,
     /// `^`
     Caret,
     /// `&`
     And,
+    /// `&&`
+    AndAnd,
     /// `==`
     EqualEqual,
     /// `!=`
@@ -66,6 +70,8 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
+            BarBar => 2,
+            AndAnd => 3,
             Bar => 4,
             Caret => 5,
             And => 6,
@@ -144,9 +150,15 @@ impl<'a> Iterator for Tokens<'a> {
         let mut chars = source.chars();
         let (result, token_len) = match chars.next() {
             None => return None,
-            Some('|') => (Ok(TokenValue::Operator(Operator::Bar)), 1),
+            Some('|') => match chars.next() {
+                Some('|') => (Ok(TokenValue::Operator(Operator::BarBar)), 2),
+                _ => (Ok(TokenValue::Operator(Operator::Bar)), 1),
+            },
             Some('^') => (Ok(TokenValue::Operator(Operator::Caret)), 1),
-            Some('&') => (Ok(TokenValue::Operator(Operator::And)), 1),
+            Some('&') => match chars.next() {
+                Some('&') => (Ok(TokenValue::Operator(Operator::AndAnd)), 2),
+                _ => (Ok(TokenValue::Operator(Operator::And)), 1),
+            },
             Some('=') => match chars.next() {
                 Some('=') => (Ok(TokenValue::Operator(Operator::EqualEqual)), 2),
                 c => todo!("unrecognized character {:?}", c),
@@ -393,6 +405,13 @@ mod tests {
             })),
         );
         assert_eq!(
+            Tokens::new("||").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::BarBar),
+                location: 0..2
+            })),
+        );
+        assert_eq!(
             Tokens::new("^").next(),
             Some(Ok(Token {
                 value: TokenValue::Operator(Operator::Caret),
@@ -404,6 +423,13 @@ mod tests {
             Some(Ok(Token {
                 value: TokenValue::Operator(Operator::And),
                 location: 0..1
+            })),
+        );
+        assert_eq!(
+            Tokens::new("&&").next(),
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::AndAnd),
+                location: 0..2
             })),
         );
         assert_eq!(

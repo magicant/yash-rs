@@ -199,6 +199,8 @@ fn eval_binary<E: Env>(
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
         use Operator::*;
         value = match op {
+            BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
+            AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
             Bar => Value::Integer(lhs | rhs),
             Caret => Value::Integer(lhs ^ rhs),
             And => Value::Integer(lhs & rhs),
@@ -355,6 +357,22 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn boolean_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0||0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 || 0 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 0 || 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("2 || 3", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("0&&0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 && 0 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 0 && 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("2 && 3", env), Ok(Value::Integer(1)));
+    }
+
+    // TODO conditional_evaluation_in_boolean_logic_operators
 
     #[test]
     fn bitwise_logic_operators() {
