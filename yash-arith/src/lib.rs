@@ -18,6 +18,7 @@
 //!
 //! TODO Elaborate
 
+use assert_matches::assert_matches;
 use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Range;
@@ -43,7 +44,12 @@ pub enum Term<'a> {
     /// Value
     Value(Value),
     /// Variable
-    Variable(&'a str),
+    Variable {
+        /// Variable name
+        name: &'a str,
+        /// Range of the substring in the evaluated expression where the variable occurs
+        location: Range<usize>,
+    },
 }
 
 mod token;
@@ -51,7 +57,6 @@ mod token;
 use token::Operator;
 use token::Token;
 pub use token::TokenError;
-use token::TokenValue;
 use token::Tokens;
 
 /// Cause of an arithmetic expansion error
@@ -147,21 +152,11 @@ fn eval_leaf<E: Env>(
     env: &mut E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
-        Some(Token {
-            value: TokenValue::Term(Term::Value(value)),
-            location: _,
-        }) => Ok(value),
-
-        Some(Token {
-            value: TokenValue::Term(Term::Variable(name)),
-            location,
-        }) => expand_variable(name, &location, env),
-
-        Some(Token {
-            value: TokenValue::Operator(_op),
-            location: _,
-        }) => todo!("handle orphan operator"),
-
+        Some(Token::Term(Term::Value(value))) => Ok(value),
+        Some(Token::Term(Term::Variable { name, location })) => {
+            expand_variable(name, &location, env)
+        }
+        Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
 }
@@ -184,21 +179,18 @@ fn eval_binary<E: Env>(
 ) -> Result<Value, Error<E::AssignVariableError>> {
     let mut value = eval_leaf(tokens, env)?;
 
-    while let Some(&Ok(Token {
-        value: TokenValue::Operator(op),
-        location: _,
-    })) = tokens.peek()
-    {
-        let precedence = op.precedence();
+    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+        let precedence = operator.precedence();
         if precedence < min_precedence {
             break;
         }
 
-        let location = tokens.next().unwrap().unwrap().location;
+        let location =
+            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
         let rhs = eval_binary(tokens, precedence + 1, env)?;
         let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
         use Operator::*;
-        value = match op {
+        value = match operator {
             BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
             AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
             Bar => Value::Integer(lhs | rhs),

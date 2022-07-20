@@ -13,3 +13,6 @@ license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
+
+[dependencies]
+assert_matches = "1.5.0"
