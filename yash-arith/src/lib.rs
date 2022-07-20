@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 use std::fmt::Display;
+use std::iter::Peekable;
 use std::ops::Range;
 
 /// Result of arithmetic expansion
@@ -42,18 +43,15 @@ pub enum Term<'a> {
     /// Value
     Value(Value),
     /// Variable
-    Variable {
-        /// Variable name
-        name: &'a str,
-        /// Range of the substring in the evaluated expression where the variable occurs
-        location: Range<usize>,
-    },
+    Variable(&'a str),
 }
 
 mod token;
 
+use token::Operator;
 use token::Token;
 pub use token::TokenError;
+use token::TokenValue;
 use token::Tokens;
 
 /// Cause of an arithmetic expansion error
@@ -63,18 +61,25 @@ pub enum ErrorCause<E> {
     TokenError(TokenError),
     /// A variable value that is not a valid number
     InvalidVariableValue(String),
+    /// Result out of bounds
+    Overflow,
+    /// Division by zero
+    DivisionByZero,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
 
 impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ErrorCause::*;
         match self {
-            ErrorCause::TokenError(e) => e.fmt(f),
-            ErrorCause::InvalidVariableValue(v) => {
+            TokenError(e) => e.fmt(f),
+            InvalidVariableValue(v) => {
                 write!(f, "variable value {:?} cannot be parsed as a number", v)
             }
-            ErrorCause::AssignVariableError(e) => e.fmt(f),
+            Overflow => "overflow".fmt(f),
+            DivisionByZero => "division by zero".fmt(f),
+            AssignVariableError(e) => e.fmt(f),
         }
     }
 }
@@ -133,17 +138,126 @@ fn expand_variable<E: Env>(
     }
 }
 
-/// Performs arithmetic expansion
-pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
-    let mut tokens = Tokens::new(expression);
-    match tokens.next() {
-        Some(Ok(Token::Term(Term::Value(value)))) => Ok(value),
-        Some(Ok(Token::Term(Term::Variable { name, location }))) => {
-            expand_variable(name, &location, env)
-        }
-        Some(Err(error)) => Err(error.into()),
+/// Evaluates a leaf expression.
+///
+/// A leaf expression is a constant number, variable, or parenthesized
+/// expression, optionally modified by a unary operator.
+fn eval_leaf<E: Env>(
+    tokens: &mut Peekable<Tokens>,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    match tokens.next().transpose()? {
+        Some(Token {
+            value: TokenValue::Term(Term::Value(value)),
+            location: _,
+        }) => Ok(value),
+
+        Some(Token {
+            value: TokenValue::Term(Term::Variable(name)),
+            location,
+        }) => expand_variable(name, &location, env),
+
+        Some(Token {
+            value: TokenValue::Operator(_op),
+            location: _,
+        }) => todo!("handle orphan operator"),
+
         None => todo!("handle missing token"),
     }
+}
+
+fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
+    result.ok_or(Error {
+        cause: ErrorCause::Overflow,
+        location,
+    })
+}
+
+/// Evaluates an expression that may contain binary operators.
+///
+/// This function consumes binary operators with precedence equal to or greater
+/// than the given minimum precedence.
+fn eval_binary<E: Env>(
+    tokens: &mut Peekable<Tokens>,
+    min_precedence: u8,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    let mut value = eval_leaf(tokens, env)?;
+
+    while let Some(&Ok(Token {
+        value: TokenValue::Operator(op),
+        location: _,
+    })) = tokens.peek()
+    {
+        let precedence = op.precedence();
+        if precedence < min_precedence {
+            break;
+        }
+
+        let location = tokens.next().unwrap().unwrap().location;
+        let rhs = eval_binary(tokens, precedence + 1, env)?;
+        let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+        use Operator::*;
+        value = match op {
+            Bar => Value::Integer(lhs | rhs),
+            Caret => Value::Integer(lhs ^ rhs),
+            And => Value::Integer(lhs & rhs),
+            EqualEqual => Value::Integer((lhs == rhs) as _),
+            BangEqual => Value::Integer((lhs != rhs) as _),
+            Less => Value::Integer((lhs < rhs) as _),
+            Greater => Value::Integer((lhs > rhs) as _),
+            LessEqual => Value::Integer((lhs <= rhs) as _),
+            GreaterEqual => Value::Integer((lhs >= rhs) as _),
+            LessLess => {
+                let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
+                let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
+                if result >> rhs != lhs {
+                    return Err(Error {
+                        cause: ErrorCause::Overflow,
+                        location,
+                    });
+                }
+                Value::Integer(result)
+            }
+            GreaterGreater => Value::Integer(unwrap_or_overflow(
+                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
+                location,
+            )?),
+            Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+            Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
+            Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
+            Slash => {
+                if rhs == 0 {
+                    return Err(Error {
+                        cause: ErrorCause::DivisionByZero,
+                        location,
+                    });
+                } else {
+                    Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
+                }
+            }
+            Percent => {
+                if rhs == 0 {
+                    return Err(Error {
+                        cause: ErrorCause::DivisionByZero,
+                        location,
+                    });
+                } else {
+                    Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
+                }
+            }
+        };
+    }
+
+    Ok(value)
+}
+
+/// Performs arithmetic expansion
+pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
+    let mut tokens = Tokens::new(expression).peekable();
+    let value = eval_binary(&mut tokens, 0, env)?;
+    assert_eq!(tokens.next(), None, "todo: handle orphan term");
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -241,6 +355,249 @@ mod tests {
                 location: 2..5,
             })
         );
+    }
+
+    #[test]
+    fn bitwise_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("3|5", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 5 | 3 ", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 10 | 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" 7 | 14 | 28 ", env), Ok(Value::Integer(31)));
+
+        assert_eq!(eval("3^5", env), Ok(Value::Integer(6)));
+        assert_eq!(eval(" 5 ^ 3 ", env), Ok(Value::Integer(6)));
+        assert_eq!(eval(" 10 ^ 10 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 7 ^ 14 ^ 28 ", env), Ok(Value::Integer(21)));
+
+        assert_eq!(eval("3&5", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 & 3 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 10 & 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" 7 & 14 & 28 ", env), Ok(Value::Integer(4)));
+    }
+
+    #[test]
+    fn equality_comparison_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1==2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 == 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 == 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 1 == 2 == 2 ", env), Ok(Value::Integer(0)));
+
+        assert_eq!(eval("1!=2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 != 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 != 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 != 1 != 2 ", env), Ok(Value::Integer(1)));
+    }
+
+    #[test]
+    fn inequality_comparison_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1<2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 < 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 < 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 3 < 3 < 3 ", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("1<=2", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 2 <= 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 5 <= 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 3 <= 3 <= 3 ", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("1>2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 > 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 > 5 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 3 > 3 > 3 ", env), Ok(Value::Integer(0)));
+
+        assert_eq!(eval("1>=2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 2 >= 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 5 >= 5 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 3 >= 3 >= 3 ", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
+    fn bit_shift_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("5<<3", env), Ok(Value::Integer(40)));
+        assert_eq!(eval(" 3 << 5 ", env), Ok(Value::Integer(96)));
+        assert_eq!(eval(" 2 << 2 << 2 ", env), Ok(Value::Integer(32)));
+
+        assert_eq!(eval("64>>3", env), Ok(Value::Integer(8)));
+        assert_eq!(eval(" 63 >> 3 ", env), Ok(Value::Integer(7)));
+        assert_eq!(eval(" 2 >> 2 >> 2 ", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
+    fn overflow_in_bit_shifting() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0x4000000000000000<<1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 18..20,
+            })
+        );
+        assert_eq!(
+            eval("0<<1000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
+        // TODO 1 << -1
+
+        assert_eq!(
+            eval("0>>1000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
+        // TODO 1 >> -1
+    }
+
+    #[test]
+    fn addition_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1+2", env), Ok(Value::Integer(3)));
+        assert_eq!(eval(" 12 + 34 ", env), Ok(Value::Integer(46)));
+        assert_eq!(eval(" 3 + 16 + 5 ", env), Ok(Value::Integer(24)));
+    }
+
+    #[test]
+    fn overflow_in_addition() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("9223372036854775807+1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 19..20,
+            })
+        );
+    }
+
+    #[test]
+    fn subtraction_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2-1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 42 - 15 ", env), Ok(Value::Integer(27)));
+        assert_eq!(eval(" 10 - 7 - 5 ", env), Ok(Value::Integer(-2)));
+    }
+
+    #[test]
+    fn overflow_in_subtraction() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0-9223372036854775807-2", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 21..22,
+            })
+        );
+    }
+
+    #[test]
+    fn multiplication_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("3*6", env), Ok(Value::Integer(18)));
+        assert_eq!(eval(" 5 * 11 ", env), Ok(Value::Integer(55)));
+        assert_eq!(eval(" 2 * 3 * 4 ", env), Ok(Value::Integer(24)));
+    }
+
+    #[test]
+    fn overflow_in_multiplication() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("0x100000000 * 0x80000000", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 12..13,
+            })
+        );
+    }
+
+    #[test]
+    fn division_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("6/2", env), Ok(Value::Integer(3)));
+        assert_eq!(eval(" 120 / 24 ", env), Ok(Value::Integer(5)));
+        assert_eq!(eval(" 120/10/5 ", env), Ok(Value::Integer(2)));
+    }
+
+    #[test]
+    fn division_by_zero() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("0/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("10/0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 2..3,
+            })
+        );
+    }
+
+    // TODO overflow_in_division
+
+    #[test]
+    fn remainder_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("6%2", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 17 % 5 ", env), Ok(Value::Integer(2)));
+        assert_eq!(eval(" 42 % 11 % 5 ", env), Ok(Value::Integer(4)));
+    }
+
+    #[test]
+    fn remainder_by_zero() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("0%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 1..2,
+            })
+        );
+        assert_eq!(
+            eval("10%0", env),
+            Err(Error {
+                cause: ErrorCause::DivisionByZero,
+                location: 2..3,
+            })
+        );
+    }
+
+    // TODO overflow_in_remainder
+
+    #[test]
+    fn combining_operators_of_same_precedence() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2+5-3", env), Ok(Value::Integer(4)));
+    }
+
+    #[test]
+    fn combining_operators_of_different_precedences() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("2+3*4", env), Ok(Value::Integer(14)));
+        assert_eq!(eval("2*3+4", env), Ok(Value::Integer(10)));
     }
 
     // TODO Operators
