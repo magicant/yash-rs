@@ -160,10 +160,20 @@ impl Term<'_> {
 /// expression, optionally modified by a unary operator.
 fn eval_leaf<'a, E: Env>(
     tokens: &mut Peekable<Tokens<'a>>,
-    _env: &mut E,
+    env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
         Some(Token::Term(term)) => Ok(term),
+
+        Some(Token::Operator {
+            operator: Operator::OpenParen,
+            ..
+        }) => {
+            let inner = eval_binary(tokens, 1, env);
+            tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
+            inner
+        }
+
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
@@ -236,13 +246,14 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
             }
         }
+        OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
     })
 }
 
 /// Evaluates an expression that may contain binary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
-/// than the given minimum precedence.
+/// than the given minimum precedence, which must be greater than 0.
 fn eval_binary<'a, E: Env>(
     tokens: &mut Peekable<Tokens<'a>>,
     min_precedence: u8,
@@ -280,6 +291,8 @@ fn eval_binary<'a, E: Env>(
                 let (lhs, rhs) = (term.into_value(env)?, rhs.into_value(env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
+            OpenParen => todo!("syntax error"),
+            CloseParen => panic!("min_precedence must not be 0"),
         };
     }
 
@@ -289,7 +302,7 @@ fn eval_binary<'a, E: Env>(
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression).peekable();
-    let term = eval_binary(&mut tokens, 0, env)?;
+    let term = eval_binary(&mut tokens, 1, env)?;
     assert_eq!(tokens.next(), None, "todo: handle orphan term");
     term.into_value(env)
 }
@@ -647,6 +660,8 @@ mod tests {
 
     // TODO overflow_in_remainder
 
+    // TODO Unary operators
+
     #[test]
     fn combining_operators_of_same_precedence() {
         let env = &mut HashMap::new();
@@ -660,5 +675,16 @@ mod tests {
         assert_eq!(eval("2*3+4", env), Ok(Value::Integer(10)));
     }
 
-    // TODO Operators
+    #[test]
+    fn parentheses() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(42)", env), Ok(Value::Integer(42)));
+        assert_eq!(eval("(1+2)", env), Ok(Value::Integer(3)));
+        assert_eq!(eval("(2+3)*4", env), Ok(Value::Integer(20)));
+        assert_eq!(eval("2*(3+4)", env), Ok(Value::Integer(14)));
+        assert_eq!(eval(" ( 6 - ( 7 - 3 ) ) * 2 ", env), Ok(Value::Integer(4)));
+        assert_eq!(eval(" 4 | ( ( 2 && 2 ) & 3 )", env), Ok(Value::Integer(5)));
+    }
+
+    // TODO unmatched_parentheses
 }

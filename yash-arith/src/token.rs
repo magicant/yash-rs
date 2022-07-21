@@ -62,6 +62,10 @@ pub enum Operator {
     Slash,
     /// `%`
     Percent,
+    /// `(`
+    OpenParen,
+    /// `)`
+    CloseParen,
 }
 
 impl Operator {
@@ -72,17 +76,19 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
-            Equal => 0,
-            BarBar => 2,
-            AndAnd => 3,
-            Bar => 4,
-            Caret => 5,
-            And => 6,
-            EqualEqual | BangEqual => 7,
-            Less | LessEqual | Greater | GreaterEqual => 8,
-            LessLess | GreaterGreater => 9,
-            Plus | Minus => 10,
-            Asterisk | Slash | Percent => 11,
+            CloseParen => 0,
+            Equal => 1,
+            BarBar => 3,
+            AndAnd => 4,
+            Bar => 5,
+            Caret => 6,
+            And => 7,
+            EqualEqual | BangEqual => 8,
+            Less | LessEqual | Greater | GreaterEqual => 9,
+            LessLess | GreaterGreater => 10,
+            Plus | Minus => 11,
+            Asterisk | Slash | Percent => 12,
+            OpenParen => 13,
         }
     }
 }
@@ -150,6 +156,8 @@ const OPERATORS: &[(&str, Operator)] = &[
     ("*", Operator::Asterisk),
     ("/", Operator::Slash),
     ("%", Operator::Percent),
+    ("(", Operator::OpenParen),
+    (")", Operator::CloseParen),
 ];
 
 /// Iterator extracting tokens from a string
@@ -507,6 +515,20 @@ mod tests {
             Some(Ok(Token::Operator {
                 operator: Operator::Percent,
                 location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("(").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::OpenParen,
+                location: 0..1
+            }))
+        );
+        assert_eq!(
+            Tokens::new("(").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::OpenParen,
+                location: 0..1
             }))
         );
     }
