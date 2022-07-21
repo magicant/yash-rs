@@ -176,6 +176,68 @@ fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result
     })
 }
 
+/// Applies a binary operator.
+fn apply_binary<E>(
+    op: Operator,
+    lhs: Value,
+    rhs: Value,
+    location: Range<usize>,
+) -> Result<Value, Error<E>> {
+    let (Value::Integer(lhs), Value::Integer(rhs)) = (lhs, rhs);
+    use Operator::*;
+    Ok(match op {
+        BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
+        AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
+        Bar => Value::Integer(lhs | rhs),
+        Caret => Value::Integer(lhs ^ rhs),
+        And => Value::Integer(lhs & rhs),
+        EqualEqual => Value::Integer((lhs == rhs) as _),
+        BangEqual => Value::Integer((lhs != rhs) as _),
+        Less => Value::Integer((lhs < rhs) as _),
+        Greater => Value::Integer((lhs > rhs) as _),
+        LessEqual => Value::Integer((lhs <= rhs) as _),
+        GreaterEqual => Value::Integer((lhs >= rhs) as _),
+        LessLess => {
+            let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
+            let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
+            if result >> rhs != lhs {
+                return Err(Error {
+                    cause: ErrorCause::Overflow,
+                    location,
+                });
+            }
+            Value::Integer(result)
+        }
+        GreaterGreater => Value::Integer(unwrap_or_overflow(
+            rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
+            location,
+        )?),
+        Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+        Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
+        Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
+        Slash => {
+            if rhs == 0 {
+                return Err(Error {
+                    cause: ErrorCause::DivisionByZero,
+                    location,
+                });
+            } else {
+                Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
+            }
+        }
+        Percent => {
+            if rhs == 0 {
+                return Err(Error {
+                    cause: ErrorCause::DivisionByZero,
+                    location,
+                });
+            } else {
+                Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
+            }
+        }
+    })
+}
+
 /// Evaluates an expression that may contain binary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
@@ -196,60 +258,8 @@ fn eval_binary<'a, E: Env>(
         let location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
         let rhs = eval_binary(tokens, precedence + 1, env)?;
-        let (Value::Integer(lhs), Value::Integer(rhs)) =
-            (term.into_value(env)?, rhs.into_value(env)?);
-        use Operator::*;
-        term = Term::Value(match operator {
-            BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
-            AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
-            Bar => Value::Integer(lhs | rhs),
-            Caret => Value::Integer(lhs ^ rhs),
-            And => Value::Integer(lhs & rhs),
-            EqualEqual => Value::Integer((lhs == rhs) as _),
-            BangEqual => Value::Integer((lhs != rhs) as _),
-            Less => Value::Integer((lhs < rhs) as _),
-            Greater => Value::Integer((lhs > rhs) as _),
-            LessEqual => Value::Integer((lhs <= rhs) as _),
-            GreaterEqual => Value::Integer((lhs >= rhs) as _),
-            LessLess => {
-                let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
-                let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
-                if result >> rhs != lhs {
-                    return Err(Error {
-                        cause: ErrorCause::Overflow,
-                        location,
-                    });
-                }
-                Value::Integer(result)
-            }
-            GreaterGreater => Value::Integer(unwrap_or_overflow(
-                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
-                location,
-            )?),
-            Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
-            Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
-            Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
-            Slash => {
-                if rhs == 0 {
-                    return Err(Error {
-                        cause: ErrorCause::DivisionByZero,
-                        location,
-                    });
-                } else {
-                    Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
-                }
-            }
-            Percent => {
-                if rhs == 0 {
-                    return Err(Error {
-                        cause: ErrorCause::DivisionByZero,
-                        location,
-                    });
-                } else {
-                    Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
-                }
-            }
-        });
+        let (lhs, rhs) = (term.into_value(env)?, rhs.into_value(env)?);
+        term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
     }
 
     Ok(term)
