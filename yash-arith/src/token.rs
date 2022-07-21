@@ -34,6 +34,8 @@ pub enum Operator {
     And,
     /// `&&`
     AndAnd,
+    /// `=`
+    Equal,
     /// `==`
     EqualEqual,
     /// `!=`
@@ -70,6 +72,7 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
+            Equal => 0,
             BarBar => 2,
             AndAnd => 3,
             Bar => 4,
@@ -134,6 +137,7 @@ const OPERATORS: &[(&str, Operator)] = &[
     ("&&", Operator::AndAnd),
     ("&", Operator::And),
     ("==", Operator::EqualEqual),
+    ("=", Operator::Equal),
     ("!=", Operator::BangEqual),
     ("<=", Operator::LessEqual),
     ("<<", Operator::LessLess),
@@ -405,6 +409,13 @@ mod tests {
             Some(Ok(Token::Operator {
                 operator: Operator::AndAnd,
                 location: 0..2,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::Equal,
+                location: 0..1,
             }))
         );
         assert_eq!(

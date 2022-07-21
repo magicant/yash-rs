@@ -186,6 +186,7 @@ fn apply_binary<E>(
     let (Value::Integer(lhs), Value::Integer(rhs)) = (lhs, rhs);
     use Operator::*;
     Ok(match op {
+        Equal => Value::Integer(rhs),
         BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
         AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
         Bar => Value::Integer(lhs | rhs),
@@ -257,9 +258,29 @@ fn eval_binary<'a, E: Env>(
 
         let location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
-        let rhs = eval_binary(tokens, precedence + 1, env)?;
-        let (lhs, rhs) = (term.into_value(env)?, rhs.into_value(env)?);
-        term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
+
+        use Operator::*;
+        match operator {
+            Equal => match term {
+                Term::Value(_) => todo!(),
+                Term::Variable { name, location } => {
+                    let value = eval_binary(tokens, precedence + 1, env)?.into_value(env)?;
+                    env.assign_variable(name, value.to_string())
+                        .map_err(|e| Error {
+                            cause: ErrorCause::AssignVariableError(e),
+                            location,
+                        })?;
+                    term = Term::Value(value);
+                }
+            },
+            BarBar | AndAnd | Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual
+            | Greater | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk
+            | Slash | Percent => {
+                let rhs = eval_binary(tokens, precedence + 1, env)?;
+                let (lhs, rhs) = (term.into_value(env)?, rhs.into_value(env)?);
+                term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
+            }
+        };
     }
 
     Ok(term)
@@ -367,6 +388,17 @@ mod tests {
                 location: 2..6,
             })
         );
+    }
+
+    #[test]
+    fn simple_assignment_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a=1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" foo = 42 ", env), Ok(Value::Integer(42)));
+
+        assert_eq!(env["a"], "1");
+        assert_eq!(env["foo"], "42");
+        assert_eq!(env.len(), 2);
     }
 
     #[test]
