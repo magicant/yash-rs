@@ -40,6 +40,7 @@ impl Display for Value {
 
 /// Intermediate result of evaluating part of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+// TODO Should be private
 pub enum Term<'a> {
     /// Value
     Value(Value),
@@ -143,19 +144,25 @@ fn expand_variable<E: Env>(
     }
 }
 
+impl Term<'_> {
+    /// Evaluate the term into a value.
+    fn into_value<E: Env>(self, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
+        match self {
+            Term::Value(value) => Ok(value),
+            Term::Variable { name, location } => expand_variable(name, &location, env),
+        }
+    }
+}
+
 /// Evaluates a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
 /// expression, optionally modified by a unary operator.
 fn eval_leaf<'a, E: Env>(
     tokens: &mut Peekable<Tokens<'a>>,
-    env: &mut E,
+    _env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
-        // TODO Don't expand variable here
-        Some(Token::Term(Term::Variable { name, location })) => {
-            expand_variable(name, &location, env).map(Term::Value)
-        }
         Some(Token::Term(term)) => Ok(term),
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
@@ -189,10 +196,8 @@ fn eval_binary<'a, E: Env>(
         let location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
         let rhs = eval_binary(tokens, precedence + 1, env)?;
-        let (Value::Integer(lhs), Value::Integer(rhs)) = match (term, rhs) {
-            (Term::Value(lhs), Term::Value(rhs)) => (lhs, rhs),
-            _ => todo!(),
-        };
+        let (Value::Integer(lhs), Value::Integer(rhs)) =
+            (term.into_value(env)?, rhs.into_value(env)?);
         use Operator::*;
         term = Term::Value(match operator {
             BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
@@ -255,10 +260,7 @@ pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::Ass
     let mut tokens = Tokens::new(expression).peekable();
     let term = eval_binary(&mut tokens, 0, env)?;
     assert_eq!(tokens.next(), None, "todo: handle orphan term");
-    match term {
-        Term::Value(value) => Ok(value),
-        Term::Variable { .. } => todo!("expand variable"),
-    }
+    term.into_value(env)
 }
 
 #[cfg(test)]
