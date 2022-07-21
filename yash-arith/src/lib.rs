@@ -147,15 +147,16 @@ fn expand_variable<E: Env>(
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
 /// expression, optionally modified by a unary operator.
-fn eval_leaf<E: Env>(
-    tokens: &mut Peekable<Tokens>,
+fn eval_leaf<'a, E: Env>(
+    tokens: &mut Peekable<Tokens<'a>>,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Term<'a>, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
-        Some(Token::Term(Term::Value(value))) => Ok(value),
+        // TODO Don't expand variable here
         Some(Token::Term(Term::Variable { name, location })) => {
-            expand_variable(name, &location, env)
+            expand_variable(name, &location, env).map(Term::Value)
         }
+        Some(Token::Term(term)) => Ok(term),
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
@@ -172,12 +173,12 @@ fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result
 ///
 /// This function consumes binary operators with precedence equal to or greater
 /// than the given minimum precedence.
-fn eval_binary<E: Env>(
-    tokens: &mut Peekable<Tokens>,
+fn eval_binary<'a, E: Env>(
+    tokens: &mut Peekable<Tokens<'a>>,
     min_precedence: u8,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
-    let mut value = eval_leaf(tokens, env)?;
+) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+    let mut term = eval_leaf(tokens, env)?;
 
     while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
         let precedence = operator.precedence();
@@ -188,9 +189,12 @@ fn eval_binary<E: Env>(
         let location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
         let rhs = eval_binary(tokens, precedence + 1, env)?;
-        let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+        let (Value::Integer(lhs), Value::Integer(rhs)) = match (term, rhs) {
+            (Term::Value(lhs), Term::Value(rhs)) => (lhs, rhs),
+            _ => todo!(),
+        };
         use Operator::*;
-        value = match operator {
+        term = Term::Value(match operator {
             BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
             AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
             Bar => Value::Integer(lhs | rhs),
@@ -240,18 +244,21 @@ fn eval_binary<E: Env>(
                     Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
                 }
             }
-        };
+        });
     }
 
-    Ok(value)
+    Ok(term)
 }
 
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression).peekable();
-    let value = eval_binary(&mut tokens, 0, env)?;
+    let term = eval_binary(&mut tokens, 0, env)?;
     assert_eq!(tokens.next(), None, "todo: handle orphan term");
-    Ok(value)
+    match term {
+        Term::Value(value) => Ok(value),
+        Term::Variable { .. } => todo!("expand variable"),
+    }
 }
 
 #[cfg(test)]
