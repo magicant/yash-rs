@@ -144,22 +144,39 @@ fn expand_variable<E: Env>(
     }
 }
 
+/// Specifies the behavior of parse functions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Mode {
+    /// Evaluate the (sub)expression parsed.
+    Eval,
+    /// Just parse a (sub)expression; don't evaluate.
+    Skip,
+}
+
 impl Term<'_> {
     /// Evaluate the term into a value.
-    fn into_value<E: Env>(self, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
-        match self {
-            Term::Value(value) => Ok(value),
-            Term::Variable { name, location } => expand_variable(name, &location, env),
+    fn into_value<E: Env>(
+        self,
+        mode: Mode,
+        env: &E,
+    ) -> Result<Value, Error<E::AssignVariableError>> {
+        match mode {
+            Mode::Eval => match self {
+                Term::Value(value) => Ok(value),
+                Term::Variable { name, location } => expand_variable(name, &location, env),
+            },
+            Mode::Skip => Ok(Value::Integer(0)),
         }
     }
 }
 
-/// Evaluates a leaf expression.
+/// Parses a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
 /// expression, optionally modified by a unary operator.
-fn eval_leaf<'a, E: Env>(
+fn parse_leaf<'a, E: Env>(
     tokens: &mut Peekable<Tokens<'a>>,
+    mode: Mode,
     env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
@@ -169,7 +186,7 @@ fn eval_leaf<'a, E: Env>(
             operator: Operator::OpenParen,
             ..
         }) => {
-            let inner = eval_binary(tokens, 1, env);
+            let inner = parse_binary(tokens, 1, mode, env);
             tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
             inner
         }
@@ -250,16 +267,17 @@ fn apply_binary<E>(
     })
 }
 
-/// Evaluates an expression that may contain binary operators.
+/// Parses an expression that may contain binary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
 /// than the given minimum precedence, which must be greater than 0.
-fn eval_binary<'a, E: Env>(
+fn parse_binary<'a, E: Env>(
     tokens: &mut Peekable<Tokens<'a>>,
     min_precedence: u8,
+    mode: Mode,
     env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
-    let mut term = eval_leaf(tokens, env)?;
+    let mut term = parse_leaf(tokens, mode, env)?;
 
     while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
         let precedence = operator.precedence();
@@ -275,20 +293,35 @@ fn eval_binary<'a, E: Env>(
             Equal => match term {
                 Term::Value(_) => todo!(),
                 Term::Variable { name, location } => {
-                    let value = eval_binary(tokens, precedence + 1, env)?.into_value(env)?;
-                    env.assign_variable(name, value.to_string())
-                        .map_err(|e| Error {
-                            cause: ErrorCause::AssignVariableError(e),
-                            location,
-                        })?;
+                    let value =
+                        parse_binary(tokens, precedence + 1, mode, env)?.into_value(mode, env)?;
+                    if mode == Mode::Eval {
+                        env.assign_variable(name, value.to_string())
+                            .map_err(|e| Error {
+                                cause: ErrorCause::AssignVariableError(e),
+                                location,
+                            })?;
+                    }
                     term = Term::Value(value);
                 }
             },
-            BarBar | AndAnd | Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual
-            | Greater | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk
-            | Slash | Percent => {
-                let rhs = eval_binary(tokens, precedence + 1, env)?;
-                let (lhs, rhs) = (term.into_value(env)?, rhs.into_value(env)?);
+            BarBar | AndAnd => {
+                let Value::Integer(lhs) = term.into_value(mode, env)?;
+                let skip_rhs = match operator {
+                    BarBar => lhs != 0,
+                    AndAnd => lhs == 0,
+                    _ => unreachable!(),
+                };
+                let rhs_mode = if skip_rhs { Mode::Skip } else { mode };
+                let rhs = parse_binary(tokens, precedence + 1, rhs_mode, env)?
+                    .into_value(rhs_mode, env)?;
+                term = Term::Value(apply_binary(operator, Value::Integer(lhs), rhs, location)?);
+            }
+            Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual | Greater
+            | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk | Slash
+            | Percent => {
+                let rhs = parse_binary(tokens, precedence + 1, mode, env)?;
+                let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
             OpenParen => todo!("syntax error"),
@@ -302,9 +335,9 @@ fn eval_binary<'a, E: Env>(
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression).peekable();
-    let term = eval_binary(&mut tokens, 1, env)?;
+    let term = parse_binary(&mut tokens, 1, Mode::Eval, env)?;
     assert_eq!(tokens.next(), None, "todo: handle orphan term");
-    term.into_value(env)
+    term.into_value(Mode::Eval, env)
 }
 
 #[cfg(test)]
@@ -428,7 +461,33 @@ mod tests {
         assert_eq!(eval("2 && 3", env), Ok(Value::Integer(1)));
     }
 
-    // TODO conditional_evaluation_in_boolean_logic_operators
+    #[test]
+    fn conditional_evaluation_in_boolean_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 0) || (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "0");
+        assert_eq!(env["b"], "2");
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 3) || (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "3");
+        assert_eq!(env.get("b"), None);
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 0) && (b = 2)", env), Ok(Value::Integer(0)));
+        assert_eq!(env["a"], "0");
+        assert_eq!(env.get("b"), None);
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 3) && (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "3");
+        assert_eq!(env["b"], "2");
+
+        let env = &mut HashMap::new();
+        env.insert("x".to_string(), "@".to_string());
+        assert_eq!(eval("0 && (x || x)", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("1 || x && x", env), Ok(Value::Integer(1)));
+    }
 
     #[test]
     fn bitwise_logic_operators() {
