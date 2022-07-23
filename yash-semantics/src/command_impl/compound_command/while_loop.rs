@@ -27,11 +27,15 @@ async fn execute_condition(env: &mut Env, condition: &List) -> Result<bool> {
     Continue(env.exit_status == ExitStatus::SUCCESS)
 }
 
-/// Executes the while loop.
-pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
+async fn execute_loop(
+    env: &mut Env,
+    condition_command: &List,
+    expected_condition: bool,
+    body: &List,
+) -> Result {
     let mut exit_status = ExitStatus::SUCCESS;
     // TODO Handle break and continue
-    while execute_condition(env, condition).await? {
+    while execute_condition(env, condition_command).await? == expected_condition {
         body.execute(env).await?;
         exit_status = env.exit_status;
     }
@@ -39,9 +43,14 @@ pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Resu
     Continue(())
 }
 
+/// Executes the while loop.
+pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
+    execute_loop(env, condition, true, body).await
+}
+
 /// Executes the until loop.
-pub async fn execute_until(_env: &mut Env, _condition: &List, _body: &List) -> Result {
-    todo!()
+pub async fn execute_until(env: &mut Env, condition: &List, body: &List) -> Result {
+    execute_loop(env, condition, false, body).await
 }
 
 #[cfg(test)]
@@ -131,5 +140,67 @@ mod tests {
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(42));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "A\n"));
+    }
+
+    #[test]
+    fn zero_round_until_loop() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus(17);
+        let command = "until echo $?; return -n 0; do echo unreached; done";
+        let command: CompoundCommand = command.parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "17\n"));
+    }
+
+    #[test]
+    fn one_round_until_loop() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus(10);
+        let command = "until return -n $(($?/10)); do echo body; return -n 7; done";
+        let command: CompoundCommand = command.parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(7));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "body\n"));
+    }
+
+    #[test]
+    fn three_round_until_loop() {
+        let (mut env, _state) = fixture();
+        let command = "until return -n $((a<3)); do a=$((a+1)); return -n $((a*10)); done";
+        let command: CompoundCommand = command.parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(30));
+        assert_eq!(
+            env.variables.get("a").unwrap().value,
+            Scalar("3".to_string())
+        );
+    }
+
+    #[test]
+    fn return_from_until_condition() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "until return 12; echo X; do echo Y; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(12));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn return_from_until_body() {
+        let (mut env, _state) = fixture();
+        let command: CompoundCommand = "until return -n 9; do return 35; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(35));
     }
 }
