@@ -18,6 +18,7 @@
 //!
 //! TODO Elaborate
 
+use assert_matches::assert_matches;
 use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Range;
@@ -39,11 +40,17 @@ impl Display for Value {
 
 /// Intermediate result of evaluating part of an expression
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+// TODO Should be private
 pub enum Term<'a> {
     /// Value
     Value(Value),
     /// Variable
-    Variable(&'a str),
+    Variable {
+        /// Variable name
+        name: &'a str,
+        /// Range of the substring in the evaluated expression where the variable occurs
+        location: Range<usize>,
+    },
 }
 
 mod token;
@@ -51,7 +58,6 @@ mod token;
 use token::Operator;
 use token::Token;
 pub use token::TokenError;
-use token::TokenValue;
 use token::Tokens;
 
 /// Cause of an arithmetic expansion error
@@ -138,30 +144,54 @@ fn expand_variable<E: Env>(
     }
 }
 
-/// Evaluates a leaf expression.
+/// Specifies the behavior of parse functions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Mode {
+    /// Evaluate the (sub)expression parsed.
+    Eval,
+    /// Just parse a (sub)expression; don't evaluate.
+    Skip,
+}
+
+impl Term<'_> {
+    /// Evaluate the term into a value.
+    fn into_value<E: Env>(
+        self,
+        mode: Mode,
+        env: &E,
+    ) -> Result<Value, Error<E::AssignVariableError>> {
+        match mode {
+            Mode::Eval => match self {
+                Term::Value(value) => Ok(value),
+                Term::Variable { name, location } => expand_variable(name, &location, env),
+            },
+            Mode::Skip => Ok(Value::Integer(0)),
+        }
+    }
+}
+
+/// Parses a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
 /// expression, optionally modified by a unary operator.
-fn eval_leaf<E: Env>(
-    tokens: &mut Peekable<Tokens>,
+fn parse_leaf<'a, E: Env>(
+    tokens: &mut Peekable<Tokens<'a>>,
+    mode: Mode,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Term<'a>, Error<E::AssignVariableError>> {
     match tokens.next().transpose()? {
-        Some(Token {
-            value: TokenValue::Term(Term::Value(value)),
-            location: _,
-        }) => Ok(value),
+        Some(Token::Term(term)) => Ok(term),
 
-        Some(Token {
-            value: TokenValue::Term(Term::Variable(name)),
-            location,
-        }) => expand_variable(name, &location, env),
+        Some(Token::Operator {
+            operator: Operator::OpenParen,
+            ..
+        }) => {
+            let inner = parse_binary(tokens, 1, mode, env);
+            tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
+            inner
+        }
 
-        Some(Token {
-            value: TokenValue::Operator(_op),
-            location: _,
-        }) => todo!("handle orphan operator"),
-
+        Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
 }
@@ -173,91 +203,141 @@ fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result
     })
 }
 
-/// Evaluates an expression that may contain binary operators.
+/// Applies a binary operator.
+fn apply_binary<E>(
+    op: Operator,
+    lhs: Value,
+    rhs: Value,
+    location: Range<usize>,
+) -> Result<Value, Error<E>> {
+    let (Value::Integer(lhs), Value::Integer(rhs)) = (lhs, rhs);
+    use Operator::*;
+    Ok(match op {
+        Equal => Value::Integer(rhs),
+        BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
+        AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
+        Bar => Value::Integer(lhs | rhs),
+        Caret => Value::Integer(lhs ^ rhs),
+        And => Value::Integer(lhs & rhs),
+        EqualEqual => Value::Integer((lhs == rhs) as _),
+        BangEqual => Value::Integer((lhs != rhs) as _),
+        Less => Value::Integer((lhs < rhs) as _),
+        Greater => Value::Integer((lhs > rhs) as _),
+        LessEqual => Value::Integer((lhs <= rhs) as _),
+        GreaterEqual => Value::Integer((lhs >= rhs) as _),
+        LessLess => {
+            let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
+            let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
+            if result >> rhs != lhs {
+                return Err(Error {
+                    cause: ErrorCause::Overflow,
+                    location,
+                });
+            }
+            Value::Integer(result)
+        }
+        GreaterGreater => Value::Integer(unwrap_or_overflow(
+            rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
+            location,
+        )?),
+        Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+        Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
+        Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
+        Slash => {
+            if rhs == 0 {
+                return Err(Error {
+                    cause: ErrorCause::DivisionByZero,
+                    location,
+                });
+            } else {
+                Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
+            }
+        }
+        Percent => {
+            if rhs == 0 {
+                return Err(Error {
+                    cause: ErrorCause::DivisionByZero,
+                    location,
+                });
+            } else {
+                Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
+            }
+        }
+        OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
+    })
+}
+
+/// Parses an expression that may contain binary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
-/// than the given minimum precedence.
-fn eval_binary<E: Env>(
-    tokens: &mut Peekable<Tokens>,
+/// than the given minimum precedence, which must be greater than 0.
+fn parse_binary<'a, E: Env>(
+    tokens: &mut Peekable<Tokens<'a>>,
     min_precedence: u8,
+    mode: Mode,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
-    let mut value = eval_leaf(tokens, env)?;
+) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+    let mut term = parse_leaf(tokens, mode, env)?;
 
-    while let Some(&Ok(Token {
-        value: TokenValue::Operator(op),
-        location: _,
-    })) = tokens.peek()
-    {
-        let precedence = op.precedence();
+    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+        let precedence = operator.precedence();
         if precedence < min_precedence {
             break;
         }
 
-        let location = tokens.next().unwrap().unwrap().location;
-        let rhs = eval_binary(tokens, precedence + 1, env)?;
-        let (Value::Integer(lhs), Value::Integer(rhs)) = (value, rhs);
+        let location =
+            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+
         use Operator::*;
-        value = match op {
-            Bar => Value::Integer(lhs | rhs),
-            Caret => Value::Integer(lhs ^ rhs),
-            And => Value::Integer(lhs & rhs),
-            EqualEqual => Value::Integer((lhs == rhs) as _),
-            BangEqual => Value::Integer((lhs != rhs) as _),
-            Less => Value::Integer((lhs < rhs) as _),
-            Greater => Value::Integer((lhs > rhs) as _),
-            LessEqual => Value::Integer((lhs <= rhs) as _),
-            GreaterEqual => Value::Integer((lhs >= rhs) as _),
-            LessLess => {
-                let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
-                let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
-                if result >> rhs != lhs {
-                    return Err(Error {
-                        cause: ErrorCause::Overflow,
-                        location,
-                    });
+        match operator {
+            Equal => match term {
+                Term::Value(_) => todo!(),
+                Term::Variable { name, location } => {
+                    let value =
+                        parse_binary(tokens, precedence + 1, mode, env)?.into_value(mode, env)?;
+                    if mode == Mode::Eval {
+                        env.assign_variable(name, value.to_string())
+                            .map_err(|e| Error {
+                                cause: ErrorCause::AssignVariableError(e),
+                                location,
+                            })?;
+                    }
+                    term = Term::Value(value);
                 }
-                Value::Integer(result)
+            },
+            BarBar | AndAnd => {
+                let Value::Integer(lhs) = term.into_value(mode, env)?;
+                let skip_rhs = match operator {
+                    BarBar => lhs != 0,
+                    AndAnd => lhs == 0,
+                    _ => unreachable!(),
+                };
+                let rhs_mode = if skip_rhs { Mode::Skip } else { mode };
+                let rhs = parse_binary(tokens, precedence + 1, rhs_mode, env)?
+                    .into_value(rhs_mode, env)?;
+                term = Term::Value(apply_binary(operator, Value::Integer(lhs), rhs, location)?);
             }
-            GreaterGreater => Value::Integer(unwrap_or_overflow(
-                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
-                location,
-            )?),
-            Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
-            Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
-            Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
-            Slash => {
-                if rhs == 0 {
-                    return Err(Error {
-                        cause: ErrorCause::DivisionByZero,
-                        location,
-                    });
-                } else {
-                    Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
-                }
+            Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual | Greater
+            | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk | Slash
+            | Percent => {
+                let rhs = parse_binary(tokens, precedence + 1, mode, env)?;
+                let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
+                term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
-            Percent => {
-                if rhs == 0 {
-                    return Err(Error {
-                        cause: ErrorCause::DivisionByZero,
-                        location,
-                    });
-                } else {
-                    Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
-                }
-            }
+            OpenParen => todo!("syntax error"),
+            CloseParen => panic!("min_precedence must not be 0"),
         };
     }
 
-    Ok(value)
+    Ok(term)
 }
 
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
     let mut tokens = Tokens::new(expression).peekable();
-    let value = eval_binary(&mut tokens, 0, env)?;
+    let term = parse_binary(&mut tokens, 1, Mode::Eval, env)?;
     assert_eq!(tokens.next(), None, "todo: handle orphan term");
-    Ok(value)
+    term.into_value(Mode::Eval, env)
 }
 
 #[cfg(test)]
@@ -354,6 +434,59 @@ mod tests {
                 location: 2..6,
             })
         );
+    }
+
+    #[test]
+    fn simple_assignment_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a=1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" foo = 42 ", env), Ok(Value::Integer(42)));
+
+        assert_eq!(env["a"], "1");
+        assert_eq!(env["foo"], "42");
+        assert_eq!(env.len(), 2);
+    }
+
+    #[test]
+    fn boolean_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0||0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 || 0 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" 0 || 1 ", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("2 || 3", env), Ok(Value::Integer(1)));
+
+        assert_eq!(eval("0&&0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 1 && 0 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" 0 && 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("2 && 3", env), Ok(Value::Integer(1)));
+    }
+
+    #[test]
+    fn conditional_evaluation_in_boolean_logic_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 0) || (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "0");
+        assert_eq!(env["b"], "2");
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 3) || (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "3");
+        assert_eq!(env.get("b"), None);
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 0) && (b = 2)", env), Ok(Value::Integer(0)));
+        assert_eq!(env["a"], "0");
+        assert_eq!(env.get("b"), None);
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a = 3) && (b = 2)", env), Ok(Value::Integer(1)));
+        assert_eq!(env["a"], "3");
+        assert_eq!(env["b"], "2");
+
+        let env = &mut HashMap::new();
+        env.insert("x".to_string(), "@".to_string());
+        assert_eq!(eval("0 && (x || x)", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("1 || x && x", env), Ok(Value::Integer(1)));
     }
 
     #[test]
@@ -586,6 +719,8 @@ mod tests {
 
     // TODO overflow_in_remainder
 
+    // TODO Unary operators
+
     #[test]
     fn combining_operators_of_same_precedence() {
         let env = &mut HashMap::new();
@@ -599,5 +734,16 @@ mod tests {
         assert_eq!(eval("2*3+4", env), Ok(Value::Integer(10)));
     }
 
-    // TODO Operators
+    #[test]
+    fn parentheses() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(42)", env), Ok(Value::Integer(42)));
+        assert_eq!(eval("(1+2)", env), Ok(Value::Integer(3)));
+        assert_eq!(eval("(2+3)*4", env), Ok(Value::Integer(20)));
+        assert_eq!(eval("2*(3+4)", env), Ok(Value::Integer(14)));
+        assert_eq!(eval(" ( 6 - ( 7 - 3 ) ) * 2 ", env), Ok(Value::Integer(4)));
+        assert_eq!(eval(" 4 | ( ( 2 && 2 ) & 3 )", env), Ok(Value::Integer(5)));
+    }
+
+    // TODO unmatched_parentheses
 }
