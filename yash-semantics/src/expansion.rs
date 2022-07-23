@@ -75,8 +75,10 @@ pub mod split;
 use self::attr::AttrChar;
 use self::attr::AttrField;
 use self::attr::Origin;
+use self::attr_strip::Strip;
 use self::glob::glob;
 use self::initial::Expand;
+use self::quote_removal::skip_quotes;
 use self::split::Ifs;
 use std::borrow::Cow;
 use yash_env::semantics::ExitStatus;
@@ -87,6 +89,7 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::Text;
 use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
@@ -97,6 +100,8 @@ pub use yash_env::semantics::Field;
 pub enum ErrorCause {
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
+    /// Error while evaluating an arithmetic expansion.
+    ArithError(yash_arith::ErrorCause<ReadOnlyError>),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }
@@ -109,6 +114,7 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(_) => "error performing the command substitution",
+            ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
         }
     }
@@ -120,7 +126,8 @@ impl ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(e) => e.desc().into(),
-            AssignReadOnly(e) => format!("variable `{}` is read-only", e.name).into(),
+            ArithError(e) => e.to_string().into(),
+            AssignReadOnly(e) => e.to_string().into(),
         }
     }
 
@@ -131,7 +138,7 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            CommandSubstError(_) => None,
+            CommandSubstError(_) | ArithError(_) => None,
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
@@ -145,6 +152,7 @@ impl std::fmt::Display for ErrorCause {
         use ErrorCause::*;
         match self {
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
+            ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
         }
     }
@@ -189,6 +197,32 @@ impl MessageBase for Error {
 /// Result of word expansion.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Expands a text to a string.
+///
+/// This function performs the initial expansion, quote removal, and attribute
+/// stripping.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
+pub async fn expand_text(
+    env: &mut yash_env::Env,
+    text: &Text,
+) -> Result<(String, Option<ExitStatus>)> {
+    let mut env = initial::Env::new(env);
+    // It would be technically correct to set `will_split` to false, but it does
+    // not affect the final results because we will join the results anyway.
+    // env.will_split = false;
+
+    use self::initial::QuickExpand::*;
+    let phrase = match text.quick_expand(&mut env) {
+        Ready(result) => result?,
+        Interim(interim) => text.async_expand(&mut env, interim).await?,
+    };
+
+    let chars = phrase.ifs_join(&env.inner.variables);
+    let result = skip_quotes(chars).strip().collect();
+    Ok((result, env.last_command_subst_exit_status))
+}
+
 /// Expands a word to a field.
 ///
 /// This function performs the initial expansion, quote removal, and attribute
@@ -211,11 +245,11 @@ pub async fn expand_word(
         Ready(result) => result?,
         Interim(interim) => word.async_expand(&mut env, interim).await?,
     };
+
     let chars = phrase.ifs_join(&env.inner.variables);
-    let field = AttrField {
-        chars,
-        origin: word.location.clone(),
-    };
+    let origin = word.location.clone();
+    let field = AttrField { chars, origin };
+
     let field = field.remove_quotes_and_strip();
     Ok((field, env.last_command_subst_exit_status))
 }

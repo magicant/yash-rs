@@ -8,6 +8,7 @@ set -x
 git diff --exit-code -- Cargo.lock
 cargo +nightly update -Z minimal-versions
 
+cargo +1.58.0 test --package 'yash-arith' -- $quiet
 cargo +1.58.0 test --package 'yash-builtin' -- $quiet
 cargo +1.58.0 test --package 'yash-env' -- $quiet
 cargo +1.58.0 test --package 'yash-fnmatch' -- $quiet

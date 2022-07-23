@@ -16,6 +16,7 @@
 
 //! TODO Elaborate
 
+pub use yash_arith as arith;
 pub use yash_builtin as builtin;
 pub use yash_env as env;
 pub use yash_fnmatch as fnmatch;
