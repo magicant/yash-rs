@@ -313,13 +313,13 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let arith = TextUnit::Arith {
-            content: "0".parse().unwrap(),
+            content: "1+2*3".parse().unwrap(),
             location: Location::dummy(""),
         };
         assert_matches!(arith.quick_expand(&mut env), Interim(()));
         let result = arith.async_expand(&mut env, ()).now_or_never().unwrap();
         let c = AttrChar {
-            value: '0',
+            value: '7',
             origin: Origin::SoftExpansion,
             is_quoted: false,
             is_quoting: false,

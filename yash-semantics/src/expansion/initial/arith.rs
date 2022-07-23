@@ -111,13 +111,13 @@ mod tests {
 
     #[test]
     fn successful_inner_text_expansion() {
-        let text = "0".parse().unwrap();
+        let text = "17%9".parse().unwrap();
         let location = Location::dummy("my location");
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let result = expand(&text, &location, &mut env).now_or_never().unwrap();
         let c = AttrChar {
-            value: '0',
+            value: '8',
             origin: Origin::SoftExpansion,
             is_quoted: false,
             is_quoting: false,
