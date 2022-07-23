@@ -22,17 +22,20 @@ use yash_env::semantics::{ExitStatus, Result};
 use yash_env::Env;
 use yash_syntax::syntax::List;
 
+async fn execute_condition(env: &mut Env, condition: &List) -> Result<bool> {
+    condition.execute(env).await?;
+    Continue(env.exit_status == ExitStatus::SUCCESS)
+}
+
 /// Executes the while loop.
 pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
+    let mut exit_status = ExitStatus::SUCCESS;
     // TODO Handle break and continue
-    condition.execute(env).await?;
-    if env.exit_status == ExitStatus::SUCCESS {
-        // TODO Handle break and continue
+    while execute_condition(env, condition).await? {
         body.execute(env).await?;
-    } else {
-        env.exit_status = ExitStatus::SUCCESS;
+        exit_status = env.exit_status;
     }
-    // TODO loop
+    env.exit_status = exit_status;
     Continue(())
 }
 
@@ -49,20 +52,28 @@ mod tests {
     use crate::tests::return_builtin;
     use crate::Command;
     use futures_util::FutureExt;
+    use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::SystemState;
+    use yash_env::variable::Value::Scalar;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
-    #[test]
-    fn zero_round_while_loop() {
+    fn fixture() -> (Env, Rc<RefCell<SystemState>>) {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
+        (env, state)
+    }
+
+    #[test]
+    fn zero_round_while_loop() {
+        let (mut env, state) = fixture();
         env.exit_status = ExitStatus(15);
         let command = "while echo $?; return -n 1; do echo unreached; done";
         let command: CompoundCommand = command.parse().unwrap();
@@ -75,11 +86,7 @@ mod tests {
 
     #[test]
     fn one_round_while_loop() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
-        env.builtins.insert("return", return_builtin());
+        let (mut env, state) = fixture();
         let command = "while return -n $?0; do echo body; return -n 7; done";
         let command: CompoundCommand = command.parse().unwrap();
 
@@ -90,12 +97,23 @@ mod tests {
     }
 
     #[test]
+    fn three_round_while_loop() {
+        let (mut env, _state) = fixture();
+        let command = "while return -n $((a>=3)); do a=$((a+1)); return -n $((a*10)); done";
+        let command: CompoundCommand = command.parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(30));
+        assert_eq!(
+            env.variables.get("a").unwrap().value,
+            Scalar("3".to_string())
+        );
+    }
+
+    #[test]
     fn return_from_while_condition() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
-        env.builtins.insert("return", return_builtin());
+        let (mut env, state) = fixture();
         let command: CompoundCommand = "while return 36; echo X; do echo Y; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -106,11 +124,7 @@ mod tests {
 
     #[test]
     fn return_from_while_body() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("echo", echo_builtin());
-        env.builtins.insert("return", return_builtin());
+        let (mut env, state) = fixture();
         let command: CompoundCommand = "while echo A; do return 42; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
