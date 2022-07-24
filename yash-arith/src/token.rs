@@ -38,6 +38,8 @@ pub enum Operator {
     Equal,
     /// `==`
     EqualEqual,
+    /// `!`
+    Bang,
     /// `!=`
     BangEqual,
     /// `<`
@@ -90,7 +92,7 @@ impl Operator {
             LessLess | GreaterGreater => 10,
             Plus | Minus => 11,
             Asterisk | Slash | Percent => 12,
-            Tilde | OpenParen => 15,
+            Tilde | Bang | OpenParen => 15,
         }
     }
 }
@@ -159,6 +161,7 @@ const OPERATORS: &[(&str, Operator)] = &[
     ("/", Operator::Slash),
     ("%", Operator::Percent),
     ("~", Operator::Tilde),
+    ("!", Operator::Bang),
     ("(", Operator::OpenParen),
     (")", Operator::CloseParen),
 ];
@@ -524,6 +527,13 @@ mod tests {
             Tokens::new("~").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Tilde,
+                location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("!").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::Bang,
                 location: 0..1,
             }))
         );

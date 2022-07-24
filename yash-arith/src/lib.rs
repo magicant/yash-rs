@@ -222,6 +222,14 @@ fn parse_leaf<'a, E: Env>(
             Ok(Term::Value(Value::Integer(!operand)))
         }
 
+        Some(Token::Operator {
+            operator: Operator::Bang,
+            ..
+        }) => {
+            let Value::Integer(operand) = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
+            Ok(Term::Value(Value::Integer((operand == 0) as i64)))
+        }
+
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
@@ -287,7 +295,7 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
             }
         }
-        Tilde | OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
+        Tilde | Bang | OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
     })
 }
 
@@ -348,7 +356,7 @@ fn parse_binary<'a, E: Env>(
                 let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
-            Tilde | OpenParen => todo!("syntax error"),
+            Tilde | Bang | OpenParen => todo!("syntax error"),
             CloseParen => panic!("min_precedence must not be 0"),
         };
     }
@@ -783,6 +791,15 @@ mod tests {
         assert_eq!(eval(" ~ 3 ", env), Ok(Value::Integer(!3)));
         assert_eq!(eval(" ~ ~ 42", env), Ok(Value::Integer(42)));
         assert_eq!(eval(" ~ ~ ~ 0x38E7", env), Ok(Value::Integer(!0x38E7)));
+    }
+
+    #[test]
+    fn logical_negation_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("!0", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" ! 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" ! 2 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" ! ! 3", env), Ok(Value::Integer(1)));
     }
 
     // TODO Unary operators
