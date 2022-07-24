@@ -191,6 +191,13 @@ fn parse_leaf<'a, E: Env>(
             inner
         }
 
+        Some(Token::Operator {
+            operator: Operator::Plus,
+            ..
+        }) => Ok(Term::Value(
+            parse_leaf(tokens, mode, env)?.into_value(mode, env)?,
+        )),
+
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
@@ -718,6 +725,14 @@ mod tests {
     }
 
     // TODO overflow_in_remainder
+
+    #[test]
+    fn plus_prefix_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("+0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" + 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" + + 57", env), Ok(Value::Integer(57)));
+    }
 
     // TODO Unary operators
 
