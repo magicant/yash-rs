@@ -18,6 +18,7 @@
 
 mod for_loop;
 mod subshell;
+mod while_loop;
 
 use super::perform_redirs;
 use super::Command;
@@ -56,6 +57,18 @@ impl Command for syntax::FullCompoundCommand {
 /// field resulting from the expansion is assigned to the variable `name`, and
 /// in turn, `body` is executed.
 ///
+/// # While loop
+///
+/// The `condition` is executed first. If its exit status is zero, the `body` is
+/// executed. The execution is repeated while the `condition` exit status is
+/// zero.
+///
+/// # Until loop
+///
+/// The until loop is executed in the same manner as the while loop except that
+/// the loop condition is inverted: The execution continues until the
+/// `condition` exit status is zero.
+///
 /// TODO Elaborate
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
@@ -65,9 +78,10 @@ impl Command for syntax::CompoundCommand {
             Grouping(list) => list.execute(env).await,
             Subshell { body, location } => subshell::execute(env, body.clone(), location).await,
             For { name, values, body } => for_loop::execute(env, name, values, body).await,
-            // TODO execute while/until loop
-            // TODO execute case
+            While { condition, body } => while_loop::execute_while(env, condition, body).await,
+            Until { condition, body } => while_loop::execute_until(env, condition, body).await,
             // TODO execute if
+            // TODO execute case
             _ => {
                 env.print_error(&format!("Not implemented: {}\n", self))
                     .await;
