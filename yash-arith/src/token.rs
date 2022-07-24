@@ -62,6 +62,8 @@ pub enum Operator {
     Slash,
     /// `%`
     Percent,
+    /// `~`
+    Tilde,
     /// `(`
     OpenParen,
     /// `)`
@@ -88,7 +90,7 @@ impl Operator {
             LessLess | GreaterGreater => 10,
             Plus | Minus => 11,
             Asterisk | Slash | Percent => 12,
-            OpenParen => 13,
+            Tilde | OpenParen => 15,
         }
     }
 }
@@ -156,6 +158,7 @@ const OPERATORS: &[(&str, Operator)] = &[
     ("*", Operator::Asterisk),
     ("/", Operator::Slash),
     ("%", Operator::Percent),
+    ("~", Operator::Tilde),
     ("(", Operator::OpenParen),
     (")", Operator::CloseParen),
 ];
@@ -514,6 +517,13 @@ mod tests {
             Tokens::new("%").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Percent,
+                location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("~").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::Tilde,
                 location: 0..1,
             }))
         );
