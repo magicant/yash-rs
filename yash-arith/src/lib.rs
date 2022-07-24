@@ -170,6 +170,13 @@ impl Term<'_> {
     }
 }
 
+fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
+    result.ok_or(Error {
+        cause: ErrorCause::Overflow,
+        location,
+    })
+}
+
 /// Parses a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
@@ -198,16 +205,18 @@ fn parse_leaf<'a, E: Env>(
             parse_leaf(tokens, mode, env)?.into_value(mode, env)?,
         )),
 
+        Some(Token::Operator {
+            operator: Operator::Minus,
+            location,
+        }) => {
+            let Value::Integer(operand) = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
+            let result = unwrap_or_overflow(operand.checked_neg(), location)?;
+            Ok(Term::Value(Value::Integer(result)))
+        }
+
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
-}
-
-fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
-    result.ok_or(Error {
-        cause: ErrorCause::Overflow,
-        location,
-    })
 }
 
 /// Applies a binary operator.
@@ -732,6 +741,31 @@ mod tests {
         assert_eq!(eval("+0", env), Ok(Value::Integer(0)));
         assert_eq!(eval(" + 10 ", env), Ok(Value::Integer(10)));
         assert_eq!(eval(" + + 57", env), Ok(Value::Integer(57)));
+    }
+
+    #[test]
+    fn numeric_negation_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("-0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" - 12 ", env), Ok(Value::Integer(-12)));
+        assert_eq!(eval(" - - 49", env), Ok(Value::Integer(49)));
+        assert_eq!(eval(" - - - 49", env), Ok(Value::Integer(-49)));
+    }
+
+    #[test]
+    fn overflow_in_numeric_negation() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("-0x7FFFFFFFFFFFFFFF-1", env),
+            Ok(Value::Integer(i64::MIN))
+        );
+        assert_eq!(
+            eval(" - (-0x7FFFFFFFFFFFFFFF-1)", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..2
+            })
+        );
     }
 
     // TODO Unary operators
