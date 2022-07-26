@@ -230,6 +230,28 @@ fn parse_leaf<'a, E: Env>(
             Ok(Term::Value(Value::Integer((operand == 0) as i64)))
         }
 
+        Some(Token::Operator {
+            operator: Operator::PlusPlus,
+            location: _op_location,
+        }) => {
+            match parse_leaf(tokens, mode, env)? {
+                Term::Value(_) => todo!("reject non-variable"),
+                Term::Variable { name, location } => {
+                    let Value::Integer(old_value) = expand_variable(name, &location, env)?;
+                    let new_value = Value::Integer(old_value + 1); // TODO Check overflow
+
+                    if mode == Mode::Eval {
+                        env.assign_variable(name, new_value.to_string())
+                            .map_err(|e| Error {
+                                cause: ErrorCause::AssignVariableError(e),
+                                location,
+                            })?;
+                    }
+                    Ok(Term::Value(new_value))
+                }
+            }
+        }
+
         Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
@@ -295,7 +317,9 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
             }
         }
-        Tilde | Bang | OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
+        Tilde | Bang | PlusPlus | OpenParen | CloseParen => {
+            panic!("not a binary operator: {:?}", op)
+        }
     })
 }
 
@@ -356,7 +380,7 @@ fn parse_binary<'a, E: Env>(
                 let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
-            Tilde | Bang | OpenParen => todo!("syntax error"),
+            Tilde | Bang | PlusPlus | OpenParen => todo!("syntax error"),
             CloseParen => panic!("min_precedence must not be 0"),
         };
     }
@@ -519,6 +543,10 @@ mod tests {
         env.insert("x".to_string(), "@".to_string());
         assert_eq!(eval("0 && (x || x)", env), Ok(Value::Integer(0)));
         assert_eq!(eval("1 || x && x", env), Ok(Value::Integer(1)));
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0 && ++x", env), Ok(Value::Integer(0)));
+        assert_eq!(env.get("x"), None);
     }
 
     #[test]
@@ -801,6 +829,17 @@ mod tests {
         assert_eq!(eval(" ! 2 ", env), Ok(Value::Integer(0)));
         assert_eq!(eval(" ! ! 3", env), Ok(Value::Integer(1)));
     }
+
+    #[test]
+    fn prefix_increment_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("++a", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("++a", env), Ok(Value::Integer(2)));
+        assert_eq!(eval("++a", env), Ok(Value::Integer(3)));
+        assert_eq!(eval("a", env), Ok(Value::Integer(3)));
+    }
+
+    // TODO prefix_incrementing_non_variable eval("++ +a")
 
     // TODO Unary operators
 

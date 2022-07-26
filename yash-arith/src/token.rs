@@ -56,6 +56,8 @@ pub enum Operator {
     GreaterGreater,
     /// `+`
     Plus,
+    /// `++`
+    PlusPlus,
     /// `-`
     Minus,
     /// `*`
@@ -92,7 +94,7 @@ impl Operator {
             LessLess | GreaterGreater => 10,
             Plus | Minus => 11,
             Asterisk | Slash | Percent => 12,
-            Tilde | Bang | OpenParen => 15,
+            Tilde | Bang | PlusPlus | OpenParen => 13,
         }
     }
 }
@@ -155,6 +157,7 @@ const OPERATORS: &[(&str, Operator)] = &[
     (">=", Operator::GreaterEqual),
     (">>", Operator::GreaterGreater),
     (">", Operator::Greater),
+    ("++", Operator::PlusPlus),
     ("+", Operator::Plus),
     ("-", Operator::Minus),
     ("*", Operator::Asterisk),
@@ -493,6 +496,13 @@ mod tests {
             Some(Ok(Token::Operator {
                 operator: Operator::Plus,
                 location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("++").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::PlusPlus,
+                location: 0..2,
             }))
         );
         assert_eq!(
