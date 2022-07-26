@@ -177,6 +177,31 @@ fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result
     })
 }
 
+/// Applies a unary operator.
+fn apply_unary<E>(
+    operator: Operator,
+    operand: Value,
+    location: Range<usize>,
+) -> Result<Value, Error<E>> {
+    let Value::Integer(value) = operand;
+    use Operator::*;
+    Ok(match operator {
+        Plus => Value::Integer(value),
+        Minus => Value::Integer(unwrap_or_overflow(value.checked_neg(), location)?),
+        Tilde => Value::Integer(!value),
+        Bang => Value::Integer((value == 0) as i64),
+        PlusPlus => {
+            // TODO check overflow
+            Value::Integer(value + 1)
+        }
+        MinusMinus => {
+            // TODO check overflow
+            Value::Integer(value - 1)
+        }
+        _ => panic!("not a unary operator: {:?}", operator),
+    })
+}
+
 /// Parses a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
@@ -186,95 +211,42 @@ fn parse_leaf<'a, E: Env>(
     mode: Mode,
     env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+    use Operator::*;
     match tokens.next().transpose()? {
         Some(Token::Term(term)) => Ok(term),
 
         Some(Token::Operator {
-            operator: Operator::OpenParen,
-            ..
-        }) => {
-            let inner = parse_binary(tokens, 1, mode, env);
-            tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
-            inner
-        }
-
-        Some(Token::Operator {
-            operator: Operator::Plus,
-            ..
-        }) => Ok(Term::Value(
-            parse_leaf(tokens, mode, env)?.into_value(mode, env)?,
-        )),
-
-        Some(Token::Operator {
-            operator: Operator::Minus,
-            location,
-        }) => {
-            let Value::Integer(operand) = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
-            let result = unwrap_or_overflow(operand.checked_neg(), location)?;
-            Ok(Term::Value(Value::Integer(result)))
-        }
-
-        Some(Token::Operator {
-            operator: Operator::Tilde,
-            ..
-        }) => {
-            let Value::Integer(operand) = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
-            Ok(Term::Value(Value::Integer(!operand)))
-        }
-
-        Some(Token::Operator {
-            operator: Operator::Bang,
-            ..
-        }) => {
-            let Value::Integer(operand) = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
-            Ok(Term::Value(Value::Integer((operand == 0) as i64)))
-        }
-
-        Some(Token::Operator {
-            operator: Operator::PlusPlus,
-            location: _op_location,
-        }) => {
-            match parse_leaf(tokens, mode, env)? {
+            operator,
+            location: op_location,
+        }) => match operator {
+            OpenParen => {
+                let inner = parse_binary(tokens, 1, mode, env);
+                tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
+                inner
+            }
+            Plus | Minus | Tilde | Bang => {
+                let operand = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
+                apply_unary(operator, operand, op_location).map(Term::Value)
+            }
+            PlusPlus | MinusMinus => match parse_leaf(tokens, mode, env)? {
                 Term::Value(_) => todo!("reject non-variable"),
                 Term::Variable { name, location } => {
-                    let Value::Integer(old_value) = expand_variable(name, &location, env)?;
-                    let new_value = Value::Integer(old_value + 1); // TODO Check overflow
+                    let old_value = expand_variable(name, &location, env)?;
+                    let new_value = apply_unary(operator, old_value, location)?;
 
                     if mode == Mode::Eval {
                         env.assign_variable(name, new_value.to_string())
                             .map_err(|e| Error {
                                 cause: ErrorCause::AssignVariableError(e),
-                                location,
+                                location: op_location,
                             })?;
                     }
                     Ok(Term::Value(new_value))
                 }
-            }
-        }
+            },
+            _ => todo!("handle orphan operator: {:?}", operator),
+        },
 
-        Some(Token::Operator {
-            operator: Operator::MinusMinus,
-            location: _op_location,
-        }) => {
-            match parse_leaf(tokens, mode, env)? {
-                Term::Value(_) => todo!("reject non-variable"),
-                Term::Variable { name, location } => {
-                    let Value::Integer(old_value) = expand_variable(name, &location, env)?;
-                    let new_value = Value::Integer(old_value - 1); // TODO Check overflow
-
-                    if mode == Mode::Eval {
-                        env.assign_variable(name, new_value.to_string())
-                            .map_err(|e| Error {
-                                cause: ErrorCause::AssignVariableError(e),
-                                location,
-                            })?;
-                    }
-                    Ok(Term::Value(new_value))
-                }
-            }
-        }
-
-        Some(Token::Operator { .. }) => todo!("handle orphan operator"),
         None => todo!("handle missing token"),
     }
 }
