@@ -133,6 +133,7 @@ fn expand_variable<E: Env>(
     env: &E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match env.get_variable(name) {
+        // TODO Parse non-decimal constant
         Some(value) => match value.parse() {
             Ok(number) => Ok(Value::Integer(number)),
             Err(_) => Err(Error {
@@ -190,14 +191,8 @@ fn apply_unary<E>(
         Minus => Value::Integer(unwrap_or_overflow(value.checked_neg(), location)?),
         Tilde => Value::Integer(!value),
         Bang => Value::Integer((value == 0) as i64),
-        PlusPlus => {
-            // TODO check overflow
-            Value::Integer(value + 1)
-        }
-        MinusMinus => {
-            // TODO check overflow
-            Value::Integer(value - 1)
-        }
+        PlusPlus => Value::Integer(unwrap_or_overflow(value.checked_add(1), location)?),
+        MinusMinus => Value::Integer(unwrap_or_overflow(value.checked_sub(1), location)?),
         _ => panic!("not a unary operator: {:?}", operator),
     })
 }
@@ -232,7 +227,7 @@ fn parse_leaf<'a, E: Env>(
                 Term::Value(_) => todo!("reject non-variable"),
                 Term::Variable { name, location } => {
                     let old_value = expand_variable(name, &location, env)?;
-                    let new_value = apply_unary(operator, old_value, location)?;
+                    let new_value = apply_unary(operator, old_value, op_location.clone())?;
 
                     if mode == Mode::Eval {
                         env.assign_variable(name, new_value.to_string())
@@ -836,12 +831,40 @@ mod tests {
     // TODO prefix_incrementing_non_variable eval("++ +a")
 
     #[test]
+    fn overflow_in_increment() {
+        let env = &mut HashMap::new();
+        env.assign_variable("i", "9223372036854775807".to_string())
+            .unwrap();
+        assert_eq!(
+            eval("  ++ i", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 2..4,
+            })
+        );
+    }
+
+    #[test]
     fn prefix_decrement_operator() {
         let env = &mut HashMap::new();
         assert_eq!(eval("--d", env), Ok(Value::Integer(-1)));
         assert_eq!(eval("--d", env), Ok(Value::Integer(-2)));
         assert_eq!(eval("--d", env), Ok(Value::Integer(-3)));
         assert_eq!(eval("d", env), Ok(Value::Integer(-3)));
+    }
+
+    #[test]
+    fn overflow_in_decrement() {
+        let env = &mut HashMap::new();
+        env.assign_variable("i", "-9223372036854775808".to_string())
+            .unwrap();
+        assert_eq!(
+            eval(" -- i", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
     }
 
     // TODO prefix_decrementing_non_variable eval("-- +a")
