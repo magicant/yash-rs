@@ -133,6 +133,7 @@ fn expand_variable<E: Env>(
     env: &E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match env.get_variable(name) {
+        // TODO Parse non-decimal constant
         Some(value) => match value.parse() {
             Ok(number) => Ok(Value::Integer(number)),
             Err(_) => Err(Error {
@@ -170,6 +171,69 @@ impl Term<'_> {
     }
 }
 
+fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
+    result.ok_or(Error {
+        cause: ErrorCause::Overflow,
+        location,
+    })
+}
+
+/// Applies a unary operator.
+fn apply_unary<E>(
+    operator: Operator,
+    operand: Value,
+    location: Range<usize>,
+) -> Result<Value, Error<E>> {
+    let Value::Integer(value) = operand;
+    use Operator::*;
+    Ok(match operator {
+        Plus => Value::Integer(value),
+        Minus => Value::Integer(unwrap_or_overflow(value.checked_neg(), location)?),
+        Tilde => Value::Integer(!value),
+        Bang => Value::Integer((value == 0) as i64),
+        PlusPlus => Value::Integer(unwrap_or_overflow(value.checked_add(1), location)?),
+        MinusMinus => Value::Integer(unwrap_or_overflow(value.checked_sub(1), location)?),
+        _ => panic!("not a unary operator: {:?}", operator),
+    })
+}
+
+/// Parses optional postfix operators.
+fn parse_postfix<'a, E: Env>(
+    operand: Term<'a>,
+    tokens: &mut Peekable<Tokens<'a>>,
+    mode: Mode,
+    env: &mut E,
+) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+    if let Some(Ok(Token::Operator {
+        operator: Operator::PlusPlus | Operator::MinusMinus,
+        ..
+    })) = tokens.peek()
+    {
+        let (operator, op_location) = assert_matches!(
+            tokens.next(),
+            Some(Ok(Token::Operator { operator, location })) => (operator, location)
+        );
+        match operand {
+            Term::Value(_) => todo!("reject non-variable"),
+            Term::Variable { name, location } => {
+                let old_value = expand_variable(name, &location, env)?;
+                let new_value = apply_unary(operator, old_value.clone(), op_location.clone())?;
+
+                if mode == Mode::Eval {
+                    env.assign_variable(name, new_value.to_string())
+                        .map_err(|e| Error {
+                            cause: ErrorCause::AssignVariableError(e),
+                            location: op_location,
+                        })?;
+                }
+                Ok(Term::Value(old_value))
+            }
+        }
+    } else {
+        Ok(operand)
+    }
+}
+
 /// Parses a leaf expression.
 ///
 /// A leaf expression is a constant number, variable, or parenthesized
@@ -179,28 +243,44 @@ fn parse_leaf<'a, E: Env>(
     mode: Mode,
     env: &mut E,
 ) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+    use Operator::*;
     match tokens.next().transpose()? {
-        Some(Token::Term(term)) => Ok(term),
+        Some(Token::Term(term)) => parse_postfix(term, tokens, mode, env),
 
         Some(Token::Operator {
-            operator: Operator::OpenParen,
-            ..
-        }) => {
-            let inner = parse_binary(tokens, 1, mode, env);
-            tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
-            inner
-        }
+            operator,
+            location: op_location,
+        }) => match operator {
+            OpenParen => {
+                let inner = parse_binary(tokens, 1, mode, env)?;
+                tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
+                parse_postfix(inner, tokens, mode, env)
+            }
+            Plus | Minus | Tilde | Bang => {
+                let operand = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
+                apply_unary(operator, operand, op_location).map(Term::Value)
+            }
+            PlusPlus | MinusMinus => match parse_leaf(tokens, mode, env)? {
+                Term::Value(_) => todo!("reject non-variable"),
+                Term::Variable { name, location } => {
+                    let old_value = expand_variable(name, &location, env)?;
+                    let new_value = apply_unary(operator, old_value, op_location.clone())?;
 
-        Some(Token::Operator { .. }) => todo!("handle orphan operator"),
+                    if mode == Mode::Eval {
+                        env.assign_variable(name, new_value.to_string())
+                            .map_err(|e| Error {
+                                cause: ErrorCause::AssignVariableError(e),
+                                location: op_location,
+                            })?;
+                    }
+                    Ok(Term::Value(new_value))
+                }
+            },
+            _ => todo!("handle orphan operator: {:?}", operator),
+        },
+
         None => todo!("handle missing token"),
     }
-}
-
-fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
-    result.ok_or(Error {
-        cause: ErrorCause::Overflow,
-        location,
-    })
 }
 
 /// Applies a binary operator.
@@ -263,7 +343,9 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
             }
         }
-        OpenParen | CloseParen => panic!("not a binary operator: {:?}", op),
+        Tilde | Bang | PlusPlus | MinusMinus | OpenParen | CloseParen => {
+            panic!("not a binary operator: {:?}", op)
+        }
     })
 }
 
@@ -324,7 +406,7 @@ fn parse_binary<'a, E: Env>(
                 let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
-            OpenParen => todo!("syntax error"),
+            Tilde | Bang | PlusPlus | MinusMinus | OpenParen => todo!("syntax error"),
             CloseParen => panic!("min_precedence must not be 0"),
         };
     }
@@ -487,6 +569,14 @@ mod tests {
         env.insert("x".to_string(), "@".to_string());
         assert_eq!(eval("0 && (x || x)", env), Ok(Value::Integer(0)));
         assert_eq!(eval("1 || x && x", env), Ok(Value::Integer(1)));
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0 && ++x", env), Ok(Value::Integer(0)));
+        assert_eq!(env.get("x"), None);
+
+        let env = &mut HashMap::new();
+        assert_eq!(eval("0 && x++", env), Ok(Value::Integer(0)));
+        assert_eq!(env.get("x"), None);
     }
 
     #[test]
@@ -719,7 +809,128 @@ mod tests {
 
     // TODO overflow_in_remainder
 
-    // TODO Unary operators
+    #[test]
+    fn plus_prefix_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("+0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" + 10 ", env), Ok(Value::Integer(10)));
+        assert_eq!(eval(" + + 57", env), Ok(Value::Integer(57)));
+    }
+
+    #[test]
+    fn numeric_negation_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("-0", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" - 12 ", env), Ok(Value::Integer(-12)));
+        assert_eq!(eval(" - - 49", env), Ok(Value::Integer(49)));
+        assert_eq!(eval(" - - - 49", env), Ok(Value::Integer(-49)));
+    }
+
+    #[test]
+    fn overflow_in_numeric_negation() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("-0x7FFFFFFFFFFFFFFF-1", env),
+            Ok(Value::Integer(i64::MIN))
+        );
+        assert_eq!(
+            eval(" - (-0x7FFFFFFFFFFFFFFF-1)", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..2
+            })
+        );
+    }
+
+    #[test]
+    fn bitwise_negation_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("~0", env), Ok(Value::Integer(-1)));
+        assert_eq!(eval(" ~ 3 ", env), Ok(Value::Integer(!3)));
+        assert_eq!(eval(" ~ ~ 42", env), Ok(Value::Integer(42)));
+        assert_eq!(eval(" ~ ~ ~ 0x38E7", env), Ok(Value::Integer(!0x38E7)));
+    }
+
+    #[test]
+    fn logical_negation_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("!0", env), Ok(Value::Integer(1)));
+        assert_eq!(eval(" ! 1 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" ! 2 ", env), Ok(Value::Integer(0)));
+        assert_eq!(eval(" ! ! 3", env), Ok(Value::Integer(1)));
+    }
+
+    #[test]
+    fn prefix_increment_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("++a", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("++a", env), Ok(Value::Integer(2)));
+        assert_eq!(eval("++a", env), Ok(Value::Integer(3)));
+        assert_eq!(eval("a", env), Ok(Value::Integer(3)));
+    }
+
+    // TODO prefix_incrementing_non_variable eval("++ +a")
+
+    #[test]
+    fn overflow_in_increment() {
+        let env = &mut HashMap::new();
+        env.assign_variable("i", "9223372036854775807".to_string())
+            .unwrap();
+        assert_eq!(
+            eval("  ++ i", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 2..4,
+            })
+        );
+    }
+
+    #[test]
+    fn prefix_decrement_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("--d", env), Ok(Value::Integer(-1)));
+        assert_eq!(eval("--d", env), Ok(Value::Integer(-2)));
+        assert_eq!(eval("--d", env), Ok(Value::Integer(-3)));
+        assert_eq!(eval("d", env), Ok(Value::Integer(-3)));
+    }
+
+    #[test]
+    fn overflow_in_decrement() {
+        let env = &mut HashMap::new();
+        env.assign_variable("i", "-9223372036854775808".to_string())
+            .unwrap();
+        assert_eq!(
+            eval(" -- i", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 1..3,
+            })
+        );
+    }
+
+    // TODO prefix_decrementing_non_variable eval("-- +a")
+
+    #[test]
+    fn postfix_increment_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a++", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("a++", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("a++", env), Ok(Value::Integer(2)));
+        assert_eq!(eval("a", env), Ok(Value::Integer(3)));
+    }
+
+    // TODO postfix_incrementing_non_variable eval("5++")
+
+    #[test]
+    fn postfix_decrement_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a--", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("a--", env), Ok(Value::Integer(-1)));
+        assert_eq!(eval("a--", env), Ok(Value::Integer(-2)));
+        assert_eq!(eval("a", env), Ok(Value::Integer(-3)));
+    }
+
+    // TODO postfix_decrementing_non_variable eval("7--")
 
     #[test]
     fn combining_operators_of_same_precedence() {
@@ -735,6 +946,15 @@ mod tests {
     }
 
     #[test]
+    fn combining_prefix_and_postfix_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("+a++", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("-a++", env), Ok(Value::Integer(-1)));
+        assert_eq!(eval("~a--", env), Ok(Value::Integer(-3)));
+        assert_eq!(eval("!a--", env), Ok(Value::Integer(0)));
+    }
+
+    #[test]
     fn parentheses() {
         let env = &mut HashMap::new();
         assert_eq!(eval("(42)", env), Ok(Value::Integer(42)));
@@ -743,6 +963,14 @@ mod tests {
         assert_eq!(eval("2*(3+4)", env), Ok(Value::Integer(14)));
         assert_eq!(eval(" ( 6 - ( 7 - 3 ) ) * 2 ", env), Ok(Value::Integer(4)));
         assert_eq!(eval(" 4 | ( ( 2 && 2 ) & 3 )", env), Ok(Value::Integer(5)));
+    }
+
+    #[test]
+    fn combining_postfix_operator_and_parentheses() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("(a)++", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("(a) --", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("a", env), Ok(Value::Integer(0)));
     }
 
     // TODO unmatched_parentheses
