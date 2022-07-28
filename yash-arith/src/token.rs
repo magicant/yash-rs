@@ -237,15 +237,14 @@ impl<'a> Iterator for Tokens<'a> {
             Some(Ok(Token::Operator { operator, location }))
         } else {
             // The next token should be a term. Try parsing it.
-            if !first_char.is_alphanumeric() {
+            let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
+            let token_len = source.len() - remainder.len();
+            if token_len == 0 {
                 return Some(Err(Error {
                     cause: TokenError::InvalidCharacter,
                     location: start_of_token..start_of_token + 1,
                 }));
             }
-            let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
-            let token_len = source.len() - remainder.len();
-            assert!(token_len > 0, "token cannot be empty");
             let end_of_token = start_of_token + token_len;
             let location = start_of_token..end_of_token;
             let token = &source[..token_len];
@@ -424,6 +423,13 @@ mod tests {
             Some(Ok(Token::Term(Term::Variable {
                 name: "a1B2c",
                 location: 0..5
+            })))
+        );
+        assert_eq!(
+            Tokens::new(" _var").next(),
+            Some(Ok(Token::Term(Term::Variable {
+                name: "_var",
+                location: 1..5
             })))
         );
     }
