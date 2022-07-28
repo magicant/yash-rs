@@ -145,14 +145,18 @@ pub enum Token<'a> {
 /// Cause of a tokenization error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TokenError {
-    /// A value expression contains an invalid character.
+    /// A value token contains an invalid character.
     InvalidNumericConstant,
+    /// An expression contains a character that is not a whitespace, number, or
+    /// number.
+    InvalidCharacter,
 }
 
 impl Display for TokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TokenError::InvalidNumericConstant => "invalid numeric constant".fmt(f),
+            TokenError::InvalidCharacter => "invalid character".fmt(f),
         }
     }
 }
@@ -234,7 +238,10 @@ impl<'a> Iterator for Tokens<'a> {
         } else {
             // The next token should be a term. Try parsing it.
             if !first_char.is_alphanumeric() {
-                todo!("unrecognized character {:?}", first_char);
+                return Some(Err(Error {
+                    cause: TokenError::InvalidCharacter,
+                    location: start_of_token..start_of_token + 1,
+                }));
             }
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
@@ -677,5 +684,23 @@ mod tests {
             Some(Ok(Token::Term(Term::Value(Value::Integer(0)))))
         );
         assert_eq!(tokens.next(), None);
+    }
+
+    #[test]
+    fn unrecognized_character() {
+        assert_eq!(
+            Tokens::new("#").next(),
+            Some(Err(Error {
+                cause: TokenError::InvalidCharacter,
+                location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new(" @@").next(),
+            Some(Err(Error {
+                cause: TokenError::InvalidCharacter,
+                location: 1..2,
+            }))
+        );
     }
 }
