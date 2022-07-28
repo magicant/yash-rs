@@ -74,7 +74,7 @@ pub struct Process {
     /// to the `SelectSystem` for the child is set.
     pub(crate) selector: Weak<RefCell<SelectSystem>>,
 
-    /// Copy of arguments passed to [`execve`](crate::VirtualSystem::execve).
+    /// Copy of arguments passed to [`execve`](crate::System::execve).
     pub(crate) last_exec: Option<(CString, Vec<CString>, Vec<CString>)>,
 }
 
@@ -342,7 +342,7 @@ impl Process {
     }
 
     /// Returns the arguments to the last call to
-    /// [`execve`](crate::VirtualSystem::execve) on this process.
+    /// [`execve`](crate::System::execve) on this process.
     #[inline(always)]
     #[must_use]
     pub fn last_exec(&self) -> &Option<(CString, Vec<CString>, Vec<CString>)> {
