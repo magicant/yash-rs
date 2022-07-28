@@ -16,10 +16,37 @@
 
 //! Tokenization
 
-use super::Term;
-use super::Value;
 use std::fmt::Display;
 use std::ops::Range;
+
+/// Result of evaluating an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Value {
+    Integer(i64),
+    // TODO Float, String
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Integer(i) => i.fmt(f),
+        }
+    }
+}
+
+/// Intermediate result of evaluating part of an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Term<'a> {
+    /// Value
+    Value(Value),
+    /// Variable
+    Variable {
+        /// Variable name
+        name: &'a str,
+        /// Range of the substring in the evaluated expression where the variable occurs
+        location: Range<usize>,
+    },
+}
 
 /// Operator
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

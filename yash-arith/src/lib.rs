@@ -23,42 +23,14 @@ use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Range;
 
-/// Result of arithmetic expansion
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Value {
-    Integer(i64),
-    // TODO Float, String
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Integer(i) => i.fmt(f),
-        }
-    }
-}
-
-/// Intermediate result of evaluating part of an expression
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// TODO Should be private
-pub enum Term<'a> {
-    /// Value
-    Value(Value),
-    /// Variable
-    Variable {
-        /// Variable name
-        name: &'a str,
-        /// Range of the substring in the evaluated expression where the variable occurs
-        location: Range<usize>,
-    },
-}
-
 mod token;
 
 use token::Operator;
+use token::Term;
 use token::Token;
 pub use token::TokenError;
 use token::Tokens;
+pub use token::Value;
 
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
