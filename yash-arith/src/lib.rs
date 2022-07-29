@@ -637,7 +637,13 @@ mod tests {
                 location: 1..3,
             })
         );
-        // TODO 1 << -1
+        assert_eq!(
+            eval("1 << -1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 2..4,
+            })
+        );
 
         assert_eq!(
             eval("0>>1000", env),
@@ -646,7 +652,13 @@ mod tests {
                 location: 1..3,
             })
         );
-        // TODO 1 >> -1
+        assert_eq!(
+            eval("1 >> -1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 2..4,
+            })
+        );
     }
 
     #[test]
@@ -743,7 +755,17 @@ mod tests {
         );
     }
 
-    // TODO overflow_in_division
+    #[test]
+    fn overflow_in_division() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("(-0x7FFFFFFFFFFFFFFF-1)/-1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 23..24,
+            })
+        );
+    }
 
     #[test]
     fn remainder_operator() {
@@ -779,7 +801,17 @@ mod tests {
         );
     }
 
-    // TODO overflow_in_remainder
+    #[test]
+    fn overflow_in_remainder() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("(-0x7FFFFFFFFFFFFFFF-1)%-1", env),
+            Err(Error {
+                cause: ErrorCause::Overflow,
+                location: 23..24,
+            })
+        );
+    }
 
     #[test]
     fn plus_prefix_operator() {
