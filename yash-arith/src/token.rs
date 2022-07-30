@@ -51,6 +51,10 @@ pub enum Term<'a> {
 /// Operator
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
+    /// `?`
+    Question,
+    /// `:`
+    Colon,
     /// `|`
     Bar,
     /// `||`
@@ -111,8 +115,9 @@ impl Operator {
     pub fn precedence(self) -> u8 {
         use Operator::*;
         match self {
-            CloseParen => 0,
+            CloseParen | Colon => 0,
             Equal => 1,
+            Question => 2,
             BarBar => 3,
             AndAnd => 4,
             Bar => 5,
@@ -176,6 +181,8 @@ pub struct Error {
 /// operator) must appear after the longer. With this ordering, we can
 /// short-circuit unnecessary matching on finding a first match.
 const OPERATORS: &[(&str, Operator)] = &[
+    ("?", Operator::Question),
+    (":", Operator::Colon),
     ("||", Operator::BarBar),
     ("|", Operator::Bar),
     ("^", Operator::Caret),
@@ -436,6 +443,20 @@ mod tests {
 
     #[test]
     fn operators() {
+        assert_eq!(
+            Tokens::new("?").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::Question,
+                location: 0..1
+            }))
+        );
+        assert_eq!(
+            Tokens::new(":").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::Colon,
+                location: 0..1
+            }))
+        );
         assert_eq!(
             Tokens::new("|").next(),
             Some(Ok(Token::Operator {

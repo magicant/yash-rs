@@ -341,7 +341,7 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
             }
         }
-        Tilde | Bang | PlusPlus | MinusMinus | OpenParen | CloseParen => {
+        Question | Colon | Tilde | Bang | PlusPlus | MinusMinus | OpenParen | CloseParen => {
             panic!("not a binary operator: {:?}", op)
         }
     })
@@ -385,6 +385,25 @@ fn parse_binary<'a, E: Env>(
                     term = Term::Value(value);
                 }
             },
+            Question => {
+                let Value::Integer(condition) = term.into_value(mode, env)?;
+                let (then_mode, else_mode) = if condition != 0 {
+                    (mode, Mode::Skip)
+                } else {
+                    (Mode::Skip, mode)
+                };
+                debug_assert_eq!(precedence, 2);
+                let then_result = parse_binary(tokens, 1, then_mode, env)?;
+                // TODO Reject if a colon is missing
+                tokens.next().transpose()?;
+                let else_result = parse_binary(tokens, 2, else_mode, env)?;
+                term = if condition != 0 {
+                    then_result
+                } else {
+                    else_result
+                };
+                // TODO result into_value
+            }
             BarBar | AndAnd => {
                 let Value::Integer(lhs) = term.into_value(mode, env)?;
                 let skip_rhs = match operator {
@@ -404,7 +423,7 @@ fn parse_binary<'a, E: Env>(
                 let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
                 term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
             }
-            Tilde | Bang | PlusPlus | MinusMinus | OpenParen => todo!("syntax error"),
+            Colon | Tilde | Bang | PlusPlus | MinusMinus | OpenParen => todo!("syntax error"),
             CloseParen => panic!("min_precedence must not be 0"),
         };
     }
@@ -525,6 +544,37 @@ mod tests {
         assert_eq!(env["a"], "1");
         assert_eq!(env["foo"], "42");
         assert_eq!(env.len(), 2);
+    }
+
+    #[test]
+    fn conditional_operator() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("1?a=10:(b=20)", env), Ok(Value::Integer(10)));
+        assert_eq!(env["a"], "10");
+        assert_eq!(env.get("b"), None);
+
+        assert_eq!(eval("0 ? x = 30 : (y = 40)", env), Ok(Value::Integer(40)));
+        assert_eq!(env.get("x"), None);
+        assert_eq!(env["y"], "40");
+
+        assert_eq!(eval("9 ? 1 : 0 ? 2 : 3", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("0 ? 1 : 0 ? 2 : 3", env), Ok(Value::Integer(3)));
+    }
+
+    #[test]
+    fn conditional_evaluation_in_conditional_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1 ? 2 : (a = 3) ? b = 4 : (c = 5)", env),
+            Ok(Value::Integer(2))
+        );
+        assert!(env.is_empty(), "expected empty env: {:?}", env);
+
+        assert_eq!(
+            eval("0 ? (a = 1) ? b = 2 : (c = 3) : 4", env),
+            Ok(Value::Integer(4))
+        );
+        assert!(env.is_empty(), "expected empty env: {:?}", env);
     }
 
     #[test]
