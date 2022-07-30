@@ -108,6 +108,7 @@ pub use env::Env;
 fn expand_variable<E: Env>(
     name: &str,
     location: &Range<usize>,
+    // TODO mode: Mode,
     env: &E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match env.get_variable(name) {
@@ -262,6 +263,10 @@ fn parse_leaf<'a, E: Env>(
 }
 
 /// Applies a binary operator.
+///
+/// If `op` is a compound assignment operator, only the binary operation is
+/// performed, ignoring the assignment. For `Operator::Equal`, `rhs` is
+/// returned, ignoring `lhs`.
 fn apply_binary<E>(
     op: Operator,
     lhs: Value,
@@ -274,16 +279,16 @@ fn apply_binary<E>(
         Equal => Value::Integer(rhs),
         BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
         AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
-        Bar => Value::Integer(lhs | rhs),
-        Caret => Value::Integer(lhs ^ rhs),
-        And => Value::Integer(lhs & rhs),
+        Bar | BarEqual => Value::Integer(lhs | rhs),
+        Caret | CaretEqual => Value::Integer(lhs ^ rhs),
+        And | AndEqual => Value::Integer(lhs & rhs),
         EqualEqual => Value::Integer((lhs == rhs) as _),
         BangEqual => Value::Integer((lhs != rhs) as _),
         Less => Value::Integer((lhs < rhs) as _),
         Greater => Value::Integer((lhs > rhs) as _),
         LessEqual => Value::Integer((lhs <= rhs) as _),
         GreaterEqual => Value::Integer((lhs >= rhs) as _),
-        LessLess => {
+        LessLess | LessLessEqual => {
             if lhs < 0 {
                 return Err(Error {
                     cause: ErrorCause::LeftShiftingNegative,
@@ -306,7 +311,7 @@ fn apply_binary<E>(
             }
             Value::Integer(result)
         }
-        GreaterGreater => {
+        GreaterGreater | GreaterGreaterEqual => {
             if rhs < 0 {
                 return Err(Error {
                     cause: ErrorCause::ReverseShifting,
@@ -318,10 +323,12 @@ fn apply_binary<E>(
                 location,
             )?)
         }
-        Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
-        Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
-        Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
-        Slash => {
+        Plus | PlusEqual => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
+        Minus | MinusEqual => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
+        Asterisk | AsteriskEqual => {
+            Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?)
+        }
+        Slash | SlashEqual => {
             if rhs == 0 {
                 return Err(Error {
                     cause: ErrorCause::DivisionByZero,
@@ -331,7 +338,7 @@ fn apply_binary<E>(
                 Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
             }
         }
-        Percent => {
+        Percent | PercentEqual => {
             if rhs == 0 {
                 return Err(Error {
                     cause: ErrorCause::DivisionByZero,
@@ -365,21 +372,27 @@ fn parse_binary<'a, E: Env>(
             break;
         }
 
-        let location =
+        let op_location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
 
         use Operator::*;
         match operator {
-            Equal => match term {
+            Equal | BarEqual | CaretEqual | AndEqual | LessLessEqual | GreaterGreaterEqual
+            | PlusEqual | MinusEqual | AsteriskEqual | SlashEqual | PercentEqual => match term {
                 Term::Value(_) => todo!(),
                 Term::Variable { name, location } => {
-                    let value =
-                        parse_binary(tokens, precedence + 1, mode, env)?.into_value(mode, env)?;
+                    let lhs = if operator == Equal {
+                        Value::Integer(0)
+                    } else {
+                        expand_variable(name, &location, env)?
+                    };
+                    let rhs = parse_binary(tokens, precedence, mode, env)?.into_value(mode, env)?;
+                    let value = apply_binary(operator, lhs, rhs, op_location.clone())?;
                     if mode == Mode::Eval {
                         env.assign_variable(name, value.to_string())
                             .map_err(|e| Error {
                                 cause: ErrorCause::AssignVariableError(e),
-                                location,
+                                location: op_location,
                             })?;
                     }
                     term = Term::Value(value);
@@ -414,14 +427,15 @@ fn parse_binary<'a, E: Env>(
                 let rhs_mode = if skip_rhs { Mode::Skip } else { mode };
                 let rhs = parse_binary(tokens, precedence + 1, rhs_mode, env)?
                     .into_value(rhs_mode, env)?;
-                term = Term::Value(apply_binary(operator, Value::Integer(lhs), rhs, location)?);
+                let value = apply_binary(operator, Value::Integer(lhs), rhs, op_location)?;
+                term = Term::Value(value);
             }
             Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual | Greater
             | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk | Slash
             | Percent => {
                 let rhs = parse_binary(tokens, precedence + 1, mode, env)?;
                 let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
-                term = Term::Value(apply_binary(operator, lhs, rhs, location)?);
+                term = Term::Value(apply_binary(operator, lhs, rhs, op_location)?);
             }
             Colon | Tilde | Bang | PlusPlus | MinusMinus | OpenParen => todo!("syntax error"),
             CloseParen => panic!("min_precedence must not be 0"),
@@ -538,12 +552,39 @@ mod tests {
     #[test]
     fn simple_assignment_operator() {
         let env = &mut HashMap::new();
+        env.insert("foo".to_string(), "#ignored_value#".to_string());
+
         assert_eq!(eval("a=1", env), Ok(Value::Integer(1)));
         assert_eq!(eval(" foo = 42 ", env), Ok(Value::Integer(42)));
 
         assert_eq!(env["a"], "1");
         assert_eq!(env["foo"], "42");
         assert_eq!(env.len(), 2);
+    }
+
+    #[test]
+    fn compound_assignment_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a|=1", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("a^=7", env), Ok(Value::Integer(6)));
+        assert_eq!(eval("a&=3", env), Ok(Value::Integer(2)));
+        assert_eq!(eval("a<<=4", env), Ok(Value::Integer(32)));
+        assert_eq!(eval("a>>=2", env), Ok(Value::Integer(8)));
+        assert_eq!(eval("a+=1", env), Ok(Value::Integer(9)));
+        assert_eq!(eval("a-=4", env), Ok(Value::Integer(5)));
+        assert_eq!(eval("a*=21", env), Ok(Value::Integer(105)));
+        assert_eq!(eval("a/=8", env), Ok(Value::Integer(13)));
+        assert_eq!(eval("a%=8", env), Ok(Value::Integer(5)));
+        assert_eq!(env["a"], "5");
+    }
+
+    #[test]
+    fn combining_assignment_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(eval("a = b -= c = 7", env), Ok(Value::Integer(-7)));
+        assert_eq!(env["a"], "-7");
+        assert_eq!(env["b"], "-7");
+        assert_eq!(env["c"], "7");
     }
 
     #[test]

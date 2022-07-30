@@ -59,12 +59,18 @@ pub enum Operator {
     Bar,
     /// `||`
     BarBar,
+    /// `|=`
+    BarEqual,
     /// `^`
     Caret,
+    /// `^=`
+    CaretEqual,
     /// `&`
     And,
     /// `&&`
     AndAnd,
+    /// `&=`
+    AndEqual,
     /// `=`
     Equal,
     /// `==`
@@ -79,26 +85,40 @@ pub enum Operator {
     LessEqual,
     /// `<<`
     LessLess,
+    /// `<<=`
+    LessLessEqual,
     /// `>`
     Greater,
     /// `>=`
     GreaterEqual,
     /// `>>`
     GreaterGreater,
+    /// `>>=`
+    GreaterGreaterEqual,
     /// `+`
     Plus,
     /// `++`
     PlusPlus,
+    /// `+=`
+    PlusEqual,
     /// `-`
     Minus,
     /// `--`
     MinusMinus,
+    /// `-=`
+    MinusEqual,
     /// `*`
     Asterisk,
+    /// `*=`
+    AsteriskEqual,
     /// `/`
     Slash,
+    /// `/=`
+    SlashEqual,
     /// `%`
     Percent,
+    /// `%=`
+    PercentEqual,
     /// `~`
     Tilde,
     /// `(`
@@ -116,7 +136,8 @@ impl Operator {
         use Operator::*;
         match self {
             CloseParen | Colon => 0,
-            Equal => 1,
+            Equal | BarEqual | CaretEqual | AndEqual | LessLessEqual | GreaterGreaterEqual
+            | PlusEqual | MinusEqual | AsteriskEqual | SlashEqual | PercentEqual => 1,
             Question => 2,
             BarBar => 3,
             AndAnd => 4,
@@ -183,26 +204,36 @@ pub struct Error {
 const OPERATORS: &[(&str, Operator)] = &[
     ("?", Operator::Question),
     (":", Operator::Colon),
+    ("|=", Operator::BarEqual),
     ("||", Operator::BarBar),
     ("|", Operator::Bar),
+    ("^=", Operator::CaretEqual),
     ("^", Operator::Caret),
+    ("&=", Operator::AndEqual),
     ("&&", Operator::AndAnd),
     ("&", Operator::And),
     ("==", Operator::EqualEqual),
     ("=", Operator::Equal),
     ("!=", Operator::BangEqual),
     ("<=", Operator::LessEqual),
+    ("<<=", Operator::LessLessEqual),
     ("<<", Operator::LessLess),
     ("<", Operator::Less),
     (">=", Operator::GreaterEqual),
+    (">>=", Operator::GreaterGreaterEqual),
     (">>", Operator::GreaterGreater),
     (">", Operator::Greater),
+    ("+=", Operator::PlusEqual),
     ("++", Operator::PlusPlus),
     ("+", Operator::Plus),
+    ("-=", Operator::MinusEqual),
     ("--", Operator::MinusMinus),
     ("-", Operator::Minus),
+    ("*=", Operator::AsteriskEqual),
     ("*", Operator::Asterisk),
+    ("/=", Operator::SlashEqual),
     ("/", Operator::Slash),
+    ("%=", Operator::PercentEqual),
     ("%", Operator::Percent),
     ("~", Operator::Tilde),
     ("!", Operator::Bang),
@@ -472,10 +503,24 @@ mod tests {
             }))
         );
         assert_eq!(
+            Tokens::new("|=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::BarEqual,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
             Tokens::new("^").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Caret,
                 location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("^=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::CaretEqual,
+                location: 0..2,
             }))
         );
         assert_eq!(
@@ -489,6 +534,13 @@ mod tests {
             Tokens::new("&&").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::AndAnd,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("&=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::AndEqual,
                 location: 0..2,
             }))
         );
@@ -535,6 +587,13 @@ mod tests {
             }))
         );
         assert_eq!(
+            Tokens::new("<<=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::LessLessEqual,
+                location: 0..3,
+            }))
+        );
+        assert_eq!(
             Tokens::new(">").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Greater,
@@ -556,6 +615,13 @@ mod tests {
             }))
         );
         assert_eq!(
+            Tokens::new(">>=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::GreaterGreaterEqual,
+                location: 0..3,
+            }))
+        );
+        assert_eq!(
             Tokens::new("+").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Plus,
@@ -566,6 +632,13 @@ mod tests {
             Tokens::new("++").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::PlusPlus,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("+=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::PlusEqual,
                 location: 0..2,
             }))
         );
@@ -584,10 +657,24 @@ mod tests {
             }))
         );
         assert_eq!(
+            Tokens::new("-=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::MinusEqual,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
             Tokens::new("*").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Asterisk,
                 location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("*=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::AsteriskEqual,
+                location: 0..2,
             }))
         );
         assert_eq!(
@@ -598,10 +685,24 @@ mod tests {
             }))
         );
         assert_eq!(
+            Tokens::new("/=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::SlashEqual,
+                location: 0..2,
+            }))
+        );
+        assert_eq!(
             Tokens::new("%").next(),
             Some(Ok(Token::Operator {
                 operator: Operator::Percent,
                 location: 0..1,
+            }))
+        );
+        assert_eq!(
+            Tokens::new("%=").next(),
+            Some(Ok(Token::Operator {
+                operator: Operator::PercentEqual,
+                location: 0..2,
             }))
         );
         assert_eq!(
