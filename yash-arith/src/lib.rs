@@ -388,9 +388,9 @@ fn parse_binary<'a, E: Env>(
             Question => {
                 let Value::Integer(condition) = term.into_value(mode, env)?;
                 let (then_mode, else_mode) = if condition != 0 {
-                    (/*TODO mode*/ Mode::Eval, Mode::Skip)
+                    (mode, Mode::Skip)
                 } else {
-                    (Mode::Skip, /*TODO mode*/ Mode::Eval)
+                    (Mode::Skip, mode)
                 };
                 debug_assert_eq!(precedence, 2);
                 let then_result = parse_binary(tokens, 1, then_mode, env)?;
@@ -559,6 +559,22 @@ mod tests {
 
         assert_eq!(eval("9 ? 1 : 0 ? 2 : 3", env), Ok(Value::Integer(1)));
         assert_eq!(eval("0 ? 1 : 0 ? 2 : 3", env), Ok(Value::Integer(3)));
+    }
+
+    #[test]
+    fn conditional_evaluation_in_conditional_operators() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1 ? 2 : (a = 3) ? b = 4 : (c = 5)", env),
+            Ok(Value::Integer(2))
+        );
+        assert!(env.is_empty(), "expected empty env: {:?}", env);
+
+        assert_eq!(
+            eval("0 ? (a = 1) ? b = 2 : (c = 3) : 4", env),
+            Ok(Value::Integer(4))
+        );
+        assert!(env.is_empty(), "expected empty env: {:?}", env);
     }
 
     #[test]
