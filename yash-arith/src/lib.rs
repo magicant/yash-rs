@@ -43,6 +43,8 @@ pub enum ErrorCause<E> {
     Overflow,
     /// Division by zero
     DivisionByZero,
+    /// Left bit-shifting of a negative value
+    LeftShiftingNegative,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
@@ -57,6 +59,7 @@ impl<E: Display> Display for ErrorCause<E> {
             }
             Overflow => "overflow".fmt(f),
             DivisionByZero => "division by zero".fmt(f),
+            LeftShiftingNegative => "negative value cannot be left-shifted".fmt(f),
             AssignVariableError(e) => e.fmt(f),
         }
     }
@@ -278,6 +281,12 @@ fn apply_binary<E>(
         LessEqual => Value::Integer((lhs <= rhs) as _),
         GreaterEqual => Value::Integer((lhs >= rhs) as _),
         LessLess => {
+            if lhs < 0 {
+                return Err(Error {
+                    cause: ErrorCause::LeftShiftingNegative,
+                    location,
+                });
+            }
             let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
             let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
             if result >> rhs != lhs {
@@ -659,6 +668,31 @@ mod tests {
                 location: 2..4,
             })
         );
+    }
+
+    #[test]
+    fn bit_shifting_of_negative_values() {
+        let env = &mut HashMap::new();
+
+        // Left-shifting a negative value is undefined in C.
+        assert_eq!(
+            eval("-1<<1", env),
+            Err(Error {
+                cause: ErrorCause::LeftShiftingNegative,
+                location: 2..4,
+            })
+        );
+        assert_eq!(
+            eval("(-0x7FFFFFFFFFFFFFFF-1)<<1", env),
+            Err(Error {
+                cause: ErrorCause::LeftShiftingNegative,
+                location: 23..25,
+            })
+        );
+
+        // Right-shifting a negative value is implementation-defined in C.
+        assert_eq!(eval("-4>>1", env), Ok(Value::Integer(-4 >> 1)));
+        assert_eq!(eval("-1>>1", env), Ok(Value::Integer(-1 >> 1)));
     }
 
     #[test]
