@@ -45,6 +45,8 @@ pub enum ErrorCause<E> {
     DivisionByZero,
     /// Left bit-shifting of a negative value
     LeftShiftingNegative,
+    /// Bit-shifting with a negative right-hand-side operand
+    ReverseShifting,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
@@ -60,6 +62,7 @@ impl<E: Display> Display for ErrorCause<E> {
             Overflow => "overflow".fmt(f),
             DivisionByZero => "division by zero".fmt(f),
             LeftShiftingNegative => "negative value cannot be left-shifted".fmt(f),
+            ReverseShifting => "bit-shifting with negative right-hand-side operand".fmt(f),
             AssignVariableError(e) => e.fmt(f),
         }
     }
@@ -287,6 +290,12 @@ fn apply_binary<E>(
                     location,
                 });
             }
+            if rhs < 0 {
+                return Err(Error {
+                    cause: ErrorCause::ReverseShifting,
+                    location,
+                });
+            }
             let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
             let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
             if result >> rhs != lhs {
@@ -297,10 +306,18 @@ fn apply_binary<E>(
             }
             Value::Integer(result)
         }
-        GreaterGreater => Value::Integer(unwrap_or_overflow(
-            rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
-            location,
-        )?),
+        GreaterGreater => {
+            if rhs < 0 {
+                return Err(Error {
+                    cause: ErrorCause::ReverseShifting,
+                    location,
+                });
+            }
+            Value::Integer(unwrap_or_overflow(
+                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
+                location,
+            )?)
+        }
         Plus => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
         Minus => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
         Asterisk => Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?),
@@ -647,10 +664,10 @@ mod tests {
             })
         );
         assert_eq!(
-            eval("1 << -1", env),
+            eval("0<<0x100000000", env),
             Err(Error {
                 cause: ErrorCause::Overflow,
-                location: 2..4,
+                location: 1..3,
             })
         );
 
@@ -662,10 +679,10 @@ mod tests {
             })
         );
         assert_eq!(
-            eval("1 >> -1", env),
+            eval("0>>0x100000000", env),
             Err(Error {
                 cause: ErrorCause::Overflow,
-                location: 2..4,
+                location: 1..3,
             })
         );
     }
@@ -693,6 +710,26 @@ mod tests {
         // Right-shifting a negative value is implementation-defined in C.
         assert_eq!(eval("-4>>1", env), Ok(Value::Integer(-4 >> 1)));
         assert_eq!(eval("-1>>1", env), Ok(Value::Integer(-1 >> 1)));
+    }
+
+    #[test]
+    fn reverse_bit_shifting() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("1 << -1", env),
+            Err(Error {
+                cause: ErrorCause::ReverseShifting,
+                location: 2..4,
+            })
+        );
+
+        assert_eq!(
+            eval("1 >> -1", env),
+            Err(Error {
+                cause: ErrorCause::ReverseShifting,
+                location: 2..4,
+            })
+        );
     }
 
     #[test]
