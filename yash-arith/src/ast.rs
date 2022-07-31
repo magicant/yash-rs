@@ -20,6 +20,7 @@ use crate::token::Operator;
 use crate::token::Term;
 use crate::token::Token;
 use crate::token::TokenError;
+use assert_matches::assert_matches;
 use std::iter::Peekable;
 use std::ops::Range;
 
@@ -51,50 +52,54 @@ pub enum PostfixOperator {
 
 /// Node of an abstract syntax tree (AST)
 ///
-/// A whole AST is meant to be constructed as a vector of `Ast` nodes. Each node
-/// refers to its operand nodes by indexing into the vector rather than using
-/// references or boxes to reduce allocation.
+/// A whole AST is meant to be constructed as a vector of `Ast` nodes. A
+/// non-leaf node immediately follows its operand node in the vector. If a node
+/// has more than one operand, the first operand immediately precedes the
+/// second. This scheme makes up the tree in reverse Polish notation.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Ast<'a> {
     /// Term: a constant value or variable
     Term(Term<'a>),
     /// Prefix operator
+    ///
+    /// This node immediately follows its operand node.
     Prefix {
         /// Operator
         operator: PrefixOperator,
-        /// Index of the operand node
-        operand: usize,
         /// Range of the substring where the operator occurs in the parsed expression
         location: Range<usize>,
     },
     /// Postfix operator
+    ///
+    /// This node immediately follows its operand node.
     Postfix {
         /// Operator
         operator: PostfixOperator,
-        /// Index of the operand node
-        operand: usize,
         /// Range of the substring where the operator occurs in the parsed expression
         location: Range<usize>,
     },
     /// Binary operator
+    ///
+    /// This node immediately follows its right-hand-side operand node. The
+    /// right-hand-side operand tree in turn follows the left-hand-side.
     Binary {
         /// Operator
         operator: Operator,
-        /// Index of the left-hand-side node
-        lhs: usize,
-        /// Index of the right-hand-side node
-        rhs: usize,
+        /// Length (number of `Ast` nodes) of the right-hand-side operand tree
+        rhs_len: usize,
         /// Range of the substring where the operator occurs in the parsed expression
         location: Range<usize>,
     },
     /// Conditional ternary operator
+    ///
+    /// This node has three child nodes: the condition, the then value, and the
+    /// else value. They appear in the `Ast` vector in this order and are
+    /// immediately followed by this `Conditional` node.
     Conditional {
-        /// Index of the first operand (condition) node.
-        condition_node: usize,
-        /// Index of the second operand (then value) node.
-        then_node: usize,
-        /// Index of the third operand (else value) node.
-        else_node: usize,
+        /// Length (number of `Ast` nodes) of the then value tree
+        then_len: usize,
+        /// Length (number of `Ast` nodes) of the else value tree
+        else_len: usize,
     },
 }
 
@@ -144,37 +149,17 @@ fn parse_postfix<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> 
 where
     I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
 {
-    loop {
-        match tokens.peek() {
-            Some(Ok(Token::Operator {
-                operator: Operator::PlusPlus,
-                ref location,
-            })) => {
-                let location = location.clone();
-                tokens.next();
-                result.push(Ast::Postfix {
-                    operator: PostfixOperator::Increment,
-                    operand: current_root_index(&result),
-                    location,
-                });
-            }
-
-            Some(Ok(Token::Operator {
-                operator: Operator::MinusMinus,
-                ref location,
-            })) => {
-                let location = location.clone();
-                tokens.next();
-                result.push(Ast::Postfix {
-                    operator: PostfixOperator::Decrement,
-                    operand: current_root_index(&result),
-                    location,
-                });
-            }
-
-            _ => break Ok(()),
-        }
+    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+        let operator = match operator {
+            Operator::PlusPlus => PostfixOperator::Increment,
+            Operator::MinusMinus => PostfixOperator::Decrement,
+            _ => break,
+        };
+        let location =
+            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+        result.push(Ast::Postfix { operator, location });
     }
+    return Ok(());
 }
 
 /// Parses a leaf expression.
@@ -207,12 +192,7 @@ where
                 _ => todo!("handle syntax error"),
             };
             parse_leaf(tokens, result)?;
-            let operand = current_root_index(&result);
-            result.push(Ast::Prefix {
-                operator,
-                operand,
-                location,
-            });
+            result.push(Ast::Prefix { operator, location });
             Ok(())
         }
     }
@@ -236,7 +216,6 @@ mod tests {
     use super::*;
     use crate::token::Tokens;
     use crate::token::Value;
-    use assert_matches::assert_matches;
 
     fn parse_str(source: &str) -> Result<Vec<Ast>, Error> {
         parse(Tokens::new(source).peekable())
@@ -277,173 +256,200 @@ mod tests {
 
     #[test]
     fn increment_postfix_operator() {
-        let nodes = parse_str("a++").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Postfix { operator, operand, ref location }) => {
-            assert_eq!(operator, PostfixOperator::Increment);
-            assert_eq!(*location, 1..3);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 0..1);
-            });
-        });
+        assert_eq!(
+            parse_str("a++").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 0..1,
+                }),
+                Ast::Postfix {
+                    operator: PostfixOperator::Increment,
+                    location: 1..3,
+                },
+            ]
+        );
     }
 
     #[test]
     fn decrement_postfix_operator() {
-        let nodes = parse_str("a--").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Postfix { operator, operand, ref location }) => {
-            assert_eq!(operator, PostfixOperator::Decrement);
-            assert_eq!(*location, 1..3);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 0..1);
-            });
-        });
+        assert_eq!(
+            parse_str("a--").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 0..1,
+                }),
+                Ast::Postfix {
+                    operator: PostfixOperator::Decrement,
+                    location: 1..3,
+                },
+            ]
+        );
     }
 
     #[test]
     fn combination_of_postfix_operators() {
-        let nodes = parse_str(" x ++  -- ++ ").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Postfix { operator, operand, ref location }) => {
-            assert_eq!(operator, PostfixOperator::Increment);
-            assert_eq!(*location, 10..12);
-            assert_matches!(nodes[operand], Ast::Postfix { operator, operand, ref location } => {
-                assert_eq!(operator, PostfixOperator::Decrement);
-                assert_eq!(*location, 7..9);
-                assert_matches!(nodes[operand], Ast::Postfix { operator, operand, ref location } => {
-                    assert_eq!(operator, PostfixOperator::Increment);
-                    assert_eq!(*location, 3..5);
-                    assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                        assert_eq!(name, "x");
-                        assert_eq!(*location, 1..2);
-                    });
-                });
-            });
-        });
+        assert_eq!(
+            parse_str(" x ++  -- ++ ").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "x",
+                    location: 1..2,
+                }),
+                Ast::Postfix {
+                    operator: PostfixOperator::Increment,
+                    location: 3..5,
+                },
+                Ast::Postfix {
+                    operator: PostfixOperator::Decrement,
+                    location: 7..9,
+                },
+                Ast::Postfix {
+                    operator: PostfixOperator::Increment,
+                    location: 10..12,
+                },
+            ]
+        );
     }
 
     #[test]
     fn increment_prefix_operator() {
-        let nodes = parse_str("++a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::Increment);
-            assert_eq!(*location, 0..2);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 2..3);
-            });
-        });
+        assert_eq!(
+            parse_str("++a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 2..3,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::Increment,
+                    location: 0..2,
+                },
+            ]
+        );
     }
 
     #[test]
     fn decrement_prefix_operator() {
-        let nodes = parse_str("--a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::Decrement);
-            assert_eq!(*location, 0..2);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 2..3);
-            });
-        });
+        assert_eq!(
+            parse_str("--a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 2..3,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::Decrement,
+                    location: 0..2,
+                },
+            ]
+        );
     }
 
     #[test]
     fn numeric_coercion_prefix_operator() {
-        let nodes = parse_str("+a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::NumericCoercion);
-            assert_eq!(*location, 0..1);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 1..2);
-            });
-        });
+        assert_eq!(
+            parse_str("+a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::NumericCoercion,
+                    location: 0..1,
+                },
+            ]
+        );
     }
 
     #[test]
     fn numeric_negation_prefix_operator() {
-        let nodes = parse_str("-a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::NumericNegation);
-            assert_eq!(*location, 0..1);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 1..2);
-            });
-        });
+        assert_eq!(
+            parse_str("-a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::NumericNegation,
+                    location: 0..1,
+                },
+            ]
+        );
     }
 
     #[test]
     fn logical_negation_prefix_operator() {
-        let nodes = parse_str("!a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::LogicalNegation);
-            assert_eq!(*location, 0..1);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 1..2);
-            });
-        });
+        assert_eq!(
+            parse_str("!a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::LogicalNegation,
+                    location: 0..1,
+                },
+            ]
+        );
     }
 
     #[test]
     fn bitwise_negation_prefix_operator() {
-        let nodes = parse_str("~a").unwrap();
-        assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::BitwiseNegation);
-            assert_eq!(*location, 0..1);
-            assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-                assert_eq!(name, "a");
-                assert_eq!(*location, 1..2);
-            });
-        });
+        assert_eq!(
+            parse_str("~a").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::BitwiseNegation,
+                    location: 0..1,
+                },
+            ]
+        );
     }
 
     #[test]
     fn combination_of_prefix_operators() {
-        let nodes = parse_str(" - + !  ~ ++ -- i ").unwrap();
-
-        let operand = assert_matches!(nodes.last(), Some(&Ast::Prefix { operator, operand, ref location }) => {
-            assert_eq!(operator, PrefixOperator::NumericNegation);
-            assert_eq!(*location, 1..2);
-            operand
-        });
-
-        let operand = assert_matches!(nodes[operand], Ast::Prefix { operator, operand, ref location } => {
-            assert_eq!(operator, PrefixOperator::NumericCoercion);
-            assert_eq!(*location, 3..4);
-            operand
-        });
-
-        let operand = assert_matches!(nodes[operand], Ast::Prefix { operator, operand, ref location } => {
-            assert_eq!(operator, PrefixOperator::LogicalNegation);
-            assert_eq!(*location, 5..6);
-            operand
-        });
-
-        let operand = assert_matches!(nodes[operand], Ast::Prefix { operator, operand, ref location } => {
-            assert_eq!(operator, PrefixOperator::BitwiseNegation);
-            assert_eq!(*location, 8..9);
-            operand
-        });
-
-        let operand = assert_matches!(nodes[operand], Ast::Prefix { operator, operand, ref location } => {
-            assert_eq!(operator, PrefixOperator::Increment);
-            assert_eq!(*location, 10..12);
-            operand
-        });
-
-        let operand = assert_matches!(nodes[operand], Ast::Prefix { operator, operand, ref location } => {
-            assert_eq!(operator, PrefixOperator::Decrement);
-            assert_eq!(*location, 13..15);
-            operand
-        });
-
-        assert_matches!(nodes[operand], Ast::Term(Term::Variable { name, ref location }) => {
-            assert_eq!(name, "i");
-            assert_eq!(*location, 16..17);
-        });
+        assert_eq!(
+            parse_str(" - + !  ~ ++ -- i ").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "i",
+                    location: 16..17,
+                }),
+                Ast::Prefix {
+                    operator: PrefixOperator::Decrement,
+                    location: 13..15,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::Increment,
+                    location: 10..12,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::BitwiseNegation,
+                    location: 8..9,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::LogicalNegation,
+                    location: 5..6,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::NumericCoercion,
+                    location: 3..4,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::NumericNegation,
+                    location: 1..2,
+                },
+            ]
+        );
     }
 
     // TODO binary_operators
