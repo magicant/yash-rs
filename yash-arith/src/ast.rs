@@ -261,6 +261,28 @@ where
     }
 }
 
+/// Parses the right-hand-side operand of a binary operation and pushes the
+/// operator to the result.
+fn parse_binary_rhs<'a, I>(
+    tokens: &mut Peekable<I>,
+    operator: BinaryOperator,
+    location: Range<usize>,
+    min_precedence: u8,
+    result: &mut Vec<Ast<'a>>,
+) -> Result<(), Error>
+where
+    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+{
+    let old_len = result.len();
+    parse_tree(tokens, min_precedence, result)?;
+    result.push(Ast::Binary {
+        operator,
+        rhs_len: result.len() - old_len,
+        location,
+    });
+    Ok(())
+}
+
 /// Parses a expression that may contain binary and ternary operators.
 ///
 /// This function consumes binary operators with precedence equal to or greater
@@ -285,18 +307,21 @@ where
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
 
         use Operator::*;
-        match operator {
-            Equal => {
-                let old_len = result.len();
-                parse_tree(tokens, precedence, result)?;
-                result.push(Ast::Binary {
-                    operator: BinaryOperator::Assign,
-                    rhs_len: result.len() - old_len,
-                    location,
-                });
-            }
+        let (operator, rhs_precedence) = match operator {
+            Equal => (BinaryOperator::Assign, precedence),
+            BarEqual => (BinaryOperator::BitwiseOrAssign, precedence),
+            CaretEqual => (BinaryOperator::BitwiseXorAssign, precedence),
+            AndEqual => (BinaryOperator::BitwiseAndAssign, precedence),
+            LessLessEqual => (BinaryOperator::ShiftLeftAssign, precedence),
+            GreaterGreaterEqual => (BinaryOperator::ShiftRightAssign, precedence),
+            PlusEqual => (BinaryOperator::AddAssign, precedence),
+            MinusEqual => (BinaryOperator::SubtractAssign, precedence),
+            AsteriskEqual => (BinaryOperator::MultiplyAssign, precedence),
+            SlashEqual => (BinaryOperator::DivideAssign, precedence),
+            PercentEqual => (BinaryOperator::RemainderAssign, precedence),
             _ => todo!("handle operator {:?}", operator),
         };
+        parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?
     }
     Ok(())
 }
@@ -569,6 +594,308 @@ mod tests {
                     operator: BinaryOperator::Assign,
                     rhs_len: 1,
                     location: 1..2,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bitwise_or_assign_operator() {
+        assert_eq!(
+            parse_str("b|=2").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "b",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseOrAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bitwise_xor_assign_operator() {
+        assert_eq!(
+            parse_str("c^=3").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "c",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseXorAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn bitwise_and_assign_operator() {
+        assert_eq!(
+            parse_str("d&=5").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "d",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseAndAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn shift_left_assign_operator() {
+        assert_eq!(
+            parse_str("e<<=7").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "e",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(7))),
+                Ast::Binary {
+                    operator: BinaryOperator::ShiftLeftAssign,
+                    rhs_len: 1,
+                    location: 1..4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn shift_right_assign_operator() {
+        assert_eq!(
+            parse_str("f>>=11").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "f",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(11))),
+                Ast::Binary {
+                    operator: BinaryOperator::ShiftRightAssign,
+                    rhs_len: 1,
+                    location: 1..4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn add_assign_operator() {
+        assert_eq!(
+            parse_str("g+=13").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "g",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(13))),
+                Ast::Binary {
+                    operator: BinaryOperator::AddAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn subtract_assign_operator() {
+        assert_eq!(
+            parse_str("h-=17").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "h",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(17))),
+                Ast::Binary {
+                    operator: BinaryOperator::SubtractAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn multiply_assign_operator() {
+        assert_eq!(
+            parse_str("i*=19").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(19))),
+                Ast::Binary {
+                    operator: BinaryOperator::MultiplyAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn divide_assign_operator() {
+        assert_eq!(
+            parse_str("j/=23").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "j",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(23))),
+                Ast::Binary {
+                    operator: BinaryOperator::DivideAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn remainder_assign_operator() {
+        assert_eq!(
+            parse_str("k%=29").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "k",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(29))),
+                Ast::Binary {
+                    operator: BinaryOperator::RemainderAssign,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn assignment_operators_are_right_associative() {
+        assert_eq!(
+            parse_str(" a = b |= c ^= d &= e <<= f >>= g += h -= i *= j /= k %= m ").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "b",
+                    location: 5..6,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "c",
+                    location: 10..11,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "d",
+                    location: 15..16,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "e",
+                    location: 20..21,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "f",
+                    location: 26..27,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "g",
+                    location: 32..33,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "h",
+                    location: 37..38,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "i",
+                    location: 42..43,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "j",
+                    location: 47..48,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "k",
+                    location: 52..53,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "m",
+                    location: 57..58,
+                }),
+                Ast::Binary {
+                    operator: BinaryOperator::RemainderAssign,
+                    rhs_len: 1,
+                    location: 54..56,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::DivideAssign,
+                    rhs_len: 3,
+                    location: 49..51,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::MultiplyAssign,
+                    rhs_len: 5,
+                    location: 44..46,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::SubtractAssign,
+                    rhs_len: 7,
+                    location: 39..41,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::AddAssign,
+                    rhs_len: 9,
+                    location: 34..36,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::ShiftRightAssign,
+                    rhs_len: 11,
+                    location: 28..31,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::ShiftLeftAssign,
+                    rhs_len: 13,
+                    location: 22..25,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseAndAssign,
+                    rhs_len: 15,
+                    location: 17..19,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseXorAssign,
+                    rhs_len: 17,
+                    location: 12..14,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::BitwiseOrAssign,
+                    rhs_len: 19,
+                    location: 7..9,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: 21,
+                    location: 3..4,
                 },
             ]
         );
