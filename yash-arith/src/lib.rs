@@ -32,6 +32,13 @@ pub use token::TokenError;
 use token::Tokens;
 pub use token::Value;
 
+mod ast;
+
+// TODO Consider making these public
+// use ast::parse;
+// use ast::Ast;
+pub use ast::SyntaxError;
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause<E> {
