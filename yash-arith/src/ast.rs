@@ -50,6 +50,69 @@ pub enum PostfixOperator {
     Decrement,
 }
 
+/// Postfix operator kind
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BinaryOperator {
+    /// `=`
+    Assign,
+    /// `||`
+    ConditionalOr,
+    /// `&&`
+    ConditionalAnd,
+    /// `|`
+    BitwiseOr,
+    /// `|=`
+    BitwiseOrAssign,
+    /// `^`
+    BitwiseXor,
+    /// `^=`
+    BitwiseXorAssign,
+    /// `&`
+    BitwiseAnd,
+    /// `&=`
+    BitwiseAndAssign,
+    /// `==`
+    Equal,
+    /// `!=`
+    NotEqual,
+    /// `<`
+    LessThan,
+    /// `>`
+    GreaterThan,
+    /// `<=`
+    LessThanOrEqual,
+    /// `>=`
+    GreaterThanOrEqual,
+    /// `<<`
+    ShiftLeft,
+    /// `<<=`
+    ShiftLeftAssign,
+    /// `>>`
+    ShiftRight,
+    /// `>>=`
+    ShiftRightAssign,
+    /// `+`
+    Add,
+    /// `+=`
+    AddAssign,
+    /// `-`
+    Subtract,
+    /// `-=`
+    SubtractAssign,
+    /// `*`
+    Multiply,
+    /// `*=`
+    MultiplyAssign,
+    /// `/`
+    Divide,
+    /// `/=`
+    DivideAssign,
+    /// `%`
+    Remainder,
+    /// `%=`
+    RemainderAssign,
+}
+
 /// Node of an abstract syntax tree (AST)
 ///
 /// A whole AST is meant to be constructed as a vector of `Ast` nodes. A
@@ -84,7 +147,7 @@ pub enum Ast<'a> {
     /// right-hand-side operand tree in turn follows the left-hand-side.
     Binary {
         /// Operator
-        operator: Operator,
+        operator: BinaryOperator,
         /// Length (number of `Ast` nodes) of the right-hand-side operand tree
         rhs_len: usize,
         /// Range of the substring where the operator occurs in the parsed expression
@@ -198,6 +261,46 @@ where
     }
 }
 
+/// Parses a expression that may contain binary and ternary operators.
+///
+/// This function consumes binary operators with precedence equal to or greater
+/// than the given minimum precedence, which must be greater than 0.
+fn parse_tree<'a, I>(
+    tokens: &mut Peekable<I>,
+    min_precedence: u8,
+    result: &mut Vec<Ast<'a>>,
+) -> Result<(), Error>
+where
+    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+{
+    parse_leaf(tokens, result)?;
+
+    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+        let precedence = operator.precedence();
+        if precedence < min_precedence {
+            break;
+        }
+
+        let location =
+            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+
+        use Operator::*;
+        match operator {
+            Equal => {
+                let old_len = result.len();
+                parse_tree(tokens, precedence, result)?;
+                result.push(Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: result.len() - old_len,
+                    location,
+                });
+            }
+            _ => todo!("handle operator {:?}", operator),
+        };
+    }
+    Ok(())
+}
+
 /// Parses the whole expression.
 ///
 /// A successful parse is returned as a non-empty vector of `Ast` nodes, where
@@ -207,7 +310,7 @@ where
     I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
 {
     let mut result = Vec::new();
-    parse_leaf(&mut tokens, &mut result)?;
+    parse_tree(&mut tokens, 1, &mut result)?;
     Ok(result)
 }
 
@@ -446,6 +549,25 @@ mod tests {
                 },
                 Ast::Prefix {
                     operator: PrefixOperator::NumericNegation,
+                    location: 1..2,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn simple_assignment_operator() {
+        assert_eq!(
+            parse_str("a=42").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Value(Value::Integer(42))),
+                Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: 1,
                     location: 1..2,
                 },
             ]
