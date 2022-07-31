@@ -108,19 +108,19 @@ pub use env::Env;
 fn expand_variable<E: Env>(
     name: &str,
     location: &Range<usize>,
-    // TODO mode: Mode,
+    mode: Mode,
     env: &E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
-    match env.get_variable(name) {
-        // TODO Parse non-decimal constant
-        Some(value) => match value.parse() {
+    if let (Mode::Eval, Some(value)) = (mode, env.get_variable(name)) {
+        match value.parse() {
             Ok(number) => Ok(Value::Integer(number)),
             Err(_) => Err(Error {
                 cause: ErrorCause::InvalidVariableValue(value.to_string()),
                 location: location.clone(),
             }),
-        },
-        None => Ok(Value::Integer(0)),
+        }
+    } else {
+        Ok(Value::Integer(0))
     }
 }
 
@@ -143,7 +143,7 @@ impl Term<'_> {
         match mode {
             Mode::Eval => match self {
                 Term::Value(value) => Ok(value),
-                Term::Variable { name, location } => expand_variable(name, &location, env),
+                Term::Variable { name, location } => expand_variable(name, &location, mode, env),
             },
             Mode::Skip => Ok(Value::Integer(0)),
         }
@@ -195,7 +195,7 @@ fn parse_postfix<'a, E: Env>(
         match operand {
             Term::Value(_) => todo!("reject non-variable"),
             Term::Variable { name, location } => {
-                let old_value = expand_variable(name, &location, env)?;
+                let old_value = expand_variable(name, &location, mode, env)?;
                 let new_value = apply_unary(operator, old_value.clone(), op_location.clone())?;
 
                 if mode == Mode::Eval {
@@ -242,17 +242,19 @@ fn parse_leaf<'a, E: Env>(
             PlusPlus | MinusMinus => match parse_leaf(tokens, mode, env)? {
                 Term::Value(_) => todo!("reject non-variable"),
                 Term::Variable { name, location } => {
-                    let old_value = expand_variable(name, &location, env)?;
-                    let new_value = apply_unary(operator, old_value, op_location.clone())?;
-
-                    if mode == Mode::Eval {
+                    let old_value = expand_variable(name, &location, mode, env)?;
+                    let result = if mode == Mode::Eval {
+                        let new_value = apply_unary(operator, old_value, op_location.clone())?;
                         env.assign_variable(name, new_value.to_string())
                             .map_err(|e| Error {
                                 cause: ErrorCause::AssignVariableError(e),
                                 location: op_location,
                             })?;
-                    }
-                    Ok(Term::Value(new_value))
+                        new_value
+                    } else {
+                        Value::Integer(0)
+                    };
+                    Ok(Term::Value(result))
                 }
             },
             _ => todo!("handle orphan operator: {:?}", operator),
@@ -384,18 +386,21 @@ fn parse_binary<'a, E: Env>(
                     let lhs = if operator == Equal {
                         Value::Integer(0)
                     } else {
-                        expand_variable(name, &location, env)?
+                        expand_variable(name, &location, mode, env)?
                     };
                     let rhs = parse_binary(tokens, precedence, mode, env)?.into_value(mode, env)?;
-                    let value = apply_binary(operator, lhs, rhs, op_location.clone())?;
-                    if mode == Mode::Eval {
-                        env.assign_variable(name, value.to_string())
+                    let result = if mode == Mode::Eval {
+                        let result = apply_binary(operator, lhs, rhs, op_location.clone())?;
+                        env.assign_variable(name, result.to_string())
                             .map_err(|e| Error {
                                 cause: ErrorCause::AssignVariableError(e),
                                 location: op_location,
                             })?;
-                    }
-                    term = Term::Value(value);
+                        result
+                    } else {
+                        Value::Integer(0)
+                    };
+                    term = Term::Value(result);
                 }
             },
             Question => {
@@ -547,6 +552,16 @@ mod tests {
                 location: 2..6,
             })
         );
+    }
+
+    #[test]
+    fn unevaluated_variable_value() {
+        let env = &mut HashMap::new();
+        env.insert("empty".to_string(), "".to_string());
+        assert_eq!(eval("1 || empty", env), Ok(Value::Integer(1)));
+        assert_eq!(eval("0 && empty++", env), Ok(Value::Integer(0)));
+        assert_eq!(eval("1 ? 2 : --empty", env), Ok(Value::Integer(2)));
+        assert_eq!(eval("0 ? empty /= 1 : 3", env), Ok(Value::Integer(3)));
     }
 
     #[test]
