@@ -308,6 +308,22 @@ where
 
         use Operator::*;
         let (operator, rhs_precedence) = match operator {
+            Question => {
+                let then_index = result.len();
+                parse_tree(tokens, 1, result)?;
+
+                // TODO Reject if a colon is missing
+                tokens.next().transpose()?;
+
+                let else_index = result.len();
+                parse_tree(tokens, precedence, result)?;
+
+                result.push(Ast::Conditional {
+                    then_len: else_index - then_index,
+                    else_len: result.len() - else_index,
+                });
+                continue;
+            }
             Equal => (BinaryOperator::Assign, precedence),
             BarEqual => (BinaryOperator::BitwiseOrAssign, precedence),
             CaretEqual => (BinaryOperator::BitwiseXorAssign, precedence),
@@ -902,5 +918,101 @@ mod tests {
     }
 
     // TODO binary_operators
-    // TODO conditional_operator
+
+    #[test]
+    fn conditional_operator() {
+        assert_eq!(
+            parse_str("1?2:3").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Conditional {
+                    then_len: 1,
+                    else_len: 1,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn assignment_in_then_value() {
+        assert_eq!(
+            parse_str("a ? b = 0 : 1").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 0..1,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "b",
+                    location: 4..5,
+                }),
+                Ast::Term(Term::Value(Value::Integer(0))),
+                Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: 1,
+                    location: 6..7,
+                },
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Conditional {
+                    then_len: 3,
+                    else_len: 1,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn condition_in_assignment() {
+        assert_eq!(
+            parse_str("4 ? a : b = 5").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(4))),
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 4..5,
+                }),
+                Ast::Term(Term::Variable {
+                    name: "b",
+                    location: 8..9,
+                }),
+                Ast::Conditional {
+                    then_len: 1,
+                    else_len: 1,
+                },
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: 1,
+                    location: 10..11,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn conditional_operator_is_right_associative() {
+        assert_eq!(
+            parse_str("5 ? 6 : 7 ? 8 : 9").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Term(Term::Value(Value::Integer(6))),
+                Ast::Term(Term::Value(Value::Integer(7))),
+                Ast::Term(Term::Value(Value::Integer(8))),
+                Ast::Term(Term::Value(Value::Integer(9))),
+                Ast::Conditional {
+                    then_len: 1,
+                    else_len: 1,
+                },
+                Ast::Conditional {
+                    then_len: 1,
+                    else_len: 4,
+                },
+            ]
+        );
+    }
+
+    // TODO question_without_colon
+    // TODO colon_without_question
 }
