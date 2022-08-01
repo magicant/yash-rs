@@ -334,7 +334,15 @@ where
             parse_postfix(tokens, result)
         }
 
-        // TODO Parentheses
+        Token::Operator { operator, .. } if operator == Operator::OpenParen => {
+            parse_tree(tokens, 1, result)?;
+
+            // TODO Reject if a closing parenthesis is missing
+            tokens.next().transpose()?;
+
+            parse_postfix(tokens, result)
+        }
+
         Token::Operator { operator, location } => {
             let operator = operator.as_prefix().expect("TODO: handle syntax error");
             parse_leaf(tokens, result)?;
@@ -427,6 +435,7 @@ where
 {
     let mut result = Vec::new();
     parse_tree(&mut tokens, 1, &mut result)?;
+    // TODO Reject if there are unparsed tokens
     Ok(result)
 }
 
@@ -1313,4 +1322,27 @@ mod tests {
 
     // TODO question_without_colon
     // TODO colon_without_question
+
+    #[test]
+    fn parentheses() {
+        assert_eq!(
+            parse_str("(a = 0)--").unwrap(),
+            [
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 1..2,
+                }),
+                Ast::Term(Term::Value(Value::Integer(0))),
+                Ast::Binary {
+                    operator: BinaryOperator::Assign,
+                    rhs_len: 1,
+                    location: 3..4,
+                },
+                Ast::Postfix {
+                    operator: PostfixOperator::Decrement,
+                    location: 7..9,
+                },
+            ]
+        );
+    }
 }
