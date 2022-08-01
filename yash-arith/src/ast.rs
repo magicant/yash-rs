@@ -113,6 +113,72 @@ pub enum BinaryOperator {
     RemainderAssign,
 }
 
+impl Operator {
+    fn as_prefix(self) -> Option<PrefixOperator> {
+        match self {
+            Operator::PlusPlus => Some(PrefixOperator::Increment),
+            Operator::MinusMinus => Some(PrefixOperator::Decrement),
+            Operator::Plus => Some(PrefixOperator::NumericCoercion),
+            Operator::Minus => Some(PrefixOperator::NumericNegation),
+            Operator::Bang => Some(PrefixOperator::LogicalNegation),
+            Operator::Tilde => Some(PrefixOperator::BitwiseNegation),
+            _ => None,
+        }
+    }
+
+    fn as_postfix(self) -> Option<PostfixOperator> {
+        match self {
+            Operator::PlusPlus => Some(PostfixOperator::Increment),
+            Operator::MinusMinus => Some(PostfixOperator::Decrement),
+            _ => None,
+        }
+    }
+
+    fn as_binary(self) -> Option<BinaryOperator> {
+        match self {
+            Operator::Equal => Some(BinaryOperator::Assign),
+            Operator::BarEqual => Some(BinaryOperator::BitwiseOrAssign),
+            Operator::CaretEqual => Some(BinaryOperator::BitwiseXorAssign),
+            Operator::AndEqual => Some(BinaryOperator::BitwiseAndAssign),
+            Operator::LessLessEqual => Some(BinaryOperator::ShiftLeftAssign),
+            Operator::GreaterGreaterEqual => Some(BinaryOperator::ShiftRightAssign),
+            Operator::PlusEqual => Some(BinaryOperator::AddAssign),
+            Operator::MinusEqual => Some(BinaryOperator::SubtractAssign),
+            Operator::AsteriskEqual => Some(BinaryOperator::MultiplyAssign),
+            Operator::SlashEqual => Some(BinaryOperator::DivideAssign),
+            Operator::PercentEqual => Some(BinaryOperator::RemainderAssign),
+            // TODO Other binary operators
+            _ => None,
+        }
+    }
+
+    // TODO Make this private
+    /// Returns the precedence of the operator.
+    ///
+    /// If the operator acts as both a unary and binary operator, the result is
+    /// the precedence as a binary operator.
+    pub fn precedence(self) -> u8 {
+        use Operator::*;
+        match self {
+            CloseParen | Colon => 0,
+            Equal | BarEqual | CaretEqual | AndEqual | LessLessEqual | GreaterGreaterEqual
+            | PlusEqual | MinusEqual | AsteriskEqual | SlashEqual | PercentEqual => 1,
+            Question => 2,
+            BarBar => 3,
+            AndAnd => 4,
+            Bar => 5,
+            Caret => 6,
+            And => 7,
+            EqualEqual | BangEqual => 8,
+            Less | LessEqual | Greater | GreaterEqual => 9,
+            LessLess | GreaterGreater => 10,
+            Plus | Minus => 11,
+            Asterisk | Slash | Percent => 12,
+            Tilde | Bang | PlusPlus | MinusMinus | OpenParen => 13,
+        }
+    }
+}
+
 /// Node of an abstract syntax tree (AST)
 ///
 /// A whole AST is meant to be constructed as a vector of `Ast` nodes. A
@@ -213,10 +279,9 @@ where
     I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
 {
     while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
-        let operator = match operator {
-            Operator::PlusPlus => PostfixOperator::Increment,
-            Operator::MinusMinus => PostfixOperator::Decrement,
-            _ => break,
+        let operator = match operator.as_postfix() {
+            Some(operator) => operator,
+            None => break,
         };
         let location =
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
@@ -245,15 +310,7 @@ where
 
         // TODO Parentheses
         Token::Operator { operator, location } => {
-            let operator = match operator {
-                Operator::PlusPlus => PrefixOperator::Increment,
-                Operator::MinusMinus => PrefixOperator::Decrement,
-                Operator::Plus => PrefixOperator::NumericCoercion,
-                Operator::Minus => PrefixOperator::NumericNegation,
-                Operator::Bang => PrefixOperator::LogicalNegation,
-                Operator::Tilde => PrefixOperator::BitwiseNegation,
-                _ => todo!("handle syntax error"),
-            };
+            let operator = operator.as_prefix().expect("TODO: handle syntax error");
             parse_leaf(tokens, result)?;
             result.push(Ast::Prefix { operator, location });
             Ok(())
@@ -307,36 +364,25 @@ where
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
 
         use Operator::*;
-        let (operator, rhs_precedence) = match operator {
-            Question => {
-                let then_index = result.len();
-                parse_tree(tokens, 1, result)?;
+        if operator == Question {
+            let then_index = result.len();
+            parse_tree(tokens, 1, result)?;
 
-                // TODO Reject if a colon is missing
-                tokens.next().transpose()?;
+            // TODO Reject if a colon is missing
+            tokens.next().transpose()?;
 
-                let else_index = result.len();
-                parse_tree(tokens, precedence, result)?;
+            let else_index = result.len();
+            parse_tree(tokens, precedence, result)?;
 
-                result.push(Ast::Conditional {
-                    then_len: else_index - then_index,
-                    else_len: result.len() - else_index,
-                });
-                continue;
-            }
-            Equal => (BinaryOperator::Assign, precedence),
-            BarEqual => (BinaryOperator::BitwiseOrAssign, precedence),
-            CaretEqual => (BinaryOperator::BitwiseXorAssign, precedence),
-            AndEqual => (BinaryOperator::BitwiseAndAssign, precedence),
-            LessLessEqual => (BinaryOperator::ShiftLeftAssign, precedence),
-            GreaterGreaterEqual => (BinaryOperator::ShiftRightAssign, precedence),
-            PlusEqual => (BinaryOperator::AddAssign, precedence),
-            MinusEqual => (BinaryOperator::SubtractAssign, precedence),
-            AsteriskEqual => (BinaryOperator::MultiplyAssign, precedence),
-            SlashEqual => (BinaryOperator::DivideAssign, precedence),
-            PercentEqual => (BinaryOperator::RemainderAssign, precedence),
-            _ => todo!("handle operator {:?}", operator),
-        };
+            result.push(Ast::Conditional {
+                then_len: else_index - then_index,
+                else_len: result.len() - else_index,
+            });
+            continue;
+        }
+
+        let operator = operator.as_binary().expect("TODO: unsupported operator");
+        let rhs_precedence = precedence;
         parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?
     }
     Ok(())
