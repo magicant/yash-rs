@@ -72,17 +72,17 @@ pub enum BinaryOperator {
     /// `&=`
     BitwiseAndAssign,
     /// `==`
-    Equal,
+    EqualTo,
     /// `!=`
-    NotEqual,
+    NotEqualTo,
     /// `<`
     LessThan,
     /// `>`
     GreaterThan,
     /// `<=`
-    LessThanOrEqual,
+    LessThanOrEqualTo,
     /// `>=`
-    GreaterThanOrEqual,
+    GreaterThanOrEqualTo,
     /// `<<`
     ShiftLeft,
     /// `<<=`
@@ -157,7 +157,23 @@ impl Operator {
             Operator::SlashEqual => Some((DivideAssign, Right)),
             Operator::PercentEqual => Some((RemainderAssign, Right)),
             Operator::BarBar => Some((LogicalOr, Left)),
-            // TODO Other binary operators
+            Operator::AndAnd => Some((LogicalAnd, Left)),
+            Operator::Bar => Some((BitwiseOr, Left)),
+            Operator::Caret => Some((BitwiseXor, Left)),
+            Operator::And => Some((BitwiseAnd, Left)),
+            Operator::EqualEqual => Some((EqualTo, Left)),
+            Operator::BangEqual => Some((NotEqualTo, Left)),
+            Operator::Less => Some((LessThan, Left)),
+            Operator::LessEqual => Some((LessThanOrEqualTo, Left)),
+            Operator::Greater => Some((GreaterThan, Left)),
+            Operator::GreaterEqual => Some((GreaterThanOrEqualTo, Left)),
+            Operator::LessLess => Some((ShiftLeft, Left)),
+            Operator::GreaterGreater => Some((ShiftRight, Left)),
+            Operator::Plus => Some((Add, Left)),
+            Operator::Minus => Some((Subtract, Left)),
+            Operator::Asterisk => Some((Multiply, Left)),
+            Operator::Slash => Some((Divide, Left)),
+            Operator::Percent => Some((Remainder, Left)),
             _ => None,
         }
     }
@@ -656,6 +672,43 @@ mod tests {
     }
 
     #[test]
+    fn combination_of_unary_and_binary_operators() {
+        assert_eq!(
+            parse_str("0 + + a ++ * !1").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(0))),
+                Ast::Term(Term::Variable {
+                    name: "a",
+                    location: 6..7,
+                }),
+                Ast::Postfix {
+                    operator: PostfixOperator::Increment,
+                    location: 8..10,
+                },
+                Ast::Prefix {
+                    operator: PrefixOperator::NumericCoercion,
+                    location: 4..5,
+                },
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Prefix {
+                    operator: PrefixOperator::LogicalNegation,
+                    location: 13..14,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::Multiply,
+                    rhs_len: 2,
+                    location: 11..12,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::Add,
+                    rhs_len: 6,
+                    location: 2..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn simple_assignment_operator() {
         assert_eq!(
             parse_str("a=42").unwrap(),
@@ -1042,7 +1095,127 @@ mod tests {
         );
     }
 
-    // TODO binary_operators
+    #[test]
+    fn logical_and_operator() {
+        assert_eq!(
+            parse_str("3&&5").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalAnd,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logical_and_operator_is_left_associative() {
+        assert_eq!(
+            parse_str("1&&2&&3").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalAnd,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalAnd,
+                    rhs_len: 1,
+                    location: 4..6,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logical_and_operator_in_logical_or_operator() {
+        assert_eq!(
+            parse_str("1&&2||3&&4").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalAnd,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Term(Term::Value(Value::Integer(4))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalAnd,
+                    rhs_len: 1,
+                    location: 7..9,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 3,
+                    location: 4..6,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn multiplication_operator_in_addition_operator() {
+        assert_eq!(
+            parse_str("1*2+3*4").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::Multiply,
+                    rhs_len: 1,
+                    location: 1..2,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Term(Term::Value(Value::Integer(4))),
+                Ast::Binary {
+                    operator: BinaryOperator::Multiply,
+                    rhs_len: 1,
+                    location: 5..6,
+                },
+                Ast::Binary {
+                    operator: BinaryOperator::Add,
+                    rhs_len: 3,
+                    location: 3..4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn multiplication_division_remainder_operators_are_left_associative() {
+        assert_eq!(
+            parse_str("1*2/3%4").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::Multiply,
+                    rhs_len: 1,
+                    location: 1..2,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Binary {
+                    operator: BinaryOperator::Divide,
+                    rhs_len: 1,
+                    location: 3..4,
+                },
+                Ast::Term(Term::Value(Value::Integer(4))),
+                Ast::Binary {
+                    operator: BinaryOperator::Remainder,
+                    rhs_len: 1,
+                    location: 5..6,
+                },
+            ]
+        );
+    }
 
     #[test]
     fn conditional_operator() {
