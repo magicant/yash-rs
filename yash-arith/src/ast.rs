@@ -56,9 +56,9 @@ pub enum BinaryOperator {
     /// `=`
     Assign,
     /// `||`
-    ConditionalOr,
+    LogicalOr,
     /// `&&`
-    ConditionalAnd,
+    LogicalAnd,
     /// `|`
     BitwiseOr,
     /// `|=`
@@ -113,6 +113,13 @@ pub enum BinaryOperator {
     RemainderAssign,
 }
 
+/// Associativity kind of binary operators
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Associativity {
+    Left,
+    Right,
+}
+
 impl Operator {
     fn as_prefix(self) -> Option<PrefixOperator> {
         match self {
@@ -134,19 +141,22 @@ impl Operator {
         }
     }
 
-    fn as_binary(self) -> Option<BinaryOperator> {
+    fn as_binary(self) -> Option<(BinaryOperator, Associativity)> {
+        use Associativity::*;
+        use BinaryOperator::*;
         match self {
-            Operator::Equal => Some(BinaryOperator::Assign),
-            Operator::BarEqual => Some(BinaryOperator::BitwiseOrAssign),
-            Operator::CaretEqual => Some(BinaryOperator::BitwiseXorAssign),
-            Operator::AndEqual => Some(BinaryOperator::BitwiseAndAssign),
-            Operator::LessLessEqual => Some(BinaryOperator::ShiftLeftAssign),
-            Operator::GreaterGreaterEqual => Some(BinaryOperator::ShiftRightAssign),
-            Operator::PlusEqual => Some(BinaryOperator::AddAssign),
-            Operator::MinusEqual => Some(BinaryOperator::SubtractAssign),
-            Operator::AsteriskEqual => Some(BinaryOperator::MultiplyAssign),
-            Operator::SlashEqual => Some(BinaryOperator::DivideAssign),
-            Operator::PercentEqual => Some(BinaryOperator::RemainderAssign),
+            Operator::Equal => Some((Assign, Right)),
+            Operator::BarEqual => Some((BitwiseOrAssign, Right)),
+            Operator::CaretEqual => Some((BitwiseXorAssign, Right)),
+            Operator::AndEqual => Some((BitwiseAndAssign, Right)),
+            Operator::LessLessEqual => Some((ShiftLeftAssign, Right)),
+            Operator::GreaterGreaterEqual => Some((ShiftRightAssign, Right)),
+            Operator::PlusEqual => Some((AddAssign, Right)),
+            Operator::MinusEqual => Some((SubtractAssign, Right)),
+            Operator::AsteriskEqual => Some((MultiplyAssign, Right)),
+            Operator::SlashEqual => Some((DivideAssign, Right)),
+            Operator::PercentEqual => Some((RemainderAssign, Right)),
+            Operator::BarBar => Some((LogicalOr, Left)),
             // TODO Other binary operators
             _ => None,
         }
@@ -381,8 +391,11 @@ where
             continue;
         }
 
-        let operator = operator.as_binary().expect("TODO: unsupported operator");
-        let rhs_precedence = precedence;
+        let (operator, associativity) = operator.as_binary().expect("TODO: unsupported operator");
+        let rhs_precedence = match associativity {
+            Associativity::Left => precedence + 1,
+            Associativity::Right => precedence,
+        };
         parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?
     }
     Ok(())
@@ -958,6 +971,72 @@ mod tests {
                     operator: BinaryOperator::Assign,
                     rhs_len: 21,
                     location: 3..4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logical_or_operator() {
+        assert_eq!(
+            parse_str("3||5").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logical_or_operator_is_left_associative() {
+        assert_eq!(
+            parse_str("1||2||3").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 1,
+                    location: 4..6,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logical_or_operator_in_conditional_operator() {
+        assert_eq!(
+            parse_str("1||2?3:4||5").unwrap(),
+            [
+                Ast::Term(Term::Value(Value::Integer(1))),
+                Ast::Term(Term::Value(Value::Integer(2))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 1,
+                    location: 1..3,
+                },
+                Ast::Term(Term::Value(Value::Integer(3))),
+                Ast::Term(Term::Value(Value::Integer(4))),
+                Ast::Term(Term::Value(Value::Integer(5))),
+                Ast::Binary {
+                    operator: BinaryOperator::LogicalOr,
+                    rhs_len: 1,
+                    location: 8..10,
+                },
+                Ast::Conditional {
+                    then_len: 1,
+                    else_len: 3,
                 },
             ]
         );
