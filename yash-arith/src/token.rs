@@ -20,10 +20,10 @@ use std::fmt::Display;
 use std::ops::Range;
 
 /// Result of evaluating an expression
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Value {
     Integer(i64),
-    // TODO Float, String
+    // TODO Float
 }
 
 impl Display for Value {

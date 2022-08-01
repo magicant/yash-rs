@@ -39,6 +39,8 @@ mod ast;
 // use ast::Ast;
 pub use ast::SyntaxError;
 
+mod eval;
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause<E> {
