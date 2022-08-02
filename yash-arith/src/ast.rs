@@ -24,6 +24,9 @@ use assert_matches::assert_matches;
 use std::iter::Peekable;
 use std::ops::Range;
 
+// TODO: POSIX does not require the increment/decrement operators. Maybe we
+// should provide an option to reject those non-portable operators.
+
 /// Prefix operator kind
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrefixOperator {
