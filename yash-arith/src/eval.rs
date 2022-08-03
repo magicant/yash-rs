@@ -17,6 +17,7 @@
 //! Evaluation of the expression
 
 use crate::ast::Ast;
+use crate::ast::BinaryOperator;
 use crate::ast::PostfixOperator;
 use crate::ast::PrefixOperator;
 use crate::env::Env;
@@ -175,6 +176,91 @@ fn apply_postfix<'a, E: Env>(
     }
 }
 
+/// Computes the result value of a binary operator.
+///
+/// If `operator` is a compound assignment operator, this function only computes
+/// the result value without performing assignment.
+fn binary_result<E>(
+    lhs: Value,
+    rhs: Value,
+    operator: BinaryOperator,
+    op_location: &Range<usize>,
+) -> Result<Value, Error<E>> {
+    let Value::Integer(lhs) = lhs;
+    let Value::Integer(rhs) = rhs;
+    use BinaryOperator::*;
+    let result = match operator {
+        LogicalOr => todo!(),
+        LogicalAnd => todo!(),
+        BitwiseOr => todo!(),
+        BitwiseXor => todo!(),
+        BitwiseAnd => todo!(),
+        EqualTo => todo!(),
+        NotEqualTo => todo!(),
+        LessThan => todo!(),
+        GreaterThan => todo!(),
+        LessThanOrEqualTo => todo!(),
+        GreaterThanOrEqualTo => todo!(),
+        ShiftLeft => todo!(),
+        ShiftRight => todo!(),
+        Add | AddAssign => lhs.checked_add(rhs),
+        Subtract => lhs.checked_sub(rhs),
+        Multiply => todo!(),
+        Divide => todo!(),
+        Remainder => todo!(),
+        Assign => Some(rhs),
+        BitwiseOrAssign => todo!(),
+        BitwiseXorAssign => todo!(),
+        BitwiseAndAssign => todo!(),
+        ShiftLeftAssign => todo!(),
+        ShiftRightAssign => todo!(),
+        SubtractAssign => todo!(),
+        MultiplyAssign => todo!(),
+        DivideAssign => todo!(),
+        RemainderAssign => todo!(),
+    };
+    let result = unwrap_or_overflow(result, op_location)?;
+    Ok(Value::Integer(result))
+}
+
+/// Applies a binary operator.
+fn apply_binary<'a, E: Env>(
+    lhs: Term<'a>,
+    rhs: Term<'a>,
+    operator: BinaryOperator,
+    op_location: &Range<usize>,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    use BinaryOperator::*;
+    match operator {
+        LogicalOr | LogicalAnd | BitwiseOr | BitwiseXor | BitwiseAnd | EqualTo | NotEqualTo
+        | LessThan | GreaterThan | LessThanOrEqualTo | GreaterThanOrEqualTo | ShiftLeft
+        | ShiftRight | Add | Subtract | Multiply | Divide | Remainder => {
+            let lhs = into_value(lhs, env)?;
+            let rhs = into_value(rhs, env)?;
+            binary_result(lhs, rhs, operator, op_location)
+        }
+        Assign => match lhs {
+            Term::Value(_) => todo!("reject non-variable"),
+            Term::Variable { name, location } => {
+                let value = into_value(rhs, env)?;
+                assign(name, value, location, env)
+            }
+        },
+        BitwiseOrAssign | BitwiseXorAssign | BitwiseAndAssign | ShiftLeftAssign
+        | ShiftRightAssign | AddAssign | SubtractAssign | MultiplyAssign | DivideAssign
+        | RemainderAssign => match lhs {
+            Term::Value(_) => todo!("reject non-variable"),
+            Term::Variable { name, location } => {
+                let lhs = expand_variable(name, &location, env)?;
+                let rhs = into_value(rhs, env)?;
+                let result = binary_result(lhs, rhs, operator, op_location)?;
+                assign(name, result, location, env)
+            }
+        },
+    }
+}
+
 /// Evaluates an expression.
 ///
 /// The given `ast` must not be empty, or this function will **panic**.
@@ -200,7 +286,13 @@ pub fn eval<'a, E: Env>(
             operator,
             rhs_len,
             location,
-        } => todo!(),
+        } => {
+            let (lhs_ast, rhs_ast) = children.split_at(children.len() - rhs_len);
+            let lhs = eval(lhs_ast, env)?;
+            let rhs = eval(rhs_ast, env)?;
+            apply_binary(lhs, rhs, *operator, location, env).map(Term::Value)
+        }
+
         Ast::Conditional { then_len, else_len } => todo!(),
     }
 }
@@ -585,6 +677,97 @@ mod tests {
     // TODO apply_postfix_decrement_not_variable
 
     #[test]
+    fn apply_binary_add() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(30));
+        let rhs = Term::Value(Value::Integer(12));
+        let operator = BinaryOperator::Add;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(result, Ok(Value::Integer(42)));
+    }
+
+    #[test]
+    fn apply_binary_add_overflow() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(i64::MAX));
+        let rhs = Term::Value(Value::Integer(1));
+        let operator = BinaryOperator::Add;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(
+            result,
+            Err(Error {
+                cause: EvalError::Overflow,
+                location: 4..5,
+            })
+        );
+    }
+
+    #[test]
+    fn apply_binary_subtract() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(30));
+        let rhs = Term::Value(Value::Integer(12));
+        let operator = BinaryOperator::Subtract;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(result, Ok(Value::Integer(18)));
+    }
+
+    #[test]
+    fn apply_binary_subtract_overflow() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(i64::MIN));
+        let rhs = Term::Value(Value::Integer(1));
+        let operator = BinaryOperator::Subtract;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(
+            result,
+            Err(Error {
+                cause: EvalError::Overflow,
+                location: 4..5,
+            })
+        );
+    }
+
+    #[test]
+    fn apply_binary_assign() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Variable {
+            name: "foo",
+            location: 1..4,
+        };
+        let rhs = Term::Value(Value::Integer(42));
+        let operator = BinaryOperator::Assign;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(result, Ok(Value::Integer(42)));
+        assert_eq!(env["foo"], "42");
+    }
+
+    // TODO apply_binary_assign_not_variable
+
+    #[test]
+    fn apply_binary_add_assign() {
+        let env = &mut HashMap::new();
+        env.insert("a".to_string(), "10".to_string());
+        let lhs = Term::Variable {
+            name: "a",
+            location: 1..2,
+        };
+        let rhs = Term::Value(Value::Integer(32));
+        let operator = BinaryOperator::AddAssign;
+        let op_location = 4..6;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(result, Ok(Value::Integer(42)));
+        assert_eq!(env["a"], "42");
+    }
+
+    // TODO apply_binary_add_assign_not_variable
+
+    #[test]
     fn eval_term() {
         let env = &mut HashMap::new();
 
@@ -625,5 +808,20 @@ mod tests {
             },
         ];
         assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
+    }
+
+    #[test]
+    fn eval_binary() {
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(12))),
+            Ast::Term(Term::Value(Value::Integer(34))),
+            Ast::Binary {
+                operator: BinaryOperator::Add,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(46))));
     }
 }
