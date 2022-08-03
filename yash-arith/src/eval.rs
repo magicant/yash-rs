@@ -17,6 +17,7 @@
 //! Evaluation of the expression
 
 use crate::ast::Ast;
+use crate::ast::PostfixOperator;
 use crate::ast::PrefixOperator;
 use crate::env::Env;
 use crate::token::Term;
@@ -151,6 +152,29 @@ fn apply_prefix<'a, E: Env>(
     }
 }
 
+/// Applies a postfix operator to a term.
+fn apply_postfix<'a, E: Env>(
+    term: Term<'a>,
+    operator: PostfixOperator,
+    op_location: &Range<usize>,
+    env: &mut E,
+) -> Result<Value, Error<E::AssignVariableError>> {
+    match term {
+        Term::Value(_) => todo!("reject non-variable"),
+        Term::Variable { name, location } => match expand_variable(name, &location, env)? {
+            old_value @ Value::Integer(value) => {
+                let result = match operator {
+                    PostfixOperator::Increment => value.checked_add(1),
+                    PostfixOperator::Decrement => value.checked_sub(1),
+                };
+                let new_value = Value::Integer(unwrap_or_overflow(result, op_location)?);
+                assign(name, new_value, location, env)?;
+                Ok(old_value)
+            }
+        },
+    }
+}
+
 /// Evaluates an expression.
 ///
 /// The given `ast` must not be empty, or this function will **panic**.
@@ -167,7 +191,11 @@ pub fn eval<'a, E: Env>(
             apply_prefix(term, *operator, location, env).map(Term::Value)
         }
 
-        Ast::Postfix { operator, location } => todo!(),
+        Ast::Postfix { operator, location } => {
+            let term = eval(children, env)?;
+            apply_postfix(term, *operator, location, env).map(Term::Value)
+        }
+
         Ast::Binary {
             operator,
             rhs_len,
@@ -445,6 +473,118 @@ mod tests {
     }
 
     #[test]
+    fn apply_postfix_increment() {
+        let env = &mut HashMap::new();
+
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Increment,
+                &(3..5),
+                env
+            ),
+            Ok(Value::Integer(0))
+        );
+        assert_eq!(env["i"], "1");
+
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Increment,
+                &(3..5),
+                env
+            ),
+            Ok(Value::Integer(1))
+        );
+        assert_eq!(env["i"], "2");
+    }
+
+    #[test]
+    fn apply_postfix_increment_overflow() {
+        let env = &mut HashMap::new();
+        env.insert("i".to_string(), "9223372036854775807".to_string());
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Increment,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::Overflow,
+                location: 3..5,
+            })
+        );
+    }
+
+    // TODO apply_postfix_increment_not_variable
+
+    #[test]
+    fn apply_postfix_decrement() {
+        let env = &mut HashMap::new();
+
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Decrement,
+                &(3..5),
+                env
+            ),
+            Ok(Value::Integer(0))
+        );
+        assert_eq!(env["i"], "-1");
+
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Decrement,
+                &(3..5),
+                env
+            ),
+            Ok(Value::Integer(-1))
+        );
+        assert_eq!(env["i"], "-2");
+    }
+
+    #[test]
+    fn apply_postfix_decrement_overflow() {
+        let env = &mut HashMap::new();
+        env.insert("i".to_string(), "-9223372036854775808".to_string());
+        assert_eq!(
+            apply_postfix(
+                Term::Variable {
+                    name: "i",
+                    location: 0..1,
+                },
+                PostfixOperator::Decrement,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::Overflow,
+                location: 3..5,
+            })
+        );
+    }
+
+    // TODO apply_postfix_decrement_not_variable
+
+    #[test]
     fn eval_term() {
         let env = &mut HashMap::new();
 
@@ -469,5 +609,21 @@ mod tests {
             },
         ];
         assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(-15))));
+    }
+
+    #[test]
+    fn eval_postfix() {
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Variable {
+                name: "x",
+                location: 0..1,
+            }),
+            Ast::Postfix {
+                operator: PostfixOperator::Increment,
+                location: 1..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
     }
 }
