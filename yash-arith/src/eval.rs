@@ -38,6 +38,8 @@ pub enum EvalError<E> {
     LeftShiftingNegative,
     /// Bit-shifting with a negative right-hand-side operand
     ReverseShifting,
+    /// Assignment with a left-hand-side operand not being a variable
+    AssignmentToValue,
     /// Error assigning a variable value.
     AssignVariableError(E),
 }
@@ -79,6 +81,23 @@ fn into_value<E: Env>(term: Term, env: &E) -> Result<Value, Error<E::AssignVaria
     }
 }
 
+/// Tests if a term is a variable.
+///
+/// If the term is a value, returns an `AssignmentToValue` error with the given
+/// location.
+fn require_variable<'a, E>(
+    term: Term<'a>,
+    op_location: &Range<usize>,
+) -> Result<(&'a str, Range<usize>), Error<E>> {
+    match term {
+        Term::Variable { name, location } => Ok((name, location)),
+        Term::Value(_) => Err(Error {
+            cause: EvalError::AssignmentToValue,
+            location: op_location.clone(),
+        }),
+    }
+}
+
 /// Extracts a successful computation result or returns an overflow error.
 fn unwrap_or_overflow<T, E>(
     checked_computation: Option<T>,
@@ -114,26 +133,26 @@ fn apply_prefix<'a, E: Env>(
     env: &mut E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
     match operator {
-        PrefixOperator::Increment => match term {
-            Term::Value(_) => todo!("reject non-variable"),
-            Term::Variable { name, location } => match expand_variable(name, &location, env)? {
+        PrefixOperator::Increment => {
+            let (name, location) = require_variable(term, op_location)?;
+            match expand_variable(name, &location, env)? {
                 Value::Integer(value) => {
                     let new_value =
                         Value::Integer(unwrap_or_overflow(value.checked_add(1), op_location)?);
                     assign(name, new_value, location, env)
                 }
-            },
-        },
-        PrefixOperator::Decrement => match term {
-            Term::Value(_) => todo!("reject non-variable"),
-            Term::Variable { name, location } => match expand_variable(name, &location, env)? {
+            }
+        }
+        PrefixOperator::Decrement => {
+            let (name, location) = require_variable(term, op_location)?;
+            match expand_variable(name, &location, env)? {
                 Value::Integer(value) => {
                     let new_value =
                         Value::Integer(unwrap_or_overflow(value.checked_sub(1), op_location)?);
                     assign(name, new_value, location, env)
                 }
-            },
-        },
+            }
+        }
         PrefixOperator::NumericCoercion => into_value(term, env),
         PrefixOperator::NumericNegation => match into_value(term, env)? {
             Value::Integer(value) => match value.checked_neg() {
@@ -160,19 +179,17 @@ fn apply_postfix<'a, E: Env>(
     op_location: &Range<usize>,
     env: &mut E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
-    match term {
-        Term::Value(_) => todo!("reject non-variable"),
-        Term::Variable { name, location } => match expand_variable(name, &location, env)? {
-            old_value @ Value::Integer(value) => {
-                let result = match operator {
-                    PostfixOperator::Increment => value.checked_add(1),
-                    PostfixOperator::Decrement => value.checked_sub(1),
-                };
-                let new_value = Value::Integer(unwrap_or_overflow(result, op_location)?);
-                assign(name, new_value, location, env)?;
-                Ok(old_value)
-            }
-        },
+    let (name, location) = require_variable(term, op_location)?;
+    match expand_variable(name, &location, env)? {
+        old_value @ Value::Integer(value) => {
+            let result = match operator {
+                PostfixOperator::Increment => value.checked_add(1),
+                PostfixOperator::Decrement => value.checked_sub(1),
+            };
+            let new_value = Value::Integer(unwrap_or_overflow(result, op_location)?);
+            assign(name, new_value, location, env)?;
+            Ok(old_value)
+        }
     }
 }
 
@@ -240,24 +257,20 @@ fn apply_binary<'a, E: Env>(
             let rhs = into_value(rhs, env)?;
             binary_result(lhs, rhs, operator, op_location)
         }
-        Assign => match lhs {
-            Term::Value(_) => todo!("reject non-variable"),
-            Term::Variable { name, location } => {
-                let value = into_value(rhs, env)?;
-                assign(name, value, location, env)
-            }
-        },
+        Assign => {
+            let (name, location) = require_variable(lhs, op_location)?;
+            let value = into_value(rhs, env)?;
+            assign(name, value, location, env)
+        }
         BitwiseOrAssign | BitwiseXorAssign | BitwiseAndAssign | ShiftLeftAssign
         | ShiftRightAssign | AddAssign | SubtractAssign | MultiplyAssign | DivideAssign
-        | RemainderAssign => match lhs {
-            Term::Value(_) => todo!("reject non-variable"),
-            Term::Variable { name, location } => {
-                let lhs = expand_variable(name, &location, env)?;
-                let rhs = into_value(rhs, env)?;
-                let result = binary_result(lhs, rhs, operator, op_location)?;
-                assign(name, result, location, env)
-            }
-        },
+        | RemainderAssign => {
+            let (name, location) = require_variable(lhs, op_location)?;
+            let lhs = expand_variable(name, &location, env)?;
+            let rhs = into_value(rhs, env)?;
+            let result = binary_result(lhs, rhs, operator, op_location)?;
+            assign(name, result, location, env)
+        }
     }
 }
 
@@ -388,7 +401,22 @@ mod tests {
         );
     }
 
-    // TODO apply_prefix_increment_not_variable
+    #[test]
+    fn apply_prefix_increment_not_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            apply_prefix(
+                Term::Value(Value::Integer(3)),
+                PrefixOperator::Increment,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 3..5,
+            })
+        );
+    }
 
     #[test]
     fn apply_prefix_decrement() {
@@ -444,7 +472,22 @@ mod tests {
         );
     }
 
-    // TODO apply_prefix_decrement_not_variable
+    #[test]
+    fn apply_prefix_decrement_not_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            apply_prefix(
+                Term::Value(Value::Integer(3)),
+                PrefixOperator::Decrement,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 3..5,
+            })
+        );
+    }
 
     #[test]
     fn apply_prefix_numeric_coercion() {
@@ -618,7 +661,22 @@ mod tests {
         );
     }
 
-    // TODO apply_postfix_increment_not_variable
+    #[test]
+    fn apply_postfix_increment_not_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            apply_postfix(
+                Term::Value(Value::Integer(13)),
+                PostfixOperator::Increment,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 3..5,
+            })
+        );
+    }
 
     #[test]
     fn apply_postfix_decrement() {
@@ -674,7 +732,22 @@ mod tests {
         );
     }
 
-    // TODO apply_postfix_decrement_not_variable
+    #[test]
+    fn apply_postfix_decrement_not_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            apply_postfix(
+                Term::Value(Value::Integer(13)),
+                PostfixOperator::Decrement,
+                &(3..5),
+                env
+            ),
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 3..5,
+            })
+        );
+    }
 
     #[test]
     fn apply_binary_add() {
@@ -747,7 +820,22 @@ mod tests {
         assert_eq!(env["foo"], "42");
     }
 
-    // TODO apply_binary_assign_not_variable
+    #[test]
+    fn apply_binary_assign_not_variable() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(3));
+        let rhs = Term::Value(Value::Integer(42));
+        let operator = BinaryOperator::Assign;
+        let op_location = 4..5;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(
+            result,
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 4..5,
+            })
+        );
+    }
 
     #[test]
     fn apply_binary_add_assign() {
@@ -765,7 +853,22 @@ mod tests {
         assert_eq!(env["a"], "42");
     }
 
-    // TODO apply_binary_add_assign_not_variable
+    #[test]
+    fn apply_binary_add_assign_not_variable() {
+        let env = &mut HashMap::new();
+        let lhs = Term::Value(Value::Integer(3));
+        let rhs = Term::Value(Value::Integer(42));
+        let operator = BinaryOperator::AddAssign;
+        let op_location = 4..6;
+        let result = apply_binary(lhs, rhs, operator, &op_location, env);
+        assert_eq!(
+            result,
+            Err(Error {
+                cause: EvalError::AssignmentToValue,
+                location: 4..6,
+            })
+        );
+    }
 
     #[test]
     fn eval_term() {
