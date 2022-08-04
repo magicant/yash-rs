@@ -361,7 +361,17 @@ pub fn eval<'a, E: Env>(
             apply_binary(lhs, rhs, *operator, location, env).map(Term::Value)
         }
 
-        Ast::Conditional { then_len, else_len } => todo!(),
+        Ast::Conditional { then_len, else_len } => {
+            let (children_2, else_ast) = children.split_at(children.len() - else_len);
+            let (condition_ast, then_ast) = children_2.split_at(children_2.len() - then_len);
+            let condition = into_value(eval(condition_ast, env)?, env)?;
+            let result_ast = if condition != Value::Integer(0) {
+                then_ast
+            } else {
+                else_ast
+            };
+            eval(result_ast, env)
+        }
     }
 }
 
@@ -1571,5 +1581,43 @@ mod tests {
             },
         ];
         assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(46))));
+    }
+
+    #[test]
+    fn eval_conditional_then() {
+        let env = &mut HashMap::new();
+        env.insert("a".to_string(), "*".to_string());
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(1))),
+            Ast::Term(Term::Value(Value::Integer(10))),
+            Ast::Term(Term::Variable {
+                name: "a",
+                location: 4..5,
+            }),
+            Ast::Conditional {
+                then_len: 1,
+                else_len: 1,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(10))));
+    }
+
+    #[test]
+    fn eval_conditional_else() {
+        let env = &mut HashMap::new();
+        env.insert("a".to_string(), "*".to_string());
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Term(Term::Variable {
+                name: "a",
+                location: 4..5,
+            }),
+            Ast::Term(Term::Value(Value::Integer(21))),
+            Ast::Conditional {
+                then_len: 1,
+                else_len: 1,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(21))));
     }
 }
