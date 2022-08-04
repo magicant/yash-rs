@@ -323,6 +323,34 @@ pub fn eval<'a, E: Env>(
         }
 
         Ast::Binary {
+            operator: BinaryOperator::LogicalOr,
+            rhs_len,
+            location,
+        } => {
+            let (lhs_ast, rhs_ast) = children.split_at(children.len() - rhs_len);
+            let lhs = into_value(eval(lhs_ast, env)?, env)?;
+            if lhs != Value::Integer(0) {
+                return Ok(Term::Value(Value::Integer(1)));
+            }
+            let rhs = into_value(eval(rhs_ast, env)?, env)?;
+            binary_result(lhs, rhs, BinaryOperator::LogicalOr, location).map(Term::Value)
+        }
+
+        Ast::Binary {
+            operator: BinaryOperator::LogicalAnd,
+            rhs_len,
+            location,
+        } => {
+            let (lhs_ast, rhs_ast) = children.split_at(children.len() - rhs_len);
+            let lhs = into_value(eval(lhs_ast, env)?, env)?;
+            if lhs == Value::Integer(0) {
+                return Ok(Term::Value(Value::Integer(0)));
+            }
+            let rhs = into_value(eval(rhs_ast, env)?, env)?;
+            binary_result(lhs, rhs, BinaryOperator::LogicalAnd, location).map(Term::Value)
+        }
+
+        Ast::Binary {
             operator,
             rhs_len,
             location,
@@ -1433,6 +1461,98 @@ mod tests {
             Ast::Postfix {
                 operator: PostfixOperator::Increment,
                 location: 1..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
+    }
+
+    #[test]
+    fn eval_logical_or_short_circuit() {
+        let env = &mut HashMap::new();
+        env.insert("a".to_string(), "*".to_string());
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(-1))),
+            Ast::Term(Term::Variable {
+                name: "a",
+                location: 4..5,
+            }),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalOr,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(1))));
+    }
+
+    #[test]
+    fn eval_logical_or_full_evaluation() {
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Term(Term::Value(Value::Integer(2))),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalOr,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(1))));
+
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalOr,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
+    }
+
+    #[test]
+    fn eval_logical_and_short_circuit() {
+        let env = &mut HashMap::new();
+        env.insert("a".to_string(), "*".to_string());
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Term(Term::Variable {
+                name: "a",
+                location: 4..5,
+            }),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalAnd,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
+    }
+
+    #[test]
+    fn eval_logical_and_full_evaluation() {
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(2))),
+            Ast::Term(Term::Value(Value::Integer(3))),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalAnd,
+                rhs_len: 1,
+                location: 2..3,
+            },
+        ];
+        assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(1))));
+
+        let env = &mut HashMap::new();
+        let ast = &[
+            Ast::Term(Term::Value(Value::Integer(2))),
+            Ast::Term(Term::Value(Value::Integer(0))),
+            Ast::Binary {
+                operator: BinaryOperator::LogicalAnd,
+                rhs_len: 1,
+                location: 2..3,
             },
         ];
         assert_eq!(eval(ast, env), Ok(Term::Value(Value::Integer(0))));
