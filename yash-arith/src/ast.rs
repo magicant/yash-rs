@@ -293,15 +293,6 @@ impl From<crate::token::Error> for Error {
     }
 }
 
-/// Returns the index of the last node.
-///
-/// Panics if the slice is empty.
-fn current_root_index(nodes: &[Ast]) -> usize {
-    let len = nodes.len();
-    assert!(len > 0);
-    len - 1
-}
-
 /// Parses postfix operators
 fn parse_postfix<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
 where

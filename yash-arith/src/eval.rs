@@ -74,7 +74,7 @@ fn expand_variable<E: Env>(
 }
 
 /// Evaluates a term into a value.
-fn into_value<E: Env>(term: Term, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
+pub fn into_value<E: Env>(term: Term, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
     match term {
         Term::Value(value) => Ok(value),
         Term::Variable { name, location } => expand_variable(name, &location, env),
