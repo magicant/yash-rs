@@ -181,12 +181,11 @@ impl Operator {
         }
     }
 
-    // TODO Make this private
     /// Returns the precedence of the operator.
     ///
     /// If the operator acts as both a unary and binary operator, the result is
     /// the precedence as a binary operator.
-    pub fn precedence(self) -> u8 {
+    fn precedence(self) -> u8 {
         use Operator::*;
         match self {
             CloseParen | Colon => 0,
@@ -307,7 +306,7 @@ where
             assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
         result.push(Ast::Postfix { operator, location });
     }
-    return Ok(());
+    Ok(())
 }
 
 /// Parses a leaf expression.
@@ -472,9 +471,6 @@ mod tests {
             })
         );
     }
-
-    // TODO parentheses
-    // TODO unmatched_parentheses
 
     #[test]
     fn increment_postfix_operator() {
@@ -1339,4 +1335,6 @@ mod tests {
             ]
         );
     }
+
+    // TODO unmatched_parentheses
 }
