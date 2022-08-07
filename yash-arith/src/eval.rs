@@ -205,7 +205,11 @@ fn binary_result<E>(
 ) -> Result<Value, Error<E>> {
     fn require_non_negative<E>(v: i64, location: &Range<usize>) -> Result<u32, Error<E>> {
         v.try_into().map_err(|_| Error {
-            cause: EvalError::ReverseShifting,
+            cause: if v < 0 {
+                EvalError::ReverseShifting
+            } else {
+                EvalError::Overflow
+            },
             location: location.clone(),
         })
     }
@@ -1063,16 +1067,18 @@ mod tests {
     #[test]
     fn binary_result_shift_left_too_large_rhs() {
         let lhs = Value::Integer(0);
-        let rhs = Value::Integer(i64::BITS as _);
-        for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
-            assert_eq!(
-                result,
-                Err(Error {
-                    cause: EvalError::Overflow,
-                    location: 3..4,
-                })
-            );
+        for rhs in [i64::BITS as i64, i64::MAX] {
+            let rhs = Value::Integer(rhs);
+            for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
+                let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+                assert_eq!(
+                    result,
+                    Err(Error {
+                        cause: EvalError::Overflow,
+                        location: 3..4,
+                    })
+                );
+            }
         }
     }
 
