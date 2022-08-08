@@ -18,59 +18,63 @@
 //!
 //! TODO Elaborate
 
-use assert_matches::assert_matches;
+use std::fmt::Debug;
 use std::fmt::Display;
-use std::iter::Peekable;
+use std::fmt::Pointer;
 use std::ops::Range;
 
 mod token;
 
-use token::Operator;
-use token::Term;
-use token::Token;
 pub use token::TokenError;
 use token::Tokens;
 pub use token::Value;
 
+mod ast;
+
+pub use ast::SyntaxError;
+
+mod env;
+
+pub use env::Env;
+
+mod eval;
+
+pub use eval::EvalError;
+
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorCause<E> {
-    /// Error in tokenization
-    TokenError(TokenError),
-    /// A variable value that is not a valid number
-    InvalidVariableValue(String),
-    /// Result out of bounds
-    Overflow,
-    /// Division by zero
-    DivisionByZero,
-    /// Left bit-shifting of a negative value
-    LeftShiftingNegative,
-    /// Bit-shifting with a negative right-hand-side operand
-    ReverseShifting,
-    /// Error assigning a variable value.
-    AssignVariableError(E),
+    /// Syntax error parsing the expression
+    SyntaxError(SyntaxError),
+    /// Error evaluating the parsed expression
+    EvalError(EvalError<E>),
 }
 
 impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
-            TokenError(e) => e.fmt(f),
-            InvalidVariableValue(v) => {
-                write!(f, "variable value {:?} cannot be parsed as a number", v)
-            }
-            Overflow => "overflow".fmt(f),
-            DivisionByZero => "division by zero".fmt(f),
-            LeftShiftingNegative => "negative value cannot be left-shifted".fmt(f),
-            ReverseShifting => "bit-shifting with negative right-hand-side operand".fmt(f),
-            AssignVariableError(e) => e.fmt(f),
+            SyntaxError(e) => e.fmt(f),
+            EvalError(e) => e.fmt(f),
         }
     }
 }
 
 impl<E> From<TokenError> for ErrorCause<E> {
     fn from(e: TokenError) -> Self {
-        ErrorCause::TokenError(e)
+        ErrorCause::SyntaxError(e.into())
+    }
+}
+
+impl<E> From<SyntaxError> for ErrorCause<E> {
+    fn from(e: SyntaxError) -> Self {
+        ErrorCause::SyntaxError(e)
+    }
+}
+
+impl<E> From<EvalError<E>> for ErrorCause<E> {
+    fn from(e: EvalError<E>) -> Self {
+        ErrorCause::EvalError(e)
     }
 }
 
@@ -91,8 +95,8 @@ impl<E: Display> Display for Error<E> {
 
 impl<E: std::fmt::Debug + Display> std::error::Error for Error<E> {}
 
-impl<E> From<token::Error> for Error<E> {
-    fn from(e: token::Error) -> Self {
+impl<E> From<ast::Error> for Error<E> {
+    fn from(e: ast::Error) -> Self {
         Error {
             cause: e.cause.into(),
             location: e.location,
@@ -100,362 +104,22 @@ impl<E> From<token::Error> for Error<E> {
     }
 }
 
-mod env;
-
-pub use env::Env;
-
-/// Expands a variable to its value.
-fn expand_variable<E: Env>(
-    name: &str,
-    location: &Range<usize>,
-    mode: Mode,
-    env: &E,
-) -> Result<Value, Error<E::AssignVariableError>> {
-    if let (Mode::Eval, Some(value)) = (mode, env.get_variable(name)) {
-        match value.parse() {
-            Ok(number) => Ok(Value::Integer(number)),
-            Err(_) => Err(Error {
-                cause: ErrorCause::InvalidVariableValue(value.to_string()),
-                location: location.clone(),
-            }),
-        }
-    } else {
-        Ok(Value::Integer(0))
-    }
-}
-
-/// Specifies the behavior of parse functions.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Mode {
-    /// Evaluate the (sub)expression parsed.
-    Eval,
-    /// Just parse a (sub)expression; don't evaluate.
-    Skip,
-}
-
-impl Term<'_> {
-    /// Evaluate the term into a value.
-    fn into_value<E: Env>(
-        self,
-        mode: Mode,
-        env: &E,
-    ) -> Result<Value, Error<E::AssignVariableError>> {
-        match mode {
-            Mode::Eval => match self {
-                Term::Value(value) => Ok(value),
-                Term::Variable { name, location } => expand_variable(name, &location, mode, env),
-            },
-            Mode::Skip => Ok(Value::Integer(0)),
+impl<E> From<eval::Error<E>> for Error<E> {
+    fn from(e: eval::Error<E>) -> Self {
+        Error {
+            cause: e.cause.into(),
+            location: e.location,
         }
     }
-}
-
-fn unwrap_or_overflow<T, E>(result: Option<T>, location: Range<usize>) -> Result<T, Error<E>> {
-    result.ok_or(Error {
-        cause: ErrorCause::Overflow,
-        location,
-    })
-}
-
-/// Applies a unary operator.
-fn apply_unary<E>(
-    operator: Operator,
-    operand: Value,
-    location: Range<usize>,
-) -> Result<Value, Error<E>> {
-    let Value::Integer(value) = operand;
-    use Operator::*;
-    Ok(match operator {
-        Plus => Value::Integer(value),
-        Minus => Value::Integer(unwrap_or_overflow(value.checked_neg(), location)?),
-        Tilde => Value::Integer(!value),
-        Bang => Value::Integer((value == 0) as i64),
-        PlusPlus => Value::Integer(unwrap_or_overflow(value.checked_add(1), location)?),
-        MinusMinus => Value::Integer(unwrap_or_overflow(value.checked_sub(1), location)?),
-        _ => panic!("not a unary operator: {:?}", operator),
-    })
-}
-
-/// Parses optional postfix operators.
-fn parse_postfix<'a, E: Env>(
-    operand: Term<'a>,
-    tokens: &mut Peekable<Tokens<'a>>,
-    mode: Mode,
-    env: &mut E,
-) -> Result<Term<'a>, Error<E::AssignVariableError>> {
-    if let Some(Ok(Token::Operator {
-        operator: Operator::PlusPlus | Operator::MinusMinus,
-        ..
-    })) = tokens.peek()
-    {
-        let (operator, op_location) = assert_matches!(
-            tokens.next(),
-            Some(Ok(Token::Operator { operator, location })) => (operator, location)
-        );
-        match operand {
-            Term::Value(_) => todo!("reject non-variable"),
-            Term::Variable { name, location } => {
-                let old_value = expand_variable(name, &location, mode, env)?;
-                let new_value = apply_unary(operator, old_value.clone(), op_location.clone())?;
-
-                if mode == Mode::Eval {
-                    env.assign_variable(name, new_value.to_string())
-                        .map_err(|e| Error {
-                            cause: ErrorCause::AssignVariableError(e),
-                            location: op_location,
-                        })?;
-                }
-                Ok(Term::Value(old_value))
-            }
-        }
-    } else {
-        Ok(operand)
-    }
-}
-
-/// Parses a leaf expression.
-///
-/// A leaf expression is a constant number, variable, or parenthesized
-/// expression, optionally modified by a unary operator.
-fn parse_leaf<'a, E: Env>(
-    tokens: &mut Peekable<Tokens<'a>>,
-    mode: Mode,
-    env: &mut E,
-) -> Result<Term<'a>, Error<E::AssignVariableError>> {
-    use Operator::*;
-    match tokens.next().transpose()? {
-        Some(Token::Term(term)) => parse_postfix(term, tokens, mode, env),
-
-        Some(Token::Operator {
-            operator,
-            location: op_location,
-        }) => match operator {
-            OpenParen => {
-                let inner = parse_binary(tokens, 1, mode, env)?;
-                tokens.next().transpose()?; // TODO Check if this token is a closing parenthesis
-                parse_postfix(inner, tokens, mode, env)
-            }
-            Plus | Minus | Tilde | Bang => {
-                let operand = parse_leaf(tokens, mode, env)?.into_value(mode, env)?;
-                apply_unary(operator, operand, op_location).map(Term::Value)
-            }
-            PlusPlus | MinusMinus => match parse_leaf(tokens, mode, env)? {
-                Term::Value(_) => todo!("reject non-variable"),
-                Term::Variable { name, location } => {
-                    let old_value = expand_variable(name, &location, mode, env)?;
-                    let result = if mode == Mode::Eval {
-                        let new_value = apply_unary(operator, old_value, op_location.clone())?;
-                        env.assign_variable(name, new_value.to_string())
-                            .map_err(|e| Error {
-                                cause: ErrorCause::AssignVariableError(e),
-                                location: op_location,
-                            })?;
-                        new_value
-                    } else {
-                        Value::Integer(0)
-                    };
-                    Ok(Term::Value(result))
-                }
-            },
-            _ => todo!("handle orphan operator: {:?}", operator),
-        },
-
-        None => todo!("handle missing token"),
-    }
-}
-
-/// Applies a binary operator.
-///
-/// If `op` is a compound assignment operator, only the binary operation is
-/// performed, ignoring the assignment. For `Operator::Equal`, `rhs` is
-/// returned, ignoring `lhs`.
-fn apply_binary<E>(
-    op: Operator,
-    lhs: Value,
-    rhs: Value,
-    location: Range<usize>,
-) -> Result<Value, Error<E>> {
-    let (Value::Integer(lhs), Value::Integer(rhs)) = (lhs, rhs);
-    use Operator::*;
-    Ok(match op {
-        Equal => Value::Integer(rhs),
-        BarBar => Value::Integer((lhs != 0 || rhs != 0) as _),
-        AndAnd => Value::Integer((lhs != 0 && rhs != 0) as _),
-        Bar | BarEqual => Value::Integer(lhs | rhs),
-        Caret | CaretEqual => Value::Integer(lhs ^ rhs),
-        And | AndEqual => Value::Integer(lhs & rhs),
-        EqualEqual => Value::Integer((lhs == rhs) as _),
-        BangEqual => Value::Integer((lhs != rhs) as _),
-        Less => Value::Integer((lhs < rhs) as _),
-        Greater => Value::Integer((lhs > rhs) as _),
-        LessEqual => Value::Integer((lhs <= rhs) as _),
-        GreaterEqual => Value::Integer((lhs >= rhs) as _),
-        LessLess | LessLessEqual => {
-            if lhs < 0 {
-                return Err(Error {
-                    cause: ErrorCause::LeftShiftingNegative,
-                    location,
-                });
-            }
-            if rhs < 0 {
-                return Err(Error {
-                    cause: ErrorCause::ReverseShifting,
-                    location,
-                });
-            }
-            let rhs = unwrap_or_overflow(rhs.try_into().ok(), location.clone())?;
-            let result = unwrap_or_overflow(lhs.checked_shl(rhs), location.clone())?;
-            if result >> rhs != lhs {
-                return Err(Error {
-                    cause: ErrorCause::Overflow,
-                    location,
-                });
-            }
-            Value::Integer(result)
-        }
-        GreaterGreater | GreaterGreaterEqual => {
-            if rhs < 0 {
-                return Err(Error {
-                    cause: ErrorCause::ReverseShifting,
-                    location,
-                });
-            }
-            Value::Integer(unwrap_or_overflow(
-                rhs.try_into().ok().and_then(|rhs| lhs.checked_shr(rhs)),
-                location,
-            )?)
-        }
-        Plus | PlusEqual => Value::Integer(unwrap_or_overflow(lhs.checked_add(rhs), location)?),
-        Minus | MinusEqual => Value::Integer(unwrap_or_overflow(lhs.checked_sub(rhs), location)?),
-        Asterisk | AsteriskEqual => {
-            Value::Integer(unwrap_or_overflow(lhs.checked_mul(rhs), location)?)
-        }
-        Slash | SlashEqual => {
-            if rhs == 0 {
-                return Err(Error {
-                    cause: ErrorCause::DivisionByZero,
-                    location,
-                });
-            } else {
-                Value::Integer(unwrap_or_overflow(lhs.checked_div(rhs), location)?)
-            }
-        }
-        Percent | PercentEqual => {
-            if rhs == 0 {
-                return Err(Error {
-                    cause: ErrorCause::DivisionByZero,
-                    location,
-                });
-            } else {
-                Value::Integer(unwrap_or_overflow(lhs.checked_rem(rhs), location)?)
-            }
-        }
-        Question | Colon | Tilde | Bang | PlusPlus | MinusMinus | OpenParen | CloseParen => {
-            panic!("not a binary operator: {:?}", op)
-        }
-    })
-}
-
-/// Parses an expression that may contain binary operators.
-///
-/// This function consumes binary operators with precedence equal to or greater
-/// than the given minimum precedence, which must be greater than 0.
-fn parse_binary<'a, E: Env>(
-    tokens: &mut Peekable<Tokens<'a>>,
-    min_precedence: u8,
-    mode: Mode,
-    env: &mut E,
-) -> Result<Term<'a>, Error<E::AssignVariableError>> {
-    let mut term = parse_leaf(tokens, mode, env)?;
-
-    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
-        let precedence = operator.precedence();
-        if precedence < min_precedence {
-            break;
-        }
-
-        let op_location =
-            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
-
-        use Operator::*;
-        match operator {
-            Equal | BarEqual | CaretEqual | AndEqual | LessLessEqual | GreaterGreaterEqual
-            | PlusEqual | MinusEqual | AsteriskEqual | SlashEqual | PercentEqual => match term {
-                Term::Value(_) => todo!(),
-                Term::Variable { name, location } => {
-                    let lhs = if operator == Equal {
-                        Value::Integer(0)
-                    } else {
-                        expand_variable(name, &location, mode, env)?
-                    };
-                    let rhs = parse_binary(tokens, precedence, mode, env)?.into_value(mode, env)?;
-                    let result = if mode == Mode::Eval {
-                        let result = apply_binary(operator, lhs, rhs, op_location.clone())?;
-                        env.assign_variable(name, result.to_string())
-                            .map_err(|e| Error {
-                                cause: ErrorCause::AssignVariableError(e),
-                                location: op_location,
-                            })?;
-                        result
-                    } else {
-                        Value::Integer(0)
-                    };
-                    term = Term::Value(result);
-                }
-            },
-            Question => {
-                let Value::Integer(condition) = term.into_value(mode, env)?;
-                let (then_mode, else_mode) = if condition != 0 {
-                    (mode, Mode::Skip)
-                } else {
-                    (Mode::Skip, mode)
-                };
-                debug_assert_eq!(precedence, 2);
-                let then_result = parse_binary(tokens, 1, then_mode, env)?;
-                // TODO Reject if a colon is missing
-                tokens.next().transpose()?;
-                let else_result = parse_binary(tokens, 2, else_mode, env)?;
-                term = if condition != 0 {
-                    then_result
-                } else {
-                    else_result
-                };
-                // TODO result into_value
-            }
-            BarBar | AndAnd => {
-                let Value::Integer(lhs) = term.into_value(mode, env)?;
-                let skip_rhs = match operator {
-                    BarBar => lhs != 0,
-                    AndAnd => lhs == 0,
-                    _ => unreachable!(),
-                };
-                let rhs_mode = if skip_rhs { Mode::Skip } else { mode };
-                let rhs = parse_binary(tokens, precedence + 1, rhs_mode, env)?
-                    .into_value(rhs_mode, env)?;
-                let value = apply_binary(operator, Value::Integer(lhs), rhs, op_location)?;
-                term = Term::Value(value);
-            }
-            Bar | Caret | And | EqualEqual | BangEqual | Less | LessEqual | Greater
-            | GreaterEqual | LessLess | GreaterGreater | Plus | Minus | Asterisk | Slash
-            | Percent => {
-                let rhs = parse_binary(tokens, precedence + 1, mode, env)?;
-                let (lhs, rhs) = (term.into_value(mode, env)?, rhs.into_value(mode, env)?);
-                term = Term::Value(apply_binary(operator, lhs, rhs, op_location)?);
-            }
-            Colon | Tilde | Bang | PlusPlus | MinusMinus | OpenParen => todo!("syntax error"),
-            CloseParen => panic!("min_precedence must not be 0"),
-        };
-    }
-
-    Ok(term)
 }
 
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
-    let mut tokens = Tokens::new(expression).peekable();
-    let term = parse_binary(&mut tokens, 1, Mode::Eval, env)?;
-    assert_eq!(tokens.next(), None, "todo: handle orphan term");
-    term.into_value(Mode::Eval, env)
+    let tokens = Tokens::new(expression).peekable();
+    let ast = ast::parse(tokens)?;
+    let term = eval::eval(&ast, env)?;
+    let value = eval::into_value(term, env)?;
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -485,14 +149,14 @@ mod tests {
         assert_eq!(
             eval("08", env),
             Err(Error {
-                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
+                cause: TokenError::InvalidNumericConstant.into(),
                 location: 0..2,
             })
         );
         assert_eq!(
             eval("0192", env),
             Err(Error {
-                cause: ErrorCause::TokenError(TokenError::InvalidNumericConstant),
+                cause: TokenError::InvalidNumericConstant.into(),
                 location: 0..4,
             })
         );
@@ -534,21 +198,21 @@ mod tests {
         assert_eq!(
             eval("foo", env),
             Err(Error {
-                cause: ErrorCause::InvalidVariableValue("".to_string()),
+                cause: EvalError::InvalidVariableValue("".to_string()).into(),
                 location: 0..3,
             })
         );
         assert_eq!(
             eval("bar", env),
             Err(Error {
-                cause: ErrorCause::InvalidVariableValue("*".to_string()),
+                cause: EvalError::InvalidVariableValue("*".to_string()).into(),
                 location: 0..3,
             })
         );
         assert_eq!(
             eval("  oops ", env),
             Err(Error {
-                cause: ErrorCause::InvalidVariableValue("foo".to_string()),
+                cause: EvalError::InvalidVariableValue("foo".to_string()).into(),
                 location: 2..6,
             })
         );
@@ -758,21 +422,21 @@ mod tests {
         assert_eq!(
             eval("0x4000000000000000<<1", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 18..20,
             })
         );
         assert_eq!(
             eval("0<<1000", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..3,
             })
         );
         assert_eq!(
             eval("0<<0x100000000", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..3,
             })
         );
@@ -780,14 +444,14 @@ mod tests {
         assert_eq!(
             eval("0>>1000", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..3,
             })
         );
         assert_eq!(
             eval("0>>0x100000000", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..3,
             })
         );
@@ -801,14 +465,14 @@ mod tests {
         assert_eq!(
             eval("-1<<1", env),
             Err(Error {
-                cause: ErrorCause::LeftShiftingNegative,
+                cause: EvalError::LeftShiftingNegative.into(),
                 location: 2..4,
             })
         );
         assert_eq!(
             eval("(-0x7FFFFFFFFFFFFFFF-1)<<1", env),
             Err(Error {
-                cause: ErrorCause::LeftShiftingNegative,
+                cause: EvalError::LeftShiftingNegative.into(),
                 location: 23..25,
             })
         );
@@ -824,7 +488,7 @@ mod tests {
         assert_eq!(
             eval("1 << -1", env),
             Err(Error {
-                cause: ErrorCause::ReverseShifting,
+                cause: EvalError::ReverseShifting.into(),
                 location: 2..4,
             })
         );
@@ -832,7 +496,7 @@ mod tests {
         assert_eq!(
             eval("1 >> -1", env),
             Err(Error {
-                cause: ErrorCause::ReverseShifting,
+                cause: EvalError::ReverseShifting.into(),
                 location: 2..4,
             })
         );
@@ -852,7 +516,7 @@ mod tests {
         assert_eq!(
             eval("9223372036854775807+1", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 19..20,
             })
         );
@@ -872,7 +536,7 @@ mod tests {
         assert_eq!(
             eval("0-9223372036854775807-2", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 21..22,
             })
         );
@@ -892,7 +556,7 @@ mod tests {
         assert_eq!(
             eval("0x100000000 * 0x80000000", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 12..13,
             })
         );
@@ -912,21 +576,21 @@ mod tests {
         assert_eq!(
             eval("1/0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 1..2,
             })
         );
         assert_eq!(
             eval("0/0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 1..2,
             })
         );
         assert_eq!(
             eval("10/0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 2..3,
             })
         );
@@ -938,7 +602,7 @@ mod tests {
         assert_eq!(
             eval("(-0x7FFFFFFFFFFFFFFF-1)/-1", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 23..24,
             })
         );
@@ -958,21 +622,21 @@ mod tests {
         assert_eq!(
             eval("1%0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 1..2,
             })
         );
         assert_eq!(
             eval("0%0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 1..2,
             })
         );
         assert_eq!(
             eval("10%0", env),
             Err(Error {
-                cause: ErrorCause::DivisionByZero,
+                cause: EvalError::DivisionByZero.into(),
                 location: 2..3,
             })
         );
@@ -984,7 +648,7 @@ mod tests {
         assert_eq!(
             eval("(-0x7FFFFFFFFFFFFFFF-1)%-1", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 23..24,
             })
         );
@@ -1017,7 +681,7 @@ mod tests {
         assert_eq!(
             eval(" - (-0x7FFFFFFFFFFFFFFF-1)", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..2
             })
         );
@@ -1060,7 +724,7 @@ mod tests {
         assert_eq!(
             eval("  ++ i", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 2..4,
             })
         );
@@ -1083,7 +747,7 @@ mod tests {
         assert_eq!(
             eval(" -- i", env),
             Err(Error {
-                cause: ErrorCause::Overflow,
+                cause: EvalError::Overflow.into(),
                 location: 1..3,
             })
         );

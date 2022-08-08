@@ -20,10 +20,10 @@ use std::fmt::Display;
 use std::ops::Range;
 
 /// Result of evaluating an expression
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Value {
     Integer(i64),
-    // TODO Float, String
+    // TODO Float
 }
 
 impl Display for Value {
@@ -125,33 +125,6 @@ pub enum Operator {
     OpenParen,
     /// `)`
     CloseParen,
-}
-
-impl Operator {
-    /// Returns the precedence of the operator.
-    ///
-    /// If the operator acts as both a unary and binary operator, the result is
-    /// the precedence as a binary operator.
-    pub fn precedence(self) -> u8 {
-        use Operator::*;
-        match self {
-            CloseParen | Colon => 0,
-            Equal | BarEqual | CaretEqual | AndEqual | LessLessEqual | GreaterGreaterEqual
-            | PlusEqual | MinusEqual | AsteriskEqual | SlashEqual | PercentEqual => 1,
-            Question => 2,
-            BarBar => 3,
-            AndAnd => 4,
-            Bar => 5,
-            Caret => 6,
-            And => 7,
-            EqualEqual | BangEqual => 8,
-            Less | LessEqual | Greater | GreaterEqual => 9,
-            LessLess | GreaterGreater => 10,
-            Plus | Minus => 11,
-            Asterisk | Slash | Percent => 12,
-            Tilde | Bang | PlusPlus | MinusMinus | OpenParen => 13,
-        }
-    }
 }
 
 /// Atomic lexical element of an expression
