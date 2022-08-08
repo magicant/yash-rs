@@ -265,7 +265,17 @@ pub enum Ast<'a> {
 pub enum SyntaxError {
     /// Error in tokenization
     TokenError(TokenError),
-    // TODO
+    /// `(` without `)`
+    UnclosedParenthesis,
+}
+
+impl std::fmt::Display for SyntaxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SyntaxError::TokenError(e) => e.fmt(f),
+            SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
+        }
+    }
 }
 
 impl From<TokenError> for SyntaxError {
@@ -327,11 +337,22 @@ where
             parse_postfix(tokens, result)
         }
 
-        Token::Operator { operator, .. } if operator == Operator::OpenParen => {
+        Token::Operator { operator, location } if operator == Operator::OpenParen => {
             parse_tree(tokens, 1, result)?;
 
-            // TODO Reject if a closing parenthesis is missing
-            tokens.next().transpose()?;
+            // Reject if a closing parenthesis is missing
+            if !matches!(
+                tokens.next().transpose()?,
+                Some(Token::Operator {
+                    operator: Operator::CloseParen,
+                    ..
+                })
+            ) {
+                return Err(Error {
+                    cause: SyntaxError::UnclosedParenthesis,
+                    location,
+                });
+            }
 
             parse_postfix(tokens, result)
         }
@@ -1336,5 +1357,14 @@ mod tests {
         );
     }
 
-    // TODO unmatched_parentheses
+    #[test]
+    fn unmatched_parentheses() {
+        assert_eq!(
+            parse_str("(a + 0 : "),
+            Err(Error {
+                cause: SyntaxError::UnclosedParenthesis,
+                location: 0..1,
+            })
+        );
+    }
 }

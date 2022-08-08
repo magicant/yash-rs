@@ -54,7 +54,7 @@ impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
-            SyntaxError(e) => e.fmt(f),
+            SyntaxError(e) => Display::fmt(&e, f),
             EvalError(e) => e.fmt(f),
         }
     }
@@ -818,5 +818,15 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(0)));
     }
 
-    // TODO unmatched_parentheses
+    #[test]
+    fn unmatched_parenthesis() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval(" ( 1 ", env),
+            Err(Error {
+                cause: SyntaxError::UnclosedParenthesis.into(),
+                location: 1..2,
+            })
+        );
+    }
 }
