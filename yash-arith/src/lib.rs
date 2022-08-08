@@ -20,7 +20,6 @@
 
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::fmt::Pointer;
 use std::ops::Range;
 
 mod token;
@@ -54,8 +53,8 @@ impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
-            SyntaxError(e) => Display::fmt(&e, f),
-            EvalError(e) => e.fmt(f),
+            SyntaxError(e) => Display::fmt(e, f),
+            EvalError(e) => Display::fmt(e, f),
         }
     }
 }

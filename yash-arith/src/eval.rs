@@ -44,6 +44,25 @@ pub enum EvalError<E> {
     AssignVariableError(E),
 }
 
+impl<E> std::fmt::Display for EvalError<E>
+where
+    E: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvalError::InvalidVariableValue(value) => {
+                write!(f, "invalid variable value: {:?}", value)
+            }
+            EvalError::Overflow => "overflow".fmt(f),
+            EvalError::DivisionByZero => "division by zero".fmt(f),
+            EvalError::LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
+            EvalError::ReverseShifting => "negative shift width".fmt(f),
+            EvalError::AssignmentToValue => "assignment to a non-variable".fmt(f),
+            EvalError::AssignVariableError(e) => e.fmt(f),
+        }
+    }
+}
+
 /// Description of an error that occurred during evaluation
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Error<E> {
