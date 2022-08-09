@@ -271,6 +271,8 @@ pub enum SyntaxError {
     QuestionWithoutColon,
     /// `:` without `?`
     ColonWithoutQuestion,
+    /// Other error in operator usage
+    InvalidOperator,
 }
 
 impl std::fmt::Display for SyntaxError {
@@ -280,6 +282,7 @@ impl std::fmt::Display for SyntaxError {
             SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
             SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
             SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
+            SyntaxError::InvalidOperator => "invalid use of operator".fmt(f),
         }
     }
 }
@@ -378,7 +381,15 @@ where
         }
 
         Token::Operator { operator, location } => {
-            let operator = operator.as_prefix().expect("TODO: handle syntax error");
+            let operator = match operator.as_prefix() {
+                Some(operator) => operator,
+                None => {
+                    return Err(Error {
+                        cause: SyntaxError::InvalidOperator,
+                        location,
+                    })
+                }
+            };
             parse_leaf(tokens, result)?;
             result.push(Ast::Prefix { operator, location });
             Ok(())
@@ -460,10 +471,15 @@ where
             continue;
         }
 
-        let (operator, associativity) = operator.as_binary().expect("TODO: unsupported operator");
-        let rhs_precedence = match associativity {
-            Associativity::Left => precedence + 1,
-            Associativity::Right => precedence,
+        let (operator, rhs_precedence) = match operator.as_binary() {
+            Some((operator, Associativity::Left)) => (operator, precedence + 1),
+            Some((operator, Associativity::Right)) => (operator, precedence),
+            None => {
+                return Err(Error {
+                    cause: SyntaxError::InvalidOperator,
+                    location,
+                })
+            }
         };
         parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?
     }
@@ -1450,6 +1466,31 @@ mod tests {
             Err(Error {
                 cause: SyntaxError::UnclosedParenthesis,
                 location: 0..1,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_operator() {
+        assert_eq!(
+            parse_str(" 3 ! 5"),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 3..4,
+            })
+        );
+        assert_eq!(
+            parse_str(" 1 + 2 ~ 3 + 4 "),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 7..8,
+            })
+        );
+        assert_eq!(
+            parse_str(" + * 3 "),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 3..4,
             })
         );
     }
