@@ -269,6 +269,8 @@ pub enum SyntaxError {
     UnclosedParenthesis,
     /// `?` without `:`
     QuestionWithoutColon,
+    /// `:` without `?`
+    ColonWithoutQuestion,
 }
 
 impl std::fmt::Display for SyntaxError {
@@ -277,6 +279,7 @@ impl std::fmt::Display for SyntaxError {
             SyntaxError::TokenError(e) => e.fmt(f),
             SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
             SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
+            SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
         }
     }
 }
@@ -322,6 +325,34 @@ where
     Ok(())
 }
 
+/// Parses a closing parenthesis `")"`.
+///
+/// Returns an error if the next token is not a closing parenthesis.
+fn parse_close_paren<'a, I>(tokens: &mut Peekable<I>, location: Range<usize>) -> Result<(), Error>
+where
+    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+{
+    match tokens.next().transpose()? {
+        Some(Token::Operator {
+            operator: Operator::CloseParen,
+            ..
+        }) => Ok(()),
+
+        Some(Token::Operator {
+            operator: Operator::Colon,
+            location,
+        }) => Err(Error {
+            cause: SyntaxError::ColonWithoutQuestion,
+            location,
+        }),
+
+        _ => Err(Error {
+            cause: SyntaxError::UnclosedParenthesis,
+            location,
+        }),
+    }
+}
+
 /// Parses a leaf expression.
 ///
 /// A leaf expression is a term or parenthesized expression, optionally modified
@@ -342,21 +373,7 @@ where
 
         Token::Operator { operator, location } if operator == Operator::OpenParen => {
             parse_tree(tokens, 1, result)?;
-
-            // Reject if a closing parenthesis is missing
-            if !matches!(
-                tokens.next().transpose()?,
-                Some(Token::Operator {
-                    operator: Operator::CloseParen,
-                    ..
-                })
-            ) {
-                return Err(Error {
-                    cause: SyntaxError::UnclosedParenthesis,
-                    location,
-                });
-            }
-
+            parse_close_paren(tokens, location)?;
             parse_postfix(tokens, result)
         }
 
@@ -453,6 +470,28 @@ where
     Ok(())
 }
 
+/// Ensures there is no more token.
+///
+/// Returns an error if there is a next token.
+fn parse_end_of_input<'a, I>(tokens: &mut Peekable<I>) -> Result<(), Error>
+where
+    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+{
+    match tokens.next().transpose()? {
+        None => Ok(()),
+
+        Some(Token::Operator {
+            operator: Operator::Colon,
+            location,
+        }) => Err(Error {
+            cause: SyntaxError::ColonWithoutQuestion,
+            location,
+        }),
+
+        Some(token) => todo!("reject unparsed token {:?}", token),
+    }
+}
+
 /// Parses the whole expression.
 ///
 /// A successful parse is returned as a non-empty vector of `Ast` nodes, where
@@ -463,7 +502,7 @@ where
 {
     let mut result = Vec::new();
     parse_tree(&mut tokens, 1, &mut result)?;
-    // TODO Reject if there are unparsed tokens
+    parse_end_of_input(&mut tokens)?;
     Ok(result)
 }
 
@@ -1363,7 +1402,23 @@ mod tests {
         );
     }
 
-    // TODO colon_without_question
+    #[test]
+    fn colon_without_question() {
+        assert_eq!(
+            parse_str(" 2 : 3 "),
+            Err(Error {
+                cause: SyntaxError::ColonWithoutQuestion,
+                location: 3..4,
+            })
+        );
+        assert_eq!(
+            parse_str("(4+5-6:7)"),
+            Err(Error {
+                cause: SyntaxError::ColonWithoutQuestion,
+                location: 6..7,
+            })
+        );
+    }
 
     #[test]
     fn parentheses() {
@@ -1391,7 +1446,7 @@ mod tests {
     #[test]
     fn unmatched_parentheses() {
         assert_eq!(
-            parse_str("(a + 0 : "),
+            parse_str("(a + 0 "),
             Err(Error {
                 cause: SyntaxError::UnclosedParenthesis,
                 location: 0..1,
