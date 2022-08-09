@@ -267,6 +267,8 @@ pub enum SyntaxError {
     TokenError(TokenError),
     /// `(` without `)`
     UnclosedParenthesis,
+    /// `?` without `:`
+    QuestionWithoutColon,
 }
 
 impl std::fmt::Display for SyntaxError {
@@ -274,6 +276,7 @@ impl std::fmt::Display for SyntaxError {
         match self {
             SyntaxError::TokenError(e) => e.fmt(f),
             SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
+            SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
         }
     }
 }
@@ -416,8 +419,19 @@ where
             let then_index = result.len();
             parse_tree(tokens, 1, result)?;
 
-            // TODO Reject if a colon is missing
-            tokens.next().transpose()?;
+            // Reject if a colon is missing
+            if !matches!(
+                tokens.next().transpose()?,
+                Some(Token::Operator {
+                    operator: Operator::Colon,
+                    ..
+                })
+            ) {
+                return Err(Error {
+                    cause: SyntaxError::QuestionWithoutColon,
+                    location,
+                });
+            }
 
             let else_index = result.len();
             parse_tree(tokens, precedence, result)?;
@@ -1331,7 +1345,24 @@ mod tests {
         );
     }
 
-    // TODO question_without_colon
+    #[test]
+    fn question_without_colon() {
+        assert_eq!(
+            parse_str(" 1 ? 2 + 3 "),
+            Err(Error {
+                cause: SyntaxError::QuestionWithoutColon,
+                location: 3..4,
+            })
+        );
+        assert_eq!(
+            parse_str("(9?8)"),
+            Err(Error {
+                cause: SyntaxError::QuestionWithoutColon,
+                location: 2..3,
+            })
+        );
+    }
+
     // TODO colon_without_question
 
     #[test]
