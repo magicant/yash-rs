@@ -18,8 +18,8 @@
 
 use crate::token::Operator;
 use crate::token::Term;
-use crate::token::Token;
 use crate::token::TokenError;
+use crate::token::TokenValue;
 use assert_matches::assert_matches;
 use std::iter::Peekable;
 use std::ops::Range;
@@ -314,15 +314,14 @@ impl From<crate::token::Error> for Error {
 /// Parses postfix operators
 fn parse_postfix<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
-    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+    while let Some(&Ok(TokenValue::Operator { operator, .. })) = tokens.peek() {
         let operator = match operator.as_postfix() {
             Some(operator) => operator,
             None => break,
         };
-        let location =
-            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+        let location = assert_matches!(tokens.next(), Some(Ok(TokenValue::Operator { location, .. })) => location);
         result.push(Ast::Postfix { operator, location });
     }
     Ok(())
@@ -333,15 +332,15 @@ where
 /// Returns an error if the next token is not a closing parenthesis.
 fn parse_close_paren<'a, I>(tokens: &mut Peekable<I>, location: Range<usize>) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     match tokens.next().transpose()? {
-        Some(Token::Operator {
+        Some(TokenValue::Operator {
             operator: Operator::CloseParen,
             ..
         }) => Ok(()),
 
-        Some(Token::Operator {
+        Some(TokenValue::Operator {
             operator: Operator::Colon,
             location,
         }) => Err(Error {
@@ -362,25 +361,25 @@ where
 /// by unary operators.
 fn parse_leaf<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     let token = tokens
         .next()
         .transpose()?
         .expect("TODO: handle empty expression error");
     match token {
-        Token::Term(term) => {
+        TokenValue::Term(term) => {
             result.push(Ast::Term(term));
             parse_postfix(tokens, result)
         }
 
-        Token::Operator { operator, location } if operator == Operator::OpenParen => {
+        TokenValue::Operator { operator, location } if operator == Operator::OpenParen => {
             parse_tree(tokens, 1, result)?;
             parse_close_paren(tokens, location)?;
             parse_postfix(tokens, result)
         }
 
-        Token::Operator { operator, location } => {
+        TokenValue::Operator { operator, location } => {
             let operator = match operator.as_prefix() {
                 Some(operator) => operator,
                 None => {
@@ -407,7 +406,7 @@ fn parse_binary_rhs<'a, I>(
     result: &mut Vec<Ast<'a>>,
 ) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     let old_len = result.len();
     parse_tree(tokens, min_precedence, result)?;
@@ -429,18 +428,17 @@ fn parse_tree<'a, I>(
     result: &mut Vec<Ast<'a>>,
 ) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     parse_leaf(tokens, result)?;
 
-    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+    while let Some(&Ok(TokenValue::Operator { operator, .. })) = tokens.peek() {
         let precedence = operator.precedence();
         if precedence < min_precedence {
             break;
         }
 
-        let location =
-            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+        let location = assert_matches!(tokens.next(), Some(Ok(TokenValue::Operator { location, .. })) => location);
 
         use Operator::*;
         if operator == Question {
@@ -450,7 +448,7 @@ where
             // Reject if a colon is missing
             if !matches!(
                 tokens.next().transpose()?,
-                Some(Token::Operator {
+                Some(TokenValue::Operator {
                     operator: Operator::Colon,
                     ..
                 })
@@ -491,12 +489,12 @@ where
 /// Returns an error if there is a next token.
 fn parse_end_of_input<'a, I>(tokens: &mut Peekable<I>) -> Result<(), Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     match tokens.next().transpose()? {
         None => Ok(()),
 
-        Some(Token::Operator {
+        Some(TokenValue::Operator {
             operator: Operator::Colon,
             location,
         }) => Err(Error {
@@ -514,7 +512,7 @@ where
 /// the last node is the root.
 pub fn parse<'a, I>(mut tokens: Peekable<I>) -> Result<Vec<Ast<'a>>, Error>
 where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
+    I: Iterator<Item = Result<TokenValue<'a>, crate::token::Error>>,
 {
     let mut result = Vec::new();
     parse_tree(&mut tokens, 1, &mut result)?;
