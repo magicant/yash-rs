@@ -222,6 +222,13 @@ const OPERATORS: &[(&str, Operator)] = &[
 ];
 
 /// Iterator extracting tokens from a string
+///
+/// `Tokens` implements `Iterator` but never yields `None` because it returns a
+/// special token with `TokenValue::EndOfInput` when there are no more tokens.
+/// The `next_token` inherent method may be handier than the methods of
+/// `Iterator` since it returns tokens without wrapping them in `Option`.
+///
+/// See also [`PeekableTokens`], which makes the iterator peekable.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Tokens<'a> {
     source: &'a str,
@@ -233,21 +240,17 @@ impl<'a> Tokens<'a> {
     pub fn new(source: &'a str) -> Self {
         Tokens { source, index: 0 }
     }
-}
 
-impl<'a> Iterator for Tokens<'a> {
-    type Item = Result<Token<'a>, Error>;
-
-    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
+    pub fn next_token(&mut self) -> Result<Token<'a>, Error> {
         let source = self.source[self.index..].trim_start();
         let start_of_token = self.source.len() - source.len();
         let first_char = if let Some(c) = source.chars().next() {
             c
         } else {
-            return Some(Ok(Token {
+            return Ok(Token {
                 value: TokenValue::EndOfInput,
                 location: start_of_token..start_of_token,
-            }));
+            });
         };
 
         if let Some((lexeme, operator)) = OPERATORS
@@ -259,19 +262,19 @@ impl<'a> Iterator for Tokens<'a> {
             let end_of_token = start_of_token + lexeme.len();
             let location = start_of_token..end_of_token;
             self.index = end_of_token;
-            Some(Ok(Token {
+            Ok(Token {
                 value: TokenValue::Operator(operator),
                 location,
-            }))
+            })
         } else {
             // The next token should be a term. Try parsing it.
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
             if token_len == 0 {
-                return Some(Err(Error {
+                return Err(Error {
                     cause: TokenError::InvalidCharacter,
                     location: start_of_token..start_of_token + 1,
-                }));
+                });
             }
             let end_of_token = start_of_token + token_len;
             let location = start_of_token..end_of_token;
@@ -289,10 +292,10 @@ impl<'a> Iterator for Tokens<'a> {
                 match parse {
                     Ok(i) => Term::Value(Value::Integer(i)),
                     Err(_) => {
-                        return Some(Err(Error {
+                        return Err(Error {
                             cause: TokenError::InvalidNumericConstant,
                             location,
-                        }))
+                        })
                     }
                 }
             } else {
@@ -303,16 +306,64 @@ impl<'a> Iterator for Tokens<'a> {
             };
 
             self.index = end_of_token;
-            Some(Ok(Token {
+            Ok(Token {
                 value: TokenValue::Term(term),
                 location,
-            }))
+            })
         }
+    }
+}
+
+impl<'a> Iterator for Tokens<'a> {
+    type Item = Result<Token<'a>, Error>;
+
+    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
+        Some(self.next_token())
     }
 }
 
 /// `Tokens` is fused because it never yields `None`.
 impl FusedIterator for Tokens<'_> {}
+
+/// Peekable iterator extracting tokens from a string
+///
+/// `PeekableTokens` works as a wrapper of [`Tokens`] that adds the
+/// [`peek`](Self::peek) method.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PeekableTokens<'a> {
+    inner: Tokens<'a>,
+    cached_next: Option<Result<Token<'a>, Error>>,
+}
+
+impl<'a> PeekableTokens<'a> {
+    /// Creates a tokenizer.
+    pub fn new(inner: Tokens<'a>) -> Self {
+        let cached_next = None;
+        PeekableTokens { inner, cached_next }
+    }
+
+    /// Consumes and returns the next token.
+    pub fn next(&mut self) -> Result<Token<'a>, Error> {
+        self.cached_next
+            .take()
+            .unwrap_or_else(|| self.inner.next_token())
+    }
+
+    /// Returns the next token without consuming it.
+    ///
+    /// The token will be returned again on a next call to `peek` or
+    /// [`next`](Self::next).
+    pub fn peek(&mut self) -> &Result<Token<'a>, Error> {
+        self.cached_next
+            .get_or_insert_with(|| self.inner.next_token())
+    }
+}
+
+impl<'a> From<&'a str> for PeekableTokens<'a> {
+    fn from(source: &'a str) -> Self {
+        PeekableTokens::new(Tokens::new(source))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -906,6 +957,70 @@ mod tests {
                 cause: TokenError::InvalidCharacter,
                 location: 1..2,
             }))
+        );
+    }
+
+    #[test]
+    fn peekable_tokens() {
+        let mut tokens = PeekableTokens::from("1 + 2");
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 2..3,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 2..3,
+            })
+        );
+
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(2))),
+                location: 4..5,
+            })
+        );
+
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 5..5,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 5..5,
+            })
         );
     }
 }
