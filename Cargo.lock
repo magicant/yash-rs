@@ -383,9 +383,6 @@ dependencies = [
 [[package]]
 name = "yash-arith"
 version = "0.1.0"
-dependencies = [
- "assert_matches",
-]
 
 [[package]]
 name = "yash-builtin"
