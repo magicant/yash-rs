@@ -505,7 +505,11 @@ where
     I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
 {
     match tokens.next().transpose()? {
-        None => Ok(()),
+        None
+        | Some(Token {
+            value: TokenValue::EndOfInput,
+            ..
+        }) => Ok(()),
 
         Some(Token {
             value: TokenValue::Operator(Operator::Colon),

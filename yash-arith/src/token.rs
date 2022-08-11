@@ -17,6 +17,7 @@
 //! Tokenization
 
 use std::fmt::Display;
+use std::iter::FusedIterator;
 use std::ops::Range;
 
 /// Result of evaluating an expression
@@ -240,7 +241,14 @@ impl<'a> Iterator for Tokens<'a> {
     fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
         let source = self.source[self.index..].trim_start();
         let start_of_token = self.source.len() - source.len();
-        let first_char = source.chars().next()?;
+        let first_char = if let Some(c) = source.chars().next() {
+            c
+        } else {
+            return Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: start_of_token..start_of_token,
+            }));
+        };
 
         if let Some((lexeme, operator)) = OPERATORS
             .iter()
@@ -302,6 +310,9 @@ impl<'a> Iterator for Tokens<'a> {
         }
     }
 }
+
+/// `Tokens` is fused because it never yields `None`.
+impl FusedIterator for Tokens<'_> {}
 
 #[cfg(test)]
 mod tests {
@@ -804,7 +815,13 @@ mod tests {
                 location: 6..9,
             }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 10..10,
+            }))
+        );
     }
 
     #[test]
@@ -832,7 +849,13 @@ mod tests {
                 location: 4..5,
             }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 6..6,
+            }))
+        );
     }
 
     #[test]
@@ -859,7 +882,13 @@ mod tests {
                 location: 2..3,
             }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 3..3,
+            }))
+        );
     }
 
     #[test]
