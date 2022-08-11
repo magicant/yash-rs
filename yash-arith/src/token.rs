@@ -127,7 +127,7 @@ pub enum Operator {
     CloseParen,
 }
 
-/// Atomic lexical element of an expression
+/// Value of a [`Token`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TokenValue<'a> {
     /// Term
@@ -136,9 +136,20 @@ pub enum TokenValue<'a> {
     Operator {
         /// Operator kind
         operator: Operator,
+        // TODO Remove location from TokenValue::Operator
         /// Range of the substring where the token occurs in the parsed expression
         location: Range<usize>,
     },
+    // TODO EndOfInput
+}
+
+/// Atomic lexical element of an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Token<'a> {
+    /// Token value
+    pub value: TokenValue<'a>,
+    /// Range of the substring where the token occurs in the parsed expression
+    pub location: Range<usize>,
 }
 
 /// Cause of a tokenization error
