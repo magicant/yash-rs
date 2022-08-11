@@ -17,11 +17,11 @@
 //! Abstract syntax tree parser
 
 use crate::token::Operator;
+use crate::token::PeekableTokens;
 use crate::token::Term;
 use crate::token::Token;
 use crate::token::TokenError;
 use crate::token::TokenValue;
-use std::iter::Peekable;
 use std::ops::Range;
 
 // TODO: POSIX does not require the increment/decrement operators. Maybe we
@@ -312,20 +312,20 @@ impl From<crate::token::Error> for Error {
 }
 
 /// Parses postfix operators
-fn parse_postfix<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    while let Some(&Ok(Token {
+fn parse_postfix<'a>(
+    tokens: &mut PeekableTokens<'a>,
+    result: &mut Vec<Ast<'a>>,
+) -> Result<(), Error> {
+    while let &Ok(Token {
         value: TokenValue::Operator(operator),
         ..
-    })) = tokens.peek()
+    }) = tokens.peek()
     {
         let operator = match operator.as_postfix() {
             Some(operator) => operator,
             None => break,
         };
-        let location = tokens.next().unwrap().unwrap().location;
+        let location = tokens.next().unwrap().location;
         result.push(Ast::Postfix { operator, location });
     }
     Ok(())
@@ -334,20 +334,17 @@ where
 /// Parses a closing parenthesis `")"`.
 ///
 /// Returns an error if the next token is not a closing parenthesis.
-fn parse_close_paren<'a, I>(tokens: &mut Peekable<I>, location: Range<usize>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    match tokens.next().transpose()? {
-        Some(Token {
+fn parse_close_paren(tokens: &mut PeekableTokens, location: Range<usize>) -> Result<(), Error> {
+    match tokens.next()? {
+        Token {
             value: TokenValue::Operator(Operator::CloseParen),
             ..
-        }) => Ok(()),
+        } => Ok(()),
 
-        Some(Token {
+        Token {
             value: TokenValue::Operator(Operator::Colon),
             location,
-        }) => Err(Error {
+        } => Err(Error {
             cause: SyntaxError::ColonWithoutQuestion,
             location,
         }),
@@ -363,14 +360,8 @@ where
 ///
 /// A leaf expression is a term or parenthesized expression, optionally modified
 /// by unary operators.
-fn parse_leaf<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    let token = tokens
-        .next()
-        .transpose()?
-        .expect("TODO: handle empty expression error");
+fn parse_leaf<'a>(tokens: &mut PeekableTokens<'a>, result: &mut Vec<Ast<'a>>) -> Result<(), Error> {
+    let token = tokens.next()?;
     match token.value {
         TokenValue::Term(term) => {
             result.push(Ast::Term(term));
@@ -407,16 +398,13 @@ where
 
 /// Parses the right-hand-side operand of a binary operation and pushes the
 /// operator to the result.
-fn parse_binary_rhs<'a, I>(
-    tokens: &mut Peekable<I>,
+fn parse_binary_rhs<'a>(
+    tokens: &mut PeekableTokens<'a>,
     operator: BinaryOperator,
     location: Range<usize>,
     min_precedence: u8,
     result: &mut Vec<Ast<'a>>,
-) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+) -> Result<(), Error> {
     let old_len = result.len();
     parse_tree(tokens, min_precedence, result)?;
     result.push(Ast::Binary {
@@ -431,27 +419,24 @@ where
 ///
 /// This function consumes binary operators with precedence equal to or greater
 /// than the given minimum precedence, which must be greater than 0.
-fn parse_tree<'a, I>(
-    tokens: &mut Peekable<I>,
+fn parse_tree<'a>(
+    tokens: &mut PeekableTokens<'a>,
     min_precedence: u8,
     result: &mut Vec<Ast<'a>>,
-) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+) -> Result<(), Error> {
     parse_leaf(tokens, result)?;
 
-    while let Some(&Ok(Token {
+    while let &Ok(Token {
         value: TokenValue::Operator(operator),
         ..
-    })) = tokens.peek()
+    }) = tokens.peek()
     {
         let precedence = operator.precedence();
         if precedence < min_precedence {
             break;
         }
 
-        let location = tokens.next().unwrap().unwrap().location;
+        let location = tokens.next().unwrap().location;
 
         use Operator::*;
         if operator == Question {
@@ -460,11 +445,11 @@ where
 
             // Reject if a colon is missing
             if !matches!(
-                tokens.next().transpose()?,
-                Some(Token {
+                tokens.next()?,
+                Token {
                     value: TokenValue::Operator(Operator::Colon),
                     ..
-                })
+                }
             ) {
                 return Err(Error {
                     cause: SyntaxError::QuestionWithoutColon,
@@ -500,26 +485,22 @@ where
 /// Ensures there is no more token.
 ///
 /// Returns an error if there is a next token.
-fn parse_end_of_input<'a, I>(tokens: &mut Peekable<I>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    match tokens.next().transpose()? {
-        None
-        | Some(Token {
+fn parse_end_of_input(tokens: &mut PeekableTokens) -> Result<(), Error> {
+    match tokens.next()? {
+        Token {
             value: TokenValue::EndOfInput,
             ..
-        }) => Ok(()),
+        } => Ok(()),
 
-        Some(Token {
+        Token {
             value: TokenValue::Operator(Operator::Colon),
             location,
-        }) => Err(Error {
+        } => Err(Error {
             cause: SyntaxError::ColonWithoutQuestion,
             location,
         }),
 
-        Some(token) => todo!("reject unparsed token {:?}", token),
+        token => todo!("reject unparsed token {:?}", token),
     }
 }
 
@@ -527,10 +508,7 @@ where
 ///
 /// A successful parse is returned as a non-empty vector of `Ast` nodes, where
 /// the last node is the root.
-pub fn parse<'a, I>(mut tokens: Peekable<I>) -> Result<Vec<Ast<'a>>, Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+pub fn parse(mut tokens: PeekableTokens) -> Result<Vec<Ast>, Error> {
     let mut result = Vec::new();
     parse_tree(&mut tokens, 1, &mut result)?;
     parse_end_of_input(&mut tokens)?;
@@ -540,11 +518,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::Tokens;
     use crate::token::Value;
 
     fn parse_str(source: &str) -> Result<Vec<Ast>, Error> {
-        parse(Tokens::new(source).peekable())
+        parse(PeekableTokens::from(source))
     }
 
     #[test]

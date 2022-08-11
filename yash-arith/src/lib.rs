@@ -24,8 +24,8 @@ use std::ops::Range;
 
 mod token;
 
+use token::PeekableTokens;
 pub use token::TokenError;
-use token::Tokens;
 pub use token::Value;
 
 mod ast;
@@ -114,7 +114,7 @@ impl<E> From<eval::Error<E>> for Error<E> {
 
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
-    let tokens = Tokens::new(expression).peekable();
+    let tokens = PeekableTokens::from(expression);
     let ast = ast::parse(tokens)?;
     let term = eval::eval(&ast, env)?;
     let value = eval::into_value(term, env)?;
