@@ -265,6 +265,8 @@ pub enum Ast<'a> {
 pub enum SyntaxError {
     /// Error in tokenization
     TokenError(TokenError),
+    /// Expression with a missing value
+    IncompleteExpression,
     /// `(` without `)`
     UnclosedParenthesis,
     /// `?` without `:`
@@ -279,6 +281,7 @@ impl std::fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SyntaxError::TokenError(e) => e.fmt(f),
+            SyntaxError::IncompleteExpression => "incomplete expression".fmt(f),
             SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
             SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
             SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
@@ -392,7 +395,10 @@ fn parse_leaf<'a>(tokens: &mut PeekableTokens<'a>, result: &mut Vec<Ast<'a>>) ->
             Ok(())
         }
 
-        TokenValue::EndOfInput => todo!("handle empty expression error"),
+        TokenValue::EndOfInput => Err(Error {
+            cause: SyntaxError::IncompleteExpression,
+            location: token.location,
+        }),
     }
 }
 
@@ -1458,6 +1464,24 @@ mod tests {
             Err(Error {
                 cause: SyntaxError::UnclosedParenthesis,
                 location: 0..1,
+            })
+        );
+    }
+
+    #[test]
+    fn incomplete_expression() {
+        assert_eq!(
+            parse_str("   "),
+            Err(Error {
+                cause: SyntaxError::IncompleteExpression,
+                location: 3..3,
+            })
+        );
+        assert_eq!(
+            parse_str("+"),
+            Err(Error {
+                cause: SyntaxError::IncompleteExpression,
+                location: 1..1,
             })
         );
     }
