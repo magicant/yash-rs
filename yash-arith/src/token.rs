@@ -134,7 +134,8 @@ pub enum TokenValue<'a> {
     Term(Term<'a>),
     /// Operator
     Operator(Operator),
-    // TODO EndOfInput
+    /// Imaginary token value for the end of input.
+    EndOfInput,
 }
 
 /// Atomic lexical element of an expression

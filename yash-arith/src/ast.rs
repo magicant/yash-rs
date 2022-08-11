@@ -400,6 +400,8 @@ where
             });
             Ok(())
         }
+
+        TokenValue::EndOfInput => todo!("handle empty expression error"),
     }
 }
 
