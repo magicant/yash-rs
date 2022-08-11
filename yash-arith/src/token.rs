@@ -17,6 +17,7 @@
 //! Tokenization
 
 use std::fmt::Display;
+use std::iter::FusedIterator;
 use std::ops::Range;
 
 /// Result of evaluating an expression
@@ -127,18 +128,24 @@ pub enum Operator {
     CloseParen,
 }
 
-/// Atomic lexical element of an expression
+/// Value of a [`Token`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Token<'a> {
+pub enum TokenValue<'a> {
     /// Term
     Term(Term<'a>),
     /// Operator
-    Operator {
-        /// Operator kind
-        operator: Operator,
-        /// Range of the substring where the token occurs in the parsed expression
-        location: Range<usize>,
-    },
+    Operator(Operator),
+    /// Imaginary token value for the end of input.
+    EndOfInput,
+}
+
+/// Atomic lexical element of an expression
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Token<'a> {
+    /// Token value
+    pub value: TokenValue<'a>,
+    /// Range of the substring where the token occurs in the parsed expression
+    pub location: Range<usize>,
 }
 
 /// Cause of a tokenization error
@@ -215,6 +222,13 @@ const OPERATORS: &[(&str, Operator)] = &[
 ];
 
 /// Iterator extracting tokens from a string
+///
+/// `Tokens` implements `Iterator` but never yields `None` because it returns a
+/// special token with `TokenValue::EndOfInput` when there are no more tokens.
+/// The `next_token` inherent method may be handier than the methods of
+/// `Iterator` since it returns tokens without wrapping them in `Option`.
+///
+/// See also [`PeekableTokens`], which makes the iterator peekable.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Tokens<'a> {
     source: &'a str,
@@ -226,15 +240,18 @@ impl<'a> Tokens<'a> {
     pub fn new(source: &'a str) -> Self {
         Tokens { source, index: 0 }
     }
-}
 
-impl<'a> Iterator for Tokens<'a> {
-    type Item = Result<Token<'a>, Error>;
-
-    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
+    pub fn next_token(&mut self) -> Result<Token<'a>, Error> {
         let source = self.source[self.index..].trim_start();
         let start_of_token = self.source.len() - source.len();
-        let first_char = source.chars().next()?;
+        let first_char = if let Some(c) = source.chars().next() {
+            c
+        } else {
+            return Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: start_of_token..start_of_token,
+            });
+        };
 
         if let Some((lexeme, operator)) = OPERATORS
             .iter()
@@ -245,16 +262,19 @@ impl<'a> Iterator for Tokens<'a> {
             let end_of_token = start_of_token + lexeme.len();
             let location = start_of_token..end_of_token;
             self.index = end_of_token;
-            Some(Ok(Token::Operator { operator, location }))
+            Ok(Token {
+                value: TokenValue::Operator(operator),
+                location,
+            })
         } else {
             // The next token should be a term. Try parsing it.
             let remainder = source.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             let token_len = source.len() - remainder.len();
             if token_len == 0 {
-                return Some(Err(Error {
+                return Err(Error {
                     cause: TokenError::InvalidCharacter,
                     location: start_of_token..start_of_token + 1,
-                }));
+                });
             }
             let end_of_token = start_of_token + token_len;
             let location = start_of_token..end_of_token;
@@ -272,22 +292,76 @@ impl<'a> Iterator for Tokens<'a> {
                 match parse {
                     Ok(i) => Term::Value(Value::Integer(i)),
                     Err(_) => {
-                        return Some(Err(Error {
+                        return Err(Error {
                             cause: TokenError::InvalidNumericConstant,
                             location,
-                        }))
+                        })
                     }
                 }
             } else {
                 Term::Variable {
                     name: token,
-                    location,
+                    location: location.clone(),
                 }
             };
 
             self.index = end_of_token;
-            Some(Ok(Token::Term(term)))
+            Ok(Token {
+                value: TokenValue::Term(term),
+                location,
+            })
         }
+    }
+}
+
+impl<'a> Iterator for Tokens<'a> {
+    type Item = Result<Token<'a>, Error>;
+
+    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
+        Some(self.next_token())
+    }
+}
+
+/// `Tokens` is fused because it never yields `None`.
+impl FusedIterator for Tokens<'_> {}
+
+/// Peekable iterator extracting tokens from a string
+///
+/// `PeekableTokens` works as a wrapper of [`Tokens`] that adds the
+/// [`peek`](Self::peek) method.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PeekableTokens<'a> {
+    inner: Tokens<'a>,
+    cached_next: Option<Result<Token<'a>, Error>>,
+}
+
+impl<'a> PeekableTokens<'a> {
+    /// Creates a tokenizer.
+    pub fn new(inner: Tokens<'a>) -> Self {
+        let cached_next = None;
+        PeekableTokens { inner, cached_next }
+    }
+
+    /// Consumes and returns the next token.
+    pub fn next(&mut self) -> Result<Token<'a>, Error> {
+        self.cached_next
+            .take()
+            .unwrap_or_else(|| self.inner.next_token())
+    }
+
+    /// Returns the next token without consuming it.
+    ///
+    /// The token will be returned again on a next call to `peek` or
+    /// [`next`](Self::next).
+    pub fn peek(&mut self) -> &Result<Token<'a>, Error> {
+        self.cached_next
+            .get_or_insert_with(|| self.inner.next_token())
+    }
+}
+
+impl<'a> From<&'a str> for PeekableTokens<'a> {
+    fn from(source: &'a str) -> Self {
+        PeekableTokens::new(Tokens::new(source))
     }
 }
 
@@ -299,11 +373,17 @@ mod tests {
     fn decimal_integer_constants() {
         assert_eq!(
             Tokens::new("1").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            }))
         );
         assert_eq!(
             Tokens::new("42").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(42))),
+                location: 0..2,
+            }))
         );
     }
 
@@ -329,19 +409,31 @@ mod tests {
     fn octal_integer_constants() {
         assert_eq!(
             Tokens::new("0").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 0..1,
+            }))
         );
         assert_eq!(
             Tokens::new("01").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o1))),
+                location: 0..2,
+            }))
         );
         assert_eq!(
             Tokens::new("07").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o7)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o7))),
+                location: 0..2,
+            }))
         );
         assert_eq!(
             Tokens::new("0123").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o123))),
+                location: 0..4,
+            }))
         );
     }
 
@@ -374,15 +466,24 @@ mod tests {
     fn hexadecimal_integer_constants() {
         assert_eq!(
             Tokens::new("0x0").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x0))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("0X1").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x1)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x1))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("0x19Af").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0x19AF)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0x19AF))),
+                location: 0..6,
+            }))
         );
     }
 
@@ -417,31 +518,43 @@ mod tests {
     fn variables() {
         assert_eq!(
             Tokens::new("abc").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "abc",
-                location: 0..3
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable {
+                    name: "abc",
+                    location: 0..3,
+                }),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("foo_BAR").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "foo_BAR",
-                location: 0..7
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable {
+                    name: "foo_BAR",
+                    location: 0..7,
+                }),
+                location: 0..7,
+            }))
         );
         assert_eq!(
             Tokens::new("a1B2c").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "a1B2c",
-                location: 0..5
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable {
+                    name: "a1B2c",
+                    location: 0..5,
+                }),
+                location: 0..5,
+            }))
         );
         assert_eq!(
             Tokens::new(" _var").next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "_var",
-                location: 1..5
-            })))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable {
+                    name: "_var",
+                    location: 1..5,
+                }),
+                location: 1..5,
+            }))
         );
     }
 
@@ -449,260 +562,260 @@ mod tests {
     fn operators() {
         assert_eq!(
             Tokens::new("?").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Question,
-                location: 0..1
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Question),
+                location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new(":").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Colon,
-                location: 0..1
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Colon),
+                location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("|").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Bar,
-                location: 0..1
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Bar),
+                location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("||").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::BarBar,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::BarBar),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("|=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::BarEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::BarEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("^").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Caret,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Caret),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("^=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::CaretEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::CaretEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("&").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::And,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::And),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("&&").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::AndAnd,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::AndAnd),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("&=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::AndEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::AndEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Equal,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Equal),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("==").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::EqualEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::EqualEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("!=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::BangEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::BangEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("<").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Less,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Less),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("<=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::LessEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::LessEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("<<").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::LessLess,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::LessLess),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("<<=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::LessLessEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::LessLessEqual),
                 location: 0..3,
             }))
         );
         assert_eq!(
             Tokens::new(">").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Greater,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Greater),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new(">=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::GreaterEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::GreaterEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new(">>").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::GreaterGreater,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::GreaterGreater),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new(">>=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::GreaterGreaterEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::GreaterGreaterEqual),
                 location: 0..3,
             }))
         );
         assert_eq!(
             Tokens::new("+").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Plus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("++").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::PlusPlus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::PlusPlus),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("+=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::PlusEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::PlusEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("-").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Minus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Minus),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("--").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::MinusMinus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::MinusMinus),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("-=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::MinusEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::MinusEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("*").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Asterisk,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Asterisk),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("*=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::AsteriskEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::AsteriskEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("/").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Slash,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Slash),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("/=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::SlashEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::SlashEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("%").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Percent,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Percent),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("%=").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::PercentEqual,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::PercentEqual),
                 location: 0..2,
             }))
         );
         assert_eq!(
             Tokens::new("~").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Tilde,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Tilde),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("!").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Bang,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Bang),
                 location: 0..1,
             }))
         );
         assert_eq!(
             Tokens::new("(").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::OpenParen,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::OpenParen),
                 location: 0..1
             }))
         );
         assert_eq!(
             Tokens::new("(").next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::OpenParen,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::OpenParen),
                 location: 0..1
             }))
         );
@@ -712,15 +825,24 @@ mod tests {
     fn space_around_token() {
         assert_eq!(
             Tokens::new(" 42").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(42))),
+                location: 1..3,
+            }))
         );
         assert_eq!(
             Tokens::new("042 ").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0o42)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0o42))),
+                location: 0..3,
+            }))
         );
         assert_eq!(
             Tokens::new("\t 123 \n").next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(123))),
+                location: 2..5,
+            }))
         );
     }
 
@@ -729,16 +851,28 @@ mod tests {
         let mut tokens = Tokens::new(" 123  foo ");
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(123)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(123))),
+                location: 1..4,
+            }))
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Variable {
-                name: "foo",
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Variable {
+                    name: "foo",
+                    location: 6..9,
+                }),
                 location: 6..9,
-            })))
+            }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 10..10,
+            }))
+        );
     }
 
     #[test]
@@ -747,20 +881,32 @@ mod tests {
         let mut tokens = Tokens::new(" 10+0 ");
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(10)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(10))),
+                location: 1..3,
+            }))
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Plus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
                 location: 3..4,
             }))
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 4..5,
+            }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 6..6,
+            }))
+        );
     }
 
     #[test]
@@ -768,23 +914,32 @@ mod tests {
         let mut tokens = Tokens::new("+-0");
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Plus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
                 location: 0..1,
             }))
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Operator {
-                operator: Operator::Minus,
+            Some(Ok(Token {
+                value: TokenValue::Operator(Operator::Minus),
                 location: 1..2,
             }))
         );
         assert_eq!(
             tokens.next(),
-            Some(Ok(Token::Term(Term::Value(Value::Integer(0)))))
+            Some(Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(0))),
+                location: 2..3,
+            }))
         );
-        assert_eq!(tokens.next(), None);
+        assert_eq!(
+            tokens.next(),
+            Some(Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 3..3,
+            }))
+        );
     }
 
     #[test]
@@ -802,6 +957,70 @@ mod tests {
                 cause: TokenError::InvalidCharacter,
                 location: 1..2,
             }))
+        );
+    }
+
+    #[test]
+    fn peekable_tokens() {
+        let mut tokens = PeekableTokens::from("1 + 2");
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(1))),
+                location: 0..1,
+            })
+        );
+
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 2..3,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Operator(Operator::Plus),
+                location: 2..3,
+            })
+        );
+
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::Term(Term::Value(Value::Integer(2))),
+                location: 4..5,
+            })
+        );
+
+        assert_eq!(
+            tokens.peek(),
+            &Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 5..5,
+            })
+        );
+        assert_eq!(
+            tokens.next(),
+            Ok(Token {
+                value: TokenValue::EndOfInput,
+                location: 5..5,
+            })
         );
     }
 }
