@@ -117,3 +117,5 @@ mod param;
 mod slice;
 mod text;
 mod word;
+
+pub use arith::ArithError;

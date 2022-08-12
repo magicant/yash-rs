@@ -77,6 +77,7 @@ use self::attr::AttrField;
 use self::attr::Origin;
 use self::attr_strip::Strip;
 use self::glob::glob;
+use self::initial::ArithError;
 use self::initial::Expand;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
@@ -101,7 +102,7 @@ pub enum ErrorCause {
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
     /// Error while evaluating an arithmetic expansion.
-    ArithError(yash_arith::ErrorCause<ReadOnlyError>),
+    ArithError(ArithError),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
 }
