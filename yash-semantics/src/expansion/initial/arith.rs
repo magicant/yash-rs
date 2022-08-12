@@ -45,7 +45,7 @@ use yash_syntax::syntax::Text;
 /// - `ArithError` may contain informative [`Location`] that can be used to
 ///   produce an error message with annotated code while `ErrorCause` may just
 ///   specify a location as an index range.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ArithError {
     /// A value token contains an invalid character.
     InvalidNumericConstant,
@@ -55,7 +55,7 @@ pub enum ArithError {
     /// Expression with a missing value
     IncompleteExpression,
     /// `(` without `)`
-    UnclosedParenthesis,
+    UnclosedParenthesis { opening_location: Location },
     /// `?` without `:`
     QuestionWithoutColon,
     /// `:` without `?`
@@ -83,7 +83,7 @@ impl std::fmt::Display for ArithError {
             InvalidNumericConstant => "invalid numeric constant".fmt(f),
             InvalidCharacter => "invalid character".fmt(f),
             IncompleteExpression => "incomplete expression".fmt(f),
-            UnclosedParenthesis => "unmatched parenthesis".fmt(f),
+            UnclosedParenthesis { .. } => "unmatched parenthesis".fmt(f),
             QuestionWithoutColon => "`?` without matching `:`".fmt(f),
             ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
             InvalidOperator => "invalid use of operator".fmt(f),
@@ -104,7 +104,7 @@ impl std::fmt::Display for ArithError {
 #[must_use]
 pub fn convert_error_cause(
     cause: yash_arith::ErrorCause<ReadOnlyError>,
-    _source: &Rc<Code>,
+    source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
     match cause {
@@ -120,8 +120,12 @@ pub fn convert_error_cause(
             yash_arith::SyntaxError::IncompleteExpression => {
                 ErrorCause::ArithError(IncompleteExpression)
             }
-            yash_arith::SyntaxError::UnclosedParenthesis => {
-                ErrorCause::ArithError(UnclosedParenthesis)
+            yash_arith::SyntaxError::UnclosedParenthesis { opening_location } => {
+                let opening_location = Location {
+                    code: Rc::clone(source),
+                    range: opening_location,
+                };
+                ErrorCause::ArithError(UnclosedParenthesis { opening_location })
             }
             yash_arith::SyntaxError::QuestionWithoutColon => {
                 ErrorCause::ArithError(QuestionWithoutColon)

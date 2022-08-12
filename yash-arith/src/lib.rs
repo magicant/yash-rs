@@ -823,8 +823,10 @@ mod tests {
         assert_eq!(
             eval(" ( 1 ", env),
             Err(Error {
-                cause: SyntaxError::UnclosedParenthesis.into(),
-                location: 1..2,
+                cause: ErrorCause::SyntaxError(SyntaxError::UnclosedParenthesis {
+                    opening_location: 1..2,
+                }),
+                location: 5..5,
             })
         );
     }

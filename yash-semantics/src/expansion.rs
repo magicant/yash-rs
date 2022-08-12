@@ -139,11 +139,14 @@ impl ErrorCause {
         // TODO Localize
         use ErrorCause::*;
         match self {
-            CommandSubstError(_) | ArithError(_) => None,
+            ArithError(initial::ArithError::UnclosedParenthesis { opening_location }) => {
+                Some((opening_location, "the opening parenthesis was here"))
+            }
             AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
+            CommandSubstError(_) | ArithError(_) => None,
         }
     }
 }

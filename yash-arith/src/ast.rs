@@ -268,7 +268,10 @@ pub enum SyntaxError {
     /// Expression with a missing value
     IncompleteExpression,
     /// `(` without `)`
-    UnclosedParenthesis,
+    UnclosedParenthesis {
+        /// Range of the substring in the evaluated expression string where `(` appears
+        opening_location: Range<usize>,
+    },
     /// `?` without `:`
     QuestionWithoutColon,
     /// `:` without `?`
@@ -282,7 +285,7 @@ impl std::fmt::Display for SyntaxError {
         match self {
             SyntaxError::TokenError(e) => e.fmt(f),
             SyntaxError::IncompleteExpression => "incomplete expression".fmt(f),
-            SyntaxError::UnclosedParenthesis => "unmatched parenthesis".fmt(f),
+            SyntaxError::UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
             SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
             SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
             SyntaxError::InvalidOperator => "invalid use of operator".fmt(f),
@@ -337,24 +340,22 @@ fn parse_postfix<'a>(
 /// Parses a closing parenthesis `")"`.
 ///
 /// Returns an error if the next token is not a closing parenthesis.
-fn parse_close_paren(tokens: &mut PeekableTokens, location: Range<usize>) -> Result<(), Error> {
-    match tokens.next()? {
-        Token {
-            value: TokenValue::Operator(Operator::CloseParen),
-            ..
-        } => Ok(()),
+fn parse_close_paren(
+    tokens: &mut PeekableTokens,
+    opening_location: Range<usize>,
+) -> Result<(), Error> {
+    let token = tokens.next()?;
+    match token.value {
+        TokenValue::Operator(Operator::CloseParen) => Ok(()),
 
-        Token {
-            value: TokenValue::Operator(Operator::Colon),
-            location,
-        } => Err(Error {
+        TokenValue::Operator(Operator::Colon) => Err(Error {
             cause: SyntaxError::ColonWithoutQuestion,
-            location,
+            location: token.location,
         }),
 
         _ => Err(Error {
-            cause: SyntaxError::UnclosedParenthesis,
-            location,
+            cause: SyntaxError::UnclosedParenthesis { opening_location },
+            location: token.location,
         }),
     }
 }
@@ -1462,8 +1463,19 @@ mod tests {
         assert_eq!(
             parse_str("(a + 0 "),
             Err(Error {
-                cause: SyntaxError::UnclosedParenthesis,
-                location: 0..1,
+                cause: SyntaxError::UnclosedParenthesis {
+                    opening_location: 0..1,
+                },
+                location: 7..7,
+            })
+        );
+        assert_eq!(
+            parse_str(" ((0)"),
+            Err(Error {
+                cause: SyntaxError::UnclosedParenthesis {
+                    opening_location: 1..2,
+                },
+                location: 5..5,
             })
         );
     }
