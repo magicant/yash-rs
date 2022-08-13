@@ -273,7 +273,10 @@ pub enum SyntaxError {
         opening_location: Range<usize>,
     },
     /// `?` without `:`
-    QuestionWithoutColon,
+    QuestionWithoutColon {
+        /// Range of the substring in the evaluated expression string where `?` appears
+        question_location: Range<usize>,
+    },
     /// `:` without `?`
     ColonWithoutQuestion,
     /// Other error in operator usage
@@ -286,7 +289,7 @@ impl std::fmt::Display for SyntaxError {
             SyntaxError::TokenError(e) => e.fmt(f),
             SyntaxError::IncompleteExpression => "incomplete expression".fmt(f),
             SyntaxError::UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
-            SyntaxError::QuestionWithoutColon => "`?` without matching `:`".fmt(f),
+            SyntaxError::QuestionWithoutColon { .. } => "expected `:`".fmt(f),
             SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
             SyntaxError::InvalidOperator => "invalid use of operator".fmt(f),
         }
@@ -450,17 +453,14 @@ fn parse_tree<'a>(
             let then_index = result.len();
             parse_tree(tokens, 1, result)?;
 
-            // Reject if a colon is missing
-            if !matches!(
-                tokens.next()?,
-                Token {
-                    value: TokenValue::Operator(Operator::Colon),
-                    ..
-                }
-            ) {
+            // Skip the colon operator
+            let token = tokens.next()?;
+            if token.value != TokenValue::Operator(Operator::Colon) {
                 return Err(Error {
-                    cause: SyntaxError::QuestionWithoutColon,
-                    location,
+                    cause: SyntaxError::QuestionWithoutColon {
+                        question_location: location,
+                    },
+                    location: token.location,
                 });
             }
 
@@ -1404,15 +1404,19 @@ mod tests {
         assert_eq!(
             parse_str(" 1 ? 2 + 3 "),
             Err(Error {
-                cause: SyntaxError::QuestionWithoutColon,
-                location: 3..4,
+                cause: SyntaxError::QuestionWithoutColon {
+                    question_location: 3..4,
+                },
+                location: 11..11,
             })
         );
         assert_eq!(
             parse_str("(9?8)"),
             Err(Error {
-                cause: SyntaxError::QuestionWithoutColon,
-                location: 2..3,
+                cause: SyntaxError::QuestionWithoutColon {
+                    question_location: 2..3,
+                },
+                location: 4..5,
             })
         );
     }

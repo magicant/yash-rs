@@ -57,7 +57,7 @@ pub enum ArithError {
     /// `(` without `)`
     UnclosedParenthesis { opening_location: Location },
     /// `?` without `:`
-    QuestionWithoutColon,
+    QuestionWithoutColon { question_location: Location },
     /// `:` without `?`
     ColonWithoutQuestion,
     /// Other error in operator usage
@@ -84,7 +84,7 @@ impl std::fmt::Display for ArithError {
             InvalidCharacter => "invalid character".fmt(f),
             IncompleteExpression => "incomplete expression".fmt(f),
             UnclosedParenthesis { .. } => "unmatched parenthesis".fmt(f),
-            QuestionWithoutColon => "`?` without matching `:`".fmt(f),
+            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
             ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
             InvalidOperator => "invalid use of operator".fmt(f),
             InvalidVariableValue(value) => write!(f, "invalid variable value: {:?}", value),
@@ -93,6 +93,32 @@ impl std::fmt::Display for ArithError {
             LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
             ReverseShifting => "negative shift width".fmt(f),
             AssignmentToValue => "assignment to a non-variable".fmt(f),
+        }
+    }
+}
+
+impl ArithError {
+    /// Returns a location related with this error and a message describing the
+    /// location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use ArithError::*;
+        match self {
+            InvalidNumericConstant
+            | InvalidCharacter
+            | IncompleteExpression
+            | ColonWithoutQuestion
+            | InvalidOperator
+            | InvalidVariableValue(_)
+            | Overflow
+            | DivisionByZero
+            | LeftShiftingNegative
+            | ReverseShifting
+            | AssignmentToValue => None,
+            UnclosedParenthesis { opening_location } => {
+                Some((opening_location, "the opening parenthesis was here"))
+            }
+            QuestionWithoutColon { question_location } => Some((question_location, "`?` was here")),
         }
     }
 }
@@ -127,8 +153,12 @@ pub fn convert_error_cause(
                 };
                 ErrorCause::ArithError(UnclosedParenthesis { opening_location })
             }
-            yash_arith::SyntaxError::QuestionWithoutColon => {
-                ErrorCause::ArithError(QuestionWithoutColon)
+            yash_arith::SyntaxError::QuestionWithoutColon { question_location } => {
+                let question_location = Location {
+                    code: Rc::clone(source),
+                    range: question_location,
+                };
+                ErrorCause::ArithError(QuestionWithoutColon { question_location })
             }
             yash_arith::SyntaxError::ColonWithoutQuestion => {
                 ErrorCause::ArithError(ColonWithoutQuestion)
