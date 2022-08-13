@@ -21,10 +21,12 @@ use std::iter::FusedIterator;
 use std::ops::Range;
 
 /// Result of evaluating an expression
+///
+/// TODO: The current implementation only supports integer arithmetic. A future
+/// version may also support floating-point numbers.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Value {
     Integer(i64),
-    // TODO Float
 }
 
 impl Display for Value {
@@ -153,8 +155,8 @@ pub struct Token<'a> {
 pub enum TokenError {
     /// A value token contains an invalid character.
     InvalidNumericConstant,
-    /// An expression contains a character that is not a whitespace, number, or
-    /// number.
+    /// An expression contains a character that is not a whitespace, operator,
+    /// or number.
     InvalidCharacter,
 }
 

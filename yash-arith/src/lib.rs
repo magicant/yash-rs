@@ -14,9 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! This crate implements arithmetic expansion.
+//! This crate implements shell arithmetic expansion.
 //!
-//! TODO Elaborate
+//! Arithmetic expansion evaluates an expression that may contain some operators
+//! that perform basic maths. The expression is given as a string and parsed
+//! like an expression in C. The expression can include variables that interact
+//! with the [environment](Env).
+//!
+//! To evaluate an expression, you call the [`eval()`] function with a string
+//! and an environment.
 
 use std::fmt::Debug;
 use std::fmt::Display;

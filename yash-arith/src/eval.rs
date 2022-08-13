@@ -34,7 +34,7 @@ pub enum EvalError<E> {
     Overflow,
     /// Division by zero
     DivisionByZero,
-    /// Left bit-shifting of a negative value
+    /// Left bit-shifting with a negative left-hand-side operand
     LeftShiftingNegative,
     /// Bit-shifting with a negative right-hand-side operand
     ReverseShifting,
