@@ -80,7 +80,7 @@ async fn perform_redirs(
     env: &mut RedirGuard<'_>,
     redirs: &[syntax::Redir],
 ) -> Result<Option<ExitStatus>> {
-    match env.perform_redirs(&*redirs).await {
+    match env.perform_redirs(redirs).await {
         Ok(exit_status) => Continue(exit_status),
         Err(e) => {
             e.handle(env).await?;
