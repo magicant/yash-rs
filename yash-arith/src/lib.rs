@@ -713,7 +713,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(3)));
     }
 
-    // TODO prefix_incrementing_non_variable eval("++ +a")
+    #[test]
+    fn prefix_incrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval(" ++ +a ", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 1..3,
+            })
+        );
+    }
 
     #[test]
     fn overflow_in_increment() {
@@ -752,7 +762,17 @@ mod tests {
         );
     }
 
-    // TODO prefix_decrementing_non_variable eval("-- +a")
+    #[test]
+    fn prefix_decrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("  -- +a ", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 2..4,
+            })
+        );
+    }
 
     #[test]
     fn postfix_increment_operator() {
@@ -763,7 +783,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(3)));
     }
 
-    // TODO postfix_incrementing_non_variable eval("5++")
+    #[test]
+    fn postfix_incrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("5++", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 1..3,
+            })
+        );
+    }
 
     #[test]
     fn postfix_decrement_operator() {
@@ -774,7 +804,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(-3)));
     }
 
-    // TODO postfix_decrementing_non_variable eval("7--")
+    #[test]
+    fn postfix_decrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("7 --", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 2..4,
+            })
+        );
+    }
 
     #[test]
     fn combining_operators_of_same_precedence() {
