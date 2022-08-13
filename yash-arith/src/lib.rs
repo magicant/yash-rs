@@ -20,13 +20,12 @@
 
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::fmt::Pointer;
 use std::ops::Range;
 
 mod token;
 
+use token::PeekableTokens;
 pub use token::TokenError;
-use token::Tokens;
 pub use token::Value;
 
 mod ast;
@@ -54,8 +53,8 @@ impl<E: Display> Display for ErrorCause<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
-            SyntaxError(e) => e.fmt(f),
-            EvalError(e) => e.fmt(f),
+            SyntaxError(e) => Display::fmt(e, f),
+            EvalError(e) => Display::fmt(e, f),
         }
     }
 }
@@ -115,7 +114,7 @@ impl<E> From<eval::Error<E>> for Error<E> {
 
 /// Performs arithmetic expansion
 pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
-    let tokens = Tokens::new(expression).peekable();
+    let tokens = PeekableTokens::from(expression);
     let ast = ast::parse(tokens)?;
     let term = eval::eval(&ast, env)?;
     let value = eval::into_value(term, env)?;
@@ -714,7 +713,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(3)));
     }
 
-    // TODO prefix_incrementing_non_variable eval("++ +a")
+    #[test]
+    fn prefix_incrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval(" ++ +a ", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 1..3,
+            })
+        );
+    }
 
     #[test]
     fn overflow_in_increment() {
@@ -753,7 +762,17 @@ mod tests {
         );
     }
 
-    // TODO prefix_decrementing_non_variable eval("-- +a")
+    #[test]
+    fn prefix_decrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("  -- +a ", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 2..4,
+            })
+        );
+    }
 
     #[test]
     fn postfix_increment_operator() {
@@ -764,7 +783,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(3)));
     }
 
-    // TODO postfix_incrementing_non_variable eval("5++")
+    #[test]
+    fn postfix_incrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("5++", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 1..3,
+            })
+        );
+    }
 
     #[test]
     fn postfix_decrement_operator() {
@@ -775,7 +804,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(-3)));
     }
 
-    // TODO postfix_decrementing_non_variable eval("7--")
+    #[test]
+    fn postfix_decrementing_non_variable() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval("7 --", env),
+            Err(Error {
+                cause: EvalError::AssignmentToValue.into(),
+                location: 2..4,
+            })
+        );
+    }
 
     #[test]
     fn combining_operators_of_same_precedence() {
@@ -818,5 +857,17 @@ mod tests {
         assert_eq!(eval("a", env), Ok(Value::Integer(0)));
     }
 
-    // TODO unmatched_parentheses
+    #[test]
+    fn unmatched_parenthesis() {
+        let env = &mut HashMap::new();
+        assert_eq!(
+            eval(" ( 1 ", env),
+            Err(Error {
+                cause: ErrorCause::SyntaxError(SyntaxError::UnclosedParenthesis {
+                    opening_location: 1..2,
+                }),
+                location: 5..5,
+            })
+        );
+    }
 }

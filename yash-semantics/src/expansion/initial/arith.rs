@@ -35,6 +35,157 @@ use yash_syntax::source::Location;
 use yash_syntax::source::Source;
 use yash_syntax::syntax::Text;
 
+/// Types of errors that may occur in arithmetic expansion
+///
+/// This enum is essentially equivalent to `yash_arith::ErrorCause`. The
+/// differences between the two are:
+///
+/// - `ArithError` defines all error variants flatly while `ErrorCause` has
+///   nested variants.
+/// - `ArithError` may contain informative [`Location`] that can be used to
+///   produce an error message with annotated code while `ErrorCause` may just
+///   specify a location as an index range.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ArithError {
+    /// A value token contains an invalid character.
+    InvalidNumericConstant,
+    /// An expression contains a character that is not a whitespace, number, or
+    /// number.
+    InvalidCharacter,
+    /// Expression with a missing value
+    IncompleteExpression,
+    /// Operator missing
+    MissingOperator,
+    /// `(` without `)`
+    UnclosedParenthesis { opening_location: Location },
+    /// `?` without `:`
+    QuestionWithoutColon { question_location: Location },
+    /// `:` without `?`
+    ColonWithoutQuestion,
+    /// Other error in operator usage
+    InvalidOperator,
+    /// A variable value that is not a valid number
+    InvalidVariableValue(String),
+    /// Result out of bounds
+    Overflow,
+    /// Division by zero
+    DivisionByZero,
+    /// Left bit-shifting of a negative value
+    LeftShiftingNegative,
+    /// Bit-shifting with a negative right-hand-side operand
+    ReverseShifting,
+    /// Assignment with a left-hand-side operand not being a variable
+    AssignmentToValue,
+}
+
+impl std::fmt::Display for ArithError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use ArithError::*;
+        match self {
+            InvalidNumericConstant => "invalid numeric constant".fmt(f),
+            InvalidCharacter => "invalid character".fmt(f),
+            IncompleteExpression => "incomplete expression".fmt(f),
+            MissingOperator => "expected an operator".fmt(f),
+            UnclosedParenthesis { .. } => "unmatched parenthesis".fmt(f),
+            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
+            ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
+            InvalidOperator => "invalid use of operator".fmt(f),
+            InvalidVariableValue(value) => write!(f, "invalid variable value: {:?}", value),
+            Overflow => "overflow".fmt(f),
+            DivisionByZero => "division by zero".fmt(f),
+            LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
+            ReverseShifting => "negative shift width".fmt(f),
+            AssignmentToValue => "assignment to a non-variable".fmt(f),
+        }
+    }
+}
+
+impl ArithError {
+    /// Returns a location related with this error and a message describing the
+    /// location.
+    #[must_use]
+    pub fn related_location(&self) -> Option<(&Location, &'static str)> {
+        use ArithError::*;
+        match self {
+            InvalidNumericConstant
+            | InvalidCharacter
+            | IncompleteExpression
+            | MissingOperator
+            | ColonWithoutQuestion
+            | InvalidOperator
+            | InvalidVariableValue(_)
+            | Overflow
+            | DivisionByZero
+            | LeftShiftingNegative
+            | ReverseShifting
+            | AssignmentToValue => None,
+            UnclosedParenthesis { opening_location } => {
+                Some((opening_location, "the opening parenthesis was here"))
+            }
+            QuestionWithoutColon { question_location } => Some((question_location, "`?` was here")),
+        }
+    }
+}
+
+/// Converts `yash_arith::ErrorCause` into `initial::ErrorCause`.
+///
+/// The `source` argument must be the arithmetic expression being expanded.
+/// It is used to reproduce a location contained in the error cause.
+#[must_use]
+pub fn convert_error_cause(
+    cause: yash_arith::ErrorCause<ReadOnlyError>,
+    source: &Rc<Code>,
+) -> ErrorCause {
+    use ArithError::*;
+    match cause {
+        yash_arith::ErrorCause::SyntaxError(e) => match e {
+            yash_arith::SyntaxError::TokenError(e) => match e {
+                yash_arith::TokenError::InvalidNumericConstant => {
+                    ErrorCause::ArithError(InvalidNumericConstant)
+                }
+                yash_arith::TokenError::InvalidCharacter => {
+                    ErrorCause::ArithError(InvalidCharacter)
+                }
+            },
+            yash_arith::SyntaxError::IncompleteExpression => {
+                ErrorCause::ArithError(IncompleteExpression)
+            }
+            yash_arith::SyntaxError::MissingOperator => ErrorCause::ArithError(MissingOperator),
+            yash_arith::SyntaxError::UnclosedParenthesis { opening_location } => {
+                let opening_location = Location {
+                    code: Rc::clone(source),
+                    range: opening_location,
+                };
+                ErrorCause::ArithError(UnclosedParenthesis { opening_location })
+            }
+            yash_arith::SyntaxError::QuestionWithoutColon { question_location } => {
+                let question_location = Location {
+                    code: Rc::clone(source),
+                    range: question_location,
+                };
+                ErrorCause::ArithError(QuestionWithoutColon { question_location })
+            }
+            yash_arith::SyntaxError::ColonWithoutQuestion => {
+                ErrorCause::ArithError(ColonWithoutQuestion)
+            }
+            yash_arith::SyntaxError::InvalidOperator => ErrorCause::ArithError(InvalidOperator),
+        },
+        yash_arith::ErrorCause::EvalError(e) => match e {
+            yash_arith::EvalError::InvalidVariableValue(value) => {
+                ErrorCause::ArithError(InvalidVariableValue(value))
+            }
+            yash_arith::EvalError::Overflow => ErrorCause::ArithError(Overflow),
+            yash_arith::EvalError::DivisionByZero => ErrorCause::ArithError(DivisionByZero),
+            yash_arith::EvalError::LeftShiftingNegative => {
+                ErrorCause::ArithError(LeftShiftingNegative)
+            }
+            yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
+            yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
+            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
+        },
+    }
+}
+
 struct VarEnv<'a>(&'a mut VariableSet);
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
@@ -82,19 +233,23 @@ pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Resu
                 .collect();
             Ok(Phrase::Field(chars))
         }
-        Err(error) => Err(Error {
-            cause: ErrorCause::ArithError(error.cause),
-            location: Location {
-                code: Rc::new(Code {
-                    value: expression.into(),
-                    start_line_number: 1.try_into().unwrap(),
-                    source: Source::Arith {
-                        original: location.clone(),
-                    },
-                }),
-                range: error.location,
-            },
-        }),
+        Err(error) => {
+            let code = Rc::new(Code {
+                value: expression.into(),
+                start_line_number: 1.try_into().unwrap(),
+                source: Source::Arith {
+                    original: location.clone(),
+                },
+            });
+            let cause = convert_error_cause(error.cause, &code);
+            Err(Error {
+                cause,
+                location: Location {
+                    code,
+                    range: error.location,
+                },
+            })
+        }
     }
 }
 
@@ -105,7 +260,6 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
-    use yash_arith::TokenError;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
 
@@ -180,7 +334,7 @@ mod tests {
         let e = result.unwrap_err();
         assert_eq!(
             e.cause,
-            ErrorCause::ArithError(TokenError::InvalidNumericConstant.into())
+            ErrorCause::ArithError(ArithError::InvalidNumericConstant)
         );
         assert_eq!(*e.location.code.value.borrow(), "09");
         assert_eq!(e.location.code.source, Source::Arith { original: location });

@@ -17,11 +17,11 @@
 //! Abstract syntax tree parser
 
 use crate::token::Operator;
+use crate::token::PeekableTokens;
 use crate::token::Term;
 use crate::token::Token;
 use crate::token::TokenError;
-use assert_matches::assert_matches;
-use std::iter::Peekable;
+use crate::token::TokenValue;
 use std::ops::Range;
 
 // TODO: POSIX does not require the increment/decrement operators. Maybe we
@@ -265,7 +265,39 @@ pub enum Ast<'a> {
 pub enum SyntaxError {
     /// Error in tokenization
     TokenError(TokenError),
-    // TODO
+    /// Expression with a missing value
+    IncompleteExpression,
+    /// Operator missing
+    MissingOperator,
+    /// `(` without `)`
+    UnclosedParenthesis {
+        /// Range of the substring in the evaluated expression string where `(` appears
+        opening_location: Range<usize>,
+    },
+    /// `?` without `:`
+    QuestionWithoutColon {
+        /// Range of the substring in the evaluated expression string where `?` appears
+        question_location: Range<usize>,
+    },
+    /// `:` without `?`
+    ColonWithoutQuestion,
+    /// Other error in operator usage
+    InvalidOperator,
+}
+
+impl std::fmt::Display for SyntaxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SyntaxError::*;
+        match self {
+            TokenError(e) => e.fmt(f),
+            IncompleteExpression => "incomplete expression".fmt(f),
+            MissingOperator => "expected an operator".fmt(f),
+            UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
+            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
+            ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
+            InvalidOperator => "invalid use of operator".fmt(f),
+        }
+    }
 }
 
 impl From<TokenError> for SyntaxError {
@@ -293,70 +325,100 @@ impl From<crate::token::Error> for Error {
 }
 
 /// Parses postfix operators
-fn parse_postfix<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+fn parse_postfix<'a>(
+    tokens: &mut PeekableTokens<'a>,
+    result: &mut Vec<Ast<'a>>,
+) -> Result<(), Error> {
+    while let &Ok(Token {
+        value: TokenValue::Operator(operator),
+        ..
+    }) = tokens.peek()
+    {
         let operator = match operator.as_postfix() {
             Some(operator) => operator,
             None => break,
         };
-        let location =
-            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+        let location = tokens.next().unwrap().location;
         result.push(Ast::Postfix { operator, location });
     }
     Ok(())
+}
+
+/// Parses a closing parenthesis `")"`.
+///
+/// Returns an error if the next token is not a closing parenthesis.
+fn parse_close_paren(
+    tokens: &mut PeekableTokens,
+    opening_location: Range<usize>,
+) -> Result<(), Error> {
+    let token = tokens.next()?;
+    match token.value {
+        TokenValue::Operator(Operator::CloseParen) => Ok(()),
+
+        TokenValue::Operator(Operator::Colon) => Err(Error {
+            cause: SyntaxError::ColonWithoutQuestion,
+            location: token.location,
+        }),
+
+        _ => Err(Error {
+            cause: SyntaxError::UnclosedParenthesis { opening_location },
+            location: token.location,
+        }),
+    }
 }
 
 /// Parses a leaf expression.
 ///
 /// A leaf expression is a term or parenthesized expression, optionally modified
 /// by unary operators.
-fn parse_leaf<'a, I>(tokens: &mut Peekable<I>, result: &mut Vec<Ast<'a>>) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
-    let token = tokens
-        .next()
-        .transpose()?
-        .expect("TODO: handle empty expression error");
-    match token {
-        Token::Term(term) => {
+fn parse_leaf<'a>(tokens: &mut PeekableTokens<'a>, result: &mut Vec<Ast<'a>>) -> Result<(), Error> {
+    let token = tokens.next()?;
+    match token.value {
+        TokenValue::Term(term) => {
             result.push(Ast::Term(term));
             parse_postfix(tokens, result)
         }
 
-        Token::Operator { operator, .. } if operator == Operator::OpenParen => {
+        TokenValue::Operator(Operator::OpenParen) => {
             parse_tree(tokens, 1, result)?;
-
-            // TODO Reject if a closing parenthesis is missing
-            tokens.next().transpose()?;
-
+            parse_close_paren(tokens, token.location)?;
             parse_postfix(tokens, result)
         }
 
-        Token::Operator { operator, location } => {
-            let operator = operator.as_prefix().expect("TODO: handle syntax error");
+        TokenValue::Operator(operator) => {
+            let operator = match operator.as_prefix() {
+                Some(operator) => operator,
+                None => {
+                    return Err(Error {
+                        cause: SyntaxError::InvalidOperator,
+                        location: token.location,
+                    })
+                }
+            };
             parse_leaf(tokens, result)?;
-            result.push(Ast::Prefix { operator, location });
+            result.push(Ast::Prefix {
+                operator,
+                location: token.location,
+            });
             Ok(())
         }
+
+        TokenValue::EndOfInput => Err(Error {
+            cause: SyntaxError::IncompleteExpression,
+            location: token.location,
+        }),
     }
 }
 
 /// Parses the right-hand-side operand of a binary operation and pushes the
 /// operator to the result.
-fn parse_binary_rhs<'a, I>(
-    tokens: &mut Peekable<I>,
+fn parse_binary_rhs<'a>(
+    tokens: &mut PeekableTokens<'a>,
     operator: BinaryOperator,
     location: Range<usize>,
     min_precedence: u8,
     result: &mut Vec<Ast<'a>>,
-) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+) -> Result<(), Error> {
     let old_len = result.len();
     parse_tree(tokens, min_precedence, result)?;
     result.push(Ast::Binary {
@@ -371,32 +433,40 @@ where
 ///
 /// This function consumes binary operators with precedence equal to or greater
 /// than the given minimum precedence, which must be greater than 0.
-fn parse_tree<'a, I>(
-    tokens: &mut Peekable<I>,
+fn parse_tree<'a>(
+    tokens: &mut PeekableTokens<'a>,
     min_precedence: u8,
     result: &mut Vec<Ast<'a>>,
-) -> Result<(), Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+) -> Result<(), Error> {
     parse_leaf(tokens, result)?;
 
-    while let Some(&Ok(Token::Operator { operator, .. })) = tokens.peek() {
+    while let &Ok(Token {
+        value: TokenValue::Operator(operator),
+        ..
+    }) = tokens.peek()
+    {
         let precedence = operator.precedence();
         if precedence < min_precedence {
             break;
         }
 
-        let location =
-            assert_matches!(tokens.next(), Some(Ok(Token::Operator { location, .. })) => location);
+        let location = tokens.next().unwrap().location;
 
         use Operator::*;
         if operator == Question {
             let then_index = result.len();
             parse_tree(tokens, 1, result)?;
 
-            // TODO Reject if a colon is missing
-            tokens.next().transpose()?;
+            // Skip the colon operator
+            let token = tokens.next()?;
+            if token.value != TokenValue::Operator(Operator::Colon) {
+                return Err(Error {
+                    cause: SyntaxError::QuestionWithoutColon {
+                        question_location: location,
+                    },
+                    location: token.location,
+                });
+            }
 
             let else_index = result.len();
             parse_tree(tokens, precedence, result)?;
@@ -408,38 +478,59 @@ where
             continue;
         }
 
-        let (operator, associativity) = operator.as_binary().expect("TODO: unsupported operator");
-        let rhs_precedence = match associativity {
-            Associativity::Left => precedence + 1,
-            Associativity::Right => precedence,
+        let (operator, rhs_precedence) = match operator.as_binary() {
+            Some((operator, Associativity::Left)) => (operator, precedence + 1),
+            Some((operator, Associativity::Right)) => (operator, precedence),
+            None => {
+                return Err(Error {
+                    cause: SyntaxError::InvalidOperator,
+                    location,
+                })
+            }
         };
         parse_binary_rhs(tokens, operator, location, rhs_precedence, result)?
     }
     Ok(())
 }
 
+/// Ensures there is no more token.
+///
+/// Returns an error if there is a next token.
+fn parse_end_of_input(tokens: &mut PeekableTokens) -> Result<(), Error> {
+    let token = tokens.next()?;
+    match token.value {
+        TokenValue::EndOfInput => Ok(()),
+
+        TokenValue::Operator(Operator::Colon) => Err(Error {
+            cause: SyntaxError::ColonWithoutQuestion,
+            location: token.location,
+        }),
+
+        _ => Err(Error {
+            cause: SyntaxError::MissingOperator,
+            location: token.location,
+        }),
+    }
+}
+
 /// Parses the whole expression.
 ///
 /// A successful parse is returned as a non-empty vector of `Ast` nodes, where
 /// the last node is the root.
-pub fn parse<'a, I>(mut tokens: Peekable<I>) -> Result<Vec<Ast<'a>>, Error>
-where
-    I: Iterator<Item = Result<Token<'a>, crate::token::Error>>,
-{
+pub fn parse(mut tokens: PeekableTokens) -> Result<Vec<Ast>, Error> {
     let mut result = Vec::new();
     parse_tree(&mut tokens, 1, &mut result)?;
-    // TODO Reject if there are unparsed tokens
+    parse_end_of_input(&mut tokens)?;
     Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::Tokens;
     use crate::token::Value;
 
     fn parse_str(source: &str) -> Result<Vec<Ast>, Error> {
-        parse(Tokens::new(source).peekable())
+        parse(PeekableTokens::from(source))
     }
 
     #[test]
@@ -1310,8 +1401,45 @@ mod tests {
         );
     }
 
-    // TODO question_without_colon
-    // TODO colon_without_question
+    #[test]
+    fn question_without_colon() {
+        assert_eq!(
+            parse_str(" 1 ? 2 + 3 "),
+            Err(Error {
+                cause: SyntaxError::QuestionWithoutColon {
+                    question_location: 3..4,
+                },
+                location: 11..11,
+            })
+        );
+        assert_eq!(
+            parse_str("(9?8)"),
+            Err(Error {
+                cause: SyntaxError::QuestionWithoutColon {
+                    question_location: 2..3,
+                },
+                location: 4..5,
+            })
+        );
+    }
+
+    #[test]
+    fn colon_without_question() {
+        assert_eq!(
+            parse_str(" 2 : 3 "),
+            Err(Error {
+                cause: SyntaxError::ColonWithoutQuestion,
+                location: 3..4,
+            })
+        );
+        assert_eq!(
+            parse_str("(4+5-6:7)"),
+            Err(Error {
+                cause: SyntaxError::ColonWithoutQuestion,
+                location: 6..7,
+            })
+        );
+    }
 
     #[test]
     fn parentheses() {
@@ -1336,5 +1464,79 @@ mod tests {
         );
     }
 
-    // TODO unmatched_parentheses
+    #[test]
+    fn unmatched_parentheses() {
+        assert_eq!(
+            parse_str("(a + 0 "),
+            Err(Error {
+                cause: SyntaxError::UnclosedParenthesis {
+                    opening_location: 0..1,
+                },
+                location: 7..7,
+            })
+        );
+        assert_eq!(
+            parse_str(" ((0)"),
+            Err(Error {
+                cause: SyntaxError::UnclosedParenthesis {
+                    opening_location: 1..2,
+                },
+                location: 5..5,
+            })
+        );
+    }
+
+    #[test]
+    fn incomplete_expression() {
+        assert_eq!(
+            parse_str("   "),
+            Err(Error {
+                cause: SyntaxError::IncompleteExpression,
+                location: 3..3,
+            })
+        );
+        assert_eq!(
+            parse_str("+"),
+            Err(Error {
+                cause: SyntaxError::IncompleteExpression,
+                location: 1..1,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_operator() {
+        assert_eq!(
+            parse_str(" 3 ! 5"),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 3..4,
+            })
+        );
+        assert_eq!(
+            parse_str(" 1 + 2 ~ 3 + 4 "),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 7..8,
+            })
+        );
+        assert_eq!(
+            parse_str(" + * 3 "),
+            Err(Error {
+                cause: SyntaxError::InvalidOperator,
+                location: 3..4,
+            })
+        );
+    }
+
+    #[test]
+    fn redundant_tokens() {
+        assert_eq!(
+            parse_str(" 1 22 "),
+            Err(Error {
+                cause: SyntaxError::MissingOperator,
+                location: 3..5,
+            })
+        );
+    }
 }
