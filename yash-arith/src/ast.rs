@@ -267,6 +267,8 @@ pub enum SyntaxError {
     TokenError(TokenError),
     /// Expression with a missing value
     IncompleteExpression,
+    /// Operator missing
+    MissingOperator,
     /// `(` without `)`
     UnclosedParenthesis {
         /// Range of the substring in the evaluated expression string where `(` appears
@@ -285,13 +287,15 @@ pub enum SyntaxError {
 
 impl std::fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use SyntaxError::*;
         match self {
-            SyntaxError::TokenError(e) => e.fmt(f),
-            SyntaxError::IncompleteExpression => "incomplete expression".fmt(f),
-            SyntaxError::UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
-            SyntaxError::QuestionWithoutColon { .. } => "expected `:`".fmt(f),
-            SyntaxError::ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
-            SyntaxError::InvalidOperator => "invalid use of operator".fmt(f),
+            TokenError(e) => e.fmt(f),
+            IncompleteExpression => "incomplete expression".fmt(f),
+            MissingOperator => "expected an operator".fmt(f),
+            UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
+            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
+            ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
+            InvalidOperator => "invalid use of operator".fmt(f),
         }
     }
 }
@@ -493,21 +497,19 @@ fn parse_tree<'a>(
 ///
 /// Returns an error if there is a next token.
 fn parse_end_of_input(tokens: &mut PeekableTokens) -> Result<(), Error> {
-    match tokens.next()? {
-        Token {
-            value: TokenValue::EndOfInput,
-            ..
-        } => Ok(()),
+    let token = tokens.next()?;
+    match token.value {
+        TokenValue::EndOfInput => Ok(()),
 
-        Token {
-            value: TokenValue::Operator(Operator::Colon),
-            location,
-        } => Err(Error {
+        TokenValue::Operator(Operator::Colon) => Err(Error {
             cause: SyntaxError::ColonWithoutQuestion,
-            location,
+            location: token.location,
         }),
 
-        token => todo!("reject unparsed token {:?}", token),
+        _ => Err(Error {
+            cause: SyntaxError::MissingOperator,
+            location: token.location,
+        }),
     }
 }
 
@@ -1523,6 +1525,17 @@ mod tests {
             Err(Error {
                 cause: SyntaxError::InvalidOperator,
                 location: 3..4,
+            })
+        );
+    }
+
+    #[test]
+    fn redundant_tokens() {
+        assert_eq!(
+            parse_str(" 1 22 "),
+            Err(Error {
+                cause: SyntaxError::MissingOperator,
+                location: 3..5,
             })
         );
     }

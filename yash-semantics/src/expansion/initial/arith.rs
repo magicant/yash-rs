@@ -54,6 +54,8 @@ pub enum ArithError {
     InvalidCharacter,
     /// Expression with a missing value
     IncompleteExpression,
+    /// Operator missing
+    MissingOperator,
     /// `(` without `)`
     UnclosedParenthesis { opening_location: Location },
     /// `?` without `:`
@@ -83,6 +85,7 @@ impl std::fmt::Display for ArithError {
             InvalidNumericConstant => "invalid numeric constant".fmt(f),
             InvalidCharacter => "invalid character".fmt(f),
             IncompleteExpression => "incomplete expression".fmt(f),
+            MissingOperator => "expected an operator".fmt(f),
             UnclosedParenthesis { .. } => "unmatched parenthesis".fmt(f),
             QuestionWithoutColon { .. } => "expected `:`".fmt(f),
             ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
@@ -107,6 +110,7 @@ impl ArithError {
             InvalidNumericConstant
             | InvalidCharacter
             | IncompleteExpression
+            | MissingOperator
             | ColonWithoutQuestion
             | InvalidOperator
             | InvalidVariableValue(_)
@@ -146,6 +150,7 @@ pub fn convert_error_cause(
             yash_arith::SyntaxError::IncompleteExpression => {
                 ErrorCause::ArithError(IncompleteExpression)
             }
+            yash_arith::SyntaxError::MissingOperator => ErrorCause::ArithError(MissingOperator),
             yash_arith::SyntaxError::UnclosedParenthesis { opening_location } => {
                 let opening_location = Location {
                     code: Rc::clone(source),
