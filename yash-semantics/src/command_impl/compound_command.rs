@@ -17,6 +17,7 @@
 //! Implementation of the compound command semantics.
 
 mod for_loop;
+mod r#if;
 mod subshell;
 mod while_loop;
 
@@ -69,6 +70,16 @@ impl Command for syntax::FullCompoundCommand {
 /// the loop condition is inverted: The execution continues until the
 /// `condition` exit status is zero.
 ///
+/// # If conditional construct
+///
+/// The if command first executes the `condition`. If its exit status is zero,
+/// it runs the `body`, and its exit status becomes that of the if command.
+/// Otherwise, it executes the `condition` of each elif-then clause until
+/// finding a condition that returns an exit status of zero, after which it runs
+/// the corresponding `body`. If all the conditions result in a non-zero exit
+/// status, it runs the `else` clause, if any. In case the command has no `else`
+/// clause, the final exit status will be zero.
+///
 /// TODO Elaborate
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
@@ -80,7 +91,12 @@ impl Command for syntax::CompoundCommand {
             For { name, values, body } => for_loop::execute(env, name, values, body).await,
             While { condition, body } => while_loop::execute_while(env, condition, body).await,
             Until { condition, body } => while_loop::execute_until(env, condition, body).await,
-            // TODO execute if
+            If {
+                condition,
+                body,
+                elifs,
+                r#else,
+            } => r#if::execute(env, condition, body, elifs, r#else).await,
             // TODO execute case
             _ => {
                 env.print_error(&format!("Not implemented: {}\n", self))
