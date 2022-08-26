@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `syntax::CompoundCommand::Subshell` from a tuple variant `Subshell(List)`
   to a struct variant `Subshell { body: Rc<List>, location: Location }`.
+- Dependency versions
+    - futures-util 0.3.21 → 0.3.23
 
 ## [0.5.0] - 2022-07-02
 
