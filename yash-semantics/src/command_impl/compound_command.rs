@@ -16,6 +16,7 @@
 
 //! Implementation of the compound command semantics.
 
+mod case;
 mod for_loop;
 mod r#if;
 mod subshell;
@@ -25,7 +26,6 @@ use super::perform_redirs;
 use super::Command;
 use crate::redir::RedirGuard;
 use async_trait::async_trait;
-use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
@@ -80,7 +80,14 @@ impl Command for syntax::FullCompoundCommand {
 /// status, it runs the `else` clause, if any. In case the command has no `else`
 /// clause, the final exit status will be zero.
 ///
-/// TODO Elaborate
+/// # Case conditional construct
+///
+/// The "case" command expands the subject word and executes the body of the
+/// first item with a pattern matching the word. Each pattern is subjected to
+/// word expansion before matching.
+///
+/// POSIX does not specify the order in which the shell tests multiple patterns
+/// in an item. This implementation tries them in the order of appearance.
 #[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
@@ -97,12 +104,7 @@ impl Command for syntax::CompoundCommand {
                 elifs,
                 r#else,
             } => r#if::execute(env, condition, body, elifs, r#else).await,
-            // TODO execute case
-            _ => {
-                env.print_error(&format!("Not implemented: {}\n", self))
-                    .await;
-                Continue(())
-            }
+            Case { subject, items } => case::execute(env, subject, items).await,
         }
     }
 }
@@ -114,6 +116,7 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::semantics::ExitStatus;
