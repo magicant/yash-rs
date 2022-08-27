@@ -17,12 +17,77 @@
 //! Execution of the case command
 
 use std::ops::ControlFlow::Continue;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
 
 /// Executes the case command.
-pub async fn execute(_env: &mut Env, _subject: &Word, _items: &[CaseItem]) -> Result {
+pub async fn execute(env: &mut Env, _subject: &Word, _items: &[CaseItem]) -> Result {
+    env.exit_status = ExitStatus::SUCCESS;
     Continue(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::assert_stdout;
+    use crate::tests::echo_builtin;
+    use crate::Command;
+    use futures_util::FutureExt;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use yash_env::system::r#virtual::SystemState;
+    use yash_env::VirtualSystem;
+    use yash_syntax::syntax::CompoundCommand;
+
+    fn fixture() -> (Env, Rc<RefCell<SystemState>>) {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        (env, state)
+    }
+
+    #[test]
+    fn no_items() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus(57);
+        let command: CompoundCommand = "case foo in esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+    }
+
+    #[test]
+    fn one_unmatched_item() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus(17);
+        let command: CompoundCommand = "case foo in (bar) echo X;; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn many_unmatched_items() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus::FAILURE;
+        let command: CompoundCommand = "case word in
+        (foo) echo foo;;
+        (bar|baz) echo bar baz;;
+        (1|2|3) echo 1 2 3;;
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
 }
