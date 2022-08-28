@@ -80,7 +80,9 @@ mod tests {
     use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -90,6 +92,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
         (env, state)
     }
 
@@ -254,5 +257,20 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
-    // TODO Return from body
+    #[test]
+    fn return_from_body() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus::ERROR;
+        let command: CompoundCommand = "case success in
+        (success) return 73;;
+        (success) echo X;;
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(73));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
 }
