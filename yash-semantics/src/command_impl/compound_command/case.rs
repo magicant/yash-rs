@@ -18,6 +18,7 @@
 
 use crate::expansion::expand_word;
 use crate::Command;
+use crate::Handle;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -39,7 +40,7 @@ fn config() -> Config {
 pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
     let subject = match expand_word(env, subject).await {
         Ok((expansion, _exit_status)) => expansion,
-        Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
+        Err(error) => return error.handle(env).await,
     };
 
     'outer: for item in items {
@@ -47,7 +48,7 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
             // TODO Apply quotes in pattern
             let pattern = match expand_word(env, pattern).await {
                 Ok((expansion, _exit_status)) => expansion,
-                Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
+                Err(error) => return error.handle(env).await,
             };
 
             let pattern = match Pattern::parse_with_config(without_escape(&pattern.value), config())
@@ -272,5 +273,27 @@ mod tests {
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(73));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn error_expanding_subject() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case $(echo X) in (X) echo X; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn error_expanding_pattern() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case X in ($(echo X)) echo X; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 }
