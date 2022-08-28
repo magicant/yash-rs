@@ -16,6 +16,8 @@
 
 //! Execution of the case command
 
+use crate::expansion::expand_word;
+use crate::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -24,7 +26,32 @@ use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
 
 /// Executes the case command.
-pub async fn execute(env: &mut Env, _subject: &Word, _items: &[CaseItem]) -> Result {
+pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
+    let subject = match expand_word(env, subject).await {
+        Ok((expansion, _exit_status)) => expansion,
+        Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
+    };
+
+    // TODO Scan all items
+    if let Some(item) = items.first() {
+        // TODO Scan all patterns
+        if let Some(pattern) = item.patterns.first() {
+            // TODO Apply quotes in pattern
+            let pattern = match expand_word(env, pattern).await {
+                Ok((expansion, _exit_status)) => expansion,
+                Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
+            };
+
+            // let parse = match Pattern::parse(without_escape(&pattern.value)) {
+            //     Ok(parse) => {parse},
+            //     Err(error) => {todo!("ignore broken pattern: {:?}", error)},
+            // };
+            if subject.value == pattern.value {
+                return item.body.execute(env).await;
+            }
+        }
+    }
+
     env.exit_status = ExitStatus::SUCCESS;
     Continue(())
 }
@@ -32,8 +59,11 @@ pub async fn execute(env: &mut Env, _subject: &Word, _items: &[CaseItem]) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
+    use crate::tests::return_builtin;
     use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -90,4 +120,30 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
+
+    #[test]
+    fn first_item_matched() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert("return", return_builtin());
+            env.exit_status = ExitStatus(100);
+            let command: CompoundCommand = "case foo in
+            ($(echo foo)) echo A; return -n 42;;
+            ($(echo 1 >&2)|$(echo 2 >&2)|$(echo 3 >&2)) echo B;;
+            ($(echo 4 >&2)|$(echo 5 >&2)) echo C;;
+            esac"
+                .parse()
+                .unwrap();
+
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(42));
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "A\n"));
+            assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+        })
+    }
+
+    // TODO Pattern must match whole word
+    // TODO Empty body
+    // TODO Return from body
 }
