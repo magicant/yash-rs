@@ -42,7 +42,7 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
         Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
     };
 
-    for item in items {
+    'outer: for item in items {
         for pattern in &item.patterns {
             // TODO Apply quotes in pattern
             let pattern = match expand_word(env, pattern).await {
@@ -55,7 +55,11 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
                 Ok(parse) => parse,
                 Err(error) => todo!("ignore broken pattern: {:?}", error),
             };
+
             if pattern.is_match(&subject.value) {
+                if item.body.0.is_empty() {
+                    break 'outer;
+                };
                 return item.body.execute(env).await;
             }
         }
@@ -233,6 +237,22 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1*3\n"));
     }
 
-    // TODO Empty body
+    #[test]
+    fn item_with_empty_body() {
+        let (mut env, state) = fixture();
+        env.exit_status = ExitStatus::ERROR;
+        let command: CompoundCommand = "case success in
+        (success) ;;
+        (success) echo X;;
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
     // TODO Return from body
 }
