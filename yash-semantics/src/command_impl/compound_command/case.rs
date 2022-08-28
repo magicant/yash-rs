@@ -22,8 +22,18 @@ use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
+use yash_fnmatch::without_escape;
+use yash_fnmatch::Config;
+use yash_fnmatch::Pattern;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
+
+fn config() -> Config {
+    let mut config = Config::default();
+    config.anchor_begin = true;
+    config.anchor_end = true;
+    config
+}
 
 /// Executes the case command.
 pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
@@ -40,11 +50,12 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
                 Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
             };
 
-            // let parse = match Pattern::parse(without_escape(&pattern.value)) {
-            //     Ok(parse) => {parse},
-            //     Err(error) => {todo!("ignore broken pattern: {:?}", error)},
-            // };
-            if subject.value == pattern.value {
+            let pattern = match Pattern::parse_with_config(without_escape(&pattern.value), config())
+            {
+                Ok(parse) => parse,
+                Err(error) => todo!("ignore broken pattern: {:?}", error),
+            };
+            if pattern.is_match(&subject.value) {
                 return item.body.execute(env).await;
             }
         }
@@ -204,7 +215,24 @@ mod tests {
         })
     }
 
-    // TODO Pattern must match whole word
+    #[test]
+    fn pattern_must_match_whole_word() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case 123 in
+        (2) echo 2;;
+        (2*) echo '2*';;
+        (*2) echo '*2';;
+        (1*3) echo '1*3';;
+        esac"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1*3\n"));
+    }
+
     // TODO Empty body
     // TODO Return from body
 }
