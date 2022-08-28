@@ -32,10 +32,8 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
         Err(error) => todo!("{:?}", error), // TODO return error.handle(env).await,
     };
 
-    // TODO Scan all items
-    if let Some(item) = items.first() {
-        // TODO Scan all patterns
-        if let Some(pattern) = item.patterns.first() {
+    for item in items {
+        for pattern in &item.patterns {
             // TODO Apply quotes in pattern
             let pattern = match expand_word(env, pattern).await {
                 Ok((expansion, _exit_status)) => expansion,
@@ -139,6 +137,69 @@ mod tests {
             assert_eq!(result, Continue(()));
             assert_eq!(env.exit_status, ExitStatus(42));
             assert_stdout(&state, |stdout| assert_eq!(stdout, "A\n"));
+            assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+        })
+    }
+
+    #[test]
+    fn first_pattern_of_second_item_matched() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.exit_status = ExitStatus(100);
+            let command: CompoundCommand = "case 1 in
+            ($(echo foo)) echo A;;
+            ($(echo 1)|$(echo 2)|$(echo 3 >&2)) echo B;;
+            ($(echo 4 >&2)|$(echo 5 >&2)) echo C;;
+            esac"
+                .parse()
+                .unwrap();
+
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "B\n"));
+            assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+        })
+    }
+
+    #[test]
+    fn second_pattern_of_second_item_matched() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.exit_status = ExitStatus(100);
+            let command: CompoundCommand = "case 2 in
+            ($(echo foo)) echo A;;
+            ($(echo 1)|$(echo 2)|$(echo 3 >&2)) echo B;;
+            ($(echo 4 >&2)|$(echo 5 >&2)) echo C;;
+            esac"
+                .parse()
+                .unwrap();
+
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "B\n"));
+            assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+        })
+    }
+
+    #[test]
+    fn third_item_matched() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.exit_status = ExitStatus(100);
+            let command: CompoundCommand = "case 4 in
+            ($(echo foo)) echo A; return -n 42;;
+            ($(echo 1)|$(echo 2)|$(echo 3)) echo B;;
+            ($(echo 4)|$(echo 5 >&2)) echo C;;
+            esac"
+                .parse()
+                .unwrap();
+
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "C\n"));
             assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
         })
     }
