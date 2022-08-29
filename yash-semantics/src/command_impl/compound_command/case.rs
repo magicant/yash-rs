@@ -54,7 +54,10 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
             let pattern = match Pattern::parse_with_config(without_escape(&pattern.value), config())
             {
                 Ok(parse) => parse,
-                Err(error) => todo!("ignore broken pattern: {:?}", error),
+                Err(_error) => {
+                    // Treat the broken pattern as a valid pattern that does not match anything
+                    continue;
+                }
             };
 
             if pattern.is_match(&subject.value) {
@@ -239,6 +242,18 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1*3\n"));
+    }
+
+    #[test]
+    fn broken_pattern_is_ignored() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case [[..]] in ([[..]]) echo X; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     #[test]
