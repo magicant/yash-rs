@@ -18,8 +18,9 @@
 //!
 //! The word expansion involves many kinds of operations described below.
 //! The [`expand_words`] function carries out all of them and produces any
-//! number of fields depending on the expanded word. The [`expand_word`]
-//! function omits some of them to ensure that the result is a single field.
+//! number of fields depending on the expanded word. The [`expand_word_attr`]
+//! and [`expand_word`] functions omit some of them to ensure that the result is
+//! a single field.
 //!
 //! # Initial expansion
 //!
@@ -225,18 +226,18 @@ pub async fn expand_text(
     Ok((result, env.last_command_subst_exit_status))
 }
 
-/// Expands a word to a field.
+/// Expands a word to an attributed field.
 ///
-/// This function performs the initial expansion, quote removal, and attribute
-/// stripping.
-/// The second field of the result tuple is the exit status of the last command
-/// substitution performed during the expansion, if any.
+/// This function performs initial expansion and joins the resultant phrase into
+/// a field. The second field of the result tuple is the exit status of the last
+/// command substitution performed during the expansion, if any.
 ///
-/// To expand multiple words to multiple fields, use [`expand_words`].
-pub async fn expand_word(
+/// Compare [`expand_word`] that performs not only initial expansion but also
+/// quote removal and attribute stripping.
+pub async fn expand_word_attr(
     env: &mut yash_env::Env,
     word: &Word,
-) -> Result<(Field, Option<ExitStatus>)> {
+) -> Result<(AttrField, Option<ExitStatus>)> {
     let mut env = initial::Env::new(env);
     // It would be technically correct to set `will_split` to false, but it does
     // not affect the final results because we will join the results anyway.
@@ -251,9 +252,26 @@ pub async fn expand_word(
     let chars = phrase.ifs_join(&env.inner.variables);
     let origin = word.location.clone();
     let field = AttrField { chars, origin };
-
-    let field = field.remove_quotes_and_strip();
     Ok((field, env.last_command_subst_exit_status))
+}
+
+/// Expands a word to a field.
+///
+/// This function performs the initial expansion, quote removal, and attribute
+/// stripping.
+/// The second field of the result tuple is the exit status of the last command
+/// substitution performed during the expansion, if any.
+///
+/// To expand a word to an [`AttrField`] without performing quote removal or
+/// attribute stripping, use [`expand_word_attr`].
+/// To expand multiple words to multiple fields, use [`expand_words`].
+pub async fn expand_word(
+    env: &mut yash_env::Env,
+    word: &Word,
+) -> Result<(Field, Option<ExitStatus>)> {
+    let (field, exit_status) = expand_word_attr(env, word).await?;
+    let field = field.remove_quotes_and_strip();
+    Ok((field, exit_status))
 }
 
 /// Expands words to fields.
