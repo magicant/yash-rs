@@ -16,18 +16,46 @@
 
 //! Execution of the case command
 
+use crate::expansion::attr::AttrChar;
 use crate::expansion::expand_word;
+use crate::expansion::expand_word_attr;
 use crate::Command;
 use crate::Handle;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
-use yash_fnmatch::without_escape;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
+use yash_fnmatch::PatternChar;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
+
+/// Converts unquoted backslashes to quoting characters.
+///
+/// Sets the `is_quoting` flag of unquoted backslashes and the `is_quoted` flag
+/// of their following characters.
+fn apply_escapes(chars: &mut [AttrChar]) {
+    for j in 1..chars.len() {
+        let i = j - 1;
+        if chars[i].value == '\\' && !chars[i].is_quoting && !chars[i].is_quoted {
+            chars[i].is_quoting = true;
+            chars[j].is_quoted = true;
+        }
+    }
+}
+
+fn to_pattern_chars(chars: &[AttrChar]) -> impl Iterator<Item = PatternChar> + Clone + '_ {
+    chars.iter().filter_map(|c| {
+        if c.is_quoting {
+            None
+        } else if c.is_quoted {
+            Some(PatternChar::Literal(c.value))
+        } else {
+            Some(PatternChar::Normal(c.value))
+        }
+    })
+}
 
 fn config() -> Config {
     let mut config = Config::default();
@@ -45,20 +73,22 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
 
     'outer: for item in items {
         for pattern in &item.patterns {
-            // TODO Apply quotes in pattern
-            let pattern = match expand_word(env, pattern).await {
+            let mut pattern = match expand_word_attr(env, pattern).await {
                 Ok((expansion, _exit_status)) => expansion,
                 Err(error) => return error.handle(env).await,
             };
 
-            let pattern = match Pattern::parse_with_config(without_escape(&pattern.value), config())
-            {
-                Ok(parse) => parse,
-                Err(_error) => {
-                    // Treat the broken pattern as a valid pattern that does not match anything
-                    continue;
-                }
-            };
+            // Unquoted backslashes should act as quoting, as required by POSIX XCU 2.13.1
+            apply_escapes(&mut pattern.chars);
+
+            let pattern =
+                match Pattern::parse_with_config(to_pattern_chars(&pattern.chars), config()) {
+                    Ok(parse) => parse,
+                    Err(_error) => {
+                        // Treat the broken pattern as a valid pattern that does not match anything
+                        continue;
+                    }
+                };
 
             if pattern.is_match(&subject.value) {
                 if item.body.0.is_empty() {
@@ -88,6 +118,9 @@ mod tests {
     use std::rc::Rc;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env::variable::Scope;
+    use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -242,6 +275,76 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1*3\n"));
+    }
+
+    #[test]
+    fn quoted_pattern() {
+        let (mut env, state) = fixture();
+        let command: CompoundCommand = "case X in
+        ('*') echo quoted;;
+        (*) echo literal;;
+        esac"
+            .parse()
+            .unwrap();
+
+        let _ = command.execute(&mut env).now_or_never().unwrap();
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "literal\n"));
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn unquoted_backslash_escapes_next_char_in_pattern() {
+        let (mut env, state) = fixture();
+        env.variables
+            .assign(
+                Scope::Global,
+                "empty".to_string(),
+                Variable {
+                    value: Value::Scalar("".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                Scope::Global,
+                "one".to_string(),
+                Variable {
+                    value: Value::Scalar(r"\".to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        env.variables
+            .assign(
+                Scope::Global,
+                "v".to_string(),
+                Variable {
+                    value: Value::Scalar(r#"\\\a"#.to_string()),
+                    last_assigned_location: None,
+                    is_exported: false,
+                    read_only_location: None,
+                },
+            )
+            .unwrap();
+        let command: CompoundCommand = r#"case '\a' in
+        ($empty) echo unquoted empty;;
+        ("$empty") echo quoted empty;;
+        ($one) echo unquoted one;;
+        ("$one") echo quoted one;;
+        ("$v") echo wrong quote;;
+        ($v) echo ok;;
+        esac"#
+            .parse()
+            .unwrap();
+
+        let _ = command.execute(&mut env).now_or_never().unwrap();
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "ok\n"));
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     #[test]
