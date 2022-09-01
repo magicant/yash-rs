@@ -201,12 +201,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
     }
 
     fn assign_variable(&mut self, name: &str, value: String) -> Result<(), ReadOnlyError> {
-        let value = Variable {
-            value: Scalar(value),
-            last_assigned_location: None, // TODO Provide correct location
-            is_exported: false,
-            read_only_location: None,
-        };
+        let value = Variable::new(value) /* TODO .set_assigned_location(location) */;
         self.0.assign(Global, name.to_owned(), value).map(drop)
     }
 }

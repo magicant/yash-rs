@@ -119,7 +119,6 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -296,40 +295,13 @@ mod tests {
     fn unquoted_backslash_escapes_next_char_in_pattern() {
         let (mut env, state) = fixture();
         env.variables
-            .assign(
-                Scope::Global,
-                "empty".to_string(),
-                Variable {
-                    value: Value::Scalar("".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "empty".to_string(), Variable::new(""))
             .unwrap();
         env.variables
-            .assign(
-                Scope::Global,
-                "one".to_string(),
-                Variable {
-                    value: Value::Scalar(r"\".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "one".to_string(), Variable::new(r"\"))
             .unwrap();
         env.variables
-            .assign(
-                Scope::Global,
-                "v".to_string(),
-                Variable {
-                    value: Value::Scalar(r#"\\\a"#.to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: None,
-                },
-            )
+            .assign(Scope::Global, "v".to_string(), Variable::new(r#"\\\a"#))
             .unwrap();
         let command: CompoundCommand = r#"case '\a' in
         ($empty) echo unquoted empty;;

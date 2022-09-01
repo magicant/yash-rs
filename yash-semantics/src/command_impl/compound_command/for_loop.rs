@@ -66,12 +66,7 @@ pub async fn execute(
     };
 
     for Field { value, origin } in values {
-        let var = Variable {
-            value: Scalar(value),
-            last_assigned_location: Some(origin),
-            is_exported: false,
-            read_only_location: None,
-        };
+        let var = Variable::new(value).set_assigned_location(origin);
         match env.variables.assign(Scope::Global, name.value.clone(), var) {
             Ok(_) => body.execute(env).await?,
             Err(error) => {
@@ -215,12 +210,7 @@ mod tests {
             .assign(
                 Scope::Global,
                 "x".to_string(),
-                Variable {
-                    value: Scalar("".to_string()),
-                    last_assigned_location: None,
-                    is_exported: false,
-                    read_only_location: Some(Location::dummy("")),
-                },
+                Variable::new("").make_read_only(Location::dummy("")),
             )
             .unwrap();
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
