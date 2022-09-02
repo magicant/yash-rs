@@ -734,8 +734,7 @@ mod tests {
     #[test]
     fn overflow_in_increment() {
         let env = &mut HashMap::new();
-        env.assign_variable("i", "9223372036854775807".to_string())
-            .unwrap();
+        env.insert("i".to_string(), "9223372036854775807".to_string());
         assert_eq!(
             eval("  ++ i", env),
             Err(Error {
@@ -757,8 +756,7 @@ mod tests {
     #[test]
     fn overflow_in_decrement() {
         let env = &mut HashMap::new();
-        env.assign_variable("i", "-9223372036854775808".to_string())
-            .unwrap();
+        env.insert("i".to_string(), "-9223372036854775808".to_string());
         assert_eq!(
             eval(" -- i", env),
             Err(Error {

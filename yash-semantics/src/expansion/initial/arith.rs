@@ -23,6 +23,7 @@ use super::super::ErrorCause;
 use super::Env;
 use super::Error;
 use crate::expansion::expand_text;
+use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::variable::ReadOnlyError;
@@ -186,23 +187,42 @@ pub fn convert_error_cause(
     }
 }
 
-struct VarEnv<'a>(&'a mut VariableSet);
+struct VarEnv<'a> {
+    variables: &'a mut VariableSet,
+    expression: &'a str,
+    expansion_location: &'a Location,
+}
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
     type AssignVariableError = ReadOnlyError;
 
     #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Option<&str> {
-        if let Some(Variable { value: Scalar(value), .. }) = self.0.get(name) {
+        if let Some(Variable { value: Scalar(value), .. }) = self.variables.get(name) {
             Some(value)
         } else {
             None
         }
     }
 
-    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), ReadOnlyError> {
-        let value = Variable::new(value) /* TODO .set_assigned_location(location) */;
-        self.0.assign(Global, name.to_owned(), value).map(drop)
+    fn assign_variable(
+        &mut self,
+        name: &str,
+        value: String,
+        range: Range<usize>,
+    ) -> Result<(), ReadOnlyError> {
+        let code = Rc::new(Code {
+            value: self.expression.to_string().into(),
+            start_line_number: 1.try_into().unwrap(),
+            source: Source::Arith {
+                original: self.expansion_location.clone(),
+            },
+        });
+        let location = Location { code, range };
+        let value = Variable::new(value).set_assigned_location(location);
+        self.variables
+            .assign(Global, name.to_owned(), value)
+            .map(drop)
     }
 }
 
@@ -212,7 +232,14 @@ pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Resu
         env.last_command_subst_exit_status = exit_status;
     }
 
-    let result = eval(&expression, &mut VarEnv(&mut env.inner.variables));
+    let result = eval(
+        &expression,
+        &mut VarEnv {
+            variables: &mut env.inner.variables,
+            expression: &expression,
+            expansion_location: location,
+        },
+    );
 
     match result {
         Ok(value) => {
@@ -257,6 +284,7 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
+    use yash_env::variable::Value;
 
     #[test]
     fn successful_inner_text_expansion() {
@@ -317,6 +345,25 @@ mod tests {
         assert_eq!(e.cause, ErrorCause::CommandSubstError(Errno::ENOSYS));
         assert_eq!(*e.location.code.value.borrow(), "$(x)");
         assert_eq!(e.location.range, 0..4);
+    }
+
+    #[test]
+    fn variable_assigned_during_arithmetic_evaluation() {
+        let text = "3 + (x = 4 * 6)".parse().unwrap();
+        let location = Location::dummy("my location");
+        let mut env = yash_env::Env::new_virtual();
+        let mut env2 = Env::new(&mut env);
+        let _ = expand(&text, &location, &mut env2).now_or_never().unwrap();
+
+        let v = env.variables.get("x").unwrap();
+        assert_eq!(v.value, Value::Scalar("24".to_string()));
+        let location2 = v.last_assigned_location.as_ref().unwrap();
+        assert_eq!(*location2.code.value.borrow(), "3 + (x = 4 * 6)");
+        assert_eq!(location2.code.start_line_number.get(), 1);
+        assert_eq!(location2.code.source, Source::Arith { original: location });
+        assert_eq!(location2.range, 5..6);
+        assert!(!v.is_exported);
+        assert_eq!(v.read_only_location, None);
     }
 
     #[test]

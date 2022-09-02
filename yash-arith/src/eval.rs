@@ -135,7 +135,7 @@ fn assign<E: Env>(
     location: Range<usize>,
     env: &mut E,
 ) -> Result<Value, Error<E::AssignVariableError>> {
-    match env.assign_variable(name, value.to_string()) {
+    match env.assign_variable(name, value.to_string(), location.clone()) {
         Ok(()) => Ok(value),
         Err(e) => Err(Error {
             cause: EvalError::AssignVariableError(e),

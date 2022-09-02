@@ -18,6 +18,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::Infallible;
+use std::ops::Range;
 
 /// Interface for accessing variables during evaluation
 pub trait Env {
@@ -28,10 +29,14 @@ pub trait Env {
     fn get_variable(&self, name: &str) -> Option<&str>;
 
     /// Assigns a new value to the specified variable.
+    ///
+    /// The `location` parameter is the index range to the evaluated expression
+    /// where the assignment appears.
     fn assign_variable(
         &mut self,
         name: &str,
         value: String,
+        location: Range<usize>,
     ) -> Result<(), Self::AssignVariableError>;
 }
 
@@ -42,7 +47,12 @@ impl Env for HashMap<String, String> {
         self.get(name).map(String::as_str)
     }
 
-    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), Infallible> {
+    fn assign_variable(
+        &mut self,
+        name: &str,
+        value: String,
+        _location: Range<usize>,
+    ) -> Result<(), Infallible> {
         self.insert(name.to_owned(), value);
         Ok(())
     }
@@ -55,7 +65,12 @@ impl Env for BTreeMap<String, String> {
         self.get(name).map(String::as_str)
     }
 
-    fn assign_variable(&mut self, name: &str, value: String) -> Result<(), Infallible> {
+    fn assign_variable(
+        &mut self,
+        name: &str,
+        value: String,
+        _location: Range<usize>,
+    ) -> Result<(), Infallible> {
         self.insert(name.to_owned(), value);
         Ok(())
     }
