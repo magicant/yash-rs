@@ -36,7 +36,11 @@ impl BracketAtom {
         match self {
             BracketAtom::Char(c) => return BracketAtom::fmt_regex_char(*c, regex),
             BracketAtom::CollatingSymbol(value) | BracketAtom::EquivalenceClass(value) => {
-                regex.write_str(value)
+                if !value.is_empty() {
+                    regex.write_str(value)
+                } else {
+                    return Err(Error::EmptyCollatingSymbol);
+                }
             }
             BracketAtom::CharClass(class) => {
                 if ClassAsciiKind::from_name(class).is_some() {
@@ -372,6 +376,34 @@ mod tests {
     }
 
     #[test]
+    fn empty_collating_symbol_in_atom() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::CollatingSymbol(
+                "".to_string(),
+            ))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let e = ast.to_regex(&Config::default()).unwrap_err();
+        assert_eq!(e, Error::EmptyCollatingSymbol);
+    }
+
+    #[test]
+    fn empty_collating_symbol_in_range() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Range(
+                BracketAtom::CollatingSymbol("".to_string())..=BracketAtom::Char('x'),
+            )],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let e = ast.to_regex(&Config::default()).unwrap_err();
+        assert_eq!(e, Error::EmptyCollatingSymbol);
+    }
+
+    #[test]
     fn single_character_equivalence_class() {
         let bracket = Bracket {
             complement: false,
@@ -397,6 +429,34 @@ mod tests {
         let ast = Ast { atoms };
         let regex = ast.to_regex(&Config::default()).unwrap();
         assert_eq!(regex, "(?:ij)");
+    }
+
+    #[test]
+    fn empty_equivalence_class_in_atom() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Atom(BracketAtom::EquivalenceClass(
+                "".to_string(),
+            ))],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let e = ast.to_regex(&Config::default()).unwrap_err();
+        assert_eq!(e, Error::EmptyCollatingSymbol);
+    }
+
+    #[test]
+    fn empty_equivalence_class_in_range() {
+        let bracket = Bracket {
+            complement: false,
+            items: vec![BracketItem::Range(
+                BracketAtom::EquivalenceClass("".to_string())..=BracketAtom::Char('x'),
+            )],
+        };
+        let atoms = vec![Atom::Bracket(bracket)];
+        let ast = Ast { atoms };
+        let e = ast.to_regex(&Config::default()).unwrap_err();
+        assert_eq!(e, Error::EmptyCollatingSymbol);
     }
 
     #[test]
