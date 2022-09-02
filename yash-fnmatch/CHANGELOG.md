@@ -5,6 +5,14 @@ All notable changes to `yash-fnmatch` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - XXXX-XX-XX
+
+### Fixed
+
+- A bug where an `Ast` containing an empty collating symbol or equivalence class
+  in a `BracketItem::Atom` was producing a malformed regex rather than returning
+  an `Error::EmptyCollatingSymbol`.
+
 ## [1.0.0] - 2022-07-02
 
 The first release.
