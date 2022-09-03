@@ -38,6 +38,10 @@ use std::ops::DerefMut;
 /// Element of runtime execution context stack
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Frame {
+    /// For, while, or until loop
+    Loop,
+    /// Subshell
+    Subshell,
     /// Built-in utility
     Builtin {
         /// Name of the built-in
@@ -45,7 +49,7 @@ pub enum Frame {
     },
     /// Trap
     Trap,
-    // TODO Loops, subshell, dot script, eval
+    // TODO dot script, eval
 }
 
 /// Runtime execution context stack
