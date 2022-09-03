@@ -19,6 +19,7 @@
 use crate::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::{ExitStatus, Result};
+use yash_env::stack::Frame;
 use yash_env::Env;
 use yash_syntax::syntax::List;
 
@@ -33,6 +34,8 @@ async fn execute_loop(
     expected_condition: bool,
     body: &List,
 ) -> Result {
+    let env = &mut env.push_frame(Frame::Loop);
+
     let mut exit_status = ExitStatus::SUCCESS;
     // TODO Handle break and continue
     while execute_condition(env, condition_command).await? == expected_condition {
@@ -62,10 +65,14 @@ mod tests {
     use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
+    use std::future::Future;
     use std::ops::ControlFlow::Break;
+    use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::builtin::Builtin;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Value::Scalar;
     use yash_env::VirtualSystem;
@@ -143,6 +150,28 @@ mod tests {
     }
 
     #[test]
+    fn stack_frame_in_while_loop() {
+        fn execute(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                assert_eq!(env.stack[0], Frame::Loop);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        let (mut env, _state) = fixture();
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("check", Builtin { r#type, execute });
+        let command: CompoundCommand = "while check; do check; return; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.stack[..], []);
+    }
+
+    #[test]
     fn zero_round_until_loop() {
         let (mut env, state) = fixture();
         env.exit_status = ExitStatus(17);
@@ -202,5 +231,27 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(35));
+    }
+
+    #[test]
+    fn stack_frame_in_until_loop() {
+        fn execute(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                assert_eq!(env.stack[0], Frame::Loop);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        let (mut env, _state) = fixture();
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("check", Builtin { r#type, execute });
+        let command: CompoundCommand = "until ! check; do check; return; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.stack[..], []);
     }
 }
