@@ -19,6 +19,7 @@
 //! TODO Elaborate
 
 pub mod alias;
+pub mod r#break;
 pub mod common;
 pub mod jobs;
 pub mod readonly;
@@ -41,6 +42,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Intrinsic,
             execute: alias::builtin_main,
+        },
+    ),
+    (
+        "break",
+        Builtin {
+            r#type: Special,
+            execute: r#break::builtin_main,
         },
     ),
     (
