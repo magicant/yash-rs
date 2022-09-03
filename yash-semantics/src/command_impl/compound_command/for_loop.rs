@@ -25,6 +25,7 @@ use crate::Handle;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
 use yash_env::variable::Variable;
@@ -65,6 +66,8 @@ pub async fn execute(
         }
     };
 
+    let env = &mut env.push_frame(Frame::Loop);
+
     for Field { value, origin } in values {
         let var = Variable::new(value).set_assigned_location(origin);
         match env.variables.assign(Scope::Global, name.value.clone(), var) {
@@ -89,8 +92,11 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::Command;
     use futures_util::FutureExt;
+    use std::future::Future;
     use std::ops::ControlFlow::Break;
+    use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::builtin::Builtin;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
@@ -167,6 +173,29 @@ mod tests {
     }
 
     // TODO with empty body
+
+    #[test]
+    fn stack_frame_in_loop() {
+        fn execute(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                assert_eq!(env.stack[0], Frame::Loop);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        let mut env = Env::new_virtual();
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("check", Builtin { r#type, execute });
+        let command: CompoundCommand = "for i in 1; do check; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.stack[..], []);
+    }
+
     // TODO break_for_loop
     // TODO break_outer_loop
     // TODO continue_for_loop
