@@ -120,7 +120,7 @@ impl Accumulator {
     ///
     /// 1. Formats a job report in `self.print` so it can be printed later.
     /// 1. Clears the `status_changed` flag of the job.
-    /// 1. Remembers the job index in `self.indices_to_remove` so the job can be
+    /// 1. Remembers the job index in `self.indices_reported` so the job can be
     ///    removed later.
     fn report(&mut self, index: usize, job: &Job) {
         use yash_env::job::fmt::{Marker, Report};
