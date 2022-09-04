@@ -105,6 +105,27 @@ impl Stack {
         std::mem::forget(guard);
         frame
     }
+
+    /// Returns the number of enclosing loops.
+    ///
+    /// This function returns the number of lexically enclosing `for`, `while`,
+    /// and `until` loops in the current execution environment. That is, the
+    /// result is the count of `Frame::Loop`s pushed after the last
+    /// `Frame::Subshell`.
+    ///
+    /// The function stops counting when `max_count` is reached. The parameter
+    /// is useful if you don't have to count more than a specific number.
+    /// Pass `usize::MAX` to count all loops.
+    #[must_use]
+    pub fn loop_count(&self, max_count: usize) -> usize {
+        self.inner
+            .iter()
+            .rev()
+            .take_while(|&frame| frame != &Frame::Subshell)
+            .filter(|&frame| frame == &Frame::Loop)
+            .take(max_count)
+            .count()
+    }
 }
 
 /// When the guard is dropped, the stack frame that was pushed when creating the
@@ -175,5 +196,81 @@ impl Deref for EnvFrameGuard<'_> {
 impl DerefMut for EnvFrameGuard<'_> {
     fn deref_mut(&mut self) -> &mut Env {
         self.env
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loop_count_empty() {
+        let stack = Stack::default();
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+    }
+
+    #[test]
+    fn loop_count_with_non_loop_frames() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Builtin {
+            name: Field::dummy(""),
+        });
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let stack = stack.push(Frame::Trap);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+    }
+
+    #[test]
+    fn loop_count_with_one_loop() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let stack = stack.push(Frame::Trap);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+    }
+
+    #[test]
+    fn loop_count_with_two_loops() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Trap);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+        let stack = stack.push(Frame::Trap);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+    }
+
+    #[test]
+    fn loop_count_with_subshells() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Subshell);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+        let mut stack = stack.push(Frame::Subshell);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+    }
+
+    #[test]
+    fn loop_count_with_small_max_count() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::Trap);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+        assert_eq!(stack.loop_count(3), 2);
+        assert_eq!(stack.loop_count(2), 2);
+        assert_eq!(stack.loop_count(1), 1);
+        assert_eq!(stack.loop_count(0), 0);
+
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(4), 3);
+        assert_eq!(stack.loop_count(3), 3);
+        assert_eq!(stack.loop_count(2), 2);
     }
 }
