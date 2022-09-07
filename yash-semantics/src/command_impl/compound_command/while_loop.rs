@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Execution of the while loop
+//! Execution of the while and until loop
 
 use crate::Command;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
 use yash_env::stack::Frame;
 use yash_env::Env;
@@ -37,7 +38,6 @@ async fn execute_loop(
     let env = &mut env.push_frame(Frame::Loop);
 
     let mut exit_status = ExitStatus::SUCCESS;
-    // TODO Handle break and continue
     while execute_condition(env, condition_command).await? == expected_condition {
         body.execute(env).await?;
         exit_status = env.exit_status;
@@ -46,35 +46,44 @@ async fn execute_loop(
     Continue(())
 }
 
+fn handle_divert(result: Result) -> Result {
+    match result {
+        Break(Divert::Break { count: 0 }) => Continue(()),
+        Break(Divert::Break { count }) => Break(Divert::Break { count: count - 1 }),
+        other => other,
+    }
+}
+
 /// Executes the while loop.
 pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
-    execute_loop(env, condition, true, body).await
+    handle_divert(execute_loop(env, condition, true, body).await)
 }
 
 /// Executes the until loop.
 pub async fn execute_until(env: &mut Env, condition: &List, body: &List) -> Result {
-    execute_loop(env, condition, false, body).await
+    handle_divert(execute_loop(env, condition, false, body).await)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tests::assert_stdout;
+    use crate::tests::break_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::future::Future;
-    use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
-    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
+    use yash_env::variable::Scope;
     use yash_env::variable::Value::Scalar;
+    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -172,6 +181,64 @@ mod tests {
     }
 
     #[test]
+    fn break_while_loop_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "while break; do echo 1; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn break_while_loop_body() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "while echo 1; do break; echo 2; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
+    }
+
+    #[test]
+    fn break_outer_loop_of_while() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "while break $n; do echo 1; done".parse().unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Break { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    // TODO continue_while_loop_condition
+    // TODO continue_while_loop_body
+    // TODO continue_outer_loop_of_while
+
+    #[test]
     fn zero_round_until_loop() {
         let (mut env, state) = fixture();
         env.exit_status = ExitStatus(17);
@@ -254,4 +321,62 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.stack[..], []);
     }
+
+    #[test]
+    fn break_until_loop_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "until ! break; do echo 1; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn break_until_loop_body() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "until ! echo 1; do break; echo 2; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
+    }
+
+    #[test]
+    fn break_outer_loop_of_until() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "until ! break $n; do echo 1; done".parse().unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Break { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    // TODO continue_until_loop_condition
+    // TODO continue_until_loop_body
+    // TODO continue_outer_loop_of_until
 }
