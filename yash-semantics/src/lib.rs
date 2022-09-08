@@ -209,6 +209,25 @@ pub(crate) mod tests {
         }
     }
 
+    fn continue_builtin_main(
+        _env: &mut Env,
+        args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
+        Box::pin(ready((
+            ExitStatus::SUCCESS,
+            Break(Divert::Continue { count: count - 1 }),
+        )))
+    }
+
+    /// Returns a minimal implementation of the `continue` built-in.
+    pub fn continue_builtin() -> Builtin {
+        Builtin {
+            r#type: Special,
+            execute: continue_builtin_main,
+        }
+    }
+
     fn local_builtin_main(
         env: &mut Env,
         args: Vec<Field>,

@@ -24,44 +24,71 @@ use yash_env::stack::Frame;
 use yash_env::Env;
 use yash_syntax::syntax::List;
 
-async fn execute_condition(env: &mut Env, condition: &List) -> Result<bool> {
-    condition.execute(env).await?;
-    Continue(env.exit_status == ExitStatus::SUCCESS)
+/// Execution context for loops
+struct Loop<'a> {
+    env: &'a mut Env,
+    condition_command: &'a List,
+    expected_condition: bool,
+    body: &'a List,
+    exit_status: ExitStatus,
 }
 
-async fn execute_loop(
+impl Loop<'_> {
+    async fn evaluate_condition(&mut self) -> Result<bool> {
+        self.condition_command.execute(self.env).await?;
+        Continue(self.env.exit_status == ExitStatus::SUCCESS)
+    }
+
+    async fn iterate(&mut self) -> Result {
+        while self.evaluate_condition().await? == self.expected_condition {
+            self.body.execute(self.env).await?;
+            self.exit_status = self.env.exit_status;
+        }
+        Continue(())
+    }
+
+    async fn execute(&mut self) -> Result {
+        loop {
+            match self.iterate().await {
+                Break(Divert::Break { count: 0 }) => return Continue(()),
+                Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
+                Break(Divert::Continue { count: 0 }) => continue,
+                Break(Divert::Continue { count }) => {
+                    return Break(Divert::Continue { count: count - 1 })
+                }
+                other => return other,
+            }
+        }
+    }
+}
+
+async fn execute_common(
     env: &mut Env,
     condition_command: &List,
     expected_condition: bool,
     body: &List,
 ) -> Result {
     let env = &mut env.push_frame(Frame::Loop);
-
-    let mut exit_status = ExitStatus::SUCCESS;
-    while execute_condition(env, condition_command).await? == expected_condition {
-        body.execute(env).await?;
-        exit_status = env.exit_status;
-    }
-    env.exit_status = exit_status;
+    let mut l = Loop {
+        env,
+        condition_command,
+        expected_condition,
+        body,
+        exit_status: ExitStatus::default(),
+    };
+    l.execute().await?;
+    env.exit_status = l.exit_status;
     Continue(())
-}
-
-fn handle_divert(result: Result) -> Result {
-    match result {
-        Break(Divert::Break { count: 0 }) => Continue(()),
-        Break(Divert::Break { count }) => Break(Divert::Break { count: count - 1 }),
-        other => other,
-    }
 }
 
 /// Executes the while loop.
 pub async fn execute_while(env: &mut Env, condition: &List, body: &List) -> Result {
-    handle_divert(execute_loop(env, condition, true, body).await)
+    execute_common(env, condition, true, body).await
 }
 
 /// Executes the until loop.
 pub async fn execute_until(env: &mut Env, condition: &List, body: &List) -> Result {
-    handle_divert(execute_loop(env, condition, false, body).await)
+    execute_common(env, condition, false, body).await
 }
 
 #[cfg(test)]
@@ -69,6 +96,7 @@ mod tests {
     use super::*;
     use crate::tests::assert_stdout;
     use crate::tests::break_builtin;
+    use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::Command;
@@ -234,9 +262,89 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
-    // TODO continue_while_loop_condition
-    // TODO continue_while_loop_body
-    // TODO continue_outer_loop_of_while
+    #[test]
+    fn continue_while_loop_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "while return -n $(((i+=1)>3)) && continue; do echo X; done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn continue_while_loop_body() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand =
+            "while return -n $(((i+=1)>3)); do echo +$i; continue; echo -$i; done"
+                .parse()
+                .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+1\n+2\n+3\n"));
+    }
+
+    #[test]
+    fn exit_status_of_continued_while_loop() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "while
+            case $count in
+                ('') count=1 ;;
+                (1) count=2; continue ;;
+                (*) return -n 1 ;;
+            esac
+        do
+            return -n 100
+        done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(100));
+    }
+
+    #[test]
+    fn continue_outer_loop_of_while() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "while continue $n; do echo 1; done".parse().unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Continue { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
 
     #[test]
     fn zero_round_until_loop() {
@@ -376,7 +484,87 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
-    // TODO continue_until_loop_condition
-    // TODO continue_until_loop_body
-    // TODO continue_outer_loop_of_until
+    #[test]
+    fn continue_until_loop_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "until return -n $(((i+=1)<3)) || continue; do echo X; done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn continue_until_loop_body() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand =
+            "until return -n $(((i+=1)<3)); do echo +$i; continue; echo -$i; done"
+                .parse()
+                .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+1\n+2\n"));
+    }
+
+    #[test]
+    fn exit_status_of_continued_until_loop() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "until
+            case $count in
+                ('') count=1; return -n 1 ;;
+                (1) count=2; continue ;;
+                (*) return -n 0 ;;
+            esac
+        do
+            return -n 100
+        done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(100));
+    }
+
+    #[test]
+    fn continue_outer_loop_of_until() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "until continue $n; do echo 1; done".parse().unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Continue { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
 }

@@ -75,6 +75,10 @@ pub async fn execute(
             Ok(_) => match body.execute(env).await {
                 Break(Divert::Break { count: 0 }) => break,
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
+                Break(Divert::Continue { count: 0 }) => continue,
+                Break(Divert::Continue { count }) => {
+                    return Break(Divert::Continue { count: count - 1 })
+                }
                 other => other?,
             },
             Err(error) => {
@@ -95,6 +99,7 @@ mod tests {
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
     use crate::tests::break_builtin;
+    use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::Command;
@@ -258,8 +263,47 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, "a\na\na\n"));
     }
 
-    // TODO continue_for_loop
-    // TODO continue_outer_loop
+    #[test]
+    fn continue_for_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "for i in 1 2 3; do echo +$i; continue; echo -$i; done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "+1\n+2\n+3\n"));
+    }
+
+    #[test]
+    fn continue_outer_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("continue", continue_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for i in 1 2 3; do echo a; continue $n; echo b; done"
+            .parse()
+            .unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Continue { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "a\na\na\n"));
+    }
 
     #[test]
     fn expansion_error_in_name() {

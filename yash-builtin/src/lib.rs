@@ -21,6 +21,7 @@
 pub mod alias;
 pub mod r#break;
 pub mod common;
+pub mod r#continue;
 pub mod jobs;
 pub mod readonly;
 pub mod r#return;
@@ -49,6 +50,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: r#break::builtin_main,
+        },
+    ),
+    (
+        "continue",
+        Builtin {
+            r#type: Special,
+            execute: r#continue::builtin_main,
         },
     ),
     (
