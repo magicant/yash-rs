@@ -52,6 +52,7 @@ use self::job::WaitStatus;
 use self::job::WaitStatusEx;
 use self::option::OptionSet;
 use self::semantics::ExitStatus;
+use self::stack::Frame;
 use self::stack::Stack;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
@@ -274,6 +275,8 @@ impl Env {
         let task: ChildProcessTask = Box::new(move |env| {
             let f = f.take().expect("child process task should run only once");
             Box::pin(async move {
+                let mut env = env.push_frame(Frame::Subshell);
+                let env = &mut *env;
                 env.traps.enter_subshell(&mut env.system);
                 match f(env).await {
                     Continue(()) => (),
@@ -595,6 +598,21 @@ mod tests {
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
             job.status = WaitStatus::Exited(pid, 42);
             assert_eq!(env.jobs.get(job_index), Some(&job));
+        });
+    }
+
+    #[test]
+    fn stack_frame_in_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.run_in_subshell(|env| {
+                Box::pin(async move {
+                    assert_eq!(env.stack[..], [Frame::Subshell]);
+                    Continue(())
+                })
+            })
+            .await
+            .unwrap();
+            assert_eq!(env.stack[..], []);
         });
     }
 

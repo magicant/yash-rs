@@ -22,9 +22,11 @@ use crate::expansion::expand_word;
 use crate::expansion::expand_words;
 use crate::Command;
 use crate::Handle;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
 use yash_env::variable::Variable;
@@ -65,10 +67,16 @@ pub async fn execute(
         }
     };
 
+    let env = &mut env.push_frame(Frame::Loop);
+
     for Field { value, origin } in values {
         let var = Variable::new(value).set_assigned_location(origin);
         match env.variables.assign(Scope::Global, name.value.clone(), var) {
-            Ok(_) => body.execute(env).await?,
+            Ok(_) => match body.execute(env).await {
+                Break(Divert::Break { count: 0 }) => break,
+                Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
+                other => other?,
+            },
             Err(error) => {
                 let cause = ErrorCause::AssignReadOnly(error);
                 let location = name.origin;
@@ -86,12 +94,15 @@ mod tests {
     use super::*;
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
+    use crate::tests::break_builtin;
     use crate::tests::echo_builtin;
+    use crate::tests::return_builtin;
     use crate::Command;
     use futures_util::FutureExt;
-    use std::ops::ControlFlow::Break;
+    use std::future::Future;
+    use std::pin::Pin;
     use std::rc::Rc;
-    use yash_env::semantics::Divert;
+    use yash_env::builtin::Builtin;
     use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -167,8 +178,86 @@ mod tests {
     }
 
     // TODO with empty body
-    // TODO break_for_loop
-    // TODO break_outer_loop
+
+    #[test]
+    fn stack_frame_in_loop() {
+        fn execute(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                assert_eq!(env.stack[0], Frame::Loop);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        let mut env = Env::new_virtual();
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("check", Builtin { r#type, execute });
+        let command: CompoundCommand = "for i in 1; do check; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(env.stack[..], []);
+    }
+
+    #[test]
+    fn return_from_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("return", return_builtin());
+        let command: CompoundCommand = "for i in 1; do return 2; echo X; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(env.exit_status, ExitStatus(2));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn break_for_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand = "for i in 1 2 3; do echo a; break; echo b; done"
+            .parse()
+            .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "a\n"));
+    }
+
+    #[test]
+    fn break_outer_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("echo", echo_builtin());
+        let command: CompoundCommand = "for i in 1 2 3; do echo a; break $n; echo b; done"
+            .parse()
+            .unwrap();
+
+        for n in 2..5 {
+            env.exit_status = ExitStatus(123);
+            env.variables
+                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .unwrap();
+
+            let result = command.execute(&mut env).now_or_never().unwrap();
+            assert_eq!(result, Break(Divert::Break { count: n - 2 }));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        }
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "a\na\na\n"));
+    }
+
     // TODO continue_for_loop
     // TODO continue_outer_loop
 
