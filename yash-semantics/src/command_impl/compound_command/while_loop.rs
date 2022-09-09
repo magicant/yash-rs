@@ -50,7 +50,10 @@ impl Loop<'_> {
     async fn execute(&mut self) -> Result {
         loop {
             match self.iterate().await {
-                Break(Divert::Break { count: 0 }) => return Continue(()),
+                Break(Divert::Break { count: 0 }) => {
+                    self.exit_status = self.env.exit_status;
+                    return Continue(());
+                }
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
                 Break(Divert::Continue { count: 0 }) => continue,
                 Break(Divert::Continue { count }) => {
@@ -238,6 +241,27 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
+    }
+
+    #[test]
+    fn exit_status_of_broken_while_loop() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand =
+            "while return -n $((i)) || break; do i=1; return -n 100; done"
+                .parse()
+                .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        // It is POSIXly unclear what the exit status of the above command
+        // should be. Our implementation returns that of the break built-in,
+        // which is SUCCESS, rather than that of the previously executed loop
+        // body. Returning the result of the previous iteration would not be
+        // very sensible if the break built-in fired in the middle of the body.
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
     }
 
     #[test]
@@ -460,6 +484,23 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n"));
+    }
+
+    #[test]
+    fn exit_status_of_broken_until_loop() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("break", break_builtin());
+        env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(123);
+        let command: CompoundCommand =
+            "until return -n $((i+1)) && break; do i=-1; return -n 100; done"
+                .parse()
+                .unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        // See also exit_status_of_broken_while_loop
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
     }
 
     #[test]
