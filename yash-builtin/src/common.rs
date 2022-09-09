@@ -150,6 +150,10 @@ where
         format!("error occurred in the {} built-in", builtin_name.value).into(),
         &invocation_location,
     ));
+    invocation_location
+        .code
+        .source
+        .complement_annotations(&mut message.annotations);
 
     yash_env::io::print_message(env, message).await;
 
