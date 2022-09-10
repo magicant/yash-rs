@@ -99,8 +99,7 @@ impl Expand for WordUnit {
             Unquoted(text_unit) => text_unit.async_expand(env, ()).await,
             SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
             DoubleQuote(text) => {
-                let would_split = env.will_split;
-                env.will_split = false;
+                let would_split = std::mem::replace(&mut env.will_split, false);
                 let result = match text.quick_expand(env) {
                     Ready(result) => result,
                     Interim(interim) => text.async_expand(env, interim).await,
