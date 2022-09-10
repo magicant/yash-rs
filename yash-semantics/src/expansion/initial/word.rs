@@ -28,21 +28,21 @@ use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit::{self, *};
 
 fn expand_single_quote(value: &str) -> Phrase {
-    let mut field = Vec::with_capacity(value.chars().count() + 2);
-    let quote = AttrChar {
+    const QUOTE: AttrChar = AttrChar {
         value: '\'',
         origin: Origin::Literal,
         is_quoted: false,
         is_quoting: true,
     };
-    field.push(quote);
+    let mut field = Vec::with_capacity(value.chars().count() + 2);
+    field.push(QUOTE);
     field.extend(value.chars().map(|c| AttrChar {
         value: c,
         origin: Origin::Literal,
         is_quoted: true,
         is_quoting: false,
     }));
-    field.push(quote);
+    field.push(QUOTE);
     Phrase::Field(field)
 }
 
