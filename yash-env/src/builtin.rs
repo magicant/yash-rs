@@ -53,6 +53,11 @@ pub enum Type {
     /// Non-intrinsic built-ins are much like external utilities; They must be
     /// found in $PATH in order to be executed.
     NonIntrinsic,
+    // /// Non-portable extension.
+    // ///
+    // /// Extension built-ins are intrinsic built-ins that are not defined in POSIX.
+    // /// They are treated like non-existing utilities in the POSIX mode.
+    // TODO Extension,
 }
 
 /// Result of built-in utility execution.
