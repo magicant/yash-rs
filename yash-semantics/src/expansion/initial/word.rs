@@ -109,7 +109,7 @@ impl Expand for WordUnit {
             SingleQuote(value) => Ready(Ok(expand_single_quote(value))),
             // TODO Can we call text.quick_expand here?
             DoubleQuote(_text) => Interim(()),
-            Tilde(_name) => todo!(),
+            Tilde(name) => Ready(Ok(super::tilde::expand(name, env.inner).into())),
         }
     }
 
@@ -129,7 +129,7 @@ impl Expand for WordUnit {
                 double_quote(&mut phrase);
                 Ok(phrase)
             }
-            Tilde(_name) => todo!(),
+            Tilde(_name) => unimplemented!("async_expand not expecting Tilde"),
         }
     }
 }
