@@ -60,6 +60,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::rc::Weak;
@@ -296,6 +297,11 @@ pub trait System: Debug {
         args: &[CString],
         envs: &[CString],
     ) -> nix::Result<Infallible>;
+
+    /// Returns the home directory path of the given user.
+    ///
+    /// Returns `Ok(None)` if the user is not found.
+    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>>;
 }
 
 /// Sentinel for the current working directory
@@ -690,6 +696,9 @@ impl System for SharedSystem {
         envs: &[CString],
     ) -> nix::Result<Infallible> {
         self.0.borrow_mut().execve(path, args, envs)
+    }
+    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
+        self.0.borrow().getpwnam_dir(name)
     }
 }
 

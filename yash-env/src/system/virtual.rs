@@ -71,6 +71,7 @@ use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::ffi::CStr;
@@ -628,6 +629,11 @@ impl System for VirtualSystem {
             Err(Errno::ENOEXEC)
         }
     }
+
+    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
+        let state = self.state.borrow();
+        Ok(state.home_dirs.get(name).cloned())
+    }
 }
 
 /// Implementor of [`ChildProcess`] that is returned from
@@ -701,6 +707,12 @@ pub struct SystemState {
 
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
+
+    /// Map from user names to their home directory paths.
+    ///
+    /// [`VirtualSystem::getpwnam_dir`] looks up its argument in this
+    /// dictionary.
+    pub home_dirs: HashMap<String, PathBuf>,
 }
 
 impl SystemState {
