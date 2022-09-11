@@ -165,8 +165,7 @@ mod tests {
             );
             assert_eq!(
                 env.variables.get("b").unwrap(),
-                &Variable::new_array([] as [&str; 0])
-                    .set_assigned_location(assigns[1].location.clone())
+                &Variable::new_empty_array().set_assigned_location(assigns[1].location.clone())
             );
         })
     }

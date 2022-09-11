@@ -365,12 +365,8 @@ mod tests {
     #[test]
     fn variable_array_found() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "x".to_string(),
-            Variable::new_array([] as [&str; 0]),
-        )
-        .unwrap();
+        vars.assign(Scope::Global, "x".to_string(), Variable::new_empty_array())
+            .unwrap();
         vars.assign(
             Scope::Global,
             "PATH".to_string(),

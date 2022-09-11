@@ -1098,7 +1098,7 @@ mod tests {
         vars.assign(
             Scope::Global,
             "IFS".to_string(),
-            Variable::new_array([] as [&str; 0]),
+            Variable::new_empty_array(),
         )
         .unwrap();
         let phrase = Full(vec![

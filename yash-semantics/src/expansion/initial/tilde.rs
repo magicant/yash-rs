@@ -89,7 +89,7 @@ mod tests {
             .assign(
                 Scope::Global,
                 "HOME".to_string(),
-                Variable::new_array([] as [&str; 0]),
+                Variable::new_empty_array(),
             )
             .unwrap();
 

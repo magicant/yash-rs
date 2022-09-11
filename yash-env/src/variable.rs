@@ -199,6 +199,17 @@ impl Variable {
         }
     }
 
+    /// Creates a new empty array variable.
+    ///
+    /// The returned variable's `last_assigned_location` and
+    /// `read_only_location` are `None` and `is_exported` is false.
+    /// You should update these fields as necessary before assigning to a
+    /// variable set.
+    #[must_use]
+    pub fn new_empty_array() -> Self {
+        Self::new_array([] as [&str; 0])
+    }
+
     /// Sets the last assigned location.
     ///
     /// This is a convenience function for doing
@@ -286,7 +297,7 @@ impl Context {
     fn new(r#type: ContextType) -> Self {
         Context {
             r#type,
-            positional_params: Variable::new_array([] as [&str; 0]),
+            positional_params: Variable::new_empty_array(),
         }
     }
 }
