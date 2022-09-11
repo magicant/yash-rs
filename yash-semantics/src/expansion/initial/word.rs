@@ -79,7 +79,26 @@ fn double_quote(phrase: &mut Phrase) {
 
 /// Expands the word unit.
 ///
-/// TODO Elaborate
+/// # Unquoted
+///
+/// Expansion of `Unquoted(text_unit)` delegates to expansion of `text_unit`.
+///
+/// # Single quote
+///
+/// `SingleQuote(value)` expands to `value` surrounded by `'`.
+///
+/// # Double quote
+///
+/// A double-quoted text expands to a phrase in a non-splitting context and
+/// surrounds each field in the phrase with `"`.
+///
+/// # Tilde
+///
+/// `Tilde("")` expands to the value of the `HOME` scalar variable.
+///
+/// `Tilde(user)` expands to the `user`'s home directory.
+///
+/// TODO: `~+`, `~-`, `~+n`, `~-n`
 #[async_trait(?Send)]
 impl Expand for WordUnit {
     type Interim = ();
@@ -90,7 +109,7 @@ impl Expand for WordUnit {
             SingleQuote(value) => Ready(Ok(expand_single_quote(value))),
             // TODO Can we call text.quick_expand here?
             DoubleQuote(_text) => Interim(()),
-            Tilde(_name) => todo!(),
+            Tilde(name) => Ready(Ok(super::tilde::expand(name, env.inner).into())),
         }
     }
 
@@ -110,7 +129,7 @@ impl Expand for WordUnit {
                 double_quote(&mut phrase);
                 Ok(phrase)
             }
-            Tilde(_name) => todo!(),
+            Tilde(_name) => unimplemented!("async_expand not expecting Tilde"),
         }
     }
 }

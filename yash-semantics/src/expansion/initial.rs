@@ -116,6 +116,7 @@ mod command_subst;
 mod param;
 mod slice;
 mod text;
+mod tilde;
 mod word;
 
 pub use arith::ArithError;
