@@ -21,31 +21,50 @@ use crate::expansion::attr::Origin;
 use yash_env::variable::Value;
 use yash_env::variable::Variable;
 use yash_env::Env;
+use yash_env::System;
+
+fn into_attr_chars<I>(i: I) -> Vec<AttrChar>
+where
+    I: IntoIterator<Item = char>,
+{
+    i.into_iter()
+        .map(|c| AttrChar {
+            value: c,
+            origin: Origin::HardExpansion,
+            is_quoted: false,
+            is_quoting: false,
+        })
+        .collect()
+}
 
 /// Performs tilde expansion.
-pub fn expand(_name: &str, env: &Env) -> Vec<AttrChar> {
-    match env.variables.get("HOME") {
-        Some(Variable {
-            value: Value::Scalar(value),
-            ..
-        }) => value,
-        _ => "~",
+pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
+    if name.is_empty() {
+        let result = &match env.variables.get("HOME") {
+            Some(Variable {
+                value: Value::Scalar(value),
+                ..
+            }) => value,
+            _ => "~",
+        };
+        into_attr_chars(result.chars())
+    } else {
+        if let Ok(Some(path)) = env.system.getpwnam_dir(name) {
+            if let Ok(path) = path.into_os_string().into_string() {
+                return into_attr_chars(path.chars());
+            }
+        }
+        into_attr_chars(std::iter::once('~').chain(name.chars()))
     }
-    .chars()
-    .map(|c| AttrChar {
-        value: c,
-        origin: Origin::HardExpansion,
-        is_quoted: false,
-        is_quoting: false,
-    })
-    .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
+    use yash_env::VirtualSystem;
 
     #[test]
     fn empty_name_with_scalar_home() {
@@ -102,6 +121,40 @@ mod tests {
                 is_quoting: false
             }]
         );
+    }
+
+    #[test]
+    fn existing_user_home_directory() {
+        let system = Box::new(VirtualSystem::new());
+        system
+            .state
+            .borrow_mut()
+            .home_dirs
+            .insert("love".to_string(), PathBuf::from("/usr/home/love"));
+        let env = Env::with_system(system);
+
+        let expansion = expand("love", &env);
+        let value: String = expansion.iter().copied().map(|c| c.value).collect();
+        assert_eq!(value, "/usr/home/love");
+        for c in expansion {
+            assert!(!c.is_quoted);
+            assert!(!c.is_quoting);
+            assert_eq!(c.origin, Origin::HardExpansion);
+        }
+    }
+
+    #[test]
+    fn non_existing_user_home_directory() {
+        let env = Env::new_virtual();
+
+        let expansion = expand("love", &env);
+        let value: String = expansion.iter().copied().map(|c| c.value).collect();
+        assert_eq!(value, "~love");
+        for c in expansion {
+            assert!(!c.is_quoted);
+            assert!(!c.is_quoting);
+            assert_eq!(c.origin, Origin::HardExpansion);
+        }
     }
 
     // TODO other forms of tilde expansion
