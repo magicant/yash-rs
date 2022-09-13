@@ -316,6 +316,10 @@ impl System for RealSystem {
             }
         }
     }
+
+    fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {
+        nix::unistd::User::from_name(name).map(|o| o.map(|passwd| passwd.dir))
+    }
 }
 
 /// Implementor of [`ChildProcess`] that is returned from
