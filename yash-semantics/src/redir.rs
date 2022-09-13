@@ -415,6 +415,9 @@ impl<'e> RedirGuard<'e> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
+    use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -434,7 +437,8 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3< foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        let result = env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        assert_eq!(result, None);
 
         let mut buffer = [0; 4];
         let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
@@ -622,6 +626,20 @@ mod tests {
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer, [30]);
+    }
+
+    #[test]
+    fn exit_status_of_command_substitution() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert("return", return_builtin());
+            let mut env = RedirGuard::new(&mut env);
+            let redir = "3> $(echo foo; return -n 79)".parse().unwrap();
+            let result = env.perform_redir(&redir).await.unwrap();
+            assert_eq!(result, Some(ExitStatus(79)));
+            let file = state.borrow().file_system.get("foo");
+            assert!(file.is_ok(), "{:?}", file);
+        })
     }
 
     #[test]
