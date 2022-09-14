@@ -234,6 +234,19 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location)
     }
 }
 
+/// Copies or closes a file descriptor.
+fn copy_fd(_env: &mut Env, target: Field) -> Result<(Fd, Location), Error> {
+    // TODO Handle the "-" target
+    // TODO Check if the FD is really readable or writable
+    match target.value.parse() {
+        Ok(number) => Ok((Fd(number), target.origin)),
+        Err(error) => Err(Error {
+            cause: ErrorCause::MalformedFd(target.value, error),
+            location: target.origin,
+        }),
+    }
+}
+
 /// Opens the file for a normal redirection.
 async fn open_normal(
     env: &mut Env,
@@ -254,6 +267,7 @@ async fn open_normal(
             operand,
         ),
         FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
+        FdIn | FdOut => copy_fd(env, operand),
         _ => todo!(),
     }
 }
@@ -797,4 +811,45 @@ mod tests {
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [132, 79, 210, 0]);
     }
+
+    #[test]
+    fn fd_in_copies_fd() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        state
+            .borrow_mut()
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .body = FileBody::new([1, 2, 42]);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3<& 0".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 4];
+        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
+        assert_eq!(read_count, 3);
+        assert_eq!(buffer, [1, 2, 42, 0]);
+    }
+
+    #[test]
+    fn fd_out_copies_fd() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "4>& 1".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        env.system.write(Fd(4), &[7, 6, 91]).unwrap();
+        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [7, 6, 91]);
+        });
+    }
+
+    // TODO Don't close target FD on error in FdIn and FdOut
 }
