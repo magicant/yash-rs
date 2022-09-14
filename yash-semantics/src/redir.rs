@@ -60,6 +60,7 @@ use crate::expansion::expand_word;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
+use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::io::Fd;
@@ -104,6 +105,8 @@ pub enum ErrorCause {
     ///
     /// The `CString` is the pathname of the file that could not be opened.
     OpenFile(CString, Errno),
+    /// Operand of `<&` or `>&` that cannot be parsed as an integer.
+    MalformedFd(String, ParseIntError),
 }
 
 impl ErrorCause {
@@ -117,6 +120,7 @@ impl ErrorCause {
             NulByte(_) => "nul byte found in the pathname",
             FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
             OpenFile(_, _) => "cannot open the file",
+            MalformedFd(_, _) => "not a valid file descriptor",
         }
     }
 
@@ -130,6 +134,7 @@ impl ErrorCause {
             NulByte(_) => "pathname should not contain a nul byte".into(),
             FdNotOverwritten(_, errno) => errno.desc().into(),
             OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
+            MalformedFd(value, error) => format!("{}: {}", value, error).into(),
         }
     }
 }
@@ -147,6 +152,9 @@ impl std::fmt::Display for ErrorCause {
                 path.to_string_lossy(),
                 errno
             ),
+            MalformedFd(value, error) => {
+                write!(f, "{:?} is not a valid file descriptor: {}", value, error)
+            }
         }
     }
 }
