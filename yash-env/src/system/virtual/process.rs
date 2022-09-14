@@ -31,6 +31,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::os::unix::io::RawFd;
 use std::rc::Weak;
 
 /// Process in a virtual system.
@@ -66,6 +67,9 @@ pub struct Process {
 
     /// List of signals that have been delivered and caught.
     pub(crate) caught_signals: Vec<Signal>,
+
+    /// Maximum number of open file descriptors.
+    pub(crate) rlimit_nofile: RawFd,
 
     /// Weak reference to the `SelectSystem` for this process.
     ///
@@ -109,6 +113,7 @@ impl Process {
             blocked_signals: SigSet::empty(),
             pending_signals: SigSet::empty(),
             caught_signals: Vec::new(),
+            rlimit_nofile: 1 << 10,
             selector: Weak::new(),
             last_exec: None,
         }
@@ -156,11 +161,15 @@ impl Process {
 
     /// Assigns the given FD to the body.
     ///
-    /// If successful, returns an `Ok` value containing the body for the FD. If
-    /// the FD is out of bounds, returns `Err(body)`.
+    /// If successful, returns an `Ok` value containing the previous body for
+    /// the FD. If the FD is equal to or greater than `rlimit_nofile`, returns
+    /// `Err(body)`.
     pub fn set_fd(&mut self, fd: Fd, body: FdBody) -> Result<Option<FdBody>, FdBody> {
-        // TODO fail if fd is out of bounds (cf. EMFILE)
-        Ok(self.fds.insert(fd, body))
+        if fd.0 < self.rlimit_nofile {
+            Ok(self.fds.insert(fd, body))
+        } else {
+            Err(body)
+        }
     }
 
     /// Assigns a new FD to the given body.
