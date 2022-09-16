@@ -205,8 +205,27 @@ impl MessageBase for Error {
     }
 }
 
+/// Intermediate state of a redirected file descriptor
+#[derive(Debug)]
+enum FdSpec {
+    /// File descriptor specifically opened for redirection
+    Owned(Fd),
+    /// Existing file descriptor
+    Borrowed(Fd),
+    // /// Closed file descriptor
+    // TODO Closed,
+}
+
+impl FdSpec {
+    fn as_fd(&self) -> Option<Fd> {
+        match self {
+            &FdSpec::Owned(fd) | &FdSpec::Borrowed(fd) => Some(fd),
+        }
+    }
+}
+
 /// Opens a file for redirection.
-fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location), Error> {
+fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Location), Error> {
     let Field { value, origin } = path;
     let path = match CString::new(value) {
         Ok(path) => path,
@@ -226,7 +245,7 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location)
         | Mode::S_IWOTH;
 
     match env.system.open(&path, option, mode) {
-        Ok(fd) => Ok((fd, origin)),
+        Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
             location: origin,
@@ -235,11 +254,11 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location)
 }
 
 /// Copies or closes a file descriptor.
-fn copy_fd(_env: &mut Env, target: Field) -> Result<(Fd, Location), Error> {
+fn copy_fd(_env: &mut Env, target: Field) -> Result<(FdSpec, Location), Error> {
     // TODO Handle the "-" target
     // TODO Check if the FD is really readable or writable
     match target.value.parse() {
-        Ok(number) => Ok((Fd(number), target.origin)),
+        Ok(number) => Ok((FdSpec::Borrowed(Fd(number)), target.origin)),
         Err(error) => Err(Error {
             cause: ErrorCause::MalformedFd(target.value, error),
             location: target.origin,
@@ -252,7 +271,7 @@ async fn open_normal(
     env: &mut Env,
     operator: RedirOp,
     operand: Field,
-) -> Result<(Fd, Location), Error> {
+) -> Result<(FdSpec, Location), Error> {
     use RedirOp::*;
     match operator {
         FileIn => open_file(env, OFlag::O_RDONLY, operand),
@@ -288,7 +307,7 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
     };
 
     // Prepare an FD from the redirection body
-    let (fd, location, exit_status) = match &redir.body {
+    let (fd_spec, location, exit_status) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
             let (expansion, exit_status) = expand_word(env, operand).await?;
@@ -298,23 +317,25 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
         RedirBody::HereDoc(_) => todo!(),
     };
 
-    if fd != target_fd {
-        // Copy the new open file description from `fd` to `target_fd`
-        match env.system.dup2(fd, target_fd) {
-            Ok(new_fd) => assert_eq!(new_fd, target_fd),
-            Err(errno) => {
-                // TODO Is it ok to unconditionally close fd?
-                let _: Result<_, _> = env.system.close(fd);
-
-                return Err(Error {
-                    cause: ErrorCause::FdNotOverwritten(target_fd, errno),
-                    location,
-                });
+    if let Some(fd) = fd_spec.as_fd() {
+        if fd != target_fd {
+            // Copy the new open file description from `fd` to `target_fd`
+            match env.system.dup2(fd, target_fd) {
+                Ok(new_fd) => assert_eq!(new_fd, target_fd),
+                Err(errno) => {
+                    if let FdSpec::Owned(fd) = fd_spec {
+                        let _: Result<_, _> = env.system.close(fd);
+                    }
+                    return Err(Error {
+                        cause: ErrorCause::FdNotOverwritten(target_fd, errno),
+                        location,
+                    });
+                }
             }
-        }
 
-        // Close `fd`
-        let _: Result<_, _> = env.system.close(fd);
+            // Close `fd`
+            let _: Result<_, _> = env.system.close(fd);
+        }
     }
 
     let original = target_fd;
@@ -665,6 +686,27 @@ mod tests {
     }
 
     #[test]
+    fn file_in_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999</dev/stdin".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd(3), &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_out_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -698,6 +740,26 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(content[..], []);
         });
+    }
+
+    #[test]
+    fn file_out_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
     }
 
     #[test]
@@ -740,6 +802,26 @@ mod tests {
     // TODO file_clobber_with_noclobber_fails_with_existing_file
 
     #[test]
+    fn file_clobber_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>|foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_append_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -778,6 +860,26 @@ mod tests {
     }
 
     #[test]
+    fn file_append_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_in_out_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -813,6 +915,26 @@ mod tests {
     }
 
     #[test]
+    fn file_in_out_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999<>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn fd_in_copies_fd() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -835,6 +957,27 @@ mod tests {
     }
 
     #[test]
+    fn keep_target_fd_open_on_error_in_fd_in() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999<&0".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let mut buffer = [0; 1];
+        let read_count = env.system.read(Fd(0), &mut buffer).unwrap();
+        assert_eq!(read_count, 0);
+    }
+
+    #[test]
     fn fd_out_copies_fd() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -851,5 +994,23 @@ mod tests {
         });
     }
 
-    // TODO Don't close target FD on error in FdIn and FdOut
+    #[test]
+    fn keep_target_fd_open_on_error_in_fd_out() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>&1".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let write_count = env.system.write(Fd(1), &[0x20]).unwrap();
+        assert_eq!(write_count, 1);
+    }
 }
