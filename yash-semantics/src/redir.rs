@@ -222,6 +222,13 @@ impl FdSpec {
             &FdSpec::Owned(fd) | &FdSpec::Borrowed(fd) => Some(fd),
         }
     }
+
+    fn close<S: System>(self, system: &mut S) {
+        match self {
+            FdSpec::Owned(fd) => drop(system.close(fd)),
+            FdSpec::Borrowed(_) => (),
+        }
+    }
 }
 
 /// Opens a file for redirection.
@@ -319,22 +326,17 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
 
     if let Some(fd) = fd_spec.as_fd() {
         if fd != target_fd {
-            // Copy the new open file description from `fd` to `target_fd`
-            match env.system.dup2(fd, target_fd) {
+            let dup_result = env.system.dup2(fd, target_fd);
+            fd_spec.close(&mut env.system);
+            match dup_result {
                 Ok(new_fd) => assert_eq!(new_fd, target_fd),
                 Err(errno) => {
-                    if let FdSpec::Owned(fd) = fd_spec {
-                        let _: Result<_, _> = env.system.close(fd);
-                    }
                     return Err(Error {
                         cause: ErrorCause::FdNotOverwritten(target_fd, errno),
                         location,
                     });
                 }
             }
-
-            // Close `fd`
-            let _: Result<_, _> = env.system.close(fd);
         }
     }
 
@@ -936,24 +938,26 @@ mod tests {
 
     #[test]
     fn fd_in_copies_fd() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        state
-            .borrow_mut()
-            .file_system
-            .get("/dev/stdin")
-            .unwrap()
-            .borrow_mut()
-            .body = FileBody::new([1, 2, 42]);
-        let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirGuard::new(&mut env);
-        let redir = "3<& 0".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        for fd in [Fd(0), Fd(3)] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            state
+                .borrow_mut()
+                .file_system
+                .get("/dev/stdin")
+                .unwrap()
+                .borrow_mut()
+                .body = FileBody::new([1, 2, 42]);
+            let mut env = Env::with_system(Box::new(system));
+            let mut env = RedirGuard::new(&mut env);
+            let redir = "3<& 0".parse().unwrap();
+            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
 
-        let mut buffer = [0; 4];
-        let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
-        assert_eq!(read_count, 3);
-        assert_eq!(buffer, [1, 2, 42, 0]);
+            let mut buffer = [0; 4];
+            let read_count = env.system.read(fd, &mut buffer).unwrap();
+            assert_eq!(read_count, 3);
+            assert_eq!(buffer, [1, 2, 42, 0]);
+        }
     }
 
     #[test]
@@ -979,19 +983,21 @@ mod tests {
 
     #[test]
     fn fd_out_copies_fd() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(Box::new(system));
-        let mut env = RedirGuard::new(&mut env);
-        let redir = "4>& 1".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        for fd in [Fd(1), Fd(4)] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Box::new(system));
+            let mut env = RedirGuard::new(&mut env);
+            let redir = "4>& 1".parse().unwrap();
+            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
 
-        env.system.write(Fd(4), &[7, 6, 91]).unwrap();
-        let file = state.borrow().file_system.get("/dev/stdout").unwrap();
-        let file = file.borrow();
-        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
-            assert_eq!(content[..], [7, 6, 91]);
-        });
+            env.system.write(fd, &[7, 6, 91]).unwrap();
+            let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+            let file = file.borrow();
+            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [7, 6, 91]);
+            });
+        }
     }
 
     #[test]
