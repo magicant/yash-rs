@@ -212,21 +212,24 @@ enum FdSpec {
     Owned(Fd),
     /// Existing file descriptor
     Borrowed(Fd),
-    // /// Closed file descriptor
-    // TODO Closed,
+    /// Closed file descriptor
+    Closed,
 }
 
 impl FdSpec {
     fn as_fd(&self) -> Option<Fd> {
         match self {
             &FdSpec::Owned(fd) | &FdSpec::Borrowed(fd) => Some(fd),
+            &FdSpec::Closed => None,
         }
     }
 
     fn close<S: System>(self, system: &mut S) {
         match self {
-            FdSpec::Owned(fd) => drop(system.close(fd)),
-            FdSpec::Borrowed(_) => (),
+            FdSpec::Owned(fd) => {
+                let _ = system.close(fd);
+            }
+            FdSpec::Borrowed(_) | FdSpec::Closed => (),
         }
     }
 }
@@ -262,7 +265,9 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Locat
 
 /// Copies or closes a file descriptor.
 fn copy_fd(_env: &mut Env, target: Field) -> Result<(FdSpec, Location), Error> {
-    // TODO Handle the "-" target
+    if target.value == "-" {
+        return Ok((FdSpec::Closed, target.origin));
+    }
     // TODO Check if the FD is really readable or writable
     match target.value.parse() {
         Ok(number) => Ok((FdSpec::Borrowed(Fd(number)), target.origin)),
@@ -338,6 +343,8 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
                 }
             }
         }
+    } else {
+        let _: Result<(), Errno> = env.system.close(target_fd);
     }
 
     let original = target_fd;
@@ -961,6 +968,18 @@ mod tests {
     }
 
     #[test]
+    fn fd_in_closes_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "<& -".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd::STDIN, &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn keep_target_fd_open_on_error_in_fd_in() {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
@@ -998,6 +1017,18 @@ mod tests {
                 assert_eq!(content[..], [7, 6, 91]);
             });
         }
+    }
+
+    #[test]
+    fn fd_out_closes_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = ">& -".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd::STDOUT, &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
     }
 
     #[test]
