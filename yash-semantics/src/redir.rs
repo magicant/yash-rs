@@ -109,6 +109,8 @@ pub enum ErrorCause {
     MalformedFd(String, ParseIntError),
     /// `<&` applied to an unreadable file descriptor
     UnreadableFd(Fd),
+    /// `>&` applied to an unwritable file descriptor
+    UnwritableFd(Fd),
 }
 
 impl ErrorCause {
@@ -123,7 +125,7 @@ impl ErrorCause {
             FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
             OpenFile(_, _) => "cannot open the file",
             MalformedFd(_, _) => "not a valid file descriptor",
-            UnreadableFd(_) => "cannot copy file descriptor",
+            UnreadableFd(_) | UnwritableFd(_) => "cannot copy file descriptor",
         }
     }
 
@@ -139,6 +141,7 @@ impl ErrorCause {
             OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
             MalformedFd(value, error) => format!("{}: {}", value, error).into(),
             UnreadableFd(fd) => format!("{}: not a readable file descriptor", fd).into(),
+            UnwritableFd(fd) => format!("{}: not a writable file descriptor", fd).into(),
         }
     }
 }
@@ -160,6 +163,7 @@ impl std::fmt::Display for ErrorCause {
                 write!(f, "{:?} is not a valid file descriptor: {}", value, error)
             }
             UnreadableFd(fd) => write!(f, "{} is not a readable file descriptor", fd),
+            UnwritableFd(fd) => write!(f, "{} is not a writable file descriptor", fd),
         }
     }
 }
@@ -269,7 +273,11 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Locat
 }
 
 /// Parses the target of `<&` and `>&`.
-fn copy_fd(env: &mut Env, target: Field) -> Result<(FdSpec, Location), Error> {
+fn copy_fd(
+    env: &mut Env,
+    target: Field,
+    expected_mode: OFlag,
+) -> Result<(FdSpec, Location), Error> {
     if target.value == "-" {
         return Ok((FdSpec::Closed, target.origin));
     }
@@ -288,13 +296,17 @@ fn copy_fd(env: &mut Env, target: Field) -> Result<(FdSpec, Location), Error> {
     // Check if the FD is really readable or writable
     if let Ok(flags) = env.system.fcntl_getfl(fd) {
         let mode = flags & OFlag::O_ACCMODE;
-        if !(mode == OFlag::O_RDONLY || mode == OFlag::O_RDWR) {
+        if !(mode == expected_mode || mode == OFlag::O_RDWR) {
             return Err(Error {
-                cause: ErrorCause::UnreadableFd(fd),
+                cause: if expected_mode == OFlag::O_RDONLY {
+                    ErrorCause::UnreadableFd(fd)
+                } else {
+                    assert_eq!(expected_mode, OFlag::O_WRONLY);
+                    ErrorCause::UnwritableFd(fd)
+                },
                 location: target.origin,
             });
         }
-        // TODO Check if the FD is really writable
     }
 
     Ok((FdSpec::Borrowed(fd), target.origin))
@@ -320,7 +332,8 @@ async fn open_normal(
             operand,
         ),
         FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
-        FdIn | FdOut => copy_fd(env, operand),
+        FdIn => copy_fd(env, operand, OFlag::O_RDONLY),
+        FdOut => copy_fd(env, operand, OFlag::O_WRONLY),
         _ => todo!(),
     }
 }
@@ -1068,6 +1081,23 @@ mod tests {
         let mut buffer = [0; 1];
         let e = env.system.read(Fd::STDOUT, &mut buffer).unwrap_err();
         assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
+    fn fd_out_rejects_unwritable_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3</dev/stdin".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let redir = ">&3".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnwritableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
     }
 
     #[test]
