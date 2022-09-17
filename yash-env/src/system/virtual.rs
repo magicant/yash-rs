@@ -383,10 +383,19 @@ impl System for VirtualSystem {
         Ok(())
     }
 
-    /// Current implementation returns `Ok(OFlag::empty())`.
-    fn fcntl_getfl(&self, _fd: Fd) -> nix::Result<OFlag> {
-        // TODO do what this function should do
-        Ok(OFlag::empty())
+    fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {
+        self.with_open_file_description(fd, |ofd| {
+            let mut mode = match (ofd.is_readable, ofd.is_writable) {
+                (true, true) => OFlag::O_RDWR,
+                (true, false) => OFlag::O_RDONLY,
+                (false, true) => OFlag::O_WRONLY,
+                (false, false) => todo!("unsupported mode"),
+            };
+            if ofd.is_appending {
+                mode |= OFlag::O_APPEND;
+            }
+            Ok(mode)
+        })
     }
 
     /// Current implementation does nothing but return `Ok(())`.
@@ -1212,6 +1221,33 @@ mod tests {
 
         let result = system.close(Fd::STDERR);
         assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn fcntl_getfl() {
+        let mut system = VirtualSystem::new();
+        let mode = nix::sys::stat::Mode::all();
+        let reader = system
+            .open(&CString::new("/dev/stdin").unwrap(), OFlag::O_RDONLY, mode)
+            .unwrap();
+        let writer = system
+            .open(&CString::new("/dev/stdout").unwrap(), OFlag::O_WRONLY, mode)
+            .unwrap();
+        let appender = system
+            .open(
+                &CString::new("/dev/stdout").unwrap(),
+                OFlag::O_RDWR | OFlag::O_APPEND,
+                mode,
+            )
+            .unwrap();
+
+        assert_eq!(system.fcntl_getfl(reader), Ok(OFlag::O_RDONLY));
+        assert_eq!(system.fcntl_getfl(writer), Ok(OFlag::O_WRONLY));
+        assert_eq!(
+            system.fcntl_getfl(appender),
+            Ok(OFlag::O_RDWR | OFlag::O_APPEND)
+        );
+        assert_eq!(system.fcntl_getfl(Fd(100)), Err(Errno::EBADF));
     }
 
     #[test]
