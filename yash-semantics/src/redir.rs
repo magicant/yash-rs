@@ -60,6 +60,7 @@ use crate::expansion::expand_word;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
+use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::io::Fd;
@@ -104,6 +105,12 @@ pub enum ErrorCause {
     ///
     /// The `CString` is the pathname of the file that could not be opened.
     OpenFile(CString, Errno),
+    /// Operand of `<&` or `>&` that cannot be parsed as an integer.
+    MalformedFd(String, ParseIntError),
+    /// `<&` applied to an unreadable file descriptor
+    UnreadableFd(Fd),
+    /// `>&` applied to an unwritable file descriptor
+    UnwritableFd(Fd),
 }
 
 impl ErrorCause {
@@ -117,6 +124,8 @@ impl ErrorCause {
             NulByte(_) => "nul byte found in the pathname",
             FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
             OpenFile(_, _) => "cannot open the file",
+            MalformedFd(_, _) => "not a valid file descriptor",
+            UnreadableFd(_) | UnwritableFd(_) => "cannot copy file descriptor",
         }
     }
 
@@ -130,6 +139,9 @@ impl ErrorCause {
             NulByte(_) => "pathname should not contain a nul byte".into(),
             FdNotOverwritten(_, errno) => errno.desc().into(),
             OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
+            MalformedFd(value, error) => format!("{}: {}", value, error).into(),
+            UnreadableFd(fd) => format!("{}: not a readable file descriptor", fd).into(),
+            UnwritableFd(fd) => format!("{}: not a writable file descriptor", fd).into(),
         }
     }
 }
@@ -147,6 +159,11 @@ impl std::fmt::Display for ErrorCause {
                 path.to_string_lossy(),
                 errno
             ),
+            MalformedFd(value, error) => {
+                write!(f, "{:?} is not a valid file descriptor: {}", value, error)
+            }
+            UnreadableFd(fd) => write!(f, "{} is not a readable file descriptor", fd),
+            UnwritableFd(fd) => write!(f, "{} is not a writable file descriptor", fd),
         }
     }
 }
@@ -197,8 +214,37 @@ impl MessageBase for Error {
     }
 }
 
+/// Intermediate state of a redirected file descriptor
+#[derive(Debug)]
+enum FdSpec {
+    /// File descriptor specifically opened for redirection
+    Owned(Fd),
+    /// Existing file descriptor
+    Borrowed(Fd),
+    /// Closed file descriptor
+    Closed,
+}
+
+impl FdSpec {
+    fn as_fd(&self) -> Option<Fd> {
+        match self {
+            &FdSpec::Owned(fd) | &FdSpec::Borrowed(fd) => Some(fd),
+            &FdSpec::Closed => None,
+        }
+    }
+
+    fn close<S: System>(self, system: &mut S) {
+        match self {
+            FdSpec::Owned(fd) => {
+                let _ = system.close(fd);
+            }
+            FdSpec::Borrowed(_) | FdSpec::Closed => (),
+        }
+    }
+}
+
 /// Opens a file for redirection.
-fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location), Error> {
+fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Location), Error> {
     let Field { value, origin } = path;
     let path = match CString::new(value) {
         Ok(path) => path,
@@ -218,7 +264,7 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location)
         | Mode::S_IWOTH;
 
     match env.system.open(&path, option, mode) {
-        Ok(fd) => Ok((fd, origin)),
+        Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
             location: origin,
@@ -226,12 +272,52 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(Fd, Location)
     }
 }
 
+/// Parses the target of `<&` and `>&`.
+fn copy_fd(
+    env: &mut Env,
+    target: Field,
+    expected_mode: OFlag,
+) -> Result<(FdSpec, Location), Error> {
+    if target.value == "-" {
+        return Ok((FdSpec::Closed, target.origin));
+    }
+
+    // Parse the string as an integer
+    let fd = match target.value.parse() {
+        Ok(number) => Fd(number),
+        Err(error) => {
+            return Err(Error {
+                cause: ErrorCause::MalformedFd(target.value, error),
+                location: target.origin,
+            })
+        }
+    };
+
+    // Check if the FD is really readable or writable
+    if let Ok(flags) = env.system.fcntl_getfl(fd) {
+        let mode = flags & OFlag::O_ACCMODE;
+        if !(mode == expected_mode || mode == OFlag::O_RDWR) {
+            return Err(Error {
+                cause: if expected_mode == OFlag::O_RDONLY {
+                    ErrorCause::UnreadableFd(fd)
+                } else {
+                    assert_eq!(expected_mode, OFlag::O_WRONLY);
+                    ErrorCause::UnwritableFd(fd)
+                },
+                location: target.origin,
+            });
+        }
+    }
+
+    Ok((FdSpec::Borrowed(fd), target.origin))
+}
+
 /// Opens the file for a normal redirection.
 async fn open_normal(
     env: &mut Env,
     operator: RedirOp,
     operand: Field,
-) -> Result<(Fd, Location), Error> {
+) -> Result<(FdSpec, Location), Error> {
     use RedirOp::*;
     match operator {
         FileIn => open_file(env, OFlag::O_RDONLY, operand),
@@ -246,6 +332,8 @@ async fn open_normal(
             operand,
         ),
         FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
+        FdIn => copy_fd(env, operand, OFlag::O_RDONLY),
+        FdOut => copy_fd(env, operand, OFlag::O_WRONLY),
         _ => todo!(),
     }
 }
@@ -266,7 +354,7 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
     };
 
     // Prepare an FD from the redirection body
-    let (fd, location, exit_status) = match &redir.body {
+    let (fd_spec, location, exit_status) = match &redir.body {
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
             let (expansion, exit_status) = expand_word(env, operand).await?;
@@ -276,23 +364,22 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
         RedirBody::HereDoc(_) => todo!(),
     };
 
-    if fd != target_fd {
-        // Copy the new open file description from `fd` to `target_fd`
-        match env.system.dup2(fd, target_fd) {
-            Ok(new_fd) => assert_eq!(new_fd, target_fd),
-            Err(errno) => {
-                // TODO Is it ok to unconditionally close fd?
-                let _: Result<_, _> = env.system.close(fd);
-
-                return Err(Error {
-                    cause: ErrorCause::FdNotOverwritten(target_fd, errno),
-                    location,
-                });
+    if let Some(fd) = fd_spec.as_fd() {
+        if fd != target_fd {
+            let dup_result = env.system.dup2(fd, target_fd);
+            fd_spec.close(&mut env.system);
+            match dup_result {
+                Ok(new_fd) => assert_eq!(new_fd, target_fd),
+                Err(errno) => {
+                    return Err(Error {
+                        cause: ErrorCause::FdNotOverwritten(target_fd, errno),
+                        location,
+                    });
+                }
             }
         }
-
-        // Close `fd`
-        let _: Result<_, _> = env.system.close(fd);
+    } else {
+        let _: Result<(), Errno> = env.system.close(target_fd);
     }
 
     let original = target_fd;
@@ -643,6 +730,27 @@ mod tests {
     }
 
     #[test]
+    fn file_in_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999</dev/stdin".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd(3), &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_out_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -676,6 +784,26 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(content[..], []);
         });
+    }
+
+    #[test]
+    fn file_out_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
     }
 
     #[test]
@@ -718,6 +846,26 @@ mod tests {
     // TODO file_clobber_with_noclobber_fails_with_existing_file
 
     #[test]
+    fn file_clobber_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>|foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_append_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -756,6 +904,26 @@ mod tests {
     }
 
     #[test]
+    fn file_append_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
     fn file_in_out_creates_empty_file() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -788,5 +956,167 @@ mod tests {
         let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
         assert_eq!(read_count, 3);
         assert_eq!(buffer, [132, 79, 210, 0]);
+    }
+
+    #[test]
+    fn file_in_out_closes_opened_file_on_error() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999<>foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let e = env.system.write(Fd(3), &[0x20]).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
+    fn fd_in_copies_fd() {
+        for fd in [Fd(0), Fd(3)] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            state
+                .borrow_mut()
+                .file_system
+                .get("/dev/stdin")
+                .unwrap()
+                .borrow_mut()
+                .body = FileBody::new([1, 2, 42]);
+            let mut env = Env::with_system(Box::new(system));
+            let mut env = RedirGuard::new(&mut env);
+            let redir = "3<& 0".parse().unwrap();
+            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+            let mut buffer = [0; 4];
+            let read_count = env.system.read(fd, &mut buffer).unwrap();
+            assert_eq!(read_count, 3);
+            assert_eq!(buffer, [1, 2, 42, 0]);
+        }
+    }
+
+    #[test]
+    fn fd_in_closes_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "<& -".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd::STDIN, &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
+    fn fd_in_rejects_unreadable_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3>foo".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let redir = "<&3".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnreadableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
+    fn keep_target_fd_open_on_error_in_fd_in() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999<&0".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let mut buffer = [0; 1];
+        let read_count = env.system.read(Fd(0), &mut buffer).unwrap();
+        assert_eq!(read_count, 0);
+    }
+
+    #[test]
+    fn fd_out_copies_fd() {
+        for fd in [Fd(1), Fd(4)] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Box::new(system));
+            let mut env = RedirGuard::new(&mut env);
+            let redir = "4>& 1".parse().unwrap();
+            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+            env.system.write(fd, &[7, 6, 91]).unwrap();
+            let file = state.borrow().file_system.get("/dev/stdout").unwrap();
+            let file = file.borrow();
+            assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+                assert_eq!(content[..], [7, 6, 91]);
+            });
+        }
+    }
+
+    #[test]
+    fn fd_out_closes_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = ">& -".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let mut buffer = [0; 1];
+        let e = env.system.read(Fd::STDOUT, &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
+    }
+
+    #[test]
+    fn fd_out_rejects_unwritable_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3</dev/stdin".parse().unwrap();
+        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+
+        let redir = ">&3".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnwritableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
+    fn keep_target_fd_open_on_error_in_fd_out() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "999999999>&1".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::FdNotOverwritten(Fd(999999999), Errno::EBADF)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let write_count = env.system.write(Fd(1), &[0x20]).unwrap();
+        assert_eq!(write_count, 1);
     }
 }
