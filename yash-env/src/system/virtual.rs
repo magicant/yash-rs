@@ -123,10 +123,12 @@ impl VirtualSystem {
     /// process ID 2 in the process set ([`SystemState::processes`]). The file
     /// system will contain files named `/dev/stdin`, `/dev/stdout`, and
     /// `/dev/stderr` that are opened in the process with file descriptor 0, 1,
-    /// and 2, respectively.
+    /// and 2, respectively. The file system also contains an empty directory
+    /// `/tmp`.
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
         let mut process = Process::with_parent(Pid::from_raw(1));
+
         let mut set_std_fd = |path, fd| {
             let file = Rc::new(RefCell::new(INode::new([])));
             state.file_system.save(path, Rc::clone(&file)).unwrap();
@@ -145,6 +147,19 @@ impl VirtualSystem {
         set_std_fd("/dev/stdin", Fd::STDIN);
         set_std_fd("/dev/stdout", Fd::STDOUT);
         set_std_fd("/dev/stderr", Fd::STDERR);
+
+        state
+            .file_system
+            .save(
+                "/tmp",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Directory {
+                        files: Default::default(),
+                    },
+                    permissions: Mode(0o777),
+                })),
+            )
+            .unwrap();
 
         let process_id = Pid::from_raw(2);
         state.processes.insert(process_id, process);
