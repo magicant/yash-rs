@@ -48,6 +48,8 @@ pub(super) async fn open(
     let (content, exit_status) = expand_text(env, &here_doc.content.borrow()).await?;
     let location = here_doc.delimiter.location.clone();
 
+    // TODO Use a pipe for short content
+
     let fd = match env.system.open_tmpfile(Path::new("/tmp")) {
         Ok(fd) => fd,
         Err(errno) => {

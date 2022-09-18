@@ -47,7 +47,10 @@
 //!
 //! TODO `noclobber` option
 //!
-//! If the body is `HereDoc`, (TODO Elaborate).
+//! If the body is `HereDoc`, the redirection opens a readable file descriptor
+//! that yields [expansion](crate::expansion) of the content. The current
+//! implementation uses an unnamed temporary file for the file descriptor, but
+//! we may change the behavior in the future.
 //!
 //! # Performing redirections
 //!
@@ -339,7 +342,8 @@ async fn open_normal(
         FileInOut => open_file(env, OFlag::O_RDWR | OFlag::O_CREAT, operand),
         FdIn => copy_fd(env, operand, OFlag::O_RDONLY),
         FdOut => copy_fd(env, operand, OFlag::O_WRONLY),
-        _ => todo!(),
+        Pipe => todo!("pipe redirection: {:?}", operand.value),
+        String => todo!("here-string: {:?}", operand.value),
     }
 }
 
