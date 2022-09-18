@@ -338,6 +338,8 @@ async fn open_normal(
     }
 }
 
+mod here_doc;
+
 /// Performs a redirection.
 async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitStatus>), Error> {
     // Save the current open file description at `target_fd`
@@ -361,7 +363,7 @@ async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitSt
             let (fd, location) = open_normal(env, *operator, expansion).await?;
             (fd, location, exit_status)
         }
-        RedirBody::HereDoc(_) => todo!(),
+        RedirBody::HereDoc(here_doc) => here_doc::open(env, here_doc).await?,
     };
 
     if let Some(fd) = fd_spec.as_fd() {
