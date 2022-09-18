@@ -17,14 +17,23 @@
 //! Here-documents
 
 use super::Error;
+use super::ErrorCause;
 use super::FdSpec;
 use crate::expansion::expand_text;
 use std::path::Path;
+use yash_env::io::Fd;
 use yash_env::semantics::ExitStatus;
+use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::HereDoc;
+
+async fn write_content(env: &mut Env, fd: Fd, content: &str) -> Result<(), Errno> {
+    env.system.write_all(fd, content.as_bytes()).await?;
+    env.system.lseek(fd, std::io::SeekFrom::Start(0))?;
+    Ok(())
+}
 
 /// Opens a here-document.
 ///
@@ -37,24 +46,29 @@ pub(super) async fn open(
     here_doc: &HereDoc,
 ) -> Result<(FdSpec, Location, Option<ExitStatus>), Error> {
     let (content, exit_status) = expand_text(env, &here_doc.content.borrow()).await?;
-
-    let fd = env
-        .system
-        .open_tmpfile(Path::new("/tmp"))
-        .expect("todo: handle error");
-
-    env.system
-        .write_all(fd, content.as_bytes())
-        .await
-        .expect("todo: handle error");
-
-    env.system
-        .lseek(fd, std::io::SeekFrom::Start(0))
-        .expect("todo: handle error");
-
-    // TODO Make the file descriptor read-only
-
     let location = here_doc.delimiter.location.clone();
+
+    let fd = match env.system.open_tmpfile(Path::new("/tmp")) {
+        Ok(fd) => fd,
+        Err(errno) => {
+            return Err(Error {
+                cause: ErrorCause::TemporaryFileUnavailable(errno),
+                location,
+            })
+        }
+    };
+
+    match write_content(env, fd, &content).await {
+        Ok(()) => (),
+        Err(errno) => {
+            let _ = env.system.close(fd);
+            return Err(Error {
+                cause: ErrorCause::TemporaryFileUnavailable(errno),
+                location,
+            });
+        }
+    };
+
     Ok((FdSpec::Owned(fd), location, exit_status))
 }
 

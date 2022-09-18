@@ -111,6 +111,8 @@ pub enum ErrorCause {
     UnreadableFd(Fd),
     /// `>&` applied to an unwritable file descriptor
     UnwritableFd(Fd),
+    /// Error preparing a temporary file to save here-document content
+    TemporaryFileUnavailable(Errno),
 }
 
 impl ErrorCause {
@@ -126,6 +128,7 @@ impl ErrorCause {
             OpenFile(_, _) => "cannot open the file",
             MalformedFd(_, _) => "not a valid file descriptor",
             UnreadableFd(_) | UnwritableFd(_) => "cannot copy file descriptor",
+            TemporaryFileUnavailable(_) => "cannot prepare here-document",
         }
     }
 
@@ -142,6 +145,7 @@ impl ErrorCause {
             MalformedFd(value, error) => format!("{}: {}", value, error).into(),
             UnreadableFd(fd) => format!("{}: not a readable file descriptor", fd).into(),
             UnwritableFd(fd) => format!("{}: not a writable file descriptor", fd).into(),
+            TemporaryFileUnavailable(errno) => errno.desc().into(),
         }
     }
 }
@@ -164,6 +168,7 @@ impl std::fmt::Display for ErrorCause {
             }
             UnreadableFd(fd) => write!(f, "{} is not a readable file descriptor", fd),
             UnwritableFd(fd) => write!(f, "{} is not a writable file descriptor", fd),
+            TemporaryFileUnavailable(errno) => write!(f, "cannot prepare here-document: {}", errno),
         }
     }
 }
