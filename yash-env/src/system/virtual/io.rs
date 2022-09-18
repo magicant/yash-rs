@@ -19,7 +19,6 @@
 use super::FileBody;
 use super::INode;
 use nix::errno::Errno;
-use nix::libc::off_t;
 use nix::unistd::Whence;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -203,7 +202,7 @@ impl OpenFileDescription {
     ///
     /// The current implementation for `OpenFileDescription` does not support
     /// `Whence::SeekHole` or `Whence::SeekData`.
-    pub fn seek(&mut self, offset: off_t, whence: Whence) -> nix::Result<off_t> {
+    pub fn seek(&mut self, offset: isize, whence: Whence) -> nix::Result<usize> {
         let len = match &self.file.borrow().body {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
@@ -217,12 +216,14 @@ impl OpenFileDescription {
             _ => return Err(Errno::EINVAL),
         };
 
-        fn add(a: usize, b: off_t) -> Option<off_t> {
-            off_t::try_from(a).ok()?.checked_add(b)
+        // TODO Use usize::checked_add_signed
+        fn add(a: usize, b: isize) -> Option<isize> {
+            isize::try_from(a).ok()?.checked_add(b)
         }
 
         let new_offset = add(base, offset).ok_or(Errno::EOVERFLOW)?;
-        self.offset = usize::try_from(new_offset).map_err(|_| Errno::EINVAL)?;
+        let new_offset = usize::try_from(new_offset).map_err(|_| Errno::EINVAL)?;
+        self.offset = new_offset;
         Ok(new_offset)
     }
 

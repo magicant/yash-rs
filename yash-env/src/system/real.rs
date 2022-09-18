@@ -44,10 +44,12 @@ use nix::sys::stat::stat;
 use nix::unistd::access;
 use nix::unistd::AccessFlags;
 use std::convert::Infallible;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::future::Future;
+use std::io::SeekFrom;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
@@ -204,6 +206,19 @@ impl System for RealSystem {
                 return result;
             }
         }
+    }
+
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+        use nix::unistd::Whence::*;
+        let (offset, whence) = match position {
+            SeekFrom::Start(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekSet)
+            }
+            SeekFrom::End(offset) => (offset, SeekEnd),
+            SeekFrom::Current(offset) => (offset, SeekCur),
+        };
+        nix::unistd::lseek(fd.0, offset, whence).map(|new_offset| new_offset as u64)
     }
 
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {

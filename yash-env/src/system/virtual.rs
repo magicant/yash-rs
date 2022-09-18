@@ -74,11 +74,13 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
@@ -447,6 +449,26 @@ impl System for VirtualSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
+    }
+
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+        use nix::unistd::Whence::*;
+        let (offset, whence) = match position {
+            SeekFrom::Start(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekSet)
+            }
+            SeekFrom::End(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekEnd)
+            }
+            SeekFrom::Current(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekCur)
+            }
+        };
+        self.with_open_file_description_mut(fd, |ofd| ofd.seek(offset, whence))
+            .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
 
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
@@ -1249,10 +1271,11 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system.open_tmpfile(Path::new("")).unwrap();
         system.write(fd, &[42, 17, 75]).unwrap();
-        // TODO Read after seeking
+        system.lseek(fd, SeekFrom::Start(0)).unwrap();
         let mut buffer = [0; 4];
         let count = system.read(fd, &mut buffer).unwrap();
-        assert_eq!(count, 0);
+        assert_eq!(count, 3);
+        assert_eq!(buffer[..3], [42, 17, 75]);
     }
 
     #[test]

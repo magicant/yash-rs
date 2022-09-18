@@ -57,6 +57,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::SeekFrom;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
@@ -154,6 +155,9 @@ pub trait System: Debug {
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Moves the position of the open file description.
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64>;
 
     /// Opens a directory for enumerating entries.
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
@@ -657,6 +661,9 @@ impl System for SharedSystem {
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
+    }
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+        self.0.borrow_mut().lseek(fd, position)
     }
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
         self.0.borrow_mut().fdopendir(fd)
