@@ -393,6 +393,24 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
+    fn open_tmpfile(&mut self, _parent_dir: &Path) -> nix::Result<Fd> {
+        let file = Rc::new(RefCell::new(INode::new([])));
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+            file,
+            offset: 0,
+            is_readable: true,
+            is_writable: true,
+            is_appending: false,
+        }));
+        let body = FdBody {
+            open_file_description,
+            cloexec: false,
+        };
+        let mut state = self.state.borrow_mut();
+        let process = state.processes.get_mut(&self.process_id).unwrap();
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
+    }
+
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
@@ -1224,6 +1242,17 @@ mod tests {
         let count = system.read(reader.unwrap(), &mut buffer).unwrap();
         assert_eq!(count, 4);
         assert_eq!(buffer[0..4], [1, 2, 3, 42]);
+    }
+
+    #[test]
+    fn open_tmpfile() {
+        let mut system = VirtualSystem::new();
+        let fd = system.open_tmpfile(Path::new("")).unwrap();
+        system.write(fd, &[42, 17, 75]).unwrap();
+        // TODO Read after seeking
+        let mut buffer = [0; 4];
+        let count = system.read(fd, &mut buffer).unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]

@@ -60,6 +60,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
+use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -110,6 +111,12 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `open` system call.
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
+
+    /// Opens a file descriptor associated with an anonymous temporary file.
+    ///
+    /// This function works similarly to the `O_TMPFILE` flag specified to the
+    /// `open` function.
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd>;
 
     /// Closes a file descriptor.
     ///
@@ -629,6 +636,9 @@ impl System for SharedSystem {
     }
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
         self.0.borrow_mut().open(path, option, mode)
+    }
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
+        self.0.borrow_mut().open_tmpfile(parent_dir)
     }
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.0.borrow_mut().close(fd)

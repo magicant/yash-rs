@@ -50,6 +50,8 @@ use std::ffi::OsStr;
 use std::future::Future;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::io::IntoRawFd;
+use std::path::Path;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
@@ -152,6 +154,16 @@ impl System for RealSystem {
 
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
         nix::fcntl::open(path, option, mode).map(Fd)
+    }
+
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
+        match tempfile::tempfile_in(parent_dir) {
+            Ok(file) => Ok(Fd(file.into_raw_fd())),
+            Err(error) => {
+                let errno = error.raw_os_error().unwrap_or(0);
+                Err(Errno::from_i32(errno))
+            }
+        }
     }
 
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
