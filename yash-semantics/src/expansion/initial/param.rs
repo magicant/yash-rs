@@ -59,12 +59,21 @@ impl ParamRef<'_> {
 
         // TODO Apply Index
 
-        let value = lookup.into_owned();
+        let mut value = lookup.into_owned();
 
         // TODO Switch
         // TODO Check for nounset error
         // TODO Trim & Subst
-        // TODO Length
+
+        // Length modifier //
+        if *self.modifier == Modifier::Length {
+            // TODO Reject ${#*} and ${#@} in POSIX mode
+            match &mut value {
+                None => (),
+                Some(Value::Scalar(v)) => to_length(v),
+                Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
+            }
+        }
 
         let mut phrase = into_phrase(value);
         if !env.will_split && self.name == "*" {
@@ -72,6 +81,11 @@ impl ParamRef<'_> {
         }
         Ok(phrase)
     }
+}
+
+/// Modifies a string to its length.
+fn to_length(v: &mut String) {
+    *v = v.chars().count().to_string()
 }
 
 /// Converts a value into a phrase.
@@ -121,6 +135,70 @@ pub mod tests {
             modifier: Modifier::None,
             location: Location::dummy(""),
         }
+    }
+
+    #[test]
+    fn basic_expansion() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable::new("a1\u{30A4}"),
+            )
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let param = param("foo");
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("a1\u{30A4}")));
+    }
+
+    #[test]
+    fn length_of_scalar() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable::new("a1\u{30A4}"),
+            )
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Length;
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("3")));
+    }
+
+    #[test]
+    fn length_of_array() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(
+                Scope::Global,
+                "foo".to_string(),
+                Variable::new_array(["", "foo", "1", "bar"]),
+            )
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Length;
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(
+            phrase,
+            Phrase::Full(vec![
+                to_field("0"),
+                to_field("3"),
+                to_field("1"),
+                to_field("3")
+            ])
+        );
     }
 
     #[test]
