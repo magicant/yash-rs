@@ -130,16 +130,9 @@ pub mod tests {
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;
-        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
 
-        let a = AttrChar {
-            value: 'a',
-            origin: Origin::SoftExpansion,
-            is_quoted: false,
-            is_quoting: false,
-        };
-        let c = AttrChar { value: 'c', ..a };
-        assert_eq!(phrase, Phrase::Full(vec![vec![a], vec![c]]));
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Full(vec![to_field("a"), to_field("c")]));
     }
 
     #[test]
@@ -148,16 +141,9 @@ pub mod tests {
         let param = param("*");
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
-        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
 
-        let a = AttrChar {
-            value: 'a',
-            origin: Origin::SoftExpansion,
-            is_quoted: false,
-            is_quoting: false,
-        };
-        let c = AttrChar { value: 'c', ..a };
-        assert_eq!(phrase, Phrase::Full(vec![vec![a], vec![c]]));
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Full(vec![to_field("a"), to_field("c")]));
     }
 
     #[test]
@@ -167,17 +153,9 @@ pub mod tests {
         let param = ParamRef::from(&param);
         let mut env = Env::new(&mut env);
         env.will_split = false;
-        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
 
-        let a = AttrChar {
-            value: 'a',
-            origin: Origin::SoftExpansion,
-            is_quoted: false,
-            is_quoting: false,
-        };
-        let amp = AttrChar { value: '&', ..a };
-        let c = AttrChar { value: 'c', ..a };
-        assert_eq!(phrase, Phrase::Field(vec![a, amp, c]));
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("a&c")));
     }
 
     #[test]
@@ -191,14 +169,7 @@ pub mod tests {
         assert_eq!(result, Phrase::one_empty_field());
 
         let result = into_phrase(Some(Value::Scalar("foo".to_string())));
-        let f = AttrChar {
-            value: 'f',
-            origin: Origin::SoftExpansion,
-            is_quoted: false,
-            is_quoting: false,
-        };
-        let o = AttrChar { value: 'o', ..f };
-        assert_eq!(result, Phrase::Field(vec![f, o, o]));
+        assert_eq!(result, Phrase::Field(to_field("foo")));
     }
 
     #[test]
@@ -206,21 +177,9 @@ pub mod tests {
         let result = into_phrase(Some(Value::Array(vec![])));
         assert_eq!(result, Phrase::zero_fields());
 
-        let result = into_phrase(Some(Value::Array(vec![
-            "foo".to_string(),
-            "bar".to_string(),
-        ])));
-        let f = AttrChar {
-            value: 'f',
-            origin: Origin::SoftExpansion,
-            is_quoted: false,
-            is_quoting: false,
-        };
-        let o = AttrChar { value: 'o', ..f };
-        let b = AttrChar { value: 'b', ..f };
-        let a = AttrChar { value: 'a', ..f };
-        let r = AttrChar { value: 'r', ..f };
-        assert_eq!(result, Phrase::Full(vec![vec![f, o, o], vec![b, a, r]]));
+        let values = vec!["foo".to_string(), "bar".to_string()];
+        let result = into_phrase(Some(Value::Array(values)));
+        assert_eq!(result, Phrase::Full(vec![to_field("foo"), to_field("bar")]));
     }
 
     #[test]
