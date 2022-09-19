@@ -57,9 +57,11 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::SeekFrom;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::os::raw::c_int;
+use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -111,6 +113,12 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `open` system call.
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
 
+    /// Opens a file descriptor associated with an anonymous temporary file.
+    ///
+    /// This function works similarly to the `O_TMPFILE` flag specified to the
+    /// `open` function.
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd>;
+
     /// Closes a file descriptor.
     ///
     /// This is a thin wrapper around the `close` system call.
@@ -147,6 +155,9 @@ pub trait System: Debug {
     /// to support concurrent I/O in an `async` function context and ensure the
     /// whole `buffer` is written.
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize>;
+
+    /// Moves the position of the open file description.
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64>;
 
     /// Opens a directory for enumerating entries.
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>>;
@@ -630,6 +641,9 @@ impl System for SharedSystem {
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
         self.0.borrow_mut().open(path, option, mode)
     }
+    fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
+        self.0.borrow_mut().open_tmpfile(parent_dir)
+    }
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.0.borrow_mut().close(fd)
     }
@@ -647,6 +661,9 @@ impl System for SharedSystem {
     }
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.0.borrow_mut().write(fd, buffer)
+    }
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+        self.0.borrow_mut().lseek(fd, position)
     }
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
         self.0.borrow_mut().fdopendir(fd)

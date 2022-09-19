@@ -841,8 +841,10 @@ pub struct HereDoc {
 
     /// Content of the here-document.
     ///
-    /// The content ends with a newline unless it is empty. If the delimiter
-    /// is quoted, the content must be all literal.
+    /// The content ends with a newline unless it is empty. If the delimiter is
+    /// quoted, the content must be all literal. If `remove_tabs` is `true`,
+    /// each content line does not start with tabs as they are removed when
+    /// parsed.
     ///
     /// This value is wrapped in `RefCell` because the here-doc content is
     /// parsed separately from the here-doc operator. When the operator is

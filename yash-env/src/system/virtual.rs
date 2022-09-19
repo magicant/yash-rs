@@ -74,11 +74,13 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::os::raw::c_int;
 use std::os::unix::ffi::OsStrExt;
@@ -123,10 +125,12 @@ impl VirtualSystem {
     /// process ID 2 in the process set ([`SystemState::processes`]). The file
     /// system will contain files named `/dev/stdin`, `/dev/stdout`, and
     /// `/dev/stderr` that are opened in the process with file descriptor 0, 1,
-    /// and 2, respectively.
+    /// and 2, respectively. The file system also contains an empty directory
+    /// `/tmp`.
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
         let mut process = Process::with_parent(Pid::from_raw(1));
+
         let mut set_std_fd = |path, fd| {
             let file = Rc::new(RefCell::new(INode::new([])));
             state.file_system.save(path, Rc::clone(&file)).unwrap();
@@ -145,6 +149,19 @@ impl VirtualSystem {
         set_std_fd("/dev/stdin", Fd::STDIN);
         set_std_fd("/dev/stdout", Fd::STDOUT);
         set_std_fd("/dev/stderr", Fd::STDERR);
+
+        state
+            .file_system
+            .save(
+                "/tmp",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Directory {
+                        files: Default::default(),
+                    },
+                    permissions: Mode(0o777),
+                })),
+            )
+            .unwrap();
 
         let process_id = Pid::from_raw(2);
         state.processes.insert(process_id, process);
@@ -378,6 +395,24 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
+    fn open_tmpfile(&mut self, _parent_dir: &Path) -> nix::Result<Fd> {
+        let file = Rc::new(RefCell::new(INode::new([])));
+        let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
+            file,
+            offset: 0,
+            is_readable: true,
+            is_writable: true,
+            is_appending: false,
+        }));
+        let body = FdBody {
+            open_file_description,
+            cloexec: false,
+        };
+        let mut state = self.state.borrow_mut();
+        let process = state.processes.get_mut(&self.process_id).unwrap();
+        process.open_fd(body).map_err(|_| Errno::EMFILE)
+    }
+
     fn close(&mut self, fd: Fd) -> nix::Result<()> {
         self.current_process_mut().close_fd(fd);
         Ok(())
@@ -414,6 +449,26 @@ impl System for VirtualSystem {
 
     fn write(&mut self, fd: Fd, buffer: &[u8]) -> nix::Result<usize> {
         self.with_open_file_description_mut(fd, |ofd| ofd.write(buffer))
+    }
+
+    fn lseek(&mut self, fd: Fd, position: SeekFrom) -> nix::Result<u64> {
+        use nix::unistd::Whence::*;
+        let (offset, whence) = match position {
+            SeekFrom::Start(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekSet)
+            }
+            SeekFrom::End(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekEnd)
+            }
+            SeekFrom::Current(offset) => {
+                let offset = offset.try_into().map_err(|_| Errno::EOVERFLOW)?;
+                (offset, SeekCur)
+            }
+        };
+        self.with_open_file_description_mut(fd, |ofd| ofd.seek(offset, whence))
+            .and_then(|new_offset| new_offset.try_into().map_err(|_| Errno::EOVERFLOW))
     }
 
     fn fdopendir(&mut self, fd: Fd) -> nix::Result<Box<dyn Dir>> {
@@ -1209,6 +1264,18 @@ mod tests {
         let count = system.read(reader.unwrap(), &mut buffer).unwrap();
         assert_eq!(count, 4);
         assert_eq!(buffer[0..4], [1, 2, 3, 42]);
+    }
+
+    #[test]
+    fn open_tmpfile() {
+        let mut system = VirtualSystem::new();
+        let fd = system.open_tmpfile(Path::new("")).unwrap();
+        system.write(fd, &[42, 17, 75]).unwrap();
+        system.lseek(fd, SeekFrom::Start(0)).unwrap();
+        let mut buffer = [0; 4];
+        let count = system.read(fd, &mut buffer).unwrap();
+        assert_eq!(count, 3);
+        assert_eq!(buffer[..3], [42, 17, 75]);
     }
 
     #[test]
