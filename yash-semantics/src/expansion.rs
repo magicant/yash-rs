@@ -78,7 +78,9 @@ use self::attr::AttrField;
 use self::attr::Origin;
 use self::attr_strip::Strip;
 use self::glob::glob;
+use self::initial::expand;
 use self::initial::ArithError;
+#[cfg(doc)]
 use self::initial::Expand;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
@@ -214,13 +216,7 @@ pub async fn expand_text(
     // It would be technically correct to set `will_split` to false, but it does
     // not affect the final results because we will join the results anyway.
     // env.will_split = false;
-
-    use self::initial::QuickExpand::*;
-    let phrase = match text.quick_expand(&mut env) {
-        Ready(result) => result?,
-        Interim(interim) => text.async_expand(&mut env, interim).await?,
-    };
-
+    let phrase = expand(&mut env, text).await?;
     let chars = phrase.ifs_join(&env.inner.variables);
     let result = skip_quotes(chars).strip().collect();
     Ok((result, env.last_command_subst_exit_status))
@@ -242,13 +238,7 @@ pub async fn expand_word_attr(
     // It would be technically correct to set `will_split` to false, but it does
     // not affect the final results because we will join the results anyway.
     // env.will_split = false;
-
-    use self::initial::QuickExpand::*;
-    let phrase = match word.quick_expand(&mut env) {
-        Ready(result) => result?,
-        Interim(interim) => word.async_expand(&mut env, interim).await?,
-    };
-
+    let phrase = expand(&mut env, word).await?;
     let chars = phrase.ifs_join(&env.inner.variables);
     let origin = word.location.clone();
     let field = AttrField { chars, origin };
@@ -292,11 +282,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     let words = words.into_iter();
     let mut fields = Vec::with_capacity(words.size_hint().0);
     for word in words {
-        use self::initial::QuickExpand::*;
-        let phrase = match word.quick_expand(&mut env) {
-            Ready(result) => result?,
-            Interim(interim) => word.async_expand(&mut env, interim).await?,
-        };
+        let phrase = expand(&mut env, word).await?;
         fields.extend(phrase.into_iter().map(|chars| AttrField {
             chars,
             origin: word.location.clone(),
