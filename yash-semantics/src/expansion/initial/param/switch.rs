@@ -53,6 +53,10 @@ impl ValueState {
 }
 
 /// Modifies the origin of characters in the phrase to `SoftExpansion`.
+///
+/// This function updates the result of [`expand`]. Since the switch modifier is
+/// part of a parameter expansion, the substitution produced by the switch
+/// should be regarded as originating from a parameter expansion.
 fn attribute(mut phrase: Phrase) -> Phrase {
     phrase.for_each_char_mut(|c| match c.origin {
         Origin::Literal => c.origin = Origin::SoftExpansion,
