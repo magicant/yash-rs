@@ -33,11 +33,21 @@ enum ValueState {
 }
 
 impl ValueState {
-    fn with(_cond: SwitchCondition, value: &Option<Value>) -> Self {
-        // TODO Apply the condition
+    fn with(cond: SwitchCondition, value: &Option<Value>) -> Self {
         match value {
-            Some(_) => ValueState::Set,
             None => ValueState::Unset,
+            Some(value) => match cond {
+                SwitchCondition::Unset => ValueState::Set,
+                SwitchCondition::UnsetOrEmpty => match value {
+                    Value::Scalar(value) if value.is_empty() => ValueState::Unset,
+                    Value::Array(values)
+                        if values.is_empty() || values.len() == 1 && values[0].is_empty() =>
+                    {
+                        ValueState::Unset
+                    }
+                    _ => ValueState::Set,
+                },
+            },
         }
     }
 }
@@ -84,6 +94,47 @@ mod tests {
     use yash_env::variable::Value::*;
     use yash_syntax::syntax::SwitchCondition::*;
     use yash_syntax::syntax::SwitchType::*;
+
+    #[test]
+    fn value_state() {
+        let unset = None;
+        let empty_scalar = Some(Value::Scalar("".to_string()));
+        let non_empty_scalar = Some(Value::Scalar(".".to_string()));
+        let valueless_array = Some(Value::Array(vec![]));
+        let empty_value_array = Some(Value::Array(vec!["".to_string()]));
+        let non_empty_value_array = Some(Value::Array(vec![".".to_string()]));
+        let multi_value_array = Some(Value::Array(vec!["".to_string(), "".to_string()]));
+
+        let state = ValueState::with(SwitchCondition::Unset, &unset);
+        assert_eq!(state, ValueState::Unset);
+        let state = ValueState::with(SwitchCondition::Unset, &empty_scalar);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::Unset, &non_empty_scalar);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::Unset, &valueless_array);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::Unset, &empty_value_array);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::Unset, &non_empty_value_array);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::Unset, &multi_value_array);
+        assert_eq!(state, ValueState::Set);
+
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &unset);
+        assert_eq!(state, ValueState::Unset);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &empty_scalar);
+        assert_eq!(state, ValueState::Unset);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &non_empty_scalar);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &valueless_array);
+        assert_eq!(state, ValueState::Unset);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &empty_value_array);
+        assert_eq!(state, ValueState::Unset);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &non_empty_value_array);
+        assert_eq!(state, ValueState::Set);
+        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &multi_value_array);
+        assert_eq!(state, ValueState::Set);
+    }
 
     #[test]
     fn attributing() {
