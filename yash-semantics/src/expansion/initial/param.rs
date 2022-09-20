@@ -45,6 +45,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
 }
 
 mod lookup;
+mod switch;
 
 impl ParamRef<'_> {
     /// Performs parameter expansion.
@@ -61,7 +62,13 @@ impl ParamRef<'_> {
 
         let mut value = lookup.into_owned();
 
-        // TODO Switch
+        // Switch //
+        if let Modifier::Switch(switch) = &self.modifier {
+            if let Some(result) = switch::apply(env, switch, &mut value).await {
+                return result;
+            }
+        }
+
         // TODO Check for nounset error
         // TODO Trim & Subst
 
@@ -199,6 +206,27 @@ pub mod tests {
                 to_field("3")
             ])
         );
+    }
+
+    #[test]
+    fn alter_empty() {
+        use yash_syntax::syntax::{Switch, SwitchCondition, SwitchType};
+
+        let mut env = env_with_positional_params_and_ifs();
+        env.variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
+            .unwrap();
+        let mut param = param("foo");
+        param.modifier = Modifier::Switch(Switch {
+            r#type: SwitchType::Alter,
+            condition: SwitchCondition::Unset,
+            word: "bar".parse().unwrap(),
+        });
+        let param = ParamRef::from(&param);
+        let mut env = Env::new(&mut env);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("bar")));
     }
 
     #[test]

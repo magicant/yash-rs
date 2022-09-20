@@ -296,6 +296,18 @@ impl Phrase {
             },
         }
     }
+
+    /// Applies a function to every character in the phrase.
+    pub fn for_each_char_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut AttrChar),
+    {
+        match self {
+            Char(c) => f(c),
+            Field(field) => field.iter_mut().for_each(f),
+            Full(fields) => fields.iter_mut().flatten().for_each(f),
+        }
+    }
 }
 
 impl From<AttrChar> for Phrase {
