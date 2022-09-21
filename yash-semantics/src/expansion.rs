@@ -123,7 +123,7 @@ impl ErrorCause {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
-            EmptyExpansion(_) => "parameter expansion with empty value",
+            EmptyExpansion(error) => error.message_or_default(),
         }
     }
 

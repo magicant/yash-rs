@@ -20,11 +20,15 @@ use super::Env;
 use super::Error;
 use super::Phrase;
 use crate::expansion::attr::Origin;
+use crate::expansion::expand_word;
 use crate::expansion::initial::expand;
+use crate::expansion::ErrorCause;
 use yash_env::variable::Value;
+use yash_syntax::source::Location;
 use yash_syntax::syntax::Switch;
 use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
+use yash_syntax::syntax::Word;
 
 /// State of a [value](Value) that may be considered as "not set"
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -88,11 +92,31 @@ impl std::fmt::Display for ValueState {
 pub struct EmptyError {
     /// State of the variable value that caused this error
     pub state: ValueState,
+    /// Error message specified in the switch
+    pub message: Option<String>,
+}
+
+impl EmptyError {
+    /// Returns the message.
+    ///
+    /// If `self.message` is `Some(_)`, its content is returned. Otherwise, the
+    /// default message is returned.
+    #[must_use]
+    pub fn message_or_default(&self) -> &str {
+        self.message
+            .as_deref()
+            .unwrap_or("parameter expansion with empty value")
+    }
 }
 
 impl std::fmt::Display for EmptyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.state.fmt(f)
+        write!(
+            f,
+            "{} ({})",
+            self.message_or_default(),
+            self.state.description()
+        )
     }
 }
 
@@ -133,6 +157,37 @@ fn attribute(mut phrase: Phrase) -> Phrase {
     phrase
 }
 
+/// Expands a word to be used as an empty expansion error message.
+async fn empty_expansion_error_message(
+    env: &mut Env<'_>,
+    message_word: &Word,
+) -> Result<Option<String>, Error> {
+    if message_word.units.is_empty() {
+        return Ok(None);
+    }
+
+    let (message_field, exit_status) = expand_word(env.inner, message_word).await?;
+    if exit_status.is_some() {
+        env.last_command_subst_exit_status = exit_status;
+    }
+    Ok(Some(message_field.value))
+}
+
+/// Constructs an empty expansion error.
+async fn empty_expansion_error(
+    env: &mut Env<'_>,
+    state: ValueState,
+    message_word: &Word,
+    location: Location,
+) -> Error {
+    let message = match empty_expansion_error_message(env, message_word).await {
+        Ok(message) => message,
+        Err(error) => return error,
+    };
+    let cause = ErrorCause::EmptyExpansion(EmptyError { state, message });
+    Error { cause, location }
+}
+
 /// Applies a switch.
 ///
 /// If this function returns `Some(_)`, that should be the result of the whole
@@ -145,14 +200,21 @@ pub async fn apply(
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
-    let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
+    let state = ValueState::of(&*value);
+    let cond = ValueCondition::with(switch.condition, state);
+    let location = Location::dummy("todo");
     match (switch.r#type, cond) {
+        (Alter, Unset) | (Default, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset) => Some(expand(env, &switch.word).await.map(attribute)),
-        (Alter, Unset) | (Default, Set) => None,
         (Assign, Set) => todo!(),
         (Assign, Unset) => todo!(),
-        (Error, Set) => todo!(),
-        (Error, Unset) => todo!(),
+        (Error, Unset) => Some(Err(empty_expansion_error(
+            env,
+            state.expect("TODO: ValueCondition::Unset should provide the state"),
+            &switch.word,
+            location,
+        )
+        .await)),
     }
 }
 
@@ -161,6 +223,7 @@ mod tests {
     use super::super::to_field;
     use super::*;
     use crate::expansion::attr::AttrChar;
+    use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Value::*;
     use yash_syntax::syntax::SwitchCondition::*;
@@ -234,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_unset() {
+    fn alter_with_unset_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -249,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn alter_non_empty() {
+    fn alter_with_non_empty_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -263,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn default_unset() {
+    fn default_with_unset_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -277,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn default_non_empty() {
+    fn default_with_non_empty_value() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -289,5 +352,75 @@ mod tests {
         let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
         assert_eq!(result, None);
         assert_eq!(value, Some(Scalar("bar".to_string())));
+    }
+
+    #[test]
+    fn error_with_unset_value_and_non_empty_word() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Error,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = None;
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let error = result.unwrap().unwrap_err();
+        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+            assert_eq!(e.message, Some("foo".to_string()));
+            assert_eq!(e.state, ValueState::Unset);
+        });
+    }
+
+    #[test]
+    fn error_with_empty_scalar_and_non_empty_word() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Error,
+            condition: UnsetOrEmpty,
+            word: "bar".parse().unwrap(),
+        };
+        let mut value = Some(Value::Scalar("".to_string()));
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let error = result.unwrap().unwrap_err();
+        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+            assert_eq!(e.message, Some("bar".to_string()));
+            assert_eq!(e.state, ValueState::EmptyScalar);
+        });
+    }
+
+    #[test]
+    fn error_with_valueless_array_and_empty_word() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Error,
+            condition: UnsetOrEmpty,
+            word: "".parse().unwrap(),
+        };
+        let mut value = Some(Value::Array(vec![]));
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let error = result.unwrap().unwrap_err();
+        assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
+            assert_eq!(e.message, None);
+            assert_eq!(e.state, ValueState::ValuelessArray);
+        });
+        // TODO assert_eq!(error.location, location);
+    }
+
+    #[test]
+    fn error_with_set_value() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Error,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = Some(Value::Scalar("".to_string()));
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        assert_eq!(result, None);
+        assert_eq!(value, Some(Scalar("".to_string())));
     }
 }
