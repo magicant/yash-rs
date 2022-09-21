@@ -47,6 +47,9 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
 mod lookup;
 mod switch;
 
+pub use switch::EmptyError;
+pub use switch::ValueState;
+
 impl ParamRef<'_> {
     /// Performs parameter expansion.
     pub async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {

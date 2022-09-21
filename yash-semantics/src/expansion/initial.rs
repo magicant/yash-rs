@@ -131,3 +131,5 @@ mod tilde;
 mod word;
 
 pub use arith::ArithError;
+pub use param::EmptyError;
+pub use param::ValueState;

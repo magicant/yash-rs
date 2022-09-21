@@ -26,26 +26,98 @@ use yash_syntax::syntax::Switch;
 use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
 
+/// State of a [value](Value) that may be considered as "not set"
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum ValueState {
+#[non_exhaustive]
+pub enum ValueState {
+    /// The variable is not set.
+    Unset,
+    /// The value is a scalar with no characters.
+    EmptyScalar,
+    /// The value is an array with no elements.
+    ValuelessArray,
+    /// The value is an array with one element containing no characters.
+    EmptyValueArray,
+}
+
+impl ValueState {
+    /// Computes the state of a value.
+    ///
+    /// Returns `None` if the value does not fall under any of the `ValueState`
+    /// variants.
+    #[must_use]
+    pub fn of<'a, I: Into<Option<&'a Value>>>(value: I) -> Option<ValueState> {
+        fn inner(value: Option<&Value>) -> Option<ValueState> {
+            use ValueState::*;
+            match value {
+                None => Some(Unset),
+                Some(Value::Scalar(scalar)) if scalar.is_empty() => Some(EmptyScalar),
+                Some(Value::Array(array)) if array.is_empty() => Some(ValuelessArray),
+                Some(Value::Array(array)) if array.len() == 1 && array[0].is_empty() => {
+                    Some(EmptyValueArray)
+                }
+                Some(_) => None,
+            }
+        }
+        inner(value.into())
+    }
+
+    pub fn description(&self) -> &'static str {
+        use ValueState::*;
+        match self {
+            Unset => "unset variable",
+            EmptyScalar => "empty string",
+            ValuelessArray => "empty array",
+            EmptyValueArray => "array with empty string",
+        }
+    }
+}
+
+impl std::fmt::Display for ValueState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.description().fmt(f)
+    }
+}
+
+/// Error caused by an error switch
+///
+/// `UnsetError` is an error that occurs when you apply a switch with
+/// `SwitchCondition::Error` to an empty value.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct EmptyError {
+    /// State of the variable value that caused this error
+    pub state: ValueState,
+}
+
+impl std::fmt::Display for EmptyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.state.fmt(f)
+    }
+}
+
+impl std::error::Error for EmptyError {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum ValueCondition {
     Set,
     Unset,
 }
 
-impl ValueState {
+impl ValueCondition {
     fn with(cond: SwitchCondition, value: &Option<Value>) -> Self {
         match value {
-            None => ValueState::Unset,
+            None => ValueCondition::Unset,
             Some(value) => match cond {
-                SwitchCondition::Unset => ValueState::Set,
+                SwitchCondition::Unset => ValueCondition::Set,
                 SwitchCondition::UnsetOrEmpty => match value {
-                    Value::Scalar(value) if value.is_empty() => ValueState::Unset,
+                    Value::Scalar(value) if value.is_empty() => ValueCondition::Unset,
                     Value::Array(values)
                         if values.is_empty() || values.len() == 1 && values[0].is_empty() =>
                     {
-                        ValueState::Unset
+                        ValueCondition::Unset
                     }
-                    _ => ValueState::Set,
+                    _ => ValueCondition::Set,
                 },
             },
         }
@@ -76,8 +148,8 @@ pub async fn apply(
     value: &mut Option<Value>,
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
-    use ValueState::*;
-    match (switch.r#type, ValueState::with(switch.condition, value)) {
+    use ValueCondition::*;
+    match (switch.r#type, ValueCondition::with(switch.condition, value)) {
         (Alter, Set) | (Default, Unset) => Some(expand(env, &switch.word).await.map(attribute)),
         (Alter, Unset) | (Default, Set) => None,
         (Assign, Set) => todo!(),
@@ -98,7 +170,25 @@ mod tests {
     use yash_syntax::syntax::SwitchType::*;
 
     #[test]
-    fn value_state() {
+    fn value_state_from_value() {
+        let state = ValueState::of(&None);
+        assert_eq!(state, Some(ValueState::Unset));
+        let state = ValueState::of(&Some(Value::Scalar("".to_string())));
+        assert_eq!(state, Some(ValueState::EmptyScalar));
+        let state = ValueState::of(&Some(Value::Scalar(".".to_string())));
+        assert_eq!(state, None);
+        let state = ValueState::of(&Some(Value::Array(vec![])));
+        assert_eq!(state, Some(ValueState::ValuelessArray));
+        let state = ValueState::of(&Some(Value::Array(vec!["".to_string()])));
+        assert_eq!(state, Some(ValueState::EmptyValueArray));
+        let state = ValueState::of(&Some(Value::Array(vec![".".to_string()])));
+        assert_eq!(state, None);
+        let state = ValueState::of(&Some(Value::Array(vec!["".to_string(), "".to_string()])));
+        assert_eq!(state, None);
+    }
+
+    #[test]
+    fn value_condition() {
         let unset = None;
         let empty_scalar = Some(Value::Scalar("".to_string()));
         let non_empty_scalar = Some(Value::Scalar(".".to_string()));
@@ -107,35 +197,35 @@ mod tests {
         let non_empty_value_array = Some(Value::Array(vec![".".to_string()]));
         let multi_value_array = Some(Value::Array(vec!["".to_string(), "".to_string()]));
 
-        let state = ValueState::with(SwitchCondition::Unset, &unset);
-        assert_eq!(state, ValueState::Unset);
-        let state = ValueState::with(SwitchCondition::Unset, &empty_scalar);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::Unset, &non_empty_scalar);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::Unset, &valueless_array);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::Unset, &empty_value_array);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::Unset, &non_empty_value_array);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::Unset, &multi_value_array);
-        assert_eq!(state, ValueState::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &unset);
+        assert_eq!(condition, ValueCondition::Unset);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &empty_scalar);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &non_empty_scalar);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &valueless_array);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &empty_value_array);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &non_empty_value_array);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::Unset, &multi_value_array);
+        assert_eq!(condition, ValueCondition::Set);
 
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &unset);
-        assert_eq!(state, ValueState::Unset);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &empty_scalar);
-        assert_eq!(state, ValueState::Unset);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &non_empty_scalar);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &valueless_array);
-        assert_eq!(state, ValueState::Unset);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &empty_value_array);
-        assert_eq!(state, ValueState::Unset);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &non_empty_value_array);
-        assert_eq!(state, ValueState::Set);
-        let state = ValueState::with(SwitchCondition::UnsetOrEmpty, &multi_value_array);
-        assert_eq!(state, ValueState::Set);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &unset);
+        assert_eq!(condition, ValueCondition::Unset);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &empty_scalar);
+        assert_eq!(condition, ValueCondition::Unset);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &non_empty_scalar);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &valueless_array);
+        assert_eq!(condition, ValueCondition::Unset);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &empty_value_array);
+        assert_eq!(condition, ValueCondition::Unset);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &non_empty_value_array);
+        assert_eq!(condition, ValueCondition::Set);
+        let condition = ValueCondition::with(SwitchCondition::UnsetOrEmpty, &multi_value_array);
+        assert_eq!(condition, ValueCondition::Set);
     }
 
     #[test]

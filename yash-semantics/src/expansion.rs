@@ -80,6 +80,7 @@ use self::attr_strip::Strip;
 use self::glob::glob;
 use self::initial::expand;
 use self::initial::ArithError;
+use self::initial::EmptyError;
 #[cfg(doc)]
 use self::initial::Expand;
 use self::quote_removal::skip_quotes;
@@ -108,6 +109,8 @@ pub enum ErrorCause {
     ArithError(ArithError),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
+    /// Expansion of an empty value with an error switch
+    EmptyExpansion(EmptyError),
 }
 
 impl ErrorCause {
@@ -120,6 +123,7 @@ impl ErrorCause {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
+            EmptyExpansion(_) => "parameter expansion with empty value",
         }
     }
 
@@ -132,6 +136,7 @@ impl ErrorCause {
             CommandSubstError(e) => e.desc().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
+            EmptyExpansion(e) => e.state.description().into(),
         }
     }
 
@@ -148,6 +153,7 @@ impl ErrorCause {
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
+            EmptyExpansion(_) => None,
         }
     }
 }
@@ -159,6 +165,7 @@ impl std::fmt::Display for ErrorCause {
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
             ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
+            EmptyExpansion(error) => error.fmt(f),
         }
     }
 }
