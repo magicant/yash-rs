@@ -78,10 +78,8 @@ pub async fn apply(
     use SwitchType::*;
     use ValueState::*;
     match (switch.r#type, ValueState::with(switch.condition, value)) {
-        (Alter, Set) => Some(expand(env, &switch.word).await.map(attribute)),
-        (Alter, Unset) => None,
-        (Default, Set) => todo!(),
-        (Default, Unset) => todo!(),
+        (Alter, Set) | (Default, Unset) => Some(expand(env, &switch.word).await.map(attribute)),
+        (Alter, Unset) | (Default, Set) => None,
         (Assign, Set) => todo!(),
         (Assign, Unset) => todo!(),
         (Error, Set) => todo!(),
@@ -216,5 +214,34 @@ mod tests {
         let mut value = Some(Scalar("bar".to_string()));
         let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
+    }
+
+    #[test]
+    fn default_unset() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Default,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = None;
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
+    }
+
+    #[test]
+    fn default_non_empty() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Default,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = Some(Scalar("bar".to_string()));
+        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        assert_eq!(result, None);
+        assert_eq!(value, Some(Scalar("bar".to_string())));
     }
 }
