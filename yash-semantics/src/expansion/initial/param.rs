@@ -67,7 +67,7 @@ impl ParamRef<'_> {
 
         // Switch //
         if let Modifier::Switch(switch) = &self.modifier {
-            if let Some(result) = switch::apply(env, switch, &mut value).await {
+            if let Some(result) = switch::apply(env, switch, &mut value, self.location).await {
                 return result;
             }
         }

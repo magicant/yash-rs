@@ -197,12 +197,12 @@ pub async fn apply(
     env: &mut Env<'_>,
     switch: &Switch,
     value: &mut Option<Value>,
+    location: &Location,
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
     let state = ValueState::of(&*value);
     let cond = ValueCondition::with(switch.condition, state);
-    let location = Location::dummy("todo");
     match (switch.r#type, cond) {
         (Alter, Unset) | (Default, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset) => Some(expand(env, &switch.word).await.map(attribute)),
@@ -212,7 +212,7 @@ pub async fn apply(
             env,
             state.expect("TODO: ValueCondition::Unset should provide the state"),
             &switch.word,
-            location,
+            location.clone(),
         )
         .await)),
     }
@@ -306,7 +306,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = None;
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, None);
         assert_eq!(value, None);
     }
@@ -321,7 +324,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = Some(Scalar("bar".to_string()));
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
     }
 
@@ -335,7 +341,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = None;
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
     }
 
@@ -349,7 +358,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = Some(Scalar("bar".to_string()));
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, None);
         assert_eq!(value, Some(Scalar("bar".to_string())));
     }
@@ -364,7 +376,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = None;
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("foo".to_string()));
@@ -382,7 +397,10 @@ mod tests {
             word: "bar".parse().unwrap(),
         };
         let mut value = Some(Value::Scalar("".to_string()));
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, Some("bar".to_string()));
@@ -400,13 +418,16 @@ mod tests {
             word: "".parse().unwrap(),
         };
         let mut value = Some(Value::Array(vec![]));
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         let error = result.unwrap().unwrap_err();
         assert_matches!(error.cause, ErrorCause::EmptyExpansion(e) => {
             assert_eq!(e.message, None);
             assert_eq!(e.state, ValueState::ValuelessArray);
         });
-        // TODO assert_eq!(error.location, location);
+        assert_eq!(error.location, location);
     }
 
     #[test]
@@ -419,7 +440,10 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let mut value = Some(Value::Scalar("".to_string()));
-        let result = apply(&mut env, &switch, &mut value).now_or_never().unwrap();
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, &mut value, &location)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, None);
         assert_eq!(value, Some(Scalar("".to_string())));
     }
