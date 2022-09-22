@@ -30,7 +30,7 @@ use yash_syntax::syntax::SwitchCondition;
 use yash_syntax::syntax::SwitchType;
 use yash_syntax::syntax::Word;
 
-/// State of a [value](Value) that may be considered as "not set"
+/// Physical state of a [value](Value) that may be considered as "not set"
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum ValueState {
@@ -122,10 +122,11 @@ impl std::fmt::Display for EmptyError {
 
 impl std::error::Error for EmptyError {}
 
+/// Abstract state of a [value](Value) that determines the effect of a switch
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ValueCondition {
     Set,
-    Unset,
+    Unset(ValueState),
 }
 
 impl ValueCondition {
@@ -133,8 +134,8 @@ impl ValueCondition {
         fn inner(cond: SwitchCondition, state: Option<ValueState>) -> ValueCondition {
             match (cond, state) {
                 (_, None) => ValueCondition::Set,
-                (SwitchCondition::UnsetOrEmpty, Some(_)) => ValueCondition::Unset,
-                (_, Some(ValueState::Unset)) => ValueCondition::Unset,
+                (SwitchCondition::UnsetOrEmpty, Some(state)) => ValueCondition::Unset(state),
+                (_, Some(ValueState::Unset)) => ValueCondition::Unset(ValueState::Unset),
                 (SwitchCondition::Unset, Some(ValueState::EmptyScalar)) => ValueCondition::Set,
                 (SwitchCondition::Unset, Some(ValueState::ValuelessArray)) => ValueCondition::Set,
                 (SwitchCondition::Unset, Some(ValueState::EmptyValueArray)) => ValueCondition::Set,
@@ -201,16 +202,15 @@ pub async fn apply(
 ) -> Option<Result<Phrase, Error>> {
     use SwitchType::*;
     use ValueCondition::*;
-    let state = ValueState::of(&*value);
-    let cond = ValueCondition::with(switch.condition, state);
+    let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
     match (switch.r#type, cond) {
-        (Alter, Unset) | (Default, Set) | (Error, Set) => None,
-        (Alter, Set) | (Default, Unset) => Some(expand(env, &switch.word).await.map(attribute)),
+        (Alter, Unset(_)) | (Default, Set) | (Error, Set) => None,
+        (Alter, Set) | (Default, Unset(_)) => Some(expand(env, &switch.word).await.map(attribute)),
         (Assign, Set) => todo!(),
-        (Assign, Unset) => todo!(),
-        (Error, Unset) => Some(Err(empty_expansion_error(
+        (Assign, Unset(_)) => todo!(),
+        (Error, Unset(state)) => Some(Err(empty_expansion_error(
             env,
-            state.expect("TODO: ValueCondition::Unset should provide the state"),
+            state,
             &switch.word,
             location.clone(),
         )
