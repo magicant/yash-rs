@@ -20,10 +20,13 @@ use super::Env;
 use super::Error;
 use super::Phrase;
 use crate::expansion::attr::Origin;
+use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
 use crate::expansion::initial::expand;
 use crate::expansion::ErrorCause;
+use yash_env::variable::Scope;
 use yash_env::variable::Value;
+use yash_env::variable::Variable;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Switch;
 use yash_syntax::syntax::SwitchCondition;
@@ -158,6 +161,27 @@ fn attribute(mut phrase: Phrase) -> Phrase {
     phrase
 }
 
+/// Assigns the expansion of `value` to variable `name`.
+async fn assign(
+    env: &mut Env<'_>,
+    name: &str,
+    value: &Word,
+    location: &Location,
+) -> Result<Phrase, Error> {
+    let value_phrase = attribute(expand(env, value).await?);
+    let variable_value = value_phrase.clone().ifs_join(&env.inner.variables);
+    let variable = Variable::new(variable_value.into_iter().strip().collect::<String>())
+        .set_assigned_location(location.clone());
+    env.inner
+        .variables
+        .assign(Scope::Global, name.to_owned(), variable)
+        .map_err(|e| Error {
+            cause: ErrorCause::AssignReadOnly(e),
+            location: location.clone(),
+        })?;
+    Ok(value_phrase)
+}
+
 /// Expands a word to be used as an empty expansion error message.
 async fn empty_expansion_error_message(
     env: &mut Env<'_>,
@@ -197,6 +221,7 @@ async fn empty_expansion_error(
 pub async fn apply(
     env: &mut Env<'_>,
     switch: &Switch,
+    name: &str,
     value: &mut Option<Value>,
     location: &Location,
 ) -> Option<Result<Phrase, Error>> {
@@ -204,10 +229,9 @@ pub async fn apply(
     use ValueCondition::*;
     let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
     match (switch.r#type, cond) {
-        (Alter, Unset(_)) | (Default, Set) | (Error, Set) => None,
+        (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset(_)) => Some(expand(env, &switch.word).await.map(attribute)),
-        (Assign, Set) => todo!(),
-        (Assign, Unset(_)) => todo!(),
+        (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location).await),
         (Error, Unset(state)) => Some(Err(empty_expansion_error(
             env,
             state,
@@ -307,7 +331,7 @@ mod tests {
         };
         let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
@@ -325,7 +349,7 @@ mod tests {
         };
         let mut value = Some(Scalar("bar".to_string()));
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -342,7 +366,7 @@ mod tests {
         };
         let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
@@ -359,12 +383,90 @@ mod tests {
         };
         let mut value = Some(Scalar("bar".to_string()));
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
         assert_eq!(value, Some(Scalar("bar".to_string())));
     }
+
+    #[test]
+    fn assign_with_unset_value() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Assign,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = None;
+        let location = Location::dummy("somewhere");
+
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
+
+        let var = env.inner.variables.get("var").unwrap();
+        assert_eq!(var.value, Value::Scalar("foo".to_string()));
+        assert_eq!(var.last_assigned_location, Some(location));
+        assert!(!var.is_exported);
+        assert_eq!(var.read_only_location, None);
+    }
+
+    // TODO assign_with_array_index
+
+    #[test]
+    fn assign_with_non_empty_value() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Assign,
+            condition: Unset,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = Some(Scalar("bar".to_string()));
+        let location = Location::dummy("somewhere");
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, None);
+        assert_eq!(value, Some(Scalar("bar".to_string())));
+    }
+
+    #[test]
+    fn assign_with_read_only_variable() {
+        let mut env = yash_env::Env::new_virtual();
+        let variable = Variable::new("").make_read_only(Location::dummy("read-only"));
+        env.variables
+            .assign(Scope::Global, "var".to_string(), variable.clone())
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Assign,
+            condition: UnsetOrEmpty,
+            word: "foo".parse().unwrap(),
+        };
+        let mut value = None;
+        let location = Location::dummy("somewhere");
+
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
+            .now_or_never()
+            .unwrap();
+        assert_matches!(result, Some(Err(error)) => {
+            assert_matches!(error.cause, ErrorCause::AssignReadOnly(e) => {
+                assert_eq!(e.name, "var");
+                assert_eq!(e.read_only_location, Location::dummy("read-only"));
+                assert_eq!(e.new_value.value, Value::scalar("foo"));
+                assert_eq!(e.new_value.last_assigned_location, Some(location));
+                assert!(!e.new_value.is_exported);
+                assert_eq!(e.new_value.read_only_location, None);
+            });
+        });
+        assert_eq!(env.inner.variables.get("var"), Some(&variable));
+    }
+
+    // TODO assign_with_non_assignable_name
 
     #[test]
     fn error_with_unset_value_and_non_empty_word() {
@@ -377,7 +479,7 @@ mod tests {
         };
         let mut value = None;
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -398,7 +500,7 @@ mod tests {
         };
         let mut value = Some(Value::Scalar("".to_string()));
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -419,7 +521,7 @@ mod tests {
         };
         let mut value = Some(Value::Array(vec![]));
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         let error = result.unwrap().unwrap_err();
@@ -441,7 +543,7 @@ mod tests {
         };
         let mut value = Some(Value::Scalar("".to_string()));
         let location = Location::dummy("somewhere");
-        let result = apply(&mut env, &switch, &mut value, &location)
+        let result = apply(&mut env, &switch, "var", &mut value, &location)
             .now_or_never()
             .unwrap();
         assert_eq!(result, None);
