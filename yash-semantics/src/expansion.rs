@@ -78,7 +78,10 @@ use self::attr::AttrField;
 use self::attr::Origin;
 use self::attr_strip::Strip;
 use self::glob::glob;
+use self::initial::expand;
 use self::initial::ArithError;
+use self::initial::EmptyError;
+#[cfg(doc)]
 use self::initial::Expand;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
@@ -106,6 +109,8 @@ pub enum ErrorCause {
     ArithError(ArithError),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
+    /// Expansion of an empty value with an error switch
+    EmptyExpansion(EmptyError),
 }
 
 impl ErrorCause {
@@ -118,6 +123,7 @@ impl ErrorCause {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
+            EmptyExpansion(error) => error.message_or_default(),
         }
     }
 
@@ -130,6 +136,7 @@ impl ErrorCause {
             CommandSubstError(e) => e.desc().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
+            EmptyExpansion(e) => e.state.description().into(),
         }
     }
 
@@ -146,6 +153,7 @@ impl ErrorCause {
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
+            EmptyExpansion(_) => None,
         }
     }
 }
@@ -157,6 +165,7 @@ impl std::fmt::Display for ErrorCause {
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
             ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
+            EmptyExpansion(error) => error.fmt(f),
         }
     }
 }
@@ -214,13 +223,7 @@ pub async fn expand_text(
     // It would be technically correct to set `will_split` to false, but it does
     // not affect the final results because we will join the results anyway.
     // env.will_split = false;
-
-    use self::initial::QuickExpand::*;
-    let phrase = match text.quick_expand(&mut env) {
-        Ready(result) => result?,
-        Interim(interim) => text.async_expand(&mut env, interim).await?,
-    };
-
+    let phrase = expand(&mut env, text).await?;
     let chars = phrase.ifs_join(&env.inner.variables);
     let result = skip_quotes(chars).strip().collect();
     Ok((result, env.last_command_subst_exit_status))
@@ -242,13 +245,7 @@ pub async fn expand_word_attr(
     // It would be technically correct to set `will_split` to false, but it does
     // not affect the final results because we will join the results anyway.
     // env.will_split = false;
-
-    use self::initial::QuickExpand::*;
-    let phrase = match word.quick_expand(&mut env) {
-        Ready(result) => result?,
-        Interim(interim) => word.async_expand(&mut env, interim).await?,
-    };
-
+    let phrase = expand(&mut env, word).await?;
     let chars = phrase.ifs_join(&env.inner.variables);
     let origin = word.location.clone();
     let field = AttrField { chars, origin };
@@ -292,11 +289,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     let words = words.into_iter();
     let mut fields = Vec::with_capacity(words.size_hint().0);
     for word in words {
-        use self::initial::QuickExpand::*;
-        let phrase = match word.quick_expand(&mut env) {
-            Ready(result) => result?,
-            Interim(interim) => word.async_expand(&mut env, interim).await?,
-        };
+        let phrase = expand(&mut env, word).await?;
         fields.extend(phrase.into_iter().map(|chars| AttrField {
             chars,
             origin: word.location.clone(),

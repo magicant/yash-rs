@@ -111,6 +111,17 @@ pub trait Expand {
     ) -> Result<Phrase, Error>;
 }
 
+/// Performs initial expansion.
+///
+/// This is a convenience function that calls [`Expand`]'s methods to obtain an
+/// expansion result.
+pub async fn expand<E: Expand>(env: &mut Env<'_>, e: &E) -> Result<Phrase, Error> {
+    match e.quick_expand(env) {
+        QuickExpand::Ready(result) => result,
+        QuickExpand::Interim(interim) => e.async_expand(env, interim).await,
+    }
+}
+
 mod arith;
 mod command_subst;
 mod param;
@@ -120,3 +131,5 @@ mod tilde;
 mod word;
 
 pub use arith::ArithError;
+pub use param::EmptyError;
+pub use param::ValueState;

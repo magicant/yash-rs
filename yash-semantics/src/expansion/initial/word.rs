@@ -19,6 +19,7 @@
 use super::super::attr::AttrChar;
 use super::super::attr::Origin;
 use super::super::Error;
+use super::expand;
 use super::Env;
 use super::Expand;
 use super::Phrase;
@@ -119,10 +120,7 @@ impl Expand for WordUnit {
             SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
             DoubleQuote(text) => {
                 let would_split = std::mem::replace(&mut env.will_split, false);
-                let result = match text.quick_expand(env) {
-                    Ready(result) => result,
-                    Interim(interim) => text.async_expand(env, interim).await,
-                };
+                let result = expand(env, text).await;
                 env.will_split = would_split;
 
                 let mut phrase = result?;
