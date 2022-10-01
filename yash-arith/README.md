@@ -15,7 +15,14 @@ independently.
 
 Add `yash-arith` as a dependency in your `Cargo.toml`.
 
-<!-- TODO code example -->
+``` rust
+use std::collections::HashMap;
+use yash_arith::{eval, Value};
+let mut env = HashMap::new();
+env.insert("a".to_owned(), "2".to_owned());
+let result = eval("1 + a", &mut env);
+assert_eq!(result, Ok(Value::Integer(3)));
+```
 
 ## License
 

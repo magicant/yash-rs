@@ -23,6 +23,15 @@
 //!
 //! To evaluate an expression, you call the [`eval()`] function with a string
 //! and an environment.
+//!
+//! ```
+//! use std::collections::HashMap;
+//! use yash_arith::{eval, Value};
+//! let mut env = HashMap::new();
+//! env.insert("a".to_owned(), "2".to_owned());
+//! let result = eval("1 + a", &mut env);
+//! assert_eq!(result, Ok(Value::Integer(3)));
+//! ```
 
 use std::fmt::Debug;
 use std::fmt::Display;
