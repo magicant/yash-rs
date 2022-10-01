@@ -23,7 +23,7 @@ futures-util = "0.3.23"
 yash-arith = { path = "../yash-arith", version = "0.1.0" }
 yash-builtin = { path = "../yash-builtin", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
-yash-fnmatch = { path = "../yash-fnmatch", version = "1.0.0" }
+yash-fnmatch = { path = "../yash-fnmatch", version = "1.0.1" }
 yash-quote = { path = "../yash-quote", version = "1.0.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.1.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.5.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.6.0" }
