@@ -18,8 +18,8 @@
 
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
+use std::ffi::c_int;
 use std::ops::ControlFlow;
-use std::os::raw::c_int;
 use yash_syntax::source::Location;
 
 /// Resultant string of word expansion.

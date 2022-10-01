@@ -270,10 +270,7 @@ impl<'a> LexerCore<'a> {
             .count()
             .try_into()
             .unwrap_or(u64::MAX);
-        // TODO Use NonZeroU64::saturating_add
-        // let start_line_number = self.raw_code.start_line_number.saturating_add(lines);
-        let start_line_number = self.raw_code.start_line_number.get().saturating_add(lines);
-        let start_line_number = NonZeroU64::new(start_line_number).unwrap();
+        let start_line_number = self.raw_code.start_line_number.saturating_add(lines);
         self.raw_code = Rc::new(Code {
             value: RefCell::new(String::new()),
             start_line_number,
