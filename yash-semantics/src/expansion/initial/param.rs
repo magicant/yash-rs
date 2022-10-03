@@ -45,6 +45,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
 }
 
 mod lookup;
+mod name;
 mod switch;
 
 pub use switch::EmptyError;
