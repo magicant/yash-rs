@@ -21,7 +21,6 @@ use super::super::AttrChar;
 use super::super::Error;
 use super::super::Origin;
 use super::Env;
-use std::borrow::Cow;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Modifier;
@@ -46,6 +45,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
 
 mod lookup;
 mod name;
+mod resolve;
 mod switch;
 
 pub use switch::EmptyError;
