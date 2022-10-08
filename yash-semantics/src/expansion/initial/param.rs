@@ -43,11 +43,12 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
     }
 }
 
-mod lookup;
+// TODO Consider exporting these modules
 mod name;
 mod resolve;
 mod switch;
 
+use resolve::Resolve;
 pub use switch::EmptyError;
 pub use switch::ValueState;
 
@@ -57,14 +58,14 @@ impl ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let lookup = match lookup::look_up_special_parameter(env.inner, self.name) {
-            Some(lookup) => lookup,
-            None => lookup::look_up_ordinary_parameter(&env.inner.variables, self.name),
+        let resolve = match self.name.try_into() {
+            Ok(name) => resolve::resolve(env.inner, name),
+            Err(_) => Resolve::Unset,
         };
 
         // TODO Apply Index
 
-        let mut value = lookup.into_owned();
+        let mut value = resolve.into_owned();
 
         // Switch //
         if let Modifier::Switch(switch) = &self.modifier {
