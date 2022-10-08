@@ -83,6 +83,7 @@ use self::initial::ArithError;
 use self::initial::EmptyError;
 #[cfg(doc)]
 use self::initial::Expand;
+use self::initial::NonassignableError;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
 use std::borrow::Cow;
@@ -111,6 +112,8 @@ pub enum ErrorCause {
     AssignReadOnly(ReadOnlyError),
     /// Expansion of an empty value with an error switch
     EmptyExpansion(EmptyError),
+    /// Assignment to a nonassignable parameter
+    NonassignableParameter(NonassignableError),
 }
 
 impl ErrorCause {
@@ -124,6 +127,7 @@ impl ErrorCause {
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
             EmptyExpansion(error) => error.message_or_default(),
+            NonassignableParameter(_) => "cannot assign to parameter",
         }
     }
 
@@ -137,6 +141,7 @@ impl ErrorCause {
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
             EmptyExpansion(e) => e.state.description().into(),
+            NonassignableParameter(e) => e.to_string().into(),
         }
     }
 
@@ -154,6 +159,7 @@ impl ErrorCause {
                 "the variable was made read-only here",
             )),
             EmptyExpansion(_) => None,
+            NonassignableParameter(_) => None,
         }
     }
 }
@@ -166,6 +172,7 @@ impl std::fmt::Display for ErrorCause {
             ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
             EmptyExpansion(error) => error.fmt(f),
+            NonassignableParameter(error) => error.fmt(f),
         }
     }
 }

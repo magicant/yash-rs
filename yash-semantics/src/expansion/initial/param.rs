@@ -50,6 +50,7 @@ mod switch;
 
 use resolve::Resolve;
 pub use switch::EmptyError;
+pub use switch::NonassignableError;
 pub use switch::ValueState;
 
 impl ParamRef<'_> {
