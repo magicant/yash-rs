@@ -58,9 +58,10 @@ impl ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let resolve = match self.name.try_into() {
-            Ok(name) => resolve::resolve(env.inner, name),
-            Err(_) => Resolve::Unset,
+        let name = self.name.try_into().ok();
+        let resolve = match name {
+            Some(name) => resolve::resolve(env.inner, name),
+            None => Resolve::Unset,
         };
 
         // TODO Apply Index
@@ -69,8 +70,7 @@ impl ParamRef<'_> {
 
         // Switch //
         if let Modifier::Switch(switch) = &self.modifier {
-            if let Some(result) =
-                switch::apply(env, switch, self.name, &mut value, self.location).await
+            if let Some(result) = switch::apply(env, switch, name, &mut value, self.location).await
             {
                 return result;
             }

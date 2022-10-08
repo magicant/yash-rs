@@ -21,7 +21,7 @@ use yash_syntax::parser::lex::is_name_char;
 use yash_syntax::parser::lex::is_special_parameter_char;
 
 /// Parameter name
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Name<'a> {
     /// Variable
     ///
