@@ -24,6 +24,7 @@ use crate::expansion::attr::Origin;
 use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
 use crate::expansion::initial::expand;
+use crate::expansion::quote_removal::skip_quotes;
 use crate::expansion::ErrorCause;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
@@ -203,7 +204,7 @@ async fn assign(
     };
     let value_phrase = attribute(expand(env, value).await?);
     let variable_value = value_phrase.clone().ifs_join(&env.inner.variables);
-    let variable = Variable::new(variable_value.into_iter().strip().collect::<String>())
+    let variable = Variable::new(skip_quotes(variable_value).strip().collect::<String>())
         .set_assigned_location(location.clone());
     env.inner
         .variables
@@ -447,6 +448,66 @@ mod tests {
 
         let var = env.inner.variables.get("var").unwrap();
         assert_eq!(var.value, Value::Scalar("foo".to_string()));
+        assert_eq!(var.last_assigned_location, Some(location));
+        assert!(!var.is_exported);
+        assert_eq!(var.read_only_location, None);
+    }
+
+    #[test]
+    fn assign_array_word() {
+        let mut env = yash_env::Env::new_virtual();
+        env.variables.positional_params_mut().value = Value::array(["1", "2  2", "3"]);
+        env.variables
+            .assign(Scope::Global, "IFS".to_string(), Variable::new("~"))
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let switch = Switch {
+            r#type: Assign,
+            condition: Unset,
+            word: "\"$@\"".parse().unwrap(),
+        };
+        let name = Some(Name::Variable("var"));
+        let mut value = None;
+        let location = Location::dummy("somewhere");
+
+        let result = apply(&mut env, &switch, name, &mut value, &location)
+            .now_or_never()
+            .unwrap();
+
+        fn quoting(value: char) -> AttrChar {
+            AttrChar {
+                value,
+                origin: Origin::SoftExpansion,
+                is_quoted: false,
+                is_quoting: true,
+            }
+        }
+        fn quoted(value: char) -> AttrChar {
+            AttrChar {
+                value,
+                origin: Origin::SoftExpansion,
+                is_quoted: true,
+                is_quoting: false,
+            }
+        }
+        assert_eq!(
+            result,
+            Some(Ok(Phrase::Full(vec![
+                vec![quoting('"'), quoted('1'), quoting('"')],
+                vec![
+                    quoting('"'),
+                    quoted('2'),
+                    quoted(' '),
+                    quoted(' '),
+                    quoted('2'),
+                    quoting('"'),
+                ],
+                vec![quoting('"'), quoted('3'), quoting('"')],
+            ])))
+        );
+
+        let var = env.inner.variables.get("var").unwrap();
+        assert_eq!(var.value, Value::scalar("1~2  2~3"));
         assert_eq!(var.last_assigned_location, Some(location));
         assert!(!var.is_exported);
         assert_eq!(var.read_only_location, None);
