@@ -21,7 +21,6 @@ use super::super::AttrChar;
 use super::super::Error;
 use super::super::Origin;
 use super::Env;
-use std::borrow::Cow;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Modifier;
@@ -44,10 +43,14 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
     }
 }
 
-mod lookup;
+// TODO Consider exporting these modules
+mod name;
+mod resolve;
 mod switch;
 
+use resolve::Resolve;
 pub use switch::EmptyError;
+pub use switch::NonassignableError;
 pub use switch::ValueState;
 
 impl ParamRef<'_> {
@@ -56,19 +59,19 @@ impl ParamRef<'_> {
         // TODO Expand and parse Index
 
         // Lookup //
-        let lookup = match lookup::look_up_special_parameter(env.inner, self.name) {
-            Some(lookup) => lookup,
-            None => lookup::look_up_ordinary_parameter(&env.inner.variables, self.name),
+        let name = self.name.try_into().ok();
+        let resolve = match name {
+            Some(name) => resolve::resolve(env.inner, name),
+            None => Resolve::Unset,
         };
 
         // TODO Apply Index
 
-        let mut value = lookup.into_owned();
+        let mut value = resolve.into_owned();
 
         // Switch //
         if let Modifier::Switch(switch) = &self.modifier {
-            if let Some(result) =
-                switch::apply(env, switch, self.name, &mut value, self.location).await
+            if let Some(result) = switch::apply(env, switch, name, &mut value, self.location).await
             {
                 return result;
             }
