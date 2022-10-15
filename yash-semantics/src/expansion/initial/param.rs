@@ -47,6 +47,7 @@ impl<'a> From<&'a Param> for ParamRef<'a> {
 mod name;
 mod resolve;
 mod switch;
+mod trim;
 
 use resolve::Resolve;
 pub use switch::EmptyError;
@@ -70,7 +71,7 @@ impl ParamRef<'_> {
         let mut value = resolve.into_owned();
 
         // Switch //
-        if let Modifier::Switch(switch) = &self.modifier {
+        if let Modifier::Switch(switch) = self.modifier {
             if let Some(result) = switch::apply(env, switch, name, &mut value, self.location).await
             {
                 return result;
@@ -78,15 +79,25 @@ impl ParamRef<'_> {
         }
 
         // TODO Check for nounset error
-        // TODO Trim & Subst
+        // TODO Reject POSIXly unspecified combinations of name and modifier
 
-        // Length modifier //
-        if *self.modifier == Modifier::Length {
-            // TODO Reject ${#*} and ${#@} in POSIX mode
-            match &mut value {
-                None => (),
-                Some(Value::Scalar(v)) => to_length(v),
-                Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
+        // Other modifiers //
+        match self.modifier {
+            Modifier::None | Modifier::Switch(_) => (),
+
+            Modifier::Length => {
+                // TODO Reject ${#*} and ${#@} in POSIX mode
+                match &mut value {
+                    None => (),
+                    Some(Value::Scalar(v)) => to_length(v),
+                    Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
+                }
+            }
+
+            Modifier::Trim(trim) => {
+                if let Some(value) = &mut value {
+                    trim::apply(env, trim, value).await?
+                }
             }
         }
 
@@ -235,6 +246,45 @@ pub mod tests {
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
         assert_eq!(phrase, Phrase::Field(to_field("bar")));
+    }
+
+    #[test]
+    fn trim_some_value() {
+        use yash_syntax::syntax::{Trim, TrimLength, TrimSide};
+
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("abc"))
+            .unwrap();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Trim(Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Shortest,
+            pattern: "?b".parse().unwrap(),
+        });
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::Field(to_field("c")));
+    }
+
+    #[test]
+    fn trim_unset_value() {
+        use yash_syntax::syntax::{Trim, TrimLength, TrimSide};
+
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Trim(Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Shortest,
+            pattern: "?b".parse().unwrap(),
+        });
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::one_empty_field());
     }
 
     #[test]

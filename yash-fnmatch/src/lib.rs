@@ -265,6 +265,38 @@ impl Pattern {
             }
         }
     }
+
+    /// Returns the index range where this pattern matches in the given text.
+    ///
+    /// If `self` matches (part of) `text`, this function returns the index
+    /// range of the last match. Otherwise, the result is `None`.
+    #[must_use]
+    pub fn rfind(&self, text: &str) -> Option<Range<usize>> {
+        match &self.body {
+            Body::Literal(s) => match (self.config.anchor_begin, self.config.anchor_end) {
+                (false, false) => text.rfind(s).map(|pos| pos..pos + s.len()),
+                (true, false) => text.starts_with(s).then(|| 0..s.len()),
+                (false, true) => text.ends_with(s).then(|| text.len() - s.len()..text.len()),
+                (true, true) => (text == s).then(|| 0..s.len()),
+            },
+
+            Body::Regex {
+                regex,
+                starts_with_literal_dot: _,
+            } => {
+                let mut range = self.find(text)?;
+
+                while let Some(next_range) = (range.start + 1..=text.len())
+                    .find(|&index| text.is_char_boundary(index))
+                    .and_then(|index| regex.find_at(text, index).map(|m| m.range()))
+                {
+                    range = next_range;
+                }
+
+                Some(range)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -286,6 +318,11 @@ mod tests {
         assert_eq!(p.find("a"), Some(0..0));
         assert_eq!(p.find("."), Some(0..0));
         assert_eq!(p.find("*"), Some(0..0));
+
+        assert_eq!(p.rfind(""), Some(0..0));
+        assert_eq!(p.rfind("a"), Some(1..1));
+        assert_eq!(p.rfind("."), Some(1..1));
+        assert_eq!(p.rfind("*"), Some(1..1));
     }
 
     #[test]
@@ -306,6 +343,13 @@ mod tests {
         assert_eq!(p.find("b"), None);
         assert_eq!(p.find("ab"), Some(0..1));
         assert_eq!(p.find("ba"), Some(1..2));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), Some(0..1));
+        assert_eq!(p.rfind("aa"), Some(1..2));
+        assert_eq!(p.rfind("b"), None);
+        assert_eq!(p.rfind("ab"), Some(0..1));
+        assert_eq!(p.rfind("ba"), Some(1..2));
     }
 
     #[test]
@@ -326,6 +370,13 @@ mod tests {
         assert_eq!(p.find("bin"), Some(1..3));
         assert_eq!(p.find("inn"), Some(0..2));
         assert_eq!(p.find("nit"), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("i"), None);
+        assert_eq!(p.rfind("n"), None);
+        assert_eq!(p.rfind("bin"), Some(1..3));
+        assert_eq!(p.rfind("inn"), Some(0..2));
+        assert_eq!(p.rfind("nit"), None);
     }
 
     #[test]
@@ -336,6 +387,10 @@ mod tests {
         assert_eq!(p.find(r".\+()][{}^$-X"), Some(0..13));
         assert_eq!(p.find(r".\+()][{}^$-Y"), Some(0..13));
         assert_eq!(p.find(r".\+()][{}^$-"), None);
+
+        assert_eq!(p.rfind(r".\+()][{}^$-X"), Some(0..13));
+        assert_eq!(p.rfind(r".\+()][{}^$-Y"), Some(0..13));
+        assert_eq!(p.rfind(r".\+()][{}^$-"), None);
     }
 
     #[test]
@@ -343,10 +398,12 @@ mod tests {
         let p = Pattern::parse(without_escape("a\nb")).unwrap();
         assert_eq!(p.as_literal(), Some("a\nb"));
         assert_eq!(p.find("a\nb"), Some(0..3));
+        assert_eq!(p.rfind("a\nb"), Some(0..3));
 
         let p = Pattern::parse(without_escape("a?b")).unwrap();
         assert_eq!(p.as_literal(), None);
         assert_eq!(p.find("a\nb"), Some(0..3));
+        assert_eq!(p.rfind("a\nb"), Some(0..3));
     }
 
     #[test]
@@ -357,6 +414,10 @@ mod tests {
         assert_eq!(p.find(""), None);
         assert_eq!(p.find("i"), Some(0..1));
         assert_eq!(p.find("yes"), Some(0..1));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("i"), Some(0..1));
+        assert_eq!(p.rfind("yes"), Some(2..3));
     }
 
     #[test]
@@ -369,6 +430,12 @@ mod tests {
         assert_eq!(p.find("ac"), None);
         assert_eq!(p.find("bc"), None);
         assert_eq!(p.find("abc"), Some(0..3));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("ab"), None);
+        assert_eq!(p.rfind("ac"), None);
+        assert_eq!(p.rfind("bc"), None);
+        assert_eq!(p.rfind("abc"), Some(0..3));
     }
 
     #[test]
@@ -379,6 +446,10 @@ mod tests {
         assert_eq!(p.find(""), Some(0..0));
         assert_eq!(p.find("i"), Some(0..1));
         assert_eq!(p.find("yes"), Some(0..3));
+
+        assert_eq!(p.rfind(""), Some(0..0));
+        assert_eq!(p.rfind("i"), Some(1..1));
+        assert_eq!(p.rfind("yes"), Some(3..3));
     }
 
     #[test]
@@ -391,6 +462,12 @@ mod tests {
         assert_eq!(p.find("ab"), Some(0..2));
         assert_eq!(p.find("aabb"), Some(0..4));
         assert_eq!(p.find("lambda"), Some(1..4));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), None);
+        assert_eq!(p.rfind("ab"), Some(0..2));
+        assert_eq!(p.rfind("aabb"), Some(1..4));
+        assert_eq!(p.rfind("lambda"), Some(1..4));
     }
 
     #[test]
@@ -620,7 +697,14 @@ mod tests {
         assert_eq!(p.find("b"), None);
         assert_eq!(p.find("c"), Some(0..1));
         assert_eq!(p.find("!"), Some(0..1));
-        assert_eq!(p.find("abc"), Some(2..3));
+        assert_eq!(p.find("abcd"), Some(2..3));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), None);
+        assert_eq!(p.rfind("b"), None);
+        assert_eq!(p.rfind("c"), Some(0..1));
+        assert_eq!(p.rfind("!"), Some(0..1));
+        assert_eq!(p.rfind("abcd"), Some(3..4));
     }
 
     #[test]
@@ -954,6 +1038,11 @@ mod tests {
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find(".a"), None);
         assert_eq!(p.find("a."), Some(0..1));
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), Some(0..1));
+        assert_eq!(p.rfind(".a"), None);
+        assert_eq!(p.rfind("a."), Some(0..1));
     }
 
     #[test]
@@ -976,6 +1065,12 @@ mod tests {
         assert_eq!(p.find("as"), Some(0..2));
         assert_eq!(p.find("apple"), Some(0..2));
         assert_eq!(p.find("bass"), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), None);
+        assert_eq!(p.rfind("as"), Some(0..2));
+        assert_eq!(p.rfind("apple"), Some(0..2));
+        assert_eq!(p.rfind("bass"), None);
     }
 
     #[test]
@@ -996,6 +1091,11 @@ mod tests {
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("..a"), Some(2..3));
         assert_eq!(p.find("a.."), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), Some(0..1));
+        assert_eq!(p.rfind("..a"), Some(2..3));
+        assert_eq!(p.rfind("a.."), None);
     }
 
     #[test]
@@ -1018,6 +1118,12 @@ mod tests {
         assert_eq!(p.find("in"), Some(0..2));
         assert_eq!(p.find("begin"), Some(3..5));
         assert_eq!(p.find("beginning"), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("n"), None);
+        assert_eq!(p.rfind("in"), Some(0..2));
+        assert_eq!(p.rfind("begin"), Some(3..5));
+        assert_eq!(p.rfind("beginning"), None);
     }
 
     #[test]
@@ -1039,6 +1145,11 @@ mod tests {
         assert_eq!(p.find("a"), Some(0..1));
         assert_eq!(p.find("..a"), None);
         assert_eq!(p.find("a.."), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a"), Some(0..1));
+        assert_eq!(p.rfind("..a"), None);
+        assert_eq!(p.rfind("a.."), None);
     }
 
     #[test]
@@ -1058,6 +1169,10 @@ mod tests {
         assert_eq!(p.find("in"), None);
         assert_eq!(p.find("out"), Some(0..3));
         assert_eq!(p.find("from"), None);
+
+        assert_eq!(p.rfind("in"), None);
+        assert_eq!(p.rfind("out"), Some(0..3));
+        assert_eq!(p.rfind("from"), None);
     }
 
     #[test]
@@ -1074,6 +1189,9 @@ mod tests {
         assert_eq!(p.find("."), None);
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), None);
+        assert_eq!(p.rfind(".."), Some(1..2));
+        assert_eq!(p.rfind("a"), Some(0..1));
 
         let p = Pattern::parse_with_config(without_escape("*"), config).unwrap();
         assert!(p.is_match("."));
@@ -1082,6 +1200,9 @@ mod tests {
         assert_eq!(p.find("."), Some(1..1));
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), Some(1..1));
+        assert_eq!(p.rfind(".."), Some(2..2));
+        assert_eq!(p.rfind("a"), Some(1..1));
 
         let p = Pattern::parse_with_config(without_escape("[.a]"), config).unwrap();
         assert!(!p.is_match("."));
@@ -1090,12 +1211,17 @@ mod tests {
         assert_eq!(p.find("."), None);
         assert_eq!(p.find(".."), Some(1..2));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), None);
+        assert_eq!(p.rfind(".."), Some(1..2));
+        assert_eq!(p.rfind("a"), Some(0..1));
 
         let p = Pattern::parse_with_config(without_escape(".*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..2));
+        assert_eq!(p.rfind("."), Some(0..1));
+        assert_eq!(p.rfind(".."), Some(1..2));
     }
 
     #[test]
@@ -1109,6 +1235,9 @@ mod tests {
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..1));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), Some(0..1));
+        assert_eq!(p.rfind(".."), Some(1..2));
+        assert_eq!(p.rfind("a"), Some(0..1));
 
         let p = Pattern::parse_with_config(without_escape("*"), config).unwrap();
         assert!(p.is_match("."));
@@ -1117,6 +1246,9 @@ mod tests {
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..2));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), Some(1..1));
+        assert_eq!(p.rfind(".."), Some(2..2));
+        assert_eq!(p.rfind("a"), Some(1..1));
 
         let p = Pattern::parse_with_config(without_escape("[.a]"), config).unwrap();
         assert!(p.is_match("."));
@@ -1125,31 +1257,40 @@ mod tests {
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..1));
         assert_eq!(p.find("a"), Some(0..1));
+        assert_eq!(p.rfind("."), Some(0..1));
+        assert_eq!(p.rfind(".."), Some(1..2));
+        assert_eq!(p.rfind("a"), Some(0..1));
 
         let p = Pattern::parse_with_config(without_escape(".*"), config).unwrap();
         assert!(p.is_match("."));
         assert!(p.is_match(".."));
         assert_eq!(p.find("."), Some(0..1));
         assert_eq!(p.find(".."), Some(0..2));
+        assert_eq!(p.rfind("."), Some(0..1));
+        assert_eq!(p.rfind(".."), Some(1..2));
     }
 
     #[test]
     fn non_literal_with_shortest_match() {
         let p = Pattern::parse_with_config(without_escape("1*9"), Config::default()).unwrap();
-        assert!(p.is_match("19"));
-        assert!(p.is_match("1999"));
-        assert_eq!(p.find("19"), Some(0..2));
-        assert_eq!(p.find("1999"), Some(0..4));
+        assert!(p.is_match("119"));
+        assert!(p.is_match("11999"));
+        assert_eq!(p.find("119"), Some(0..3));
+        assert_eq!(p.find("11999"), Some(0..5));
+        assert_eq!(p.rfind("119"), Some(1..3));
+        assert_eq!(p.rfind("11999"), Some(1..5));
 
         let config = Config {
             shortest_match: true,
             ..Config::default()
         };
         let p = Pattern::parse_with_config(without_escape("1*9"), config).unwrap();
-        assert!(p.is_match("19"));
-        assert!(p.is_match("1999"));
-        assert_eq!(p.find("19"), Some(0..2));
-        assert_eq!(p.find("1999"), Some(0..2));
+        assert!(p.is_match("119"));
+        assert!(p.is_match("11999"));
+        assert_eq!(p.find("119"), Some(0..3));
+        assert_eq!(p.find("11999"), Some(0..3));
+        assert_eq!(p.rfind("119"), Some(1..3));
+        assert_eq!(p.rfind("11999"), Some(1..3));
     }
 
     #[test]
@@ -1170,5 +1311,10 @@ mod tests {
         assert_eq!(p.find("a-z"), Some(0..3));
         assert_eq!(p.find("A-Z"), Some(0..3));
         assert_eq!(p.find("b&b"), None);
+
+        assert_eq!(p.rfind(""), None);
+        assert_eq!(p.rfind("a-z"), Some(0..3));
+        assert_eq!(p.rfind("A-Z"), Some(0..3));
+        assert_eq!(p.rfind("b&b"), None);
     }
 }
