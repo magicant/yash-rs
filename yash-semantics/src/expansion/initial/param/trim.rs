@@ -56,6 +56,18 @@ fn to_pattern_chars(chars: &[AttrChar]) -> impl Iterator<Item = PatternChar> + C
     })
 }
 
+fn trim_value(pattern: &Pattern, value: &mut String) {
+    let config = pattern.config();
+    let find = if config.anchor_end && config.shortest_match {
+        Pattern::rfind
+    } else {
+        Pattern::find
+    };
+    if let Some(range) = find(pattern, value) {
+        value.drain(range);
+    }
+}
+
 /// Applies the trim modifier to the value.
 pub async fn apply(env: &mut Env<'_>, trim: &Trim, value: &mut Value) -> Result<(), Error> {
     let expansion = expand(env, &trim.pattern).await?;
@@ -64,8 +76,7 @@ pub async fn apply(env: &mut Env<'_>, trim: &Trim, value: &mut Value) -> Result<
 
     let mut config = Config::default();
     match trim.side {
-        Prefix => {}
-        /*TODO anchor_begin */
+        Prefix => config.anchor_begin = true,
         Suffix => config.anchor_end = true,
     }
     match trim.length {
@@ -81,16 +92,10 @@ pub async fn apply(env: &mut Env<'_>, trim: &Trim, value: &mut Value) -> Result<
     };
 
     match value {
-        Scalar(value) => {
-            if let Some(range) = pattern.find(value) {
-                value.drain(range);
-            }
-        }
+        Scalar(value) => trim_value(&pattern, value),
         Array(array) => {
             for value in array {
-                if let Some(range) = pattern.find(value) {
-                    value.drain(range);
-                }
+                trim_value(&pattern, value);
             }
         }
     }
@@ -134,6 +139,21 @@ mod tests {
     }
 
     #[test]
+    fn shortest_prefix_unmatched() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let trim = Trim {
+            side: Prefix,
+            length: Shortest,
+            pattern: "2*".parse().unwrap(),
+        };
+        let mut value = Value::scalar("123123123");
+        let result = apply(&mut env, &trim, &mut value).now_or_never().unwrap();
+        assert_eq!(result, Ok(()));
+        assert_eq!(value, Value::scalar("123123123"));
+    }
+
+    #[test]
     fn longest_prefix() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
@@ -149,7 +169,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
     fn shortest_suffix() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
@@ -177,5 +196,20 @@ mod tests {
         let result = apply(&mut env, &trim, &mut value).now_or_never().unwrap();
         assert_eq!(result, Ok(()));
         assert_eq!(value, Value::scalar("1"));
+    }
+
+    #[test]
+    fn longest_suffix_unmatched() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let trim = Trim {
+            side: Suffix,
+            length: Longest,
+            pattern: "*2".parse().unwrap(),
+        };
+        let mut value = Value::scalar("123123123");
+        let result = apply(&mut env, &trim, &mut value).now_or_never().unwrap();
+        assert_eq!(result, Ok(()));
+        assert_eq!(value, Value::scalar("123123123"));
     }
 }
