@@ -16,7 +16,8 @@
 
 //! Execution of the case command
 
-use crate::expansion::attr::AttrChar;
+use crate::expansion::attr::fnmatch::apply_escapes;
+use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
 use crate::Command;
@@ -27,35 +28,8 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
-use yash_fnmatch::PatternChar;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
-
-/// Converts unquoted backslashes to quoting characters.
-///
-/// Sets the `is_quoting` flag of unquoted backslashes and the `is_quoted` flag
-/// of their following characters.
-fn apply_escapes(chars: &mut [AttrChar]) {
-    for j in 1..chars.len() {
-        let i = j - 1;
-        if chars[i].value == '\\' && !chars[i].is_quoting && !chars[i].is_quoted {
-            chars[i].is_quoting = true;
-            chars[j].is_quoted = true;
-        }
-    }
-}
-
-fn to_pattern_chars(chars: &[AttrChar]) -> impl Iterator<Item = PatternChar> + Clone + '_ {
-    chars.iter().filter_map(|c| {
-        if c.is_quoting {
-            None
-        } else if c.is_quoted {
-            Some(PatternChar::Literal(c.value))
-        } else {
-            Some(PatternChar::Normal(c.value))
-        }
-    })
-}
 
 fn config() -> Config {
     let mut config = Config::default();

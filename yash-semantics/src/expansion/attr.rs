@@ -24,6 +24,8 @@
 //! later steps of the expansion. An [`AttrField`] is a string of `AttrChar`s
 //! associated with the location of the originating word.
 
+pub(crate) mod fnmatch;
+
 use yash_env::semantics::Field;
 use yash_syntax::source::Location;
 

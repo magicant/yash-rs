@@ -18,43 +18,15 @@
 
 use super::Env;
 use super::Error;
-use crate::expansion::attr::AttrChar;
+use crate::expansion::attr::fnmatch::apply_escapes;
+use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::initial::expand;
 use yash_env::variable::Value::{self, Array, Scalar};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
-use yash_fnmatch::PatternChar;
 use yash_syntax::syntax::Trim;
 use yash_syntax::syntax::TrimLength::{Longest, Shortest};
 use yash_syntax::syntax::TrimSide::{Prefix, Suffix};
-
-// TODO Merge implementation with command_impl/compound_command/case.rs
-/// Converts unquoted backslashes to quoting characters.
-///
-/// Sets the `is_quoting` flag of unquoted backslashes and the `is_quoted` flag
-/// of their following characters.
-fn apply_escapes(chars: &mut [AttrChar]) {
-    for j in 1..chars.len() {
-        let i = j - 1;
-        if chars[i].value == '\\' && !chars[i].is_quoting && !chars[i].is_quoted {
-            chars[i].is_quoting = true;
-            chars[j].is_quoted = true;
-        }
-    }
-}
-
-// TODO Merge implementation with command_impl/compound_command/case.rs
-fn to_pattern_chars(chars: &[AttrChar]) -> impl Iterator<Item = PatternChar> + Clone + '_ {
-    chars.iter().filter_map(|c| {
-        if c.is_quoting {
-            None
-        } else if c.is_quoted {
-            Some(PatternChar::Literal(c.value))
-        } else {
-            Some(PatternChar::Normal(c.value))
-        }
-    })
-}
 
 fn trim_value(pattern: &Pattern, value: &mut String) {
     let config = pattern.config();
