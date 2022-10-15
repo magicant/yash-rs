@@ -270,6 +270,24 @@ pub mod tests {
     }
 
     #[test]
+    fn trim_unset_value() {
+        use yash_syntax::syntax::{Trim, TrimLength, TrimSide};
+
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let mut param = param("foo");
+        param.modifier = Modifier::Trim(Trim {
+            side: TrimSide::Prefix,
+            length: TrimLength::Shortest,
+            pattern: "?b".parse().unwrap(),
+        });
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::one_empty_field());
+    }
+
+    #[test]
     fn expand_at_no_join_in_non_splitting_context() {
         let mut env = env_with_positional_params_and_ifs();
         let param = param("@");
