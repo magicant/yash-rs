@@ -22,9 +22,9 @@ mod r#if;
 mod subshell;
 mod while_loop;
 
-use super::perform_redirs;
 use super::Command;
 use crate::redir::RedirGuard;
+use crate::Handle;
 use async_trait::async_trait;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -35,8 +35,10 @@ use yash_syntax::syntax;
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
-        perform_redirs(&mut env, &self.redirs).await?;
-        self.command.execute(&mut env).await
+        match env.perform_redirs(&self.redirs).await {
+            Ok(_) => self.command.execute(&mut env).await,
+            Err(error) => error.handle(&mut env).await,
+        }
     }
 }
 
@@ -112,6 +114,7 @@ impl Command for syntax::CompoundCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
@@ -139,6 +142,20 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content).unwrap(), "1\n2\n");
         });
+    }
+
+    #[test]
+    fn redirection_error_prevents_command_execution() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: syntax::FullCompoundCommand =
+            "{ echo not reached; } < /no/such/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
