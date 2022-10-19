@@ -262,7 +262,9 @@ async fn execute_builtin(
     let name = fields.remove(0);
     let env = &mut env.push_frame(Frame::Builtin { name });
     let env = &mut RedirGuard::new(env);
-    perform_redirs(env, redirs).await?;
+    if let Err(e) = env.perform_redirs(redirs).await {
+        return e.handle(env).await;
+    };
 
     use yash_env::builtin::Type::*;
     let (exit_status, abort) = match builtin.r#type {
@@ -407,6 +409,7 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::future::Future;
     use std::pin::Pin;
@@ -541,6 +544,24 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("hello\n"));
         });
+    }
+
+    #[test]
+    fn simple_command_skips_running_builtin_on_redirection_error() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: syntax::SimpleCommand = "echo X </no/such/file >/tmp/file".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_eq!(
+            state.borrow().file_system.get("/tmp/file"),
+            Err(Errno::ENOENT)
+        );
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
