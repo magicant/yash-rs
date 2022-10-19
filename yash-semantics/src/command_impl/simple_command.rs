@@ -262,7 +262,11 @@ async fn execute_builtin(
     let env = &mut env.push_frame(Frame::Builtin { name });
     let env = &mut RedirGuard::new(env);
     if let Err(e) = env.perform_redirs(redirs).await {
-        return e.handle(env).await;
+        e.handle(env).await?;
+        return match builtin.r#type {
+            Special => Break(Divert::Interrupt(None)),
+            Intrinsic | NonIntrinsic => Continue(()),
+        };
     };
 
     use yash_env::builtin::Type::*;
@@ -564,6 +568,18 @@ mod tests {
             Err(Errno::ENOENT)
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn special_builtin_interrupts_on_redirection_error() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("return", return_builtin());
+        let command: syntax::SimpleCommand = "return </no/such/file".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Interrupt(None)));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
 
     #[test]
