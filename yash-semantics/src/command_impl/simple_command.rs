@@ -16,7 +16,6 @@
 
 //! Implementation of simple command semantics.
 
-use super::perform_redirs;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
@@ -328,7 +327,9 @@ async fn execute_external_utility(
     let args = to_c_strings(fields);
 
     let env = &mut RedirGuard::new(env);
-    perform_redirs(env, redirs).await?;
+    if let Err(e) = env.perform_redirs(redirs).await {
+        return e.handle(env).await;
+    };
 
     let mut env = env.push_context(ContextType::Volatile);
     perform_assignments(&mut *env, assigns, true).await?;
@@ -853,6 +854,29 @@ mod tests {
             assert_eq!(result, Continue(()));
             // In VirtualSystem, execve fails with ENOSYS.
             assert_eq!(env.exit_status, ExitStatus::NOEXEC);
+        });
+    }
+
+    #[test]
+    fn simple_command_skips_running_external_utility_on_redirection_error() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
+            content.permissions.0 |= 0o100;
+            let content = Rc::new(RefCell::new(content));
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
+
+            let command: syntax::SimpleCommand = "/some/file </no/such/file".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::ERROR);
         });
     }
 
