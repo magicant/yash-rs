@@ -219,7 +219,13 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
-                let redir_exit_status = perform_redirs(env, &*redirs).await?;
+                let redir_exit_status = match env.perform_redirs(&*redirs).await {
+                    Ok(exit_status) => exit_status,
+                    Err(e) => {
+                        e.handle(env).await?;
+                        return Break(Divert::Exit(None));
+                    }
+                };
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
@@ -435,6 +441,17 @@ mod tests {
             let command: syntax::SimpleCommand = ">/tmp/foo$(return -n 42)".parse().unwrap();
             command.execute(&mut env).await;
             assert_eq!(env.exit_status, ExitStatus(42));
+        });
+    }
+
+    #[test]
+    fn simple_command_handles_redirection_error_with_absent_target() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            let command = &"$(return -n 11) < /no/such/file$(return -n 22)";
+            let command: syntax::SimpleCommand = command.parse().unwrap();
+            command.execute(&mut env).await;
+            assert_eq!(env.exit_status, ExitStatus::ERROR);
         });
     }
 
