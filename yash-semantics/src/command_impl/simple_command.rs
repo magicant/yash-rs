@@ -408,7 +408,6 @@ mod tests {
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::future::Future;
@@ -464,7 +463,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -473,7 +472,7 @@ mod tests {
     fn simple_command_performs_assignment_with_absent_target() {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(
@@ -505,7 +504,7 @@ mod tests {
             )
             .unwrap();
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -515,7 +514,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "return -n 93".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(93));
     }
@@ -525,7 +524,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "return 37".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
@@ -537,7 +536,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
 
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
@@ -569,7 +568,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::SimpleCommand = "v=42 return -n 0".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
         let v = env.variables.get("v").unwrap();
         assert_eq!(v.value, Value::Scalar("42".to_string()));
         assert!(!v.is_exported);
@@ -582,7 +581,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("local", local_builtin());
         let command: syntax::SimpleCommand = "v=42 local v".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("v"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "v=42\n"));
     }
@@ -610,7 +609,7 @@ mod tests {
             },
         );
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.stack[..], []);
     }
 
@@ -626,7 +625,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(13));
     }
@@ -645,7 +644,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "foo >/tmp/file".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
 
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
@@ -666,7 +665,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(26));
     }
@@ -685,7 +684,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "foo bar baz".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "bar-baz-\n"));
     }
@@ -705,7 +704,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "foo".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
     }
@@ -724,7 +723,7 @@ mod tests {
             is_read_only: false,
         })));
         let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
-        block_on(command.execute(&mut env));
+        command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "hello\n"));
     }
@@ -748,7 +747,7 @@ mod tests {
             )
             .unwrap();
         let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_matches!(result, Break(Divert::Interrupt(Some(exit_status))) => {
             assert_ne!(exit_status, ExitStatus::SUCCESS);
         });
@@ -866,7 +865,7 @@ mod tests {
     fn simple_command_returns_126_on_fork_failure() {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOEXEC);
     }
@@ -875,7 +874,7 @@ mod tests {
     fn exit_status_is_127_on_command_not_found() {
         let mut env = Env::new_virtual();
         let command: syntax::SimpleCommand = "no_such_command".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::NOT_FOUND);
     }
