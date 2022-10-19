@@ -939,11 +939,13 @@ mod tests {
     #[test]
     fn simple_command_performs_redirections_and_assignments_for_target_not_found() {
         in_virtual_system(|mut env, _pid, state| async move {
-            // TODO Test with assignment with side-effect: foo=${bar=baz}
             let command: syntax::SimpleCommand =
-                "foo=bar no_such_utility >/tmp/file".parse().unwrap();
+                "foo=${bar=baz} no_such_utility >/tmp/file".parse().unwrap();
             command.execute(&mut env).await;
             assert_eq!(env.variables.get("foo"), None);
+            assert_matches!(env.variables.get("bar"), Some(var) => {
+                assert_eq!(var.value, Value::scalar("baz"));
+            });
 
             let stdout = state.borrow().file_system.get("/tmp/file").unwrap();
             let stdout = stdout.borrow();
