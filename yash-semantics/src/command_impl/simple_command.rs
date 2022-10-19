@@ -291,7 +291,9 @@ async fn execute_function(
     redirs: &[Redir],
 ) -> Result {
     let env = &mut RedirGuard::new(env);
-    perform_redirs(env, redirs).await?;
+    if let Err(e) = env.perform_redirs(redirs).await {
+        return e.handle(env).await;
+    };
 
     let mut outer = env.push_context(ContextType::Volatile);
     perform_assignments(&mut outer, assigns, true).await?;
@@ -651,6 +653,28 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content), Ok("ok\n"));
         });
+    }
+
+    #[test]
+    fn simple_command_skips_running_function_on_redirection_error() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ echo ok; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        let command: syntax::SimpleCommand = "a=v foo </no/such/file".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
+        assert_eq!(env.variables.get("a"), None);
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
     #[test]
