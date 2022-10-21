@@ -291,17 +291,17 @@ mod tests {
     fn value_state_from_value() {
         let state = ValueState::of(&None);
         assert_eq!(state, Some(ValueState::Unset));
-        let state = ValueState::of(&Some(Value::Scalar("".to_string())));
+        let state = ValueState::of(&Some(Value::scalar("")));
         assert_eq!(state, Some(ValueState::EmptyScalar));
-        let state = ValueState::of(&Some(Value::Scalar(".".to_string())));
+        let state = ValueState::of(&Some(Value::scalar(".")));
         assert_eq!(state, None);
         let state = ValueState::of(&Some(Value::Array(vec![])));
         assert_eq!(state, Some(ValueState::ValuelessArray));
-        let state = ValueState::of(&Some(Value::Array(vec!["".to_string()])));
+        let state = ValueState::of(&Some(Value::array([""])));
         assert_eq!(state, Some(ValueState::EmptyValueArray));
-        let state = ValueState::of(&Some(Value::Array(vec![".".to_string()])));
+        let state = ValueState::of(&Some(Value::array(["."])));
         assert_eq!(state, None);
-        let state = ValueState::of(&Some(Value::Array(vec!["".to_string(), "".to_string()])));
+        let state = ValueState::of(&Some(Value::array(["", ""])));
         assert_eq!(state, None);
     }
 
@@ -447,7 +447,7 @@ mod tests {
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
 
         let var = env.inner.variables.get("var").unwrap();
-        assert_eq!(var.value, Value::Scalar("foo".to_string()));
+        assert_eq!(var.value, Value::scalar("foo"));
         assert_eq!(var.last_assigned_location, Some(location));
         assert!(!var.is_exported);
         assert_eq!(var.read_only_location, None);
@@ -623,7 +623,7 @@ mod tests {
             word: "bar".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Value::Scalar("".to_string()));
+        let mut value = Some(Value::scalar(""));
         let location = Location::dummy("somewhere");
         let result = apply(&mut env, &switch, name, &mut value, &location)
             .now_or_never()
@@ -668,7 +668,7 @@ mod tests {
             word: "foo".parse().unwrap(),
         };
         let name = Some(Name::Variable("var"));
-        let mut value = Some(Value::Scalar("".to_string()));
+        let mut value = Some(Value::scalar(""));
         let location = Location::dummy("somewhere");
         let result = apply(&mut env, &switch, name, &mut value, &location)
             .now_or_never()

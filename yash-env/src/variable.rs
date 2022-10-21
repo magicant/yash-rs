@@ -93,15 +93,15 @@ impl Value {
     /// splitting the value.
     ///
     /// ```
-    /// # use yash_env::variable::Value::Scalar;
-    /// let scalar = Scalar("/usr/local/bin:/usr/bin:/bin".to_string());
+    /// # use yash_env::variable::Value;
+    /// let scalar = Value::scalar("/usr/local/bin:/usr/bin:/bin");
     /// let values: Vec<&str> = scalar.split().collect();
     /// assert_eq!(values, ["/usr/local/bin", "/usr/bin", "/bin"]);
     /// ```
     ///
     /// ```
-    /// # use yash_env::variable::Value::Array;
-    /// let array = Array(vec!["foo".to_string(), "bar".to_string()]);
+    /// # use yash_env::variable::Value;
+    /// let array = Value::array(vec!["foo", "bar"]);
     /// let values: Vec<&str> = array.split().collect();
     /// assert_eq!(values, ["foo", "bar"]);
     /// ```
@@ -118,9 +118,9 @@ impl Value {
     ///
     /// ```
     /// # use yash_env::variable::Value;
-    /// let scalar = Value::Scalar("foo bar".to_string());
+    /// let scalar = Value::scalar("foo bar");
     /// assert_eq!(scalar.quote(), "'foo bar'");
-    /// let array = Value::Array(vec!["1".to_string(), "".to_string(), "'\\'".to_string()]);
+    /// let array = Value::array(vec!["1", "", "'\\'"]);
     /// assert_eq!(array.quote(), r#"(1 '' "'\\'")"#);
     /// ```
     pub fn quote(&self) -> Cow<str> {
@@ -925,7 +925,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.name, "foo");
         assert_eq!(error.read_only_location, read_only_location);
-        assert_eq!(error.new_value.value, Value::Scalar("1".to_string()));
+        assert_eq!(error.new_value.value, Value::scalar("1"));
     }
 
     #[test]

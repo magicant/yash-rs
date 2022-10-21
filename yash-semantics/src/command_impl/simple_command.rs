@@ -308,7 +308,7 @@ async fn execute_function(
     let mut i = fields.into_iter();
     let field = i.next().unwrap();
     params.last_assigned_location = Some(field.origin);
-    params.value = Value::Array(i.map(|f| f.value).collect());
+    params.value = Value::array(i.map(|f| f.value));
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;

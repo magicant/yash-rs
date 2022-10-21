@@ -284,7 +284,6 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
-    use yash_env::variable::Value;
 
     #[test]
     fn successful_inner_text_expansion() {
@@ -356,7 +355,7 @@ mod tests {
         let _ = expand(&text, &location, &mut env2).now_or_never().unwrap();
 
         let v = env.variables.get("x").unwrap();
-        assert_eq!(v.value, Value::Scalar("24".to_string()));
+        assert_eq!(v.value, Scalar("24".to_string()));
         let location2 = v.last_assigned_location.as_ref().unwrap();
         assert_eq!(*location2.code.value.borrow(), "3 + (x = 4 * 6)");
         assert_eq!(location2.code.start_line_number.get(), 1);

@@ -140,7 +140,7 @@ mod tests {
         assert_matches!(e.cause, ErrorCause::AssignReadOnly(roe) => {
             assert_eq!(roe.name, "v");
             assert_eq!(roe.read_only_location, location);
-            assert_eq!(roe.new_value.value, Value::Scalar("new".into()));
+            assert_eq!(roe.new_value.value, Value::scalar("new"));
         });
         assert_eq!(*e.location.code.value.borrow(), "v=new");
         assert_eq!(e.location.code.start_line_number.get(), 1);

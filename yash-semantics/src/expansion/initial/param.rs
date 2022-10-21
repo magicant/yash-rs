@@ -147,8 +147,7 @@ pub mod tests {
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
-        env.variables.positional_params_mut().value =
-            Value::Array(vec!["a".to_string(), "c".to_string()]);
+        env.variables.positional_params_mut().value = Value::array(["a", "c"]);
         env.variables
             .assign(Scope::Global, "IFS".to_string(), Variable::new("&?!"))
             .unwrap();
@@ -329,10 +328,10 @@ pub mod tests {
 
     #[test]
     fn scalar_into_phrase() {
-        let result = into_phrase(Some(Value::Scalar("".to_string())));
+        let result = into_phrase(Some(Value::scalar("")));
         assert_eq!(result, Phrase::one_empty_field());
 
-        let result = into_phrase(Some(Value::Scalar("foo".to_string())));
+        let result = into_phrase(Some(Value::scalar("foo")));
         assert_eq!(result, Phrase::Field(to_field("foo")));
     }
 
@@ -341,8 +340,7 @@ pub mod tests {
         let result = into_phrase(Some(Value::Array(vec![])));
         assert_eq!(result, Phrase::zero_fields());
 
-        let values = vec!["foo".to_string(), "bar".to_string()];
-        let result = into_phrase(Some(Value::Array(values)));
+        let result = into_phrase(Some(Value::array(["foo", "bar"])));
         assert_eq!(result, Phrase::Full(vec![to_field("foo"), to_field("bar")]));
     }
 
