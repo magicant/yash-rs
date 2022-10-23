@@ -409,6 +409,7 @@ mod tests {
         let args = Field::dummies(["%2"]);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -435,6 +436,7 @@ mod tests {
         let args = Field::dummies(["%?first", "%echo"]);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -457,6 +459,7 @@ mod tests {
 
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -493,6 +496,7 @@ mod tests {
 
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));

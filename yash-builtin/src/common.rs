@@ -52,7 +52,7 @@ impl BuiltinName for Stack {
     fn builtin_name(&self) -> &Field {
         self.iter()
             .filter_map(|frame| {
-                if let &Frame::Builtin { ref name } = frame {
+                if let &Frame::Builtin { ref name, .. } = frame {
                     Some(name)
                 } else {
                     None
@@ -167,7 +167,8 @@ mod tests {
     #[test]
     fn builtin_name_in_stack() {
         let name = Field::dummy("my built-in");
-        let stack = Stack::from(vec![Frame::Builtin { name }]);
+        let is_special = false;
+        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
         // TODO Test with a stack containing a frame other than Frame::Builtin
         assert_eq!(stack.builtin_name().value, "my built-in");
     }

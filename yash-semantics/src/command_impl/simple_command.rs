@@ -258,8 +258,10 @@ async fn execute_builtin(
     mut fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
+    use yash_env::builtin::Type::*;
     let name = fields.remove(0);
-    let env = &mut env.push_frame(Frame::Builtin { name });
+    let is_special = builtin.r#type == Special;
+    let env = &mut env.push_frame(Frame::Builtin { name, is_special });
     let env = &mut RedirGuard::new(env);
     if let Err(e) = env.perform_redirs(redirs).await {
         e.handle(env).await?;
@@ -269,7 +271,6 @@ async fn execute_builtin(
         };
     };
 
-    use yash_env::builtin::Type::*;
     let (exit_status, abort) = match builtin.r#type {
         Special => {
             perform_assignments(&mut **env, assigns, false).await?;
@@ -612,8 +613,21 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async {
-                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name }] => {
+                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name, is_special }] => {
                     assert_eq!(name.value, "builtin");
+                    assert!(!is_special);
+                });
+                (ExitStatus(0), Continue(()))
+            })
+        }
+        fn special_main(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async {
+                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name, is_special }] => {
+                    assert_eq!(name.value, "special");
+                    assert!(is_special);
                 });
                 (ExitStatus(0), Continue(()))
             })
@@ -627,7 +641,16 @@ mod tests {
                 execute: builtin_main,
             },
         );
+        env.builtins.insert(
+            "special",
+            Builtin {
+                r#type: yash_env::builtin::Type::Special,
+                execute: special_main,
+            },
+        );
         let command: syntax::SimpleCommand = "builtin".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+        let command: syntax::SimpleCommand = "special".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.stack[..], []);
     }

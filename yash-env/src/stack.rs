@@ -40,13 +40,23 @@ use std::ops::DerefMut;
 pub enum Frame {
     /// For, while, or until loop
     Loop,
+
     /// Subshell
     Subshell,
+
     /// Built-in utility
     Builtin {
         /// Name of the built-in
         name: Field,
+
+        /// Whether the utility acts as a special built-in
+        ///
+        /// This value determines whether an error in the built-in interrupts
+        /// the shell. This will be false if a special built-in is executed
+        /// through the `command` built-in.
+        is_special: bool,
     },
+
     /// Trap
     Trap,
     // TODO dot script, eval
@@ -214,6 +224,7 @@ mod tests {
         let mut stack = Stack::default();
         let mut stack = stack.push(Frame::Builtin {
             name: Field::dummy(""),
+            is_special: false,
         });
         assert_eq!(stack.loop_count(usize::MAX), 0);
         let stack = stack.push(Frame::Trap);

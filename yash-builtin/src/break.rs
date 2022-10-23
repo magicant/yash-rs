@@ -193,6 +193,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
@@ -212,6 +213,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
@@ -233,6 +235,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
@@ -254,6 +257,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["1"]);
 
@@ -276,6 +280,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["3"]);
 
@@ -299,6 +304,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["5"]);
 
@@ -319,6 +325,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["0"]);
 
@@ -338,6 +345,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["999999999999999999999999999999"]);
 
@@ -355,6 +363,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["1", "1"]);
 
@@ -374,6 +383,7 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("break"),
+            is_special: true,
         });
         let args = Field::dummies(["--", "1"]);
 

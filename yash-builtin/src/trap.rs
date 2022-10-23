@@ -214,6 +214,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("trap"),
+            is_special: true,
         });
         let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut *env, args).now_or_never().unwrap();

@@ -354,8 +354,9 @@ xtrace           off
     fn setting_some_positional_parameters() {
         let name = Field::dummy("set");
         let location = name.origin.clone();
+        let is_special = true;
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin { name });
+        let mut env = env.push_frame(Frame::Builtin { name, is_special });
         let args = Field::dummies(["a", "b", "z"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
