@@ -42,6 +42,10 @@ pub trait BuiltinEnv {
     /// Returns the name of the currently-executing built-in.
     #[must_use]
     fn builtin_name(&self) -> &Field;
+
+    /// Returns whether the currently executing built-in is considered special.
+    #[must_use]
+    fn is_executing_special_builtin(&self) -> bool;
 }
 
 impl BuiltinEnv for Stack {
@@ -61,6 +65,23 @@ impl BuiltinEnv for Stack {
             .next_back()
             .expect("a Frame::Builtin must be in the stack")
     }
+
+    /// Returns whether the currently executing built-in is considered special.
+    ///
+    /// This function returns false if `self` does not contain any
+    /// `Frame::Builtin` item.
+    fn is_executing_special_builtin(&self) -> bool {
+        self.iter()
+            .filter_map(|frame| {
+                if let &Frame::Builtin { is_special, .. } = frame {
+                    Some(is_special)
+                } else {
+                    None
+                }
+            })
+            .next_back()
+            .unwrap_or(false)
+    }
 }
 
 impl BuiltinEnv for yash_env::Env {
@@ -70,6 +91,10 @@ impl BuiltinEnv for yash_env::Env {
     /// `Frame::Builtin` item.
     fn builtin_name(&self) -> &Field {
         self.stack.builtin_name()
+    }
+
+    fn is_executing_special_builtin(&self) -> bool {
+        self.stack.is_executing_special_builtin()
     }
 }
 
@@ -177,5 +202,26 @@ mod tests {
     #[should_panic(expected = "a Frame::Builtin must be in the stack")]
     fn builtin_name_not_in_stack() {
         let _ = Stack::from(vec![]).builtin_name();
+    }
+
+    #[test]
+    fn is_executing_special_builtin_true_in_stack() {
+        let name = Field::dummy("my built-in");
+        let is_special = true;
+        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
+        assert!(stack.is_executing_special_builtin());
+    }
+
+    #[test]
+    fn is_executing_special_builtin_false_in_stack() {
+        let name = Field::dummy("my built-in");
+        let is_special = false;
+        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
+        assert!(!stack.is_executing_special_builtin());
+    }
+
+    #[test]
+    fn is_executing_special_builtin_not_in_stack() {
+        assert!(!Stack::from(vec![]).is_executing_special_builtin());
     }
 }
