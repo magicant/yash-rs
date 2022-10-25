@@ -36,15 +36,15 @@ use yash_syntax::source::pretty::Message;
 
 pub mod arg;
 
-/// Part of the execution environment that allows examining the name of the
-/// currently executing built-in.
-pub trait BuiltinName {
+/// Execution environment extension for examining the currently running
+/// built-in.
+pub trait BuiltinEnv {
     /// Returns the name of the currently-executing built-in.
     #[must_use]
     fn builtin_name(&self) -> &Field;
 }
 
-impl BuiltinName for Stack {
+impl BuiltinEnv for Stack {
     /// Returns the name of the currently-executing built-in.
     ///
     /// This function **panics** if `self` does not contain any `Frame::Builtin`
@@ -63,7 +63,7 @@ impl BuiltinName for Stack {
     }
 }
 
-impl BuiltinName for yash_env::Env {
+impl BuiltinEnv for yash_env::Env {
     /// Returns the name of the currently-executing built-in.
     ///
     /// This function **panics** if `self.stack` does not contain any
@@ -110,7 +110,7 @@ pub trait Print {
 }
 
 #[async_trait(?Send)]
-impl<T: BuiltinName + Stdout + Stderr> Print for T {
+impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
     async fn print(&mut self, text: &str) -> ExitStatus {
         match self.try_print(text).await {
             Ok(()) => ExitStatus::SUCCESS,
@@ -130,7 +130,7 @@ impl<T: BuiltinName + Stdout + Stderr> Print for T {
 /// Prints an error message.
 ///
 /// This function prepares a [`Message`] from the given error, inserts into it
-/// an annotation indicating the [built-in name](BuiltinName::builtin_name), and
+/// an annotation indicating the [built-in name](BuiltinEnv::builtin_name), and
 /// prints it to the standard error using [`yash_env::io::print_message`].
 ///
 /// Returns `(ExitStatus::ERROR, ControlFlow::Continue(()))`.
@@ -139,7 +139,7 @@ pub async fn print_error_message<'a, E, F>(
     error: F,
 ) -> (ExitStatus, yash_env::semantics::Result)
 where
-    E: BuiltinName + Stderr,
+    E: BuiltinEnv + Stderr,
     F: Into<Message<'a>> + 'a,
 {
     let builtin_name = env.builtin_name();

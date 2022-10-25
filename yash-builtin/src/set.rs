@@ -121,7 +121,7 @@
 //! place of an option-operand separator. This behavior is not portable either.
 
 use crate::common::print_error_message;
-use crate::common::BuiltinName;
+use crate::common::BuiltinEnv;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;

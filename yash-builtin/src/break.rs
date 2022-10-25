@@ -74,7 +74,7 @@
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::print_error_message;
-use crate::common::BuiltinName;
+use crate::common::BuiltinEnv;
 use std::future::Future;
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
