@@ -95,8 +95,7 @@ async fn handle_error(env: &mut Env, title: &str, annotation: Annotation<'_>) ->
         title: title.into(),
         annotations: vec![annotation],
     };
-    print_error_message(env, message).await;
-    (ExitStatus::ERROR, Break(Divert::Interrupt(None)))
+    print_error_message(env, message).await
 }
 
 async fn syntax_error(env: &mut Env, label: &str, location: &Location) -> Result {

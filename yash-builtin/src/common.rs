@@ -178,7 +178,8 @@ impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
 /// an annotation indicating the [built-in name](BuiltinEnv::builtin_name), and
 /// prints it to the standard error using [`yash_env::io::print_message`].
 ///
-/// Returns `(ExitStatus::ERROR, ControlFlow::Continue(()))`.
+/// Returns `(ExitStatus::ERROR, env.builtin_error())`.
+/// (cf. [`BuiltinEnv::builtin_error`])
 pub async fn print_error_message<'a, E, F>(
     env: &mut E,
     error: F,
@@ -202,7 +203,7 @@ where
 
     yash_env::io::print_message(env, message).await;
 
-    (ExitStatus::ERROR, Continue(()))
+    (ExitStatus::ERROR, env.builtin_error())
 }
 
 #[cfg(test)]
