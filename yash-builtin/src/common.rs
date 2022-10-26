@@ -21,10 +21,11 @@
 //! dependency on it.
 
 use async_trait::async_trait;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{self, Break, Continue};
 use yash_env::io::Fd;
 #[doc(no_inline)]
 pub use yash_env::io::Stderr;
+use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Frame;
@@ -46,6 +47,13 @@ pub trait BuiltinEnv {
     /// Returns whether the currently executing built-in is considered special.
     #[must_use]
     fn is_executing_special_builtin(&self) -> bool;
+
+    /// Returns `ControlFlow` on error in a built-in.
+    ///
+    /// If [`BuiltinEnv::is_executing_special_builtin`], the result is
+    /// `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
+    #[must_use]
+    fn builtin_error(&self) -> ControlFlow<Divert>;
 }
 
 impl BuiltinEnv for Stack {
@@ -82,6 +90,14 @@ impl BuiltinEnv for Stack {
             .next_back()
             .unwrap_or(false)
     }
+
+    fn builtin_error(&self) -> ControlFlow<Divert> {
+        if self.is_executing_special_builtin() {
+            Break(Divert::Interrupt(None))
+        } else {
+            Continue(())
+        }
+    }
 }
 
 impl BuiltinEnv for yash_env::Env {
@@ -95,6 +111,10 @@ impl BuiltinEnv for yash_env::Env {
 
     fn is_executing_special_builtin(&self) -> bool {
         self.stack.is_executing_special_builtin()
+    }
+
+    fn builtin_error(&self) -> ControlFlow<Divert> {
+        self.stack.builtin_error()
     }
 }
 
