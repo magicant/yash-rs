@@ -87,7 +87,6 @@ use crate::common::print_failure_message;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::id::parse;
@@ -205,9 +204,9 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    let exit_status = env.print(&accumulator.print).await;
+    let result = env.print(&accumulator.print).await;
 
-    if exit_status == ExitStatus::SUCCESS {
+    if result.0 == ExitStatus::SUCCESS {
         for index in accumulator.indices_reported {
             let mut job = env.jobs.get_mut(index).unwrap();
             if job.status.is_finished() {
@@ -218,7 +217,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    (exit_status, Continue(()))
+    result
 }
 
 /// Wrapper of [`builtin_body`] that returns the future in a pinned box.
@@ -233,6 +232,7 @@ mod tests {
     use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use futures_util::future::FutureExt;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::job::Job;

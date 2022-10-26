@@ -156,7 +156,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 // TODO skip if the name contains a character inappropriate for a name
                 writeln!(print, "{}={}", name, var.value.quote()).unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::PrintOptionsHumanReadable) => {
@@ -165,7 +165,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 let state = env.options.get(option);
                 writeln!(print, "{option:16} {state}").unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::PrintOptionsMachineReadable) => {
@@ -178,7 +178,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 };
                 writeln!(print, "{skip}set {flag}o {option}").unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::Modify {

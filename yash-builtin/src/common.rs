@@ -151,22 +151,21 @@ pub trait Print {
     ///
     /// If an error occurs while printing, an error message is printed to the
     /// standard error and a non-zero exit status is returned.
-    async fn print(&mut self, text: &str) -> ExitStatus;
+    async fn print(&mut self, text: &str) -> (ExitStatus, yash_env::semantics::Result);
 }
 
 #[async_trait(?Send)]
 impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
-    async fn print(&mut self, text: &str) -> ExitStatus {
+    async fn print(&mut self, text: &str) -> (ExitStatus, yash_env::semantics::Result) {
         match self.try_print(text).await {
-            Ok(()) => ExitStatus::SUCCESS,
+            Ok(()) => (ExitStatus::SUCCESS, Continue(())),
             Err(errno) => {
                 let message = Message {
                     r#type: AnnotationType::Error,
                     title: format!("error printing results to stdout: {}", errno).into(),
                     annotations: vec![],
                 };
-                print_error_message(self, message).await;
-                ExitStatus::FAILURE
+                print_failure_message(self, message).await
             }
         }
     }
