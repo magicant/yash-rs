@@ -172,18 +172,14 @@ impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
     }
 }
 
-/// Prints an error message.
+/// Prints a message.
 ///
 /// This function prepares a [`Message`] from the given error, inserts into it
 /// an annotation indicating the [built-in name](BuiltinEnv::builtin_name), and
 /// prints it to the standard error using [`yash_env::io::print_message`].
 ///
-/// Returns `(ExitStatus::ERROR, env.builtin_error())`.
-/// (cf. [`BuiltinEnv::builtin_error`])
-pub async fn print_error_message<'a, E, F>(
-    env: &mut E,
-    error: F,
-) -> (ExitStatus, yash_env::semantics::Result)
+/// Returns [`env.builtin_error()`](BuiltinEnv::builtin_error).
+pub async fn print_message<'a, E, F>(env: &mut E, error: F) -> yash_env::semantics::Result
 where
     E: BuiltinEnv + Stderr,
     F: Into<Message<'a>> + 'a,
@@ -203,7 +199,41 @@ where
 
     yash_env::io::print_message(env, message).await;
 
-    (ExitStatus::ERROR, env.builtin_error())
+    env.builtin_error()
+}
+
+/// Prints a failure message.
+///
+/// This function returns
+/// `(ExitStatus::FAILURE, print_message(env, error).await)`.
+/// See [`print_message`] for details.
+#[inline]
+pub async fn print_failure_message<'a, E, F>(
+    env: &mut E,
+    error: F,
+) -> (ExitStatus, yash_env::semantics::Result)
+where
+    E: BuiltinEnv + Stderr,
+    F: Into<Message<'a>> + 'a,
+{
+    (ExitStatus::FAILURE, print_message(env, error).await)
+}
+
+/// Prints an error message.
+///
+/// This function returns
+/// `(ExitStatus::ERROR, print_message(env, error).await)`.
+/// See [`print_message`] for details.
+#[inline]
+pub async fn print_error_message<'a, E, F>(
+    env: &mut E,
+    error: F,
+) -> (ExitStatus, yash_env::semantics::Result)
+where
+    E: BuiltinEnv + Stderr,
+    F: Into<Message<'a>> + 'a,
+{
+    (ExitStatus::ERROR, print_message(env, error).await)
 }
 
 #[cfg(test)]

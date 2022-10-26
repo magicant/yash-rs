@@ -83,6 +83,7 @@ use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::arg::OptionSpec;
 use crate::common::print_error_message;
+use crate::common::print_failure_message;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
@@ -198,8 +199,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.report(index, &env.jobs[index]),
                 Err(error) => {
-                    print_error_message(env, find_error_message(error, &operand)).await;
-                    return (ExitStatus::FAILURE, Continue(()));
+                    return print_failure_message(env, find_error_message(error, &operand)).await
                 }
             }
         }
