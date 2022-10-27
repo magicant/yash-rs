@@ -83,10 +83,10 @@ use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::arg::OptionSpec;
 use crate::common::print_error_message;
+use crate::common::print_failure_message;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::id::parse;
@@ -198,16 +198,15 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.report(index, &env.jobs[index]),
                 Err(error) => {
-                    print_error_message(env, find_error_message(error, &operand)).await;
-                    return (ExitStatus::FAILURE, Continue(()));
+                    return print_failure_message(env, find_error_message(error, &operand)).await
                 }
             }
         }
     }
 
-    let exit_status = env.print(&accumulator.print).await;
+    let result = env.print(&accumulator.print).await;
 
-    if exit_status == ExitStatus::SUCCESS {
+    if result.0 == ExitStatus::SUCCESS {
         for index in accumulator.indices_reported {
             let mut job = env.jobs.get_mut(index).unwrap();
             if job.status.is_finished() {
@@ -218,7 +217,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    (exit_status, Continue(()))
+    result
 }
 
 /// Wrapper of [`builtin_body`] that returns the future in a pinned box.
@@ -233,6 +232,7 @@ mod tests {
     use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use futures_util::future::FutureExt;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::job::Job;
@@ -409,6 +409,7 @@ mod tests {
         let args = Field::dummies(["%2"]);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -435,6 +436,7 @@ mod tests {
         let args = Field::dummies(["%?first", "%echo"]);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -457,6 +459,7 @@ mod tests {
 
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
@@ -493,6 +496,7 @@ mod tests {
 
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("jobs"),
+            is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::FAILURE, Continue(())));

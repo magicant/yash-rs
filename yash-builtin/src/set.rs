@@ -121,7 +121,7 @@
 //! place of an option-operand separator. This behavior is not portable either.
 
 use crate::common::print_error_message;
-use crate::common::BuiltinName;
+use crate::common::BuiltinEnv;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
@@ -156,7 +156,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 // TODO skip if the name contains a character inappropriate for a name
                 writeln!(print, "{}={}", name, var.value.quote()).unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::PrintOptionsHumanReadable) => {
@@ -165,7 +165,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 let state = env.options.get(option);
                 writeln!(print, "{option:16} {state}").unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::PrintOptionsMachineReadable) => {
@@ -178,7 +178,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 };
                 writeln!(print, "{skip}set {flag}o {option}").unwrap();
             }
-            (env.print(&print).await, Continue(()))
+            env.print(&print).await
         }
 
         Ok(arg::Parse::Modify {
@@ -354,8 +354,9 @@ xtrace           off
     fn setting_some_positional_parameters() {
         let name = Field::dummy("set");
         let location = name.origin.clone();
+        let is_special = true;
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin { name });
+        let mut env = env.push_frame(Frame::Builtin { name, is_special });
         let args = Field::dummies(["a", "b", "z"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();

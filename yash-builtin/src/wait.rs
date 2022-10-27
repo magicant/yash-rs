@@ -409,6 +409,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("wait"),
+            is_special: false,
         });
         let args = Field::dummies(["abc"]);
 
@@ -424,6 +425,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("wait"),
+            is_special: false,
         });
         let args = Field::dummies(["0"]);
 

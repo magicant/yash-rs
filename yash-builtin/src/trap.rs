@@ -50,7 +50,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
         let signal = &signal.as_str()[3..];
         writeln!(output, "trap -- {} {}", &quote(command), signal).ok();
     }
-    (env.print(&output).await, Continue(()))
+    env.print(&output).await
 }
 
 /// Implementation of the trap built-in.
@@ -109,8 +109,10 @@ mod tests {
     use crate::tests::assert_stdout;
     use futures_executor::block_on;
     use futures_util::future::FutureExt;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::io::Fd;
+    use yash_env::semantics::Divert;
     use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
     use yash_env::trap::Signal;
@@ -214,12 +216,16 @@ mod tests {
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Builtin {
             name: Field::dummy("trap"),
+            is_special: true,
         });
         let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut *env, args).now_or_never().unwrap();
 
         let result = block_on(builtin_body(&mut *env, vec![]));
-        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_eq!(
+            result,
+            (ExitStatus::FAILURE, Break(Divert::Interrupt(None)))
+        );
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
