@@ -400,9 +400,12 @@ async fn execute_external_utility(
 
 /// Converts fields to C strings.
 fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
-    // TODO return something rather than dropping null-containing strings
     s.into_iter()
-        .filter_map(|f| CString::new(f.value).ok())
+        .filter_map(|f| {
+            let bytes = f.value.into_bytes();
+            // TODO bytes.drain_filter(|b| *b == '\0' as u8);
+            CString::new(bytes).ok()
+        })
         .collect()
 }
 
