@@ -22,6 +22,7 @@ use crate::redir::RedirGuard;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
+use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
@@ -359,8 +360,11 @@ async fn execute_external_utility(
             let result = env.system.execve(path.as_c_str(), &args, &envs);
             // TODO Prefer into_err to unwrap_err
             let errno = result.unwrap_err();
-            // TODO Reopen as shell script on ENOEXEC
             match errno {
+                Errno::ENOEXEC => {
+                    fall_back_on_sh(&mut env.system, path.clone(), args, envs);
+                    env.exit_status = ExitStatus::NOEXEC;
+                }
                 Errno::ENOENT | Errno::ENOTDIR => {
                     env.exit_status = ExitStatus::NOT_FOUND;
                 }
@@ -407,6 +411,39 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
             CString::new(bytes).ok()
         })
         .collect()
+}
+
+/// Invokes the shell with the given arguments.
+fn fall_back_on_sh<S: System>(
+    system: &mut S,
+    mut script_path: CString,
+    mut args: Vec<CString>,
+    envs: Vec<CString>,
+) {
+    // Prevent the path to be regarded as an option
+    if script_path.as_bytes().starts_with("-".as_bytes()) {
+        let mut bytes = script_path.into_bytes();
+        bytes.splice(0..0, "./".bytes());
+        script_path = CString::new(bytes).unwrap();
+    }
+
+    args.insert(1, script_path);
+
+    // Some shells change their behavior depending on args[0].
+    // We set it to "sh" for the maximum portability.
+    args[0] = CString::new("sh").unwrap();
+
+    // TODO Uncomment after we implement command line argument support
+    // #[cfg(any(target_os = "linux", target_os = "android", target_os = "emscripten"))]
+    // {
+    //     let sh_path = CStr::from_bytes_with_nul(b"/proc/self/exe\0").unwrap();
+    //     let _ = system.execve(sh_path, &args, &envs);
+    // }
+    // TODO Add optimization for other targets
+
+    // TODO Use confstr(_CS_PATH) to find a correct path to sh
+    let sh_path = CStr::from_bytes_with_nul(b"/bin/sh\0").unwrap();
+    let _ = system.execve(sh_path, &args, &envs);
 }
 
 #[cfg(test)]
@@ -898,6 +935,8 @@ mod tests {
             assert_eq!(env.exit_status, ExitStatus::NOEXEC);
         });
     }
+
+    // TODO Test fall_back_on_sh
 
     #[test]
     fn simple_command_skips_running_external_utility_on_redirection_error() {
