@@ -400,6 +400,13 @@ impl VariableSet {
     /// existing read-only value, the assignment fails unless the new variable
     /// is a local variable that hides the read-only.
     ///
+    /// If an existing same-named variable is exported, this function also
+    /// exports the new value. Otherwise, the value is assigned without
+    /// modification. To apply the `AllExport` [shell
+    /// option](crate::option::Option), you should prefer the
+    /// [`Env::assign_variable`] function rather than calling this function
+    /// directly.
+    ///
     /// The behavior of assignment depends on the `scope`:
     ///
     /// - If the scope is `Global`, the assignment overwrites a visible existing

@@ -71,7 +71,7 @@ pub async fn execute(
 
     for Field { value, origin } in values {
         let var = Variable::new(value).set_assigned_location(origin);
-        match env.variables.assign(Scope::Global, name.value.clone(), var) {
+        match env.assign_variable(Scope::Global, name.value.clone(), var) {
             Ok(_) => match body.execute(env).await {
                 Break(Divert::Break { count: 0 }) => break,
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),

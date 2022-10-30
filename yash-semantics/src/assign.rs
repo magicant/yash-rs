@@ -48,12 +48,10 @@ pub async fn perform_assignment(
         is_exported: export,
         read_only_location: None,
     };
-    env.variables
-        .assign(scope, name, value)
-        .map_err(|e| Error {
-            cause: ErrorCause::AssignReadOnly(e),
-            location: assign.location.clone(),
-        })?;
+    env.assign_variable(scope, name, value).map_err(|e| Error {
+        cause: ErrorCause::AssignReadOnly(e),
+        location: assign.location.clone(),
+    })?;
     Ok(exit_status)
 }
 

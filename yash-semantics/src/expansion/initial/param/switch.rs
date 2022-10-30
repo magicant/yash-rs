@@ -207,8 +207,7 @@ async fn assign(
     let variable = Variable::new(skip_quotes(variable_value).strip().collect::<String>())
         .set_assigned_location(location.clone());
     env.inner
-        .variables
-        .assign(Scope::Global, name, variable)
+        .assign_variable(Scope::Global, name, variable)
         .map_err(|e| Error {
             cause: ErrorCause::AssignReadOnly(e),
             location: location.clone(),

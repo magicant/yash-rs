@@ -39,13 +39,12 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
             let var = Variable::new(var_value)
                 .set_assigned_location(origin.clone())
                 .make_read_only(origin);
-            // TODO Apply all-export option
 
             let mut name = value;
             name.truncate(eq_index);
             // TODO reject invalid name
 
-            match env.variables.assign(Scope::Global, name, var) {
+            match env.assign_variable(Scope::Global, name, var) {
                 Ok(_old_value) => (),
                 Err(ReadOnlyError {
                     name,

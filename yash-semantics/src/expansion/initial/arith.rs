@@ -30,7 +30,6 @@ use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
-use yash_env::variable::VariableSet;
 use yash_syntax::source::Code;
 use yash_syntax::source::Location;
 use yash_syntax::source::Source;
@@ -188,7 +187,7 @@ pub fn convert_error_cause(
 }
 
 struct VarEnv<'a> {
-    variables: &'a mut VariableSet,
+    env: &'a mut yash_env::Env,
     expression: &'a str,
     expansion_location: &'a Location,
 }
@@ -198,7 +197,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
 
     #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Option<&str> {
-        if let Some(Variable { value: Scalar(value), .. }) = self.variables.get(name) {
+        if let Some(Variable { value: Scalar(value), .. }) = self.env.variables.get(name) {
             Some(value)
         } else {
             None
@@ -220,8 +219,8 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
         });
         let location = Location { code, range };
         let value = Variable::new(value).set_assigned_location(location);
-        self.variables
-            .assign(Global, name.to_owned(), value)
+        self.env
+            .assign_variable(Global, name.to_owned(), value)
             .map(drop)
     }
 }
@@ -235,7 +234,7 @@ pub async fn expand(text: &Text, location: &Location, env: &mut Env<'_>) -> Resu
     let result = eval(
         &expression,
         &mut VarEnv {
-            variables: &mut env.inner.variables,
+            env: env.inner,
             expression: &expression,
             expansion_location: location,
         },

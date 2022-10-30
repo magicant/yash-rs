@@ -50,7 +50,9 @@ use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
 use self::job::WaitStatusEx;
+use self::option::AllExport;
 use self::option::OptionSet;
+use self::option::{Off, On};
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
@@ -62,6 +64,9 @@ use self::system::SignalHandling;
 pub use self::system::System;
 use self::trap::Signal;
 use self::trap::TrapSet;
+use self::variable::ReadOnlyError;
+use self::variable::Scope;
+use self::variable::Variable;
 use self::variable::VariableSet;
 use async_trait::async_trait;
 use futures_util::task::noop_waker_ref;
@@ -409,6 +414,25 @@ impl Env {
             };
         }
     }
+
+    /// Assigns a variable.
+    ///
+    /// This function is a thin wrapper around [`VariableSet::assign`] that
+    /// automatically applies the `AllExport` [shell
+    /// option](crate::option::Option). You should always prefer this unless you
+    /// want to ignore the option.
+    pub fn assign_variable(
+        &mut self,
+        scope: Scope,
+        name: String,
+        value: Variable,
+    ) -> Result<Option<Variable>, ReadOnlyError> {
+        let value = match self.options.get(AllExport) {
+            On => value.export(),
+            Off => value,
+        };
+        self.variables.assign(scope, name, value)
+    }
 }
 
 #[async_trait(?Send)]
@@ -737,5 +761,34 @@ mod tests {
             WaitStatus::Exited(pid_2, 35)
         );
         assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
+    }
+
+    #[test]
+    fn assign_variable_with_all_export_off() {
+        let mut env = Env::new_virtual();
+        let a = Variable::new("A");
+        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
+        assert_eq!(result, Ok(None));
+        let b = Variable::new("B").export();
+        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
+        assert_eq!(result, Ok(None));
+
+        assert_eq!(env.variables.get("a").unwrap(), &a);
+        assert_eq!(env.variables.get("b").unwrap(), &b);
+    }
+
+    #[test]
+    fn assign_variable_with_all_export_on() {
+        let mut env = Env::new_virtual();
+        env.options.set(AllExport, On);
+        let a = Variable::new("A");
+        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
+        assert_eq!(result, Ok(None));
+        let b = Variable::new("B").export();
+        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
+        assert_eq!(result, Ok(None));
+
+        assert_eq!(env.variables.get("a").unwrap(), &a.export());
+        assert_eq!(env.variables.get("b").unwrap(), &b);
     }
 }
