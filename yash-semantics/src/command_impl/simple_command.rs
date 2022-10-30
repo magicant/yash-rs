@@ -102,7 +102,9 @@ use yash_syntax::syntax::Redir;
 /// [`execve`](yash_env::System::execve) function to invoke the external utility
 /// with all the fields passed as arguments.
 ///
-/// If `execve` fails with an `ENOEXEC` error, the behavior is TODO TBD.
+/// If `execve` fails with an `ENOEXEC` error, it is re-called with the current
+/// executable file so that the restarted shell executes the external utility as
+/// a shell script.
 ///
 /// ## Target not found
 ///
