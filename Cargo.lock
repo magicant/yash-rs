@@ -490,6 +490,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "async-trait",
+ "bitflags",
  "futures-executor",
  "futures-util",
  "itertools",
