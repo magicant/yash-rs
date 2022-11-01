@@ -395,6 +395,19 @@ impl System for VirtualSystem {
             OFlag::O_RDWR => (true, true),
             _ => (false, false),
         };
+
+        if let FileBody::Fifo {
+            readers, writers, ..
+        } = &mut file.borrow_mut().body
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+        }
+
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
             offset: 0,

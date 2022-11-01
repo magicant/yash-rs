@@ -41,9 +41,7 @@ pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
-pub use nix::sys::stat::FileStat;
-#[doc(no_inline)]
-pub use nix::sys::stat::Mode;
+pub use nix::sys::stat::{FileStat, Mode, SFlag};
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;

@@ -75,6 +75,7 @@ use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
+use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
@@ -313,12 +314,17 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
         // Okay, it seems there is an existing file. Try opening it.
         match env.system.open(&path, OFlag::O_WRONLY, MODE) {
             Ok(fd) => {
-                // TODO Return successfully if `fd` refers to a non-regular file
-                let _: Result<_, _> = env.system.close(fd);
-                return Err(Error {
-                    cause: ErrorCause::OpenFile(path, Errno::EEXIST),
-                    location: origin,
-                });
+                let is_regular = matches!(env.system.fstat(fd), Ok(stat)
+                    if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
+                if is_regular {
+                    let _: Result<_, _> = env.system.close(fd);
+                    return Err(Error {
+                        cause: ErrorCause::OpenFile(path, Errno::EEXIST),
+                        location: origin,
+                    });
+                } else {
+                    return Ok((FdSpec::Owned(fd), origin));
+                }
             }
             Err(Errno::ENOENT) => {
                 // A file existed on the first open but not on the second.
@@ -880,6 +886,30 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(content[..], [42, 123, 254]);
         });
+    }
+
+    #[test]
+    fn file_out_noclobber_with_non_regular_file() {
+        let inode = INode {
+            body: FileBody::Fifo {
+                content: Default::default(),
+                readers: 1,
+                writers: 0,
+            },
+            permissions: Default::default(),
+        };
+        let file = Rc::new(RefCell::new(inode));
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Clobber, Off);
+        let mut env = RedirGuard::new(&mut env);
+
+        let redir = "3> foo".parse().unwrap();
+        let result = env.perform_redir(&redir).now_or_never().unwrap();
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
