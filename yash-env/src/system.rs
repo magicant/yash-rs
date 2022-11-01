@@ -81,6 +81,9 @@ use std::time::Instant;
 /// with asynchronous methods.
 pub trait System: Debug {
     /// Retrieves metadata of a file.
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat>;
+
+    /// Retrieves metadata of a file.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat>;
 
     /// Whether there is an executable file at the specified path.
@@ -623,6 +626,9 @@ impl SharedSystem {
 }
 
 impl System for SharedSystem {
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+        self.0.borrow().fstat(fd)
+    }
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
         self.0.borrow().fstatat(dir_fd, path, flags)
     }
