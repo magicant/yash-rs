@@ -262,20 +262,19 @@ const MODE: Mode = Mode::S_IRUSR
     .union(Mode::S_IROTH)
     .union(Mode::S_IWOTH);
 
-// TODO Consider refactoring the common parts of `open_file` and `open_file_noclobber`
+fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), Error> {
+    match CString::new(field.value) {
+        Ok(value) => Ok((value, field.origin)),
+        Err(e) => Err(Error {
+            cause: ErrorCause::NulByte(e),
+            location: field.origin,
+        }),
+    }
+}
+
 /// Opens a file for redirection.
 fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Location), Error> {
-    let Field { value, origin } = path;
-    let path = match CString::new(value) {
-        Ok(path) => path,
-        Err(e) => {
-            return Err(Error {
-                cause: ErrorCause::NulByte(e),
-                location: origin,
-            })
-        }
-    };
-
+    let (path, origin) = into_c_string_value_and_origin(path)?;
     match env.system.open(&path, option, MODE) {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
@@ -287,16 +286,7 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Locat
 
 /// Opens a file for writing with the `noclobber` option.
 fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location), Error> {
-    let Field { value, origin } = path;
-    let path = match CString::new(value) {
-        Ok(path) => path,
-        Err(e) => {
-            return Err(Error {
-                cause: ErrorCause::NulByte(e),
-                location: origin,
-            })
-        }
-    };
+    let (path, origin) = into_c_string_value_and_origin(path)?;
 
     loop {
         const FLAGS_EXCL: OFlag = OFlag::O_WRONLY.union(OFlag::O_CREAT).union(OFlag::O_EXCL);
