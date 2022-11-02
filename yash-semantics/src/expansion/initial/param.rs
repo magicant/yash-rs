@@ -19,8 +19,11 @@
 use super::super::phrase::Phrase;
 use super::super::AttrChar;
 use super::super::Error;
+use super::super::ErrorCause;
 use super::super::Origin;
 use super::Env;
+use yash_env::option::Option::Unset;
+use yash_env::option::State::Off;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Modifier;
@@ -78,7 +81,14 @@ impl ParamRef<'_> {
             }
         }
 
-        // TODO Check for nounset error
+        // Check for nounset option error //
+        if value.is_none() && env.inner.options.get(Unset) == Off {
+            return Err(Error {
+                cause: ErrorCause::UnsetParameter,
+                location: self.location.clone(),
+            });
+        }
+
         // TODO Reject POSIXly unspecified combinations of name and modifier
 
         // Other modifiers //
@@ -284,6 +294,30 @@ pub mod tests {
 
         let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
         assert_eq!(phrase, Phrase::one_empty_field());
+    }
+
+    #[test]
+    fn unset_option() {
+        let mut env = yash_env::Env::new_virtual();
+        let mut env = Env::new(&mut env);
+        let param = param("foo");
+        let param = ParamRef::from(&param);
+
+        let phrase = param.expand(&mut env).now_or_never().unwrap().unwrap();
+        assert_eq!(phrase, Phrase::one_empty_field());
+    }
+
+    #[test]
+    fn nounset_option() {
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Unset, Off);
+        let mut env = Env::new(&mut env);
+        let param = param("foo");
+        let param = ParamRef::from(&param);
+
+        let e = param.expand(&mut env).now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnsetParameter);
+        assert_eq!(e.location, Location::dummy(""));
     }
 
     #[test]

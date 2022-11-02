@@ -110,6 +110,8 @@ pub enum ErrorCause {
     ArithError(ArithError),
     /// Assignment to a read-only variable.
     AssignReadOnly(ReadOnlyError),
+    /// Expansion of an unset parameter with the `nounset` option
+    UnsetParameter,
     /// Expansion of an empty value with an error switch
     EmptyExpansion(EmptyError),
     /// Assignment to a nonassignable parameter
@@ -126,6 +128,7 @@ impl ErrorCause {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
             AssignReadOnly(_) => "cannot assign to read-only variable",
+            UnsetParameter => "unset parameter",
             EmptyExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
         }
@@ -140,6 +143,7 @@ impl ErrorCause {
             CommandSubstError(e) => e.desc().into(),
             ArithError(e) => e.to_string().into(),
             AssignReadOnly(e) => e.to_string().into(),
+            UnsetParameter => "unset parameter disallowed by the nounset option".into(),
             EmptyExpansion(e) => e.state.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
         }
@@ -158,6 +162,7 @@ impl ErrorCause {
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
+            UnsetParameter => None,
             EmptyExpansion(_) => None,
             NonassignableParameter(_) => None,
         }
@@ -171,6 +176,7 @@ impl std::fmt::Display for ErrorCause {
             CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
             ArithError(error) => error.fmt(f),
             AssignReadOnly(error) => error.fmt(f),
+            UnsetParameter => "unset parameter".fmt(f),
             EmptyExpansion(error) => error.fmt(f),
             NonassignableParameter(error) => error.fmt(f),
         }
