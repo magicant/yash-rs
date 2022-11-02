@@ -126,6 +126,10 @@ impl RealSystem {
 }
 
 impl System for RealSystem {
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+        nix::sys::stat::fstat(fd.0)
+    }
+
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
         nix::sys::stat::fstatat(dir_fd.0, path, flags)
     }

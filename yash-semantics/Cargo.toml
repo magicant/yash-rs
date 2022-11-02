@@ -17,6 +17,9 @@ publish = false
 
 [dependencies]
 async-trait = "0.1.56"
+# We need a specific version of bitflags
+# to obtain some auto-generated functions for items exported from yash-env
+bitflags = "1.3.0"
 yash-arith = { path = "../yash-arith", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-fnmatch = { path = "../yash-fnmatch", version = "1.1.0" }

@@ -41,9 +41,7 @@ pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
-pub use nix::sys::stat::FileStat;
-#[doc(no_inline)]
-pub use nix::sys::stat::Mode;
+pub use nix::sys::stat::{FileStat, Mode, SFlag};
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
@@ -80,6 +78,9 @@ use std::time::Instant;
 /// is [`SharedSystem`], which wraps a `System` instance to extend the interface
 /// with asynchronous methods.
 pub trait System: Debug {
+    /// Retrieves metadata of a file.
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat>;
+
     /// Retrieves metadata of a file.
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat>;
 
@@ -623,6 +624,9 @@ impl SharedSystem {
 }
 
 impl System for SharedSystem {
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+        self.0.borrow().fstat(fd)
+    }
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
         self.0.borrow().fstatat(dir_fd, path, flags)
     }

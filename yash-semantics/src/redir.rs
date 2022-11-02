@@ -45,7 +45,8 @@
 //! - `String`: Opens a readable file descriptor from which you can read the
 //!   expanded field followed by a newline character.
 //!
-//! TODO `noclobber` option
+//! If the `Clobber` [shell option](yash_env::option::Option) is off and a
+//! regular file exists at the target pathname, then `FileOut` will fail.
 //!
 //! If the body is `HereDoc`, the redirection opens a readable file descriptor
 //! that yields [expansion](crate::expansion) of the content. The current
@@ -67,11 +68,14 @@ use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::io::Fd;
+use yash_env::option::Option::Clobber;
+use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
+use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
@@ -251,32 +255,79 @@ impl FdSpec {
     }
 }
 
+const MODE: Mode = Mode::S_IRUSR
+    .union(Mode::S_IWUSR)
+    .union(Mode::S_IRGRP)
+    .union(Mode::S_IWGRP)
+    .union(Mode::S_IROTH)
+    .union(Mode::S_IWOTH);
+
+fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), Error> {
+    match CString::new(field.value) {
+        Ok(value) => Ok((value, field.origin)),
+        Err(e) => Err(Error {
+            cause: ErrorCause::NulByte(e),
+            location: field.origin,
+        }),
+    }
+}
+
 /// Opens a file for redirection.
 fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Location), Error> {
-    let Field { value, origin } = path;
-    let path = match CString::new(value) {
-        Ok(path) => path,
-        Err(e) => {
-            return Err(Error {
-                cause: ErrorCause::NulByte(e),
-                location: origin,
-            })
-        }
-    };
-
-    let mode = Mode::S_IRUSR
-        | Mode::S_IWUSR
-        | Mode::S_IRGRP
-        | Mode::S_IWGRP
-        | Mode::S_IROTH
-        | Mode::S_IWOTH;
-
-    match env.system.open(&path, option, mode) {
+    let (path, origin) = into_c_string_value_and_origin(path)?;
+    match env.system.open(&path, option, MODE) {
         Ok(fd) => Ok((FdSpec::Owned(fd), origin)),
         Err(errno) => Err(Error {
             cause: ErrorCause::OpenFile(path, errno),
             location: origin,
         }),
+    }
+}
+
+/// Opens a file for writing with the `noclobber` option.
+fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location), Error> {
+    let (path, origin) = into_c_string_value_and_origin(path)?;
+
+    loop {
+        const FLAGS_EXCL: OFlag = OFlag::O_WRONLY.union(OFlag::O_CREAT).union(OFlag::O_EXCL);
+        match env.system.open(&path, FLAGS_EXCL, MODE) {
+            Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
+            Err(Errno::EEXIST) => (),
+            Err(errno) => {
+                return Err(Error {
+                    cause: ErrorCause::OpenFile(path, errno),
+                    location: origin,
+                })
+            }
+        }
+
+        // Okay, it seems there is an existing file. Try opening it.
+        match env.system.open(&path, OFlag::O_WRONLY, MODE) {
+            Ok(fd) => {
+                let is_regular = matches!(env.system.fstat(fd), Ok(stat)
+                    if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
+                if is_regular {
+                    let _: Result<_, _> = env.system.close(fd);
+                    return Err(Error {
+                        cause: ErrorCause::OpenFile(path, Errno::EEXIST),
+                        location: origin,
+                    });
+                } else {
+                    return Ok((FdSpec::Owned(fd), origin));
+                }
+            }
+            Err(Errno::ENOENT) => {
+                // A file existed on the first open but not on the second.
+                // Somebody must have removed it between the two opens.
+                // Start over as we may be able to create one next time.
+            }
+            Err(errno) => {
+                return Err(Error {
+                    cause: ErrorCause::OpenFile(path, errno),
+                    location: origin,
+                })
+            }
+        }
     }
 }
 
@@ -329,6 +380,7 @@ async fn open_normal(
     use RedirOp::*;
     match operator {
         FileIn => open_file(env, OFlag::O_RDONLY, operand),
+        FileOut if env.options.get(Clobber) == Off => open_file_noclobber(env, operand),
         FileOut | FileClobber => open_file(
             env,
             OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC,
@@ -795,6 +847,59 @@ mod tests {
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(content[..], []);
         });
+    }
+
+    #[test]
+    fn file_out_noclobber_with_regular_file() {
+        let file = Rc::new(RefCell::new(INode::new([42, 123, 254])));
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Clobber, Off);
+        let mut env = RedirGuard::new(&mut env);
+
+        let redir = "3> foo".parse().unwrap();
+        let e = env
+            .perform_redir(&redir)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+
+        assert_eq!(
+            e.cause,
+            ErrorCause::OpenFile(CString::new("foo").unwrap(), Errno::EEXIST)
+        );
+        assert_eq!(e.location, redir.body.operand().location);
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(content[..], [42, 123, 254]);
+        });
+    }
+
+    #[test]
+    fn file_out_noclobber_with_non_regular_file() {
+        let inode = INode {
+            body: FileBody::Fifo {
+                content: Default::default(),
+                readers: 1,
+                writers: 0,
+            },
+            permissions: Default::default(),
+        };
+        let file = Rc::new(RefCell::new(inode));
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("foo", Rc::clone(&file)).unwrap();
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Clobber, Off);
+        let mut env = RedirGuard::new(&mut env);
+
+        let redir = "3> foo".parse().unwrap();
+        let result = env.perform_redir(&redir).now_or_never().unwrap();
+        assert_eq!(result, Ok(None));
     }
 
     #[test]

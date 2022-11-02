@@ -251,7 +251,30 @@ impl Default for VirtualSystem {
     }
 }
 
+fn stat(inode: &INode) -> Result<FileStat, Errno> {
+    let (type_flag, size) = match &inode.body {
+        FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
+        FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
+        FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
+    };
+    let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
+    result.st_mode = type_flag.bits() | inode.permissions.0;
+    result.st_size = size as _;
+    Ok(result)
+}
+
 impl System for VirtualSystem {
+    /// Retrieves metadata of a file.
+    ///
+    /// The current implementation fills only the following values of the
+    /// returned `FileStat`:
+    ///
+    /// - `st_mode`
+    /// - `st_size`
+    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+        self.with_open_file_description(fd, |ofd| stat(&ofd.file.borrow()))
+    }
+
     /// Retrieves metadata of a file.
     ///
     /// The current implementation fills only the following values of the
@@ -262,16 +285,8 @@ impl System for VirtualSystem {
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, flags)?;
-        let inode = &*inode.borrow();
-        let (type_flag, size) = match &inode.body {
-            FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
-            FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
-            FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
-        };
-        let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
-        result.st_mode = type_flag.bits() | inode.permissions.0;
-        result.st_size = size as _;
-        Ok(result)
+        let inode = inode.borrow();
+        stat(&inode)
     }
 
     /// Tests whether the specified file is executable or not.
@@ -380,6 +395,19 @@ impl System for VirtualSystem {
             OFlag::O_RDWR => (true, true),
             _ => (false, false),
         };
+
+        if let FileBody::Fifo {
+            readers, writers, ..
+        } = &mut file.borrow_mut().body
+        {
+            if is_readable {
+                *readers += 1;
+            }
+            if is_writable {
+                *writers += 1;
+            }
+        }
+
         let open_file_description = Rc::new(RefCell::new(OpenFileDescription {
             file,
             offset: 0,
