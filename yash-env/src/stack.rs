@@ -44,6 +44,12 @@ pub enum Frame {
     /// Subshell
     Subshell,
 
+    /// Context where the `ErrExit` [option](crate::option::Option) is ignored
+    ///
+    /// This frame is pushed when executing negated commands, the condition part
+    /// of and-or lists and the `if`, `while`, and `until` commands.
+    Condition,
+
     /// Built-in utility
     Builtin {
         /// Name of the built-in
