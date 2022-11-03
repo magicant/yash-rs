@@ -276,7 +276,7 @@ async fn execute_builtin(
 
     let (exit_status, abort) = match builtin.r#type {
         Special => {
-            perform_assignments(&mut **env, assigns, false).await?;
+            perform_assignments(env, assigns, false).await?;
             (builtin.execute)(env, fields).await
         }
         Intrinsic | NonIntrinsic => {
@@ -340,7 +340,7 @@ async fn execute_external_utility(
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut *env, assigns, true).await?;
+    perform_assignments(&mut env, assigns, true).await?;
 
     if path.to_bytes().is_empty() {
         print_error(

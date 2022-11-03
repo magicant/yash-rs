@@ -219,9 +219,9 @@ mod tests {
             is_special: true,
         });
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut *env, args).now_or_never().unwrap();
+        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut *env, vec![]));
+        let result = block_on(builtin_body(&mut env, vec![]));
         assert_eq!(
             result,
             (ExitStatus::FAILURE, Break(Divert::Interrupt(None)))
