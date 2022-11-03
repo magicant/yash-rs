@@ -50,9 +50,10 @@ use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
 use self::job::WaitStatusEx;
-use self::option::AllExport;
 use self::option::OptionSet;
+use self::option::{AllExport, ErrExit};
 use self::option::{Off, On};
+use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
@@ -73,7 +74,7 @@ use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::{self, Break, Continue};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
@@ -433,6 +434,20 @@ impl Env {
         };
         self.variables.assign(scope, name, value)
     }
+
+    /// Returns a `Divert` if the `ErrExit` [shell option](self::option::Option) is on.
+    ///
+    /// This function should be called when a command failed for some reasons.
+    /// The function returns `Break(Divert::Exit)` if the `ErrExit` option is on
+    /// and the current stack has no `Condition` [frame](Frame); otherwise,
+    /// `Continue(())`.
+    pub fn apply_errexit(&self) -> ControlFlow<Divert> {
+        if self.options.get(ErrExit) == Off || self.stack.contains(&Frame::Condition) {
+            Continue(())
+        } else {
+            Break(Divert::Exit(None))
+        }
+    }
 }
 
 #[async_trait(?Send)]
@@ -459,7 +474,6 @@ mod tests {
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
     use std::cell::RefCell;
-    use std::ops::ControlFlow::Continue;
     use yash_syntax::source::Location;
 
     /// Helper function to perform a test in a virtual system with an executor.
@@ -790,5 +804,26 @@ mod tests {
 
         assert_eq!(env.variables.get("a").unwrap(), &a.export());
         assert_eq!(env.variables.get("b").unwrap(), &b);
+    }
+
+    #[test]
+    fn errexit_on() {
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
+        assert_eq!(env.apply_errexit(), Break(Divert::Exit(None)));
+    }
+
+    #[test]
+    fn errexit_in_condition() {
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
+        let env = env.push_frame(Frame::Condition);
+        assert_eq!(env.apply_errexit(), Continue(()));
+    }
+
+    #[test]
+    fn errexit_off() {
+        let env = Env::new_virtual();
+        assert_eq!(env.apply_errexit(), Continue(()));
     }
 }
