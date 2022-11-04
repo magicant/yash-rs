@@ -23,12 +23,14 @@ use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::Env;
 use yash_syntax::syntax;
 
 /// Executes the condition of an if/while/until command.
 async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
-    condition.execute(env).await?;
+    let mut env = env.push_frame(Frame::Condition);
+    condition.execute(&mut env).await?;
     Continue(env.exit_status == ExitStatus::SUCCESS)
 }
 
@@ -127,12 +129,50 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
-    use std::ops::ControlFlow::Continue;
+    use futures_util::FutureExt;
+    use std::future::Future;
+    use std::ops::ControlFlow::{self, Continue};
+    use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
+
+    #[test]
+    fn stack_in_condition() {
+        fn stub_builtin(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert_matches!(
+                    env.stack.as_slice(),
+                    [Frame::Condition, Frame::Builtin { .. }]
+                );
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin,
+            },
+        );
+        let condition = "foo".parse().unwrap();
+
+        let result = evaluate_condition(&mut env, &condition)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(true));
+    }
 
     #[test]
     fn redirecting_compound_command() {
