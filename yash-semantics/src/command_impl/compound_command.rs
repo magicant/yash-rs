@@ -16,19 +16,27 @@
 
 //! Implementation of the compound command semantics.
 
+use super::Command;
+use crate::redir::RedirGuard;
+use crate::Handle;
+use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Result;
+use yash_env::Env;
+use yash_syntax::syntax;
+
+/// Executes the condition of an if/while/until command.
+async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
+    condition.execute(env).await?;
+    Continue(env.exit_status == ExitStatus::SUCCESS)
+}
+
 mod case;
 mod for_loop;
 mod r#if;
 mod subshell;
 mod while_loop;
-
-use super::Command;
-use crate::redir::RedirGuard;
-use crate::Handle;
-use async_trait::async_trait;
-use yash_env::semantics::Result;
-use yash_env::Env;
-use yash_syntax::syntax;
 
 /// Executes the compound command.
 #[async_trait(?Send)]

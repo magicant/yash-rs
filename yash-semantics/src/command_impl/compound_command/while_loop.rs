@@ -34,13 +34,10 @@ struct Loop<'a> {
 }
 
 impl Loop<'_> {
-    async fn evaluate_condition(&mut self) -> Result<bool> {
-        self.condition_command.execute(self.env).await?;
-        Continue(self.env.exit_status == ExitStatus::SUCCESS)
-    }
-
     async fn iterate(&mut self) -> Result {
-        while self.evaluate_condition().await? == self.expected_condition {
+        while super::evaluate_condition(self.env, self.condition_command).await?
+            == self.expected_condition
+        {
             self.body.execute(self.env).await?;
             self.exit_status = self.env.exit_status;
         }

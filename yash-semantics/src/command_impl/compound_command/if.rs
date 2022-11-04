@@ -16,6 +16,7 @@
 
 //! Execution of the if command
 
+use super::evaluate_condition;
 use crate::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
@@ -23,11 +24,6 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax::ElifThen;
 use yash_syntax::syntax::List;
-
-async fn execute_condition(env: &mut Env, condition: &List) -> Result<bool> {
-    condition.execute(env).await?;
-    Continue(env.exit_status == ExitStatus::SUCCESS)
-}
 
 /// Executes the if command.
 pub async fn execute(
@@ -37,11 +33,11 @@ pub async fn execute(
     elifs: &[ElifThen],
     r#else: &Option<List>,
 ) -> Result {
-    if execute_condition(env, condition).await? {
+    if evaluate_condition(env, condition).await? {
         return body.execute(env).await;
     }
     for ElifThen { condition, body } in elifs {
-        if execute_condition(env, condition).await? {
+        if evaluate_condition(env, condition).await? {
             return body.execute(env).await;
         }
     }
