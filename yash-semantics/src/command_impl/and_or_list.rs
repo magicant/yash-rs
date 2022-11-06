@@ -20,8 +20,11 @@ use super::Command;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::Env;
+use yash_syntax::syntax::AndOr::{self, AndThen, OrElse};
 use yash_syntax::syntax::AndOrList;
+use yash_syntax::syntax::Pipeline;
 
 /// Executes the and-or list.
 ///
@@ -33,21 +36,49 @@ use yash_syntax::syntax::AndOrList;
 ///
 /// The exit status of the and-or list will be that of the last executed
 /// pipeline.
+///
+/// [`Frame::Condition`] is pushed to the environment's stack while the
+/// execution of the pipelines except for the last.
 #[async_trait(?Send)]
 impl Command for AndOrList {
     async fn execute(&self, env: &mut Env) -> Result {
-        use yash_syntax::syntax::AndOr::*;
-        self.first.execute(env).await?;
-        for (and_or, pipeline) in &self.rest {
-            let success = env.exit_status.is_successful();
-            let run = match and_or {
-                AndThen => success,
-                OrElse => !success,
-            };
-            if run {
-                pipeline.execute(env).await?;
-            }
+        if self.rest.is_empty() {
+            return self.first.execute(env).await;
         }
+
+        // Execute `first`
+        let mut env2 = env.push_frame(Frame::Condition);
+        self.first.execute(&mut env2).await?;
+
+        // Execute `rest` but last
+        let mut i = self.rest.iter().peekable();
+        let mut pipeline;
+        loop {
+            pipeline = i.next().unwrap();
+            if i.peek().is_none() {
+                break;
+            }
+            execute_conditional_pipeline(&mut env2, pipeline).await?;
+        }
+        drop(env2);
+
+        // Execute last
+        execute_conditional_pipeline(env, pipeline).await
+    }
+}
+
+async fn execute_conditional_pipeline(
+    env: &mut Env,
+    (and_or, pipeline): &(AndOr, Pipeline),
+) -> Result {
+    let success = env.exit_status.is_successful();
+    let run = match and_or {
+        AndThen => success,
+        OrElse => !success,
+    };
+    if run {
+        pipeline.execute(env).await
+    } else {
         Continue(())
     }
 }
@@ -58,11 +89,17 @@ mod tests {
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
+    use assert_matches::assert_matches;
     use futures_executor::block_on;
-    use std::ops::ControlFlow::Break;
+    use std::future::Future;
+    use std::ops::ControlFlow::{self, Break};
+    use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -256,5 +293,54 @@ mod tests {
         let result = block_on(list.execute(&mut env));
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(0));
+    }
+
+    #[test]
+    fn stack_in_list() {
+        fn stub_builtin_condition(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert_matches!(
+                    env.stack.as_slice(),
+                    [Frame::Condition, Frame::Builtin { .. }]
+                );
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+        fn stub_builtin_no_condition(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert_matches!(env.stack.as_slice(), [Frame::Builtin { .. }]);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "head",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin_condition,
+            },
+        );
+        env.builtins.insert(
+            "tail",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin_no_condition,
+            },
+        );
+
+        let list: AndOrList = "tail".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Continue(()));
+
+        let list: AndOrList = "head && head && tail".parse().unwrap();
+        let result = block_on(list.execute(&mut env));
+        assert_eq!(result, Continue(()));
     }
 }
