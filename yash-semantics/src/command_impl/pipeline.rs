@@ -25,6 +25,7 @@ use yash_env::job::Pid;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::stack::Frame;
 use yash_env::system::Errno;
 use yash_env::Env;
 use yash_env::System;
@@ -55,6 +56,11 @@ use yash_syntax::syntax;
 /// performs a jump as in `! return 42`. The behavior disagrees among existing
 /// shells. This implementation does not invert the exit status when the return
 /// value is `Err(Divert::...)`, which is different from yash 2.
+///
+/// # Stack
+///
+/// if `self.negation` is true, [`Frame::Condition`] is pushed to the
+/// environment's stack while the pipeline is executed.
 #[async_trait(?Send)]
 impl Command for syntax::Pipeline {
     async fn execute(&self, env: &mut Env) -> Result {
@@ -62,7 +68,8 @@ impl Command for syntax::Pipeline {
             return execute_commands_in_pipeline(env, &self.commands).await;
         }
 
-        execute_commands_in_pipeline(env, &self.commands).await?;
+        let mut env = env.push_frame(Frame::Condition);
+        execute_commands_in_pipeline(&mut env, &self.commands).await?;
         env.exit_status = if env.exit_status == ExitStatus::SUCCESS {
             ExitStatus::FAILURE
         } else {
@@ -239,7 +246,13 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_executor::block_on;
+    use std::future::Future;
+    use std::ops::ControlFlow;
+    use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
+    use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
@@ -395,6 +408,59 @@ mod tests {
         let result = block_on(pipeline.execute(&mut env));
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(15));
+    }
+
+    #[test]
+    fn stack_without_inversion() {
+        fn stub_builtin(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert!(!env.stack.contains(&Frame::Condition), "{:?}", env.stack);
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin,
+            },
+        );
+        let pipeline: syntax::Pipeline = "foo".parse().unwrap();
+        let result = block_on(pipeline.execute(&mut env));
+        assert_eq!(result, Continue(()));
+    }
+
+    #[test]
+    fn stack_with_inversion() {
+        fn stub_builtin(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert_matches!(
+                    env.stack.as_slice(),
+                    [Frame::Condition, Frame::Builtin { .. }]
+                );
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin,
+            },
+        );
+        let pipeline: syntax::Pipeline = "! foo".parse().unwrap();
+        let result = block_on(pipeline.execute(&mut env));
+        assert_eq!(result, Continue(()));
     }
 
     #[test]
