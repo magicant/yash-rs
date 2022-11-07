@@ -17,7 +17,7 @@
 //! Semantics of subshell compound commands
 
 use crate::Command;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::Break;
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::semantics::Divert;
@@ -35,7 +35,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     match result {
         Ok(exit_status) => {
             env.exit_status = exit_status;
-            Continue(())
+            env.apply_errexit()
         }
         Err(errno) => {
             print_error(
@@ -59,7 +59,10 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -88,5 +91,17 @@ mod tests {
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn errexit_in_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(ErrExit, On);
+            let command: CompoundCommand = "(return -n 42)".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Break(Divert::Exit(None)));
+            assert_eq!(env.exit_status, ExitStatus(42));
+        })
     }
 }

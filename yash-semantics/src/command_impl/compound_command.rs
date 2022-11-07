@@ -63,6 +63,8 @@ impl Command for syntax::FullCompoundCommand {
 /// A subshell is executed by running the contained list in a
 /// [subshell](Env::run_in_subshell).
 ///
+/// After the subshell has finished, [`Env::apply_errexit`] is called.
+///
 /// # For loop
 ///
 /// Executing a for loop starts with expanding the `name` and `values`. If
