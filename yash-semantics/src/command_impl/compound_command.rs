@@ -137,7 +137,6 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
     use futures_util::FutureExt;
     use std::future::Future;
     use std::ops::ControlFlow::{self, Break, Continue};
@@ -192,7 +191,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand = "{ echo 1; echo 2; } > /file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
@@ -211,7 +210,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -224,7 +223,7 @@ mod tests {
         env.options.set(ErrExit, On);
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Exit(None)));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
@@ -234,7 +233,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::CompoundCommand = "{ return -n 42; }".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
