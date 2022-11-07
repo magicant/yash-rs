@@ -41,13 +41,20 @@ mod subshell;
 mod while_loop;
 
 /// Executes the compound command.
+///
+/// The redirections are performed, if any, before executing the command body.
+/// Redirection errors are subject to the `ErrExit` option
+/// (`Env::apply_errexit`).
 #[async_trait(?Send)]
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
         match env.perform_redirs(&self.redirs).await {
             Ok(_) => self.command.execute(&mut env).await,
-            Err(error) => error.handle(&mut env).await,
+            Err(error) => {
+                error.handle(&mut env).await?;
+                env.apply_errexit()
+            }
         }
     }
 }
@@ -133,12 +140,14 @@ mod tests {
     use futures_executor::block_on;
     use futures_util::FutureExt;
     use std::future::Future;
-    use std::ops::ControlFlow::{self, Continue};
+    use std::ops::ControlFlow::{self, Break, Continue};
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
@@ -206,6 +215,18 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn redirection_error_triggers_errexit() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(ErrExit, On);
+        let command: syntax::FullCompoundCommand =
+            "{ echo not reached; } < /no/such/file".parse().unwrap();
+        let result = block_on(command.execute(&mut env));
+        assert_eq!(result, Break(Divert::Exit(None)));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
 
     #[test]
