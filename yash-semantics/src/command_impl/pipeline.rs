@@ -245,7 +245,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::future::Future;
     use std::ops::ControlFlow;
     use std::pin::Pin;
@@ -264,7 +264,7 @@ mod tests {
             commands: vec![],
             negation: false,
         };
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
@@ -274,7 +274,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return -n 93".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(93));
     }
@@ -284,7 +284,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return 37".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
@@ -385,7 +385,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return -n 42".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
@@ -395,7 +395,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return -n 0".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
     }
@@ -405,7 +405,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return 15".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(15));
     }
@@ -431,7 +431,7 @@ mod tests {
             },
         );
         let pipeline: syntax::Pipeline = "foo".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
     }
 
@@ -459,7 +459,7 @@ mod tests {
             },
         );
         let pipeline: syntax::Pipeline = "! foo".parse().unwrap();
-        let result = block_on(pipeline.execute(&mut env));
+        let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
     }
 

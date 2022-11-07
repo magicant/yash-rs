@@ -90,7 +90,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::future::Future;
     use std::ops::ControlFlow::{self, Break};
     use std::pin::Pin;
@@ -107,7 +107,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 36".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(36));
     }
@@ -120,7 +120,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let list: AndOrList = "echo one && echo two".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
@@ -131,7 +131,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 && return -n 5".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(5));
     }
@@ -145,7 +145,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 1 && echo !".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(1));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -159,7 +159,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let list: AndOrList = "echo 1 && echo 2 && echo 3".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n3\n"));
@@ -174,7 +174,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 && return -n 2 && echo !".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -185,7 +185,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 8 && X || return -n 0".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
@@ -199,7 +199,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "echo + || return -n 100".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "+\n"));
@@ -216,7 +216,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
@@ -233,7 +233,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(2));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "one\ntwo\n"));
@@ -245,7 +245,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 1 || return -n 2 || return -n 3".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(3));
     }
@@ -259,7 +259,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 3 || echo + || return -n 4".parse().unwrap();
 
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "+\n"));
@@ -270,7 +270,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 0 || X && return -n 9".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(9));
     }
@@ -280,7 +280,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return 97".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(97));
     }
@@ -290,7 +290,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 7 || return 0 && X".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
@@ -336,11 +336,11 @@ mod tests {
         );
 
         let list: AndOrList = "tail".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
 
         let list: AndOrList = "head && head && tail".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
     }
 }
