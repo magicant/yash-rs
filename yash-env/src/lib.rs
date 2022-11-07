@@ -435,17 +435,20 @@ impl Env {
         self.variables.assign(scope, name, value)
     }
 
-    /// Returns a `Divert` if the `ErrExit` [shell option](self::option::Option) is on.
+    /// Returns a `Divert` if the shell should exit because of the `ErrExit`
+    /// [shell option](self::option::Option).
     ///
-    /// This function should be called when a command failed for some reasons.
-    /// The function returns `Break(Divert::Exit)` if the `ErrExit` option is on
-    /// and the current stack has no `Condition` [frame](Frame); otherwise,
-    /// `Continue(())`.
+    /// The function returns `Break(Divert::Exit)` if the `ErrExit` option is
+    /// on, the current `self.exit_status` is non-zero, and the current stack
+    /// has no `Condition` [frame](Frame); otherwise, `Continue(())`.
     pub fn apply_errexit(&self) -> ControlFlow<Divert> {
-        if self.options.get(ErrExit) == Off || self.stack.contains(&Frame::Condition) {
-            Continue(())
-        } else {
+        if self.options.get(ErrExit) == On
+            && self.exit_status != ExitStatus::SUCCESS
+            && !self.stack.contains(&Frame::Condition)
+        {
             Break(Divert::Exit(None))
+        } else {
+            Continue(())
         }
     }
 }
@@ -809,13 +812,22 @@ mod tests {
     #[test]
     fn errexit_on() {
         let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::FAILURE;
         env.options.set(ErrExit, On);
         assert_eq!(env.apply_errexit(), Break(Divert::Exit(None)));
     }
 
     #[test]
+    fn errexit_with_zero_exit_status() {
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
+        assert_eq!(env.apply_errexit(), Continue(()));
+    }
+
+    #[test]
     fn errexit_in_condition() {
         let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::FAILURE;
         env.options.set(ErrExit, On);
         let env = env.push_frame(Frame::Condition);
         assert_eq!(env.apply_errexit(), Continue(()));
@@ -823,7 +835,8 @@ mod tests {
 
     #[test]
     fn errexit_off() {
-        let env = Env::new_virtual();
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus::FAILURE;
         assert_eq!(env.apply_errexit(), Continue(()));
     }
 }
