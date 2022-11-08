@@ -16,28 +16,45 @@
 
 //! Implementation of the compound command semantics.
 
+use super::Command;
+use crate::redir::RedirGuard;
+use crate::Handle;
+use async_trait::async_trait;
+use std::ops::ControlFlow::Continue;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Result;
+use yash_env::stack::Frame;
+use yash_env::Env;
+use yash_syntax::syntax;
+
+/// Executes the condition of an if/while/until command.
+async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
+    let mut env = env.push_frame(Frame::Condition);
+    condition.execute(&mut env).await?;
+    Continue(env.exit_status == ExitStatus::SUCCESS)
+}
+
 mod case;
 mod for_loop;
 mod r#if;
 mod subshell;
 mod while_loop;
 
-use super::Command;
-use crate::redir::RedirGuard;
-use crate::Handle;
-use async_trait::async_trait;
-use yash_env::semantics::Result;
-use yash_env::Env;
-use yash_syntax::syntax;
-
 /// Executes the compound command.
+///
+/// The redirections are performed, if any, before executing the command body.
+/// Redirection errors are subject to the `ErrExit` option
+/// (`Env::apply_errexit`).
 #[async_trait(?Send)]
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
         match env.perform_redirs(&self.redirs).await {
             Ok(_) => self.command.execute(&mut env).await,
-            Err(error) => error.handle(&mut env).await,
+            Err(error) => {
+                error.handle(&mut env).await?;
+                env.apply_errexit()
+            }
         }
     }
 }
@@ -52,6 +69,8 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// A subshell is executed by running the contained list in a
 /// [subshell](Env::run_in_subshell).
+///
+/// After the subshell has finished, [`Env::apply_errexit`] is called.
 ///
 /// # For loop
 ///
@@ -118,13 +137,52 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
-    use std::ops::ControlFlow::Continue;
+    use futures_util::FutureExt;
+    use std::future::Future;
+    use std::ops::ControlFlow::{self, Break, Continue};
+    use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::builtin::Builtin;
+    use yash_env::builtin::Type::Special;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::VirtualSystem;
+
+    #[test]
+    fn stack_in_condition() {
+        fn stub_builtin(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+            Box::pin(async move {
+                assert_matches!(
+                    env.stack.as_slice(),
+                    [Frame::Condition, Frame::Builtin { .. }]
+                );
+                (ExitStatus::SUCCESS, Continue(()))
+            })
+        }
+
+        let mut env = Env::new_virtual();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Special,
+                execute: stub_builtin,
+            },
+        );
+        let condition = "foo".parse().unwrap();
+
+        let result = evaluate_condition(&mut env, &condition)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(true));
+    }
 
     #[test]
     fn redirecting_compound_command() {
@@ -133,7 +191,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand = "{ echo 1; echo 2; } > /file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
@@ -152,10 +210,22 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::FullCompoundCommand =
             "{ echo not reached; } < /no/such/file".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn redirection_error_triggers_errexit() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(ErrExit, On);
+        let command: syntax::FullCompoundCommand =
+            "{ echo not reached; } < /no/such/file".parse().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(None)));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
 
     #[test]
@@ -163,7 +233,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let command: syntax::CompoundCommand = "{ return -n 42; }".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(42));
     }

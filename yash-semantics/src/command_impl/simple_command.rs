@@ -51,8 +51,9 @@ use yash_syntax::syntax::Redir;
 /// The execution starts with the [expansion](crate::expansion) of the command
 /// words. Next, the [command search](crate::command_search) is performed to
 /// find an execution [target](crate::command_search::Target) named by the first
-/// [field](Field) of the expansion results. The remainder of the execution
-/// differs depending on the target.
+/// [field](Field) of the expansion results. The target type defines how the
+/// target is executed. After the execution, the `ErrExit` option is applied
+/// with [`Env::apply_errexit`].
 ///
 /// # Target types and their semantics
 ///
@@ -186,7 +187,9 @@ impl Command for syntax::SimpleCommand {
         } else {
             let exit_status = exit_status.unwrap_or_default();
             execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs), exit_status).await
-        }
+        }?;
+
+        env.apply_errexit()
     }
 }
 
@@ -464,6 +467,8 @@ mod tests {
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
@@ -1036,5 +1041,16 @@ mod tests {
                 assert_eq!(from_utf8(content), Ok(""));
             });
         });
+    }
+
+    #[test]
+    fn errexit_on_simple_command() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.options.set(ErrExit, On);
+        let command: syntax::SimpleCommand = "return -n 93".parse().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(None)));
+        assert_eq!(env.exit_status, ExitStatus(93));
     }
 }
