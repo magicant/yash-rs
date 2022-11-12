@@ -162,7 +162,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_for_loop_short() {
@@ -170,14 +170,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "A");
             assert_eq!(values, None);
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -187,14 +188,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -204,14 +206,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -221,14 +224,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "B");
             assert_eq!(values, None);
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -238,14 +242,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -255,8 +260,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             let values = values
                 .unwrap()
@@ -267,7 +273,7 @@ mod tests {
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -277,8 +283,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "in");
             let values = values
                 .unwrap()
@@ -289,7 +296,7 @@ mod tests {
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -299,14 +306,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -316,14 +324,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::For { name, values, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::For { name, values, body } => {
             assert_eq!(name.to_string(), "foo");
             assert_eq!(values, Some(vec![]));
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -346,13 +355,14 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
-        assert!(first_pass.is_alias_substituted());
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        assert_matches!(result, Ok(Rec::AliasSubstituted));
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_eq!(result.to_string(), "for A do :; done");
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_eq!(compound_command.to_string(), "for A do :; done");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -375,13 +385,14 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
-        assert!(first_pass.is_alias_substituted());
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        assert_matches!(result, Ok(Rec::AliasSubstituted));
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_eq!(result.to_string(), "for A do :; done");
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_eq!(compound_command.to_string(), "for A do :; done");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -391,7 +402,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), " for ");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -405,7 +417,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), " for\n");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -419,7 +432,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingForName));
         assert_eq!(*e.location.code.value.borrow(), "for; do :; done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -447,10 +461,11 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
-        assert!(first_pass.is_alias_substituted());
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        assert_matches!(result, Ok(Rec::AliasSubstituted));
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForName));
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -470,7 +485,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(&e.cause,
             ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "for X\n; do :; done");
@@ -504,10 +520,11 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let first_pass = block_on(parser.take_token_manual(true)).unwrap();
-        assert!(first_pass.is_alias_substituted());
+        let result = parser.take_token_manual(true).now_or_never().unwrap();
+        assert_matches!(result, Ok(Rec::AliasSubstituted));
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidForValue));
         assert_eq!(*e.location.code.value.borrow(), "&");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -527,7 +544,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(&e.cause,
             ErrorCause::Syntax(SyntaxError::MissingForBody { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " for X; ! do :; done");

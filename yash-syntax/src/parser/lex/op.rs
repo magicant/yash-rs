@@ -378,7 +378,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::num::NonZeroU64;
 
     fn ensure_sorted(trie: &Trie) {
@@ -402,7 +402,7 @@ mod tests {
     fn lexer_operator_longest_match() {
         let mut lexer = Lexer::from_memory("<<-", Source::Unknown);
 
-        let t = block_on(lexer.operator()).unwrap().unwrap();
+        let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
@@ -413,14 +413,14 @@ mod tests {
         assert_eq!(t.word.location.range, 0..3);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLessDash));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_operator_delimited_by_another_operator() {
         let mut lexer = Lexer::from_memory("<<>", Source::Unknown);
 
-        let t = block_on(lexer.operator()).unwrap().unwrap();
+        let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
@@ -430,14 +430,17 @@ mod tests {
         assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
-        assert_eq!(block_on(lexer.location()).unwrap().range, 2..3);
+        assert_eq!(
+            lexer.location().now_or_never().unwrap().unwrap().range,
+            2..3
+        );
     }
 
     #[test]
     fn lexer_operator_delimited_by_eof() {
         let mut lexer = Lexer::from_memory("<<", Source::Unknown);
 
-        let t = block_on(lexer.operator()).unwrap().unwrap();
+        let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
@@ -447,14 +450,14 @@ mod tests {
         assert_eq!(t.word.location.range, 0..2);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_operator_containing_line_continuations() {
         let mut lexer = Lexer::from_memory("\\\n\\\n<\\\n<\\\n>", Source::Unknown);
 
-        let t = block_on(lexer.operator()).unwrap().unwrap();
+        let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('<')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('<')));
@@ -464,14 +467,14 @@ mod tests {
         assert_eq!(t.word.location.range, 0..10);
         assert_eq!(t.id, TokenId::Operator(Operator::LessLess));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('>')));
     }
 
     #[test]
     fn lexer_operator_none() {
         let mut lexer = Lexer::from_memory("\\\n ", Source::Unknown);
 
-        let r = block_on(lexer.operator()).unwrap();
+        let r = lexer.operator().now_or_never().unwrap().unwrap();
         assert!(r.is_none(), "Unexpected success: {:?}", r);
     }
 
@@ -496,7 +499,7 @@ mod tests {
             Source::Unknown,
         );
 
-        let t = block_on(lexer.operator()).unwrap().unwrap();
+        let t = lexer.operator().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(t.word.units, [WordUnit::Unquoted(TextUnit::Literal('\n'))]);
         assert_eq!(*t.word.location.code.value.borrow(), "\n");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);

@@ -153,7 +153,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use yash_env::system::Errno;
 
     #[test]
@@ -227,7 +227,9 @@ mod tests {
         let location = Location::dummy("foo");
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let result = block_on(expand(command, location.clone(), &mut env));
+        let result = expand(command, location.clone(), &mut env)
+            .now_or_never()
+            .unwrap();
         let cause = ErrorCause::CommandSubstError(Errno::ENOSYS);
         assert_eq!(result, Err(Error { cause, location }));
     }

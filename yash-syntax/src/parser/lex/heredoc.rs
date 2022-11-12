@@ -113,7 +113,7 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit::*;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::cell::RefCell;
 
     #[test]
@@ -129,13 +129,13 @@ mod tests {
     #[test]
     fn lexer_line() {
         let mut lexer = Lexer::from_memory("\n", Source::Unknown);
-        let line = block_on(lexer.line()).unwrap();
+        let line = lexer.line().now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
 
         let mut lexer = Lexer::from_memory("foo\n", Source::Unknown);
-        let line = block_on(lexer.line()).unwrap();
+        let line = lexer.line().now_or_never().unwrap().unwrap();
         assert_eq!(line, "foo");
-        let next = block_on(lexer.peek_char()).unwrap().unwrap();
+        let next = lexer.peek_char().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(next, '\n');
     }
 
@@ -152,12 +152,16 @@ mod tests {
         let heredoc = here_doc_operator("END", false);
 
         let mut lexer = Lexer::from_memory("END\nX", Source::Unknown);
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
         assert_eq!(heredoc.content.borrow().0, []);
 
-        let location = block_on(lexer.location()).unwrap();
+        let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "END\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.range, 4..5);
@@ -168,12 +172,16 @@ mod tests {
         let heredoc = here_doc_operator("FOO", false);
 
         let mut lexer = Lexer::from_memory("content\nFOO\nX", Source::Unknown);
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
         assert_eq!(heredoc.content.borrow().to_string(), "content\n");
 
-        let location = block_on(lexer.location()).unwrap();
+        let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.range, 12..13);
@@ -184,12 +192,16 @@ mod tests {
         let heredoc = here_doc_operator("BAR", false);
 
         let mut lexer = Lexer::from_memory("foo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
         assert_eq!(heredoc.content.borrow().to_string(), "foo\n\tBAR\n\nbaz\n");
 
-        let location = block_on(lexer.location()).unwrap();
+        let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.range, 18..19);
@@ -206,7 +218,11 @@ END
 "#,
             Source::Unknown,
         );
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             heredoc.content.borrow().0,
             [
@@ -236,7 +252,11 @@ END
 "#,
             Source::Unknown,
         );
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             heredoc.content.borrow().0,
             [
@@ -265,12 +285,16 @@ END
         let heredoc = here_doc_operator("BAR", true);
 
         let mut lexer = Lexer::from_memory("\t\t\tfoo\n\tBAR\n\nbaz\nBAR\nX", Source::Unknown);
-        block_on(lexer.here_doc_content(&heredoc)).unwrap();
+        lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, true);
         assert_eq!(heredoc.content.borrow().to_string(), "foo\n");
 
-        let location = block_on(lexer.location()).unwrap();
+        let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
         assert_eq!(location.code.start_line_number.get(), 1);
         assert_eq!(location.range, 12..13);
@@ -281,7 +305,11 @@ END
         let heredoc = here_doc_operator("END", false);
 
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let e = block_on(lexer.here_doc_content(&heredoc)).unwrap_err();
+        let e = lexer
+            .here_doc_content(&heredoc)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedHereDocContent { redir_op_location }) => {
             assert_eq!(*redir_op_location.code.value.borrow(), "END");

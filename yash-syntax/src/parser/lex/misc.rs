@@ -68,76 +68,84 @@ impl Lexer<'_> {
 mod tests {
     use super::*;
     use crate::source::Source;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_skip_blanks() {
         let mut lexer = Lexer::from_memory(" \t w", Source::Unknown);
 
-        let c = block_on(async {
+        let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('w')));
 
         // Test idempotence
-        let c = block_on(async {
+        let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('w')));
     }
 
     #[test]
     fn lexer_skip_blanks_does_not_skip_newline() {
         let mut lexer = Lexer::from_memory("\n", Source::Unknown);
-        block_on(async {
-            lexer.skip_blanks().await.unwrap();
-            assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
-        });
+        lexer.skip_blanks().now_or_never().unwrap().unwrap();
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
     }
 
     #[test]
     fn lexer_skip_blanks_skips_line_continuations() {
         let mut lexer = Lexer::from_memory("\\\n  \\\n\\\n\\\n \\\nX", Source::Unknown);
-        let c = block_on(async {
+        let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('X')));
 
         let mut lexer = Lexer::from_memory("  \\\n\\\n  \\\n Y", Source::Unknown);
-        let c = block_on(async {
+        let c = async {
             lexer.skip_blanks().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('Y')));
     }
 
     #[test]
     fn lexer_skip_comment_no_comment() {
         let mut lexer = Lexer::from_memory("\n", Source::Unknown);
-        block_on(async {
-            lexer.skip_comment().await.unwrap();
-            assert_eq!(lexer.peek_char().await, Ok(Some('\n')));
-        });
+        lexer.skip_comment().now_or_never().unwrap().unwrap();
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
     }
 
     #[test]
     fn lexer_skip_comment_empty_comment() {
         let mut lexer = Lexer::from_memory("#\n", Source::Unknown);
 
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('\n')));
 
         // Test idempotence
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('\n')));
     }
 
@@ -145,18 +153,22 @@ mod tests {
     fn lexer_skip_comment_non_empty_comment() {
         let mut lexer = Lexer::from_memory("\\\n### foo bar\\\n", Source::Unknown);
 
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('\n')));
         assert_eq!(lexer.index(), 14);
 
         // Test idempotence
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(Some('\n')));
         assert_eq!(lexer.index(), 14);
     }
@@ -165,17 +177,21 @@ mod tests {
     fn lexer_skip_comment_not_ending_with_newline() {
         let mut lexer = Lexer::from_memory("#comment", Source::Unknown);
 
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(None));
 
         // Test idempotence
-        let c = block_on(async {
+        let c = async {
             lexer.skip_comment().await?;
             lexer.peek_char().await
-        });
+        }
+        .now_or_never()
+        .unwrap();
         assert_eq!(c, Ok(None));
     }
 }

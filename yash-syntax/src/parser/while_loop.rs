@@ -102,7 +102,7 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_while_loop_short() {
@@ -110,13 +110,14 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::While { condition, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -126,13 +127,14 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::While { condition, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::While { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -142,7 +144,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedWhileClause { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "while :");
@@ -162,7 +165,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::EmptyWhileCondition)
@@ -192,10 +196,11 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_eq!(result.to_string(), "while :; do :; done");
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_eq!(compound_command.to_string(), "while :; do :; done");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -205,13 +210,14 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Until { condition, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), ":");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -221,13 +227,14 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Until { condition, body } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Until { condition, body } => {
             assert_eq!(condition.to_string(), "false; true&");
             assert_eq!(body.to_string(), "foo; bar&");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -237,7 +244,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedUntilClause { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "until :");
@@ -257,7 +265,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::EmptyUntilCondition)
@@ -287,10 +296,11 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_eq!(result.to_string(), "until :; do :; done");
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_eq!(compound_command.to_string(), "until :; do :; done");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 }

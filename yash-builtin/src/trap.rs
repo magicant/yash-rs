@@ -107,7 +107,6 @@ mod tests {
     use super::*;
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
-    use futures_executor::block_on;
     use futures_util::future::FutureExt;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
@@ -173,7 +172,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -186,7 +185,7 @@ mod tests {
         let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "trap -- echo INT\n"));
     }
@@ -201,7 +200,7 @@ mod tests {
         let args = Field::dummies(["echo t", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
@@ -221,7 +220,7 @@ mod tests {
         let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut *env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut *env, vec![]));
+        let result = builtin_body(&mut *env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             (ExitStatus::FAILURE, Break(Divert::Interrupt(None)))
@@ -240,7 +239,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
         env.traps.enter_subshell(&mut env.system);
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- '' TERM\n")
@@ -260,7 +259,7 @@ mod tests {
         let args = Field::dummies(["ls", "QUIT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
-        let result = block_on(builtin_body(&mut env, vec![]));
+        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- ls QUIT\ntrap -- '' TERM\n")

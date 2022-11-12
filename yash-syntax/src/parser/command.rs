@@ -51,7 +51,7 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_command_simple() {
@@ -59,12 +59,13 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        assert_matches!(result, Command::Simple(c) => {
+        let result = parser.command().now_or_never().unwrap();
+        let command = result.unwrap().unwrap().unwrap();
+        assert_matches!(command, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo <bar");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -74,12 +75,13 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        assert_matches!(result, Command::Compound(c) => {
+        let result = parser.command().now_or_never().unwrap();
+        let command = result.unwrap().unwrap().unwrap();
+        assert_matches!(command, Command::Compound(c) => {
             assert_eq!(c.to_string(), "(foo) <bar");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -89,12 +91,13 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.command()).unwrap().unwrap().unwrap();
-        assert_matches!(result, Command::Function(f) => {
+        let result = parser.command().now_or_never().unwrap();
+        let command = result.unwrap().unwrap().unwrap();
+        assert_matches!(command, Command::Function(f) => {
             assert_eq!(f.to_string(), "fun() (echo)");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -104,7 +107,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.command()).unwrap().unwrap();
-        assert_eq!(option, None);
+        let result = parser.command().now_or_never().unwrap().unwrap();
+        assert_eq!(result, Rec::Parsed(None));
     }
 }

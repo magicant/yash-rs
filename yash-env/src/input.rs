@@ -85,7 +85,7 @@ mod tests {
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn stdin_empty() {
@@ -93,7 +93,8 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "");
     }
 
@@ -108,9 +109,11 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "echo ok\n");
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "");
     }
 
@@ -125,13 +128,17 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "#!/bin/sh\n");
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "echo ok\n");
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "exit");
-        let line = block_on(stdin.next_line(&Context::default())).unwrap();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let line = result.unwrap();
         assert_eq!(line, "");
     }
 
@@ -142,7 +149,8 @@ mod tests {
         let system = SharedSystem::new(Box::new(system));
         let mut stdin = Stdin::new(system);
 
-        let error = block_on(stdin.next_line(&Context::default())).unwrap_err();
+        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let error = result.unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 }

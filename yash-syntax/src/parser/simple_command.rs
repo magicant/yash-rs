@@ -171,14 +171,14 @@ mod tests {
     use crate::syntax::RedirBody;
     use crate::syntax::RedirOp;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_array_values_no_open_parenthesis() {
         let mut lexer = Lexer::from_memory(")", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let result = block_on(parser.array_values()).unwrap();
+        let result = parser.array_values().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
 
@@ -187,10 +187,11 @@ mod tests {
         let mut lexer = Lexer::from_memory("()", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let words = block_on(parser.array_values()).unwrap().unwrap();
+        let result = parser.array_values().now_or_never().unwrap();
+        let words = result.unwrap().unwrap();
         assert_eq!(words, []);
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -199,7 +200,8 @@ mod tests {
         let mut lexer = Lexer::from_memory("(a b c)", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let words = block_on(parser.array_values()).unwrap().unwrap();
+        let result = parser.array_values().now_or_never().unwrap();
+        let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
         assert_eq!(words[0].to_string(), "a");
         assert_eq!(words[1].to_string(), "b");
@@ -217,7 +219,8 @@ mod tests {
         );
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let words = block_on(parser.array_values()).unwrap().unwrap();
+        let result = parser.array_values().now_or_never().unwrap();
+        let words = result.unwrap().unwrap();
         assert_eq!(words.len(), 3);
         assert_eq!(words[0].to_string(), "a");
         assert_eq!(words[1].to_string(), "c");
@@ -229,7 +232,7 @@ mod tests {
         let mut lexer = Lexer::from_memory("(a b", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let e = block_on(parser.array_values()).unwrap_err();
+        let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
              ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "(a b");
@@ -248,7 +251,7 @@ mod tests {
         let mut lexer = Lexer::from_memory("(a;b)", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
-        let e = block_on(parser.array_values()).unwrap_err();
+        let e = parser.array_values().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArrayValue { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "(a;b)");
@@ -268,8 +271,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.simple_command()).unwrap().unwrap();
-        assert_eq!(option, None);
+        let result = parser.simple_command().now_or_never().unwrap();
+        assert_eq!(result, Ok(Rec::Parsed(None)));
     }
 
     #[test]
@@ -278,8 +281,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.simple_command()).unwrap().unwrap();
-        assert_eq!(option, None);
+        let result = parser.simple_command().now_or_never().unwrap();
+        assert_eq!(result, Ok(Rec::Parsed(None)));
     }
 
     #[test]
@@ -288,7 +291,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 1);
@@ -306,7 +310,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 3);
@@ -336,7 +341,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 1);
@@ -349,7 +355,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.words.len(), 3);
@@ -364,7 +371,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 1);
@@ -374,7 +382,7 @@ mod tests {
             assert_eq!(operand.to_string(), "foo")
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -384,7 +392,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words, []);
         assert_eq!(sc.redirs.len(), 3);
@@ -404,7 +413,7 @@ mod tests {
             assert_eq!(operand.to_string(), "three")
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -414,7 +423,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(*sc.redirs, []);
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words.len(), 1);
@@ -429,7 +439,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns, []);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
@@ -447,7 +458,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.words, []);
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
@@ -466,7 +478,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words.len(), 1);
         assert_eq!(sc.redirs.len(), 1);
@@ -486,7 +499,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
@@ -495,7 +509,7 @@ mod tests {
             assert_eq!(words, &[]);
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -505,7 +519,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
@@ -516,7 +531,7 @@ mod tests {
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..2);
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(OpenParen));
     }
 
@@ -526,7 +541,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let sc = block_on(parser.simple_command()).unwrap().unwrap().unwrap();
+        let result = parser.simple_command().now_or_never().unwrap();
+        let sc = result.unwrap().unwrap().unwrap();
         assert_eq!(sc.assigns.len(), 1);
         assert_eq!(sc.words, []);
         assert_eq!(*sc.redirs, []);
@@ -537,7 +553,7 @@ mod tests {
         assert_eq!(sc.assigns[0].location.code.source, Source::Unknown);
         assert_eq!(sc.assigns[0].location.range, 0..3);
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(OpenParen));
     }
 }

@@ -63,7 +63,7 @@ mod tests {
     use crate::syntax::Literal;
     use crate::syntax::Text;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_dollar_unit_no_dollar() {
@@ -72,7 +72,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap();
+        let result = lexer.dollar_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
 
         let mut lexer = Lexer::from_memory("()", Source::Unknown);
@@ -80,16 +80,16 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap();
+        let result = lexer.dollar_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('(')));
 
         let mut lexer = Lexer::from_memory("", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap();
+        let result = lexer.dollar_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
 
@@ -100,16 +100,16 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap();
+        let result = lexer.dollar_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('$')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('$')));
 
         let mut lexer = Lexer::from_memory("$&", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap();
+        let result = lexer.dollar_unit().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
 
@@ -120,15 +120,16 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, location } => {
+        let result = lexer.dollar_unit().now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "0");
             assert_eq!(*location.code.value.borrow(), "$0");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..2);
         });
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -138,30 +139,32 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
+        let text_unit = lexer.dollar_unit().now_or_never().unwrap();
+        let text_unit = text_unit.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$()");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..3);
             assert_eq!(&*content, "");
         });
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
 
         let mut lexer = Lexer::from_memory("$( foo bar )", Source::Unknown);
         let mut lexer = WordLexer {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
+        let result = lexer.dollar_unit().now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..12);
             assert_eq!(&*content, " foo bar ");
         });
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -171,15 +174,16 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Arith { content, location } => {
+        let result = lexer.dollar_unit().now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::Arith { content, location } => {
             assert_eq!(content, Text(vec![Literal('1')]));
             assert_eq!(*location.code.value.borrow(), "$((1))");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
             assert_eq!(location.range, 0..6);
         });
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -189,10 +193,11 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.dollar_unit()).unwrap().unwrap();
-        assert_matches!(result, TextUnit::RawParam { name, .. } => {
+        let result = lexer.dollar_unit().now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::RawParam { name, .. } => {
             assert_eq!(name, "0");
         });
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 }

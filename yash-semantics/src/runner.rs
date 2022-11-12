@@ -104,7 +104,7 @@ mod tests {
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::semantics::Divert;
@@ -119,7 +119,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
     }
@@ -133,7 +133,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(7));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
@@ -146,7 +146,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n3\n"));
     }
@@ -165,7 +165,7 @@ mod tests {
         })));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "alias\nok\n"));
@@ -177,7 +177,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut lexer = Lexer::from_memory(";;", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -189,7 +189,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -216,7 +216,7 @@ mod tests {
             .unwrap()
             .raise_signal(Signal::SIGUSR1);
         let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
-        let result = block_on(read_eval_loop(&mut env, &mut lexer));
+        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "USR1\n0\n"));

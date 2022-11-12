@@ -144,7 +144,7 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_redirection_less() {
@@ -152,14 +152,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(Newline));
     }
 
@@ -169,7 +170,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileInOut);
@@ -183,7 +185,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileOut);
@@ -197,7 +200,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileAppend);
@@ -211,7 +215,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileClobber);
@@ -225,7 +230,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FdIn);
@@ -239,7 +245,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FdOut);
@@ -253,7 +260,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::Pipe);
@@ -267,7 +275,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::String);
@@ -281,11 +290,16 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         let here_doc = assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => here_doc);
 
-        block_on(parser.newline_and_here_doc_contents()).unwrap();
+        parser
+            .newline_and_here_doc_contents()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(here_doc.delimiter.to_string(), "end");
         assert_eq!(here_doc.remove_tabs, false);
         assert_eq!(here_doc.content.borrow().to_string(), "");
@@ -297,11 +311,16 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, None);
         let here_doc = assert_matches!(redir.body, RedirBody::HereDoc(here_doc) => here_doc);
 
-        block_on(parser.newline_and_here_doc_contents()).unwrap();
+        parser
+            .newline_and_here_doc_contents()
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(here_doc.delimiter.to_string(), "end");
         assert_eq!(here_doc.remove_tabs, true);
         assert_eq!(here_doc.content.borrow().to_string(), "");
@@ -313,14 +332,15 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let redir = block_on(parser.redirection()).unwrap().unwrap();
+        let result = parser.redirection().now_or_never().unwrap();
+        let redir = result.unwrap().unwrap();
         assert_eq!(redir.fd, Some(Fd(12)));
         assert_matches!(redir.body, RedirBody::Normal { operator, operand } => {
             assert_eq!(operator, RedirOp::FileIn);
             assert_eq!(operand.to_string(), "/dev/null")
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(Newline));
     }
 
@@ -333,7 +353,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.redirection()).unwrap_err();
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::FdOutOfRange));
         assert_eq!(
             *e.location.code.value.borrow(),
@@ -350,7 +370,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        assert!(block_on(parser.redirection()).unwrap().is_none());
+        let result = parser.redirection().now_or_never().unwrap();
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
@@ -359,7 +380,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.redirection()).unwrap_err();
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
@@ -376,7 +397,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.redirection()).unwrap_err();
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingRedirOperand)
@@ -393,7 +414,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.redirection()).unwrap_err();
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)
@@ -410,7 +431,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.redirection()).unwrap_err();
+        let e = parser.redirection().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocDelimiter)

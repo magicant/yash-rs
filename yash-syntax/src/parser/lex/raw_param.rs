@@ -80,15 +80,15 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_raw_param_special_parameter() {
         let mut lexer = Lexer::from_memory("$@;", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(0)).unwrap().unwrap();
+        let result = lexer.raw_param(0).now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "@");
             assert_eq!(*location.code.value.borrow(), "$@;");
@@ -97,16 +97,16 @@ mod tests {
             assert_eq!(location.range, 0..2);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_raw_param_digit() {
         let mut lexer = Lexer::from_memory("$12", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(0)).unwrap().unwrap();
+        let result = lexer.raw_param(0).now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "1");
             assert_eq!(*location.code.value.borrow(), "$12");
@@ -115,16 +115,16 @@ mod tests {
             assert_eq!(location.range, 0..2);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('2')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('2')));
     }
 
     #[test]
     fn lexer_raw_param_posix_name() {
         let mut lexer = Lexer::from_memory("$az_AZ_019<", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(0)).unwrap().unwrap();
+        let result = lexer.raw_param(0).now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "az_AZ_019");
             assert_eq!(*location.code.value.borrow(), "$az_AZ_019<");
@@ -133,16 +133,16 @@ mod tests {
             assert_eq!(location.range, 0..10);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_raw_param_posix_name_line_continuations() {
         let mut lexer = Lexer::from_memory("$a\\\n\\\nb\\\n\\\nc\\\n>", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.raw_param(0)).unwrap().unwrap();
+        let result = lexer.raw_param(0).now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::RawParam { name, location } => {
             assert_eq!(name, "abc");
             assert_eq!(*location.code.value.borrow(), "$a\\\n\\\nb\\\n\\\nc\\\n>");
@@ -151,15 +151,15 @@ mod tests {
             assert_eq!(location.range, 0..14);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('>')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('>')));
     }
 
     #[test]
     fn lexer_raw_param_not_parameter() {
         let mut lexer = Lexer::from_memory("$;", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
-        assert_eq!(block_on(lexer.raw_param(0)), Ok(None));
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.raw_param(0).now_or_never().unwrap(), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 }

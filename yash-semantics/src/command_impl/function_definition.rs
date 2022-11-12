@@ -86,7 +86,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
 mod tests {
     use super::*;
     use crate::tests::assert_stderr;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use yash_env::option::On;
     use yash_env::option::Option::ErrExit;
@@ -105,7 +105,7 @@ mod tests {
             body: Rc::new("{ :; }".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
@@ -133,7 +133,7 @@ mod tests {
             body: Rc::new("( :; )".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
@@ -163,7 +163,7 @@ mod tests {
             body: Rc::new("( :; )".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_eq!(env.functions.len(), 1);
@@ -186,7 +186,7 @@ mod tests {
             body: Rc::new("{ :; }".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
@@ -210,7 +210,7 @@ mod tests {
         };
         env.options.set(ErrExit, On);
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Exit(None)));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
