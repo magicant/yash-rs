@@ -16,10 +16,13 @@
 
 //! Type definitions for command execution.
 
+use crate::option::Option::ErrExit;
+use crate::option::OptionSet;
+use crate::option::State::On;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use std::ffi::c_int;
-use std::ops::ControlFlow;
+use std::ops::ControlFlow::{self, Break};
 use yash_syntax::source::Location;
 
 /// Resultant string of word expansion.
@@ -222,9 +225,48 @@ impl Divert {
 /// next.
 pub type Result<T = ()> = ControlFlow<Divert, T>;
 
+/// Applies the `ErrExit` shell option to the result.
+///
+/// If the `ErrExit` option is on in `options` and the `result` is
+/// `Divert::Interrupt`, then the result is converted to `Divert::Exit`.
+pub fn apply_errexit<T>(result: Result<T>, options: &OptionSet) -> Result<T> {
+    match result {
+        Break(Divert::Interrupt(exit_status)) if options.get(ErrExit) == On => {
+            Break(Divert::Exit(exit_status))
+        }
+        other => other,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_errexit_applicable() {
+        let mut options = OptionSet::empty();
+        options.set(ErrExit, On);
+        let subject: Result = Break(Divert::Interrupt(Some(ExitStatus(42))));
+        let result = apply_errexit(subject, &options);
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus(42)))));
+    }
+
+    #[test]
+    fn apply_errexit_to_non_interrupt() {
+        let mut options = OptionSet::empty();
+        options.set(ErrExit, On);
+        let subject: Result = Break(Divert::Return);
+        let result = apply_errexit(subject, &options);
+        assert_eq!(result, subject);
+    }
+
+    #[test]
+    fn apply_errexit_with_disabled_option() {
+        let options = OptionSet::empty();
+        let subject: Result = Break(Divert::Interrupt(Some(ExitStatus(42))));
+        let result = apply_errexit(subject, &options);
+        assert_eq!(result, subject);
+    }
 
     #[test]
     fn signal_try_from_exit_status() {

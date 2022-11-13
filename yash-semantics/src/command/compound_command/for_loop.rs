@@ -23,6 +23,7 @@ use crate::expansion::expand_words;
 use crate::Command;
 use crate::Handle;
 use std::ops::ControlFlow::{Break, Continue};
+use yash_env::semantics::apply_errexit;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
@@ -43,13 +44,13 @@ pub async fn execute(
 ) -> Result {
     let (name, _) = match expand_word(env, name).await {
         Ok(word) => word,
-        Err(error) => return error.handle(env).await,
+        Err(error) => return apply_errexit(error.handle(env).await, &env.options),
     };
 
     let values = if let Some(words) = values {
         match expand_words(env, words).await {
             Ok((fields, _)) => fields,
-            Err(error) => return error.handle(env).await,
+            Err(error) => return apply_errexit(error.handle(env).await, &env.options),
         }
     } else {
         match env.variables.positional_params().value {
@@ -85,7 +86,7 @@ pub async fn execute(
                 let cause = ErrorCause::AssignReadOnly(error);
                 let location = name.origin;
                 let error = Error { cause, location };
-                return error.handle(env).await;
+                return apply_errexit(error.handle(env).await, &env.options);
             }
         };
     }
@@ -108,6 +109,8 @@ mod tests {
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -320,6 +323,21 @@ mod tests {
     }
 
     #[test]
+    fn errexit_with_expansion_error_in_name() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(ErrExit, On);
+        let command: CompoundCommand = "for $() do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
     fn expansion_error_in_words() {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -329,6 +347,21 @@ mod tests {
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn errexit_with_expansion_error_in_words() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(ErrExit, On);
+        let command: CompoundCommand = "for x in $(); do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -350,6 +383,28 @@ mod tests {
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn errexit_with_assignment_error_with_read_only_variable() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(ErrExit, On);
+        env.variables
+            .assign(
+                Scope::Global,
+                "x".to_string(),
+                Variable::new("").make_read_only(Location::dummy("")),
+            )
+            .unwrap();
+        let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
