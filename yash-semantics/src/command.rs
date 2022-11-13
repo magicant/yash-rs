@@ -23,13 +23,21 @@ mod item;
 mod pipeline;
 mod simple_command;
 
-use super::Command;
 use crate::trap::run_traps_for_caught_signals;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
+
+/// Syntactic construct that can be executed.
+#[async_trait(?Send)]
+pub trait Command {
+    /// Executes this command.
+    ///
+    /// TODO Elaborate: The exit status must be updated during execution.
+    async fn execute(&self, env: &mut Env) -> Result;
+}
 
 /// Executes the command.
 ///
