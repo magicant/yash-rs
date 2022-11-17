@@ -55,6 +55,7 @@ use super::attr::Origin;
 use std::ffi::CString;
 use std::iter::Once;
 use std::marker::PhantomData;
+use yash_env::option::State::Off;
 use yash_env::semantics::Field;
 use yash_env::system::AtFlags;
 use yash_env::system::AT_FDCWD;
@@ -229,7 +230,13 @@ impl SearchEnv<'_> {
 ///
 /// This function returns an iterator that yields fields resulting from the
 /// expansion.
+///
+/// If the `Glob` option is `Off` in `env.options`, the expansion is skipped.
 pub fn glob(env: &mut Env, field: AttrField) -> Glob {
+    if env.options.get(yash_env::option::Option::Glob) == Off {
+        return Glob::from(Inner::from(field.remove_quotes_and_strip()));
+    }
+
     // TODO Quick check for *, ?, [ containment
 
     let mut search_env = SearchEnv {
@@ -462,6 +469,16 @@ mod tests {
         let f = dummy_attr_field("foo/*");
         let mut i = glob(&mut env, f);
         assert_eq!(i.next().unwrap().value, "foo/*");
+        assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn noglob_option() {
+        let mut env = env_with_dummy_files(["foo.exe"]);
+        env.options.set(yash_env::option::Option::Glob, Off);
+        let f = dummy_attr_field("foo.*");
+        let mut i = glob(&mut env, f);
+        assert_eq!(i.next().unwrap().value, "foo.*");
         assert_eq!(i.next(), None);
     }
 }
