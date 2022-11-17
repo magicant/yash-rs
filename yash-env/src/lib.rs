@@ -435,6 +435,10 @@ impl Env {
         self.variables.assign(scope, name, value)
     }
 
+    pub(crate) fn errexit_is_applicable(&self) -> bool {
+        self.options.get(ErrExit) == On && !self.stack.contains(&Frame::Condition)
+    }
+
     /// Returns a `Divert` if the shell should exit because of the `ErrExit`
     /// [shell option](self::option::Option).
     ///
@@ -442,10 +446,7 @@ impl Env {
     /// on, the current `self.exit_status` is non-zero, and the current stack
     /// has no `Condition` [frame](Frame); otherwise, `Continue(())`.
     pub fn apply_errexit(&self) -> ControlFlow<Divert> {
-        if self.options.get(ErrExit) == On
-            && self.exit_status != ExitStatus::SUCCESS
-            && !self.stack.contains(&Frame::Condition)
-        {
+        if self.exit_status != ExitStatus::SUCCESS && self.errexit_is_applicable() {
             Break(Divert::Exit(None))
         } else {
             Continue(())

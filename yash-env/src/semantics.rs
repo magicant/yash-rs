@@ -16,9 +16,7 @@
 
 //! Type definitions for command execution.
 
-use crate::option::Option::ErrExit;
-use crate::option::OptionSet;
-use crate::option::State::On;
+use crate::Env;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use std::ffi::c_int;
@@ -227,13 +225,15 @@ pub type Result<T = ()> = ControlFlow<Divert, T>;
 
 /// Applies the `ErrExit` shell option to the result.
 ///
-/// If the `ErrExit` option is on in `options` and the `result` is
-/// `Divert::Interrupt`, then the result is converted to `Divert::Exit`.
-pub fn apply_errexit<T>(result: Result<T>, options: &OptionSet) -> Result<T> {
+/// If the `ErrExit` option is on in `env.options`, `env.stack` contains no
+/// `Frame::Condition`, and the `result` is `Divert::Interrupt`, then the result
+/// is converted to `Divert::Exit`.
+pub fn apply_errexit<T>(result: Result<T>, env: &Env) -> Result<T> {
     match result {
-        Break(Divert::Interrupt(exit_status)) if options.get(ErrExit) == On => {
+        Break(Divert::Interrupt(exit_status)) if env.errexit_is_applicable() => {
             Break(Divert::Exit(exit_status))
         }
+
         other => other,
     }
 }
@@ -241,30 +241,43 @@ pub fn apply_errexit<T>(result: Result<T>, options: &OptionSet) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::option::Option::ErrExit;
+    use crate::option::State::On;
+    use crate::stack::Frame;
 
     #[test]
     fn apply_errexit_applicable() {
-        let mut options = OptionSet::empty();
-        options.set(ErrExit, On);
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
         let subject: Result = Break(Divert::Interrupt(Some(ExitStatus(42))));
-        let result = apply_errexit(subject, &options);
+        let result = apply_errexit(subject, &env);
         assert_eq!(result, Break(Divert::Exit(Some(ExitStatus(42)))));
     }
 
     #[test]
     fn apply_errexit_to_non_interrupt() {
-        let mut options = OptionSet::empty();
-        options.set(ErrExit, On);
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
         let subject: Result = Break(Divert::Return);
-        let result = apply_errexit(subject, &options);
+        let result = apply_errexit(subject, &env);
+        assert_eq!(result, subject);
+    }
+
+    #[test]
+    fn apply_errexit_in_condition_context() {
+        let mut env = Env::new_virtual();
+        env.options.set(ErrExit, On);
+        let env = env.push_frame(Frame::Condition);
+        let subject: Result = Break(Divert::Interrupt(Some(ExitStatus(42))));
+        let result = apply_errexit(subject, &env);
         assert_eq!(result, subject);
     }
 
     #[test]
     fn apply_errexit_with_disabled_option() {
-        let options = OptionSet::empty();
+        let env = Env::new_virtual();
         let subject: Result = Break(Divert::Interrupt(Some(ExitStatus(42))));
-        let result = apply_errexit(subject, &options);
+        let result = apply_errexit(subject, &env);
         assert_eq!(result, subject);
     }
 
