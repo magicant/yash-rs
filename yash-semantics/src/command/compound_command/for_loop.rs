@@ -44,13 +44,13 @@ pub async fn execute(
 ) -> Result {
     let (name, _) = match expand_word(env, name).await {
         Ok(word) => word,
-        Err(error) => return apply_errexit(error.handle(env).await, &env),
+        Err(error) => return apply_errexit(error.handle(env).await, env),
     };
 
     let values = if let Some(words) = values {
         match expand_words(env, words).await {
             Ok((fields, _)) => fields,
-            Err(error) => return apply_errexit(error.handle(env).await, &env),
+            Err(error) => return apply_errexit(error.handle(env).await, env),
         }
     } else {
         match env.variables.positional_params().value {
@@ -86,7 +86,7 @@ pub async fn execute(
                 let cause = ErrorCause::AssignReadOnly(error);
                 let location = name.origin;
                 let error = Error { cause, location };
-                return apply_errexit(error.handle(env).await, &env);
+                return apply_errexit(error.handle(env).await, env);
             }
         };
     }

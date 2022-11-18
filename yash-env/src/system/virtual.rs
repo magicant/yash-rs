@@ -204,7 +204,7 @@ impl VirtualSystem {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
         let ofd = body.open_file_description.borrow();
-        f(&*ofd)
+        f(&ofd)
     }
 
     /// Calls the given closure passing the open file description for the FD.
@@ -217,7 +217,7 @@ impl VirtualSystem {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
         let mut ofd = body.open_file_description.borrow_mut();
-        f(&mut *ofd)
+        f(&mut ofd)
     }
 
     fn resolve_relative_path<'a>(&self, path: &'a Path) -> Cow<'a, Path> {
