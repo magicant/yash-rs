@@ -21,12 +21,17 @@
 //! implemented depending on the environment.
 
 use crate::io::Fd;
+use crate::option::State;
 use crate::system::SharedSystem;
 use async_trait::async_trait;
+use std::cell::Cell;
+use std::rc::Rc;
 use std::slice::from_mut;
 
 #[doc(no_inline)]
 pub use yash_syntax::input::*;
+
+// TODO Redefine Stdin as FdReader to support FDs other than stdin
 
 /// Input function that reads from the standard input.
 ///
@@ -39,13 +44,32 @@ pub use yash_syntax::input::*;
 /// instance will affect the next read from the other instance.
 #[derive(Clone, Debug)]
 pub struct Stdin {
+    /// System to interact with the FD
     system: SharedSystem,
+    /// Whether lines read are echoed to stderr
+    echo: Option<Rc<Cell<State>>>,
 }
 
 impl Stdin {
     /// Creates a new `Stdin` instance.
     pub fn new(system: SharedSystem) -> Self {
-        Stdin { system }
+        Stdin { system, echo: None }
+    }
+
+    /// Sets the "echo" flag.
+    ///
+    /// You can use this setter function to set a shared option state that
+    /// controls whether the input function echoes lines it reads to the
+    /// standard error. If `echo` is `None` or some shared cell containing
+    /// `Off`, the function does not echo. If a cell has `On`, the function
+    /// prints every line it reads to the standard error.
+    ///
+    /// This option implements the behavior of the `verbose` shell option. You
+    /// can change the state of the shared cell through the lifetime of the
+    /// input function to reflect the option dynamically changed, which will
+    /// affect the next `next_line` call.
+    pub fn set_echo(&mut self, echo: Option<Rc<Cell<State>>>) {
+        self.echo = echo;
     }
 }
 
@@ -74,8 +98,16 @@ impl Input for Stdin {
         }
 
         // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
-        Ok(String::from_utf8(bytes)
-            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string()))
+        let line = String::from_utf8(bytes)
+            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
+
+        if let Some(echo) = &self.echo {
+            if echo.get() == State::On {
+                let _ = self.system.write_all(Fd::STDERR, line.as_bytes()).await;
+            }
+        }
+
+        Ok(line)
     }
 }
 
@@ -85,6 +117,7 @@ mod tests {
     use crate::system::r#virtual::FileBody;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
+    use assert_matches::assert_matches;
     use futures_util::FutureExt;
 
     #[test]
@@ -152,5 +185,57 @@ mod tests {
         let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
         let error = result.unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
+    }
+
+    #[test]
+    fn echo_off() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        {
+            let state = state.borrow();
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"one\ntwo");
+        }
+        let system = SharedSystem::new(Box::new(system));
+        let mut stdin = Stdin::new(system);
+        stdin.set_echo(Some(Rc::new(Cell::new(State::Off))));
+
+        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let state = state.borrow();
+        let file = state.file_system.get("/dev/stderr").unwrap();
+        assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+            assert_eq!(content, &[]);
+        });
+    }
+
+    #[test]
+    fn echo_on() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        {
+            let state = state.borrow();
+            let file = state.file_system.get("/dev/stdin").unwrap();
+            file.borrow_mut().body = FileBody::new(*b"one\ntwo");
+        }
+        let system = SharedSystem::new(Box::new(system));
+        let mut stdin = Stdin::new(system);
+        stdin.set_echo(Some(Rc::new(Cell::new(State::On))));
+
+        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        {
+            let state = state.borrow();
+            let file = state.file_system.get("/dev/stderr").unwrap();
+            assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+                assert_eq!(content, b"one\n");
+            });
+        }
+        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        {
+            let state = state.borrow();
+            let file = state.file_system.get("/dev/stderr").unwrap();
+            assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
+                assert_eq!(content, b"one\ntwo");
+            });
+        }
     }
 }
