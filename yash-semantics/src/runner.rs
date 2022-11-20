@@ -19,9 +19,13 @@
 use crate::trap::run_traps_for_caught_signals;
 use crate::Command;
 use crate::Handle;
+use std::cell::Cell;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
+use std::rc::Rc;
+use yash_env::option::Option::Verbose;
+use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -38,6 +42,10 @@ use yash_syntax::parser::Parser;
 ///
 /// If the input source code contains no commands, the exit status is set to
 /// zero.
+///
+/// If `verbose` is `Some` shared cell, `env.options.get(Verbose)` is set to it
+/// before each parse. You should pass the same cell as the one used when
+/// creating `Stdin`.
 ///
 /// [Pending traps are run](run_traps_for_caught_signals) and [subshell statuses
 /// are updated](Env::update_all_subshell_statuses) between parsing input and
@@ -57,18 +65,26 @@ use yash_syntax::parser::Parser;
 /// # use yash_syntax::source::Source;
 /// let mut env = Env::new_virtual();
 /// let mut lexer = Lexer::from_memory("case foo in (bar) ;; esac", Source::Unknown);
-/// let result = read_eval_loop(&mut env, &mut lexer).await;
+/// let result = read_eval_loop(&mut env, &mut lexer, None).await;
 /// assert_eq!(result, Continue(()));
 /// assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 /// # })
 /// ```
-pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
+pub async fn read_eval_loop(
+    env: &mut Env,
+    lexer: &mut Lexer<'_>,
+    verbose: Option<Rc<Cell<State>>>,
+) -> Result {
     let mut executed = false;
 
     loop {
         if !lexer.pending() {
             lexer.flush();
         }
+        if let Some(verbose) = &verbose {
+            verbose.set(env.options.get(Verbose));
+        }
+
         let mut parser = Parser::new(lexer, &env.aliases);
         match parser.command_line().await {
             Ok(Some(command)) => {
@@ -93,8 +109,9 @@ pub async fn read_eval_loop(env: &mut Env, lexer: &mut Lexer<'_>) -> Result {
 pub fn read_eval_loop_boxed<'a>(
     env: &'a mut Env,
     lexer: &'a mut Lexer<'_>,
+    verbose: Option<Rc<Cell<State>>>,
 ) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
-    Box::pin(read_eval_loop(env, lexer))
+    Box::pin(read_eval_loop(env, lexer, verbose))
 }
 
 #[cfg(test)]
@@ -105,9 +122,15 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
+    use std::cell::Cell;
+    use std::num::NonZeroU64;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::input::Stdin;
+    use yash_env::option::Option::Verbose;
+    use yash_env::option::State::{Off, On};
     use yash_env::semantics::Divert;
+    use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
     use yash_env::trap::Trap;
@@ -119,7 +142,9 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(5);
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
     }
@@ -133,7 +158,9 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         let mut lexer = Lexer::from_memory("echo $?; return -n 7", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(7));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
@@ -146,7 +173,9 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo 1\necho 2\necho 3;", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "1\n2\n3\n"));
     }
@@ -165,10 +194,40 @@ mod tests {
         })));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory("echo", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "alias\nok\n"));
+    }
+
+    #[test]
+    fn verbose_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        state
+            .borrow_mut()
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .body = FileBody::new(*b"case _ in esac\n");
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Verbose, On);
+        let mut input = Box::new(Stdin::new(Clone::clone(&env.system)));
+        let verbose = Rc::new(Cell::new(Off));
+        input.set_echo(Some(Rc::clone(&verbose)));
+        let line = NonZeroU64::new(1).unwrap();
+        let mut lexer = Lexer::new(input, line, Source::Stdin);
+
+        let result = read_eval_loop(&mut env, &mut lexer, Some(Rc::clone(&verbose)))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        assert_eq!(verbose.get(), On);
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "case _ in esac\n"));
     }
 
     #[test]
@@ -177,7 +236,9 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut lexer = Lexer::from_memory(";;", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -189,7 +250,9 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut lexer = Lexer::from_memory(";;\necho !", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -216,7 +279,9 @@ mod tests {
             .unwrap()
             .raise_signal(Signal::SIGUSR1);
         let mut lexer = Lexer::from_memory("echo $?", Source::Unknown);
-        let result = read_eval_loop(&mut env, &mut lexer).now_or_never().unwrap();
+        let result = read_eval_loop(&mut env, &mut lexer, None)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "USR1\n0\n"));

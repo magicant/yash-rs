@@ -85,7 +85,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let mut env = env.push_frame(Frame::Trap);
         let previous_exit_status = env.exit_status;
-        read_eval_loop_boxed(&mut env, &mut lexer).await?;
+        read_eval_loop_boxed(&mut env, &mut lexer, None).await?;
         env.exit_status = previous_exit_status;
     }
 

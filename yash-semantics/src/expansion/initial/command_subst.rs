@@ -70,7 +70,7 @@ where
 
                 let mut lexer =
                     Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-                read_eval_loop(env, &mut lexer).await
+                read_eval_loop(env, &mut lexer, None).await
             })
         })
         .await;
