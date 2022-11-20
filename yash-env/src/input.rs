@@ -99,7 +99,7 @@ impl Input for Stdin {
 
         // TODO Maybe we should report invalid UTF-8 bytes rather than ignoring them
         let line = String::from_utf8(bytes)
-            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
+            .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into());
 
         if let Some(echo) = &self.echo {
             if echo.get() == State::On {
