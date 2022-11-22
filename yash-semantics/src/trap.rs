@@ -41,8 +41,10 @@
 //!
 //! TODO: Not yet implemented
 
-use crate::read_eval_loop_boxed;
+use crate::ReadEvalLoop;
+use std::future::Future;
 use std::ops::ControlFlow::Continue;
+use std::pin::Pin;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Trap;
@@ -85,7 +87,10 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let mut env = env.push_frame(Frame::Trap);
         let previous_exit_status = env.exit_status;
-        read_eval_loop_boxed(&mut env, &mut lexer).await?;
+        // Boxing needed for recursion
+        let future: Pin<Box<dyn Future<Output = Result>>> =
+            Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
+        future.await?;
         env.exit_status = previous_exit_status;
     }
 
@@ -100,7 +105,6 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::future::Future;
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;

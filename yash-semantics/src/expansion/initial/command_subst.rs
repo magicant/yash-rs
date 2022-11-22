@@ -22,8 +22,8 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::expansion::ErrorCause;
-use crate::read_eval_loop;
 use crate::Handle;
+use crate::ReadEvalLoop;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
@@ -70,7 +70,7 @@ where
 
                 let mut lexer =
                     Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-                read_eval_loop(env, &mut lexer).await
+                ReadEvalLoop::new(env, &mut lexer).run().await
             })
         })
         .await;
