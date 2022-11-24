@@ -191,6 +191,23 @@ impl Env {
         }
     }
 
+    /// Initializes default variables.
+    ///
+    /// This function assigns the following variables to `self`:
+    ///
+    /// - `IFS=' \t\n'`
+    /// - `OPTIND=1`
+    /// - `PS1='$ '`
+    /// - `PS2='> '`
+    /// - `PS4='+ '`
+    /// - `PPID=(parent process ID)`
+    /// - `PWD=(current working directory)`
+    pub fn init_variables(&mut self) {
+        self.variables.init();
+        // TODO PPID
+        // TODO PWD
+    }
+
     /// Convenience function that prints the given error message.
     ///
     /// This function prints the `message` to the standard error of this

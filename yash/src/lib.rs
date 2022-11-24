@@ -49,7 +49,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         let value = Variable::new(value).export();
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
-    // TODO Ignore unsafe variables such as $IFS
+    env.init_variables();
 
     let mut input = Box::new(Stdin::new(env.system.clone()));
     let echo = Rc::new(Cell::new(Off));
