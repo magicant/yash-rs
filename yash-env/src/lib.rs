@@ -204,7 +204,12 @@ impl Env {
     /// - `PWD=(current working directory)`
     pub fn init_variables(&mut self) {
         self.variables.init();
-        // TODO PPID
+
+        let _ = self.variables.assign(
+            Scope::Global,
+            "PPID".to_string(),
+            Variable::new(self.system.getppid().to_string()),
+        );
         // TODO PWD
     }
 

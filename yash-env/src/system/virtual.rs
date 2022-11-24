@@ -634,6 +634,10 @@ impl System for VirtualSystem {
         self.process_id
     }
 
+    fn getppid(&self) -> Pid {
+        self.current_process().ppid
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,

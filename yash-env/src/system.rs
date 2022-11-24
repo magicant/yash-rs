@@ -269,6 +269,10 @@ pub trait System: Debug {
     #[must_use]
     fn getpid(&self) -> Pid;
 
+    /// Returns the process ID of the parent process.
+    #[must_use]
+    fn getppid(&self) -> Pid;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -703,6 +707,9 @@ impl System for SharedSystem {
     }
     fn getpid(&self) -> Pid {
         self.0.borrow().getpid()
+    }
+    fn getppid(&self) -> Pid {
+        self.0.borrow().getppid()
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
