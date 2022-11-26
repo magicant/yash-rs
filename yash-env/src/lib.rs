@@ -31,18 +31,6 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
-pub mod builtin;
-pub mod function;
-pub mod input;
-pub mod io;
-pub mod job;
-pub mod option;
-pub mod semantics;
-pub mod stack;
-pub mod system;
-pub mod trap;
-pub mod variable;
-
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
@@ -201,7 +189,9 @@ impl Env {
     /// - `PS2='> '`
     /// - `PS4='+ '`
     /// - `PPID=(parent process ID)`
-    /// - `PWD=(current working directory)`
+    /// - `PWD=(current working directory)` (See [`Env::prepare_pwd`])
+    ///
+    /// This function ignores any errors that may occur.
     pub fn init_variables(&mut self) {
         self.variables.init();
 
@@ -210,7 +200,8 @@ impl Env {
             "PPID".to_string(),
             Variable::new(self.system.getppid().to_string()),
         );
-        // TODO PWD
+
+        let _ = self.prepare_pwd();
     }
 
     /// Convenience function that prints the given error message.
@@ -487,6 +478,19 @@ impl io::Stderr for Env {
         self.system.isatty(Fd::STDERR) == Ok(true)
     }
 }
+
+pub mod builtin;
+pub mod function;
+pub mod input;
+pub mod io;
+pub mod job;
+pub mod option;
+pub mod pwd;
+pub mod semantics;
+pub mod stack;
+pub mod system;
+pub mod trap;
+pub mod variable;
 
 #[cfg(test)]
 mod tests {
