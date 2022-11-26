@@ -288,46 +288,53 @@ fn open_file(env: &mut Env, option: OFlag, path: Field) -> Result<(FdSpec, Locat
 fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location), Error> {
     let (path, origin) = into_c_string_value_and_origin(path)?;
 
-    loop {
-        const FLAGS_EXCL: OFlag = OFlag::O_WRONLY.union(OFlag::O_CREAT).union(OFlag::O_EXCL);
-        match env.system.open(&path, FLAGS_EXCL, MODE) {
-            Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
-            Err(Errno::EEXIST) => (),
-            Err(errno) => {
-                return Err(Error {
-                    cause: ErrorCause::OpenFile(path, errno),
-                    location: origin,
-                })
-            }
+    const FLAGS_EXCL: OFlag = OFlag::O_WRONLY.union(OFlag::O_CREAT).union(OFlag::O_EXCL);
+    match env.system.open(&path, FLAGS_EXCL, MODE) {
+        Ok(fd) => return Ok((FdSpec::Owned(fd), origin)),
+        Err(Errno::EEXIST) => (),
+        Err(errno) => {
+            return Err(Error {
+                cause: ErrorCause::OpenFile(path, errno),
+                location: origin,
+            })
         }
+    }
 
-        // Okay, it seems there is an existing file. Try opening it.
-        match env.system.open(&path, OFlag::O_WRONLY, MODE) {
-            Ok(fd) => {
-                let is_regular = matches!(env.system.fstat(fd), Ok(stat)
+    // Okay, it seems there is an existing file. Try opening it.
+    match env.system.open(&path, OFlag::O_WRONLY, MODE) {
+        Ok(fd) => {
+            let is_regular = matches!(env.system.fstat(fd), Ok(stat)
                     if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
-                if is_regular {
-                    let _: Result<_, _> = env.system.close(fd);
-                    return Err(Error {
-                        cause: ErrorCause::OpenFile(path, Errno::EEXIST),
-                        location: origin,
-                    });
-                } else {
-                    return Ok((FdSpec::Owned(fd), origin));
-                }
-            }
-            Err(Errno::ENOENT) => {
-                // A file existed on the first open but not on the second.
-                // Somebody must have removed it between the two opens.
-                // Start over as we may be able to create one next time.
-            }
-            Err(errno) => {
-                return Err(Error {
-                    cause: ErrorCause::OpenFile(path, errno),
+            if is_regular {
+                // We opened the FD without the O_CREAT flag, so somebody else
+                // must have created this file. Failure.
+                let _: Result<_, _> = env.system.close(fd);
+                Err(Error {
+                    cause: ErrorCause::OpenFile(path, Errno::EEXIST),
                     location: origin,
                 })
+            } else {
+                Ok((FdSpec::Owned(fd), origin))
             }
         }
+        Err(Errno::ENOENT) => {
+            // A file existed on the first open but not on the second. There are
+            // two possibilities: One is that a file existed on the first open
+            // call and had been removed before the second. In this case, we
+            // might be able to create another if we start over. The other is
+            // that there is a symbolic link pointing to nothing, in which case
+            // retrying would only lead to the same result. Since there is no
+            // reliable way to tell the situations apart atomically, we give up
+            // and return the initial error.
+            Err(Error {
+                cause: ErrorCause::OpenFile(path, Errno::EEXIST),
+                location: origin,
+            })
+        }
+        Err(errno) => Err(Error {
+            cause: ErrorCause::OpenFile(path, errno),
+            location: origin,
+        }),
     }
 }
 

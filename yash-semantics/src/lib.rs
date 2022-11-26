@@ -22,46 +22,26 @@
 //! A word can be expanded by using functions and traits defined in
 //! [`expansion`].
 //!
-//! The [`read_eval_loop`] function reads, parses, and executes commands from an
-//! input. It is a utility function that calls `Command::execute` for you.
+//! A [`ReadEvalLoop`] reads, parses, and executes commands from an
+//! input. It is a utility for running a shell script.
 
 pub mod assign;
-mod command_impl;
 pub mod command_search;
 pub mod expansion;
-mod handle_impl;
 pub mod redir;
-mod runner;
 pub mod trap;
-
-use async_trait::async_trait;
-use yash_env::Env;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::*;
 
-/// Syntactic construct that can be executed.
-#[async_trait(?Send)]
-pub trait Command {
-    /// Executes this command.
-    ///
-    /// TODO Elaborate: The exit status must be updated during execution.
-    async fn execute(&self, env: &mut Env) -> Result;
-}
+mod command;
+pub use command::Command;
 
-/// Error handler.
-///
-/// Most errors in the shell are handled by printing an error message to the
-/// standard error and returning a non-zero exit status. This trait provides a
-/// standard interface for implementing that behavior.
-#[async_trait(?Send)]
-pub trait Handle {
-    /// Handles the argument error.
-    async fn handle(&self, env: &mut Env) -> Result;
-}
+mod handle;
+pub use handle::Handle;
 
-pub use runner::read_eval_loop;
-pub use runner::read_eval_loop_boxed;
+mod runner;
+pub use runner::ReadEvalLoop;
 
 #[cfg(test)]
 pub(crate) mod tests {

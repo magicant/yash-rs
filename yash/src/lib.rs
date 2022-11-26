@@ -27,8 +27,11 @@ pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
+    use env::option::State::Off;
+    use std::cell::Cell;
     use std::num::NonZeroU64;
     use std::ops::ControlFlow::Break;
+    use std::rc::Rc;
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
@@ -46,12 +49,16 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         let value = Variable::new(value).export();
         env.variables.assign(Scope::Global, name, value).unwrap();
     }
-    // TODO Ignore unsafe variables such as $IFS
+    env.init_variables();
 
-    let input = Box::new(Stdin::new(env.system.clone()));
+    let mut input = Box::new(Stdin::new(env.system.clone()));
+    let echo = Rc::new(Cell::new(Off));
+    input.set_echo(Some(Rc::clone(&echo)));
     let line = NonZeroU64::new(1).unwrap();
     let mut lexer = parser::lex::Lexer::new(input, line, source::Source::Stdin);
-    let result = semantics::read_eval_loop(&mut env, &mut lexer).await;
+    let mut rel = semantics::ReadEvalLoop::new(&mut env, &mut lexer);
+    rel.set_verbose(Some(echo));
+    let result = rel.run().await;
     if let Break(divert) = result {
         if let Some(exit_status) = divert.exit_status() {
             env.exit_status = exit_status;

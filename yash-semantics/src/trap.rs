@@ -41,8 +41,10 @@
 //!
 //! TODO: Not yet implemented
 
-use crate::read_eval_loop_boxed;
+use crate::ReadEvalLoop;
+use std::future::Future;
 use std::ops::ControlFlow::Continue;
+use std::pin::Pin;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Trap;
@@ -85,7 +87,10 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
         let mut env = env.push_frame(Frame::Trap);
         let previous_exit_status = env.exit_status;
-        read_eval_loop_boxed(&mut env, &mut lexer).await?;
+        // Boxing needed for recursion
+        let future: Pin<Box<dyn Future<Output = Result>>> =
+            Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
+        future.await?;
         env.exit_status = previous_exit_status;
     }
 
@@ -99,8 +104,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
-    use std::future::Future;
+    use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use yash_env::builtin::Builtin;
@@ -151,7 +155,9 @@ mod tests {
     #[test]
     fn nothing_to_do_without_signals_caught() {
         let (mut env, system) = signal_env();
-        let result = block_on(run_traps_for_caught_signals(&mut env));
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
@@ -160,7 +166,9 @@ mod tests {
     fn running_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let result = block_on(run_traps_for_caught_signals(&mut env));
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, "trapped\n"));
     }
@@ -170,7 +178,9 @@ mod tests {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
         let mut env = env.push_frame(Frame::Trap);
-        let result = block_on(run_traps_for_caught_signals(&mut env));
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
@@ -202,7 +212,9 @@ mod tests {
             )
             .unwrap();
         raise_signal(&system, Signal::SIGINT);
-        let _ = block_on(run_traps_for_caught_signals(&mut env));
+        let _ = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
     }
 
     #[test]
@@ -210,7 +222,9 @@ mod tests {
         let (mut env, system) = signal_env();
         env.exit_status = ExitStatus(42);
         raise_signal(&system, Signal::SIGINT);
-        let _ = block_on(run_traps_for_caught_signals(&mut env));
+        let _ = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_eq!(env.exit_status, ExitStatus(42));
     }
 
@@ -231,7 +245,9 @@ mod tests {
         env.exit_status = ExitStatus(123);
         raise_signal(&system, Signal::SIGUSR1);
         raise_signal(&system, Signal::SIGUSR2);
-        let _ = block_on(run_traps_for_caught_signals(&mut env));
+        let _ = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_stdout(&system.state, |stdout| {
             assert_eq!(stdout, "123\n0\n123\n0\n")
         });
@@ -241,7 +257,9 @@ mod tests {
     fn exit_from_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGUSR1);
-        let result = block_on(run_traps_for_caught_signals(&mut env));
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(56));
     }

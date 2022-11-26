@@ -76,7 +76,7 @@ mod tests {
     use super::super::lex::Lexer;
     use super::*;
     use crate::source::Source;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_and_or_list_eof() {
@@ -84,8 +84,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.and_or_list()).unwrap().unwrap();
-        assert_eq!(option, None);
+        let result = parser.and_or_list().now_or_never().unwrap();
+        assert_eq!(result, Ok(Rec::Parsed(None)));
     }
 
     #[test]
@@ -94,7 +94,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
+        let result = parser.and_or_list().now_or_never().unwrap();
+        let aol = result.unwrap().unwrap().unwrap();
         assert_eq!(aol.first.to_string(), "foo");
         assert_eq!(aol.rest, vec![]);
     }
@@ -105,7 +106,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let aol = block_on(parser.and_or_list()).unwrap().unwrap().unwrap();
+        let result = parser.and_or_list().now_or_never().unwrap();
+        let aol = result.unwrap().unwrap().unwrap();
         assert_eq!(aol.first.to_string(), "first");
         assert_eq!(aol.rest.len(), 2);
         assert_eq!(aol.rest[0].0, AndOr::AndThen);
@@ -120,7 +122,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.and_or_list()).unwrap_err();
+        let e = parser.and_or_list().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingPipeline(AndOr::AndThen))

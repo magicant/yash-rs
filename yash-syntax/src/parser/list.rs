@@ -185,7 +185,7 @@ mod tests {
     use crate::syntax::Pipeline;
     use crate::syntax::RedirBody;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_list_eof() {
@@ -193,7 +193,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0, vec![]);
     }
 
@@ -203,7 +203,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 1);
         assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
@@ -215,7 +215,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 1);
         assert_eq!(list.0[0].async_flag, None);
         assert_eq!(list.0[0].and_or.to_string(), "foo");
@@ -227,7 +227,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.list()).unwrap().unwrap();
+        let list = parser.list().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(list.0.len(), 3);
 
         let location = list.0[0].async_flag.as_ref().unwrap();
@@ -254,7 +254,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.command_line()).unwrap();
+        let result = parser.command_line().now_or_never().unwrap().unwrap();
         assert!(result.is_none());
     }
 
@@ -264,7 +264,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let List(items) = block_on(parser.command_line()).unwrap().unwrap();
+        let result = parser.command_line().now_or_never().unwrap();
+        let List(items) = result.unwrap().unwrap();
         assert_eq!(items.len(), 1);
         let item = items.first().unwrap();
         assert_eq!(item.async_flag, None);
@@ -290,8 +291,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let cmd = block_on(parser.command_line()).unwrap().unwrap();
-        assert_eq!(cmd.to_string(), "foo");
+        let result = parser.command_line().now_or_never().unwrap();
+        let list = result.unwrap().unwrap();
+        assert_eq!(list.to_string(), "foo");
     }
 
     #[test]
@@ -300,7 +302,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.command_line()).unwrap().unwrap();
+        let result = parser.command_line().now_or_never().unwrap();
+        let list = result.unwrap().unwrap();
         assert_eq!(list.0, []);
     }
 
@@ -310,7 +313,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.command_line()).unwrap_err();
+        let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingHereDocContent)
@@ -327,7 +330,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.command_line()).unwrap_err();
+        let e = parser.command_line().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
@@ -344,7 +347,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.maybe_compound_list()).unwrap();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let list = result.unwrap();
         assert_eq!(list.0, []);
     }
 
@@ -354,7 +358,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.maybe_compound_list()).unwrap();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let list = result.unwrap();
         assert_eq!(list.to_string(), "echo; ls& cat");
     }
 
@@ -364,7 +369,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.maybe_compound_list()).unwrap();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let list = result.unwrap();
         assert_eq!(list.to_string(), "echo& ls; cat");
 
         assert_eq!(lexer.index(), 15);
@@ -376,7 +382,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let list = block_on(parser.maybe_compound_list()).unwrap();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let list = result.unwrap();
         assert_eq!(list.0, []);
     }
 
@@ -388,7 +395,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.maybe_compound_list()).unwrap_err();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
@@ -405,7 +413,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.maybe_compound_list()).unwrap_err();
+        let result = parser.maybe_compound_list().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidCommandToken)

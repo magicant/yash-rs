@@ -160,7 +160,7 @@ mod tests {
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_suffix_modifier_eof() {
@@ -170,7 +170,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier());
+        let result = lexer.suffix_modifier().now_or_never().unwrap();
         assert_eq!(result, Ok(Modifier::None));
     }
 
@@ -182,10 +182,10 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier());
+        let result = lexer.suffix_modifier().now_or_never().unwrap();
         assert_eq!(result, Ok(Modifier::None));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -196,7 +196,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -205,7 +205,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 1..1);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -216,7 +216,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -233,7 +233,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 1..5);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Alter);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -253,7 +253,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 2..2);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -264,7 +264,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -273,7 +273,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 1..1);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Default);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -301,7 +301,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 2..6);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -312,7 +312,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -321,7 +321,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 2..2);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -332,7 +332,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Assign);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -348,7 +348,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 1..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -359,7 +359,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::Unset);
@@ -368,7 +368,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 1..1);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -379,7 +379,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.r#type, SwitchType::Error);
             assert_eq!(switch.condition, SwitchCondition::UnsetOrEmpty);
@@ -394,7 +394,7 @@ mod tests {
             assert_eq!(switch.word.location.range, 2..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(switch.word.units, [WordUnit::Tilde("".to_string())]);
         });
@@ -419,7 +419,7 @@ mod tests {
             context: WordContext::Text,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Switch(switch) => {
             assert_eq!(
                 switch.word.units,
@@ -436,7 +436,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
@@ -445,7 +445,7 @@ mod tests {
             assert_eq!(trim.pattern.location.range, 1..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -456,7 +456,7 @@ mod tests {
             context: WordContext::Text,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Shortest);
@@ -465,7 +465,7 @@ mod tests {
             assert_eq!(trim.pattern.location.range, 1..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -476,7 +476,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Prefix);
             assert_eq!(trim.length, TrimLength::Longest);
@@ -488,7 +488,7 @@ mod tests {
             assert_eq!(trim.pattern.location.range, 2..5);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -499,7 +499,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Suffix);
             assert_eq!(trim.length, TrimLength::Shortest);
@@ -511,7 +511,7 @@ mod tests {
             assert_eq!(trim.pattern.location.range, 1..3);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -522,7 +522,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.side, TrimSide::Suffix);
             assert_eq!(trim.length, TrimLength::Longest);
@@ -534,7 +534,7 @@ mod tests {
             assert_eq!(trim.pattern.location.range, 2..3);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('}')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('}')));
     }
 
     #[test]
@@ -545,7 +545,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let result = block_on(lexer.suffix_modifier()).unwrap();
+        let result = lexer.suffix_modifier().now_or_never().unwrap().unwrap();
         assert_matches!(result, Modifier::Trim(trim) => {
             assert_eq!(trim.pattern.units, [WordUnit::Tilde("".to_string())]);
         });
@@ -559,7 +559,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let e = block_on(lexer.suffix_modifier()).unwrap_err();
+        let e = lexer.suffix_modifier().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":");
         assert_eq!(e.location.range, 0..1);
@@ -573,7 +573,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let e = block_on(lexer.suffix_modifier()).unwrap_err();
+        let e = lexer.suffix_modifier().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":x}");
         assert_eq!(e.location.range, 0..1);
@@ -587,7 +587,7 @@ mod tests {
             context: WordContext::Word,
         };
 
-        let e = block_on(lexer.suffix_modifier()).unwrap_err();
+        let e = lexer.suffix_modifier().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::InvalidModifier));
         assert_eq!(*e.location.code.value.borrow(), ":#}");
         assert_eq!(e.location.range, 0..2);

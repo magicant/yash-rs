@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_if_command_minimum() {
@@ -150,15 +150,16 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs, []);
             assert_eq!(r#else, None);
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -171,8 +172,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "true");
             assert_eq!(body.to_string(), "false");
             assert_eq!(elifs.len(), 1);
@@ -180,7 +182,7 @@ mod tests {
             assert_eq!(r#else, None);
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -193,8 +195,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs.len(), 3);
@@ -204,7 +207,7 @@ mod tests {
             assert_eq!(r#else, None);
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -214,15 +217,16 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "a");
             assert_eq!(body.to_string(), "b");
             assert_eq!(elifs, []);
             assert_eq!(r#else.unwrap().to_string(), "c; d");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -233,8 +237,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::If { condition, body, elifs, r#else } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::If { condition, body, elifs, r#else } => {
             assert_eq!(condition.to_string(), "1");
             assert_eq!(body.to_string(), "2");
             assert_eq!(elifs.len(), 1);
@@ -242,7 +247,7 @@ mod tests {
             assert_eq!(r#else.unwrap().to_string(), "5");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -252,7 +257,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::IfMissingThen { if_location }) => {
             assert_eq!(*if_location.code.value.borrow(), " if :; fi");
             assert_eq!(if_location.code.start_line_number.get(), 1);
@@ -271,7 +277,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::ElifMissingThen { elif_location }) => {
             assert_eq!(*elif_location.code.value.borrow(), "if a; then b; elif c; fi");
@@ -291,7 +298,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedIf { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "  if :; then :; }");
@@ -311,7 +319,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfCondition));
         assert_eq!(*e.location.code.value.borrow(), "   if then :; fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -325,7 +334,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyIfBody));
         assert_eq!(*e.location.code.value.borrow(), "if :; then fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -339,7 +349,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifCondition));
         assert_eq!(
             *e.location.code.value.borrow(),
@@ -356,7 +367,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElifBody));
         assert_eq!(
             *e.location.code.value.borrow(),
@@ -373,7 +385,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyElse));
         assert_eq!(*e.location.code.value.borrow(), "if :; then :; else fi");
         assert_eq!(e.location.code.start_line_number.get(), 1);

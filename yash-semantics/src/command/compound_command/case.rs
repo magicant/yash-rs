@@ -23,6 +23,7 @@ use crate::expansion::expand_word_attr;
 use crate::Command;
 use crate::Handle;
 use std::ops::ControlFlow::Continue;
+use yash_env::semantics::apply_errexit;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -42,14 +43,14 @@ fn config() -> Config {
 pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Result {
     let subject = match expand_word(env, subject).await {
         Ok((expansion, _exit_status)) => expansion,
-        Err(error) => return error.handle(env).await,
+        Err(error) => return apply_errexit(error.handle(env).await, env),
     };
 
     'outer: for item in items {
         for pattern in &item.patterns {
             let mut pattern = match expand_word_attr(env, pattern).await {
                 Ok((expansion, _exit_status)) => expansion,
-                Err(error) => return error.handle(env).await,
+                Err(error) => return apply_errexit(error.handle(env).await, env),
             };
 
             // Unquoted backslashes should act as quoting, as required by POSIX XCU 2.13.1
@@ -90,6 +91,8 @@ mod tests {
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::option::State::On;
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
@@ -351,12 +354,36 @@ mod tests {
     }
 
     #[test]
+    fn errexit_with_error_expanding_subject() {
+        let (mut env, state) = fixture();
+        env.options.set(ErrExit, On);
+        let command: CompoundCommand = "case $(echo X) in (X) echo X; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
     fn error_expanding_pattern() {
         let (mut env, state) = fixture();
         let command: CompoundCommand = "case X in ($(echo X)) echo X; esac".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn errexit_with_error_expanding_pattern() {
+        let (mut env, state) = fixture();
+        env.options.set(ErrExit, On);
+        let command: CompoundCommand = "case X in ($(echo X)) echo X; esac".parse().unwrap();
+
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus::ERROR))));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }

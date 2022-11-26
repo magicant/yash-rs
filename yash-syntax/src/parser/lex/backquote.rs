@@ -88,7 +88,7 @@ mod tests {
     use crate::parser::lex::Lexer;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_backquote_not_backquote() {
@@ -97,7 +97,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote()).unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap();
         assert_eq!(result, None);
     }
 
@@ -108,13 +108,13 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote()).unwrap().unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(content, []);
             assert_eq!(location.range, 0..2);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -124,7 +124,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote()).unwrap().unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
@@ -138,7 +138,7 @@ mod tests {
             assert_eq!(location.range, 0..6);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -148,7 +148,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Text,
         };
-        let result = block_on(lexer.backquote()).unwrap().unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
@@ -167,7 +167,7 @@ mod tests {
             assert_eq!(location.range, 0..15);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote()).unwrap().unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
@@ -197,7 +197,7 @@ mod tests {
             assert_eq!(location.range, 0..15);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -207,7 +207,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.backquote()).unwrap().unwrap();
+        let result = lexer.backquote().now_or_never().unwrap().unwrap().unwrap();
         assert_matches!(result, TextUnit::Backquote { content, location } => {
             assert_eq!(
                 content,
@@ -216,7 +216,7 @@ mod tests {
             assert_eq!(location.range, 0..12);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -226,7 +226,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let e = block_on(lexer.backquote()).unwrap_err();
+        let e = lexer.backquote().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "`");
@@ -247,7 +247,7 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let e = block_on(lexer.backquote()).unwrap_err();
+        let e = lexer.backquote().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause, ErrorCause::Syntax(SyntaxError::UnclosedBackquote { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "`foo");
             assert_eq!(opening_location.code.start_line_number.get(), 1);

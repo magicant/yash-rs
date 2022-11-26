@@ -22,8 +22,8 @@ use super::super::phrase::Phrase;
 use super::Env;
 use super::Error;
 use crate::expansion::ErrorCause;
-use crate::read_eval_loop;
 use crate::Handle;
+use crate::ReadEvalLoop;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
@@ -70,7 +70,7 @@ where
 
                 let mut lexer =
                     Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-                read_eval_loop(env, &mut lexer).await
+                ReadEvalLoop::new(env, &mut lexer).run().await
             })
         })
         .await;
@@ -153,7 +153,7 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use yash_env::system::Errno;
 
     #[test]
@@ -227,7 +227,9 @@ mod tests {
         let location = Location::dummy("foo");
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        let result = block_on(expand(command, location.clone(), &mut env));
+        let result = expand(command, location.clone(), &mut env)
+            .now_or_never()
+            .unwrap();
         let cause = ErrorCause::CommandSubstError(Errno::ENOSYS);
         assert_eq!(result, Err(Error { cause, location }));
     }

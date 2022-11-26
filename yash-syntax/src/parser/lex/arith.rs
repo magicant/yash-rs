@@ -96,16 +96,17 @@ mod tests {
     use crate::syntax::Backslashed;
     use crate::syntax::Literal;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_arithmetic_expansion_empty() {
         let mut lexer = Lexer::from_memory("$(());", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(0)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Arith { content, location } => {
+        let result = lexer.arithmetic_expansion(0).now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::Arith { content, location } => {
             assert_eq!(content.0, []);
             assert_eq!(*location.code.value.borrow(), "$(());");
             assert_eq!(location.code.start_line_number.get(), 1);
@@ -113,26 +114,30 @@ mod tests {
             assert_eq!(location.range, 0..5);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_arithmetic_expansion_none() {
         let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
-        assert_eq!(block_on(lexer.arithmetic_expansion(0)), Ok(None));
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('(')));
+        assert_eq!(
+            lexer.arithmetic_expansion(0).now_or_never().unwrap(),
+            Ok(None)
+        );
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('(')));
     }
 
     #[test]
     fn lexer_arithmetic_expansion_line_continuations() {
         let mut lexer = Lexer::from_memory("$(\\\n\\\n(\\\n)\\\n\\\n);", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(0)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Arith { content, location } => {
+        let result = lexer.arithmetic_expansion(0).now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::Arith { content, location } => {
             assert_eq!(content.0, []);
             assert_eq!(*location.code.value.borrow(), "$(\\\n\\\n(\\\n)\\\n\\\n);");
             assert_eq!(location.code.start_line_number.get(), 1);
@@ -140,19 +145,20 @@ mod tests {
             assert_eq!(location.range, 0..15);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_arithmetic_expansion_escapes() {
         let mut lexer = Lexer::from_memory(r#".$((\\\"\`\$));"#, Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.arithmetic_expansion(1)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::Arith { content, location } => {
+        let result = lexer.arithmetic_expansion(1).now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::Arith { content, location } => {
             assert_eq!(
                 content.0,
                 [
@@ -169,16 +175,17 @@ mod tests {
             assert_eq!(location.range, 1..14);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_arithmetic_expansion_unclosed_first() {
         let mut lexer = Lexer::from_memory("$((1", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let e = block_on(lexer.arithmetic_expansion(0)).unwrap_err();
+        let result = lexer.arithmetic_expansion(0).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$((1");
@@ -195,10 +202,11 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_unclosed_second() {
         let mut lexer = Lexer::from_memory("$((1)", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let e = block_on(lexer.arithmetic_expansion(0)).unwrap_err();
+        let result = lexer.arithmetic_expansion(0).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedArith { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$((1)");
@@ -215,9 +223,12 @@ mod tests {
     #[test]
     fn lexer_arithmetic_expansion_unclosed_but_maybe_command_substitution() {
         let mut lexer = Lexer::from_memory("$((1) ", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
-        assert_eq!(block_on(lexer.arithmetic_expansion(0)), Ok(None));
+        assert_eq!(
+            lexer.arithmetic_expansion(0).now_or_never().unwrap(),
+            Ok(None)
+        );
         assert_eq!(lexer.index(), 1);
     }
 }

@@ -222,7 +222,7 @@ mod tests {
     use crate::syntax::BackquoteUnit;
     use crate::syntax::CommandSubst;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_text_unit_literal_accepted() {
@@ -232,20 +232,23 @@ mod tests {
             context: WordContext::Word,
         };
         let mut called = false;
-        let result = block_on(lexer.text_unit(
-            |c| {
-                called = true;
-                assert_eq!(c, 'X');
-                false
-            },
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| {
+                    called = true;
+                    assert_eq!(c, 'X');
+                    false
+                },
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert!(called);
         assert_matches!(result, Literal('X'));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -256,19 +259,22 @@ mod tests {
             context: WordContext::Word,
         };
         let mut called = false;
-        let result = block_on(lexer.text_unit(
-            |c| {
-                called = true;
-                assert_eq!(c, ';');
-                true
-            },
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| {
+                    called = true;
+                    assert_eq!(c, ';');
+                    true
+                },
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert!(called);
         assert_eq!(result, None);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
@@ -279,20 +285,23 @@ mod tests {
             context: WordContext::Word,
         };
         let mut called = false;
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| {
-                called = true;
-                assert_eq!(c, '#');
-                true
-            },
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| {
+                    called = true;
+                    assert_eq!(c, '#');
+                    true
+                },
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert!(called);
         assert_eq!(result, Backslashed('#'));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -302,15 +311,18 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert_eq!(result, Literal('\\'));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -321,20 +333,23 @@ mod tests {
             context: WordContext::Word,
         };
         let mut called = false;
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| {
-                called = true;
-                assert_eq!(c, '\\');
-                true
-            },
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| {
+                    called = true;
+                    assert_eq!(c, '\\');
+                    true
+                },
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert!(called);
         assert_eq!(result, Backslashed('\\'));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('\n')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('\n')));
     }
 
     #[test]
@@ -344,18 +359,21 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert_matches!(result, CommandSubst { content, location } => {
             assert_eq!(&*content, "");
             assert_eq!(location.range, 0..3);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -365,18 +383,21 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Text,
         };
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert_matches!(result, Backquote { content, location } => {
             assert_eq!(content, [BackquoteUnit::Backslashed('"')]);
             assert_eq!(location.range, 0..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -386,12 +407,15 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.text_unit(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert_matches!(result, Backquote { content, location } => {
             assert_eq!(
                 content,
@@ -400,7 +424,7 @@ mod tests {
             assert_eq!(location.range, 0..4);
         });
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
@@ -410,25 +434,31 @@ mod tests {
             lexer: &mut lexer,
             context: WordContext::Word,
         };
-        let result = block_on(lexer.text_unit(
-            |_| false,
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap()
-        .unwrap();
+        let result = lexer
+            .text_unit(
+                |_| false,
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap()
+            .unwrap();
         assert_eq!(result, Literal('X'));
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_text_empty() {
         let mut lexer = Lexer::from_memory("", Source::Unknown);
-        let Text(units) = block_on(lexer.text(
-            |c| unreachable!("unexpected call to is_delimiter({:?})", c),
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap();
+        let Text(units) = lexer
+            .text(
+                |c| unreachable!("unexpected call to is_delimiter({:?})", c),
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(units, &[]);
     }
 
@@ -436,85 +466,101 @@ mod tests {
     fn lexer_text_nonempty() {
         let mut lexer = Lexer::from_memory("abc", Source::Unknown);
         let mut called = 0;
-        let Text(units) = block_on(lexer.text(
-            |c| {
-                assert!(
-                    matches!(c, 'a' | 'b' | 'c'),
-                    "unexpected call to is_delimiter({:?}), called={}",
-                    c,
-                    called
-                );
-                called += 1;
-                false
-            },
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap();
+        let Text(units) = lexer
+            .text(
+                |c| {
+                    assert!(
+                        matches!(c, 'a' | 'b' | 'c'),
+                        "unexpected call to is_delimiter({:?}), called={}",
+                        c,
+                        called
+                    );
+                    called += 1;
+                    false
+                },
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
         assert_eq!(called, 3);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_text_delimiter() {
         let mut lexer = Lexer::from_memory("abc", Source::Unknown);
         let mut called = 0;
-        let Text(units) = block_on(lexer.text(
-            |c| {
-                assert!(
-                    matches!(c, 'a' | 'b' | 'c'),
-                    "unexpected call to is_delimiter({:?}), called={}",
-                    c,
-                    called
-                );
-                called += 1;
-                c == 'c'
-            },
-            |c| unreachable!("unexpected call to is_escapable({:?})", c),
-        ))
-        .unwrap();
+        let Text(units) = lexer
+            .text(
+                |c| {
+                    assert!(
+                        matches!(c, 'a' | 'b' | 'c'),
+                        "unexpected call to is_delimiter({:?}), called={}",
+                        c,
+                        called
+                    );
+                    called += 1;
+                    c == 'c'
+                },
+                |c| unreachable!("unexpected call to is_escapable({:?})", c),
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b')]);
         assert_eq!(called, 3);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('c')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('c')));
     }
 
     #[test]
     fn lexer_text_escaping() {
         let mut lexer = Lexer::from_memory(r"a\b\c", Source::Unknown);
         let mut tested_chars = String::new();
-        let Text(units) = block_on(lexer.text(
-            |_| false,
-            |c| {
-                tested_chars.push(c);
-                c == 'b'
-            },
-        ))
-        .unwrap();
+        let Text(units) = lexer
+            .text(
+                |_| false,
+                |c| {
+                    tested_chars.push(c);
+                    c == 'b'
+                },
+            )
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             units,
             &[Literal('a'), Backslashed('b'), Literal('\\'), Literal('c')]
         );
         assert_eq!(tested_chars, "bc");
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_text_with_parentheses_no_parentheses() {
         let mut lexer = Lexer::from_memory("abc", Source::Unknown);
-        let Text(units) = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap();
+        let Text(units) = lexer
+            .text_with_parentheses(|_| false, |_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(units, &[Literal('a'), Literal('b'), Literal('c')]);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(None));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(None));
     }
 
     #[test]
     fn lexer_text_with_parentheses_nest_1() {
         let mut lexer = Lexer::from_memory("a(b)c)", Source::Unknown);
-        let Text(units) =
-            block_on(lexer.text_with_parentheses(|c| c == 'b' || c == ')', |_| false)).unwrap();
+        let Text(units) = lexer
+            .text_with_parentheses(|c| c == 'b' || c == ')', |_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             units,
             &[
@@ -526,16 +572,17 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(')')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(')')));
     }
 
     #[test]
     fn lexer_text_with_parentheses_nest_1_1() {
         let mut lexer = Lexer::from_memory("ab(CD)ef(GH)ij;", Source::Unknown);
-        let Text(units) = block_on(
-            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
-        )
-        .unwrap();
+        let Text(units) = lexer
+            .text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             units,
             &[
@@ -556,16 +603,17 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_text_with_parentheses_nest_3() {
         let mut lexer = Lexer::from_memory("a(B((C)D))e;", Source::Unknown);
-        let Text(units) = block_on(
-            lexer.text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false),
-        )
-        .unwrap();
+        let Text(units) = lexer
+            .text_with_parentheses(|c| c.is_ascii_uppercase() || c == ';', |_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(
             units,
             &[
@@ -583,13 +631,17 @@ mod tests {
             ]
         );
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(';')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(';')));
     }
 
     #[test]
     fn lexer_text_with_parentheses_unclosed() {
         let mut lexer = Lexer::from_memory("x(()", Source::Unknown);
-        let e = block_on(lexer.text_with_parentheses(|_| false, |_| false)).unwrap_err();
+        let e = lexer
+            .text_with_parentheses(|_| false, |_| false)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedParen { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "x(()");

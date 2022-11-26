@@ -61,16 +61,17 @@ mod tests {
     use crate::parser::error::ErrorCause;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_command_substitution_success() {
         let mut lexer = Lexer::from_memory("$( foo bar )baz", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.command_substitution(0)).unwrap().unwrap();
-        assert_matches!(result, TextUnit::CommandSubst { location, content } => {
+        let result = lexer.command_substitution(0).now_or_never().unwrap();
+        let text_unit = result.unwrap().unwrap();
+        assert_matches!(text_unit, TextUnit::CommandSubst { location, content } => {
             assert_eq!(*location.code.value.borrow(), "$( foo bar )baz");
             assert_eq!(location.code.start_line_number.get(), 1);
             assert_eq!(location.code.source, Source::Unknown);
@@ -78,7 +79,7 @@ mod tests {
             assert_eq!(&*content, " foo bar ");
         });
 
-        let next = block_on(lexer.location()).unwrap();
+        let next = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*next.code.value.borrow(), "$( foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
@@ -88,13 +89,14 @@ mod tests {
     #[test]
     fn lexer_command_substitution_none() {
         let mut lexer = Lexer::from_memory("$ foo bar )baz", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let result = block_on(lexer.command_substitution(0)).unwrap();
-        assert_eq!(result, None);
+        let result = lexer.command_substitution(0).now_or_never().unwrap();
+        let text_unit = result.unwrap();
+        assert_eq!(text_unit, None);
 
-        let next = block_on(lexer.location()).unwrap();
+        let next = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*next.code.value.borrow(), "$ foo bar )baz");
         assert_eq!(next.code.start_line_number.get(), 1);
         assert_eq!(next.code.source, Source::Unknown);
@@ -104,10 +106,11 @@ mod tests {
     #[test]
     fn lexer_command_substitution_unclosed() {
         let mut lexer = Lexer::from_memory("$( foo bar baz", Source::Unknown);
-        block_on(lexer.peek_char()).unwrap();
+        lexer.peek_char().now_or_never().unwrap().unwrap();
         lexer.consume_char();
 
-        let e = block_on(lexer.command_substitution(0)).unwrap_err();
+        let result = lexer.command_substitution(0).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedCommandSubstitution { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), "$( foo bar baz");

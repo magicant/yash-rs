@@ -107,7 +107,7 @@ mod tests {
     use crate::alias::{AliasSet, HashEntry};
     use crate::source::Location;
     use crate::source::Source;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_pipeline_eof() {
@@ -115,7 +115,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.pipeline()).unwrap().unwrap();
+        let option = parser.pipeline().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(option, None);
     }
 
@@ -125,7 +125,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
         assert_eq!(p.negation, false);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "foo");
@@ -137,7 +138,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
         assert_eq!(p.negation, false);
         assert_eq!(p.commands.len(), 3);
         assert_eq!(p.commands[0].to_string(), "one");
@@ -151,7 +153,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
         assert_eq!(p.negation, true);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "foo");
@@ -163,7 +166,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.pipeline()).unwrap_err();
+        let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::DoubleNegation));
         assert_eq!(*e.location.code.value.borrow(), " !  !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -177,7 +180,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.pipeline()).unwrap_err();
+        let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBang)
@@ -194,7 +197,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.pipeline()).unwrap_err();
+        let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingCommandAfterBar)
@@ -211,7 +214,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.pipeline()).unwrap_err();
+        let e = parser.pipeline().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::BangAfterBar));
         assert_eq!(*e.location.code.value.borrow(), "foo | !");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -232,7 +235,8 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let p = block_on(parser.pipeline()).unwrap().unwrap().unwrap();
+        let result = parser.pipeline().now_or_never().unwrap();
+        let p = result.unwrap().unwrap().unwrap();
         assert_eq!(p.negation, true);
         assert_eq!(p.commands.len(), 1);
         assert_eq!(p.commands[0].to_string(), "ok");

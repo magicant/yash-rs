@@ -23,13 +23,21 @@ mod item;
 mod pipeline;
 mod simple_command;
 
-use super::Command;
 use crate::trap::run_traps_for_caught_signals;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
+
+/// Syntactic construct that can be executed.
+#[async_trait(?Send)]
+pub trait Command {
+    /// Executes this command.
+    ///
+    /// TODO Elaborate: The exit status must be updated during execution.
+    async fn execute(&self, env: &mut Env) -> Result;
+}
 
 /// Executes the command.
 ///
@@ -78,7 +86,7 @@ mod tests {
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::trap::Signal;
@@ -109,7 +117,7 @@ mod tests {
             .raise_signal(Signal::SIGUSR1);
 
         let command: syntax::Command = "echo main".parse().unwrap();
-        let result = block_on(command.execute(&mut env));
+        let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
 
@@ -121,7 +129,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: syntax::List = "return -n 1; return -n 2; return -n 4".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(4));
     }
@@ -131,7 +139,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         let list: syntax::List = "return -n 1; return 2; return -n 4".parse().unwrap();
-        let result = block_on(list.execute(&mut env));
+        let result = list.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(2));
     }

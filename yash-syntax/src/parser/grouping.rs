@@ -102,7 +102,7 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_grouping_short() {
@@ -110,8 +110,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Grouping(list) => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
         });
     }
@@ -122,8 +123,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Grouping(list) => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), "foo; bar&");
         });
     }
@@ -134,7 +136,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedGrouping { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " { oh no ");
@@ -154,7 +157,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyGrouping));
         assert_eq!(*e.location.code.value.borrow(), "{ }");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -187,8 +191,9 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Grouping(list) => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Grouping(list) => {
             assert_eq!(list.to_string(), ":");
         });
     }
@@ -199,8 +204,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Subshell { body, location } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Subshell { body, location } => {
             assert_eq!(body.to_string(), ":");
             assert_eq!(*location.code.value.borrow(), "(:)");
             assert_eq!(location.code.start_line_number.get(), 1);
@@ -215,8 +221,9 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.compound_command()).unwrap().unwrap();
-        assert_matches!(result, CompoundCommand::Subshell { body, location } => {
+        let result = parser.compound_command().now_or_never().unwrap();
+        let compound_command = result.unwrap().unwrap();
+        assert_matches!(compound_command, CompoundCommand::Subshell { body, location } => {
             assert_eq!(body.to_string(), "foo& bar");
             assert_eq!(*location.code.value.borrow(), "( foo& bar; )");
             assert_eq!(location.code.start_line_number.get(), 1);
@@ -231,7 +238,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedSubshell { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " ( oh no");
@@ -251,7 +259,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.compound_command()).unwrap_err();
+        let result = parser.compound_command().now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptySubshell));
         assert_eq!(*e.location.code.value.borrow(), "( )");
         assert_eq!(e.location.code.start_line_number.get(), 1);

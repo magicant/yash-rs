@@ -78,13 +78,13 @@ impl Input for Memory<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn memory_empty_source() {
         let mut input = Memory::new("");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 
@@ -92,10 +92,10 @@ mod tests {
     fn memory_one_line() {
         let mut input = Memory::new("one\n");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "one\n");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 
@@ -103,16 +103,16 @@ mod tests {
     fn memory_three_lines() {
         let mut input = Memory::new("one\ntwo\nthree");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "one\n");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "two\n");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "three");
 
-        let line = block_on(input.next_line(&Context)).unwrap();
+        let line = input.next_line(&Context).now_or_never().unwrap().unwrap();
         assert_eq!(line, "");
     }
 }

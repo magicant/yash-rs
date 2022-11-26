@@ -269,6 +269,10 @@ pub trait System: Debug {
     #[must_use]
     fn getpid(&self) -> Pid;
 
+    /// Returns the process ID of the parent process.
+    #[must_use]
+    fn getppid(&self) -> Pid;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -703,6 +707,9 @@ impl System for SharedSystem {
     }
     fn getpid(&self) -> Pid {
         self.0.borrow().getpid()
+    }
+    fn getppid(&self) -> Pid {
+        self.0.borrow().getppid()
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
@@ -1144,9 +1151,9 @@ mod tests {
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::r#virtual::PIPE_SIZE;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
     use futures_util::task::noop_waker;
     use futures_util::task::noop_waker_ref;
+    use futures_util::FutureExt;
     use std::future::Future;
     use std::rc::Rc;
     use std::task::Context;
@@ -1158,8 +1165,8 @@ mod tests {
         system.write(writer, &[42]).unwrap();
 
         let mut buffer = [0; 2];
-        let result = block_on(system.read_async(reader, &mut buffer));
-        assert_eq!(result, Ok(1));
+        let result = system.read_async(reader, &mut buffer).now_or_never();
+        assert_eq!(result, Some(Ok(1)));
         assert_eq!(buffer[..1], [42]);
     }
 
@@ -1199,7 +1206,7 @@ mod tests {
     fn shared_system_write_all_ready() {
         let mut system = SharedSystem::new(Box::new(VirtualSystem::new()));
         let (reader, writer) = system.pipe().unwrap();
-        let result = block_on(system.write_all(writer, &[17]));
+        let result = system.write_all(writer, &[17]).now_or_never().unwrap();
         assert_eq!(result, Ok(1));
 
         let mut buffer = [0; 2];

@@ -96,7 +96,7 @@ mod tests {
     use crate::source::Location;
     use crate::source::Source;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_short_function_definition_not_one_word_name() {
@@ -109,12 +109,13 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let result = block_on(parser.short_function_definition(c)).unwrap();
-        assert_matches!(result, Command::Simple(c) => {
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Simple(c) => {
             assert_eq!(c.to_string(), "");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(OpenParen));
     }
 
@@ -129,8 +130,9 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let result = block_on(parser.short_function_definition(c)).unwrap();
-        assert_matches!(result, Command::Simple(c) => {
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Simple(c) => {
             assert_eq!(c.to_string(), "foo");
         });
     }
@@ -146,7 +148,8 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::UnmatchedParenthesis)
@@ -168,7 +171,8 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::MissingFunctionBody)
@@ -190,7 +194,8 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)
@@ -226,18 +231,18 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(async {
-            parser.simple_command().await.unwrap(); // alias
-            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
-            parser.short_function_definition(c).await.unwrap()
-        });
-        assert_matches!(result, Command::Function(f) => {
+        parser.simple_command().now_or_never().unwrap().unwrap(); // alias
+        let sc = parser.simple_command().now_or_never().unwrap();
+        let sc = sc.unwrap().unwrap().unwrap();
+        let result = parser.short_function_definition(sc).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
             assert_eq!(f.body.to_string(), "(:)");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -266,18 +271,18 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(async {
-            parser.simple_command().await.unwrap(); // alias
-            let c = parser.simple_command().await.unwrap().unwrap().unwrap();
-            parser.short_function_definition(c).await.unwrap()
-        });
-        assert_matches!(result, Command::Function(f) => {
+        parser.simple_command().now_or_never().unwrap().unwrap(); // alias
+        let sc = parser.simple_command().now_or_never().unwrap();
+        let sc = sc.unwrap().unwrap().unwrap();
+        let result = parser.short_function_definition(sc).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "f");
             assert_eq!(f.body.to_string(), "(:)");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -305,7 +310,8 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let e = block_on(parser.short_function_definition(c)).unwrap_err();
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let e = result.unwrap_err();
         assert_eq!(
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidFunctionBody)

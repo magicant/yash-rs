@@ -17,12 +17,22 @@
 //! Error handlers.
 
 use crate::ExitStatus;
-use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::io::print_message;
 use yash_env::semantics::Divert;
 use yash_env::Env;
+
+/// Error handler.
+///
+/// Most errors in the shell are handled by printing an error message to the
+/// standard error and returning a non-zero exit status. This trait provides a
+/// standard interface for implementing that behavior.
+#[async_trait(?Send)]
+pub trait Handle {
+    /// Handles the argument error.
+    async fn handle(&self, env: &mut Env) -> super::Result;
+}
 
 /// Prints an error message.
 ///

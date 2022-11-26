@@ -568,6 +568,36 @@ impl VariableSet {
             .collect()
     }
 
+    /// Initializes default variables.
+    ///
+    /// This function assigns the following variables to `self`:
+    ///
+    /// - `IFS=' \t\n'`
+    /// - `OPTIND=1`
+    /// - `PS1='$ '`
+    /// - `PS2='> '`
+    /// - `PS4='+ '`
+    ///
+    /// The following variables are not assigned by this function as their
+    /// values cannot be determined independently:
+    ///
+    /// - `PPID`
+    /// - `PWD`
+    ///
+    /// This function ignores any assignment errors.
+    pub fn init(&mut self) {
+        const VARIABLES: &[(&str, &str)] = &[
+            ("IFS", " \t\n"),
+            ("OPTIND", "1"),
+            ("PS1", "$ "),
+            ("PS2", "> "),
+            ("PS4", "+ "),
+        ];
+        for &(name, value) in VARIABLES {
+            let _ = self.assign(Scope::Global, name.to_owned(), Variable::new(value));
+        }
+    }
+
     /// Returns a reference to the positional parameters.
     ///
     /// Every regular context starts with an empty array of positional

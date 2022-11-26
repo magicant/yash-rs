@@ -102,7 +102,7 @@ mod tests {
     use crate::syntax::Command;
     use crate::syntax::SimpleCommand;
     use assert_matches::assert_matches;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn parser_do_clause_none() {
@@ -110,7 +110,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.do_clause()).unwrap();
+        let result = parser.do_clause().now_or_never().unwrap().unwrap();
         assert!(result.is_none(), "result should be none: {:?}", result);
     }
 
@@ -120,10 +120,10 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = parser.do_clause().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(result.to_string(), ":");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -133,10 +133,10 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = parser.do_clause().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(result.to_string(), "foo; bar&");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -146,7 +146,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.do_clause()).unwrap_err();
+        let e = parser.do_clause().now_or_never().unwrap().unwrap_err();
         assert_matches!(e.cause,
             ErrorCause::Syntax(SyntaxError::UnclosedDoClause { opening_location }) => {
             assert_eq!(*opening_location.code.value.borrow(), " do not close ");
@@ -166,7 +166,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let e = block_on(parser.do_clause()).unwrap_err();
+        let e = parser.do_clause().now_or_never().unwrap().unwrap_err();
         assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::EmptyDoClause));
         assert_eq!(*e.location.code.value.borrow(), "do done");
         assert_eq!(e.location.code.start_line_number.get(), 1);
@@ -199,10 +199,10 @@ mod tests {
         ));
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let result = block_on(parser.do_clause()).unwrap().unwrap();
+        let result = parser.do_clause().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(result.to_string(), ":");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 
@@ -212,7 +212,7 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.compound_command()).unwrap();
+        let option = parser.compound_command().now_or_never().unwrap().unwrap();
         assert_eq!(option, None);
     }
 
@@ -222,8 +222,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let FullCompoundCommand { command, redirs } =
-            block_on(parser.full_compound_command()).unwrap().unwrap();
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, redirs } = result.unwrap().unwrap();
         assert_eq!(command.to_string(), "(:)");
         assert_eq!(redirs, []);
     }
@@ -234,14 +234,14 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let FullCompoundCommand { command, redirs } =
-            block_on(parser.full_compound_command()).unwrap().unwrap();
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        let FullCompoundCommand { command, redirs } = result.unwrap().unwrap();
         assert_eq!(command.to_string(), "(command)");
         assert_eq!(redirs.len(), 2);
         assert_eq!(redirs[0].to_string(), "<foo");
         assert_eq!(redirs[1].to_string(), ">bar");
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, Operator(Semicolon));
     }
 
@@ -251,8 +251,8 @@ mod tests {
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
-        let option = block_on(parser.full_compound_command()).unwrap();
-        assert_eq!(option, None);
+        let result = parser.full_compound_command().now_or_never().unwrap();
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
@@ -266,14 +266,15 @@ mod tests {
             redirs: vec![].into(),
         };
 
-        let result = block_on(parser.short_function_definition(c)).unwrap();
-        assert_matches!(result, Command::Function(f) => {
+        let result = parser.short_function_definition(c).now_or_never().unwrap();
+        let command = result.unwrap();
+        assert_matches!(command, Command::Function(f) => {
             assert_eq!(f.has_keyword, false);
             assert_eq!(f.name.to_string(), "foo");
             assert_eq!(f.body.to_string(), "(:) >/dev/null");
         });
 
-        let next = block_on(parser.peek_token()).unwrap();
+        let next = parser.peek_token().now_or_never().unwrap().unwrap();
         assert_eq!(next.id, EndOfInput);
     }
 }

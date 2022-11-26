@@ -92,14 +92,14 @@ mod tests {
     use crate::source::Source;
     use crate::syntax::TextUnit;
     use crate::syntax::WordUnit;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
 
     #[test]
     fn lexer_token_empty() {
         // If there's no word unit that can be parsed, it is the end of input.
         let mut lexer = Lexer::from_memory("", Source::Unknown);
 
-        let t = block_on(lexer.token()).unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(*t.word.location.code.value.borrow(), "");
         assert_eq!(t.word.location.code.start_line_number.get(), 1);
         assert_eq!(t.word.location.code.source, Source::Unknown);
@@ -112,7 +112,7 @@ mod tests {
     fn lexer_token_non_empty() {
         let mut lexer = Lexer::from_memory("abc ", Source::Unknown);
 
-        let t = block_on(lexer.token()).unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 3);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('a')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('b')));
@@ -124,14 +124,14 @@ mod tests {
         assert_eq!(t.id, TokenId::Token(None));
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some(' ')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some(' ')));
     }
 
     #[test]
     fn lexer_token_tilde() {
         let mut lexer = Lexer::from_memory("~a:~", Source::Unknown);
 
-        let t = block_on(lexer.token()).unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(
             t.word.units,
             [
@@ -146,7 +146,7 @@ mod tests {
     fn lexer_token_io_number_delimited_by_less() {
         let mut lexer = Lexer::from_memory("12<", Source::Unknown);
 
-        let t = block_on(lexer.token()).unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 2);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('1')));
         assert_eq!(t.word.units[1], WordUnit::Unquoted(TextUnit::Literal('2')));
@@ -157,14 +157,14 @@ mod tests {
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.peek_char()), Ok(Some('<')));
+        assert_eq!(lexer.peek_char().now_or_never().unwrap(), Ok(Some('<')));
     }
 
     #[test]
     fn lexer_token_io_number_delimited_by_greater() {
         let mut lexer = Lexer::from_memory("0>>", Source::Unknown);
 
-        let t = block_on(lexer.token()).unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
         assert_eq!(t.word.units.len(), 1);
         assert_eq!(t.word.units[0], WordUnit::Unquoted(TextUnit::Literal('0')));
         assert_eq!(*t.word.location.code.value.borrow(), "0>>");
@@ -174,31 +174,32 @@ mod tests {
         assert_eq!(t.id, TokenId::IoNumber);
         assert_eq!(t.index, 0);
 
-        assert_eq!(block_on(lexer.location()).unwrap().range, 1..2);
+        assert_eq!(
+            lexer.location().now_or_never().unwrap().unwrap().range,
+            1..2
+        );
     }
 
     #[test]
     fn lexer_token_after_blank() {
-        block_on(async {
-            let mut lexer = Lexer::from_memory(" a  ", Source::Unknown);
+        let mut lexer = Lexer::from_memory(" a  ", Source::Unknown);
 
-            lexer.skip_blanks().await.unwrap();
-            let t = lexer.token().await.unwrap();
-            assert_eq!(*t.word.location.code.value.borrow(), " a  ");
-            assert_eq!(t.word.location.code.start_line_number.get(), 1);
-            assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.range, 1..2);
-            assert_eq!(t.id, TokenId::Token(None));
-            assert_eq!(t.index, 1);
+        lexer.skip_blanks().now_or_never().unwrap().unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(*t.word.location.code.value.borrow(), " a  ");
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(t.word.location.range, 1..2);
+        assert_eq!(t.id, TokenId::Token(None));
+        assert_eq!(t.index, 1);
 
-            lexer.skip_blanks().await.unwrap();
-            let t = lexer.token().await.unwrap();
-            assert_eq!(*t.word.location.code.value.borrow(), " a  ");
-            assert_eq!(t.word.location.code.start_line_number.get(), 1);
-            assert_eq!(t.word.location.code.source, Source::Unknown);
-            assert_eq!(t.word.location.range, 4..4);
-            assert_eq!(t.id, TokenId::EndOfInput);
-            assert_eq!(t.index, 4);
-        });
+        lexer.skip_blanks().now_or_never().unwrap().unwrap();
+        let t = lexer.token().now_or_never().unwrap().unwrap();
+        assert_eq!(*t.word.location.code.value.borrow(), " a  ");
+        assert_eq!(t.word.location.code.start_line_number.get(), 1);
+        assert_eq!(t.word.location.code.source, Source::Unknown);
+        assert_eq!(t.word.location.range, 4..4);
+        assert_eq!(t.id, TokenId::EndOfInput);
+        assert_eq!(t.index, 4);
     }
 }

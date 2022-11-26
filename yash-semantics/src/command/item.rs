@@ -95,8 +95,8 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
     use crate::tests::LocalExecutor;
-    use futures_executor::block_on;
     use futures_util::task::LocalSpawnExt;
+    use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::job::WaitStatus;
     use yash_env::VirtualSystem;
@@ -110,7 +110,7 @@ mod tests {
             and_or: Rc::new(and_or),
             async_flag: None,
         };
-        let result = block_on(item.execute(&mut env));
+        let result = item.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
@@ -216,7 +216,7 @@ mod tests {
             and_or: Rc::new(and_or),
             async_flag: Some(Location::dummy("X")),
         };
-        let result = block_on(item.execute(&mut env));
+        let result = item.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::NOEXEC))));
         assert_stderr(&state, |stderr| {
             assert!(

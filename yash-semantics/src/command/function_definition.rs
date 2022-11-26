@@ -38,48 +38,59 @@ use yash_syntax::syntax;
 /// function that is read-only, the execution ends with a non-zero exit status.
 /// Finally, the function definition is inserted into the environment, and the
 /// execution ends with an exit status of zero.
+///
+/// The `ErrExit` shell option is [applied](Env::apply_errexit) on error.
 #[async_trait(?Send)]
 impl Command for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env) -> Result {
-        // Expand the function name
-        let Field {
-            value: name,
-            origin,
-        } = match expand_word(env, &self.name).await {
-            Ok((field, _exit_status)) => field,
-            Err(error) => return error.handle(env).await,
-        };
-
-        // Avoid overwriting a read-only function
-        if let Some(function) = env.functions.get(name.as_str()) {
-            if function.0.is_read_only {
-                // TODO Use pretty::Message and annotate_snippet
-                env.print_error(&format!("cannot re-define read-only function {:?}\n", name))
-                    .await;
-                env.exit_status = ExitStatus::ERROR;
-                return Continue(());
-            }
-        }
-
-        // Define the function
-        let function = Function {
-            name,
-            body: Rc::clone(&self.body),
-            origin,
-            is_read_only: false,
-        };
-        let entry = HashEntry(Rc::new(function));
-        env.functions.replace(entry);
-        env.exit_status = ExitStatus::SUCCESS;
-        Continue(())
+        define_function(env, self).await?;
+        env.apply_errexit()
     }
+}
+
+async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Result {
+    // Expand the function name
+    let Field {
+        value: name,
+        origin,
+    } = match expand_word(env, &def.name).await {
+        Ok((field, _exit_status)) => field,
+        Err(error) => return error.handle(env).await,
+    };
+
+    // Avoid overwriting a read-only function
+    if let Some(function) = env.functions.get(name.as_str()) {
+        if function.0.is_read_only {
+            // TODO Use pretty::Message and annotate_snippet
+            env.print_error(&format!("cannot re-define read-only function {:?}\n", name))
+                .await;
+            env.exit_status = ExitStatus::ERROR;
+            return Continue(());
+        }
+    }
+
+    // Define the function
+    let function = Function {
+        name,
+        body: Rc::clone(&def.body),
+        origin,
+        is_read_only: false,
+    };
+    let entry = HashEntry(Rc::new(function));
+    env.functions.replace(entry);
+    env.exit_status = ExitStatus::SUCCESS;
+    Continue(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tests::assert_stderr;
-    use futures_executor::block_on;
+    use futures_util::FutureExt;
+    use std::ops::ControlFlow::Break;
+    use yash_env::option::On;
+    use yash_env::option::Option::ErrExit;
+    use yash_env::semantics::Divert;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -94,7 +105,7 @@ mod tests {
             body: Rc::new("{ :; }".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
@@ -122,7 +133,7 @@ mod tests {
             body: Rc::new("( :; )".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
@@ -152,7 +163,7 @@ mod tests {
             body: Rc::new("( :; )".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_eq!(env.functions.len(), 1);
@@ -175,10 +186,32 @@ mod tests {
             body: Rc::new("{ :; }".parse().unwrap()),
         };
 
-        let result = block_on(definition.execute(&mut env));
+        let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
         assert_eq!(names, ["a"]);
+    }
+
+    #[test]
+    fn errexit_in_function_definition() {
+        let mut env = Env::new_virtual();
+        let function = Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ :; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: true,
+        });
+        env.functions.insert(HashEntry(Rc::clone(&function)));
+        let definition = syntax::FunctionDefinition {
+            has_keyword: false,
+            name: "foo".parse().unwrap(),
+            body: Rc::new("( :; )".parse().unwrap()),
+        };
+        env.options.set(ErrExit, On);
+
+        let result = definition.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Break(Divert::Exit(None)));
+        assert_eq!(env.exit_status, ExitStatus::ERROR);
     }
 }
