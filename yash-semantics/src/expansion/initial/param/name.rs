@@ -54,7 +54,7 @@ impl<'a> TryFrom<&'a str> for Name<'a> {
     fn try_from(s: &'a str) -> Result<Self, InvalidName> {
         let mut cs = s.chars();
         let first = cs.next().ok_or(InvalidName)?;
-        if cs.next() == None && is_special_parameter_char(first) {
+        if cs.next().is_none() && is_special_parameter_char(first) {
             return Ok(Name::Special(first));
         }
 
