@@ -20,6 +20,7 @@ use super::Env;
 use crate::variable::ReadOnlyError;
 use crate::variable::Scope::Global;
 use crate::variable::Variable;
+use crate::System;
 
 /// Error in [`Env::prepare_pwd`]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,6 +37,12 @@ impl From<ReadOnlyError> for PreparePwdError {
     }
 }
 
+impl From<nix::Error> for PreparePwdError {
+    fn from(error: nix::Error) -> Self {
+        PreparePwdError::GetCwdError(error)
+    }
+}
+
 impl Env {
     /// Updates the `$PWD` variable with the current working directory.
     ///
@@ -44,8 +51,14 @@ impl Env {
     /// not modify it. Otherwise, this function sets the value to
     /// `self.system.getcwd()`.
     pub fn prepare_pwd(&mut self) -> Result<(), PreparePwdError> {
+        let dir = self
+            .system
+            .getcwd()?
+            .into_os_string()
+            .into_string()
+            .map_err(|_| nix::Error::EILSEQ)?;
         self.variables
-            .assign(Global, "PWD".to_string(), Variable::new("TODO"))?;
+            .assign(Global, "PWD".to_string(), Variable::new(dir))?;
 
         Ok(())
     }
@@ -55,15 +68,19 @@ impl Env {
 mod tests {
     use super::*;
     use crate::variable::Value;
+    use crate::VirtualSystem;
+    use std::path::PathBuf;
 
     #[test]
     fn prepare_pwd_no_value() {
-        let mut env = Env::new_virtual();
+        let mut system = Box::new(VirtualSystem::new());
+        system.current_process_mut().cwd = PathBuf::from("/foo/bar/dir");
+        let mut env = Env::with_system(system);
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
 
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("TODO"));
+        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
     }
 
     // TODO prepare_pwd_with_correct_path
