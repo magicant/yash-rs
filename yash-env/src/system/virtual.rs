@@ -726,6 +726,10 @@ impl System for VirtualSystem {
         }
     }
 
+    fn getcwd(&self) -> nix::Result<PathBuf> {
+        Ok(self.current_process().cwd.clone())
+    }
+
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         let state = self.state.borrow();
         Ok(state.home_dirs.get(name).cloned())

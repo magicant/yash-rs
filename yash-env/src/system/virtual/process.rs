@@ -32,6 +32,8 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
+use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Weak;
 
 /// Process in a virtual system.
@@ -42,6 +44,9 @@ pub struct Process {
 
     /// Set of file descriptors open in this process.
     pub(crate) fds: BTreeMap<Fd, FdBody>,
+
+    /// Working directory path
+    pub(crate) cwd: PathBuf,
 
     /// Execution state of the process.
     pub(crate) state: ProcessState,
@@ -107,6 +112,7 @@ impl Process {
         Process {
             ppid,
             fds: BTreeMap::new(),
+            cwd: PathBuf::new(),
             state: ProcessState::Running,
             state_has_changed: false,
             signal_handlings: HashMap::new(),
@@ -204,6 +210,18 @@ impl Process {
     /// Removes all FD bodies in this process.
     pub fn close_fds(&mut self) {
         self.fds.clear();
+    }
+
+    /// Returns the working directory path.
+    pub fn getcwd(&self) -> &Path {
+        &self.cwd
+    }
+
+    /// Changes the working directory.
+    ///
+    /// This function does not check if the directory exists and is accessible.
+    pub fn chdir(&mut self, path: PathBuf) {
+        self.cwd = path
     }
 
     /// Returns the process state.
