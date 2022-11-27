@@ -27,6 +27,7 @@ use std::fmt::Debug;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Component;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 /// Collection of files.
@@ -200,6 +201,11 @@ pub enum FileBody {
         content: VecDeque<u8>,
         readers: usize,
         writers: usize,
+    },
+    /// Symbolic link
+    Symlink {
+        /// Path to the file referenced by this symlink
+        target: PathBuf,
     },
     // TODO Other filetypes
 }

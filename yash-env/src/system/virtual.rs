@@ -256,6 +256,7 @@ fn stat(inode: &INode) -> Result<FileStat, Errno> {
         FileBody::Regular { content, .. } => (SFlag::S_IFREG, content.len()),
         FileBody::Directory { files } => (SFlag::S_IFDIR, files.len()),
         FileBody::Fifo { content, .. } => (SFlag::S_IFIFO, content.len()),
+        FileBody::Symlink { target } => (SFlag::S_IFLNK, target.as_os_str().len()),
     };
     let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
     result.st_mode = type_flag.bits() | inode.permissions.0;
