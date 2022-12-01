@@ -281,6 +281,8 @@ fn stat(inode: &INode) -> Result<FileStat, Errno> {
     let mut result: FileStat = unsafe { MaybeUninit::zeroed().assume_init() };
     result.st_mode = type_flag.bits() | inode.permissions.0;
     result.st_size = size as _;
+    result.st_dev = 1;
+    result.st_ino = std::ptr::addr_of!(*inode) as nix::libc::ino_t;
     Ok(result)
 }
 
@@ -292,6 +294,8 @@ impl System for VirtualSystem {
     ///
     /// - `st_mode`
     /// - `st_size`
+    /// - `st_dev` (always 1)
+    /// - `st_ino` (computed from the address of `INode`)
     fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
         self.with_open_file_description(fd, |ofd| stat(&ofd.file.borrow()))
     }
@@ -303,6 +307,8 @@ impl System for VirtualSystem {
     ///
     /// - `st_mode`
     /// - `st_size`
+    /// - `st_dev` (always 1)
+    /// - `st_ino` (computed from the address of `INode`)
     fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let inode = self.resolve_existing_file(dir_fd, path, flags)?;
