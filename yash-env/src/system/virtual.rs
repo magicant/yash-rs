@@ -235,13 +235,33 @@ impl VirtualSystem {
         &self,
         _dir_fd: Fd,
         path: &Path,
-        _flags: AtFlags,
+        flags: AtFlags,
     ) -> nix::Result<Rc<RefCell<INode>>> {
         // TODO Resolve relative to dir_fd
         // TODO Support AT_FDCWD
-        // TODO AtFlags::AT_SYMLINK_NOFOLLOW
-        let path = self.resolve_relative_path(path);
-        self.state.borrow().file_system.get(&path)
+        const _POSIX_SYMLOOP_MAX: i32 = 8;
+
+        let mut path = Cow::Borrowed(path);
+        for _count in 0.._POSIX_SYMLOOP_MAX {
+            let resolved_path = self.resolve_relative_path(&path);
+            let inode = self.state.borrow().file_system.get(&resolved_path)?;
+            if flags.contains(AtFlags::AT_SYMLINK_NOFOLLOW) {
+                return Ok(inode);
+            }
+
+            let inode_ref = inode.borrow();
+            if let FileBody::Symlink { target } = &inode_ref.body {
+                let mut new_path = resolved_path.into_owned();
+                new_path.pop();
+                new_path.push(target);
+                path = Cow::Owned(new_path);
+            } else {
+                drop(inode_ref);
+                return Ok(inode);
+            }
+        }
+
+        Err(Errno::ELOOP)
     }
 }
 
@@ -985,6 +1005,51 @@ mod tests {
             .unwrap();
         assert_eq!(stat.st_mode, SFlag::S_IFIFO.bits() | Mode::default().0);
         assert_eq!(stat.st_size, 42);
+    }
+
+    fn system_with_symlink() -> VirtualSystem {
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save("/some/file", Rc::new(RefCell::new(INode::new([]))))
+            .unwrap();
+        state
+            .file_system
+            .save(
+                "/link",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Symlink {
+                        target: "some/file".into(),
+                    },
+                    permissions: Mode::default(),
+                })),
+            )
+            .unwrap();
+        drop(state);
+        system
+    }
+
+    #[test]
+    fn fstatat_symlink_to_regular_file() {
+        let system = system_with_symlink();
+        let stat = system
+            .fstatat(Fd(0), &CString::new("/link").unwrap(), AtFlags::empty())
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFREG.bits() | Mode::default().0);
+    }
+
+    #[test]
+    fn fstatat_symlink_no_follow() {
+        let system = system_with_symlink();
+        let stat = system
+            .fstatat(
+                Fd(0),
+                &CString::new("/link").unwrap(),
+                AtFlags::AT_SYMLINK_NOFOLLOW,
+            )
+            .unwrap();
+        assert_eq!(stat.st_mode, SFlag::S_IFLNK.bits() | Mode::default().0);
     }
 
     #[test]
