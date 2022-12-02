@@ -224,10 +224,7 @@ impl VirtualSystem {
         if path.is_absolute() {
             Cow::Borrowed(path)
         } else {
-            // TODO Support changing the current working directory
-            let mut rebased = PathBuf::from("/");
-            rebased.push(path);
-            Cow::Owned(rebased)
+            Cow::Owned(self.current_process().cwd.join(path))
         }
     }
 

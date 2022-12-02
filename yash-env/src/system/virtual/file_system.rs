@@ -134,7 +134,7 @@ impl FileSystem {
             for component in components {
                 let name = match component {
                     Component::Normal(name) => name,
-                    Component::RootDir => continue,
+                    Component::RootDir | Component::CurDir => continue,
                     _ => return Err(Errno::ENOENT),
                 };
                 let node_ref = node.borrow();
