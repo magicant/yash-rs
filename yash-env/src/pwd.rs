@@ -17,10 +17,15 @@
 //! Working directory path handling
 
 use super::Env;
+use crate::system::AtFlags;
+use crate::system::AT_FDCWD;
 use crate::variable::ReadOnlyError;
 use crate::variable::Scope::Global;
+use crate::variable::Value::Scalar;
 use crate::variable::Variable;
 use crate::System;
+use std::ffi::CStr;
+use std::ffi::CString;
 
 /// Error in [`Env::prepare_pwd`]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -44,6 +49,34 @@ impl From<nix::Error> for PreparePwdError {
 }
 
 impl Env {
+    /// Tests if the `$PWD` variable is correct.
+    ///
+    /// The variable is correct if:
+    ///
+    /// - it is a scalar variable,
+    /// - its value is a pathname of the current working directory (possibly
+    ///   including symbolic links in the pathname), and
+    /// - there is no dot (`.`) or dot-dot (`..`) component in the pathname.
+    fn has_correct_pwd(&self) -> bool {
+        match self.variables.get("PWD") {
+            Some(Variable {
+                value: Scalar(pwd), ..
+            }) => {
+                // TODO reject dot and dot-dot
+                let pwd = match CString::new(pwd.as_bytes()) {
+                    Ok(pwd) => pwd,
+                    Err(_) => return false,
+                };
+                let s1 = self.system.fstatat(AT_FDCWD, &pwd, AtFlags::empty());
+                let dot = CStr::from_bytes_with_nul(b".\0").unwrap();
+                let s2 = self.system.fstatat(AT_FDCWD, dot, AtFlags::empty());
+                matches!((s1, s2), (Ok(s1), Ok(s2)) if s1.st_dev == s2.st_dev && s1.st_ino == s2.st_ino)
+            }
+
+            _ => false,
+        }
+    }
+
     /// Updates the `$PWD` variable with the current working directory.
     ///
     /// If the value of `$PWD` is a path to the current working directory and
@@ -51,15 +84,16 @@ impl Env {
     /// not modify it. Otherwise, this function sets the value to
     /// `self.system.getcwd()`.
     pub fn prepare_pwd(&mut self) -> Result<(), PreparePwdError> {
-        let dir = self
-            .system
-            .getcwd()?
-            .into_os_string()
-            .into_string()
-            .map_err(|_| nix::Error::EILSEQ)?;
-        self.variables
-            .assign(Global, "PWD".to_string(), Variable::new(dir))?;
-
+        if !self.has_correct_pwd() {
+            let dir = self
+                .system
+                .getcwd()?
+                .into_os_string()
+                .into_string()
+                .map_err(|_| nix::Error::EILSEQ)?;
+            self.variables
+                .assign(Global, "PWD".to_string(), Variable::new(dir))?;
+        }
         Ok(())
     }
 }
@@ -67,24 +101,82 @@ impl Env {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::r#virtual::FileBody;
+    use crate::system::r#virtual::INode;
     use crate::variable::Value;
     use crate::VirtualSystem;
+    use std::cell::RefCell;
     use std::path::PathBuf;
+    use std::rc::Rc;
+
+    fn env_with_symlink_to_dir() -> Env {
+        let mut system = Box::new(VirtualSystem::new());
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save(
+                "/foo/bar/dir",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Directory {
+                        files: Default::default(),
+                    },
+                    permissions: Default::default(),
+                })),
+            )
+            .unwrap();
+        state
+            .file_system
+            .save(
+                "/foo/link",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Symlink {
+                        target: "bar/dir".into(),
+                    },
+                    permissions: Default::default(),
+                })),
+            )
+            .unwrap();
+        drop(state);
+        system.current_process_mut().cwd = PathBuf::from("/foo/bar/dir");
+        Env::with_system(system)
+    }
 
     #[test]
     fn prepare_pwd_no_value() {
-        let mut system = Box::new(VirtualSystem::new());
-        system.current_process_mut().cwd = PathBuf::from("/foo/bar/dir");
-        let mut env = Env::with_system(system);
+        let mut env = env_with_symlink_to_dir();
+
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
-
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
     }
 
-    // TODO prepare_pwd_with_correct_path
+    #[test]
+    fn prepare_pwd_with_correct_path() {
+        let mut env = env_with_symlink_to_dir();
+        env.variables
+            .assign(Global, "PWD".to_string(), Variable::new("/foo/link"))
+            .unwrap();
+
+        let result = env.prepare_pwd();
+        assert_eq!(result, Ok(()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.value, Value::scalar("/foo/link"));
+    }
+
     // TODO prepare_pwd_with_dot
     // TODO prepare_pwd_with_dot_dot
-    // TODO prepare_pwd_with_wrong_path
+
+    #[test]
+    fn prepare_pwd_with_wrong_path() {
+        let mut env = env_with_symlink_to_dir();
+        env.variables
+            .assign(Global, "PWD".to_string(), Variable::new("/foo/bar"))
+            .unwrap();
+
+        let result = env.prepare_pwd();
+        assert_eq!(result, Ok(()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+    }
 }
