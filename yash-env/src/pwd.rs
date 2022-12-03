@@ -27,6 +27,11 @@ use crate::System;
 use std::ffi::CStr;
 use std::ffi::CString;
 
+/// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
+fn has_dot_or_dot_dot(path: &str) -> bool {
+    path.split('/').any(|c| c == "." || c == "..")
+}
+
 /// Error in [`Env::prepare_pwd`]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PreparePwdError {
@@ -61,8 +66,7 @@ impl Env {
         match self.variables.get("PWD") {
             Some(Variable {
                 value: Scalar(pwd), ..
-            }) => {
-                // TODO reject dot and dot-dot
+            }) if !has_dot_or_dot_dot(pwd) => {
                 let pwd = match CString::new(pwd.as_bytes()) {
                     Ok(pwd) => pwd,
                     Err(_) => return false,
@@ -108,6 +112,30 @@ mod tests {
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
+
+    #[test]
+    fn has_dot_or_dot_dot_cases() {
+        assert!(!has_dot_or_dot_dot(""));
+        assert!(!has_dot_or_dot_dot("foo"));
+        assert!(!has_dot_or_dot_dot(".foo"));
+        assert!(!has_dot_or_dot_dot("foo.bar"));
+        assert!(!has_dot_or_dot_dot("..."));
+        assert!(!has_dot_or_dot_dot("/"));
+        assert!(!has_dot_or_dot_dot("/bar"));
+        assert!(!has_dot_or_dot_dot("/bar/baz"));
+
+        assert!(has_dot_or_dot_dot("."));
+        assert!(has_dot_or_dot_dot("/."));
+        assert!(has_dot_or_dot_dot("./"));
+        assert!(has_dot_or_dot_dot("/./"));
+        assert!(has_dot_or_dot_dot("foo/.//bar"));
+
+        assert!(has_dot_or_dot_dot(".."));
+        assert!(has_dot_or_dot_dot("/.."));
+        assert!(has_dot_or_dot_dot("../"));
+        assert!(has_dot_or_dot_dot("/../"));
+        assert!(has_dot_or_dot_dot("/foo//../bar"));
+    }
 
     fn env_with_symlink_to_dir() -> Env {
         let mut system = Box::new(VirtualSystem::new());
@@ -164,8 +192,31 @@ mod tests {
         assert_eq!(pwd.value, Value::scalar("/foo/link"));
     }
 
-    // TODO prepare_pwd_with_dot
-    // TODO prepare_pwd_with_dot_dot
+    #[test]
+    fn prepare_pwd_with_dot() {
+        let mut env = env_with_symlink_to_dir();
+        env.variables
+            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .unwrap();
+
+        let result = env.prepare_pwd();
+        assert_eq!(result, Ok(()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+    }
+
+    #[test]
+    fn prepare_pwd_with_dot_dot() {
+        let mut env = env_with_symlink_to_dir();
+        env.variables
+            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .unwrap();
+
+        let result = env.prepare_pwd();
+        assert_eq!(result, Ok(()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+    }
 
     #[test]
     fn prepare_pwd_with_wrong_path() {
