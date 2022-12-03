@@ -26,6 +26,7 @@ use crate::variable::Variable;
 use crate::System;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::path::Path;
 
 /// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
 fn has_dot_or_dot_dot(path: &str) -> bool {
@@ -66,7 +67,7 @@ impl Env {
         match self.variables.get("PWD") {
             Some(Variable {
                 value: Scalar(pwd), ..
-            }) if !has_dot_or_dot_dot(pwd) => {
+            }) if Path::new(pwd).is_absolute() && !has_dot_or_dot_dot(pwd) => {
                 let pwd = match CString::new(pwd.as_bytes()) {
                     Ok(pwd) => pwd,
                     Err(_) => return false,
@@ -229,5 +230,33 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+    }
+
+    #[test]
+    fn prepare_pwd_with_non_absolute_path() {
+        let mut system = Box::new(VirtualSystem::new());
+        let mut state = system.state.borrow_mut();
+        state
+            .file_system
+            .save(
+                "/link",
+                Rc::new(RefCell::new(INode {
+                    body: FileBody::Symlink { target: ".".into() },
+                    permissions: Default::default(),
+                })),
+            )
+            .unwrap();
+        drop(state);
+        system.current_process_mut().cwd = PathBuf::from("/");
+
+        let mut env = Env::with_system(system);
+        env.variables
+            .assign(Global, "PWD".to_string(), Variable::new("link"))
+            .unwrap();
+
+        let result = env.prepare_pwd();
+        assert_eq!(result, Ok(()));
+        let pwd = env.variables.get("PWD").unwrap();
+        assert_eq!(pwd.value, Value::scalar("/"));
     }
 }
