@@ -35,7 +35,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@nightly
+    - uses: dtolnay/rust-toolchain@1.56.0
+    - uses: dtolnay/rust-toolchain@1.58.0
+    - uses: dtolnay/rust-toolchain@1.64.0
     - name: Run tests with MSRV
-      run: |
-        rustup toolchain install nightly 1.56.0 1.58.0 1.64.0
-        ./check-msrv.sh -v
+      run: ./check-msrv.sh -v
