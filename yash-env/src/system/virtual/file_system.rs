@@ -27,6 +27,7 @@ use std::fmt::Debug;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Component;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 /// Collection of files.
@@ -133,7 +134,7 @@ impl FileSystem {
             for component in components {
                 let name = match component {
                     Component::Normal(name) => name,
-                    Component::RootDir => continue,
+                    Component::RootDir | Component::CurDir => continue,
                     _ => return Err(Errno::ENOENT),
                 };
                 let node_ref = node.borrow();
@@ -200,6 +201,11 @@ pub enum FileBody {
         content: VecDeque<u8>,
         readers: usize,
         writers: usize,
+    },
+    /// Symbolic link
+    Symlink {
+        /// Path to the file referenced by this symlink
+        target: PathBuf,
     },
     // TODO Other filetypes
 }

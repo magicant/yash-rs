@@ -89,6 +89,7 @@ impl OpenFileDescription {
             FileBody::Fifo {
                 content, writers, ..
             } => !self.is_readable || !content.is_empty() || *writers == 0,
+            FileBody::Symlink { target: _ } => false,
         }
     }
 
@@ -101,6 +102,7 @@ impl OpenFileDescription {
             FileBody::Fifo {
                 content, readers, ..
             } => *readers == 0 || PIPE_SIZE - content.len() >= PIPE_BUF,
+            FileBody::Symlink { target: _ } => false,
         }
     }
 
@@ -146,6 +148,7 @@ impl OpenFileDescription {
                 Ok(count)
             }
             FileBody::Directory { .. } => Err(Errno::EISDIR),
+            FileBody::Symlink { target: _ } => Err(Errno::ENOTSUP),
         }
     }
 
@@ -195,6 +198,7 @@ impl OpenFileDescription {
                 Ok(buffer.len())
             }
             FileBody::Directory { .. } => Err(Errno::EISDIR),
+            FileBody::Symlink { target: _ } => Err(Errno::ENOTSUP),
         }
     }
 
@@ -207,6 +211,7 @@ impl OpenFileDescription {
             FileBody::Regular { content, .. } => content.len(),
             FileBody::Directory { files, .. } => files.len(),
             FileBody::Fifo { .. } => return Err(Errno::ESPIPE),
+            FileBody::Symlink { target: _ } => return Err(Errno::ENOTSUP),
         };
         let base = match whence {
             Whence::SeekSet => 0,
