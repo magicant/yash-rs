@@ -98,7 +98,7 @@ impl ParamRef<'_> {
             Modifier::Length => {
                 // TODO Reject ${#*} and ${#@} in POSIX mode
                 match &mut value {
-                    None => (),
+                    None | Some(Value::Void) => (),
                     Some(Value::Scalar(v)) => to_length(v),
                     Some(Value::Array(vs)) => vs.iter_mut().for_each(to_length),
                 }
@@ -127,7 +127,7 @@ fn to_length(v: &mut String) {
 /// Converts a value into a phrase.
 fn into_phrase(value: Option<Value>) -> Phrase {
     match value {
-        None => Phrase::one_empty_field(),
+        None | Some(Value::Void) => Phrase::one_empty_field(),
         Some(Value::Scalar(value)) => Phrase::Field(to_field(&value)),
         Some(Value::Array(values)) => {
             Phrase::Full(values.into_iter().map(|value| to_field(&value)).collect())

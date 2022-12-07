@@ -265,6 +265,7 @@ impl Phrase {
                 _ => {
                     let separator = match vars.get("IFS") {
                         Some(var) => match &var.value {
+                            Value::Void => Some(' '), // TODO Merge with `None => Some(' ')`
                             Value::Scalar(value) => value.chars().next(),
                             Value::Array(values) => {
                                 values.first().and_then(|value| value.chars().next())

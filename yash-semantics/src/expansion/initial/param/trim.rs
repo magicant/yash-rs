@@ -21,7 +21,7 @@ use super::Error;
 use crate::expansion::attr::fnmatch::apply_escapes;
 use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::initial::expand;
-use yash_env::variable::Value::{self, Array, Scalar};
+use yash_env::variable::Value::{self, Array, Scalar, Void};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
 use yash_syntax::syntax::Trim;
@@ -64,6 +64,7 @@ pub async fn apply(env: &mut Env<'_>, trim: &Trim, value: &mut Value) -> Result<
     };
 
     match value {
+        Void => (),
         Scalar(value) => trim_value(&pattern, value),
         Array(array) => {
             for value in array {

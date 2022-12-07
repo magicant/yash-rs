@@ -61,6 +61,11 @@ use yash_syntax::source::Location;
 /// Value of a variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value {
+    /// Nothing
+    ///
+    /// This type of value occurs when a variable has been declared without
+    /// assigning anything.
+    Void,
     /// Single string.
     Scalar(String),
     /// Array of strings.
@@ -107,6 +112,7 @@ impl Value {
     /// ```
     pub fn split(&self) -> impl Iterator<Item = &str> {
         match self {
+            Void => todo!(),
             Scalar(value) => Left(value.split(':')),
             Array(values) => Right(values.iter().map(String::as_str)),
         }
@@ -123,8 +129,16 @@ impl Value {
     /// let array = Value::array(vec!["1", "", "'\\'"]);
     /// assert_eq!(array.quote(), r#"(1 '' "'\\'")"#);
     /// ```
+    ///
+    /// Returns an empty string for `Void`:
+    ///
+    /// ```
+    /// # use yash_env::variable::Value;
+    /// assert_eq!(Value::Void.quote(), "");
+    /// ```
     pub fn quote(&self) -> Cow<str> {
         match self {
+            Void => Cow::Borrowed(""),
             Scalar(value) => yash_quote::quote(value),
             Array(values) => Cow::Owned(format!(
                 "({})",
@@ -556,6 +570,7 @@ impl VariableSet {
                     let mut s = name.clone();
                     s.push('=');
                     match &var.value {
+                        Void => return None,
                         Scalar(value) => s.push_str(value),
                         Array(values) => write!(s, "{}", values.iter().format(":")).ok()?,
                     }

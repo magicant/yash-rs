@@ -77,6 +77,7 @@ impl<'a> From<&'a Vec<String>> for Resolve<'a> {
 impl From<Value> for Resolve<'static> {
     fn from(value: Value) -> Self {
         match value {
+            Value::Void => Resolve::Unset,
             Value::Scalar(value) => Resolve::from(value),
             Value::Array(values) => Resolve::from(values),
         }
@@ -86,6 +87,7 @@ impl From<Value> for Resolve<'static> {
 impl<'a> From<&'a Value> for Resolve<'a> {
     fn from(value: &'a Value) -> Self {
         match value {
+            Value::Void => Resolve::Unset,
             Value::Scalar(value) => Resolve::from(value),
             Value::Array(values) => Resolve::from(values),
         }
@@ -116,6 +118,7 @@ where
 impl Resolve<'_> {
     /// Converts into an owned value
     pub fn into_owned(self) -> Option<Value> {
+        // TODO Change return type to Value
         match self {
             Resolve::Unset => None,
             Resolve::Scalar(value) => Some(Value::Scalar(value.into_owned())),
@@ -166,7 +169,7 @@ pub fn resolve<'a>(env: &'a Env, name: Name<'_>) -> Resolve<'a> {
         Name::Special(_) => Resolve::Unset,
         Name::Positional(0) => Resolve::Unset,
         Name::Positional(index) => match &env.variables.positional_params().value {
-            Value::Scalar(_) => Resolve::Unset,
+            Value::Void | Value::Scalar(_) => Resolve::Unset,
             Value::Array(params) => params.get(index - 1).into(),
         },
     }

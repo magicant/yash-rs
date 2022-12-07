@@ -29,7 +29,7 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::variable::Scope;
-use yash_env::variable::Value::{Array, Scalar};
+use yash_env::variable::Value::{Array, Scalar, Void};
 use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_syntax::syntax::List;
@@ -54,6 +54,7 @@ pub async fn execute(
         }
     } else {
         match env.variables.positional_params().value {
+            Void => vec![],
             Scalar(ref value) => vec![Field {
                 value: value.clone(),
                 origin: name.origin.clone(),
