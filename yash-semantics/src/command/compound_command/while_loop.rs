@@ -110,7 +110,7 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
-    use yash_env::variable::Value::Scalar;
+    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -160,7 +160,7 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus(30));
         assert_eq!(
             env.variables.get("a").unwrap().value,
-            Scalar("3".to_string())
+            Some(Value::scalar("3"))
         );
     }
 
@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus(30));
         assert_eq!(
             env.variables.get("a").unwrap().value,
-            Scalar("3".to_string())
+            Some(Value::scalar("3"))
         );
     }
 

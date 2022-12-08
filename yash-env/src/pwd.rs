@@ -72,7 +72,8 @@ impl Env {
     fn has_correct_pwd(&self) -> bool {
         match self.variables.get("PWD") {
             Some(Variable {
-                value: Scalar(pwd), ..
+                value: Some(Scalar(pwd)),
+                ..
             }) if Path::new(pwd).is_absolute() && !has_dot_or_dot_dot(pwd) => {
                 let pwd = match CString::new(pwd.as_bytes()) {
                     Ok(pwd) => pwd,
@@ -183,7 +184,7 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+        assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
     }
 
     #[test]
@@ -196,7 +197,7 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/foo/link"));
+        assert_eq!(pwd.value, Some(Value::scalar("/foo/link")));
     }
 
     #[test]
@@ -209,7 +210,7 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+        assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
     }
 
     #[test]
@@ -222,7 +223,7 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+        assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
     }
 
     #[test]
@@ -235,7 +236,7 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/foo/bar/dir"));
+        assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
     }
 
     #[test]
@@ -263,6 +264,6 @@ mod tests {
         let result = env.prepare_pwd();
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
-        assert_eq!(pwd.value, Value::scalar("/"));
+        assert_eq!(pwd.value, Some(Value::scalar("/")));
     }
 }

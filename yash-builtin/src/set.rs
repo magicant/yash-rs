@@ -153,8 +153,10 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
             let mut print = String::new();
             for (name, var) in vars {
-                // TODO skip if the name contains a character inappropriate for a name
-                writeln!(print, "{}={}", name, var.value.quote()).unwrap();
+                if let Some(value) = &var.value {
+                    // TODO skip if the name contains a character inappropriate for a name
+                    writeln!(print, "{}={}", name, value.quote()).unwrap();
+                }
             }
             env.print(&print).await
         }
@@ -194,7 +196,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             if let Some(fields) = positional_params {
                 let location = env.builtin_name().origin.clone();
                 let params = env.variables.positional_params_mut();
-                params.value = Array(fields.into_iter().map(|f| f.value).collect());
+                params.value = Some(Array(fields.into_iter().map(|f| f.value).collect()));
                 params.last_assigned_location = Some(location);
             }
 
@@ -224,6 +226,7 @@ mod tests {
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
     use yash_env::variable::Scope;
+    use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_semantics::Command;
@@ -363,10 +366,7 @@ xtrace           off
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         let v = env.variables.positional_params();
-        assert_eq!(
-            v.value,
-            Array(vec!["a".to_string(), "b".to_string(), "z".to_string()])
-        );
+        assert_eq!(v.value, Some(Value::array(["a", "b", "z"])));
         assert_eq!(v.read_only_location, None);
         assert_eq!(v.last_assigned_location.as_ref().unwrap(), &location);
     }

@@ -446,7 +446,7 @@ mod tests {
         assert_eq!(result, Some(Ok(Phrase::Field(to_field("foo")))));
 
         let var = env.inner.variables.get("var").unwrap();
-        assert_eq!(var.value, Value::scalar("foo"));
+        assert_eq!(var.value, Some(Value::scalar("foo")));
         assert_eq!(var.last_assigned_location, Some(location));
         assert!(!var.is_exported);
         assert_eq!(var.read_only_location, None);
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn assign_array_word() {
         let mut env = yash_env::Env::new_virtual();
-        env.variables.positional_params_mut().value = Value::array(["1", "2  2", "3"]);
+        env.variables.positional_params_mut().value = Some(Value::array(["1", "2  2", "3"]));
         env.variables
             .assign(Scope::Global, "IFS".to_string(), Variable::new("~"))
             .unwrap();
@@ -506,7 +506,7 @@ mod tests {
         );
 
         let var = env.inner.variables.get("var").unwrap();
-        assert_eq!(var.value, Value::scalar("1~2  2~3"));
+        assert_eq!(var.value, Some(Value::scalar("1~2  2~3")));
         assert_eq!(var.last_assigned_location, Some(location));
         assert!(!var.is_exported);
         assert_eq!(var.read_only_location, None);
@@ -557,7 +557,7 @@ mod tests {
             assert_matches!(error.cause, ErrorCause::AssignReadOnly(e) => {
                 assert_eq!(e.name, "var");
                 assert_eq!(e.read_only_location, Location::dummy("read-only"));
-                assert_eq!(e.new_value.value, Value::scalar("foo"));
+                assert_eq!(e.new_value.value, Some(Value::scalar("foo")));
                 assert_eq!(e.new_value.last_assigned_location, Some(location));
                 assert!(!e.new_value.is_exported);
                 assert_eq!(e.new_value.read_only_location, None);

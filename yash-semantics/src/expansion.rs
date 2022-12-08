@@ -315,7 +315,7 @@ pub async fn expand_words<'a, I: IntoIterator<Item = &'a Word>>(
     use yash_env::variable::Value::Scalar;
     #[rustfmt::skip]
     let ifs = match env.inner.variables.get("IFS") {
-        Some(&Variable { value: Scalar(ref value), ..  }) => Ifs::new(value),
+        Some(&Variable { value: Some(Scalar(ref value)), ..  }) => Ifs::new(value),
         // TODO If the variable is an array, should we ignore it?
         _ => Ifs::default(),
     };
