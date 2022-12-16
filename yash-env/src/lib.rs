@@ -153,7 +153,7 @@ impl Env {
     /// Creates a new environment with a default-constructed [`VirtualSystem`].
     #[must_use]
     pub fn new_virtual() -> Env {
-        Env::with_system(Box::new(VirtualSystem::default()))
+        Env::with_system(Box::<VirtualSystem>::default())
     }
 
     /// Clones this environment.
