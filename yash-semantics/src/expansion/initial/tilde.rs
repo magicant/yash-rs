@@ -40,9 +40,9 @@ where
 /// Performs tilde expansion.
 pub fn expand(name: &str, env: &Env) -> Vec<AttrChar> {
     if name.is_empty() {
-        let result = &match env.variables.get("HOME") {
+        let result = match env.variables.get("HOME") {
             Some(Variable {
-                value: Value::Scalar(value),
+                value: Some(Value::Scalar(value)),
                 ..
             }) => value,
             _ => "~",

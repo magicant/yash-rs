@@ -137,10 +137,13 @@ impl Value {
 }
 
 /// Definition of a variable.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Variable {
     /// Value of the variable.
-    pub value: Value,
+    ///
+    /// The value is `None` if the variable has been declared without
+    /// assignment.
+    pub value: Option<Value>,
 
     /// Optional location where this variable was assigned.
     ///
@@ -172,7 +175,7 @@ impl Variable {
     #[must_use]
     pub fn new<S: Into<String>>(value: S) -> Self {
         Variable {
-            value: Value::scalar(value),
+            value: Some(Value::scalar(value)),
             last_assigned_location: None,
             is_exported: false,
             read_only_location: None,
@@ -192,7 +195,7 @@ impl Variable {
         S: Into<String>,
     {
         Variable {
-            value: Value::array(values),
+            value: Some(Value::array(values)),
             last_assigned_location: None,
             is_exported: false,
             read_only_location: None,
@@ -552,18 +555,15 @@ impl VariableSet {
             .iter()
             .filter_map(|(name, vars)| {
                 let var = &vars.last()?.variable;
-                if var.is_exported {
-                    let mut s = name.clone();
-                    s.push('=');
-                    match &var.value {
-                        Scalar(value) => s.push_str(value),
-                        Array(values) => write!(s, "{}", values.iter().format(":")).ok()?,
-                    }
-                    // TODO return something rather than dropping null-containing strings
-                    CString::new(s).ok()
-                } else {
-                    None
+                let value = var.value.as_ref().filter(|_| var.is_exported)?;
+                let mut result = name.clone();
+                result.push('=');
+                match value {
+                    Scalar(value) => result.push_str(value),
+                    Array(values) => write!(result, "{}", values.iter().format(":")).ok()?,
                 }
+                // TODO return something rather than dropping null-containing strings
+                CString::new(result).ok()
             })
             .collect()
     }
@@ -848,7 +848,7 @@ mod tests {
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("")));
     }
 
     #[test]
@@ -859,7 +859,7 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), Variable::new(""))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("")));
     }
 
     #[test]
@@ -886,7 +886,7 @@ mod tests {
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("b".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("b")));
         variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
     }
@@ -902,7 +902,7 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), Variable::new("1"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("1".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("1")));
     }
 
     #[test]
@@ -917,7 +917,7 @@ mod tests {
             .unwrap();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("0".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("0")));
     }
 
     #[test]
@@ -928,7 +928,7 @@ mod tests {
             .assign(Scope::Volatile, "foo".to_string(), Variable::new("0"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("0".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("0")));
     }
 
     #[test]
@@ -942,10 +942,10 @@ mod tests {
             .assign(Scope::Volatile, "foo".to_string(), Variable::new("1"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("1".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("1")));
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("0".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("0")));
     }
 
     #[test]
@@ -962,7 +962,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.name, "foo");
         assert_eq!(error.read_only_location, read_only_location);
-        assert_eq!(error.new_value.value, Value::scalar("1"));
+        assert_eq!(error.new_value.value, Some(Value::scalar("1")));
     }
 
     #[test]
@@ -994,13 +994,13 @@ mod tests {
             .assign(Scope::Global, "foo".to_string(), Variable::new("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("9".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("9")));
         variables.pop_context_impl();
         variables.pop_context_impl();
         variables.pop_context_impl();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("9".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("9")));
     }
 
     #[test]
@@ -1024,15 +1024,15 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), Variable::new("9"))
             .unwrap();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("9".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("9")));
         variables.pop_context_impl();
         variables.pop_context_impl();
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("9".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("9")));
         variables.pop_context_impl();
         let variable = variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("0".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("0")));
         variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
     }
@@ -1056,10 +1056,10 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), variable)
             .unwrap()
             .unwrap();
-        assert_eq!(old_value.value, Scalar("first".to_string()));
+        assert_eq!(old_value.value, Some(Value::scalar("first")));
         assert!(!old_value.is_exported);
         let new_value = variables.get("foo").unwrap();
-        assert_eq!(new_value.value, Scalar("second".to_string()));
+        assert_eq!(new_value.value, Some(Value::scalar("second")));
         assert!(new_value.is_exported);
     }
 
@@ -1074,10 +1074,10 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), Variable::new("second"))
             .unwrap()
             .unwrap();
-        assert_eq!(old_value.value, Scalar("first".to_string()));
+        assert_eq!(old_value.value, Some(Value::scalar("first")));
         assert!(old_value.is_exported);
         let new_value = variables.get("foo").unwrap();
-        assert_eq!(new_value.value, Scalar("second".to_string()));
+        assert_eq!(new_value.value, Some(Value::scalar("second")));
         assert!(new_value.is_exported);
     }
 
@@ -1206,6 +1206,9 @@ mod tests {
                 Variable::new("not exported"),
             )
             .unwrap();
+        variables
+            .assign(Scope::Global, "none".to_string(), Variable::default())
+            .unwrap();
         let mut ss = variables.env_c_strings();
         ss.sort_unstable();
         assert_eq!(
@@ -1221,15 +1224,15 @@ mod tests {
     #[test]
     fn positional_params_in_base_context() {
         let mut variables = VariableSet::new();
-        assert_eq!(variables.positional_params().value, Array(vec![]));
+        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
 
         let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Array(values) => {
+        assert_matches!(&mut v.value, Some(Array(values)) => {
             values.push("foo".to_string());
             values.push("bar".to_string());
         });
 
-        assert_matches!(&variables.positional_params().value, Array(values) => {
+        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
             assert_eq!(values.as_ref(), ["foo".to_string(), "bar".to_string()]);
         });
     }
@@ -1238,14 +1241,14 @@ mod tests {
     fn positional_params_in_second_regular_context() {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
-        assert_eq!(variables.positional_params().value, Array(vec![]));
+        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
 
         let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Array(values) => {
+        assert_matches!(&mut v.value, Some(Array(values)) => {
             values.push("1".to_string());
         });
 
-        assert_matches!(&variables.positional_params().value, Array(values) => {
+        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
             assert_eq!(values.as_ref(), ["1".to_string()]);
         });
     }
@@ -1255,14 +1258,14 @@ mod tests {
         let mut variables = VariableSet::new();
 
         let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Array(values) => {
+        assert_matches!(&mut v.value, Some(Array(values)) => {
             values.push("a".to_string());
             values.push("b".to_string());
             values.push("c".to_string());
         });
 
         variables.push_context_impl(ContextType::Volatile);
-        assert_matches!(&variables.positional_params().value, Array(values) => {
+        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
             assert_eq!(values.as_ref(), ["a".to_string(), "b".to_string(), "c".to_string()]);
         });
     }
@@ -1273,12 +1276,12 @@ mod tests {
         variables.push_context_impl(ContextType::Volatile);
 
         let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Array(values) => {
+        assert_matches!(&mut v.value, Some(Array(values)) => {
             values.push("x".to_string());
         });
 
         variables.pop_context_impl();
-        assert_matches!(&variables.positional_params().value, Array(values) => {
+        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
             assert_eq!(values.as_ref(), ["x".to_string()]);
         });
     }
@@ -1296,7 +1299,7 @@ mod tests {
         VariableSet::pop_context(guard);
 
         let variable = env.variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("")));
         assert_eq!(env.variables.get("bar"), None);
     }
 
@@ -1315,7 +1318,7 @@ mod tests {
         Env::pop_context(guard);
 
         let variable = env.variables.get("foo").unwrap();
-        assert_eq!(variable.value, Scalar("".to_string()));
+        assert_eq!(variable.value, Some(Value::scalar("")));
         assert_eq!(env.variables.get("bar"), None);
     }
 }

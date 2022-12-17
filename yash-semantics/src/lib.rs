@@ -225,7 +225,7 @@ pub(crate) mod tests {
                 } else {
                     let name = value;
                     if let Some(var) = env.variables.get(&name) {
-                        if let Scalar(value) = &var.value {
+                        if let Some(Scalar(value)) = &var.value {
                             let line = format!("{}={}\n", name, value);
                             if let Err(errno) =
                                 env.system.write_all(Fd::STDOUT, line.as_bytes()).await

@@ -54,11 +54,12 @@ pub async fn execute(
         }
     } else {
         match env.variables.positional_params().value {
-            Scalar(ref value) => vec![Field {
+            None => vec![],
+            Some(Scalar(ref value)) => vec![Field {
                 value: value.clone(),
                 origin: name.origin.clone(),
             }],
-            Array(ref values) => values
+            Some(Array(ref values)) => values
                 .iter()
                 .map(|value| Field {
                     value: value.clone(),
@@ -112,6 +113,7 @@ mod tests {
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
+    use yash_env::variable::Value;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
@@ -132,7 +134,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.variables.positional_params_mut().value = Array(vec!["foo".to_string()]);
+        env.variables.positional_params_mut().value = Some(Value::array(["foo"]));
         let command: CompoundCommand = "for v do echo :$v:; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -147,8 +149,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.variables.positional_params_mut().value =
-            Array(vec!["1".to_string(), "2".to_string(), "three".to_string()]);
+        env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "three"]));
         let command: CompoundCommand = "for foo do echo :$foo:; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

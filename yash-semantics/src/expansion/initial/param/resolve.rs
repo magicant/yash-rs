@@ -150,12 +150,18 @@ pub fn resolve<'a>(env: &'a Env, name: Name<'_>) -> Resolve<'a> {
         }
         value.into()
     }
+    fn variable<'a>(env: &'a Env, name: &str) -> Resolve<'a> {
+        env.variables
+            .get(name)
+            .and_then(|v| v.value.as_ref())
+            .into()
+    }
     fn positional(env: &Env) -> Resolve {
-        (&env.variables.positional_params().value).into()
+        env.variables.positional_params().value.as_ref().into()
     }
 
     match name {
-        Name::Variable(name) => env.variables.get(name).map(|v| &v.value).into(),
+        Name::Variable(name) => variable(env, name),
         Name::Special('@' | '*') => positional(env),
         Name::Special('#') => positional(env).len().to_string().into(),
         Name::Special('?') => env.exit_status.to_string().into(),
@@ -166,8 +172,8 @@ pub fn resolve<'a>(env: &'a Env, name: Name<'_>) -> Resolve<'a> {
         Name::Special(_) => Resolve::Unset,
         Name::Positional(0) => Resolve::Unset,
         Name::Positional(index) => match &env.variables.positional_params().value {
-            Value::Scalar(_) => Resolve::Unset,
-            Value::Array(params) => params.get(index - 1).into(),
+            Some(Value::Array(params)) => params.get(index - 1).into(),
+            _ => Resolve::Unset,
         },
     }
 }
@@ -242,7 +248,7 @@ mod tests {
         assert_eq!(result, Resolve::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Value::Array(params.clone());
+        env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
         let result = resolve(&env, Name::Special('@'));
         assert_eq!(result, Resolve::Array(params.into()));
     }
@@ -254,7 +260,7 @@ mod tests {
         assert_eq!(result, Resolve::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Value::Array(params.clone());
+        env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
         let result = resolve(&env, Name::Special('*'));
         assert_eq!(result, Resolve::Array(params.into()));
     }
@@ -266,7 +272,7 @@ mod tests {
         assert_eq!(result, Resolve::Scalar("0".into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Value::Array(params);
+        env.variables.positional_params_mut().value = Some(Value::Array(params));
         let result = resolve(&env, Name::Special('#'));
         assert_eq!(result, Resolve::Scalar("3".into()));
     }

@@ -197,7 +197,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
 
     #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Option<&str> {
-        if let Some(Variable { value: Scalar(value), .. }) = self.env.variables.get(name) {
+        if let Some(Variable { value: Some(Scalar(value)), .. }) = self.env.variables.get(name) {
             Some(value)
         } else {
             None
@@ -354,7 +354,7 @@ mod tests {
         let _ = expand(&text, &location, &mut env2).now_or_never().unwrap();
 
         let v = env.variables.get("x").unwrap();
-        assert_eq!(v.value, Scalar("24".to_string()));
+        assert_eq!(v.value, Some(Scalar("24".to_string())));
         let location2 = v.last_assigned_location.as_ref().unwrap();
         assert_eq!(*location2.code.value.borrow(), "3 + (x = 4 * 6)");
         assert_eq!(location2.code.start_line_number.get(), 1);

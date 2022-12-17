@@ -263,13 +263,11 @@ impl Phrase {
                 0 => vec![],
                 1 => fields.swap_remove(0),
                 _ => {
-                    let separator = match vars.get("IFS") {
-                        Some(var) => match &var.value {
-                            Value::Scalar(value) => value.chars().next(),
-                            Value::Array(values) => {
-                                values.first().and_then(|value| value.chars().next())
-                            }
-                        },
+                    let separator = match vars.get("IFS").and_then(|v| v.value.as_ref()) {
+                        Some(Value::Scalar(value)) => value.chars().next(),
+                        Some(Value::Array(values)) => {
+                            values.first().and_then(|value| value.chars().next())
+                        }
                         None => Some(' '),
                     }
                     .map(|c| AttrChar {
@@ -1055,6 +1053,20 @@ mod tests {
             dummy_field("baz"),
         ]);
         let field = phrase.ifs_join(&VariableSet::new());
+        assert_eq!(field, dummy_field("foo bar baz"));
+    }
+
+    #[test]
+    fn ifs_join_full_unassigned_ifs() {
+        let mut vars = VariableSet::new();
+        vars.assign(Scope::Global, "IFS".to_string(), Variable::default())
+            .unwrap();
+        let phrase = Full(vec![
+            dummy_field("foo"),
+            dummy_field("bar"),
+            dummy_field("baz"),
+        ]);
+        let field = phrase.ifs_join(&vars);
         assert_eq!(field, dummy_field("foo bar baz"));
     }
 

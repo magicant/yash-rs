@@ -79,7 +79,7 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_env::variable::Scalar;
+    use yash_env::variable::Value;
     use yash_env::Env;
 
     #[test]
@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
 
         let v = env.variables.get("foo").unwrap();
-        assert_eq!(v.value, Scalar("bar baz".to_string()));
+        assert_eq!(v.value, Some(Value::scalar("bar baz")));
         assert_eq!(v.is_exported, false);
         assert_eq!(v.read_only_location.as_ref().unwrap(), &location);
         assert_eq!(v.last_assigned_location.as_ref().unwrap(), &location);

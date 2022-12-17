@@ -157,7 +157,7 @@ pub mod tests {
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
-        env.variables.positional_params_mut().value = Value::array(["a", "c"]);
+        env.variables.positional_params_mut().value = Some(Value::array(["a", "c"]));
         env.variables
             .assign(Scope::Global, "IFS".to_string(), Variable::new("&?!"))
             .unwrap();

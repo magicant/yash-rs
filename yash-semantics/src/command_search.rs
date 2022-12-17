@@ -168,8 +168,8 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 /// Returns the path if successful. Note that the returned path may not be
 /// absolute if the `$PATH` contains a relative path.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
-    if let Some(path) = env.path() {
-        for dir in path.value.split() {
+    if let Some(path) = env.path().and_then(|v| v.value.as_ref()) {
+        for dir in path.split() {
             let mut file = PathBuf::new();
             file.push(dir);
             file.push(name);

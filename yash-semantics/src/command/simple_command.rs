@@ -315,7 +315,7 @@ async fn execute_function(
     let mut i = fields.into_iter();
     let field = i.next().unwrap();
     params.last_assigned_location = Some(field.origin);
-    params.value = Value::array(i.map(|f| f.value));
+    params.value = Some(Value::array(i.map(|f| f.value)));
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;
@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(
             env.variables.get("a").unwrap().value,
-            Value::Scalar("b".to_string())
+            Some(Value::scalar("b"))
         );
     }
 
@@ -637,7 +637,7 @@ mod tests {
         let command: syntax::SimpleCommand = "v=42 return -n 0".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
         let v = env.variables.get("v").unwrap();
-        assert_eq!(v.value, Value::Scalar("42".to_string()));
+        assert_eq!(v.value, Some(Value::scalar("42")));
         assert!(!v.is_exported);
     }
 
@@ -1031,9 +1031,10 @@ mod tests {
                 "foo=${bar=baz} no_such_utility >/tmp/file".parse().unwrap();
             command.execute(&mut env).await;
             assert_eq!(env.variables.get("foo"), None);
-            assert_matches!(env.variables.get("bar"), Some(var) => {
-                assert_eq!(var.value, Value::scalar("baz"));
-            });
+            assert_eq!(
+                env.variables.get("bar").unwrap().value,
+                Some(Value::scalar("baz"))
+            );
 
             let stdout = state.borrow().file_system.get("/tmp/file").unwrap();
             let stdout = stdout.borrow();
