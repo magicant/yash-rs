@@ -136,6 +136,26 @@ impl Value {
     }
 }
 
+/// Special characteristics of a variable
+///
+/// While most variables act as a simple store of a value, some variables
+/// exhibit special effects when they get expanded or assigned to. Such
+/// variables may have their value computed dynamically on expansion or may have
+/// an internal state that is updated when the value is set. `Quirk` determines
+/// the nature of a variable and contains the relevant state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Quirk {
+    /// Quirk for the `$LINENO` variable
+    ///
+    /// The value of a variable having this variant of `Quirk` is computed
+    /// dynamically from the expanding context. The result is the line number of
+    /// the location of the parameter expansion. This `Quirk` is lost when an
+    /// assignment sets a new value to the variable.
+    LineNumber,
+    // TODO $RANDOM
+    // TODO $PATH
+}
+
 /// Definition of a variable.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Variable {
@@ -144,6 +164,11 @@ pub struct Variable {
     /// The value is `None` if the variable has been declared without
     /// assignment.
     pub value: Option<Value>,
+
+    /// Special characteristics of the variable
+    ///
+    /// See [`Quirk`] for details.
+    pub quirk: Option<Quirk>,
 
     /// Optional location where this variable was assigned.
     ///
@@ -176,9 +201,7 @@ impl Variable {
     pub fn new<S: Into<String>>(value: S) -> Self {
         Variable {
             value: Some(Value::scalar(value)),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
+            ..Default::default()
         }
     }
 
@@ -196,9 +219,7 @@ impl Variable {
     {
         Variable {
             value: Some(Value::array(values)),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
+            ..Default::default()
         }
     }
 
