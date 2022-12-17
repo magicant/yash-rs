@@ -178,7 +178,20 @@ impl Variable {
     /// location.
     pub fn expand(&self, location: &Location) -> Expansion {
         match &self.quirk {
-            Some(Quirk::LineNumber) => location.code.start_line_number.to_string().into(),
+            Some(Quirk::LineNumber) => {
+                let count = location
+                    .code
+                    .value
+                    .borrow()
+                    .chars()
+                    .take(location.range.start)
+                    .filter(|c| *c == '\n')
+                    .count()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
+                let line_number = u64::from(location.code.start_line_number).saturating_add(count);
+                line_number.to_string().into()
+            }
             None => self.value.as_ref().into(),
         }
     }
@@ -217,6 +230,23 @@ mod tests {
         assert_eq!(result, Expansion::Scalar("42".into()));
     }
 
-    // TODO expand_line_number_of_third_line
+    #[test]
+    fn expand_line_number_of_third_line() {
+        let var = Variable {
+            quirk: Some(Quirk::LineNumber),
+            ..Default::default()
+        };
+        let code = Code {
+            value: "foo\nbar\nbaz\n".to_string().into(),
+            start_line_number: NonZeroU64::new(42).unwrap(),
+            source: Source::Unknown,
+        }
+        .into();
+        let range = 8..12;
+        let loc = Location { code, range };
+        let result = var.expand(&loc);
+        assert_eq!(result, Expansion::Scalar("44".into()));
+    }
+
     // TODO expand_line_number_in_alias
 }
