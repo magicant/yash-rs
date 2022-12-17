@@ -65,7 +65,7 @@ impl ParamRef<'_> {
         // Lookup //
         let name = self.name.try_into().ok();
         let resolve = match name {
-            Some(name) => resolve::resolve(env.inner, name),
+            Some(name) => resolve::resolve(name, env.inner, self.location),
             None => Resolve::Unset,
         };
 
