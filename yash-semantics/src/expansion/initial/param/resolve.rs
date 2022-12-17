@@ -17,146 +17,20 @@
 //! Resolving parameter names to values
 
 use super::name::Name;
-use std::borrow::Cow;
+use yash_env::variable::Expansion;
 use yash_env::variable::Value;
-use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_syntax::source::Location;
 
-/// Result of parameter name resolution
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Resolve<'a> {
-    Unset,
-    Scalar(Cow<'a, str>),
-    Array(Cow<'a, [String]>),
-}
-
-impl From<String> for Resolve<'static> {
-    fn from(value: String) -> Self {
-        Resolve::Scalar(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<&'a str> for Resolve<'a> {
-    fn from(value: &'a str) -> Self {
-        Resolve::Scalar(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> From<&'a String> for Resolve<'a> {
-    fn from(value: &'a String) -> Self {
-        Resolve::Scalar(Cow::Borrowed(value))
-    }
-}
-
-impl From<Option<String>> for Resolve<'static> {
-    fn from(value: Option<String>) -> Self {
-        match value {
-            Some(value) => value.into(),
-            None => Resolve::Unset,
-        }
-    }
-}
-
-impl From<Vec<String>> for Resolve<'static> {
-    fn from(values: Vec<String>) -> Self {
-        Resolve::Array(Cow::Owned(values))
-    }
-}
-
-impl<'a> From<&'a [String]> for Resolve<'a> {
-    fn from(values: &'a [String]) -> Self {
-        Resolve::Array(Cow::Borrowed(values))
-    }
-}
-
-impl<'a> From<&'a Vec<String>> for Resolve<'a> {
-    fn from(values: &'a Vec<String>) -> Self {
-        Resolve::Array(Cow::Borrowed(values))
-    }
-}
-
-impl From<Value> for Resolve<'static> {
-    fn from(value: Value) -> Self {
-        match value {
-            Value::Scalar(value) => Resolve::from(value),
-            Value::Array(values) => Resolve::from(values),
-        }
-    }
-}
-
-impl<'a> From<&'a Value> for Resolve<'a> {
-    fn from(value: &'a Value) -> Self {
-        match value {
-            Value::Scalar(value) => Resolve::from(value),
-            Value::Array(values) => Resolve::from(values),
-        }
-    }
-}
-
-impl From<Option<Value>> for Resolve<'static> {
-    fn from(value: Option<Value>) -> Self {
-        match value {
-            Some(value) => value.into(),
-            None => Resolve::Unset,
-        }
-    }
-}
-
-impl<'a, V> From<Option<&'a V>> for Resolve<'a>
-where
-    Resolve<'a>: From<&'a V>,
-{
-    fn from(value: Option<&'a V>) -> Self {
-        match value {
-            Some(value) => value.into(),
-            None => Resolve::Unset,
-        }
-    }
-}
-
-impl Resolve<'_> {
-    /// Converts into an owned value
-    pub fn into_owned(self) -> Option<Value> {
-        match self {
-            Resolve::Unset => None,
-            Resolve::Scalar(value) => Some(Value::Scalar(value.into_owned())),
-            Resolve::Array(values) => Some(Value::Array(values.into_owned())),
-        }
-    }
-
-    /// Returns the "length" of the value.
-    ///
-    /// For `Unset`, the length is 0.
-    /// For `Scalar`, the length is the number of characters.
-    /// For `Array`, the length is the number of strings.
-    pub fn len(&self) -> usize {
-        match self {
-            Resolve::Unset => 0,
-            Resolve::Scalar(value) => value.len(),
-            Resolve::Array(values) => values.len(),
-        }
-    }
-}
-
-/// Converts a variable to a resolution.
-fn resolve_variable<'a>(var: &'a Variable, location: &Location) -> Resolve<'a> {
-    use yash_env::variable::Quirk::*;
-    match &var.quirk {
-        Some(LineNumber) => location.code.start_line_number.to_string().into(),
-        None => var.value.as_ref().into(),
-    }
-}
-
 /// Resolves a parameter name to its value.
-pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Resolve<'a> {
-    fn variable<'a>(env: &'a Env, name: &str, location: &Location) -> Resolve<'a> {
+pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Expansion<'a> {
+    fn variable<'a>(env: &'a Env, name: &str, location: &Location) -> Expansion<'a> {
         env.variables
             .get(name)
-            .map(|v| resolve_variable(v, location))
-            .unwrap_or(Resolve::Unset)
+            .map(|v| v.expand(location))
+            .unwrap_or(Expansion::Unset)
     }
-    fn options(env: &Env) -> Resolve {
+    fn options(env: &Env) -> Expansion {
         let mut value = String::new();
         for option in yash_env::option::Option::iter() {
             if let Some((name, state)) = option.short_name() {
@@ -167,7 +41,7 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Resolve
         }
         value.into()
     }
-    fn positional(env: &Env) -> Resolve {
+    fn positional(env: &Env) -> Expansion {
         env.variables.positional_params().value.as_ref().into()
     }
 
@@ -180,11 +54,11 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Resolve
         Name::Special('$') => env.main_pid.to_string().into(),
         Name::Special('!') => env.jobs.last_async_pid().to_string().into(),
         Name::Special('0') => env.arg0.as_str().into(),
-        Name::Special(_) => Resolve::Unset,
-        Name::Positional(0) => Resolve::Unset,
+        Name::Special(_) => Expansion::Unset,
+        Name::Positional(0) => Expansion::Unset,
         Name::Positional(index) => match &env.variables.positional_params().value {
             Some(Value::Array(params)) => params.get(index - 1).into(),
-            _ => Resolve::Unset,
+            _ => Expansion::Unset,
         },
     }
 }
@@ -192,48 +66,18 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Resolve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::num::NonZeroU64;
     use yash_env::job::Pid;
-    use yash_env::variable::Quirk;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
-    use yash_syntax::source::Code;
     use yash_syntax::source::Location;
-    use yash_syntax::source::Source;
-
-    #[test]
-    fn no_quirk() {
-        let var = Variable::new("foo");
-        let loc = Location::dummy("somewhere");
-        let result = resolve_variable(&var, &loc);
-        assert_eq!(result, Resolve::Scalar("foo".into()));
-    }
-
-    #[test]
-    fn line_number_of_first_line() {
-        let var = Variable {
-            quirk: Some(Quirk::LineNumber),
-            ..Default::default()
-        };
-        let code = Code {
-            value: "abc\ndef\n".to_string().into(),
-            start_line_number: NonZeroU64::new(42).unwrap(),
-            source: Source::Unknown,
-        }
-        .into();
-        let range = 1..3;
-        let loc = Location { code, range };
-        let result = resolve_variable(&var, &loc);
-        assert_eq!(result, Resolve::Scalar("42".into()));
-    }
 
     #[test]
     fn variable_unset() {
         let env = Env::new_virtual();
         let loc = Location::dummy("");
-        assert_eq!(resolve(Name::Variable("foo"), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Variable("bar"), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Variable("baz"), &env, &loc), Resolve::Unset);
+        assert_eq!(resolve(Name::Variable("foo"), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Variable("bar"), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Variable("baz"), &env, &loc), Expansion::Unset);
     }
 
     #[test]
@@ -255,9 +99,9 @@ mod tests {
         let loc = Location::dummy("");
 
         let result = resolve(Name::Variable("x"), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("foo".into()));
+        assert_eq!(result, Expansion::Scalar("foo".into()));
         let result = resolve(Name::Variable("PATH"), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("/bin:/usr/bin".into()));
+        assert_eq!(result, Expansion::Scalar("/bin:/usr/bin".into()));
     }
 
     #[test]
@@ -280,9 +124,9 @@ mod tests {
         let loc = Location::dummy("");
 
         let result = resolve(Name::Variable("x"), &env, &loc);
-        assert_eq!(result, Resolve::Array([].as_slice().into()));
+        assert_eq!(result, Expansion::Array([].as_slice().into()));
         let result = resolve(Name::Variable("PATH"), &env, &loc);
-        assert_eq!(result, Resolve::Array(values.as_slice().into()));
+        assert_eq!(result, Expansion::Array(values.as_slice().into()));
     }
 
     #[test]
@@ -290,12 +134,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('@'), &env, &loc);
-        assert_eq!(result, Resolve::Array([].as_slice().into()));
+        assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
         env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
         let result = resolve(Name::Special('@'), &env, &loc);
-        assert_eq!(result, Resolve::Array(params.into()));
+        assert_eq!(result, Expansion::Array(params.into()));
     }
 
     #[test]
@@ -303,12 +147,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('*'), &env, &loc);
-        assert_eq!(result, Resolve::Array([].as_slice().into()));
+        assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
         env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
         let result = resolve(Name::Special('*'), &env, &loc);
-        assert_eq!(result, Resolve::Array(params.into()));
+        assert_eq!(result, Expansion::Array(params.into()));
     }
 
     #[test]
@@ -316,12 +160,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('#'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("0".into()));
+        assert_eq!(result, Expansion::Scalar("0".into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
         env.variables.positional_params_mut().value = Some(Value::Array(params));
         let result = resolve(Name::Special('#'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("3".into()));
+        assert_eq!(result, Expansion::Scalar("3".into()));
     }
 
     #[test]
@@ -329,11 +173,11 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('?'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("0".into()));
+        assert_eq!(result, Expansion::Scalar("0".into()));
 
         env.exit_status.0 = 49;
         let result = resolve(Name::Special('?'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("49".into()));
+        assert_eq!(result, Expansion::Scalar("49".into()));
     }
 
     #[test]
@@ -341,19 +185,19 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('-'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("".into()));
+        assert_eq!(result, Expansion::Scalar("".into()));
 
         use yash_env::option::{Option::*, OptionSet, State};
         env.options = OptionSet::empty();
         let result = resolve(Name::Special('-'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("Cnfu".into()));
+        assert_eq!(result, Expansion::Scalar("Cnfu".into()));
 
         env.options = OptionSet::default();
         env.options.set(AllExport, State::On);
         env.options.set(Verbose, State::On);
         env.options.set(Vi, State::On);
         let result = resolve(Name::Special('-'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("av".into()));
+        assert_eq!(result, Expansion::Scalar("av".into()));
     }
 
     #[test]
@@ -361,11 +205,11 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('$'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("2".into()));
+        assert_eq!(result, Expansion::Scalar("2".into()));
 
         env.main_pid = Pid::from_raw(12345);
         let result = resolve(Name::Special('$'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("12345".into()));
+        assert_eq!(result, Expansion::Scalar("12345".into()));
     }
 
     #[test]
@@ -373,11 +217,11 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('!'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("0".into()));
+        assert_eq!(result, Expansion::Scalar("0".into()));
 
         env.jobs.set_last_async_pid(Pid::from_raw(72));
         let result = resolve(Name::Special('!'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("72".into()));
+        assert_eq!(result, Expansion::Scalar("72".into()));
     }
 
     #[test]
@@ -385,21 +229,21 @@ mod tests {
         let mut env = Env::new_virtual();
         let loc = Location::dummy("");
         let result = resolve(Name::Special('0'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("".into()));
+        assert_eq!(result, Expansion::Scalar("".into()));
 
         env.arg0 = "foo/bar".to_string();
         let result = resolve(Name::Special('0'), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("foo/bar".into()));
+        assert_eq!(result, Expansion::Scalar("foo/bar".into()));
     }
 
     #[test]
     fn positional_unset() {
         let env = Env::new_virtual();
         let loc = Location::dummy("");
-        assert_eq!(resolve(Name::Positional(0), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Positional(1), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Positional(2), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Positional(10), &env, &loc), Resolve::Unset);
+        assert_eq!(resolve(Name::Positional(0), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Positional(1), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Positional(2), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Positional(10), &env, &loc), Expansion::Unset);
     }
 
     #[test]
@@ -408,13 +252,13 @@ mod tests {
         *env.variables.positional_params_mut() = Variable::new_array(["a", "b"]);
         let loc = Location::dummy("");
 
-        assert_eq!(resolve(Name::Positional(0), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Positional(3), &env, &loc), Resolve::Unset);
-        assert_eq!(resolve(Name::Positional(10), &env, &loc), Resolve::Unset);
+        assert_eq!(resolve(Name::Positional(0), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Positional(3), &env, &loc), Expansion::Unset);
+        assert_eq!(resolve(Name::Positional(10), &env, &loc), Expansion::Unset);
 
         let result = resolve(Name::Positional(1), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("a".into()));
+        assert_eq!(result, Expansion::Scalar("a".into()));
         let result = resolve(Name::Positional(2), &env, &loc);
-        assert_eq!(result, Resolve::Scalar("b".into()));
+        assert_eq!(result, Expansion::Scalar("b".into()));
     }
 }
