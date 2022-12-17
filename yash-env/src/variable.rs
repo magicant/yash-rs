@@ -598,6 +598,7 @@ impl VariableSet {
     /// - `PS1='$ '`
     /// - `PS2='> '`
     /// - `PS4='+ '`
+    /// - `LINENO` (with no value, but has its `quirk` set to [`Quirk::LineNumber`])
     ///
     /// The following variables are not assigned by this function as their
     /// values cannot be determined independently:
@@ -617,6 +618,12 @@ impl VariableSet {
         for &(name, value) in VARIABLES {
             let _ = self.assign(Scope::Global, name.to_owned(), Variable::new(value));
         }
+
+        let v = Variable {
+            quirk: Some(Quirk::LineNumber),
+            ..Default::default()
+        };
+        let _ = self.assign(Scope::Global, "LINENO".to_string(), v);
     }
 
     /// Returns a reference to the positional parameters.
@@ -1240,6 +1247,18 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn init_lineno() {
+        let mut variables = VariableSet::new();
+        variables.init();
+        let v = variables.get("LINENO").unwrap();
+        assert_eq!(v.value, None);
+        assert_eq!(v.quirk, Some(Quirk::LineNumber));
+        assert_eq!(v.last_assigned_location, None);
+        assert!(!v.is_exported);
+        assert_eq!(v.read_only_location, None);
     }
 
     #[test]
