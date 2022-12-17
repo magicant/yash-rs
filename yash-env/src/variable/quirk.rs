@@ -20,6 +20,7 @@ use super::Value;
 use super::Variable;
 use std::borrow::Cow;
 use yash_syntax::source::Location;
+use yash_syntax::source::Source;
 
 /// Special characteristics of a variable
 ///
@@ -176,9 +177,14 @@ impl Variable {
     /// This function requires the location of the parameter expanding this
     /// variable, so that `Quirk::LineNumber` can yield the line number of the
     /// location.
-    pub fn expand(&self, location: &Location) -> Expansion {
+    pub fn expand(&self, mut location: &Location) -> Expansion {
         match &self.quirk {
+            None => self.value.as_ref().into(),
+
             Some(Quirk::LineNumber) => {
+                while let Source::Alias { original, .. } = &location.code.source {
+                    location = original;
+                }
                 let count = location
                     .code
                     .value
@@ -192,7 +198,6 @@ impl Variable {
                 let line_number = u64::from(location.code.start_line_number).saturating_add(count);
                 line_number.to_string().into()
             }
-            None => self.value.as_ref().into(),
         }
     }
 }
@@ -201,8 +206,9 @@ impl Variable {
 mod tests {
     use super::*;
     use std::num::NonZeroU64;
+    use std::rc::Rc;
+    use yash_syntax::alias::Alias;
     use yash_syntax::source::Code;
-    use yash_syntax::source::Source;
 
     #[test]
     fn expand_no_quirk() {
@@ -212,18 +218,22 @@ mod tests {
         assert_eq!(result, Expansion::Scalar("foo".into()));
     }
 
+    fn stub_code() -> Rc<Code> {
+        Code {
+            value: "foo\nbar\nbaz\n".to_string().into(),
+            start_line_number: NonZeroU64::new(42).unwrap(),
+            source: Source::Unknown,
+        }
+        .into()
+    }
+
     #[test]
     fn expand_line_number_of_first_line() {
         let var = Variable {
             quirk: Some(Quirk::LineNumber),
             ..Default::default()
         };
-        let code = Code {
-            value: "foo\nbar\nbaz\n".to_string().into(),
-            start_line_number: NonZeroU64::new(42).unwrap(),
-            source: Source::Unknown,
-        }
-        .into();
+        let code = stub_code();
         let range = 1..3;
         let loc = Location { code, range };
         let result = var.expand(&loc);
@@ -236,17 +246,41 @@ mod tests {
             quirk: Some(Quirk::LineNumber),
             ..Default::default()
         };
-        let code = Code {
-            value: "foo\nbar\nbaz\n".to_string().into(),
-            start_line_number: NonZeroU64::new(42).unwrap(),
-            source: Source::Unknown,
-        }
-        .into();
+        let code = stub_code();
         let range = 8..12;
         let loc = Location { code, range };
         let result = var.expand(&loc);
         assert_eq!(result, Expansion::Scalar("44".into()));
     }
 
-    // TODO expand_line_number_in_alias
+    #[test]
+    fn expand_line_number_in_alias() {
+        fn to_alias(original: Location) -> Location {
+            let alias = Alias {
+                name: "name".to_string(),
+                replacement: "replacement".to_string(),
+                global: false,
+                origin: Location::dummy("alias"),
+            }
+            .into();
+            let code = Code {
+                value: " \n \n ".to_string().into(),
+                start_line_number: NonZeroU64::new(15).unwrap(),
+                source: Source::Alias { original, alias },
+            }
+            .into();
+            let range = 0..1;
+            Location { code, range }
+        }
+
+        let var = Variable {
+            quirk: Some(Quirk::LineNumber),
+            ..Default::default()
+        };
+        let code = stub_code();
+        let range = 8..12;
+        let loc = to_alias(to_alias(Location { code, range }));
+        let result = var.expand(&loc);
+        assert_eq!(result, Expansion::Scalar("44".into()));
+    }
 }
