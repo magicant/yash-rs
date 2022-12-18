@@ -136,6 +136,8 @@ impl Value {
     }
 }
 
+mod quirk;
+
 pub use self::quirk::Expansion;
 pub use self::quirk::Quirk;
 
@@ -150,7 +152,7 @@ pub struct Variable {
 
     /// Special characteristics of the variable
     ///
-    /// See [`Quirk`] for details.
+    /// See [`Quirk`] and [`expand`](Self::expand) for details.
     pub quirk: Option<Quirk>,
 
     /// Optional location where this variable was assigned.
@@ -255,9 +257,21 @@ impl Variable {
     pub const fn is_read_only(&self) -> bool {
         self.read_only_location.is_some()
     }
-}
 
-mod quirk;
+    // TODO Should require mutable self
+    /// Returns the value of this variable, applying any quirk.
+    ///
+    /// If this variable has no [`Quirk`], this function just returns
+    /// `self.value` converted to [`Expansion`]. Otherwise, the effect of the
+    /// quirk is applied to the value and the result is returned.
+    ///
+    /// This function requires the location of the parameter expanding this
+    /// variable, so that `Quirk::LineNumber` can yield the line number of the
+    /// location.
+    pub fn expand(&self, location: &Location) -> Expansion {
+        self::quirk::expand(self, location)
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct VariableInContext {

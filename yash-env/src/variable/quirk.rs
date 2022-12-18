@@ -176,38 +176,27 @@ impl Expansion<'_> {
     }
 }
 
-impl Variable {
-    // TODO Should require mutable self
-    /// Returns the value of this variable, applying any quirk.
-    ///
-    /// If this variable has no [`Quirk`], this function just returns
-    /// `self.value` converted to [`Expansion`]. Otherwise, the effect of the
-    /// quirk is applied to the value and the result is returned.
-    ///
-    /// This function requires the location of the parameter expanding this
-    /// variable, so that `Quirk::LineNumber` can yield the line number of the
-    /// location.
-    pub fn expand(&self, mut location: &Location) -> Expansion {
-        match &self.quirk {
-            None => self.value.as_ref().into(),
+/// Implementation of [`Variable::expand`].
+pub fn expand<'a>(var: &'a Variable, mut location: &Location) -> Expansion<'a> {
+    match &var.quirk {
+        None => var.value.as_ref().into(),
 
-            Some(Quirk::LineNumber) => {
-                while let Source::Alias { original, .. } = &location.code.source {
-                    location = original;
-                }
-                let count = location
-                    .code
-                    .value
-                    .borrow()
-                    .chars()
-                    .take(location.range.start)
-                    .filter(|c| *c == '\n')
-                    .count()
-                    .try_into()
-                    .unwrap_or(u64::MAX);
-                let line_number = u64::from(location.code.start_line_number).saturating_add(count);
-                line_number.to_string().into()
+        Some(Quirk::LineNumber) => {
+            while let Source::Alias { original, .. } = &location.code.source {
+                location = original;
             }
+            let count = location
+                .code
+                .value
+                .borrow()
+                .chars()
+                .take(location.range.start)
+                .filter(|c| *c == '\n')
+                .count()
+                .try_into()
+                .unwrap_or(u64::MAX);
+            let line_number = u64::from(location.code.start_line_number).saturating_add(count);
+            line_number.to_string().into()
         }
     }
 }
