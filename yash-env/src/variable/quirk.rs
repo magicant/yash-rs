@@ -29,6 +29,9 @@ use yash_syntax::source::Source;
 /// variables may have their value computed dynamically on expansion or may have
 /// an internal state that is updated when the value is set. `Quirk` determines
 /// the nature of a variable and contains the relevant state.
+///
+/// Use [`Variable::expand`] to apply the variable's quirk when expanding a
+/// variable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Quirk {
     /// Quirk for the `$LINENO` variable
@@ -43,10 +46,17 @@ pub enum Quirk {
 }
 
 /// Expanded value of a variable
+///
+/// Variables with a [`Quirk`] may have their values computed dynamically when
+/// expanded, hence [`Cow`] in the enum values.
+/// Use [`Variable::expand`] to get an `Expansion` instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expansion<'a> {
+    /// The value does not exist.
     Unset,
+    /// The value is a single string.
     Scalar(Cow<'a, str>),
+    /// The value is an array of strings.
     Array(Cow<'a, [String]>),
 }
 
