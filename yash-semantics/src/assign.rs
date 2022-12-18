@@ -44,6 +44,7 @@ pub async fn perform_assignment(
     let (value, exit_status) = expand_value(env, &assign.value).await?;
     let value = Variable {
         value: Some(value),
+        quirk: None,
         last_assigned_location: Some(assign.location.clone()),
         is_exported: export,
         read_only_location: None,

@@ -24,6 +24,7 @@ use super::super::Origin;
 use super::Env;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
+use yash_env::variable::Expansion;
 use yash_env::variable::Value;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Modifier;
@@ -52,7 +53,6 @@ mod resolve;
 mod switch;
 mod trim;
 
-use resolve::Resolve;
 pub use switch::EmptyError;
 pub use switch::NonassignableError;
 pub use switch::ValueState;
@@ -65,8 +65,8 @@ impl ParamRef<'_> {
         // Lookup //
         let name = self.name.try_into().ok();
         let resolve = match name {
-            Some(name) => resolve::resolve(env.inner, name),
-            None => Resolve::Unset,
+            Some(name) => resolve::resolve(name, env.inner, self.location),
+            None => Expansion::Unset,
         };
 
         // TODO Apply Index

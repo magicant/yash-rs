@@ -136,6 +136,11 @@ impl Value {
     }
 }
 
+mod quirk;
+
+pub use self::quirk::Expansion;
+pub use self::quirk::Quirk;
+
 /// Definition of a variable.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Variable {
@@ -144,6 +149,11 @@ pub struct Variable {
     /// The value is `None` if the variable has been declared without
     /// assignment.
     pub value: Option<Value>,
+
+    /// Special characteristics of the variable
+    ///
+    /// See [`Quirk`] and [`expand`](Self::expand) for details.
+    pub quirk: Option<Quirk>,
 
     /// Optional location where this variable was assigned.
     ///
@@ -176,9 +186,7 @@ impl Variable {
     pub fn new<S: Into<String>>(value: S) -> Self {
         Variable {
             value: Some(Value::scalar(value)),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
+            ..Default::default()
         }
     }
 
@@ -196,9 +204,7 @@ impl Variable {
     {
         Variable {
             value: Some(Value::array(values)),
-            last_assigned_location: None,
-            is_exported: false,
-            read_only_location: None,
+            ..Default::default()
         }
     }
 
@@ -250,6 +256,20 @@ impl Variable {
     #[must_use]
     pub const fn is_read_only(&self) -> bool {
         self.read_only_location.is_some()
+    }
+
+    // TODO Should require mutable self
+    /// Returns the value of this variable, applying any quirk.
+    ///
+    /// If this variable has no [`Quirk`], this function just returns
+    /// `self.value` converted to [`Expansion`]. Otherwise, the effect of the
+    /// quirk is applied to the value and the result is returned.
+    ///
+    /// This function requires the location of the parameter expanding this
+    /// variable, so that `Quirk::LineNumber` can yield the line number of the
+    /// location.
+    pub fn expand(&self, location: &Location) -> Expansion {
+        self::quirk::expand(self, location)
     }
 }
 
@@ -577,6 +597,7 @@ impl VariableSet {
     /// - `PS1='$ '`
     /// - `PS2='> '`
     /// - `PS4='+ '`
+    /// - `LINENO` (with no value, but has its `quirk` set to [`Quirk::LineNumber`])
     ///
     /// The following variables are not assigned by this function as their
     /// values cannot be determined independently:
@@ -596,6 +617,12 @@ impl VariableSet {
         for &(name, value) in VARIABLES {
             let _ = self.assign(Scope::Global, name.to_owned(), Variable::new(value));
         }
+
+        let v = Variable {
+            quirk: Some(Quirk::LineNumber),
+            ..Default::default()
+        };
+        let _ = self.assign(Scope::Global, "LINENO".to_string(), v);
     }
 
     /// Returns a reference to the positional parameters.
@@ -1219,6 +1246,18 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn init_lineno() {
+        let mut variables = VariableSet::new();
+        variables.init();
+        let v = variables.get("LINENO").unwrap();
+        assert_eq!(v.value, None);
+        assert_eq!(v.quirk, Some(Quirk::LineNumber));
+        assert_eq!(v.last_assigned_location, None);
+        assert!(!v.is_exported);
+        assert_eq!(v.read_only_location, None);
     }
 
     #[test]
