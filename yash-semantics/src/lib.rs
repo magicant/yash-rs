@@ -34,6 +34,8 @@ pub mod trap;
 #[doc(no_inline)]
 pub use yash_env::semantics::*;
 
+mod xtrace;
+
 mod command;
 pub use command::Command;
 
