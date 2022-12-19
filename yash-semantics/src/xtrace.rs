@@ -17,6 +17,8 @@
 //! Printing expansion results
 
 use std::fmt::Write;
+use yash_env::option::OptionSet;
+use yash_env::option::State;
 use yash_env::Env;
 
 /// Temporary buffer that accumulates expanded strings
@@ -36,8 +38,18 @@ pub struct XTrace {
 
 impl XTrace {
     /// Creates a new trace buffer.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates a new trace buffer if the `xtrace` option is on.
+    #[must_use]
+    pub fn from_options(options: &OptionSet) -> Option<Self> {
+        match options.get(yash_env::option::Option::XTrace) {
+            State::On => Some(Self::new()),
+            State::Off => None,
+        }
     }
 
     /// Clears the buffer.
@@ -66,6 +78,13 @@ impl XTrace {
         // TODO Expand $PS4
         // TODO Trim trailing spaces
         // TODO Prevent recursive tracing
+    }
+}
+
+/// Convenience function for flushing an optional trace.
+pub async fn flush(env: &mut Env, xtrace: Option<XTrace>) {
+    if let Some(mut xtrace) = xtrace {
+        xtrace.flush(env).await
     }
 }
 

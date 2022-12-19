@@ -19,6 +19,7 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -197,13 +198,14 @@ async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],
     export: bool,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let scope = if export {
         Scope::Volatile
     } else {
         Scope::Global
     };
-    match crate::assign::perform_assignments(env, assigns, scope, export).await {
+    match crate::assign::perform_assignments(env, assigns, scope, export, xtrace).await {
         Ok(exit_status) => Continue(exit_status),
         Err(error) => {
             error.handle(env).await?;
@@ -224,13 +226,15 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
-                let redir_exit_status = match env.perform_redirs(&*redirs).await {
+                let mut xtrace = XTrace::from_options(&env.options);
+                let redir_exit_status = match env.perform_redirs(&*redirs, xtrace.as_mut()).await {
                     Ok(exit_status) => exit_status,
                     Err(e) => {
                         e.handle(env).await?;
                         return Break(Divert::Exit(None));
                     }
                 };
+                // TODO flush xtrace
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
@@ -252,7 +256,9 @@ async fn execute_absent_target(
         exit_status
     };
 
-    let assignment_exit_status = perform_assignments(env, assigns, false).await?;
+    let mut xtrace = XTrace::from_options(&env.options);
+    let assignment_exit_status = perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+    // TODO flush xtrace
     env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
@@ -267,9 +273,12 @@ async fn execute_builtin(
     use yash_env::builtin::Type::*;
     let name = fields.remove(0);
     let is_special = builtin.r#type == Special;
+
+    let mut xtrace = XTrace::from_options(&env.options);
+
     let env = &mut env.push_frame(Frame::Builtin { name, is_special });
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         e.handle(env).await?;
         return match builtin.r#type {
             Special => Break(Divert::Interrupt(None)),
@@ -279,12 +288,14 @@ async fn execute_builtin(
 
     let (exit_status, abort) = match builtin.r#type {
         Special => {
-            perform_assignments(env, assigns, false).await?;
+            perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+            // TODO flush xtrace
             (builtin.execute)(env, fields).await
         }
         Intrinsic | NonIntrinsic => {
             let mut env = env.push_context(ContextType::Volatile);
-            perform_assignments(&mut env, assigns, true).await?;
+            perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+            // TODO flush xtrace
             (builtin.execute)(&mut env, fields).await
         }
     };
@@ -300,13 +311,17 @@ async fn execute_function(
     fields: Vec<Field>,
     redirs: &[Redir],
 ) -> Result {
+    let mut xtrace = XTrace::from_options(&env.options);
+
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut outer = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut outer, assigns, true).await?;
+    perform_assignments(&mut outer, assigns, true, xtrace.as_mut()).await?;
+
+    // TODO flush xtrace
 
     let mut inner = outer.push_context(ContextType::Regular);
 
@@ -337,13 +352,17 @@ async fn execute_external_utility(
     let location = name.origin.clone();
     let args = to_c_strings(fields);
 
+    let mut xtrace = XTrace::from_options(&env.options);
+
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true).await?;
+    perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+
+    // TODO flush xtrace
 
     if path.to_bytes().is_empty() {
         print_error(

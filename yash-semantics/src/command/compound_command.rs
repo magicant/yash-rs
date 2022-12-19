@@ -18,6 +18,7 @@
 
 use super::Command;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
@@ -49,13 +50,15 @@ mod while_loop;
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
-        match env.perform_redirs(&self.redirs).await {
+        let mut xtrace = XTrace::from_options(&env.options);
+        match env.perform_redirs(&self.redirs, xtrace.as_mut()).await {
             Ok(_) => self.command.execute(&mut env).await,
             Err(error) => {
                 error.handle(&mut env).await?;
                 env.apply_errexit()
             }
         }
+        // TODO flush xtrace
     }
 }
 

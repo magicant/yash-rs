@@ -61,6 +61,7 @@
 //! file descriptor. See the documentation for [`RedirGuard`] for details.
 
 use crate::expansion::expand_word;
+use crate::xtrace::XTrace;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -409,7 +410,11 @@ async fn open_normal(
 mod here_doc;
 
 /// Performs a redirection.
-async fn perform(env: &mut Env, redir: &Redir) -> Result<(SavedFd, Option<ExitStatus>), Error> {
+async fn perform(
+    env: &mut Env,
+    redir: &Redir,
+    _xtrace: Option<&mut XTrace>,
+) -> Result<(SavedFd, Option<ExitStatus>), Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
     let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
@@ -512,8 +517,15 @@ impl<'e> RedirGuard<'e> {
     /// If successful, this function saves internally a backing copy of the file
     /// descriptor affected by the redirection, and returns the exit status of
     /// the last command substitution performed during the redirection, if any.
-    pub async fn perform_redir(&mut self, redir: &Redir) -> Result<Option<ExitStatus>, Error> {
-        let (saved_fd, exit_status) = perform(self, redir).await?;
+    ///
+    /// If `xtrace` is `Some` instance of `XTrace`, the redirection operators
+    /// and the expanded operands are written to it.
+    pub async fn perform_redir(
+        &mut self,
+        redir: &Redir,
+        xtrace: Option<&mut XTrace>,
+    ) -> Result<Option<ExitStatus>, Error> {
+        let (saved_fd, exit_status) = perform(self, redir, xtrace).await?;
         self.saved_fds.push(saved_fd);
         Ok(exit_status)
     }
@@ -525,13 +537,20 @@ impl<'e> RedirGuard<'e> {
     ///
     /// If the redirection fails for an item, the remainders are ignored, but
     /// the effects of the preceding items are not canceled.
-    pub async fn perform_redirs<'a, I>(&mut self, redirs: I) -> Result<Option<ExitStatus>, Error>
+    ///
+    /// If `xtrace` is `Some` instance of `XTrace`, the redirection operators
+    /// and the expanded operands are written to it.
+    pub async fn perform_redirs<'a, I>(
+        &mut self,
+        redirs: I,
+        mut xtrace: Option<&mut XTrace>,
+    ) -> Result<Option<ExitStatus>, Error>
     where
         I: IntoIterator<Item = &'a Redir>,
     {
         let mut exit_status = None;
         for redir in redirs {
-            let new_exit_status = self.perform_redir(redir).await?;
+            let new_exit_status = self.perform_redir(redir, xtrace.as_deref_mut()).await?;
             exit_status = new_exit_status.or(exit_status);
         }
         Ok(exit_status)
@@ -594,7 +613,11 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3< foo".parse().unwrap();
-        let result = env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        let result = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(result, None);
 
         let mut buffer = [0; 4];
@@ -613,7 +636,10 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "< foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut buffer = [0; 4];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
@@ -640,7 +666,7 @@ mod tests {
         let mut redir_env = RedirGuard::new(&mut env);
         let redir = "< file".parse().unwrap();
         redir_env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -663,7 +689,7 @@ mod tests {
         let mut redir_env = RedirGuard::new(&mut env);
         let redir = "4< input".parse().unwrap();
         redir_env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -681,7 +707,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "< no_such_file".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -703,11 +729,11 @@ mod tests {
         drop(state);
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
-        env.perform_redir(&"< foo".parse().unwrap())
+        env.perform_redir(&"< foo".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.perform_redir(&"3< bar".parse().unwrap())
+        env.perform_redir(&"3< bar".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -733,11 +759,11 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
-        env.perform_redir(&"< foo".parse().unwrap())
+        env.perform_redir(&"< foo".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
-        env.perform_redir(&"< bar".parse().unwrap())
+        env.perform_redir(&"< bar".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -766,12 +792,12 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut redir_env = RedirGuard::new(&mut env);
         redir_env
-            .perform_redir(&"< foo".parse().unwrap())
+            .perform_redir(&"< foo".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
         redir_env
-            .perform_redir(&"10< bar".parse().unwrap())
+            .perform_redir(&"10< bar".parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -792,7 +818,7 @@ mod tests {
             env.builtins.insert("return", return_builtin());
             let mut env = RedirGuard::new(&mut env);
             let redir = "3> $(echo foo; return -n 79)".parse().unwrap();
-            let result = env.perform_redir(&redir).await.unwrap();
+            let result = env.perform_redir(&redir, None).await.unwrap();
             assert_eq!(result, Some(ExitStatus(79)));
             let file = state.borrow().file_system.get("foo");
             assert!(file.is_ok(), "{:?}", file);
@@ -805,7 +831,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999</dev/stdin".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -827,7 +853,10 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
@@ -848,7 +877,10 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -869,7 +901,7 @@ mod tests {
 
         let redir = "3> foo".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -905,7 +937,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3> foo".parse().unwrap();
-        let result = env.perform_redir(&redir).now_or_never().unwrap();
+        let result = env.perform_redir(&redir, None).now_or_never().unwrap();
         assert_eq!(result, Ok(None));
     }
 
@@ -915,7 +947,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>foo".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -937,7 +969,10 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3>| foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
@@ -958,7 +993,10 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3>| foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -974,7 +1012,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>|foo".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -996,7 +1034,10 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = "3>> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         env.system.write(Fd(3), &[42, 123, 57]).unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
@@ -1017,7 +1058,10 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
 
         let redir = ">> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         env.system.write(Fd::STDOUT, "two\n".as_bytes()).unwrap();
 
         let file = file.borrow();
@@ -1032,7 +1076,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>>foo".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1053,7 +1097,10 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3<> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         env.system.write(Fd(3), &[230, 175, 26]).unwrap();
 
         let file = state.borrow().file_system.get("foo").unwrap();
@@ -1073,7 +1120,10 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         let mut env = RedirGuard::new(&mut env);
         let redir = "3<> foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut buffer = [0; 4];
         let read_count = env.system.read(Fd(3), &mut buffer).unwrap();
@@ -1087,7 +1137,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999<>foo".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1116,7 +1166,10 @@ mod tests {
             let mut env = Env::with_system(Box::new(system));
             let mut env = RedirGuard::new(&mut env);
             let redir = "3<& 0".parse().unwrap();
-            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+            env.perform_redir(&redir, None)
+                .now_or_never()
+                .unwrap()
+                .unwrap();
 
             let mut buffer = [0; 4];
             let read_count = env.system.read(fd, &mut buffer).unwrap();
@@ -1130,7 +1183,10 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
         let redir = "<& -".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut buffer = [0; 1];
         let e = env.system.read(Fd::STDIN, &mut buffer).unwrap_err();
@@ -1142,11 +1198,14 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
         let redir = "3>foo".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let redir = "<&3".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1160,7 +1219,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999<&0".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1183,7 +1242,10 @@ mod tests {
             let mut env = Env::with_system(Box::new(system));
             let mut env = RedirGuard::new(&mut env);
             let redir = "4>& 1".parse().unwrap();
-            env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+            env.perform_redir(&redir, None)
+                .now_or_never()
+                .unwrap()
+                .unwrap();
 
             env.system.write(fd, &[7, 6, 91]).unwrap();
             let file = state.borrow().file_system.get("/dev/stdout").unwrap();
@@ -1199,7 +1261,10 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
         let redir = ">& -".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let mut buffer = [0; 1];
         let e = env.system.read(Fd::STDOUT, &mut buffer).unwrap_err();
@@ -1211,11 +1276,14 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
         let redir = "3</dev/stdin".parse().unwrap();
-        env.perform_redir(&redir).now_or_never().unwrap().unwrap();
+        env.perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
 
         let redir = ">&3".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1229,7 +1297,7 @@ mod tests {
         let mut env = RedirGuard::new(&mut env);
         let redir = "999999999>&1".parse().unwrap();
         let e = env
-            .perform_redir(&redir)
+            .perform_redir(&redir, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
