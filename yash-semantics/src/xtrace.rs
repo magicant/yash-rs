@@ -54,6 +54,12 @@ impl XTrace {
         }
     }
 
+    /// Returns the current buffer content.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.buffer.as_str()
+    }
+
     /// Clears the buffer.
     pub fn clear(&mut self) {
         self.buffer.clear()
@@ -153,13 +159,10 @@ mod tests {
 
     #[test]
     fn flush_clears_buffer() {
-        let (mut xtrace, mut env, state) = fixture();
+        let (mut xtrace, mut env, _state) = fixture();
         xtrace.write_str("foo").unwrap();
         xtrace.flush(&mut env).now_or_never().unwrap();
-        // The first `flush` clears the buffer, so the second is a no-op.
-        // Compare `non_empty_flush`
-        xtrace.flush(&mut env).now_or_never().unwrap();
-        assert_stderr(&state, |stderr| assert_eq!(stderr, "foo\n"));
+        assert_eq!(xtrace.as_str(), "");
     }
 
     #[test]
@@ -172,9 +175,8 @@ mod tests {
 
     #[test]
     fn trace_fields_some() {
-        let (mut xtrace, mut env, state) = fixture();
+        let mut xtrace = XTrace::new();
         trace_fields(Some(&mut xtrace), &Field::dummies(["foo", "~bar"]));
-        xtrace.flush(&mut env).now_or_never().unwrap();
-        assert_stderr(&state, |stderr| assert_eq!(stderr, "foo '~bar'\n"));
+        assert_eq!(xtrace.as_str(), "foo '~bar' ");
     }
 }
