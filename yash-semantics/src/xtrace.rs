@@ -19,7 +19,9 @@
 use std::fmt::Write;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
+use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_quote::quote;
 
 /// Temporary buffer that accumulates expanded strings
 ///
@@ -79,6 +81,15 @@ impl XTrace {
         // TODO Prefix $PS4
         // TODO Expand $PS4
         // TODO Prevent recursive tracing
+    }
+}
+
+/// Convenience function for tracing fields.
+pub fn trace_fields(xtrace: Option<&mut XTrace>, fields: &[Field]) {
+    if let Some(xtrace) = xtrace {
+        for field in fields {
+            write!(xtrace, "{} ", quote(&field.value)).unwrap();
+        }
     }
 }
 
@@ -157,5 +168,13 @@ mod tests {
         xtrace.write_str("foo   ").unwrap();
         xtrace.flush(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| assert_eq!(stderr, "foo\n"));
+    }
+
+    #[test]
+    fn trace_fields_some() {
+        let (mut xtrace, mut env, state) = fixture();
+        trace_fields(Some(&mut xtrace), &Field::dummies(["foo", "~bar"]));
+        xtrace.flush(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "foo '~bar'\n"));
     }
 }
