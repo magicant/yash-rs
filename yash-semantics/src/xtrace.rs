@@ -17,6 +17,7 @@
 //! Printing expansion results
 
 use std::fmt::Write;
+use std::ops::Add;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
@@ -118,6 +119,19 @@ impl Write for XTrace {
     }
 }
 
+/// Concatenates two traces.
+impl Add<XTrace> for XTrace {
+    type Output = XTrace;
+    fn add(mut self, rhs: XTrace) -> XTrace {
+        if self.buffer.is_empty() {
+            rhs
+        } else {
+            self.buffer += &rhs.buffer;
+            self
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,5 +192,23 @@ mod tests {
         let mut xtrace = XTrace::new();
         trace_fields(Some(&mut xtrace), &Field::dummies(["foo", "~bar"]));
         assert_eq!(xtrace.as_str(), "foo '~bar' ");
+    }
+
+    #[test]
+    fn add_xtrace_and_xtrace() {
+        let a = XTrace::new();
+        let b = XTrace::new();
+        let c = a + b;
+        assert_eq!(c.as_str(), "");
+
+        let mut d = XTrace::new();
+        d.write_str("first").unwrap();
+        let e = c + d;
+        assert_eq!(e.as_str(), "first");
+
+        let mut f = XTrace::new();
+        f.write_str(" second").unwrap();
+        let g = e + f;
+        assert_eq!(g.as_str(), "first second");
     }
 }
