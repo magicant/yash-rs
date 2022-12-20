@@ -1089,10 +1089,10 @@ mod tests {
                 "VAR=123 /some/file foo bar >/dev/null".parse().unwrap();
             let _ = command.execute(&mut env).await;
 
-            // TODO $PS4, assignments, redirections
+            // TODO $PS4, redirections
             assert_stderr(&state, |stderr| {
                 assert!(
-                    stderr.starts_with("/some/file foo bar\n"),
+                    stderr.starts_with("VAR=123 /some/file foo bar\n"),
                     "stderr = {:?}",
                     stderr
                 )

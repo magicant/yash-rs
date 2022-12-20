@@ -18,6 +18,7 @@
 
 use crate::expansion::expand_value;
 use crate::xtrace::XTrace;
+use std::fmt::Write;
 use yash_env::semantics::ExitStatus;
 use yash_env::variable::Variable;
 use yash_env::Env;
@@ -43,10 +44,15 @@ pub async fn perform_assignment(
     assign: &Assign,
     scope: Scope,
     export: bool,
-    _xtrace: Option<&mut XTrace>,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let name = assign.name.clone();
     let (value, exit_status) = expand_value(env, &assign.value).await?;
+
+    if let Some(xtrace) = xtrace {
+        write!(xtrace, "{}={} ", yash_quote::quote(&name), value.quote()).unwrap();
+    }
+
     let value = Variable {
         value: Some(value),
         quirk: None,
@@ -154,6 +160,18 @@ mod tests {
         assert_eq!(*e.location.code.value.borrow(), "v=new");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.range, 0..5);
+    }
+
+    #[test]
+    fn perform_assignment_with_xtrace() {
+        let mut xtrace = XTrace::new();
+        let mut env = Env::new_virtual();
+        let a: Assign = "foo=bar${unset-&}".parse().unwrap();
+        let _ = perform_assignment(&mut env, &a, Scope::Global, false, Some(&mut xtrace))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(xtrace.as_str(), "foo='bar&' ");
     }
 
     #[test]
