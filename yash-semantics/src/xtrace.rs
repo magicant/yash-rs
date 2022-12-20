@@ -68,6 +68,8 @@ impl XTrace {
     /// This function ignores any error that may occur while printing, so there
     /// is no return value.
     pub async fn flush(&mut self, env: &mut Env) {
+        self.buffer
+            .truncate(self.buffer.trim_end_matches(' ').len());
         if self.buffer.is_empty() {
             return;
         }
@@ -76,7 +78,6 @@ impl XTrace {
         self.clear();
         // TODO Prefix $PS4
         // TODO Expand $PS4
-        // TODO Trim trailing spaces
         // TODO Prevent recursive tracing
     }
 }
@@ -124,6 +125,11 @@ mod tests {
         let (mut xtrace, mut env, state) = fixture();
         xtrace.flush(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+
+        // Trailing spaces are ignored, so it's still empty
+        xtrace.write_str("   ").unwrap();
+        xtrace.flush(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
     }
 
     #[test]
@@ -141,6 +147,14 @@ mod tests {
         xtrace.flush(&mut env).now_or_never().unwrap();
         // The first `flush` clears the buffer, so the second is a no-op.
         // Compare `non_empty_flush`
+        xtrace.flush(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "foo\n"));
+    }
+
+    #[test]
+    fn trimming_trailing_spaces() {
+        let (mut xtrace, mut env, state) = fixture();
+        xtrace.write_str("foo   ").unwrap();
         xtrace.flush(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| assert_eq!(stderr, "foo\n"));
     }
