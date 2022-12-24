@@ -19,9 +19,9 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
-use crate::xtrace::flush;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
+use crate::xtrace::XTraceSet;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -353,21 +353,18 @@ async fn execute_external_utility(
     let name = fields[0].clone();
     let location = name.origin.clone();
 
-    let mut xtrace1 = XTrace::from_options(&env.options);
-    let mut xtrace2 = xtrace1.clone();
+    let mut xtraces = XTraceSet::from_options(&env.options);
 
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs, xtrace2.as_mut()).await {
+    if let Err(e) = env.perform_redirs(redirs, xtraces.for_redirs()).await {
         return e.handle(env).await;
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true, xtrace1.as_mut()).await?;
+    perform_assignments(&mut env, assigns, true, xtraces.main()).await?;
 
-    trace_fields(xtrace1.as_mut(), &fields);
-    if let (Some(xtrace1), Some(xtrace2)) = (xtrace1, xtrace2) {
-        (xtrace1 + xtrace2).flush(&mut env).await;
-    }
+    trace_fields(xtraces.main(), &fields);
+    xtraces.flush(&mut env).await;
 
     if path.to_bytes().is_empty() {
         print_error(

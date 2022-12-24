@@ -132,6 +132,47 @@ impl Add<XTrace> for XTrace {
     }
 }
 
+/// Set of [`XTrace`] instances for tracing a command
+#[derive(Debug)]
+pub(crate) struct XTraceSet(Option<(XTrace, XTrace)>);
+
+impl XTraceSet {
+    /// Creates a new trace set if the `xtrace` option is on.
+    ///
+    /// If the option is off, the returned set is empty. Otherwise, the result
+    /// contains two `XTrace` instances, one for assignments and fields, and the
+    /// other for redirections.
+    #[must_use]
+    pub fn from_options(options: &OptionSet) -> Self {
+        match options.get(yash_env::option::Option::XTrace) {
+            State::On => Self(Some((XTrace::new(), XTrace::new()))),
+            State::Off => Self(None),
+        }
+    }
+
+    /// Returns an optional reference to the main trace buffer.
+    ///
+    /// THe main buffer is for tracing assignments and fields.
+    #[must_use]
+    pub fn main(&mut self) -> Option<&mut XTrace> {
+        self.0.as_mut().map(|(main, _)| main)
+    }
+
+    /// Returns an optional reference to the redirection trace buffer.
+    #[must_use]
+    pub fn for_redirs(&mut self) -> Option<&mut XTrace> {
+        self.0.as_mut().map(|(_, for_redirs)| for_redirs)
+    }
+
+    /// Flushes the buffer content.
+    pub async fn flush(self, env: &mut Env) {
+        if let Some((main, for_redirs)) = self.0 {
+            let mut joined = main + for_redirs;
+            joined.flush(env).await;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
