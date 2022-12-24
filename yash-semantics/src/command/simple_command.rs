@@ -353,19 +353,21 @@ async fn execute_external_utility(
     let name = fields[0].clone();
     let location = name.origin.clone();
 
-    let mut xtrace = XTrace::from_options(&env.options);
+    let mut xtrace1 = XTrace::from_options(&env.options);
+    let mut xtrace2 = xtrace1.clone();
 
     let env = &mut RedirGuard::new(env);
-    // TODO xtrace for redirections
-    if let Err(e) = env.perform_redirs(redirs, None).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace2.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+    perform_assignments(&mut env, assigns, true, xtrace1.as_mut()).await?;
 
-    trace_fields(xtrace.as_mut(), &fields);
-    flush(&mut env, xtrace).await;
+    trace_fields(xtrace1.as_mut(), &fields);
+    if let (Some(xtrace1), Some(xtrace2)) = (xtrace1, xtrace2) {
+        (xtrace1 + xtrace2).flush(&mut env).await;
+    }
 
     if path.to_bytes().is_empty() {
         print_error(
@@ -1090,10 +1092,10 @@ mod tests {
                 "VAR=123 /some/file foo bar >/dev/null".parse().unwrap();
             let _ = command.execute(&mut env).await;
 
-            // TODO $PS4, redirections
+            // TODO $PS4
             assert_stderr(&state, |stderr| {
                 assert!(
-                    stderr.starts_with("VAR=123 /some/file foo bar\n"),
+                    stderr.starts_with("VAR=123 /some/file foo bar 1> /dev/null\n"),
                     "stderr = {:?}",
                     stderr
                 )
