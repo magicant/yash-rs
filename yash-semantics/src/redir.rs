@@ -65,6 +65,7 @@ use crate::xtrace::XTrace;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
+use std::fmt::Write;
 use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -79,6 +80,7 @@ use yash_env::system::OFlag;
 use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
+use yash_quote::quote;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -407,13 +409,27 @@ async fn open_normal(
     }
 }
 
+/// Prepares xtrace for a normal redirection.
+fn trace_normal(xtrace: Option<&mut XTrace>, target_fd: Fd, operator: RedirOp, operand: &Field) {
+    if let Some(xtrace) = xtrace {
+        write!(
+            xtrace,
+            "{}{} {} ",
+            target_fd,
+            operator,
+            quote(&operand.value)
+        )
+        .unwrap();
+    }
+}
+
 mod here_doc;
 
 /// Performs a redirection.
 async fn perform(
     env: &mut Env,
     redir: &Redir,
-    _xtrace: Option<&mut XTrace>,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<(SavedFd, Option<ExitStatus>), Error> {
     // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
@@ -433,6 +449,7 @@ async fn perform(
         RedirBody::Normal { operator, operand } => {
             // TODO perform pathname expansion if applicable
             let (expansion, exit_status) = expand_word(env, operand).await?;
+            trace_normal(xtrace, target_fd, *operator, &expansion);
             let (fd, location) = open_normal(env, *operator, expansion).await?;
             (fd, location, exit_status)
         }
@@ -823,6 +840,18 @@ mod tests {
             let file = state.borrow().file_system.get("foo");
             assert!(file.is_ok(), "{:?}", file);
         })
+    }
+
+    #[test]
+    fn xtrace_normal() {
+        let mut xtrace = XTrace::new();
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        env.perform_redir(&"> foo${unset-&}".parse().unwrap(), Some(&mut xtrace))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(xtrace.as_str(), "1> 'foo&' ");
     }
 
     #[test]

@@ -356,7 +356,8 @@ async fn execute_external_utility(
     let mut xtrace = XTrace::from_options(&env.options);
 
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
+    // TODO xtrace for redirections
+    if let Err(e) = env.perform_redirs(redirs, None).await {
         return e.handle(env).await;
     };
 
