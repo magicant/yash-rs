@@ -19,6 +19,7 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
+use crate::xtrace::flush;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
 use crate::xtrace::XTraceSet;
@@ -236,7 +237,7 @@ async fn execute_absent_target(
                         return Break(Divert::Exit(None));
                     }
                 };
-                // TODO flush xtrace
+                flush(env, xtrace).await;
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
@@ -260,7 +261,7 @@ async fn execute_absent_target(
 
     let mut xtrace = XTrace::from_options(&env.options);
     let assignment_exit_status = perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
-    // TODO flush xtrace
+    flush(env, xtrace).await;
     env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
@@ -1062,6 +1063,22 @@ mod tests {
             let stdout = stdout.borrow();
             assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
                 assert_eq!(from_utf8(content), Ok(""));
+            });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_absent_target() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options
+                .set(yash_env::option::XTrace, yash_env::option::On);
+
+            let command: syntax::SimpleCommand = "FOO=bar 3>/dev/null".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            // TODO $PS4
+            assert_stderr(&state, |stderr| {
+                assert_eq!(stderr, "3> /dev/null\nFOO=bar\n");
             });
         });
     }
