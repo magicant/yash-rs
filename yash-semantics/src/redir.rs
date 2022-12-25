@@ -60,6 +60,7 @@
 //! file descriptor. When you drop the `RedirGuard`, it undoes the effect to the
 //! file descriptor. See the documentation for [`RedirGuard`] for details.
 
+use crate::expansion::expand_text;
 use crate::expansion::expand_word;
 use crate::xtrace::XTrace;
 use std::borrow::Cow;
@@ -426,6 +427,7 @@ fn trace_normal(xtrace: Option<&mut XTrace>, target_fd: Fd, operator: RedirOp, o
 mod here_doc;
 
 /// Performs a redirection.
+#[allow(clippy::await_holding_refcell_ref)]
 async fn perform(
     env: &mut Env,
     redir: &Redir,
@@ -453,7 +455,14 @@ async fn perform(
             let (fd, location) = open_normal(env, *operator, expansion).await?;
             (fd, location, exit_status)
         }
-        RedirBody::HereDoc(here_doc) => here_doc::open(env, here_doc).await?,
+        RedirBody::HereDoc(here_doc) => {
+            let (content, exit_status) = expand_text(env, &here_doc.content.borrow()).await?;
+            let location = here_doc.delimiter.location.clone();
+            match here_doc::open_fd(env, content).await {
+                Ok(fd) => (FdSpec::Owned(fd), location, exit_status),
+                Err(cause) => return Err(Error { cause, location }),
+            }
+        }
     };
 
     if let Some(fd) = fd_spec.as_fd() {
@@ -619,6 +628,7 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_syntax::syntax::HereDoc;
 
     #[test]
     fn basic_file_in_redirection() {
@@ -829,7 +839,7 @@ mod tests {
     }
 
     #[test]
-    fn exit_status_of_command_substitution() {
+    fn exit_status_of_command_substitution_in_normal() {
         in_virtual_system(|mut env, _pid, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
@@ -839,6 +849,32 @@ mod tests {
             assert_eq!(result, Some(ExitStatus(79)));
             let file = state.borrow().file_system.get("foo");
             assert!(file.is_ok(), "{:?}", file);
+        })
+    }
+
+    #[test]
+    fn exit_status_of_command_substitution_in_here_doc() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert("return", return_builtin());
+            let mut env = RedirGuard::new(&mut env);
+            let redir = Redir {
+                fd: Some(Fd(4)),
+                body: RedirBody::HereDoc(Rc::new(HereDoc {
+                    delimiter: "-END".parse().unwrap(),
+                    remove_tabs: false,
+                    content: RefCell::new(
+                        "$(echo foo)$(echo bar; return -n 42)\n".parse().unwrap(),
+                    ),
+                })),
+            };
+            let result = env.perform_redir(&redir, None).await.unwrap();
+            assert_eq!(result, Some(ExitStatus(42)));
+
+            let mut buffer = [0; 10];
+            let count = env.system.read(Fd(4), &mut buffer).unwrap();
+            assert_eq!(count, 7);
+            assert_eq!(&buffer[..7], b"foobar\n");
         })
     }
 
