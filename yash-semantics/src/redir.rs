@@ -86,9 +86,11 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
+use yash_syntax::syntax::HereDoc;
 use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
 use yash_syntax::syntax::RedirOp;
+use yash_syntax::syntax::Unquote;
 
 const MIN_SAVE_FD: Fd = Fd(10);
 
@@ -424,6 +426,19 @@ fn trace_normal(xtrace: Option<&mut XTrace>, target_fd: Fd, operator: RedirOp, o
     }
 }
 
+/// Prepares xtrace for a here-document.
+fn trace_here_doc(xtrace: Option<&mut XTrace>, target_fd: Fd, here_doc: &HereDoc, content: &str) {
+    if let Some(xtrace) = xtrace {
+        let (delimiter, _is_quoted) = here_doc.delimiter.unquote();
+        write!(
+            xtrace,
+            "{}{}\n{}{} ",
+            target_fd, here_doc, content, delimiter
+        )
+        .unwrap();
+    }
+}
+
 mod here_doc;
 
 /// Performs a redirection.
@@ -457,6 +472,7 @@ async fn perform(
         }
         RedirBody::HereDoc(here_doc) => {
             let (content, exit_status) = expand_text(env, &here_doc.content.borrow()).await?;
+            trace_here_doc(xtrace, target_fd, here_doc, &content);
             let location = here_doc.delimiter.location.clone();
             match here_doc::open_fd(env, content).await {
                 Ok(fd) => (FdSpec::Owned(fd), location, exit_status),
@@ -628,7 +644,6 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;
-    use yash_syntax::syntax::HereDoc;
 
     #[test]
     fn basic_file_in_redirection() {
@@ -888,6 +903,26 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(xtrace.as_str(), "1> 'foo&' ");
+    }
+
+    #[test]
+    fn xtrace_here_doc() {
+        let mut xtrace = XTrace::new();
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+        let redir = Redir {
+            fd: Some(Fd(4)),
+            body: RedirBody::HereDoc(Rc::new(HereDoc {
+                delimiter: r"-\END".parse().unwrap(),
+                remove_tabs: false,
+                content: RefCell::new("foo\n".parse().unwrap()),
+            })),
+        };
+        env.perform_redir(&redir, Some(&mut xtrace))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(xtrace.as_str(), "4<< -\\END\nfoo\n-END ");
     }
 
     #[test]
