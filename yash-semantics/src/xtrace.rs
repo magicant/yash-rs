@@ -182,6 +182,15 @@ impl XTrace {
     }
 }
 
+/// Convenience function for calling [`XTrace::finish`] on an optional `XTrace`.
+pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
+    if let Some(xtrace) = xtrace {
+        xtrace.finish(env).await
+    } else {
+        String::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
