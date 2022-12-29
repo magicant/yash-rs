@@ -35,6 +35,7 @@
 
 use crate::expansion::expand_text;
 use crate::Handle;
+use std::fmt::Write;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::variable::Value::Scalar;
@@ -114,6 +115,39 @@ impl XTrace {
             State::On => Some(Self::new()),
             State::Off => None,
         }
+    }
+
+    /// Returns a reference to the main buffer.
+    ///
+    /// The main buffer is for tracing command words and assignments.
+    /// When writing to the buffer, the content should end with a space.
+    #[inline]
+    #[must_use]
+    pub fn main(&mut self) -> &mut impl Write {
+        &mut self.main
+    }
+
+    /// Returns a reference to the redirections buffer.
+    ///
+    /// The redirections buffer is for tracing redirections.
+    /// When writing to the buffer, the content should end with a space.
+    ///
+    /// You should not write the contents of here-documents to this buffer.
+    /// See also [`here_doc_contents`](Self::here_doc_contents).
+    #[inline]
+    #[must_use]
+    pub fn redirs(&mut self) -> &mut impl Write {
+        &mut self.redirs
+    }
+
+    /// Returns a reference to the here-document contents buffer.
+    ///
+    /// You should write the contents of here-documents you wrote to the
+    /// [redirections buffer](Self::redirs()).
+    #[inline]
+    #[must_use]
+    pub fn here_doc_contents(&mut self) -> &mut impl Write {
+        &mut self.here_doc_contents
     }
 
     /// Clears the buffer contents.

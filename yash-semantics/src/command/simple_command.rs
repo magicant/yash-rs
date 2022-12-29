@@ -19,6 +19,7 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
+use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
 use async_trait::async_trait;
@@ -197,13 +198,14 @@ async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],
     export: bool,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let scope = if export {
         Scope::Volatile
     } else {
         Scope::Global
     };
-    match crate::assign::perform_assignments(env, assigns, scope, export).await {
+    match crate::assign::perform_assignments(env, assigns, scope, export, xtrace).await {
         Ok(exit_status) => Continue(exit_status),
         Err(error) => {
             error.handle(env).await?;
@@ -252,7 +254,7 @@ async fn execute_absent_target(
         exit_status
     };
 
-    let assignment_exit_status = perform_assignments(env, assigns, false).await?;
+    let assignment_exit_status = perform_assignments(env, assigns, false, None).await?;
     env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
@@ -279,12 +281,12 @@ async fn execute_builtin(
 
     let (exit_status, abort) = match builtin.r#type {
         Special => {
-            perform_assignments(env, assigns, false).await?;
+            perform_assignments(env, assigns, false, None).await?;
             (builtin.execute)(env, fields).await
         }
         Intrinsic | NonIntrinsic => {
             let mut env = env.push_context(ContextType::Volatile);
-            perform_assignments(&mut env, assigns, true).await?;
+            perform_assignments(&mut env, assigns, true, None).await?;
             (builtin.execute)(&mut env, fields).await
         }
     };
@@ -306,7 +308,7 @@ async fn execute_function(
     };
 
     let mut outer = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut outer, assigns, true).await?;
+    perform_assignments(&mut outer, assigns, true, None).await?;
 
     let mut inner = outer.push_context(ContextType::Regular);
 
@@ -343,7 +345,7 @@ async fn execute_external_utility(
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true).await?;
+    perform_assignments(&mut env, assigns, true, None).await?;
 
     if path.to_bytes().is_empty() {
         print_error(
