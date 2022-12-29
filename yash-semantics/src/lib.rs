@@ -30,6 +30,7 @@ pub mod command_search;
 pub mod expansion;
 pub mod redir;
 pub mod trap;
+pub mod xtrace;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::*;
