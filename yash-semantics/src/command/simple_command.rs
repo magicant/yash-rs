@@ -226,7 +226,7 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
-                let redir_exit_status = match env.perform_redirs(&*redirs).await {
+                let redir_exit_status = match env.perform_redirs(&*redirs, None).await {
                     Ok(exit_status) => exit_status,
                     Err(e) => {
                         e.handle(env).await?;
@@ -271,7 +271,7 @@ async fn execute_builtin(
     let is_special = builtin.r#type == Special;
     let env = &mut env.push_frame(Frame::Builtin { name, is_special });
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, None).await {
         e.handle(env).await?;
         return match builtin.r#type {
             Special => Break(Divert::Interrupt(None)),
@@ -303,7 +303,7 @@ async fn execute_function(
     redirs: &[Redir],
 ) -> Result {
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, None).await {
         return e.handle(env).await;
     };
 
@@ -340,7 +340,7 @@ async fn execute_external_utility(
     let args = to_c_strings(fields);
 
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, None).await {
         return e.handle(env).await;
     };
 

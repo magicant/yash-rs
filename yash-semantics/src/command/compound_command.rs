@@ -49,7 +49,7 @@ mod while_loop;
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
-        match env.perform_redirs(&self.redirs).await {
+        match env.perform_redirs(&self.redirs, None).await {
             Ok(_) => self.command.execute(&mut env).await,
             Err(error) => {
                 error.handle(&mut env).await?;
