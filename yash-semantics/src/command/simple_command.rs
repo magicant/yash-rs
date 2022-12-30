@@ -228,13 +228,18 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
-                let redir_exit_status = match env.perform_redirs(&*redirs, None).await {
+                let mut xtrace = XTrace::from_options(&env.options);
+
+                let redir_exit_status = match env.perform_redirs(&*redirs, xtrace.as_mut()).await {
                     Ok(exit_status) => exit_status,
                     Err(e) => {
                         e.handle(env).await?;
                         return Break(Divert::Exit(None));
                     }
                 };
+
+                print(env, xtrace).await;
+
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
@@ -256,7 +261,10 @@ async fn execute_absent_target(
         exit_status
     };
 
-    let assignment_exit_status = perform_assignments(env, assigns, false, None).await?;
+    // Perform assignments in the current shell
+    let mut xtrace = XTrace::from_options(&env.options);
+    let assignment_exit_status = perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+    print(env, xtrace).await;
     env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
@@ -1049,6 +1057,21 @@ mod tests {
             let stdout = stdout.borrow();
             assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
                 assert_eq!(from_utf8(content), Ok(""));
+            });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_absent_target() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options
+                .set(yash_env::option::XTrace, yash_env::option::On);
+
+            let command: syntax::SimpleCommand = "FOO=bar 3>/dev/null".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            assert_stderr(&state, |stderr| {
+                assert_eq!(stderr, "3>/dev/null\nFOO=bar\n");
             });
         });
     }
