@@ -1131,7 +1131,7 @@ mod tests {
         command.execute(&mut env).now_or_never().unwrap();
 
         assert_stderr(&state, |stderr| {
-            assert_eq!(stderr, "x=hello foo bar 0<>/dev/null\n");
+            assert_eq!(stderr, "x=hello foo bar 0<>/dev/null\nfor i in\n");
         });
     }
 
