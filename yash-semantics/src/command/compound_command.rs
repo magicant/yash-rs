@@ -227,7 +227,9 @@ mod tests {
         env.options.set(yash_env::option::Option::XTrace, On);
         let command: syntax::FullCompoundCommand = "{ echo X; } > /file < /file".parse().unwrap();
         let _ = command.execute(&mut env).now_or_never().unwrap();
-        assert_stderr(&state, |stderr| assert_eq!(stderr, "1>/file 0</file\n"));
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "1>/file 0</file\necho X\n");
+        });
     }
 
     #[test]

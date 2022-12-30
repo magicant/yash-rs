@@ -24,12 +24,14 @@ use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
+use assert_matches::assert_matches;
 use async_trait::async_trait;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
+use yash_env::builtin::Main;
 use yash_env::function::Function;
 use yash_env::io::print_error;
 use yash_env::semantics::Divert;
@@ -281,7 +283,8 @@ async fn execute_builtin(
     let is_special = builtin.r#type == Special;
     let env = &mut env.push_frame(Frame::Builtin { name, is_special });
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs, None).await {
+    let mut xtrace = XTrace::from_options(&env.options);
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         e.handle(env).await?;
         return match builtin.r#type {
             Special => Break(Divert::Interrupt(None)),
@@ -289,15 +292,29 @@ async fn execute_builtin(
         };
     };
 
+    async fn trace_and_execute(
+        env: &mut Env,
+        fields: Vec<Field>,
+        main: Main,
+        mut xtrace: Option<XTrace>,
+    ) -> (ExitStatus, Result) {
+        let name = assert_matches!(env.stack.last(), Some(Frame::Builtin { name, .. }) => name);
+        trace_fields(xtrace.as_mut(), std::slice::from_ref(name));
+        trace_fields(xtrace.as_mut(), &fields);
+        print(env, xtrace).await;
+
+        main(env, fields).await
+    }
+
     let (exit_status, abort) = match builtin.r#type {
         Special => {
-            perform_assignments(env, assigns, false, None).await?;
-            (builtin.execute)(env, fields).await
+            perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+            trace_and_execute(env, fields, builtin.execute, xtrace).await
         }
         Intrinsic | NonIntrinsic => {
             let mut env = env.push_context(ContextType::Volatile);
-            perform_assignments(&mut env, assigns, true, None).await?;
-            (builtin.execute)(&mut env, fields).await
+            perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+            trace_and_execute(&mut env, fields, builtin.execute, xtrace).await
         }
     };
 
@@ -1073,6 +1090,22 @@ mod tests {
             assert_stderr(&state, |stderr| {
                 assert_eq!(stderr, "3>/dev/null\nFOO=bar\n");
             });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_builtin() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options
+            .set(yash_env::option::XTrace, yash_env::option::On);
+        let command: syntax::SimpleCommand = "foo=bar echo hello >/dev/null".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "foo=bar echo hello 1>/dev/null\n");
         });
     }
 

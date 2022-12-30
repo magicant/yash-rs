@@ -16,6 +16,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
+assert_matches = "1.5.0"
 async-trait = "0.1.56"
 # We need a specific version of bitflags
 # to obtain some auto-generated functions for items exported from yash-env
@@ -27,7 +28,6 @@ yash-quote = { path = "../yash-quote", version = "1.0.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.6.0" }
 
 [dev-dependencies]
-assert_matches = "1.5.0"
 futures-executor = "0.3.23"
 futures-util = "0.3.23"
 itertools = "0.10.3"
