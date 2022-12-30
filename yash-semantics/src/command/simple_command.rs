@@ -19,6 +19,8 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
+use crate::xtrace::print;
+use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
@@ -337,15 +339,19 @@ async fn execute_external_utility(
 ) -> Result {
     let name = fields[0].clone();
     let location = name.origin.clone();
-    let args = to_c_strings(fields);
+
+    let mut xtrace = XTrace::from_options(&env.options);
 
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs, None).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true, None).await?;
+    perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+
+    trace_fields(xtrace.as_mut(), &fields);
+    print(&mut env, xtrace).await;
 
     if path.to_bytes().is_empty() {
         print_error(
@@ -359,6 +365,7 @@ async fn execute_external_utility(
         return Continue(());
     }
 
+    let args = to_c_strings(fields);
     let subshell = env.run_in_subshell(move |env| {
         Box::pin(async move {
             env.traps.disable_internal_handlers(&mut env.system).ok();
@@ -1042,6 +1049,39 @@ mod tests {
             let stdout = stdout.borrow();
             assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
                 assert_eq!(from_utf8(content), Ok(""));
+            });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_external_command() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options
+                .set(yash_env::option::XTrace, yash_env::option::On);
+
+            let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
+            content.permissions.0 |= 0o100;
+            let content = Rc::new(RefCell::new(content));
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
+
+            let command: syntax::SimpleCommand =
+                "VAR=123 /some/file foo bar >/dev/null".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.starts_with("VAR=123 /some/file foo bar 1>/dev/null\n"),
+                    "stderr = {:?}",
+                    stderr
+                )
             });
         });
     }

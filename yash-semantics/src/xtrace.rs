@@ -38,9 +38,11 @@ use crate::Handle;
 use std::fmt::Write;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
+use yash_env::semantics::Field;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
 use yash_env::Env;
+use yash_quote::quote;
 use yash_syntax::syntax::Text;
 
 fn join(a: String, b: String) -> String {
@@ -182,6 +184,17 @@ impl XTrace {
     }
 }
 
+/// Convenience function for tracing fields.
+///
+/// This function writes the field values to the main buffer of the `XTrace`.
+pub fn trace_fields(xtrace: Option<&mut XTrace>, fields: &[Field]) {
+    if let Some(xtrace) = xtrace {
+        for field in fields {
+            write!(xtrace.main(), "{} ", quote(&field.value)).unwrap();
+        }
+    }
+}
+
 /// Convenience function for calling [`XTrace::finish`] on an optional `XTrace`.
 pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
     if let Some(xtrace) = xtrace {
@@ -189,6 +202,16 @@ pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
     } else {
         String::new()
     }
+}
+
+/// Convenience function for [finish]ing and [print](Env::print_error)ing an
+/// (optional) `XTrace`.
+pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
+    async fn inner(env: &mut Env, xtrace: Option<XTrace>) {
+        let s = finish(env, xtrace).await;
+        env.print_error(&s).await;
+    }
+    inner(env, xtrace.into()).await
 }
 
 #[cfg(test)]
@@ -203,6 +226,16 @@ mod tests {
         assert_eq!(join("foo".to_owned(), String::new()), "foo");
         assert_eq!(join(String::new(), "bar".to_owned()), "bar");
         assert_eq!(join("to".to_owned(), "night".to_owned()), "tonight");
+    }
+
+    #[test]
+    fn tracing_some_fields() {
+        let mut xtrace = XTrace::new();
+        let fields = Field::dummies(["one", "two", "'three'"]);
+        trace_fields(Some(&mut xtrace), &fields);
+        assert_eq!(xtrace.main, r#"one two "'three'" "#);
+        assert_eq!(xtrace.redirs, "");
+        assert_eq!(xtrace.here_doc_contents, "");
     }
 
     fn fixture() -> Env {
