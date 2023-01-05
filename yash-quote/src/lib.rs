@@ -69,10 +69,6 @@ pub fn quote(s: &str) -> Cow<'_, str> {
 
 /// Returns true iff any character needs quoting.
 fn str_needs_quoting(s: &str) -> bool {
-    if s.chars().any(char_needs_quoting) {
-        return true;
-    }
-
     // `#` or `~` occurring at the beginning of the string
     if let Some(c) = s.chars().next() {
         if c == '#' || c == '~' {
@@ -80,18 +76,21 @@ fn str_needs_quoting(s: &str) -> bool {
         }
     }
 
+    // characters that require quoting regardless of the position
+    if s.chars().any(char_needs_quoting) {
+        return true;
+    }
+
     // `{` preceding `}`
     if let Some(i) = s.find('{') {
-        let sub = &s[i + 1..];
-        if sub.find('}').is_some() {
+        if s[i + 1..].contains('}') {
             return true;
         }
     }
 
     // `[` preceding `]`
     if let Some(i) = s.find('[') {
-        let sub = &s[i + 1..];
-        if sub.find(']').is_some() {
+        if s[i + 1..].contains(']') {
             return true;
         }
     }
@@ -124,10 +123,12 @@ mod tests {
         test("{x");
         test("}");
         test("x}");
+        test("}{");
         test("[");
         test("[x");
         test("]");
         test("x]");
+        test("][");
     }
 
     #[test]
