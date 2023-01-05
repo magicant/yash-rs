@@ -24,6 +24,7 @@
 //! - `$`, `` ` ``, `\`, `"`, and `'`
 //! - `=`, `*`, and `?`
 //! - `#` or `~` occurring at the beginning of the string
+//! - `:` immediately followed by `~`
 //! - `{` preceding `}`
 //! - `[` preceding `]`
 //!
@@ -78,6 +79,11 @@ fn str_needs_quoting(s: &str) -> bool {
 
     // characters that require quoting regardless of the position
     if s.chars().any(char_needs_quoting) {
+        return true;
+    }
+
+    // `:` immediately followed by `~`
+    if s.contains(":~") {
         return true;
     }
 
@@ -144,6 +150,7 @@ mod tests {
         test("{a}");
         test("[]");
         test("[a]");
+        test("foo:~bar");
     }
 
     #[test]
