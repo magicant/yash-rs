@@ -81,7 +81,7 @@ use yash_env::system::OFlag;
 use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
-use yash_quote::quote;
+use yash_quote::quoted;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -420,7 +420,7 @@ fn trace_normal(xtrace: Option<&mut XTrace>, target_fd: Fd, operator: RedirOp, o
             "{}{}{} ",
             target_fd,
             operator,
-            quote(&operand.value)
+            quoted(&operand.value)
         )
         .unwrap();
     }

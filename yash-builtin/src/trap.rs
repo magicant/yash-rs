@@ -31,7 +31,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Trap;
 use yash_env::Env;
-use yash_quote::quote;
+use yash_quote::quoted;
 
 /// Prints the currently configured traps.
 pub async fn print_traps(env: &mut Env) -> Result {
@@ -48,7 +48,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
             Trap::Command(command) => command,
         };
         let signal = &signal.as_str()[3..];
-        writeln!(output, "trap -- {} {}", &quote(command), signal).ok();
+        writeln!(output, "trap -- {} {}", quoted(command), signal).ok();
     }
     env.print(&output).await
 }

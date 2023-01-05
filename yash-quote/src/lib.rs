@@ -7,8 +7,8 @@
 //! When used in a POSIX shell script, the resultant string will expand to a
 //! single field having the same value as the original string.
 //!
-//! POSIX specifies several types of quoting mechanisms we can use. The
-//! [`quote`] function chooses one according to the following decision rules:
+//! POSIX specifies several types of quoting mechanisms we can use. This crate
+//! picks one according to the following decision rules:
 //!
 //! - If the string is not empty and contains no characters that need quoting,
 //!   the string is returned intact.
@@ -28,7 +28,21 @@
 //! - `{` preceding `}`
 //! - `[` preceding `]`
 //!
+//!
+//! The [`quoted`] function wraps a string in [`Quoted`], which implements
+//! `Display` to produce the quoted version of the string with a formatter. The
+//! [`quote`] function returns a `Cow<str>`, avoiding unnecessary clone of the
+//! string if it requires no quoting.
+//!
 //! # Examples
+//!
+//! ```
+//! # use yash_quote::quoted;
+//! assert_eq!(format!("value={}", quoted("foo")), "value=foo");
+//! assert_eq!(format!("value={}", quoted("")), "value=''");
+//! assert_eq!(format!("value={}", quoted("$foo")), "value='$foo'");
+//! assert_eq!(format!("value={}", quoted("'$foo'")), r#"value="'\$foo'""#);
+//! ```
 //!
 //! ```
 //! # use std::borrow::Cow::{Borrowed, Owned};
@@ -41,35 +55,19 @@
 
 use std::borrow::Cow::{self, Borrowed, Owned};
 
-/// Quotes the argument.
-///
-/// If the argument needs no quoting, the return value is `Borrowed(s)`.
-/// Otherwise, it is `Owned(new_quoted_string)`.
-///
-/// See the [module doc](self) for more details.
-pub fn quote(s: &str) -> Cow<'_, str> {
-    if !s.is_empty() && !str_needs_quoting(s) {
-        return Borrowed(s);
+fn char_needs_quoting(c: char) -> bool {
+    match c {
+        ';' | '&' | '|' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n' => true,
+        '$' | '`' | '\\' | '"' | '\'' | '=' | '*' | '?' => true,
+        _ => c.is_whitespace(),
     }
-
-    if s.find('\'').is_none() {
-        return Owned(format!("'{}'", s));
-    }
-
-    let mut result = String::with_capacity(s.len().saturating_add(8));
-    result.push('"');
-    for c in s.chars() {
-        if matches!(c, '"' | '`' | '$' | '\\') {
-            result.push('\\');
-        }
-        result.push(c);
-    }
-    result.push('"');
-    Owned(result)
 }
 
-/// Returns true iff any character needs quoting.
 fn str_needs_quoting(s: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+
     // `#` or `~` occurring at the beginning of the string
     if let Some(c) = s.chars().next() {
         if c == '#' || c == '~' {
@@ -104,12 +102,91 @@ fn str_needs_quoting(s: &str) -> bool {
     false
 }
 
-fn char_needs_quoting(c: char) -> bool {
-    match c {
-        ';' | '&' | '|' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n' => true,
-        '$' | '`' | '\\' | '"' | '\'' | '=' | '*' | '?' => true,
-        _ => c.is_whitespace(),
+/// Wrapper for quoting a string.
+///
+/// `Quoted` wraps a `&str` and implements `Display` to produce a quoted version
+/// of the string. The implementation prints the same result as [`quote`] but
+/// may be more efficient if the result is to be part of a larger string built
+/// with a formatter.
+#[derive(Clone, Copy, Debug)]
+pub struct Quoted<'a> {
+    raw: &'a str,
+    needs_quoting: bool,
+}
+
+impl<'a> Quoted<'a> {
+    /// Returns the original string.
+    pub fn as_raw(&self) -> &'a str {
+        self.raw
     }
+
+    /// Tests whether the contained string requires quoting.
+    pub fn needs_quoting(&self) -> bool {
+        self.needs_quoting
+    }
+}
+
+/// Quotes the contained string.
+impl std::fmt::Display for Quoted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+        if !self.needs_quoting {
+            f.write_str(self.raw)
+        } else if !self.raw.contains('\'') {
+            write!(f, "'{}'", self.raw)
+        } else {
+            f.write_char('"')?;
+            for c in self.raw.chars() {
+                if matches!(c, '"' | '`' | '$' | '\\') {
+                    f.write_char('\\')?;
+                }
+                f.write_char(c)?;
+            }
+            f.write_char('"')
+        }
+    }
+}
+
+/// Wraps a string in [`Quoted`].
+///
+/// This function scans the string to cache the value for
+/// [`Quoted::needs_quoting`], so this is an _O_(_n_) operation.
+impl<'a> From<&'a str> for Quoted<'a> {
+    fn from(raw: &'a str) -> Self {
+        let needs_quoting = str_needs_quoting(raw);
+        Quoted { raw, needs_quoting }
+    }
+}
+
+/// Constructs a quoted string.
+impl<'a> From<Quoted<'a>> for Cow<'a, str> {
+    fn from(q: Quoted<'a>) -> Self {
+        if q.needs_quoting() {
+            Owned(q.to_string())
+        } else {
+            Borrowed(q.as_raw())
+        }
+    }
+}
+
+/// Wraps a string in [`Quoted`].
+///
+/// This function scans the string to cache the value for
+/// [`Quoted::needs_quoting`], so this is an _O_(_n_) operation.
+#[inline]
+#[must_use]
+pub fn quoted(raw: &str) -> Quoted {
+    Quoted::from(raw)
+}
+
+/// Quotes the argument.
+///
+/// If the argument needs no quoting, the return value is `Borrowed(s)`.
+/// Otherwise, it is `Owned(new_quoted_string)`.
+///
+/// See the [module doc](self) for more details.
+pub fn quote(raw: &str) -> Cow<'_, str> {
+    quoted(raw).into()
 }
 
 #[cfg(test)]

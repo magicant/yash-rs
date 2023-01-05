@@ -53,7 +53,7 @@ pub async fn perform_assignment(
         write!(
             xtrace.main(),
             "{}={} ",
-            yash_quote::quote(&name),
+            yash_quote::quoted(&name),
             value.quote()
         )
         .unwrap();

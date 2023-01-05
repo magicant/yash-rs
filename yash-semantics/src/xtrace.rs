@@ -42,7 +42,7 @@ use yash_env::semantics::Field;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
 use yash_env::Env;
-use yash_quote::quote;
+use yash_quote::quoted;
 use yash_syntax::syntax::Text;
 
 fn join(a: String, b: String) -> String {
@@ -190,7 +190,7 @@ impl XTrace {
 pub fn trace_fields(xtrace: Option<&mut XTrace>, fields: &[Field]) {
     if let Some(xtrace) = xtrace {
         for field in fields {
-            write!(xtrace.main(), "{} ", quote(&field.value)).unwrap();
+            write!(xtrace.main(), "{} ", quoted(&field.value)).unwrap();
         }
     }
 }

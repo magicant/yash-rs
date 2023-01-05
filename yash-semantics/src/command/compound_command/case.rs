@@ -32,13 +32,13 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
-use yash_quote::quote;
+use yash_quote::quoted;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
 
 async fn trace_subject(env: &mut Env, value: &str) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
-        write!(xtrace.main(), "case {} in ", quote(value)).unwrap();
+        write!(xtrace.main(), "case {} in ", quoted(value)).unwrap();
         print(env, xtrace).await;
     }
 }

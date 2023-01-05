@@ -36,7 +36,7 @@ use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
 use yash_env::variable::Variable;
 use yash_env::Env;
-use yash_quote::quote;
+use yash_quote::quoted;
 use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
 
@@ -104,7 +104,7 @@ pub async fn execute(
 
 async fn trace_values(env: &mut Env, name: &Field, values: &[Field]) {
     if let Some(mut xtrace) = XTrace::from_options(&env.options) {
-        write!(xtrace.main(), "for {} in ", quote(&name.value)).unwrap();
+        write!(xtrace.main(), "for {} in ", quoted(&name.value)).unwrap();
         trace_fields(Some(&mut xtrace), values);
         print(env, xtrace).await;
     }

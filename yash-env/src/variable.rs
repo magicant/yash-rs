@@ -114,24 +114,59 @@ impl Value {
 
     /// Quotes the value in a format suitable for re-parsing.
     ///
+    /// This function returns a temporary wrapper of `self`. To obtain a string
+    /// representation of the quoted value, you can use the `Display` or
+    /// `Into<Cow<str>>` implementation for the returned object.
+    ///
     /// See [`yash_quote`] for details of quoting.
     ///
     /// ```
     /// # use yash_env::variable::Value;
     /// let scalar = Value::scalar("foo bar");
-    /// assert_eq!(scalar.quote(), "'foo bar'");
+    /// assert_eq!(scalar.quote().to_string(), "'foo bar'");
     /// let array = Value::array(vec!["1", "", "'\\'"]);
-    /// assert_eq!(array.quote(), r#"(1 '' "'\\'")"#);
+    /// assert_eq!(array.quote().to_string(), r#"(1 '' "'\\'")"#);
     /// ```
-    pub fn quote(&self) -> Cow<str> {
-        match self {
-            Scalar(value) => yash_quote::quote(value),
-            Array(values) => Cow::Owned(format!(
+    pub fn quote(&self) -> QuotedValue {
+        QuotedValue::from(self)
+    }
+}
+
+/// Wrapper of [`Value`] for [quoting](Value::quote).
+#[derive(Clone, Copy, Debug)]
+pub struct QuotedValue<'a> {
+    value: &'a Value,
+}
+
+/// Writes a quoted version of the value to the formatter.
+impl<'a> std::fmt::Display for QuotedValue<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            Scalar(value) => yash_quote::quoted(value).fmt(f),
+            Array(values) => write!(
+                f,
                 "({})",
                 values
                     .iter()
-                    .format_with(" ", |value, f| f(&yash_quote::quote(value)))
-            )),
+                    .format_with(" ", |value, f| f(&yash_quote::quoted(value)))
+            ),
+        }
+    }
+}
+
+/// Wraps a value in `QuotedValue`.
+impl<'a> From<&'a Value> for QuotedValue<'a> {
+    fn from(value: &'a Value) -> Self {
+        QuotedValue { value }
+    }
+}
+
+/// Constructs a quoted string.
+impl<'a> From<QuotedValue<'a>> for Cow<'a, str> {
+    fn from(value: QuotedValue<'a>) -> Self {
+        match value.value {
+            Scalar(value) => yash_quote::quote(value),
+            Array(_values) => value.to_string().into(),
         }
     }
 }
