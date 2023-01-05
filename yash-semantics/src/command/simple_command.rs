@@ -19,14 +19,19 @@
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
+use crate::xtrace::print;
+use crate::xtrace::trace_fields;
+use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
+use assert_matches::assert_matches;
 use async_trait::async_trait;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
+use yash_env::builtin::Main;
 use yash_env::function::Function;
 use yash_env::io::print_error;
 use yash_env::semantics::Divert;
@@ -197,13 +202,14 @@ async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],
     export: bool,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let scope = if export {
         Scope::Volatile
     } else {
         Scope::Global
     };
-    match crate::assign::perform_assignments(env, assigns, scope, export).await {
+    match crate::assign::perform_assignments(env, assigns, scope, export, xtrace).await {
         Ok(exit_status) => Continue(exit_status),
         Err(error) => {
             error.handle(env).await?;
@@ -224,13 +230,18 @@ async fn execute_absent_target(
         let redir_results = env.run_in_subshell(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
-                let redir_exit_status = match env.perform_redirs(&*redirs).await {
+                let mut xtrace = XTrace::from_options(&env.options);
+
+                let redir_exit_status = match env.perform_redirs(&*redirs, xtrace.as_mut()).await {
                     Ok(exit_status) => exit_status,
                     Err(e) => {
                         e.handle(env).await?;
                         return Break(Divert::Exit(None));
                     }
                 };
+
+                print(env, xtrace).await;
+
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
@@ -252,7 +263,10 @@ async fn execute_absent_target(
         exit_status
     };
 
-    let assignment_exit_status = perform_assignments(env, assigns, false).await?;
+    // Perform assignments in the current shell
+    let mut xtrace = XTrace::from_options(&env.options);
+    let assignment_exit_status = perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+    print(env, xtrace).await;
     env.exit_status = assignment_exit_status.unwrap_or(redir_exit_status);
     Continue(())
 }
@@ -269,7 +283,8 @@ async fn execute_builtin(
     let is_special = builtin.r#type == Special;
     let env = &mut env.push_frame(Frame::Builtin { name, is_special });
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    let mut xtrace = XTrace::from_options(&env.options);
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         e.handle(env).await?;
         return match builtin.r#type {
             Special => Break(Divert::Interrupt(None)),
@@ -277,15 +292,29 @@ async fn execute_builtin(
         };
     };
 
+    async fn trace_and_execute(
+        env: &mut Env,
+        fields: Vec<Field>,
+        main: Main,
+        mut xtrace: Option<XTrace>,
+    ) -> (ExitStatus, Result) {
+        let name = assert_matches!(env.stack.last(), Some(Frame::Builtin { name, .. }) => name);
+        trace_fields(xtrace.as_mut(), std::slice::from_ref(name));
+        trace_fields(xtrace.as_mut(), &fields);
+        print(env, xtrace).await;
+
+        main(env, fields).await
+    }
+
     let (exit_status, abort) = match builtin.r#type {
         Special => {
-            perform_assignments(env, assigns, false).await?;
-            (builtin.execute)(env, fields).await
+            perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
+            trace_and_execute(env, fields, builtin.execute, xtrace).await
         }
         Intrinsic | NonIntrinsic => {
             let mut env = env.push_context(ContextType::Volatile);
-            perform_assignments(&mut env, assigns, true).await?;
-            (builtin.execute)(&mut env, fields).await
+            perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+            trace_and_execute(&mut env, fields, builtin.execute, xtrace).await
         }
     };
 
@@ -301,12 +330,16 @@ async fn execute_function(
     redirs: &[Redir],
 ) -> Result {
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    let mut xtrace = XTrace::from_options(&env.options);
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut outer = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut outer, assigns, true).await?;
+    perform_assignments(&mut outer, assigns, true, xtrace.as_mut()).await?;
+
+    trace_fields(xtrace.as_mut(), &fields);
+    print(&mut outer, xtrace).await;
 
     let mut inner = outer.push_context(ContextType::Regular);
 
@@ -335,15 +368,19 @@ async fn execute_external_utility(
 ) -> Result {
     let name = fields[0].clone();
     let location = name.origin.clone();
-    let args = to_c_strings(fields);
+
+    let mut xtrace = XTrace::from_options(&env.options);
 
     let env = &mut RedirGuard::new(env);
-    if let Err(e) = env.perform_redirs(redirs).await {
+    if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
         return e.handle(env).await;
     };
 
     let mut env = env.push_context(ContextType::Volatile);
-    perform_assignments(&mut env, assigns, true).await?;
+    perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
+
+    trace_fields(xtrace.as_mut(), &fields);
+    print(&mut env, xtrace).await;
 
     if path.to_bytes().is_empty() {
         print_error(
@@ -357,6 +394,7 @@ async fn execute_external_utility(
         return Continue(());
     }
 
+    let args = to_c_strings(fields);
     let subshell = env.run_in_subshell(move |env| {
         Box::pin(async move {
             env.traps.disable_internal_handlers(&mut env.system).ok();
@@ -1040,6 +1078,92 @@ mod tests {
             let stdout = stdout.borrow();
             assert_matches!(&stdout.body, FileBody::Regular { content, .. } => {
                 assert_eq!(from_utf8(content), Ok(""));
+            });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_absent_target() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options
+                .set(yash_env::option::XTrace, yash_env::option::On);
+
+            let command: syntax::SimpleCommand = "FOO=bar 3>/dev/null".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            assert_stderr(&state, |stderr| {
+                assert_eq!(stderr, "3>/dev/null\nFOO=bar\n");
+            });
+        });
+    }
+
+    #[test]
+    fn xtrace_for_builtin() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options
+            .set(yash_env::option::XTrace, yash_env::option::On);
+        let command: syntax::SimpleCommand = "foo=bar echo hello >/dev/null".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "foo=bar echo hello 1>/dev/null\n");
+        });
+    }
+
+    #[test]
+    fn xtrace_for_function() {
+        use yash_env::function::HashEntry;
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("for i in; do :; done".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        env.options
+            .set(yash_env::option::XTrace, yash_env::option::On);
+        let command: syntax::SimpleCommand = "x=hello foo bar <>/dev/null".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "x=hello foo bar 0<>/dev/null\nfor i in\n");
+        });
+    }
+
+    #[test]
+    fn xtrace_for_external_command() {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options
+                .set(yash_env::option::XTrace, yash_env::option::On);
+
+            let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
+            content.permissions.0 |= 0o100;
+            let content = Rc::new(RefCell::new(content));
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
+
+            let command: syntax::SimpleCommand =
+                "VAR=123 /some/file foo bar >/dev/null".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            assert_stderr(&state, |stderr| {
+                assert!(
+                    stderr.starts_with("VAR=123 /some/file foo bar 1>/dev/null\n"),
+                    "stderr = {:?}",
+                    stderr
+                )
             });
         });
     }

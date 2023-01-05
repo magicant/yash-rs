@@ -18,6 +18,8 @@
 
 use super::Command;
 use crate::redir::RedirGuard;
+use crate::xtrace::finish;
+use crate::xtrace::XTrace;
 use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
@@ -26,6 +28,19 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::Env;
 use yash_syntax::syntax;
+use yash_syntax::syntax::Redir;
+
+/// Performs redirections, printing their trace if required.
+async fn perform_redirs(
+    env: &mut RedirGuard<'_>,
+    redirs: &[Redir],
+) -> std::result::Result<Option<ExitStatus>, crate::redir::Error> {
+    let mut xtrace = XTrace::from_options(&env.options);
+    let result = env.perform_redirs(redirs, xtrace.as_mut()).await;
+    let xtrace = finish(env, xtrace).await;
+    env.print_error(&xtrace).await;
+    result
+}
 
 /// Executes the condition of an if/while/until command.
 async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
@@ -49,7 +64,7 @@ mod while_loop;
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
-        match env.perform_redirs(&self.redirs).await {
+        match perform_redirs(&mut env, &self.redirs).await {
             Ok(_) => self.command.execute(&mut env).await,
             Err(error) => {
                 error.handle(&mut env).await?;
@@ -133,6 +148,7 @@ impl Command for syntax::CompoundCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
@@ -199,6 +215,20 @@ mod tests {
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
             assert_eq!(from_utf8(content).unwrap(), "1\n2\n");
+        });
+    }
+
+    #[test]
+    fn tracing_redirections() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(yash_env::option::Option::XTrace, On);
+        let command: syntax::FullCompoundCommand = "{ echo X; } > /file < /file".parse().unwrap();
+        let _ = command.execute(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "1>/file 0</file\necho X\n");
         });
     }
 

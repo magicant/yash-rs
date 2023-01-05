@@ -17,6 +17,8 @@
 //! Assignment.
 
 use crate::expansion::expand_value;
+use crate::xtrace::XTrace;
+use std::fmt::Write;
 use yash_env::semantics::ExitStatus;
 use yash_env::variable::Variable;
 use yash_env::Env;
@@ -34,14 +36,29 @@ pub use yash_syntax::syntax::Assign;
 /// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
 /// The return value is the exit status of the last command substitution
 /// performed during the expansion of the assigned value, if any
+///
+/// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment word is
+/// written to its main buffer.
 pub async fn perform_assignment(
     env: &mut Env,
     assign: &Assign,
     scope: Scope,
     export: bool,
+    xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let name = assign.name.clone();
     let (value, exit_status) = expand_value(env, &assign.value).await?;
+
+    if let Some(xtrace) = xtrace {
+        write!(
+            xtrace.main(),
+            "{}={} ",
+            yash_quote::quote(&name),
+            value.quote()
+        )
+        .unwrap();
+    }
+
     let value = Variable {
         value: Some(value),
         quirk: None,
@@ -61,15 +78,20 @@ pub async fn perform_assignment(
 /// This function calls [`perform_assignment`] for each [`Assign`].
 /// The return value is the exit status of the last command substitution
 /// performed during the expansion of the assigned values, if any
+///
+/// If `xtrace` is `Some` instance of `XTrace`, the expanded assignment words
+/// are written to its main buffer.
 pub async fn perform_assignments(
     env: &mut Env,
     assigns: &[Assign],
     scope: Scope,
     export: bool,
+    mut xtrace: Option<&mut XTrace>,
 ) -> Result<Option<ExitStatus>> {
     let mut exit_status = None;
     for assign in assigns {
-        let new_exit_status = perform_assignment(env, assign, scope, export).await?;
+        let new_exit_status =
+            perform_assignment(env, assign, scope, export, xtrace.as_deref_mut()).await?;
         exit_status = new_exit_status.or(exit_status);
     }
     Ok(exit_status)
@@ -89,7 +111,7 @@ mod tests {
     fn perform_assignment_new_value() {
         let mut env = Env::new_virtual();
         let a: Assign = "foo=bar".parse().unwrap();
-        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false, None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -104,13 +126,13 @@ mod tests {
     fn perform_assignment_overwriting() {
         let mut env = Env::new_virtual();
         let a: Assign = "foo=bar".parse().unwrap();
-        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false, None)
             .now_or_never()
             .unwrap()
             .unwrap();
         assert_eq!(exit_status, None);
         let a: Assign = "foo=baz".parse().unwrap();
-        let exit_status = perform_assignment(&mut env, &a, Scope::Global, true)
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, true, None)
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -132,7 +154,7 @@ mod tests {
             .assign(Scope::Global, "v".to_string(), v)
             .unwrap();
         let a: Assign = "v=new".parse().unwrap();
-        let e = perform_assignment(&mut env, &a, Scope::Global, false)
+        let e = perform_assignment(&mut env, &a, Scope::Global, false, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -147,6 +169,27 @@ mod tests {
     }
 
     #[test]
+    fn perform_assignment_with_xtrace() {
+        let mut xtrace = XTrace::new();
+        let mut env = Env::new_virtual();
+
+        let a: Assign = "foo=bar${unset-&}".parse().unwrap();
+        let _ = perform_assignment(&mut env, &a, Scope::Global, false, Some(&mut xtrace))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let a: Assign = "one=1".parse().unwrap();
+        let _ = perform_assignment(&mut env, &a, Scope::Global, false, Some(&mut xtrace))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let result = xtrace.finish(&mut env).now_or_never().unwrap();
+        assert_eq!(result, "foo='bar&' one=1\n");
+    }
+
+    #[test]
     fn perform_assignments_exit_status() {
         in_virtual_system(|mut env, _pid, _state| async move {
             env.builtins.insert("return", return_builtin());
@@ -154,7 +197,7 @@ mod tests {
                 "a=A$(return -n 1)".parse().unwrap(),
                 "b=($(return -n 2))".parse().unwrap(),
             ];
-            let exit_status = perform_assignments(&mut env, &assigns, Scope::Global, false)
+            let exit_status = perform_assignments(&mut env, &assigns, Scope::Global, false, None)
                 .await
                 .unwrap();
             assert_eq!(exit_status, Some(ExitStatus(2)));

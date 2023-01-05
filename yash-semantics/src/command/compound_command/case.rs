@@ -20,8 +20,11 @@ use crate::expansion::attr::fnmatch::apply_escapes;
 use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
+use crate::xtrace::print;
+use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
+use std::fmt::Write;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::apply_errexit;
 use yash_env::semantics::ExitStatus;
@@ -29,8 +32,18 @@ use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
+use yash_quote::quote;
 use yash_syntax::syntax::CaseItem;
 use yash_syntax::syntax::Word;
+
+async fn trace_subject(env: &mut Env, value: &str) {
+    if let Some(mut xtrace) = XTrace::from_options(&env.options) {
+        write!(xtrace.main(), "case {} in ", quote(value)).unwrap();
+        print(env, xtrace).await;
+    }
+}
+// We don't trace expanded patterns since they need a quoting method different
+// from yash_quote::quote.
 
 fn config() -> Config {
     let mut config = Config::default();
@@ -45,6 +58,7 @@ pub async fn execute(env: &mut Env, subject: &Word, items: &[CaseItem]) -> Resul
         Ok((expansion, _exit_status)) => expansion,
         Err(error) => return apply_errexit(error.handle(env).await, env),
     };
+    trace_subject(env, &subject.value).await;
 
     'outer: for item in items {
         for pattern in &item.patterns {
@@ -340,6 +354,18 @@ mod tests {
         assert_eq!(result, Break(Divert::Return));
         assert_eq!(env.exit_status, ExitStatus(73));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    fn xtrace_of_case() {
+        let (mut env, state) = fixture();
+        env.options.set(yash_env::option::Option::XTrace, On);
+        let command: CompoundCommand =
+            "case ${unset-X} in (foo);; (bar | ${unset-X} | not_reached) esac"
+                .parse()
+                .unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| assert_eq!(stderr, "case X in\n"));
     }
 
     #[test]

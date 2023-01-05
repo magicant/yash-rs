@@ -20,8 +20,12 @@ use crate::assign::Error;
 use crate::assign::ErrorCause;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
+use crate::xtrace::print;
+use crate::xtrace::trace_fields;
+use crate::xtrace::XTrace;
 use crate::Command;
 use crate::Handle;
+use std::fmt::Write;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::apply_errexit;
 use yash_env::semantics::Divert;
@@ -32,6 +36,7 @@ use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
 use yash_env::variable::Variable;
 use yash_env::Env;
+use yash_quote::quote;
 use yash_syntax::syntax::List;
 use yash_syntax::syntax::Word;
 
@@ -69,6 +74,8 @@ pub async fn execute(
         }
     };
 
+    trace_values(env, &name, &values).await;
+
     let env = &mut env.push_frame(Frame::Loop);
 
     for Field { value, origin } in values {
@@ -93,6 +100,14 @@ pub async fn execute(
     }
 
     Continue(())
+}
+
+async fn trace_values(env: &mut Env, name: &Field, values: &[Field]) {
+    if let Some(mut xtrace) = XTrace::from_options(&env.options) {
+        write!(xtrace.main(), "for {} in ", quote(&name.value)).unwrap();
+        trace_fields(Some(&mut xtrace), values);
+        print(env, xtrace).await;
+    }
 }
 
 #[cfg(test)]
@@ -208,6 +223,20 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.stack[..], []);
+    }
+
+    #[test]
+    fn xtrace_of_for_loop() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.options.set(yash_env::option::Option::XTrace, On);
+        let command: CompoundCommand = r"for i in 1 \$ 3; do echo $i; done".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+        assert_stderr(&state, |stderr| {
+            assert_eq!(stderr, "for i in 1 '$' 3\necho 1\necho '$'\necho 3\n");
+        });
     }
 
     #[test]
