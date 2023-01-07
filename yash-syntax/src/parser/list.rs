@@ -22,14 +22,42 @@ use super::core::Result;
 use super::error::Error;
 use super::error::SyntaxError;
 use super::lex::Operator::{And, Newline, Semicolon};
-use super::lex::TokenId::Operator;
+use super::lex::TokenId::{self, EndOfInput, IoNumber, Operator, Token};
 use crate::syntax::Item;
 use crate::syntax::List;
-use std::rc::Rc;
-
-use super::lex::TokenId::EndOfInput;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
+
+fn error_type_for_trailing_token_in_command_line(token_id: TokenId) -> Option<SyntaxError> {
+    use super::lex::Keyword::*;
+    use super::lex::Operator::*;
+    use SyntaxError::*;
+    match token_id {
+        EndOfInput => None,
+        Token(None) | IoNumber => Some(MissingSeparator),
+        Token(Some(keyword)) => match keyword {
+            Bang | OpenBracketBracket | Case | For | Function | If | Until | While | OpenBrace => {
+                Some(MissingSeparator)
+            }
+            Do => Some(UnopenedLoop),
+            Done => Some(UnopenedDoClause),
+            Elif | Else | Fi | Then => Some(UnopenedIf),
+            Esac => Some(UnopenedCase),
+            In => Some(InAsCommandName),
+            CloseBrace => Some(UnopenedGrouping),
+        },
+        Operator(operator) => match operator {
+            And | AndAnd | Semicolon | Bar | BarBar => Some(InvalidCommandToken),
+            OpenParen => Some(MissingSeparator),
+            CloseParen => Some(UnopenedSubshell),
+            SemicolonSemicolon => Some(UnopenedCase),
+            Newline | Less | LessAnd | LessOpenParen | LessLess | LessLessDash | LessLessLess
+            | LessGreater | Greater | GreaterAnd | GreaterOpenParen | GreaterGreater
+            | GreaterGreaterBar | GreaterBar => unreachable!(),
+        },
+    }
+}
 
 impl Parser<'_, '_> {
     // There is no function that parses a single item because it would not be
@@ -112,12 +140,10 @@ impl Parser<'_, '_> {
 
         if !self.newline_and_here_doc_contents().await? {
             let next = self.peek_token().await?;
-            if next.id != EndOfInput {
-                // TODO Return a better error depending on the token id of the peeked token
-                return Err(Error {
-                    cause: SyntaxError::InvalidCommandToken.into(),
-                    location: next.word.location.clone(),
-                });
+            if let Some(syntax_error) = error_type_for_trailing_token_in_command_line(next.id) {
+                let cause = syntax_error.into();
+                let location = next.word.location.clone();
+                return Err(Error { cause, location });
             }
             if list.0.is_empty() {
                 return Ok(None);
@@ -325,8 +351,36 @@ mod tests {
     }
 
     #[test]
-    fn parser_command_line_wrong_delimiter() {
+    fn parser_command_line_wrong_delimiter_1() {
         let mut lexer = Lexer::from_memory("foo)", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let e = parser.command_line().now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::UnopenedSubshell));
+        assert_eq!(*e.location.code.value.borrow(), "foo)");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 3..4);
+    }
+
+    #[test]
+    fn parser_command_line_wrong_delimiter_2() {
+        let mut lexer = Lexer::from_memory("foo bar (", Source::Unknown);
+        let aliases = Default::default();
+        let mut parser = Parser::new(&mut lexer, &aliases);
+
+        let e = parser.command_line().now_or_never().unwrap().unwrap_err();
+        assert_eq!(e.cause, ErrorCause::Syntax(SyntaxError::MissingSeparator));
+        assert_eq!(*e.location.code.value.borrow(), "foo bar (");
+        assert_eq!(e.location.code.start_line_number.get(), 1);
+        assert_eq!(e.location.code.source, Source::Unknown);
+        assert_eq!(e.location.range, 8..9);
+    }
+
+    #[test]
+    fn parser_command_line_wrong_delimiter_3() {
+        let mut lexer = Lexer::from_memory("foo bar; ;", Source::Unknown);
         let aliases = Default::default();
         let mut parser = Parser::new(&mut lexer, &aliases);
 
@@ -335,10 +389,10 @@ mod tests {
             e.cause,
             ErrorCause::Syntax(SyntaxError::InvalidCommandToken)
         );
-        assert_eq!(*e.location.code.value.borrow(), "foo)");
+        assert_eq!(*e.location.code.value.borrow(), "foo bar; ;");
         assert_eq!(e.location.code.start_line_number.get(), 1);
         assert_eq!(e.location.code.source, Source::Unknown);
-        assert_eq!(e.location.range, 3..4);
+        assert_eq!(e.location.range, 9..10);
     }
 
     #[test]

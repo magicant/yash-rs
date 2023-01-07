@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0] - Unreleased
 
+### Added
+
+- Variants of `parser::SyntaxError`: `MissingSeparator`, `UnopenedGrouping`,
+  `UnopenedSubshell`, `UnopenedLoop`, `UnopenedDoClause`, `UnopenedIf`,
+  `UnopenedCase`, `InAsCommandName`
+
 ### Changed
 
+- `parser::Parser::command_line` to return the newly added variants of
+  `SyntaxError` instead of `InvalidCommandToken` depending on the type of
+  erroneous tokens.
 - Dependency versions
     - Rust 1.58.0 → 1.64.0
 

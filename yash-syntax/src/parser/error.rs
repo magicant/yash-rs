@@ -51,6 +51,8 @@ pub enum SyntaxError {
     UnclosedArith { opening_location: Location },
     /// A command begins with an inappropriate keyword or operator token.
     InvalidCommandToken,
+    /// A separator is missing between commands.
+    MissingSeparator,
     /// The file descriptor specified for a redirection cannot be used.
     FdOutOfRange,
     /// A redirection operator is missing its operand.
@@ -64,14 +66,22 @@ pub enum SyntaxError {
     UnclosedHereDocContent { redir_op_location: Location },
     /// An array assignment started with `=(` but lacks a closing `)`.
     UnclosedArrayValue { opening_location: Location },
+    /// A `}` appears without a matching `{`.
+    UnopenedGrouping,
     /// A grouping is not closed.
     UnclosedGrouping { opening_location: Location },
     /// A grouping contains no commands.
     EmptyGrouping,
+    /// A `)` appears without a matching `(`.
+    UnopenedSubshell,
     /// A subshell is not closed.
     UnclosedSubshell { opening_location: Location },
     /// A subshell contains no commands.
     EmptySubshell,
+    /// A `do` appears outside a loop.
+    UnopenedLoop,
+    /// A `done` appears outside a loop.
+    UnopenedDoClause,
     /// A do clause is not closed.
     UnclosedDoClause { opening_location: Location },
     /// A do clause contains no commands.
@@ -106,6 +116,8 @@ pub enum SyntaxError {
     EmptyElifBody,
     /// An else clause is empty.
     EmptyElse,
+    /// An `elif`, `else`, `then`, or `fi` appears outside an if command.
+    UnopenedIf,
     /// An if command is not closed.
     UnclosedIf { opening_location: Location },
     /// The case command is missing its subject.
@@ -122,6 +134,8 @@ pub enum SyntaxError {
     InvalidPattern,
     /// The first pattern of a case item is `esac`.
     EsacAsPattern,
+    /// An `esac` or `;;` appears outside a case command.
+    UnopenedCase,
     /// A case command is not closed.
     UnclosedCase { opening_location: Location },
     /// The `(` is not followed by `)` in a function definition.
@@ -130,6 +144,8 @@ pub enum SyntaxError {
     MissingFunctionBody,
     /// A function body is not a compound command.
     InvalidFunctionBody,
+    /// The keyword `in` is used as a command name.
+    InAsCommandName,
     /// A pipeline is missing after a `&&` or `||` token.
     MissingPipeline(AndOr),
     /// Two successive `!` tokens.
@@ -159,6 +175,7 @@ impl SyntaxError {
             UnclosedBackquote { .. } => "The backquote is not closed",
             UnclosedArith { .. } => "The arithmetic expansion is not closed",
             InvalidCommandToken => "The command starts with an inappropriate token",
+            MissingSeparator => "A separator is missing between the commands",
             FdOutOfRange => "The file descriptor is too large",
             MissingRedirOperand => "The redirection operator is missing its operand",
             MissingHereDocDelimiter => "The here-document operator is missing its delimiter",
@@ -167,6 +184,8 @@ impl SyntaxError {
                 "The delimiter to close the here-document content is missing"
             }
             UnclosedArrayValue { .. } => "The array assignment value is not closed",
+            UnopenedGrouping | UnopenedSubshell | UnopenedLoop | UnopenedDoClause | UnopenedIf
+            | UnopenedCase | InAsCommandName => "The compound command delimiter is unmatched",
             UnclosedGrouping { .. } => "The grouping is not closed",
             EmptyGrouping => "The grouping is missing its content",
             UnclosedSubshell { .. } => "The subshell is not closed",
@@ -244,11 +263,16 @@ impl SyntaxError {
             UnclosedBackquote { .. } => "expected '`'",
             UnclosedArith { .. } => "expected `))`",
             InvalidCommandToken => "does not begin a valid command",
+            MissingSeparator => "expected `;` or `&` before this token",
             FdOutOfRange => "unsupported file descriptor",
             MissingRedirOperand => "expected a redirection operand",
             MissingHereDocDelimiter => "expected a delimiter word",
             MissingHereDocContent => "content not found",
             UnclosedHereDocContent { .. } => "missing delimiter",
+            UnopenedGrouping => "no grouping command to close",
+            UnopenedSubshell => "no subshell to close",
+            UnopenedLoop => "not in a loop",
+            UnopenedDoClause => "no `do` clause to close",
             UnclosedDoClause { .. } => "expected `done`",
             MissingForName => "expected a variable name",
             InvalidForName => "not a valid variable name",
@@ -256,11 +280,14 @@ impl SyntaxError {
                 "expected `do ... done`"
             }
             IfMissingThen { .. } | ElifMissingThen { .. } => "expected `then ... fi`",
+            UnopenedIf => "not in an `if` command",
             UnclosedIf { .. } => "expected `fi`",
             MissingIn { .. } => "expected `in`",
             EsacAsPattern => "needs quoting",
+            UnopenedCase => "not in a `case` command",
             UnclosedCase { .. } => "expected `esac`",
             MissingFunctionBody | InvalidFunctionBody => "expected a compound command",
+            InAsCommandName => "cannot be used as a command name",
             DoubleNegation => "only one `!` allowed",
             BangAfterBar => "`!` not allowed here",
         }
