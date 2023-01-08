@@ -160,7 +160,9 @@ pub(crate) mod tests {
             Some(field) => field.value.parse().unwrap_or(2),
             None => 0,
         };
-        Box::pin(ready((ExitStatus(exit_status), divert)))
+        let mut result = yash_env::builtin::Result::new(ExitStatus(exit_status));
+        result.set_divert(divert);
+        Box::pin(ready(result))
     }
 
     /// Returns a minimal implementation of the `return` built-in.
@@ -176,10 +178,9 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
-        Box::pin(ready((
-            ExitStatus::SUCCESS,
-            Break(Divert::Break { count: count - 1 }),
-        )))
+        let mut result = yash_env::builtin::Result::new(ExitStatus::SUCCESS);
+        result.set_divert(Break(Divert::Break { count: count - 1 }));
+        Box::pin(ready(result))
     }
 
     /// Returns a minimal implementation of the `break` built-in.
@@ -195,10 +196,9 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
-        Box::pin(ready((
-            ExitStatus::SUCCESS,
-            Break(Divert::Continue { count: count - 1 }),
-        )))
+        let mut result = yash_env::builtin::Result::new(ExitStatus::SUCCESS);
+        result.set_divert(Break(Divert::Continue { count: count - 1 }));
+        Box::pin(ready(result))
     }
 
     /// Returns a minimal implementation of the `continue` built-in.
@@ -237,7 +237,7 @@ pub(crate) mod tests {
                     }
                 }
             }
-            (ExitStatus::SUCCESS, Continue(()))
+            Default::default()
         })
     }
 
@@ -259,7 +259,7 @@ pub(crate) mod tests {
                 Ok(_) => ExitStatus::SUCCESS,
                 Err(_) => ExitStatus::FAILURE,
             };
-            (result, Continue(()))
+            result.into()
         })
     }
 
@@ -291,7 +291,7 @@ pub(crate) mod tests {
                 Ok(_) => ExitStatus::SUCCESS,
                 Err(_) => ExitStatus::FAILURE,
             };
-            (result, Continue(()))
+            result.into()
         })
     }
 

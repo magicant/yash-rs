@@ -297,7 +297,7 @@ async fn execute_builtin(
         fields: Vec<Field>,
         main: Main,
         mut xtrace: Option<XTrace>,
-    ) -> (ExitStatus, Result) {
+    ) -> yash_env::builtin::Result {
         let name = assert_matches!(env.stack.last(), Some(Frame::Builtin { name, .. }) => name);
         trace_fields(xtrace.as_mut(), std::slice::from_ref(name));
         trace_fields(xtrace.as_mut(), &fields);
@@ -306,7 +306,7 @@ async fn execute_builtin(
         main(env, fields).await
     }
 
-    let (exit_status, abort) = match builtin.r#type {
+    let result = match builtin.r#type {
         Special => {
             perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
             trace_and_execute(env, fields, builtin.execute, xtrace).await
@@ -318,8 +318,9 @@ async fn execute_builtin(
         }
     };
 
-    env.exit_status = exit_status;
-    abort
+    // TODO Honor result.should_retain_redirs()
+    env.exit_status = result.exit_status();
+    result.divert()
 }
 
 async fn execute_function(
@@ -702,7 +703,7 @@ mod tests {
                     assert_eq!(name.value, "builtin");
                     assert!(!is_special);
                 });
-                (ExitStatus(0), Continue(()))
+                Default::default()
             })
         }
         fn special_main(
@@ -714,7 +715,7 @@ mod tests {
                     assert_eq!(name.value, "special");
                     assert!(is_special);
                 });
-                (ExitStatus(0), Continue(()))
+                Default::default()
             })
         }
 

@@ -151,14 +151,14 @@ pub trait Print {
     ///
     /// If an error occurs while printing, an error message is printed to the
     /// standard error and a non-zero exit status is returned.
-    async fn print(&mut self, text: &str) -> (ExitStatus, yash_env::semantics::Result);
+    async fn print(&mut self, text: &str) -> yash_env::builtin::Result;
 }
 
 #[async_trait(?Send)]
 impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
-    async fn print(&mut self, text: &str) -> (ExitStatus, yash_env::semantics::Result) {
+    async fn print(&mut self, text: &str) -> yash_env::builtin::Result {
         match self.try_print(text).await {
-            Ok(()) => (ExitStatus::SUCCESS, Continue(())),
+            Ok(()) => yash_env::builtin::Result::default(),
             Err(errno) => {
                 let message = Message {
                     r#type: AnnotationType::Error,
@@ -207,15 +207,14 @@ where
 /// `(ExitStatus::FAILURE, print_message(env, error).await)`.
 /// See [`print_message`] for details.
 #[inline]
-pub async fn print_failure_message<'a, E, F>(
-    env: &mut E,
-    error: F,
-) -> (ExitStatus, yash_env::semantics::Result)
+pub async fn print_failure_message<'a, E, F>(env: &mut E, error: F) -> yash_env::builtin::Result
 where
     E: BuiltinEnv + Stderr,
     F: Into<Message<'a>> + 'a,
 {
-    (ExitStatus::FAILURE, print_message(env, error).await)
+    let mut result = yash_env::builtin::Result::new(ExitStatus::FAILURE);
+    result.set_divert(print_message(env, error).await);
+    result
 }
 
 /// Prints an error message.
@@ -224,15 +223,14 @@ where
 /// `(ExitStatus::ERROR, print_message(env, error).await)`.
 /// See [`print_message`] for details.
 #[inline]
-pub async fn print_error_message<'a, E, F>(
-    env: &mut E,
-    error: F,
-) -> (ExitStatus, yash_env::semantics::Result)
+pub async fn print_error_message<'a, E, F>(env: &mut E, error: F) -> yash_env::builtin::Result
 where
     E: BuiltinEnv + Stderr,
     F: Into<Message<'a>> + 'a,
 {
-    (ExitStatus::ERROR, print_message(env, error).await)
+    let mut result = yash_env::builtin::Result::new(ExitStatus::ERROR);
+    result.set_divert(print_message(env, error).await);
+    result
 }
 
 #[cfg(test)]

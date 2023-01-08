@@ -65,7 +65,6 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::future::Future;
 use std::num::ParseIntError;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::JobSet;
@@ -196,7 +195,7 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
         };
     }
 
-    (exit_status, Continue(()))
+    exit_status.into()
 }
 
 /// Implementation of the wait built-in.
@@ -207,8 +206,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     if operands.is_empty() {
-        let exit_status = wait_for_all_jobs(env).await;
-        (exit_status, Continue(()))
+        wait_for_all_jobs(env).await.into()
     } else {
         wait_for_each_job(env, operands).await
     }
@@ -229,6 +227,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::job::Job;
     use yash_env::stack::Frame;
@@ -249,7 +248,7 @@ mod tests {
                 .unwrap();
 
             let result = builtin_body(&mut env, vec![]).await;
-            assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+            assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         })
     }
 
@@ -270,7 +269,7 @@ mod tests {
             }
 
             let result = builtin_body(&mut env, vec![]).await;
-            assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+            assert_eq!(result, Result::new(ExitStatus::SUCCESS));
             assert_eq!(env.jobs.len(), 0);
 
             let state = state.borrow();
@@ -296,7 +295,7 @@ mod tests {
         let index = env.jobs.add(job);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_eq!(env.jobs.get(index), None);
     }
 
@@ -308,7 +307,7 @@ mod tests {
         let index = env.jobs.add(Job::new(Pid::from_raw(1)));
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_eq!(env.jobs.get(index).unwrap().status, WaitStatus::StillAlive);
     }
 
@@ -323,7 +322,7 @@ mod tests {
 
             let args = Field::dummies([pid.to_string()]);
             let result = builtin_body(&mut env, args).await;
-            assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
+            assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
         })
     }
 
@@ -350,7 +349,7 @@ mod tests {
                 .map(|pid| Field::dummy(pid.to_string()))
                 .collect();
             let result = builtin_body(&mut env, args).await;
-            assert_eq!(result, (ExitStatus(6), Continue(())));
+            assert_eq!(result, Result::new(ExitStatus(6)));
             assert_eq!(env.jobs.len(), 0);
 
             let state = state.borrow();
@@ -377,7 +376,7 @@ mod tests {
 
         let args = Field::dummies([pid.to_string()]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus(17), Continue(())));
+        assert_eq!(result, Result::new(ExitStatus(17)));
         assert_eq!(env.jobs.get(index), None);
     }
 
@@ -390,7 +389,7 @@ mod tests {
 
         let args = Field::dummies(["19".to_string()]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
         assert_eq!(env.jobs.get(index), None);
     }
 
@@ -399,7 +398,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["9999999"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::NOT_FOUND, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
     }
 
     #[test]
@@ -414,7 +413,7 @@ mod tests {
         let args = Field::dummies(["abc"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::ERROR));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
@@ -430,7 +429,7 @@ mod tests {
         let args = Field::dummies(["0"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::ERROR));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 }

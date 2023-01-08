@@ -18,7 +18,6 @@
 
 use std::future::ready;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
@@ -54,7 +53,7 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
                     // TODO Better error message
                     // TODO Use Env rather than printing directly to stderr
                     eprintln!("cannot assign to read-only variable {}", name);
-                    return (ExitStatus::FAILURE, Continue(()));
+                    return ExitStatus::FAILURE.into();
                 }
             }
         } else {
@@ -62,7 +61,7 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    (ExitStatus::SUCCESS, Continue(()))
+    ExitStatus::SUCCESS.into()
 }
 
 /// Implementation of the readonly built-in.
@@ -89,7 +88,7 @@ mod tests {
         let location = args[0].origin.clone();
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let v = env.variables.get("foo").unwrap();
         assert_eq!(v.value, Some(Value::scalar("bar baz")));

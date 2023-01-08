@@ -92,7 +92,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::future::Future;
-    use std::ops::ControlFlow::{self, Break};
+    use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
@@ -300,22 +300,22 @@ mod tests {
         fn stub_builtin_condition(
             env: &mut Env,
             _args: Vec<Field>,
-        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
                 assert_matches!(
                     env.stack.as_slice(),
                     [Frame::Condition, Frame::Builtin { .. }]
                 );
-                (ExitStatus::SUCCESS, Continue(()))
+                Default::default()
             })
         }
         fn stub_builtin_no_condition(
             env: &mut Env,
             _args: Vec<Field>,
-        ) -> Pin<Box<dyn Future<Output = (ExitStatus, ControlFlow<Divert>)> + '_>> {
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
                 assert_matches!(env.stack.as_slice(), [Frame::Builtin { .. }]);
-                (ExitStatus::SUCCESS, Continue(()))
+                Default::default()
             })
         }
 

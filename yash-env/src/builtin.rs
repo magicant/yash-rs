@@ -22,6 +22,8 @@
 //! `yash_env` crate. For implementations of specific built-ins like `cd` and
 //! `export`, see the `yash_builtin` crate.
 
+#[cfg(doc)]
+use crate::semantics::Divert;
 use crate::semantics::ExitStatus;
 use crate::semantics::Field;
 use crate::Env;
@@ -61,7 +63,107 @@ pub enum Type {
 }
 
 /// Result of built-in utility execution.
-pub type Result = (ExitStatus, crate::semantics::Result);
+///
+/// The result type contains an exit status and optional flags that may affect
+/// the behavior of the shell following the built-in execution.
+// TODO derive Eq when ControlFlow implements Eq:
+// https://github.com/rust-lang/rust/pull/103084
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[must_use]
+pub struct Result {
+    exit_status: ExitStatus,
+    divert: crate::semantics::Result,
+    should_retain_redirs: bool,
+}
+
+impl Result {
+    /// Creates a new result.
+    pub const fn new(exit_status: ExitStatus) -> Self {
+        Self {
+            exit_status,
+            divert: crate::semantics::Result::Continue(()),
+            should_retain_redirs: false,
+        }
+    }
+
+    /// Returns the exit status of this result.
+    ///
+    /// The return value is the argument to the previous invocation of
+    /// [`new`](Self::new) or [`set_exit_status`](Self::set_exit_status).
+    #[inline]
+    #[must_use]
+    pub const fn exit_status(&self) -> ExitStatus {
+        self.exit_status
+    }
+
+    /// Sets the exit status of this result.
+    ///
+    /// See [`exit_status`](Self::exit_status()).
+    #[inline]
+    pub fn set_exit_status(&mut self, exit_status: ExitStatus) {
+        self.exit_status = exit_status
+    }
+
+    /// Returns an optional [`Divert`] to be taken.
+    ///
+    /// The return value is the argument to the previous invocation of
+    /// [`set_divert`](Self::set_divert). The default is `Continue(())`.
+    #[inline]
+    #[must_use]
+    pub const fn divert(&self) -> crate::semantics::Result {
+        self.divert
+    }
+
+    /// Sets a [`Divert`].
+    ///
+    /// See [`divert`](Self::divert()).
+    #[inline]
+    pub fn set_divert(&mut self, divert: crate::semantics::Result) {
+        self.divert = divert;
+    }
+
+    /// Tests whether the caller should retain redirections.
+    ///
+    /// Usually, the shell reverts redirections applied to a built-in after
+    /// executing it. However, redirections applied to a successful `exec`
+    /// built-in should persist. To make it happen, the `exec` built-in calls
+    /// [`retain_redirs`](Self::retain_redirs), and this function returns true.
+    /// In that case, the caller of the built-in should take appropriate actions
+    /// to preserve the effect of the redirections.
+    #[inline]
+    pub const fn should_retain_redirs(&self) -> bool {
+        self.should_retain_redirs
+    }
+
+    /// Flags that redirections applied to the built-in should persist.
+    ///
+    /// Calling this function makes
+    /// [`should_retain_redirs`](Self::should_retain_redirs) return true.
+    /// [`clear_redirs`](Self::clear_redirs) cancels the effect of this
+    /// function.
+    #[inline]
+    pub fn retain_redirs(&mut self) {
+        self.should_retain_redirs = true;
+    }
+
+    /// Cancels the effect of [`retain_redirs`](Self::retain_redirs).
+    #[inline]
+    pub fn clear_redirs(&mut self) {
+        self.should_retain_redirs = false;
+    }
+}
+
+impl Default for Result {
+    fn default() -> Self {
+        Self::new(ExitStatus::default())
+    }
+}
+
+impl From<ExitStatus> for Result {
+    fn from(exit_status: ExitStatus) -> Self {
+        Self::new(exit_status)
+    }
+}
 
 /// Type of functions that implement the behavior of a built-in.
 ///

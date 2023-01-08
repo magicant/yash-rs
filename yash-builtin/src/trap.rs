@@ -24,7 +24,6 @@ use crate::common::print_error_message;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
@@ -63,7 +62,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     match operands.len() {
         0 => return print_traps(env).await,
         2 => (),
-        _ => return (ExitStatus::ERROR, Continue(())),
+        _ => return Result::new(ExitStatus::ERROR),
         // TODO Support full syntax
     }
 
@@ -74,7 +73,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let signal = match signal_name.parse() {
         Ok(signal) => signal,
         // TODO Print error message for the unknown signal
-        Err(_) => return (ExitStatus::FAILURE, Continue(())),
+        Err(_) => return Result::new(ExitStatus::FAILURE),
     };
     let action = match value.as_str() {
         "-" => Trap::Default,
@@ -86,9 +85,9 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         .traps
         .set_trap(&mut env.system, signal, action, origin, false)
     {
-        Ok(()) => (ExitStatus::SUCCESS, Continue(())),
+        Ok(()) => Result::new(ExitStatus::SUCCESS),
         // TODO Print error message
-        Err(_) => (ExitStatus::ERROR, Continue(())),
+        Err(_) => Result::new(ExitStatus::ERROR),
     }
 }
 
@@ -126,7 +125,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let args = Field::dummies(["", "USR1"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
             process.signal_handling(Signal::SIGUSR1),
@@ -142,7 +141,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "USR2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
             process.signal_handling(Signal::SIGUSR2),
@@ -158,7 +157,7 @@ mod tests {
         let mut env = Env::with_system(system);
         let args = Field::dummies(["-", "PIPE"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
             process.signal_handling(Signal::SIGPIPE),
@@ -173,7 +172,7 @@ mod tests {
         let mut env = Env::with_system(system);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -186,7 +185,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "trap -- echo INT\n"));
     }
 
@@ -201,7 +200,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
         });
@@ -220,11 +219,10 @@ mod tests {
         let args = Field::dummies(["echo", "INT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            (ExitStatus::FAILURE, Break(Divert::Interrupt(None)))
-        );
+        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus::FAILURE);
+        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
 
@@ -240,7 +238,7 @@ mod tests {
         env.traps.enter_subshell(&mut env.system);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- '' TERM\n")
         });
@@ -260,7 +258,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- ls QUIT\ntrap -- '' TERM\n")
         });

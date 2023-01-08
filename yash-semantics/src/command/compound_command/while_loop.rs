@@ -194,7 +194,7 @@ mod tests {
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
                 assert_eq!(env.stack[0], Frame::Loop);
-                (ExitStatus::SUCCESS, Continue(()))
+                Default::default()
             })
         }
         let (mut env, _state) = fixture();
@@ -437,7 +437,7 @@ mod tests {
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
                 assert_eq!(env.stack[0], Frame::Loop);
-                (ExitStatus::SUCCESS, Continue(()))
+                Default::default()
             })
         }
         let (mut env, _state) = fixture();

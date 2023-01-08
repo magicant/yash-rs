@@ -72,7 +72,7 @@
 
 use std::future::ready;
 use std::future::Future;
-use std::ops::ControlFlow::{Break, Continue};
+use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
@@ -95,12 +95,11 @@ pub fn builtin_main_sync(_env: &mut Env, args: Vec<Field>) -> Result {
         Some(field) => field.value.parse().unwrap_or(2),
         None => 0,
     };
-    let flow = if no_return {
-        Continue(())
-    } else {
-        Break(Divert::Return)
-    };
-    (ExitStatus(exit_status), flow)
+    let mut result = Result::new(ExitStatus(exit_status));
+    if !no_return {
+        result.set_divert(Break(Divert::Return));
+    }
+    result
 }
 
 /// Implementation of the return built-in.
@@ -123,8 +122,10 @@ mod tests {
     fn returns_exit_status_specified_without_n_option() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["42"]);
-        let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus(42), Break(Divert::Return)));
+        let actual_result = builtin_main_sync(&mut env, args);
+        let mut expected_result = Result::new(ExitStatus(42));
+        expected_result.set_divert(Break(Divert::Return));
+        assert_eq!(actual_result, expected_result);
     }
 
     #[test]
@@ -132,7 +133,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["-n", "12"]);
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus(12), Continue(())));
+        assert_eq!(result, Result::new(ExitStatus(12)));
     }
 
     #[test]
@@ -140,6 +141,6 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["-n", "47"]);
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus(47), Continue(())));
+        assert_eq!(result, Result::new(ExitStatus(47)));
     }
 }

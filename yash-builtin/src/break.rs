@@ -166,7 +166,9 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         } else {
             Divert::Break { count }
         };
-        (ExitStatus::SUCCESS, Break(divert))
+        let mut result = Result::new(ExitStatus::SUCCESS);
+        result.set_divert(Break(divert));
+        result
     }
 }
 
@@ -185,6 +187,12 @@ mod tests {
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
 
+    fn result_with_divert(exit_status: ExitStatus, divert: Divert) -> Result {
+        let mut result = Result::new(exit_status);
+        result.set_divert(Break(divert));
+        result
+    }
+
     #[test]
     fn no_enclosing_loop() {
         let system = Box::new(VirtualSystem::new());
@@ -196,7 +204,10 @@ mod tests {
         });
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Break(Divert::Interrupt(None))));
+        assert_eq!(
+            result,
+            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
+        );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("cannot break"), "{:?}", stderr);
@@ -218,7 +229,7 @@ mod tests {
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 0 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
@@ -240,7 +251,7 @@ mod tests {
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 0 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
@@ -263,7 +274,7 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 0 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
@@ -286,7 +297,7 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 2 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 2 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
@@ -310,7 +321,7 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 3 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 3 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
@@ -329,7 +340,10 @@ mod tests {
         let args = Field::dummies(["0"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Break(Divert::Interrupt(None))));
+        assert_eq!(
+            result,
+            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
+        );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("not a positive integer"), "{:?}", stderr)
@@ -349,7 +363,10 @@ mod tests {
         let args = Field::dummies(["999999999999999999999999999999"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Break(Divert::Interrupt(None))));
+        assert_eq!(
+            result,
+            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
+        );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -367,7 +384,10 @@ mod tests {
         let args = Field::dummies(["1", "1"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::ERROR, Break(Divert::Interrupt(None))));
+        assert_eq!(
+            result,
+            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
+        );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("too many operands"), "{:?}", stderr)
@@ -389,7 +409,7 @@ mod tests {
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
-            (ExitStatus::SUCCESS, Break(Divert::Break { count: 0 }))
+            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| assert_eq!(stderr, ""));

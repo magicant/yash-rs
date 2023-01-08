@@ -18,7 +18,6 @@
 
 use std::future::ready;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
@@ -36,7 +35,7 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
             // TODO should print via IoEnv rather than directly to stdout
             println!("{}={}", &alias.0.name, &alias.0.replacement);
         }
-        return (ExitStatus::SUCCESS, Continue(()));
+        return ExitStatus::SUCCESS.into();
     }
 
     for Field { value, origin } in args {
@@ -51,7 +50,7 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    (ExitStatus::SUCCESS, Continue(()))
+    ExitStatus::SUCCESS.into()
 }
 
 /// Implementation of the alias built-in.
@@ -77,7 +76,7 @@ mod tests {
         let args = Field::dummies(["foo=bar baz"]);
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);
 
@@ -97,7 +96,7 @@ mod tests {
         let args = Field::dummies(["abc=xyz", "yes=no", "ls=ls --color"]);
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 3);
 
@@ -135,12 +134,12 @@ mod tests {
         let args = Field::dummies(["foo=1"]);
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let args = Field::dummies(["foo=2"]);
 
         let result = builtin_main_sync(&mut env, args);
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);
 

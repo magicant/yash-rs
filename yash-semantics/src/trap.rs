@@ -195,7 +195,7 @@ mod tests {
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
                 assert_matches!(&env.stack[0], Frame::Trap);
-                (ExitStatus::SUCCESS, Continue(()))
+                Default::default()
             })
         }
         let system = VirtualSystem::default();

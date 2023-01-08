@@ -125,7 +125,6 @@ use crate::common::BuiltinEnv;
 use crate::common::Print;
 use std::fmt::Write;
 use std::future::Future;
-use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::builtin::Result;
 #[cfg(doc)]
@@ -200,7 +199,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
                 params.last_assigned_location = Some(location);
             }
 
-            (ExitStatus::SUCCESS, Continue(()))
+            Result::new(ExitStatus::SUCCESS)
         }
 
         Err(error) => print_error_message(env, &error).await,
@@ -218,6 +217,7 @@ mod tests {
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
     use futures_util::FutureExt;
+    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
@@ -261,7 +261,7 @@ mod tests {
 
         let args = vec![];
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "bar='Hello, world!'\nbaz=(one '')\nfoo=value\n")
         });
@@ -277,7 +277,7 @@ mod tests {
 
         let args = Field::dummies(["-o"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
                 stdout,
@@ -316,7 +316,7 @@ xtrace           off
 
         let args = Field::dummies(["+o"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         // The output from `set +o` should be parsable
         let commands: List = assert_stdout(&state, |stdout| stdout.parse().unwrap());
@@ -345,7 +345,7 @@ xtrace           off
         let mut env = Env::new_virtual();
         let args = Field::dummies(["-a", "-n"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let mut options = OptionSet::default();
         options.set(AllExport, On);
@@ -363,7 +363,7 @@ xtrace           off
         let args = Field::dummies(["a", "b", "z"]);
 
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let v = env.variables.positional_params();
         assert_eq!(v.value, Some(Value::array(["a", "b", "z"])));

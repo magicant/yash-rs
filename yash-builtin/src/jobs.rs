@@ -94,7 +94,6 @@ use yash_env::job::id::parse_tail;
 use yash_env::job::id::FindError;
 use yash_env::job::Job;
 use yash_env::job::WaitStatusEx;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
@@ -206,7 +205,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
     let result = env.print(&accumulator.print).await;
 
-    if result.0 == ExitStatus::SUCCESS {
+    if result.exit_status().is_successful() {
         for index in accumulator.indices_reported {
             let mut job = env.jobs.get_mut(index).unwrap();
             if job.status.is_finished() {
@@ -232,12 +231,12 @@ mod tests {
     use crate::tests::assert_stdout;
     use assert_matches::assert_matches;
     use futures_util::future::FutureExt;
-    use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::job::Job;
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
+    use yash_env::semantics::ExitStatus;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
@@ -248,7 +247,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -266,7 +265,7 @@ mod tests {
         env.jobs.add(job);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
                 stdout,
@@ -309,7 +308,7 @@ mod tests {
         let i16 = env.jobs.add(job);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_matches!(env.jobs.get(i11), Some(_));
         assert_matches!(env.jobs.get(i12), Some(_));
@@ -335,7 +334,7 @@ mod tests {
 
         let args = Field::dummies(["%?first", "%2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
                 stdout,
@@ -367,7 +366,7 @@ mod tests {
 
         let args = Field::dummies(["%?first", "%?second"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert!(env.jobs.get(i42).is_some());
         assert!(env.jobs.get(i72).is_none());
@@ -390,7 +389,7 @@ mod tests {
 
         let args = Field::dummies(["?first", "2"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
                 stdout,
@@ -412,7 +411,7 @@ mod tests {
             is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("job not found"), "{:?}", stderr)
@@ -439,7 +438,7 @@ mod tests {
             is_special: false,
         });
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("ambiguous"), "{:?}", stderr)
@@ -462,7 +461,7 @@ mod tests {
             is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
             assert_eq!(status, WaitStatus::Exited(Pid::from_raw(10), 0));
         });
@@ -481,7 +480,7 @@ mod tests {
 
         let args = Field::dummies(["%?sec"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert!(env.jobs[i42].status_changed);
         assert!(!env.jobs[i72].status_changed);
@@ -499,7 +498,7 @@ mod tests {
             is_special: false,
         });
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::FAILURE, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert!(env.jobs[i72].status_changed);
     }
 
@@ -518,7 +517,7 @@ mod tests {
 
         let args = Field::dummies(["-l"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
                 stdout,
@@ -545,7 +544,7 @@ mod tests {
 
         let args = Field::dummies(["--verbose", "%?sec"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "[2] +    72 Stopped(SIGSTOP)     echo second\n")
         });
@@ -566,7 +565,7 @@ mod tests {
 
         let args = Field::dummies(["-p"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n72\n"));
     }
 
@@ -585,7 +584,7 @@ mod tests {
 
         let args = Field::dummies(["-pl"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n72\n"));
     }
 
@@ -605,7 +604,7 @@ mod tests {
 
         let args = Field::dummies(["--pgid-only", "%?sec"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
-        assert_eq!(result, (ExitStatus::SUCCESS, Continue(())));
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "72\n"));
     }
 }
