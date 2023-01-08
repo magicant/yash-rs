@@ -384,8 +384,7 @@ impl fmt::Debug for LexerCore<'_> {
             .field("state", &self.state)
             .field("source", &self.source)
             .field("index", &self.index)
-            .finish()
-        // TODO Call finish_non_exhaustive instead of finish
+            .finish_non_exhaustive()
     }
 }
 

@@ -82,9 +82,8 @@ pub struct Builtin {
 
 impl Debug for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO use finish_non_exhaustive
         f.debug_struct("Builtin")
             .field("type", &self.r#type)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
