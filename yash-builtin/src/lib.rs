@@ -22,6 +22,7 @@ pub mod alias;
 pub mod r#break;
 pub mod common;
 pub mod r#continue;
+pub mod exec;
 pub mod jobs;
 pub mod readonly;
 pub mod r#return;
@@ -57,6 +58,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: r#continue::builtin_main,
+        },
+    ),
+    (
+        "exec",
+        Builtin {
+            r#type: Special,
+            execute: exec::builtin_main,
         },
     ),
     (
@@ -189,5 +197,12 @@ pub(crate) mod tests {
         assert_matches!(&stderr.body, FileBody::Regular { content, .. } => {
             f(from_utf8(content).unwrap())
         })
+    }
+
+    #[test]
+    fn builtins_are_sorted() {
+        super::BUILTINS
+            .windows(2)
+            .for_each(|pair| assert!(pair[0].0 < pair[1].0, "disordered pair: {:?}", pair))
     }
 }
