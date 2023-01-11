@@ -835,7 +835,7 @@ mod tests {
             .unwrap()
             .unwrap();
         redir_env
-            .perform_redir(&"10< bar".parse().unwrap(), None)
+            .perform_redir(&format!("{MIN_SAVE_FD}< bar").parse().unwrap(), None)
             .now_or_never()
             .unwrap()
             .unwrap();
