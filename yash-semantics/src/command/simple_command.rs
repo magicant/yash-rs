@@ -318,7 +318,9 @@ async fn execute_builtin(
         }
     };
 
-    // TODO Honor result.should_retain_redirs()
+    if result.should_retain_redirs() {
+        env.preserve_redirs();
+    }
     env.exit_status = result.exit_status();
     result.divert()
 }
@@ -630,6 +632,51 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+
+        let file = state.borrow().file_system.get("/tmp/file").unwrap();
+        let file = file.borrow();
+        assert_matches!(&file.body, FileBody::Regular { content, .. } => {
+            assert_eq!(from_utf8(content), Ok("hello\n"));
+        });
+    }
+
+    #[test]
+    fn simple_command_by_default_reverts_redirections_to_builtin() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        let command: syntax::SimpleCommand = "echo hello >/tmp/file".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+        let command: syntax::SimpleCommand = "echo world".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+
+        assert_stdout(&state, |stdout| assert_eq!(stdout, "world\n"));
+    }
+
+    #[test]
+    fn simple_command_retains_redirections_to_builtin_if_requested() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert(
+            "exec",
+            Builtin {
+                r#type: yash_env::builtin::Type::Intrinsic,
+                execute: |_env, _args| {
+                    Box::pin(async {
+                        let mut result = yash_env::builtin::Result::default();
+                        result.retain_redirs();
+                        result
+                    })
+                },
+            },
+        );
+        let command: syntax::SimpleCommand = "exec >/tmp/file".parse().unwrap();
+        command.execute(&mut env).now_or_never().unwrap();
+        let command: syntax::SimpleCommand = "echo hello".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
 
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
