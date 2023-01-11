@@ -616,7 +616,11 @@ impl<'e> RedirGuard<'e> {
     /// This function closes internal backing file descriptors without restoring
     /// the original file descriptor state.
     pub fn preserve_redirs(&mut self) {
-        todo!()
+        for SavedFd { original: _, save } in self.saved_fds.drain(..) {
+            if let Some(save) = save {
+                let _: Result<_, _> = self.env.system.close(save);
+            }
+        }
     }
     // TODO Just closing save FDs in `preserve_redirs` would render incorrect
     // behavior in some situations. Assume `perform` is called twice, the
@@ -715,6 +719,36 @@ mod tests {
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
         assert_eq!(read_count, 1);
         assert_eq!(buffer[0], 17);
+    }
+
+    #[test]
+    fn preserving_fd() {
+        let system = VirtualSystem::new();
+        let mut state = system.state.borrow_mut();
+        state.file_system.save("file", Rc::default()).unwrap();
+        state
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .body = FileBody::new([17]);
+        drop(state);
+        let mut env = Env::with_system(Box::new(system));
+        let mut redir_env = RedirGuard::new(&mut env);
+        let redir = "< file".parse().unwrap();
+        redir_env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        redir_env.preserve_redirs();
+        drop(redir_env);
+
+        let mut buffer = [0; 2];
+        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
+        assert_eq!(read_count, 0);
+        let e = env.system.read(MIN_SAVE_FD, &mut buffer).unwrap_err();
+        assert_eq!(e, Errno::EBADF);
     }
 
     #[test]
