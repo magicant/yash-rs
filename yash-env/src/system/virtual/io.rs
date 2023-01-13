@@ -221,13 +221,7 @@ impl OpenFileDescription {
             _ => return Err(Errno::EINVAL),
         };
 
-        // TODO Use usize::checked_add_signed
-        fn add(a: usize, b: isize) -> Option<isize> {
-            isize::try_from(a).ok()?.checked_add(b)
-        }
-
-        let new_offset = add(base, offset).ok_or(Errno::EOVERFLOW)?;
-        let new_offset = usize::try_from(new_offset).map_err(|_| Errno::EINVAL)?;
+        let new_offset = base.checked_add_signed(offset).ok_or(Errno::EINVAL)?;
         self.offset = new_offset;
         Ok(new_offset)
     }
