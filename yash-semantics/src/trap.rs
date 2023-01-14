@@ -280,5 +280,6 @@ mod tests {
         assert_eq!(env.exit_status, ExitStatus(56));
     }
 
-    // TODO exit status on return/exit from trap
+    // TODO Should we suppress return/break/continue from trap?
+    // // TODO exit status on return/exit from trap
 }
