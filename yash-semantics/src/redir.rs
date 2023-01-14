@@ -366,19 +366,23 @@ fn copy_fd(
     };
 
     // Check if the FD is really readable or writable
-    if let Ok(flags) = env.system.fcntl_getfl(fd) {
-        let mode = flags & OFlag::O_ACCMODE;
-        if !(mode == expected_mode || mode == OFlag::O_RDWR) {
-            return Err(Error {
-                cause: if expected_mode == OFlag::O_RDONLY {
-                    ErrorCause::UnreadableFd(fd)
-                } else {
-                    assert_eq!(expected_mode, OFlag::O_WRONLY);
-                    ErrorCause::UnwritableFd(fd)
-                },
-                location: target.origin,
-            });
-        }
+    fn is_fd_valid(env: &mut Env, fd: Fd, expected_mode: OFlag) -> bool {
+        matches!(env.system.fcntl_getfl(fd), Ok(flags) if {
+            let mode = flags & OFlag::O_ACCMODE;
+            mode == expected_mode || mode == OFlag::O_RDWR
+        })
+    }
+    fn fd_error(fd: Fd, expected_mode: OFlag, target: Field) -> Result<(FdSpec, Location), Error> {
+        let cause = match expected_mode {
+            OFlag::O_RDONLY => ErrorCause::UnreadableFd(fd),
+            OFlag::O_WRONLY => ErrorCause::UnwritableFd(fd),
+            _ => unreachable!("unexpected mode {:?}", expected_mode),
+        };
+        let location = target.origin;
+        Err(Error { cause, location })
+    }
+    if !is_fd_valid(env, fd, expected_mode) {
+        return fd_error(fd, expected_mode, target);
     }
 
     Ok((FdSpec::Borrowed(fd), target.origin))
@@ -1365,6 +1369,21 @@ mod tests {
     }
 
     #[test]
+    fn fd_in_rejects_unopened_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+
+        let redir = "3<&3".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnreadableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
     fn keep_target_fd_open_on_error_in_fd_in() {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
@@ -1433,6 +1452,21 @@ mod tests {
             .unwrap();
 
         let redir = ">&3".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::UnwritableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
+    fn fd_out_rejects_unopened_fd() {
+        let mut env = Env::new_virtual();
+        let mut env = RedirGuard::new(&mut env);
+
+        let redir = "3>&3".parse().unwrap();
         let e = env
             .perform_redir(&redir, None)
             .now_or_never()
