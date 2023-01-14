@@ -33,6 +33,8 @@ pub use nix::errno::Errno;
 #[doc(no_inline)]
 pub use nix::fcntl::AtFlags;
 #[doc(no_inline)]
+pub use nix::fcntl::FdFlag;
+#[doc(no_inline)]
 pub use nix::fcntl::OFlag;
 #[doc(no_inline)]
 pub use nix::sys::select::FdSet;
@@ -127,11 +129,25 @@ pub trait System: Debug {
     /// This function returns `Ok(())` when the FD is already closed.
     fn close(&mut self, fd: Fd) -> nix::Result<()>;
 
-    /// Returns the file status flags for the file descriptor.
+    /// Returns the file status flags for the open file description.
+    ///
+    /// This is a thin wrapper around the `fcntl` system call.
     fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag>;
 
-    /// Sets the file status flags for the file descriptor.
+    /// Sets the file status flags for the open file description.
+    ///
+    /// This is a thin wrapper around the `fcntl` system call.
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()>;
+
+    /// Returns the attributes for the file descriptor.
+    ///
+    /// This is a thin wrapper around the `fcntl` system call.
+    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag>;
+
+    /// Sets attributes for the file descriptor.
+    ///
+    /// This is a thin wrapper around the `fcntl` system call.
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()>;
 
     /// Tests if a file descriptor is associated with a terminal device.
     fn isatty(&self, fd: Fd) -> nix::Result<bool>;
@@ -663,6 +679,12 @@ impl System for SharedSystem {
     }
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
         self.0.borrow_mut().fcntl_setfl(fd, flags)
+    }
+    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
+        self.0.borrow().fcntl_getfd(fd)
+    }
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
+        self.0.borrow_mut().fcntl_setfd(fd, flags)
     }
     fn isatty(&self, fd: Fd) -> nix::Result<bool> {
         self.0.borrow().isatty(fd)

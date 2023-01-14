@@ -50,6 +50,7 @@ pub use self::process::*;
 use super::AtFlags;
 use super::Dir;
 use super::Errno;
+use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::OFlag;
@@ -488,6 +489,23 @@ impl System for VirtualSystem {
     /// Current implementation does nothing but return `Ok(())`.
     fn fcntl_setfl(&mut self, _fd: Fd, _flags: OFlag) -> nix::Result<()> {
         // TODO do what this function should do
+        Ok(())
+    }
+
+    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
+        let process = self.current_process();
+        let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
+        Ok(if body.cloexec {
+            FdFlag::FD_CLOEXEC
+        } else {
+            FdFlag::empty()
+        })
+    }
+
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
+        let mut process = self.current_process_mut();
+        let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
+        body.cloexec = flags.contains(FdFlag::FD_CLOEXEC);
         Ok(())
     }
 
@@ -1420,6 +1438,27 @@ mod tests {
             Ok(OFlag::O_RDWR | OFlag::O_APPEND)
         );
         assert_eq!(system.fcntl_getfl(Fd(100)), Err(Errno::EBADF));
+    }
+
+    #[test]
+    fn fcntl_getfd_and_setfd() {
+        let mut system = VirtualSystem::new();
+
+        let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
+        assert_eq!(flags, FdFlag::empty());
+
+        system.fcntl_setfd(Fd::STDIN, FdFlag::FD_CLOEXEC).unwrap();
+
+        let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
+        assert_eq!(flags, FdFlag::FD_CLOEXEC);
+
+        let flags = system.fcntl_getfd(Fd::STDOUT).unwrap();
+        assert_eq!(flags, FdFlag::empty());
+
+        system.fcntl_setfd(Fd::STDIN, FdFlag::empty()).unwrap();
+
+        let flags = system.fcntl_getfd(Fd::STDIN).unwrap();
+        assert_eq!(flags, FdFlag::empty());
     }
 
     #[test]

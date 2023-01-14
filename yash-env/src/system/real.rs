@@ -22,6 +22,7 @@ use super::Dir;
 use super::DirEntry;
 use super::Env;
 use super::Errno;
+use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
 use super::Mode;
@@ -188,6 +189,14 @@ impl System for RealSystem {
 
     fn fcntl_setfl(&mut self, fd: Fd, flags: OFlag) -> nix::Result<()> {
         nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFL(flags)).map(drop)
+    }
+
+    fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_GETFD).map(FdFlag::from_bits_truncate)
+    }
+
+    fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
+        nix::fcntl::fcntl(fd.0, nix::fcntl::FcntlArg::F_SETFD(flags)).map(drop)
     }
 
     fn isatty(&self, fd: Fd) -> nix::Result<bool> {
