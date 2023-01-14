@@ -16,7 +16,7 @@
 
 //! Implementations for Command.
 
-mod and_or_list;
+mod and_or;
 mod compound_command;
 mod function_definition;
 mod item;
