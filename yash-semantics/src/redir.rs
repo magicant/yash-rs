@@ -59,6 +59,21 @@
 //! first. Then, you call [`RedirGuard::perform_redir`] to affect the target
 //! file descriptor. When you drop the `RedirGuard`, it undoes the effect to the
 //! file descriptor. See the documentation for [`RedirGuard`] for details.
+//!
+//! # The CLOEXEC flag
+//!
+//! The shell may open file descriptors to accomplish its tasks. For example,
+//! the dot built-in opens an FD to read a script file. Such FDs should be
+//! invisible to the user, so the shell should set the CLOEXEC flag on the FDs.
+//!
+//! When the user tries to redirect an FD with the CLOEXEC flag, it fails with a
+//! [`ReservedFd`](ErrorCause::ReservedFd) error to protect the FD from being
+//! overwritten.
+//!
+//! Note that POSIX requires FDs between 0 and 9 (inclusive) to be available for
+//! the user. The shell should move an FD to 10 or above before setting its
+//! CLOEXEC flag. Also note that the above described behavior about the CLOEXEC
+//! flag is specific to this implementation.
 
 use crate::expansion::expand_text;
 use crate::expansion::expand_word;
@@ -76,6 +91,7 @@ use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
+use yash_env::system::FdFlag;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
 use yash_env::system::SFlag;
@@ -114,6 +130,11 @@ pub enum ErrorCause {
     NulByte(NulError),
     /// The target file descriptor could not be modified for the redirection.
     FdNotOverwritten(Fd, Errno),
+    /// Use of an FD reserved by the shell
+    ///
+    /// This error occurs when a redirection tries to modify an existing FD with
+    /// the CLOEXEC flag set. See the [module documentation](self) for details.
+    ReservedFd(Fd),
     /// Error while opening a file.
     ///
     /// The `CString` is the pathname of the file that could not be opened.
@@ -137,7 +158,7 @@ impl ErrorCause {
         match self {
             Expansion(e) => e.message(),
             NulByte(_) => "nul byte found in the pathname",
-            FdNotOverwritten(_, _) => "cannot redirect the file descriptor",
+            FdNotOverwritten(_, _) | ReservedFd(_) => "cannot redirect the file descriptor",
             OpenFile(_, _) => "cannot open the file",
             MalformedFd(_, _) => "not a valid file descriptor",
             UnreadableFd(_) | UnwritableFd(_) => "cannot copy file descriptor",
@@ -154,6 +175,7 @@ impl ErrorCause {
             Expansion(e) => e.label(),
             NulByte(_) => "pathname should not contain a nul byte".into(),
             FdNotOverwritten(_, errno) => errno.desc().into(),
+            ReservedFd(fd) => format!("file descriptor {} reserved by shell", fd).into(),
             OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
             MalformedFd(value, error) => format!("{}: {}", value, error).into(),
             UnreadableFd(fd) => format!("{}: not a readable file descriptor", fd).into(),
@@ -170,6 +192,7 @@ impl std::fmt::Display for ErrorCause {
             Expansion(e) => e.fmt(f),
             NulByte(error) => error.fmt(f),
             FdNotOverwritten(_fd, errno) => errno.fmt(f),
+            ReservedFd(fd) => write!(f, "file descriptor {} is reserved by shell", fd),
             OpenFile(path, errno) => write!(
                 f,
                 "cannot open file `{}`: {}",
@@ -267,6 +290,10 @@ const MODE: Mode = Mode::S_IRUSR
     .union(Mode::S_IWGRP)
     .union(Mode::S_IROTH)
     .union(Mode::S_IWOTH);
+
+fn is_cloexec(env: &Env, fd: Fd) -> bool {
+    matches!(env.system.fcntl_getfd(fd), Ok(flags) if flags.contains(FdFlag::FD_CLOEXEC))
+}
 
 fn into_c_string_value_and_origin(field: Field) -> Result<(CString, Location), Error> {
     match CString::new(field.value) {
@@ -372,7 +399,11 @@ fn copy_fd(
             mode == expected_mode || mode == OFlag::O_RDWR
         })
     }
-    fn fd_error(fd: Fd, expected_mode: OFlag, target: Field) -> Result<(FdSpec, Location), Error> {
+    fn fd_mode_error(
+        fd: Fd,
+        expected_mode: OFlag,
+        target: Field,
+    ) -> Result<(FdSpec, Location), Error> {
         let cause = match expected_mode {
             OFlag::O_RDONLY => ErrorCause::UnreadableFd(fd),
             OFlag::O_WRONLY => ErrorCause::UnwritableFd(fd),
@@ -382,7 +413,15 @@ fn copy_fd(
         Err(Error { cause, location })
     }
     if !is_fd_valid(env, fd, expected_mode) {
-        return fd_error(fd, expected_mode, target);
+        return fd_mode_error(fd, expected_mode, target);
+    }
+
+    // Ensure the FD has no CLOEXEC flag
+    if is_cloexec(env, fd) {
+        return Err(Error {
+            cause: ErrorCause::ReservedFd(fd),
+            location: target.origin,
+        });
     }
 
     Ok((FdSpec::Borrowed(fd), target.origin))
@@ -448,8 +487,17 @@ async fn perform(
     redir: &Redir,
     xtrace: Option<&mut XTrace>,
 ) -> Result<(SavedFd, Option<ExitStatus>), Error> {
-    // Save the current open file description at `target_fd`
     let target_fd = redir.fd_or_default();
+
+    // Make sure target_fd doesn't have the CLOEXEC flag
+    if is_cloexec(env, target_fd) {
+        return Err(Error {
+            cause: ErrorCause::ReservedFd(target_fd),
+            location: redir.body.operand().location.clone(),
+        });
+    }
+
+    // Save the current open file description at target_fd to a new FD
     let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
@@ -626,12 +674,6 @@ impl<'e> RedirGuard<'e> {
             }
         }
     }
-    // TODO Just closing save FDs in `preserve_redirs` would render incorrect
-    // behavior in some situations. Assume `perform` is called twice, the
-    // second redirection's target FD is the first's save FD, and the inner
-    // `RedirGuard` is dropped by `preserve_redirs`. When the outer `RedirGuard`
-    // is dropped by `undo_redirs`, the undoing will move and close the FD that
-    // has been made permanent by `preserve_redirs`, which is not expected.
 }
 
 #[cfg(test)]
@@ -643,6 +685,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::RefCell;
+    use std::ffi::CStr;
     use std::rc::Rc;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
@@ -851,40 +894,27 @@ mod tests {
     }
 
     #[test]
-    fn undo_save_conflict() {
-        let system = VirtualSystem::new();
-        let mut state = system.state.borrow_mut();
-        let file = Rc::new(RefCell::new(INode::new([10])));
-        state.file_system.save("foo", file).unwrap();
-        let file = Rc::new(RefCell::new(INode::new([20])));
-        state.file_system.save("bar", file).unwrap();
-        state
-            .file_system
-            .get("/dev/stdin")
-            .unwrap()
-            .borrow_mut()
-            .body = FileBody::new([30]);
-        drop(state);
-        let mut env = Env::with_system(Box::new(system));
-        let mut redir_env = RedirGuard::new(&mut env);
-        redir_env
-            .perform_redir(&"< foo".parse().unwrap(), None)
-            .now_or_never()
-            .unwrap()
+    fn target_with_cloexec() {
+        let mut env = Env::new_virtual();
+        let fd = env
+            .system
+            .open(
+                CStr::from_bytes_with_nul(b"foo\0").unwrap(),
+                OFlag::O_WRONLY | OFlag::O_CREAT,
+                Mode::all(),
+            )
             .unwrap();
-        redir_env
-            .perform_redir(&format!("{MIN_SAVE_FD}< bar").parse().unwrap(), None)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        drop(redir_env);
+        env.system.fcntl_setfd(fd, FdFlag::FD_CLOEXEC).unwrap();
 
-        let mut buffer = [0; 1];
-        let e = env.system.read(MIN_SAVE_FD, &mut buffer).unwrap_err();
-        assert_eq!(e, Errno::EBADF);
-        let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
-        assert_eq!(read_count, 1);
-        assert_eq!(buffer, [30]);
+        let mut env = RedirGuard::new(&mut env);
+        let redir = format!("{fd}> bar").parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::ReservedFd(fd));
+        assert_eq!(e.location, redir.body.operand().location);
     }
 
     #[test]
@@ -1384,6 +1414,22 @@ mod tests {
     }
 
     #[test]
+    fn fd_in_rejects_fd_with_cloexec() {
+        let mut env = Env::new_virtual();
+        env.system.fcntl_setfd(Fd(0), FdFlag::FD_CLOEXEC).unwrap();
+
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "3<& 0".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::ReservedFd(Fd(0)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
     fn keep_target_fd_open_on_error_in_fd_in() {
         let mut env = Env::new_virtual();
         let mut env = RedirGuard::new(&mut env);
@@ -1473,6 +1519,22 @@ mod tests {
             .unwrap()
             .unwrap_err();
         assert_eq!(e.cause, ErrorCause::UnwritableFd(Fd(3)));
+        assert_eq!(e.location, redir.body.operand().location);
+    }
+
+    #[test]
+    fn fd_out_rejects_fd_with_cloexec() {
+        let mut env = Env::new_virtual();
+        env.system.fcntl_setfd(Fd(1), FdFlag::FD_CLOEXEC).unwrap();
+
+        let mut env = RedirGuard::new(&mut env);
+        let redir = "4>& 1".parse().unwrap();
+        let e = env
+            .perform_redir(&redir, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(e.cause, ErrorCause::ReservedFd(Fd(1)));
         assert_eq!(e.location, redir.body.operand().location);
     }
 
