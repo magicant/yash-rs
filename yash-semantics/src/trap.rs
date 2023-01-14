@@ -55,7 +55,11 @@ use yash_syntax::parser::lex::Lexer;
 use yash_syntax::source::Source;
 
 fn in_trap(env: &Env) -> bool {
-    env.stack.iter().any(|frame| frame == &Frame::Trap)
+    env.stack
+        .iter()
+        .rev()
+        .take_while(|frame| **frame != Frame::Subshell)
+        .any(|frame| *frame == Frame::Trap)
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -67,7 +71,8 @@ fn in_trap(env: &Env) -> bool {
 /// If we are already running a trap, this function does not run any traps to
 /// prevent unintended behavior of trap actions. Most shell script writers do
 /// not care for the reentrance of trap actions, so we should not assume they
-/// are reentrant.
+/// are reentrant. As an exception, this function does run traps in a subshell
+/// executed in a trap.
 pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
     env.poll_signals();
 
@@ -185,7 +190,18 @@ mod tests {
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
 
-    // TODO still allow reentrance if in subshell in trap
+    #[test]
+    fn allow_reentrance_in_subshell() {
+        let (mut env, system) = signal_env();
+        raise_signal(&system, Signal::SIGINT);
+        let mut env = env.push_frame(Frame::Trap);
+        let mut env = env.push_frame(Frame::Subshell);
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "trapped\n"));
+    }
 
     #[test]
     fn stack_frame_in_trap_action() {
