@@ -47,7 +47,7 @@ use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
-use yash_env::trap::Trap;
+use yash_env::trap::Action;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -82,7 +82,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
     }
 
     while let Some((signal, state)) = env.traps.take_caught_signal() {
-        let code = if let Trap::Command(command) = &state.action {
+        let code = if let Action::Command(command) = &state.action {
             command.clone()
         } else {
             continue;
@@ -116,8 +116,8 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::trap::Action;
     use yash_env::trap::Signal;
-    use yash_env::trap::Trap;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -130,7 +130,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGINT,
-                Trap::Command("echo trapped".into()),
+                Action::Command("echo trapped".into()),
                 Location::dummy(""),
                 false,
             )
@@ -139,7 +139,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGUSR1,
-                Trap::Command("return 56".into()),
+                Action::Command("return 56".into()),
                 Location::dummy(""),
                 false,
             )
@@ -222,7 +222,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGINT,
-                Trap::Command("check".into()),
+                Action::Command("check".into()),
                 Location::dummy(""),
                 false,
             )
@@ -252,7 +252,7 @@ mod tests {
                 .set_trap(
                     &mut env.system,
                     signal,
-                    Trap::Command("echo $?; echo $?".into()),
+                    Action::Command("echo $?; echo $?".into()),
                     Location::dummy(""),
                     false,
                 )

@@ -176,8 +176,8 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::trap::Action;
     use yash_env::trap::Signal;
-    use yash_env::trap::Trap;
     use yash_syntax::source::Location;
     use yash_syntax::source::Source;
 
@@ -305,7 +305,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGUSR1,
-                Trap::Command("echo USR1".into()),
+                Action::Command("echo USR1".into()),
                 Location::dummy(""),
                 false,
             )

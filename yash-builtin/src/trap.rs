@@ -28,7 +28,7 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::trap::Trap;
+use yash_env::trap::Action;
 use yash_env::Env;
 use yash_quote::quoted;
 
@@ -42,9 +42,9 @@ pub async fn print_traps(env: &mut Env) -> Result {
             (None, None) => continue,
         };
         let command = match &trap.action {
-            Trap::Default => continue,
-            Trap::Ignore => "",
-            Trap::Command(command) => command,
+            Action::Default => continue,
+            Action::Ignore => "",
+            Action::Command(command) => command,
         };
         let signal = &signal.as_str()[3..];
         writeln!(output, "trap -- {} {}", quoted(command), signal).ok();
@@ -76,9 +76,9 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
         Err(_) => return Result::new(ExitStatus::FAILURE),
     };
     let action = match value.as_str() {
-        "-" => Trap::Default,
-        "" => Trap::Ignore,
-        _ => Trap::Command(value.into()),
+        "-" => Action::Default,
+        "" => Action::Ignore,
+        _ => Action::Command(value.into()),
     };
 
     match env

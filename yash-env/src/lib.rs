@@ -498,7 +498,7 @@ mod tests {
     use crate::job::Job;
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
-    use crate::trap::Trap;
+    use crate::trap::Action;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
@@ -546,7 +546,7 @@ mod tests {
                 .set_trap(
                     &mut env.system,
                     Signal::SIGCHLD,
-                    Trap::Command("".into()),
+                    Action::Command("".into()),
                     Location::dummy(""),
                     false,
                 )
@@ -572,7 +572,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGCHLD,
-                Trap::Command("".into()),
+                Action::Command("".into()),
                 Location::dummy(""),
                 false,
             )
@@ -691,7 +691,7 @@ mod tests {
                 .set_trap(
                     &mut env.system,
                     Signal::SIGCHLD,
-                    Trap::Command("echo foo".into()),
+                    Action::Command("echo foo".into()),
                     Location::dummy(""),
                     false,
                 )
@@ -705,7 +705,7 @@ mod tests {
                         );
                         assert_matches!(
                             &trap_state.action,
-                            Trap::Command(body) => assert_eq!(&**body, "echo foo")
+                            Action::Command(body) => assert_eq!(&**body, "echo foo")
                         );
                         Continue(())
                     })

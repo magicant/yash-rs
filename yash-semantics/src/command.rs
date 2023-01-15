@@ -89,8 +89,8 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::trap::Action;
     use yash_env::trap::Signal;
-    use yash_env::trap::Trap;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
@@ -103,7 +103,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGUSR1,
-                Trap::Command("echo USR1".into()),
+                Action::Command("echo USR1".into()),
                 Location::dummy(""),
                 false,
             )
