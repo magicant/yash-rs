@@ -705,7 +705,7 @@ mod tests {
                         );
                         assert_matches!(
                             &trap_state.action,
-                            Trap::Command(body) => assert_eq!(body, "echo foo")
+                            Trap::Command(body) => assert_eq!(&**body, "echo foo")
                         );
                         Continue(())
                     })

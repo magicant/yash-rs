@@ -78,7 +78,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let action = match value.as_str() {
         "-" => Trap::Default,
         "" => Trap::Ignore,
-        _ => Trap::Command(value),
+        _ => Trap::Command(value.into()),
     };
 
     match env

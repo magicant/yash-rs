@@ -130,7 +130,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGINT,
-                Trap::Command("echo trapped".to_string()),
+                Trap::Command("echo trapped".into()),
                 Location::dummy(""),
                 false,
             )
@@ -139,7 +139,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGUSR1,
-                Trap::Command("return 56".to_string()),
+                Trap::Command("return 56".into()),
                 Location::dummy(""),
                 false,
             )
@@ -222,7 +222,7 @@ mod tests {
             .set_trap(
                 &mut env.system,
                 Signal::SIGINT,
-                Trap::Command("check".to_string()),
+                Trap::Command("check".into()),
                 Location::dummy(""),
                 false,
             )
@@ -252,7 +252,7 @@ mod tests {
                 .set_trap(
                     &mut env.system,
                     signal,
-                    Trap::Command("echo $?; echo $?".to_string()),
+                    Trap::Command("echo $?; echo $?".into()),
                     Location::dummy(""),
                     false,
                 )

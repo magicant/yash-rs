@@ -35,6 +35,7 @@ use crate::system::{Errno, SignalHandling};
 use crate::system::{SharedSystem, System};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use yash_syntax::source::Location;
 
 #[doc(no_inline)]
@@ -68,7 +69,7 @@ pub enum Trap {
     Ignore,
 
     /// Executes a command string.
-    Command(String),
+    Command(Rc<str>),
 }
 
 impl Default for Trap {
@@ -517,7 +518,7 @@ mod tests {
     fn setting_trap_to_command() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command("echo".to_string());
+        let action = Trap::Command("echo".into());
         let origin = Location::dummy("origin");
         let result = trap_set.set_trap(
             &mut system,
@@ -645,7 +646,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
 
-        let command = Trap::Command("echo".to_string());
+        let command = Trap::Command("echo".into());
         let origin_2 = Location::dummy("bar");
         let result = trap_set.set_trap(
             &mut system,
@@ -724,7 +725,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        let command = Trap::Command("echo".to_string());
+        let command = Trap::Command("echo".into());
         let origin_2 = Location::dummy("bar");
         trap_set
             .set_trap(
@@ -764,7 +765,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        let command = Trap::Command("echo".to_string());
+        let command = Trap::Command("echo".into());
         let origin_2 = Location::dummy("bar");
         trap_set
             .set_trap(
@@ -796,13 +797,13 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo".to_string());
+        let command = Trap::Command("echo".into());
         trap_set
             .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         trap_set.enter_subshell(&mut system);
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("ls".to_string());
+        let command = Trap::Command("ls".into());
         trap_set
             .set_trap(
                 &mut system,
@@ -826,7 +827,7 @@ mod tests {
     fn entering_subshell_resets_command_traps() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command(String::new());
+        let action = Trap::Command("".into());
         let origin = Location::dummy("origin");
         trap_set
             .set_trap(
@@ -893,7 +894,7 @@ mod tests {
     fn entering_subshell_with_internal_handler() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command(String::new());
+        let action = Trap::Command("".into());
         let origin = Location::dummy("origin");
         trap_set
             .set_trap(
@@ -929,18 +930,18 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo 1".to_string());
+        let command = Trap::Command("echo 1".into());
         trap_set
             .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("echo 2".to_string());
+        let command = Trap::Command("echo 2".into());
         trap_set
             .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
         trap_set.enter_subshell(&mut system);
 
-        let command = Trap::Command("echo 9".to_string());
+        let command = Trap::Command("echo 9".into());
         let origin_3 = Location::dummy("qux");
         trap_set
             .set_trap(
@@ -979,12 +980,12 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo 1".to_string());
+        let command = Trap::Command("echo 1".into());
         trap_set
             .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("echo 2".to_string());
+        let command = Trap::Command("echo 2".into());
         trap_set
             .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
