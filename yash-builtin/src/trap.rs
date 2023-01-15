@@ -83,7 +83,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
     match env
         .traps
-        .set_trap(&mut env.system, signal, action, origin, false)
+        .set_action(&mut env.system, signal, action, origin, false)
     {
         Ok(()) => Result::new(ExitStatus::SUCCESS),
         // TODO Print error message

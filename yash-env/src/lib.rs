@@ -543,7 +543,7 @@ mod tests {
     fn wait_for_signal_remembers_signal_in_trap_set() {
         in_virtual_system(|mut env, pid, state| async move {
             env.traps
-                .set_trap(
+                .set_action(
                     &mut env.system,
                     Signal::SIGCHLD,
                     Action::Command("".into()),
@@ -569,7 +569,7 @@ mod tests {
         let shared_system = SharedSystem::new(Box::new(system.clone()));
         let mut env = Env::with_system(Box::new(shared_system));
         env.traps
-            .set_trap(
+            .set_action(
                 &mut env.system,
                 Signal::SIGCHLD,
                 Action::Command("".into()),
@@ -688,7 +688,7 @@ mod tests {
     fn trap_reset_in_subshell() {
         in_virtual_system(|mut env, _pid, _state| async move {
             env.traps
-                .set_trap(
+                .set_action(
                     &mut env.system,
                     Signal::SIGCHLD,
                     Action::Command("echo foo".into()),

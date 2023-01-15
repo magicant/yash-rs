@@ -100,7 +100,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
         env.builtins.insert("echo", echo_builtin());
         env.traps
-            .set_trap(
+            .set_action(
                 &mut env.system,
                 Signal::SIGUSR1,
                 Action::Command("echo USR1".into()),

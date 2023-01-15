@@ -127,7 +127,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
         env.traps
-            .set_trap(
+            .set_action(
                 &mut env.system,
                 Signal::SIGINT,
                 Action::Command("echo trapped".into()),
@@ -136,7 +136,7 @@ mod tests {
             )
             .unwrap();
         env.traps
-            .set_trap(
+            .set_action(
                 &mut env.system,
                 Signal::SIGUSR1,
                 Action::Command("return 56".into()),
@@ -219,7 +219,7 @@ mod tests {
         let r#type = yash_env::builtin::Type::Intrinsic;
         env.builtins.insert("check", Builtin { r#type, execute });
         env.traps
-            .set_trap(
+            .set_action(
                 &mut env.system,
                 Signal::SIGINT,
                 Action::Command("check".into()),
@@ -249,7 +249,7 @@ mod tests {
         let (mut env, system) = signal_env();
         for signal in [Signal::SIGUSR1, Signal::SIGUSR2] {
             env.traps
-                .set_trap(
+                .set_action(
                     &mut env.system,
                     signal,
                     Action::Command("echo $?; echo $?".into()),
