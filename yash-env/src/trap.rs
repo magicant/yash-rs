@@ -212,7 +212,7 @@ pub struct TrapSet {
 
 // TODO Extend internal handlers for other signals
 impl TrapSet {
-    /// Returns the trap action for a signal.
+    /// Returns the current state for a signal.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
@@ -220,7 +220,7 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
+    pub fn get_state(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
         match self.signals.get(&signal) {
             None => (None, None),
             Some(state) => {
@@ -246,7 +246,7 @@ impl TrapSet {
     ///
     /// `origin` should be the location of the command performing this trap
     /// update. It is only informative: It does not affect the signal handling
-    /// behavior and can be referenced later by [`get_trap`](Self::get_trap).
+    /// behavior and can be referenced later by [`get_state`](Self::get_state).
     ///
     /// This function clears all parent states remembered when [entering a
     /// subshell](Self::enter_subshell), not only for `signal` but also for
@@ -342,7 +342,7 @@ impl TrapSet {
     ///
     /// The trap set will remember the original trap states as the parent
     /// states. You can get them from the second return value of
-    /// [`get_trap`](Self::get_trap) or the third item of tuples yielded by an
+    /// [`get_state`](Self::get_state) or the third item of tuples yielded by an
     /// [iterator](Self::iter).
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     fn default_trap() {
         let trap_set = TrapSet::default();
-        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGCHLD), (None, None));
     }
 
     #[test]
@@ -498,7 +498,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -529,7 +529,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action,
@@ -564,7 +564,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Default,
@@ -594,7 +594,7 @@ mod tests {
         let result = trap_set.set_trap(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetTrapError::InitiallyIgnored));
 
-        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGCHLD), (None, None));
         assert_eq!(
             system.0[&Signal::SIGCHLD],
             crate::system::SignalHandling::Ignore
@@ -616,7 +616,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -658,7 +658,7 @@ mod tests {
         assert_eq!(result, Ok(()));
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR1),
+            trap_set.get_state(Signal::SIGUSR1),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -669,7 +669,7 @@ mod tests {
             )
         );
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR2),
+            trap_set.get_state(Signal::SIGUSR2),
             (
                 Some(&TrapState {
                     action: command,
@@ -696,7 +696,7 @@ mod tests {
         let origin = Location::dummy("origin");
         let result = trap_set.set_trap(&mut system, Signal::SIGKILL, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetTrapError::SIGKILL));
-        assert_eq!(trap_set.get_trap(Signal::SIGKILL), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGKILL), (None, None));
         assert_eq!(system.0.get(&Signal::SIGKILL), None);
     }
 
@@ -707,7 +707,7 @@ mod tests {
         let origin = Location::dummy("origin");
         let result = trap_set.set_trap(&mut system, Signal::SIGSTOP, Action::Ignore, origin, false);
         assert_eq!(result, Err(SetTrapError::SIGSTOP));
-        assert_eq!(trap_set.get_trap(Signal::SIGSTOP), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGSTOP), (None, None));
         assert_eq!(system.0.get(&Signal::SIGSTOP), None);
     }
 
@@ -841,7 +841,7 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 None,
                 Some(&TrapState {
@@ -874,7 +874,7 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -909,7 +909,7 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 None,
                 Some(&TrapState {
@@ -954,7 +954,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR1),
+            trap_set.get_state(Signal::SIGUSR1),
             (
                 Some(&TrapState {
                     action: command,
@@ -964,7 +964,7 @@ mod tests {
                 None
             )
         );
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR2), (None, None));
         assert_eq!(
             system.0[&Signal::SIGUSR1],
             crate::system::SignalHandling::Catch
@@ -992,8 +992,8 @@ mod tests {
         trap_set.enter_subshell(&mut system);
         trap_set.enter_subshell(&mut system);
 
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR1), (None, None));
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR1), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR2), (None, None));
         assert_eq!(
             system.0[&Signal::SIGUSR1],
             crate::system::SignalHandling::Default
@@ -1022,9 +1022,9 @@ mod tests {
         trap_set.catch_signal(Signal::SIGCHLD);
         trap_set.catch_signal(Signal::SIGINT);
 
-        let trap_state = trap_set.get_trap(Signal::SIGINT).0.unwrap();
+        let trap_state = trap_set.get_state(Signal::SIGINT).0.unwrap();
         assert!(trap_state.pending, "{:?}", trap_state);
-        let trap_state = trap_set.get_trap(Signal::SIGTERM).0.unwrap();
+        let trap_state = trap_set.get_state(Signal::SIGTERM).0.unwrap();
         assert!(!trap_state.pending, "{:?}", trap_state);
     }
 
@@ -1178,7 +1178,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Ignore,
@@ -1212,7 +1212,7 @@ mod tests {
         trap_set.disable_internal_handlers(&mut system).unwrap();
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action: Action::Ignore,

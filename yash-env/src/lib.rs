@@ -559,7 +559,7 @@ mod tests {
             }
             env.wait_for_signal(Signal::SIGCHLD).await;
 
-            let trap_state = env.traps.get_trap(Signal::SIGCHLD).0.unwrap();
+            let trap_state = env.traps.get_state(Signal::SIGCHLD).0.unwrap();
             assert!(trap_state.pending);
         })
     }
@@ -700,7 +700,7 @@ mod tests {
                 .start_subshell(|env| {
                     Box::pin(async move {
                         let trap_state = assert_matches!(
-                            env.traps.get_trap(Signal::SIGCHLD),
+                            env.traps.get_state(Signal::SIGCHLD),
                             (None, Some(trap_state)) => trap_state
                         );
                         assert_matches!(
