@@ -142,12 +142,12 @@ enum Setting {
     /// shell has inherited from the pre-exec process is `SIG_IGN`.
     InitiallyIgnored,
     /// User-defined trap.
-    Trap(TrapState),
+    UserSpecified(TrapState),
 }
 
 impl Setting {
     fn as_trap(&self) -> Option<&TrapState> {
-        if let Setting::Trap(trap) = self {
+        if let Setting::UserSpecified(trap) = self {
             Some(trap)
         } else {
             None
@@ -160,7 +160,7 @@ impl From<&Setting> for SignalHandling {
         match state {
             Setting::InitiallyDefaulted => SignalHandling::Default,
             Setting::InitiallyIgnored => SignalHandling::Ignore,
-            Setting::Trap(trap) => (&trap.action).into(),
+            Setting::UserSpecified(trap) => (&trap.action).into(),
         }
     }
 }
@@ -294,7 +294,7 @@ impl TrapSet {
                     return Err(SetActionError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
-                    occupied.get_mut().current_setting = Setting::Trap(state);
+                    occupied.get_mut().current_setting = Setting::UserSpecified(state);
                     return Ok(());
                 }
                 Entry::Occupied(occupied)
@@ -304,7 +304,7 @@ impl TrapSet {
         system.set_signal_handling(signal, (&state.action).into())?;
 
         let state = SignalState {
-            current_setting: Setting::Trap(state),
+            current_setting: Setting::UserSpecified(state),
             parent_setting: None,
             internal_handler_enabled: false,
         };
@@ -348,7 +348,7 @@ impl TrapSet {
         self.clear_parent_settings();
 
         for (&signal, state) in &mut self.signals {
-            if let Setting::Trap(trap) = &state.current_setting {
+            if let Setting::UserSpecified(trap) = &state.current_setting {
                 if let Action::Command(_) = &trap.action {
                     state.parent_setting = Some(std::mem::replace(
                         &mut state.current_setting,
@@ -370,7 +370,7 @@ impl TrapSet {
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
         if let Some(state) = self.signals.get_mut(&signal) {
-            if let Setting::Trap(trap) = &mut state.current_setting {
+            if let Setting::UserSpecified(trap) = &mut state.current_setting {
                 trap.pending = true;
             }
         }
@@ -387,7 +387,7 @@ impl TrapSet {
         self.signals
             .iter_mut()
             .find_map(|(signal, state)| match &mut state.current_setting {
-                Setting::Trap(trap) if trap.pending => {
+                Setting::UserSpecified(trap) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
                 }
