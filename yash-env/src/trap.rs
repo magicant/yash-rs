@@ -132,9 +132,9 @@ pub struct TrapState {
     pub pending: bool,
 }
 
-/// User-visible signal disposition.
+/// User-visible signal setting.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum UserSignalState {
+enum Setting {
     /// The user has not yet set a trap for the signal, and the disposition the
     /// shell has inherited from the pre-exec process is `SIG_DFL`.
     InitiallyDefaulted,
@@ -145,9 +145,9 @@ enum UserSignalState {
     Trap(TrapState),
 }
 
-impl UserSignalState {
+impl Setting {
     fn as_trap(&self) -> Option<&TrapState> {
-        if let UserSignalState::Trap(trap) = self {
+        if let Setting::Trap(trap) = self {
             Some(trap)
         } else {
             None
@@ -155,12 +155,12 @@ impl UserSignalState {
     }
 }
 
-impl From<&UserSignalState> for SignalHandling {
-    fn from(state: &UserSignalState) -> Self {
+impl From<&Setting> for SignalHandling {
+    fn from(state: &Setting) -> Self {
         match state {
-            UserSignalState::InitiallyDefaulted => SignalHandling::Default,
-            UserSignalState::InitiallyIgnored => SignalHandling::Ignore,
-            UserSignalState::Trap(trap) => (&trap.action).into(),
+            Setting::InitiallyDefaulted => SignalHandling::Default,
+            Setting::InitiallyIgnored => SignalHandling::Ignore,
+            Setting::Trap(trap) => (&trap.action).into(),
         }
     }
 }
@@ -168,11 +168,11 @@ impl From<&UserSignalState> for SignalHandling {
 /// Whole configuration for a signal.
 #[derive(Clone, Debug)]
 struct SignalState {
-    /// User signal state that is effective in the current environment.
-    current_user_state: UserSignalState,
+    /// Setting that is effective in the current environment.
+    current_setting: Setting,
 
-    /// User signal state that was effective in the parent environment.
-    parent_user_state: Option<UserSignalState>,
+    /// Setting that was effective in the parent environment.
+    parent_setting: Option<Setting>,
 
     /// Whether the internal handler has been installed in the current environment.
     internal_handler_enabled: bool,
@@ -191,10 +191,10 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
         loop {
             let item = self.inner.next()?;
-            let current = &item.1.current_user_state;
+            let current = &item.1.current_setting;
             let current = current.as_trap();
-            let parent = &item.1.parent_user_state;
-            let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+            let parent = &item.1.parent_setting;
+            let parent = parent.as_ref().and_then(Setting::as_trap);
             if current.is_some() || parent.is_some() {
                 return Some((item.0, current, parent));
             }
@@ -224,10 +224,10 @@ impl TrapSet {
         match self.signals.get(&signal) {
             None => (None, None),
             Some(state) => {
-                let current = &state.current_user_state;
+                let current = &state.current_setting;
                 let current = current.as_trap();
-                let parent = &state.parent_user_state;
-                let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+                let parent = &state.parent_setting;
+                let parent = parent.as_ref().and_then(Setting::as_trap);
                 (current, parent)
             }
         }
@@ -265,7 +265,7 @@ impl TrapSet {
             _ => (),
         }
 
-        self.clear_parent_states();
+        self.clear_parent_settings();
 
         let state = TrapState {
             action,
@@ -280,8 +280,8 @@ impl TrapSet {
                         system.set_signal_handling(signal, SignalHandling::Ignore)?;
                     if initial_handling == SignalHandling::Ignore {
                         vacant.insert(SignalState {
-                            current_user_state: UserSignalState::InitiallyIgnored,
-                            parent_user_state: None,
+                            current_setting: Setting::InitiallyIgnored,
+                            parent_setting: None,
                             internal_handler_enabled: false,
                         });
                         return Err(SetActionError::InitiallyIgnored);
@@ -290,13 +290,11 @@ impl TrapSet {
                 Entry::Vacant(vacant)
             }
             Entry::Occupied(mut occupied) => {
-                if !override_ignore
-                    && occupied.get().current_user_state == UserSignalState::InitiallyIgnored
-                {
+                if !override_ignore && occupied.get().current_setting == Setting::InitiallyIgnored {
                     return Err(SetActionError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
-                    occupied.get_mut().current_user_state = UserSignalState::Trap(state);
+                    occupied.get_mut().current_setting = Setting::Trap(state);
                     return Ok(());
                 }
                 Entry::Occupied(occupied)
@@ -306,8 +304,8 @@ impl TrapSet {
         system.set_signal_handling(signal, (&state.action).into())?;
 
         let state = SignalState {
-            current_user_state: UserSignalState::Trap(state),
-            parent_user_state: None,
+            current_setting: Setting::Trap(state),
+            parent_setting: None,
             internal_handler_enabled: false,
         };
         #[allow(clippy::drop_ref)]
@@ -319,9 +317,9 @@ impl TrapSet {
         Ok(())
     }
 
-    fn clear_parent_states(&mut self) {
+    fn clear_parent_settings(&mut self) {
         for state in self.signals.values_mut() {
-            state.parent_user_state = None;
+            state.parent_setting = None;
         }
     }
 
@@ -347,14 +345,14 @@ impl TrapSet {
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
-        self.clear_parent_states();
+        self.clear_parent_settings();
 
         for (&signal, state) in &mut self.signals {
-            if let UserSignalState::Trap(trap) = &state.current_user_state {
+            if let Setting::Trap(trap) = &state.current_setting {
                 if let Action::Command(_) = &trap.action {
-                    state.parent_user_state = Some(std::mem::replace(
-                        &mut state.current_user_state,
-                        UserSignalState::InitiallyDefaulted,
+                    state.parent_setting = Some(std::mem::replace(
+                        &mut state.current_setting,
+                        Setting::InitiallyDefaulted,
                     ));
                     if !state.internal_handler_enabled {
                         system
@@ -372,7 +370,7 @@ impl TrapSet {
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
         if let Some(state) = self.signals.get_mut(&signal) {
-            if let UserSignalState::Trap(trap) = &mut state.current_user_state {
+            if let Setting::Trap(trap) = &mut state.current_setting {
                 trap.pending = true;
             }
         }
@@ -388,8 +386,8 @@ impl TrapSet {
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
         self.signals
             .iter_mut()
-            .find_map(|(signal, state)| match &mut state.current_user_state {
-                UserSignalState::Trap(trap) if trap.pending => {
+            .find_map(|(signal, state)| match &mut state.current_setting {
+                Setting::Trap(trap) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
                 }
@@ -421,14 +419,14 @@ impl TrapSet {
                 occupied.get_mut().internal_handler_enabled = true;
             }
             Entry::Vacant(vacant) => {
-                let current_user_state = if previous_handler == SignalHandling::Ignore {
-                    UserSignalState::InitiallyIgnored
+                let current_setting = if previous_handler == SignalHandling::Ignore {
+                    Setting::InitiallyIgnored
                 } else {
-                    UserSignalState::InitiallyDefaulted
+                    Setting::InitiallyDefaulted
                 };
                 vacant.insert(SignalState {
-                    current_user_state,
-                    parent_user_state: None,
+                    current_setting,
+                    parent_setting: None,
                     internal_handler_enabled: true,
                 });
             }
@@ -448,7 +446,7 @@ impl TrapSet {
     ) -> Result<(), Errno> {
         if let Some(state) = self.signals.get_mut(&Signal::SIGCHLD) {
             if state.internal_handler_enabled {
-                system.set_signal_handling(Signal::SIGCHLD, (&state.current_user_state).into())?;
+                system.set_signal_handling(Signal::SIGCHLD, (&state.current_setting).into())?;
                 state.internal_handler_enabled = false;
             }
         }
