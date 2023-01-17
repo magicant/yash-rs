@@ -167,7 +167,7 @@ impl From<&Setting> for SignalHandling {
 
 /// Whole configuration for a signal.
 #[derive(Clone, Debug)]
-struct SignalState {
+struct GrandState {
     /// Setting that is effective in the current environment.
     current_setting: Setting,
 
@@ -183,7 +183,7 @@ struct SignalState {
 /// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Signal, SignalState>,
+    inner: std::collections::btree_map::Iter<'a, Signal, GrandState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -207,7 +207,7 @@ impl<'a> Iterator for Iter<'a> {
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
-    signals: BTreeMap<Signal, SignalState>,
+    signals: BTreeMap<Signal, GrandState>,
 }
 
 // TODO Extend internal handlers for other signals
@@ -279,7 +279,7 @@ impl TrapSet {
                     let initial_handling =
                         system.set_signal_handling(signal, SignalHandling::Ignore)?;
                     if initial_handling == SignalHandling::Ignore {
-                        vacant.insert(SignalState {
+                        vacant.insert(GrandState {
                             current_setting: Setting::InitiallyIgnored,
                             parent_setting: None,
                             internal_handler_enabled: false,
@@ -303,7 +303,7 @@ impl TrapSet {
 
         system.set_signal_handling(signal, (&state.action).into())?;
 
-        let state = SignalState {
+        let state = GrandState {
             current_setting: Setting::UserSpecified(state),
             parent_setting: None,
             internal_handler_enabled: false,
@@ -424,7 +424,7 @@ impl TrapSet {
                 } else {
                     Setting::InitiallyDefaulted
                 };
-                vacant.insert(SignalState {
+                vacant.insert(GrandState {
                     current_setting,
                     parent_setting: None,
                     internal_handler_enabled: true,
