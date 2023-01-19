@@ -59,7 +59,7 @@ pub trait SignalSystem {
 
 /// Action performed when a signal is delivered to the shell process.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Trap {
+pub enum Action {
     /// Performs the default signal action.
     ///
     /// The behavior depends on the signal delivered.
@@ -72,25 +72,25 @@ pub enum Trap {
     Command(Rc<str>),
 }
 
-impl Default for Trap {
+impl Default for Action {
     fn default() -> Self {
-        Trap::Default
+        Action::Default
     }
 }
 
-impl From<&Trap> for SignalHandling {
-    fn from(trap: &Trap) -> Self {
+impl From<&Action> for SignalHandling {
+    fn from(trap: &Action) -> Self {
         match trap {
-            Trap::Default => SignalHandling::Default,
-            Trap::Ignore => SignalHandling::Ignore,
-            Trap::Command(_) => SignalHandling::Catch,
+            Action::Default => SignalHandling::Default,
+            Action::Ignore => SignalHandling::Ignore,
+            Action::Command(_) => SignalHandling::Catch,
         }
     }
 }
 
-/// Error that may happen in [`TrapSet::set_trap`].
+/// Error that may happen in [`TrapSet::set_action`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SetTrapError {
+pub enum SetActionError {
     /// Attempt to set a trap that has been ignored since the shell startup.
     InitiallyIgnored,
     /// Attempt to set a trap for the `SIGKILL` signal.
@@ -101,9 +101,9 @@ pub enum SetTrapError {
     SystemError(Errno),
 }
 
-impl std::fmt::Display for SetTrapError {
+impl std::fmt::Display for SetActionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use SetTrapError::*;
+        use SetActionError::*;
         match self {
             InitiallyIgnored => "the signal has been ignored since startup".fmt(f),
             SIGKILL => "cannot set a trap for SIGKILL".fmt(f),
@@ -113,11 +113,11 @@ impl std::fmt::Display for SetTrapError {
     }
 }
 
-impl std::error::Error for SetTrapError {}
+impl std::error::Error for SetActionError {}
 
-impl From<Errno> for SetTrapError {
+impl From<Errno> for SetActionError {
     fn from(errno: Errno) -> Self {
-        SetTrapError::SystemError(errno)
+        SetActionError::SystemError(errno)
     }
 }
 
@@ -125,16 +125,16 @@ impl From<Errno> for SetTrapError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrapState {
     /// Action taken when the signal is delivered to the shell process.
-    pub action: Trap,
+    pub action: Action,
     /// Location of the simple command that invoked the trap built-in that has set this trap.
     pub origin: Location,
     /// True iff the signal has been caught and the trap command has not yet executed.
     pub pending: bool,
 }
 
-/// User-visible signal disposition.
+/// User-visible signal setting.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum UserSignalState {
+enum Setting {
     /// The user has not yet set a trap for the signal, and the disposition the
     /// shell has inherited from the pre-exec process is `SIG_DFL`.
     InitiallyDefaulted,
@@ -142,12 +142,12 @@ enum UserSignalState {
     /// shell has inherited from the pre-exec process is `SIG_IGN`.
     InitiallyIgnored,
     /// User-defined trap.
-    Trap(TrapState),
+    UserSpecified(TrapState),
 }
 
-impl UserSignalState {
+impl Setting {
     fn as_trap(&self) -> Option<&TrapState> {
-        if let UserSignalState::Trap(trap) = self {
+        if let Setting::UserSpecified(trap) = self {
             Some(trap)
         } else {
             None
@@ -155,24 +155,24 @@ impl UserSignalState {
     }
 }
 
-impl From<&UserSignalState> for SignalHandling {
-    fn from(state: &UserSignalState) -> Self {
+impl From<&Setting> for SignalHandling {
+    fn from(state: &Setting) -> Self {
         match state {
-            UserSignalState::InitiallyDefaulted => SignalHandling::Default,
-            UserSignalState::InitiallyIgnored => SignalHandling::Ignore,
-            UserSignalState::Trap(trap) => (&trap.action).into(),
+            Setting::InitiallyDefaulted => SignalHandling::Default,
+            Setting::InitiallyIgnored => SignalHandling::Ignore,
+            Setting::UserSpecified(trap) => (&trap.action).into(),
         }
     }
 }
 
 /// Whole configuration for a signal.
 #[derive(Clone, Debug)]
-struct SignalState {
-    /// User signal state that is effective in the current environment.
-    current_user_state: UserSignalState,
+struct GrandState {
+    /// Setting that is effective in the current environment.
+    current_setting: Setting,
 
-    /// User signal state that was effective in the parent environment.
-    parent_user_state: Option<UserSignalState>,
+    /// Setting that was effective in the parent environment.
+    parent_setting: Option<Setting>,
 
     /// Whether the internal handler has been installed in the current environment.
     internal_handler_enabled: bool,
@@ -183,7 +183,7 @@ struct SignalState {
 /// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Signal, SignalState>,
+    inner: std::collections::btree_map::Iter<'a, Signal, GrandState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -191,10 +191,10 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
         loop {
             let item = self.inner.next()?;
-            let current = &item.1.current_user_state;
+            let current = &item.1.current_setting;
             let current = current.as_trap();
-            let parent = &item.1.parent_user_state;
-            let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+            let parent = &item.1.parent_setting;
+            let parent = parent.as_ref().and_then(Setting::as_trap);
             if current.is_some() || parent.is_some() {
                 return Some((item.0, current, parent));
             }
@@ -207,12 +207,12 @@ impl<'a> Iterator for Iter<'a> {
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
-    signals: BTreeMap<Signal, SignalState>,
+    signals: BTreeMap<Signal, GrandState>,
 }
 
 // TODO Extend internal handlers for other signals
 impl TrapSet {
-    /// Returns the trap action for a signal.
+    /// Returns the current state for a signal.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
@@ -220,14 +220,14 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_trap(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
+    pub fn get_state(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
         match self.signals.get(&signal) {
             None => (None, None),
             Some(state) => {
-                let current = &state.current_user_state;
+                let current = &state.current_setting;
                 let current = current.as_trap();
-                let parent = &state.parent_user_state;
-                let parent = parent.as_ref().and_then(UserSignalState::as_trap);
+                let parent = &state.parent_setting;
+                let parent = parent.as_ref().and_then(Setting::as_trap);
                 (current, parent)
             }
         }
@@ -246,26 +246,26 @@ impl TrapSet {
     ///
     /// `origin` should be the location of the command performing this trap
     /// update. It is only informative: It does not affect the signal handling
-    /// behavior and can be referenced later by [`get_trap`](Self::get_trap).
+    /// behavior and can be referenced later by [`get_state`](Self::get_state).
     ///
     /// This function clears all parent states remembered when [entering a
     /// subshell](Self::enter_subshell), not only for `signal` but also for
     /// other signals.
-    pub fn set_trap<S: SignalSystem>(
+    pub fn set_action<S: SignalSystem>(
         &mut self,
         system: &mut S,
         signal: Signal,
-        action: Trap,
+        action: Action,
         origin: Location,
         override_ignore: bool,
-    ) -> Result<(), SetTrapError> {
+    ) -> Result<(), SetActionError> {
         match signal {
-            Signal::SIGKILL => return Err(SetTrapError::SIGKILL),
-            Signal::SIGSTOP => return Err(SetTrapError::SIGSTOP),
+            Signal::SIGKILL => return Err(SetActionError::SIGKILL),
+            Signal::SIGSTOP => return Err(SetActionError::SIGSTOP),
             _ => (),
         }
 
-        self.clear_parent_states();
+        self.clear_parent_settings();
 
         let state = TrapState {
             action,
@@ -279,24 +279,22 @@ impl TrapSet {
                     let initial_handling =
                         system.set_signal_handling(signal, SignalHandling::Ignore)?;
                     if initial_handling == SignalHandling::Ignore {
-                        vacant.insert(SignalState {
-                            current_user_state: UserSignalState::InitiallyIgnored,
-                            parent_user_state: None,
+                        vacant.insert(GrandState {
+                            current_setting: Setting::InitiallyIgnored,
+                            parent_setting: None,
                             internal_handler_enabled: false,
                         });
-                        return Err(SetTrapError::InitiallyIgnored);
+                        return Err(SetActionError::InitiallyIgnored);
                     }
                 }
                 Entry::Vacant(vacant)
             }
             Entry::Occupied(mut occupied) => {
-                if !override_ignore
-                    && occupied.get().current_user_state == UserSignalState::InitiallyIgnored
-                {
-                    return Err(SetTrapError::InitiallyIgnored);
+                if !override_ignore && occupied.get().current_setting == Setting::InitiallyIgnored {
+                    return Err(SetActionError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
-                    occupied.get_mut().current_user_state = UserSignalState::Trap(state);
+                    occupied.get_mut().current_setting = Setting::UserSpecified(state);
                     return Ok(());
                 }
                 Entry::Occupied(occupied)
@@ -305,9 +303,9 @@ impl TrapSet {
 
         system.set_signal_handling(signal, (&state.action).into())?;
 
-        let state = SignalState {
-            current_user_state: UserSignalState::Trap(state),
-            parent_user_state: None,
+        let state = GrandState {
+            current_setting: Setting::UserSpecified(state),
+            parent_setting: None,
             internal_handler_enabled: false,
         };
         #[allow(clippy::drop_ref)]
@@ -319,9 +317,9 @@ impl TrapSet {
         Ok(())
     }
 
-    fn clear_parent_states(&mut self) {
+    fn clear_parent_settings(&mut self) {
         for state in self.signals.values_mut() {
-            state.parent_user_state = None;
+            state.parent_setting = None;
         }
     }
 
@@ -342,19 +340,19 @@ impl TrapSet {
     ///
     /// The trap set will remember the original trap states as the parent
     /// states. You can get them from the second return value of
-    /// [`get_trap`](Self::get_trap) or the third item of tuples yielded by an
+    /// [`get_state`](Self::get_state) or the third item of tuples yielded by an
     /// [iterator](Self::iter).
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
-        self.clear_parent_states();
+        self.clear_parent_settings();
 
         for (&signal, state) in &mut self.signals {
-            if let UserSignalState::Trap(trap) = &state.current_user_state {
-                if let Trap::Command(_) = &trap.action {
-                    state.parent_user_state = Some(std::mem::replace(
-                        &mut state.current_user_state,
-                        UserSignalState::InitiallyDefaulted,
+            if let Setting::UserSpecified(trap) = &state.current_setting {
+                if let Action::Command(_) = &trap.action {
+                    state.parent_setting = Some(std::mem::replace(
+                        &mut state.current_setting,
+                        Setting::InitiallyDefaulted,
                     ));
                     if !state.internal_handler_enabled {
                         system
@@ -369,10 +367,10 @@ impl TrapSet {
     /// Sets the `pending` flag of the [`TrapState`] for the specified signal.
     ///
     /// This function does nothing if no trap action has been
-    /// [set](Self::set_trap) for the signal.
+    /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
         if let Some(state) = self.signals.get_mut(&signal) {
-            if let UserSignalState::Trap(trap) = &mut state.current_user_state {
+            if let Setting::UserSpecified(trap) = &mut state.current_setting {
                 trap.pending = true;
             }
         }
@@ -388,8 +386,8 @@ impl TrapSet {
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
         self.signals
             .iter_mut()
-            .find_map(|(signal, state)| match &mut state.current_user_state {
-                UserSignalState::Trap(trap) if trap.pending => {
+            .find_map(|(signal, state)| match &mut state.current_setting {
+                Setting::UserSpecified(trap) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
                 }
@@ -421,14 +419,14 @@ impl TrapSet {
                 occupied.get_mut().internal_handler_enabled = true;
             }
             Entry::Vacant(vacant) => {
-                let current_user_state = if previous_handler == SignalHandling::Ignore {
-                    UserSignalState::InitiallyIgnored
+                let current_setting = if previous_handler == SignalHandling::Ignore {
+                    Setting::InitiallyIgnored
                 } else {
-                    UserSignalState::InitiallyDefaulted
+                    Setting::InitiallyDefaulted
                 };
-                vacant.insert(SignalState {
-                    current_user_state,
-                    parent_user_state: None,
+                vacant.insert(GrandState {
+                    current_setting,
+                    parent_setting: None,
                     internal_handler_enabled: true,
                 });
             }
@@ -448,7 +446,7 @@ impl TrapSet {
     ) -> Result<(), Errno> {
         if let Some(state) = self.signals.get_mut(&Signal::SIGCHLD) {
             if state.internal_handler_enabled {
-                system.set_signal_handling(Signal::SIGCHLD, (&state.current_user_state).into())?;
+                system.set_signal_handling(Signal::SIGCHLD, (&state.current_setting).into())?;
                 state.internal_handler_enabled = false;
             }
         }
@@ -480,7 +478,7 @@ mod tests {
     #[test]
     fn default_trap() {
         let trap_set = TrapSet::default();
-        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGCHLD), (None, None));
     }
 
     #[test]
@@ -489,19 +487,19 @@ mod tests {
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
 
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGCHLD,
-            Trap::Ignore,
+            Action::Ignore,
             origin.clone(),
             false,
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin,
                     pending: false
                 }),
@@ -518,9 +516,9 @@ mod tests {
     fn setting_trap_to_command() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command("echo".into());
+        let action = Action::Command("echo".into());
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGCHLD,
             action.clone(),
@@ -529,7 +527,7 @@ mod tests {
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
                     action,
@@ -551,23 +549,23 @@ mod tests {
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("foo");
         trap_set
-            .set_trap(&mut system, Signal::SIGCHLD, Trap::Ignore, origin, false)
+            .set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false)
             .unwrap();
 
         let origin = Location::dummy("bar");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGCHLD,
-            Trap::Default,
+            Action::Default,
             origin.clone(),
             false,
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Default,
+                    action: Action::Default,
                     origin,
                     pending: false
                 }),
@@ -586,15 +584,17 @@ mod tests {
         system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("foo");
-        let result = trap_set.set_trap(&mut system, Signal::SIGCHLD, Trap::Ignore, origin, false);
-        assert_eq!(result, Err(SetTrapError::InitiallyIgnored));
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
         // Idempotence
         let origin = Location::dummy("bar");
-        let result = trap_set.set_trap(&mut system, Signal::SIGCHLD, Trap::Ignore, origin, false);
-        assert_eq!(result, Err(SetTrapError::InitiallyIgnored));
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
 
-        assert_eq!(trap_set.get_trap(Signal::SIGCHLD), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGCHLD), (None, None));
         assert_eq!(
             system.0[&Signal::SIGCHLD],
             crate::system::SignalHandling::Ignore
@@ -607,19 +607,19 @@ mod tests {
         system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGCHLD,
-            Trap::Ignore,
+            Action::Ignore,
             origin.clone(),
             true,
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin,
                     pending: false
                 }),
@@ -637,18 +637,18 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGUSR1,
-            Trap::Ignore,
+            Action::Ignore,
             origin_1.clone(),
             false,
         );
         assert_eq!(result, Ok(()));
 
-        let command = Trap::Command("echo".into());
+        let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGUSR2,
             command.clone(),
@@ -658,10 +658,10 @@ mod tests {
         assert_eq!(result, Ok(()));
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR1),
+            trap_set.get_state(Signal::SIGUSR1),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin: origin_1,
                     pending: false
                 }),
@@ -669,7 +669,7 @@ mod tests {
             )
         );
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR2),
+            trap_set.get_state(Signal::SIGUSR2),
             (
                 Some(&TrapState {
                     action: command,
@@ -694,9 +694,10 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(&mut system, Signal::SIGKILL, Trap::Ignore, origin, false);
-        assert_eq!(result, Err(SetTrapError::SIGKILL));
-        assert_eq!(trap_set.get_trap(Signal::SIGKILL), (None, None));
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGKILL, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::SIGKILL));
+        assert_eq!(trap_set.get_state(Signal::SIGKILL), (None, None));
         assert_eq!(system.0.get(&Signal::SIGKILL), None);
     }
 
@@ -705,9 +706,10 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(&mut system, Signal::SIGSTOP, Trap::Ignore, origin, false);
-        assert_eq!(result, Err(SetTrapError::SIGSTOP));
-        assert_eq!(trap_set.get_trap(Signal::SIGSTOP), (None, None));
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGSTOP, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::SIGSTOP));
+        assert_eq!(trap_set.get_state(Signal::SIGSTOP), (None, None));
         assert_eq!(system.0.get(&Signal::SIGSTOP), None);
     }
 
@@ -717,18 +719,18 @@ mod tests {
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR1,
-                Trap::Ignore,
+                Action::Ignore,
                 origin_1.clone(),
                 false,
             )
             .unwrap();
-        let command = Trap::Command("echo".into());
+        let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR2,
                 command.clone(),
@@ -740,7 +742,7 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Signal::SIGUSR1);
-        assert_eq!(first.1.unwrap().action, Trap::Ignore);
+        assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
@@ -757,18 +759,18 @@ mod tests {
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR1,
-                Trap::Ignore,
+                Action::Ignore,
                 origin_1.clone(),
                 false,
             )
             .unwrap();
-        let command = Trap::Command("echo".into());
+        let command = Action::Command("echo".into());
         let origin_2 = Location::dummy("bar");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR2,
                 command.clone(),
@@ -781,7 +783,7 @@ mod tests {
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
         assert_eq!(first.0, &Signal::SIGUSR1);
-        assert_eq!(first.1.unwrap().action, Trap::Ignore);
+        assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
@@ -797,15 +799,15 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo".into());
+        let command = Action::Command("echo".into());
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .set_action(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         trap_set.enter_subshell(&mut system);
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("ls".into());
+        let command = Action::Command("ls".into());
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR2,
                 command.clone(),
@@ -827,10 +829,10 @@ mod tests {
     fn entering_subshell_resets_command_traps() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command("".into());
+        let action = Action::Command("".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGCHLD,
                 action.clone(),
@@ -841,7 +843,7 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 None,
                 Some(&TrapState {
@@ -863,10 +865,10 @@ mod tests {
         let mut trap_set = TrapSet::default();
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGCHLD,
-                Trap::Ignore,
+                Action::Ignore,
                 origin.clone(),
                 false,
             )
@@ -874,10 +876,10 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin,
                     pending: false
                 }),
@@ -894,10 +896,10 @@ mod tests {
     fn entering_subshell_with_internal_handler() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let action = Trap::Command("".into());
+        let action = Action::Command("".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGCHLD,
                 action.clone(),
@@ -909,7 +911,7 @@ mod tests {
 
         trap_set.enter_subshell(&mut system);
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 None,
                 Some(&TrapState {
@@ -930,21 +932,21 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo 1".into());
+        let command = Action::Command("echo 1".into());
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .set_action(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("echo 2".into());
+        let command = Action::Command("echo 2".into());
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
+            .set_action(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
         trap_set.enter_subshell(&mut system);
 
-        let command = Trap::Command("echo 9".into());
+        let command = Action::Command("echo 9".into());
         let origin_3 = Location::dummy("qux");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGUSR1,
                 command.clone(),
@@ -954,7 +956,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGUSR1),
+            trap_set.get_state(Signal::SIGUSR1),
             (
                 Some(&TrapState {
                     action: command,
@@ -964,7 +966,7 @@ mod tests {
                 None
             )
         );
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR2), (None, None));
         assert_eq!(
             system.0[&Signal::SIGUSR1],
             crate::system::SignalHandling::Catch
@@ -980,20 +982,20 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let origin_1 = Location::dummy("foo");
-        let command = Trap::Command("echo 1".into());
+        let command = Action::Command("echo 1".into());
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR1, command, origin_1, false)
+            .set_action(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
         let origin_2 = Location::dummy("bar");
-        let command = Trap::Command("echo 2".into());
+        let command = Action::Command("echo 2".into());
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR2, command, origin_2, false)
+            .set_action(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
         trap_set.enter_subshell(&mut system);
         trap_set.enter_subshell(&mut system);
 
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR1), (None, None));
-        assert_eq!(trap_set.get_trap(Signal::SIGUSR2), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR1), (None, None));
+        assert_eq!(trap_set.get_state(Signal::SIGUSR2), (None, None));
         assert_eq!(
             system.0[&Signal::SIGUSR1],
             crate::system::SignalHandling::Default
@@ -1008,23 +1010,23 @@ mod tests {
     fn catching_signal() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        let command = Trap::Command("echo INT".into());
+        let command = Action::Command("echo INT".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(&mut system, Signal::SIGINT, command, origin, false)
+            .set_action(&mut system, Signal::SIGINT, command, origin, false)
             .unwrap();
-        let command = Trap::Command("echo TERM".into());
+        let command = Action::Command("echo TERM".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(&mut system, Signal::SIGTERM, command, origin, false)
+            .set_action(&mut system, Signal::SIGTERM, command, origin, false)
             .unwrap();
 
         trap_set.catch_signal(Signal::SIGCHLD);
         trap_set.catch_signal(Signal::SIGINT);
 
-        let trap_state = trap_set.get_trap(Signal::SIGINT).0.unwrap();
+        let trap_state = trap_set.get_state(Signal::SIGINT).0.unwrap();
         assert!(trap_state.pending, "{:?}", trap_state);
-        let trap_state = trap_set.get_trap(Signal::SIGTERM).0.unwrap();
+        let trap_state = trap_set.get_state(Signal::SIGTERM).0.unwrap();
         assert!(!trap_state.pending, "{:?}", trap_state);
     }
 
@@ -1034,20 +1036,20 @@ mod tests {
         let mut trap_set = TrapSet::default();
         assert_eq!(trap_set.take_caught_signal(), None);
 
-        let command = Trap::Command("echo INT".into());
+        let command = Action::Command("echo INT".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(&mut system, Signal::SIGINT, command, origin, false)
+            .set_action(&mut system, Signal::SIGINT, command, origin, false)
             .unwrap();
-        let command = Trap::Command("echo TERM".into());
+        let command = Action::Command("echo TERM".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(&mut system, Signal::SIGTERM, command, origin, false)
+            .set_action(&mut system, Signal::SIGTERM, command, origin, false)
             .unwrap();
-        let command = Trap::Command("echo USR1".into());
+        let command = Action::Command("echo USR1".into());
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(&mut system, Signal::SIGUSR1, command, origin, false)
+            .set_action(&mut system, Signal::SIGUSR1, command, origin, false)
             .unwrap();
         assert_eq!(trap_set.take_caught_signal(), None);
 
@@ -1058,21 +1060,21 @@ mod tests {
         let result = trap_set.take_caught_signal().unwrap();
         match result.0 {
             Signal::SIGINT => {
-                assert_eq!(result.1.action, Trap::Command("echo INT".into()));
+                assert_eq!(result.1.action, Action::Command("echo INT".into()));
                 assert!(!result.1.pending);
 
                 let result = trap_set.take_caught_signal().unwrap();
                 assert_eq!(result.0, Signal::SIGUSR1);
-                assert_eq!(result.1.action, Trap::Command("echo USR1".into()));
+                assert_eq!(result.1.action, Action::Command("echo USR1".into()));
                 assert!(!result.1.pending);
             }
             Signal::SIGUSR1 => {
-                assert_eq!(result.1.action, Trap::Command("echo USR1".into()));
+                assert_eq!(result.1.action, Action::Command("echo USR1".into()));
                 assert!(!result.1.pending);
 
                 let result = trap_set.take_caught_signal().unwrap();
                 assert_eq!(result.0, Signal::SIGINT);
-                assert_eq!(result.1.action, Trap::Command("echo INT".into()));
+                assert_eq!(result.1.action, Action::Command("echo INT".into()));
                 assert!(!result.1.pending);
             }
             _ => panic!("wrong signal: {:?}", result),
@@ -1145,7 +1147,8 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(&mut system, Signal::SIGCHLD, Trap::Ignore, origin, false);
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
         assert_eq!(result, Ok(()));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
     }
@@ -1157,8 +1160,9 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(&mut system, Signal::SIGCHLD, Trap::Ignore, origin, false);
-        assert_eq!(result, Err(SetTrapError::InitiallyIgnored));
+        let result =
+            trap_set.set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
     }
 
@@ -1169,19 +1173,19 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         let origin = Location::dummy("origin");
-        let result = trap_set.set_trap(
+        let result = trap_set.set_action(
             &mut system,
             Signal::SIGCHLD,
-            Trap::Ignore,
+            Action::Ignore,
             origin.clone(),
             true,
         );
         assert_eq!(result, Ok(()));
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin,
                     pending: false
                 }),
@@ -1201,10 +1205,10 @@ mod tests {
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         let origin = Location::dummy("origin");
         trap_set
-            .set_trap(
+            .set_action(
                 &mut system,
                 Signal::SIGCHLD,
-                Trap::Ignore,
+                Action::Ignore,
                 origin.clone(),
                 false,
             )
@@ -1212,10 +1216,10 @@ mod tests {
         trap_set.disable_internal_handlers(&mut system).unwrap();
 
         assert_eq!(
-            trap_set.get_trap(Signal::SIGCHLD),
+            trap_set.get_state(Signal::SIGCHLD),
             (
                 Some(&TrapState {
-                    action: Trap::Ignore,
+                    action: Action::Ignore,
                     origin,
                     pending: false
                 }),
