@@ -46,10 +46,7 @@ pub trait SignalSystem {
     /// Sets how a signal is handled.
     ///
     /// This function updates the signal blocking mask and the signal action for
-    /// the specified signal and remembers the previous configuration for
-    /// restoration.
-    ///
-    /// Returns the previous handler.
+    /// the specified signal, and returns the previous action.
     fn set_signal_handling(
         &mut self,
         signal: Signal,
