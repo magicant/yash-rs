@@ -14,21 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for signal handling settings.
+//! Signal and other event handling settings.
 //!
-//! [`TrapSet`] is part of an [`Env`](crate::Env) that remembers the trap
-//! configured for each signal and manages the signal handlers installed to the
-//! underlying system. `TrapSet` acts as a decorator for a [`SignalSystem`]
-//! implementor. Methods of `TrapSet` expect they are passed the same system
-//! instance in every call.
+//! The trap is a mechanism of the shell that allows you to configure event
+//! handlers for specific situations. A [`TrapSet`] is a mapping from [`Condition`]s to
+//! [`Action`]s. When the mapping is modified, it updates the corresponding signal
+//! disposition in the underlying system through a [`SignalSystem`] implementor.
+//! Methods of `TrapSet` expect they are passed the same system instance in
+//! every call to keep it in a correct state.
 //!
 //! `TrapSet` manages two types of signal handling configurations. One is
 //! user-defined traps, which the user explicitly configures with the trap
 //! built-in. The other is internal handlers, which the shell implicitly
-//! installs to implement additional actions the shell must perform.
-//! `TrapSet` merges the two configurations into a single
-//! [`system::SignalHandling`](SignalHandling) for each signal and sets it to
-//! the system.
+//! installs to the system to implement additional actions it needs to perform.
+//! `TrapSet` merges the two configurations into a single [`SignalHandling`] for
+//! each signal and sets it to the system.
+//!
+//! No signal handling is involved for conditions other than signals, and the
+//! trap set serves only as a storage for action settings.
 
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
@@ -54,15 +57,66 @@ pub trait SignalSystem {
     ) -> Result<SignalHandling, Errno>;
 }
 
-/// Action performed when a signal is delivered to the shell process.
+/// Condition under which an [`Action`] is executed
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Condition {
+    /// When the shell exits
+    Exit,
+    /// When the specified signal is delivered to the shell process
+    Signal(Signal),
+}
+
+/// Conversion from `Condition` to `String`
+///
+/// The result is an uppercase string representing the condition such as
+/// `"EXIT"` and `"TERM"`.
+impl std::fmt::Display for Condition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Condition::Exit => "EXIT".fmt(f),
+            Condition::Signal(signal) => {
+                let full_name = signal.as_str();
+                let name = full_name.strip_prefix("SIG").unwrap_or(full_name);
+                name.fmt(f)
+            }
+        }
+    }
+}
+
+/// Error in conversion from string to [`Condition`]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ParseConditionError;
+
+/// Conversion from `String` to `Condition`
+///
+/// This implementation supports parsing uppercase strings like `"EXIT"` and
+/// `"TERM"`.
+impl std::str::FromStr for Condition {
+    type Err = ParseConditionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO Make case-insensitive
+        // TODO Allow SIG-prefix
+        match s {
+            "EXIT" => Ok(Self::Exit),
+            _ => match format!("SIG{s}").parse() {
+                Ok(signal) => Ok(Self::Signal(signal)),
+                Err(_) => Err(ParseConditionError),
+            },
+        }
+    }
+}
+
+/// Action performed when a [`Condition`] is met
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action {
-    /// Performs the default signal action.
+    /// Performs the default action.
     ///
-    /// The behavior depends on the signal delivered.
+    /// For signal conditions, the behavior depends on the signal delivered.
+    /// For other conditions, this is equivalent to `Ignore`.
     Default,
 
-    /// Ignores the delivered signal.
+    /// Pretends as if the condition was not met.
     Ignore,
 
     /// Executes a command string.
@@ -118,25 +172,29 @@ impl From<Errno> for SetActionError {
     }
 }
 
-/// State of the trap action for a signal.
+/// State of the trap action for a condition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrapState {
-    /// Action taken when the signal is delivered to the shell process.
+    /// Action taken when the condition is met.
     pub action: Action,
-    /// Location of the simple command that invoked the trap built-in that has set this trap.
+    /// Location of the simple command that invoked the trap built-in that set
+    /// the current action.
     pub origin: Location,
-    /// True iff the signal has been caught and the trap command has not yet executed.
+    /// True iff a signal specified by the condition has been caught and the
+    /// action command has not yet executed.
     pub pending: bool,
 }
 
-/// User-visible signal setting.
+/// User-visible trap setting.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Setting {
-    /// The user has not yet set a trap for the signal, and the disposition the
-    /// shell has inherited from the pre-exec process is `SIG_DFL`.
+    /// The user has not yet set a trap for the signal specified by the
+    /// condition, and the signal disposition the shell has inherited from the
+    /// pre-exec process is `SIG_DFL`.
     InitiallyDefaulted,
-    /// The user has not yet set a trap for the signal, and the disposition the
-    /// shell has inherited from the pre-exec process is `SIG_IGN`.
+    /// The user has not yet set a trap for the signal specified by the
+    /// condition, and the signal disposition the shell has inherited from the
+    /// pre-exec process is `SIG_IGN`.
     InitiallyIgnored,
     /// User-defined trap.
     UserSpecified(TrapState),
@@ -162,7 +220,7 @@ impl From<&Setting> for SignalHandling {
     }
 }
 
-/// Whole configuration for a signal.
+/// Whole configuration and state for a trap condition.
 #[derive(Clone, Debug)]
 struct GrandState {
     /// Setting that is effective in the current environment.
@@ -199,7 +257,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-/// Collection of signal handling settings.
+/// Collection of event handling settings.
 ///
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
@@ -470,6 +528,19 @@ mod tests {
                 .insert(signal, handling)
                 .unwrap_or(SignalHandling::Default))
         }
+    }
+
+    #[test]
+    fn condition_display() {
+        assert_eq!(Condition::Exit.to_string(), "EXIT");
+        assert_eq!(Condition::Signal(Signal::SIGINT).to_string(), "INT");
+    }
+
+    #[test]
+    fn condition_from_str() {
+        assert_eq!("EXIT".parse(), Ok(Condition::Exit));
+        assert_eq!("TERM".parse(), Ok(Condition::Signal(Signal::SIGTERM)));
+        assert_eq!("FOO".parse::<Condition>(), Err(ParseConditionError));
     }
 
     #[test]
