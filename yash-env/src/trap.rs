@@ -238,20 +238,22 @@ struct GrandState {
 /// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Signal, GrandState>,
+    inner: std::collections::btree_map::Iter<'a, Condition, GrandState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
     type Item = (&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>);
     fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
         loop {
-            let item = self.inner.next()?;
-            let current = &item.1.current_setting;
+            let (cond, state) = self.inner.next()?;
+            let current = &state.current_setting;
             let current = current.as_trap();
-            let parent = &item.1.parent_setting;
+            let parent = &state.parent_setting;
             let parent = parent.as_ref().and_then(Setting::as_trap);
-            if current.is_some() || parent.is_some() {
-                return Some((item.0, current, parent));
+            if let Condition::Signal(signal) = cond {
+                if current.is_some() || parent.is_some() {
+                    return Some((signal, current, parent));
+                }
             }
         }
     }
@@ -262,7 +264,7 @@ impl<'a> Iterator for Iter<'a> {
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
-    signals: BTreeMap<Signal, GrandState>,
+    traps: BTreeMap<Condition, GrandState>,
 }
 
 // TODO Extend internal handlers for other signals
@@ -276,7 +278,7 @@ impl TrapSet {
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
     pub fn get_state(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
-        match self.signals.get(&signal) {
+        match self.traps.get(&Condition::Signal(signal)) {
             None => (None, None),
             Some(state) => {
                 let current = &state.current_setting;
@@ -328,7 +330,7 @@ impl TrapSet {
             pending: false,
         };
 
-        let entry = match self.signals.entry(signal) {
+        let entry = match self.traps.entry(Condition::Signal(signal)) {
             Entry::Vacant(vacant) => {
                 if !override_ignore {
                     let initial_handling =
@@ -373,7 +375,7 @@ impl TrapSet {
     }
 
     fn clear_parent_settings(&mut self) {
-        for state in self.signals.values_mut() {
+        for state in self.traps.values_mut() {
             state.parent_setting = None;
         }
     }
@@ -384,7 +386,7 @@ impl TrapSet {
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
     pub fn iter(&self) -> Iter<'_> {
-        let inner = self.signals.iter();
+        let inner = self.traps.iter();
         Iter { inner }
     }
 
@@ -402,19 +404,21 @@ impl TrapSet {
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
         self.clear_parent_settings();
 
-        for (&signal, state) in &mut self.signals {
-            if let Setting::UserSpecified(trap) = &state.current_setting {
-                if let Action::Command(_) = &trap.action {
-                    state.parent_setting = Some(std::mem::replace(
-                        &mut state.current_setting,
-                        Setting::InitiallyDefaulted,
-                    ));
-                    if !state.internal_handler_enabled {
-                        system
-                            .set_signal_handling(signal, crate::system::SignalHandling::Default)
-                            .ok();
-                    }
-                }
+        for (cond, state) in &mut self.traps {
+            let Setting::UserSpecified(trap) = &state.current_setting else { continue; };
+            let Action::Command(_) = &trap.action else { continue; };
+
+            state.parent_setting = Some(std::mem::replace(
+                &mut state.current_setting,
+                Setting::InitiallyDefaulted,
+            ));
+
+            let Condition::Signal(signal) = cond else { continue; };
+
+            if !state.internal_handler_enabled {
+                system
+                    .set_signal_handling(*signal, crate::system::SignalHandling::Default)
+                    .ok();
             }
         }
     }
@@ -424,7 +428,7 @@ impl TrapSet {
     /// This function does nothing if no trap action has been
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
-        if let Some(state) = self.signals.get_mut(&signal) {
+        if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
             if let Setting::UserSpecified(trap) = &mut state.current_setting {
                 trap.pending = true;
             }
@@ -439,10 +443,10 @@ impl TrapSet {
     /// If there is more than one caught signal, it is unspecified which one of
     /// them is returned. If there is no caught signal, `None` is returned.
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
-        self.signals
+        self.traps
             .iter_mut()
-            .find_map(|(signal, state)| match &mut state.current_setting {
-                Setting::UserSpecified(trap) if trap.pending => {
+            .find_map(|(cond, state)| match (cond, &mut state.current_setting) {
+                (Condition::Signal(signal), Setting::UserSpecified(trap)) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
                 }
@@ -459,7 +463,7 @@ impl TrapSet {
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
     pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
-        let entry = self.signals.entry(Signal::SIGCHLD);
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGCHLD));
         if let Entry::Occupied(occupied) = &entry {
             if occupied.get().internal_handler_enabled {
                 return Ok(());
@@ -499,7 +503,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        if let Some(state) = self.signals.get_mut(&Signal::SIGCHLD) {
+        if let Some(state) = self.traps.get_mut(&Condition::Signal(Signal::SIGCHLD)) {
             if state.internal_handler_enabled {
                 system.set_signal_handling(Signal::SIGCHLD, (&state.current_setting).into())?;
                 state.internal_handler_enabled = false;
