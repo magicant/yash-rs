@@ -29,6 +29,7 @@ use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
+use yash_env::trap::Condition;
 use yash_env::Env;
 use yash_quote::quoted;
 
@@ -67,11 +68,9 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
     let Field { value, origin } = operands.remove(0);
 
-    let signal_name = format!("SIG{}", operands[0].value);
-    // TODO Support real-time signals
-    let signal = match signal_name.parse() {
-        Ok(signal) => signal,
-        // TODO Print error message for the unknown signal
+    let cond = match operands[0].value.parse::<Condition>() {
+        Ok(cond) => cond,
+        // TODO Print error message for the unknown condition
         Err(_) => return Result::new(ExitStatus::FAILURE),
     };
     let action = match value.as_str() {
@@ -82,7 +81,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
     match env
         .traps
-        .set_action(&mut env.system, signal, action, origin, false)
+        .set_action(&mut env.system, cond, action, origin, false)
     {
         Ok(()) => Result::new(ExitStatus::SUCCESS),
         // TODO Print error message

@@ -104,6 +104,7 @@ impl std::str::FromStr for Condition {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // TODO Make case-insensitive
         // TODO Allow SIG-prefix
+        // TODO Support real-time signals
         match s {
             "EXIT" => Ok(Self::Exit),
             _ => match format!("SIG{s}").parse() {
@@ -303,10 +304,10 @@ impl TrapSet {
         }
     }
 
-    /// Sets a trap action for a signal.
+    /// Sets a trap action for a condition.
     ///
-    /// This function installs a signal handler to the specified underlying
-    /// system.
+    /// If the condition is a signal, this function installs a signal handler to
+    /// the specified underlying system.
     ///
     /// If `override_ignore` is `false`, you cannot set a trap for a signal that
     /// has been ignored since the shell startup. An interactive shell should
@@ -319,19 +320,30 @@ impl TrapSet {
     /// behavior and can be referenced later by [`get_state`](Self::get_state).
     ///
     /// This function clears all parent states remembered when [entering a
-    /// subshell](Self::enter_subshell), not only for `signal` but also for
-    /// other signals.
-    pub fn set_action<S: SignalSystem>(
+    /// subshell](Self::enter_subshell), not only for the specified condition
+    /// but also for all other conditions.
+    pub fn set_action<S: SignalSystem, C: Into<Condition>>(
         &mut self,
         system: &mut S,
-        signal: Signal,
+        cond: C,
         action: Action,
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
-        match signal {
-            Signal::SIGKILL => return Err(SetActionError::SIGKILL),
-            Signal::SIGSTOP => return Err(SetActionError::SIGSTOP),
+        self.set_action_impl(system, cond.into(), action, origin, override_ignore)
+    }
+
+    fn set_action_impl<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+        cond: Condition,
+        action: Action,
+        origin: Location,
+        override_ignore: bool,
+    ) -> Result<(), SetActionError> {
+        match cond {
+            Condition::Signal(Signal::SIGKILL) => return Err(SetActionError::SIGKILL),
+            Condition::Signal(Signal::SIGSTOP) => return Err(SetActionError::SIGSTOP),
             _ => (),
         }
 
@@ -343,18 +355,20 @@ impl TrapSet {
             pending: false,
         };
 
-        let entry = match self.traps.entry(Condition::Signal(signal)) {
+        let entry = match self.traps.entry(cond) {
             Entry::Vacant(vacant) => {
-                if !override_ignore {
-                    let initial_handling =
-                        system.set_signal_handling(signal, SignalHandling::Ignore)?;
-                    if initial_handling == SignalHandling::Ignore {
-                        vacant.insert(GrandState {
-                            current_setting: Setting::InitiallyIgnored,
-                            parent_setting: None,
-                            internal_handler_enabled: false,
-                        });
-                        return Err(SetActionError::InitiallyIgnored);
+                if let Condition::Signal(signal) = cond {
+                    if !override_ignore {
+                        let initial_handling =
+                            system.set_signal_handling(signal, SignalHandling::Ignore)?;
+                        if initial_handling == SignalHandling::Ignore {
+                            vacant.insert(GrandState {
+                                current_setting: Setting::InitiallyIgnored,
+                                parent_setting: None,
+                                internal_handler_enabled: false,
+                            });
+                            return Err(SetActionError::InitiallyIgnored);
+                        }
                     }
                 }
                 Entry::Vacant(vacant)
@@ -371,7 +385,9 @@ impl TrapSet {
             }
         };
 
-        system.set_signal_handling(signal, (&state.action).into())?;
+        if let Condition::Signal(signal) = cond {
+            system.set_signal_handling(signal, (&state.action).into())?;
+        }
 
         let state = GrandState {
             current_setting: Setting::UserSpecified(state),
