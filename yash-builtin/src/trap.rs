@@ -35,7 +35,7 @@ use yash_quote::quoted;
 /// Prints the currently configured traps.
 pub async fn print_traps(env: &mut Env) -> Result {
     let mut output = String::new();
-    for (&signal, current, parent) in env.traps.iter() {
+    for (cond, current, parent) in env.traps.iter() {
         let trap = match (current, parent) {
             (Some(trap), _) => trap,
             (None, Some(trap)) => trap,
@@ -46,8 +46,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
             Action::Ignore => "",
             Action::Command(command) => command,
         };
-        let signal = &signal.as_str()[3..];
-        writeln!(output, "trap -- {} {}", quoted(command), signal).ok();
+        writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
     env.print(&output).await
 }

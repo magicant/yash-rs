@@ -242,18 +242,17 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>);
-    fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
+    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+
+    fn next(&mut self) -> Option<(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)> {
         loop {
             let (cond, state) = self.inner.next()?;
             let current = &state.current_setting;
             let current = current.as_trap();
             let parent = &state.parent_setting;
             let parent = parent.as_ref().and_then(Setting::as_trap);
-            if let Condition::Signal(signal) = cond {
-                if current.is_some() || parent.is_some() {
-                    return Some((signal, current, parent));
-                }
+            if current.is_some() || parent.is_some() {
+                return Some((cond, current, parent));
             }
         }
     }
@@ -813,12 +812,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR1);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Signal::SIGUSR2);
+        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1.unwrap().action, command);
         assert_eq!(second.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);
@@ -854,12 +853,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR1);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Signal::SIGUSR2);
+        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1, None);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, origin_2);
@@ -890,7 +889,7 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR2);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(first.1.unwrap().action, command);
         assert_eq!(first.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);
