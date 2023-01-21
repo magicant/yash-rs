@@ -66,6 +66,13 @@ pub enum Condition {
     Signal(Signal),
 }
 
+/// Conversion from `Signal` to `Condition`
+impl From<Signal> for Condition {
+    fn from(signal: Signal) -> Self {
+        Self::Signal(signal)
+    }
+}
+
 /// Conversion from `Condition` to `String`
 ///
 /// The result is an uppercase string representing the condition such as
@@ -268,7 +275,7 @@ pub struct TrapSet {
 
 // TODO Extend internal handlers for other signals
 impl TrapSet {
-    /// Returns the current state for a signal.
+    /// Returns the current state for a condition.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
@@ -276,8 +283,15 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_state(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
-        match self.traps.get(&Condition::Signal(signal)) {
+    pub fn get_state<C: Into<Condition>>(
+        &self,
+        cond: C,
+    ) -> (Option<&TrapState>, Option<&TrapState>) {
+        self.get_state_impl(cond.into())
+    }
+
+    fn get_state_impl(&self, cond: Condition) -> (Option<&TrapState>, Option<&TrapState>) {
+        match self.traps.get(&cond) {
             None => (None, None),
             Some(state) => {
                 let current = &state.current_setting;
