@@ -31,32 +31,28 @@ use yash_syntax::source::Source;
 /// Executes the EXIT trap.
 ///
 /// If the EXIT trap is not set in the environment, this function does nothing.
-/// Otherwise, this function executes the EXIT trap and then executes signal
-/// traps that have been queued while the EXIT trap.
+/// Otherwise, this function executes the EXIT trap.
 ///
 /// The exit status of the trap is ignored: The exit status is saved on entry to
-/// this function and restored when finished.
-pub async fn run_exit_trap(env: &mut Env) -> Result {
-    if let Some(state) = env.traps.get_state(Condition::Exit).0 {
-        if let Action::Command(command) = &state.action {
-            let command = Rc::clone(command);
+/// this function and restored when finished. However, if the trap terminates
+/// with a `Break(divert)` where `divert.exit_status()` is `Some` exit status,
+/// that exit status is set to `env.exit_status`.
+pub async fn run_exit_trap(env: &mut Env) {
+    let Some(state) = env.traps.get_state(Condition::Exit).0 else { return; };
+    let Action::Command(command) = &state.action else { return; };
 
-            let condition = Condition::Exit.to_string();
-            let origin = state.origin.clone();
-            let mut lexer = Lexer::from_memory(&command, Source::Trap { condition, origin });
-            let mut env = env.push_frame(Frame::Trap);
-            let previous_exit_status = env.exit_status;
-            // Boxing needed for recursion
-            let future: Pin<Box<dyn Future<Output = Result>>> =
-                Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-            let result = future.await;
-            env.exit_status = previous_exit_status;
-            // TODO Should handle result here rather than returning it
-            return result;
-        }
-    }
-
-    Result::Continue(())
+    let command = Rc::clone(command);
+    let condition = Condition::Exit.to_string();
+    let origin = state.origin.clone();
+    let mut lexer = Lexer::from_memory(&command, Source::Trap { condition, origin });
+    let mut env = env.push_frame(Frame::Trap);
+    let previous_exit_status = env.exit_status;
+    // Boxing needed for recursion
+    let future: Pin<Box<dyn Future<Output = Result>>> =
+        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
+    let result = future.await;
+    env.exit_status = previous_exit_status;
+    env.apply_result(result);
 }
 
 #[cfg(test)]
@@ -68,6 +64,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::builtin::Builtin;
+    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::VirtualSystem;
@@ -76,8 +73,7 @@ mod tests {
     #[test]
     fn does_nothing_if_exit_trap_is_not_set() {
         let mut env = Env::new_virtual();
-        let result = run_exit_trap(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Result::Continue(()));
+        run_exit_trap(&mut env).now_or_never().unwrap();
     }
 
     #[test]
@@ -96,8 +92,7 @@ mod tests {
             )
             .unwrap();
 
-        let result = run_exit_trap(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Result::Continue(()));
+        run_exit_trap(&mut env).now_or_never().unwrap();
         assert_stdout(&state, |stdout| assert_eq!(stdout, "exit trap executed\n"));
     }
 
@@ -124,7 +119,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        let _ = run_exit_trap(&mut env).now_or_never().unwrap();
+        run_exit_trap(&mut env).now_or_never().unwrap();
     }
 
     #[test]
@@ -142,8 +137,7 @@ mod tests {
             .unwrap();
         env.exit_status = ExitStatus(42);
 
-        let result = run_exit_trap(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Result::Continue(()));
+        run_exit_trap(&mut env).now_or_never().unwrap();
         assert_eq!(env.exit_status, ExitStatus(42));
     }
 
@@ -164,13 +158,12 @@ mod tests {
             .unwrap();
         env.exit_status = ExitStatus(123);
 
-        let result = run_exit_trap(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Result::Continue(()));
+        run_exit_trap(&mut env).now_or_never().unwrap();
         assert_stdout(&state, |stdout| assert_eq!(stdout, "123\n0\n"));
     }
 
     #[test]
-    fn exit_from_trap() {
+    fn return_from_trap() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
         env.traps
@@ -183,12 +176,37 @@ mod tests {
             )
             .unwrap();
 
-        let result = run_exit_trap(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Result::Break(yash_env::semantics::Divert::Return));
+        run_exit_trap(&mut env).now_or_never().unwrap();
         // the exit status is restored
         assert_eq!(env.exit_status, ExitStatus::default());
     }
 
-    // TODO Should we suppress return/break/continue from trap?
-    // // TODO exit status on return/exit from trap
+    #[test]
+    fn exit_from_trap() {
+        fn execute(
+            _env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                let mut result = yash_env::builtin::Result::default();
+                result.set_divert(Result::Break(Divert::Exit(Some(ExitStatus(31)))));
+                result
+            })
+        }
+        let mut env = Env::new_virtual();
+        let r#type = yash_env::builtin::Type::Intrinsic;
+        env.builtins.insert("my_exit", Builtin { r#type, execute });
+        env.traps
+            .set_action(
+                &mut env.system,
+                Condition::Exit,
+                Action::Command("my_exit".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+
+        run_exit_trap(&mut env).now_or_never().unwrap();
+        assert_eq!(env.exit_status, ExitStatus(31));
+    }
 }

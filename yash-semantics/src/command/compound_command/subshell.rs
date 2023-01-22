@@ -56,8 +56,7 @@ async fn subshell_main(env: &mut Env, body: Rc<List>) -> Result {
     let result = body.execute(env).await;
     env.apply_result(result);
 
-    let result = run_exit_trap(env).await;
-    env.apply_result(result);
+    run_exit_trap(env).await;
 
     Continue(())
 }

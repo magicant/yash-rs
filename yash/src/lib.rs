@@ -34,6 +34,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
+    use yash_semantics::trap::run_exit_trap;
 
     let mut args = std::env::args();
     if let Some(arg0) = args.next() {
@@ -61,9 +62,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     let result = rel.run().await;
     env.apply_result(result);
 
-    // Run EXIT trap
-    let result = yash_semantics::trap::run_exit_trap(&mut env).await;
-    env.apply_result(result);
+    run_exit_trap(&mut env).await;
 
     env.exit_status.0
 }
