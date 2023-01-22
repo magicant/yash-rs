@@ -54,18 +54,10 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
 /// Executes the content of the shell.
 async fn subshell_main(env: &mut Env, body: Rc<List>) -> Result {
     let result = body.execute(env).await;
-    if let Break(divert) = result {
-        if let Some(exit_status) = divert.exit_status() {
-            env.exit_status = exit_status;
-        }
-    }
+    env.apply_result(result);
 
     let result = run_exit_trap(env).await;
-    if let Break(divert) = result {
-        if let Some(exit_status) = divert.exit_status() {
-            env.exit_status = exit_status;
-        }
-    }
+    env.apply_result(result);
 
     Continue(())
 }

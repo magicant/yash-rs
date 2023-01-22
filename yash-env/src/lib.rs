@@ -298,14 +298,8 @@ impl Env {
                 let mut env = env.push_frame(Frame::Subshell);
                 let env = &mut *env;
                 env.traps.enter_subshell(&mut env.system);
-                match f(env).await {
-                    Continue(()) => (),
-                    Break(divert) => {
-                        if let Some(exit_status) = divert.exit_status() {
-                            env.exit_status = exit_status
-                        }
-                    }
-                }
+                let result = f(env).await;
+                env.apply_result(result);
             })
         });
         let mut child = self.system.new_child_process()?;
@@ -464,6 +458,21 @@ impl Env {
             Break(Divert::Exit(None))
         } else {
             Continue(())
+        }
+    }
+
+    /// Updates the exit status from the given result.
+    ///
+    /// If `result` is a `Break(divert)` where `divert.exit_status()` is `Some`
+    /// exit status, this function sets `self.exit_status` to that exit status.
+    pub fn apply_result(&mut self, result: crate::semantics::Result) {
+        match result {
+            Continue(_) => {}
+            Break(divert) => {
+                if let Some(exit_status) = divert.exit_status() {
+                    self.exit_status = exit_status;
+                }
+            }
         }
     }
 }
@@ -866,5 +875,26 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus::FAILURE;
         assert_eq!(env.apply_errexit(), Continue(()));
+    }
+
+    #[test]
+    fn apply_result_with_continue() {
+        let mut env = Env::new_virtual();
+        env.apply_result(Continue(()));
+        assert_eq!(env.exit_status, ExitStatus::default());
+    }
+
+    #[test]
+    fn apply_result_with_divert_without_exit_status() {
+        let mut env = Env::new_virtual();
+        env.apply_result(Break(Divert::Exit(None)));
+        assert_eq!(env.exit_status, ExitStatus::default());
+    }
+
+    #[test]
+    fn apply_result_with_divert_with_exit_status() {
+        let mut env = Env::new_virtual();
+        env.apply_result(Break(Divert::Exit(Some(ExitStatus(67)))));
+        assert_eq!(env.exit_status, ExitStatus(67));
     }
 }
