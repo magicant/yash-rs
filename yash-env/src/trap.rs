@@ -14,21 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Type definitions for signal handling settings.
+//! Signal and other event handling settings.
 //!
-//! [`TrapSet`] is part of an [`Env`](crate::Env) that remembers the trap
-//! configured for each signal and manages the signal handlers installed to the
-//! underlying system. `TrapSet` acts as a decorator for a [`SignalSystem`]
-//! implementor. Methods of `TrapSet` expect they are passed the same system
-//! instance in every call.
+//! The trap is a mechanism of the shell that allows you to configure event
+//! handlers for specific situations. A [`TrapSet`] is a mapping from [`Condition`]s to
+//! [`Action`]s. When the mapping is modified, it updates the corresponding signal
+//! disposition in the underlying system through a [`SignalSystem`] implementor.
+//! Methods of `TrapSet` expect they are passed the same system instance in
+//! every call to keep it in a correct state.
 //!
 //! `TrapSet` manages two types of signal handling configurations. One is
 //! user-defined traps, which the user explicitly configures with the trap
 //! built-in. The other is internal handlers, which the shell implicitly
-//! installs to implement additional actions the shell must perform.
-//! `TrapSet` merges the two configurations into a single
-//! [`system::SignalHandling`](SignalHandling) for each signal and sets it to
-//! the system.
+//! installs to the system to implement additional actions it needs to perform.
+//! `TrapSet` merges the two configurations into a single [`SignalHandling`] for
+//! each signal and sets it to the system.
+//!
+//! No signal handling is involved for conditions other than signals, and the
+//! trap set serves only as a storage for action settings.
 
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
@@ -54,15 +57,74 @@ pub trait SignalSystem {
     ) -> Result<SignalHandling, Errno>;
 }
 
-/// Action performed when a signal is delivered to the shell process.
+/// Condition under which an [`Action`] is executed
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Condition {
+    /// When the shell exits
+    Exit,
+    /// When the specified signal is delivered to the shell process
+    Signal(Signal),
+}
+
+/// Conversion from `Signal` to `Condition`
+impl From<Signal> for Condition {
+    fn from(signal: Signal) -> Self {
+        Self::Signal(signal)
+    }
+}
+
+/// Conversion from `Condition` to `String`
+///
+/// The result is an uppercase string representing the condition such as
+/// `"EXIT"` and `"TERM"`.
+impl std::fmt::Display for Condition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Condition::Exit => "EXIT".fmt(f),
+            Condition::Signal(signal) => {
+                let full_name = signal.as_str();
+                let name = full_name.strip_prefix("SIG").unwrap_or(full_name);
+                name.fmt(f)
+            }
+        }
+    }
+}
+
+/// Error in conversion from string to [`Condition`]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ParseConditionError;
+
+/// Conversion from `String` to `Condition`
+///
+/// This implementation supports parsing uppercase strings like `"EXIT"` and
+/// `"TERM"`.
+impl std::str::FromStr for Condition {
+    type Err = ParseConditionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO Make case-insensitive
+        // TODO Allow SIG-prefix
+        // TODO Support real-time signals
+        match s {
+            "EXIT" => Ok(Self::Exit),
+            _ => match format!("SIG{s}").parse() {
+                Ok(signal) => Ok(Self::Signal(signal)),
+                Err(_) => Err(ParseConditionError),
+            },
+        }
+    }
+}
+
+/// Action performed when a [`Condition`] is met
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action {
-    /// Performs the default signal action.
+    /// Performs the default action.
     ///
-    /// The behavior depends on the signal delivered.
+    /// For signal conditions, the behavior depends on the signal delivered.
+    /// For other conditions, this is equivalent to `Ignore`.
     Default,
 
-    /// Ignores the delivered signal.
+    /// Pretends as if the condition was not met.
     Ignore,
 
     /// Executes a command string.
@@ -118,25 +180,29 @@ impl From<Errno> for SetActionError {
     }
 }
 
-/// State of the trap action for a signal.
+/// State of the trap action for a condition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrapState {
-    /// Action taken when the signal is delivered to the shell process.
+    /// Action taken when the condition is met.
     pub action: Action,
-    /// Location of the simple command that invoked the trap built-in that has set this trap.
+    /// Location of the simple command that invoked the trap built-in that set
+    /// the current action.
     pub origin: Location,
-    /// True iff the signal has been caught and the trap command has not yet executed.
+    /// True iff a signal specified by the condition has been caught and the
+    /// action command has not yet executed.
     pub pending: bool,
 }
 
-/// User-visible signal setting.
+/// User-visible trap setting.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Setting {
-    /// The user has not yet set a trap for the signal, and the disposition the
-    /// shell has inherited from the pre-exec process is `SIG_DFL`.
+    /// The user has not yet set a trap for the signal specified by the
+    /// condition, and the signal disposition the shell has inherited from the
+    /// pre-exec process is `SIG_DFL`.
     InitiallyDefaulted,
-    /// The user has not yet set a trap for the signal, and the disposition the
-    /// shell has inherited from the pre-exec process is `SIG_IGN`.
+    /// The user has not yet set a trap for the signal specified by the
+    /// condition, and the signal disposition the shell has inherited from the
+    /// pre-exec process is `SIG_IGN`.
     InitiallyIgnored,
     /// User-defined trap.
     UserSpecified(TrapState),
@@ -162,7 +228,7 @@ impl From<&Setting> for SignalHandling {
     }
 }
 
-/// Whole configuration for a signal.
+/// Whole configuration and state for a trap condition.
 #[derive(Clone, Debug)]
 struct GrandState {
     /// Setting that is effective in the current environment.
@@ -180,36 +246,37 @@ struct GrandState {
 /// [`TrapSet::iter`] returns this type of iterator.
 #[must_use]
 pub struct Iter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Signal, GrandState>,
+    inner: std::collections::btree_map::Iter<'a, Condition, GrandState>,
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>);
-    fn next(&mut self) -> Option<(&'a Signal, Option<&'a TrapState>, Option<&'a TrapState>)> {
+    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+
+    fn next(&mut self) -> Option<(&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>)> {
         loop {
-            let item = self.inner.next()?;
-            let current = &item.1.current_setting;
+            let (cond, state) = self.inner.next()?;
+            let current = &state.current_setting;
             let current = current.as_trap();
-            let parent = &item.1.parent_setting;
+            let parent = &state.parent_setting;
             let parent = parent.as_ref().and_then(Setting::as_trap);
             if current.is_some() || parent.is_some() {
-                return Some((item.0, current, parent));
+                return Some((cond, current, parent));
             }
         }
     }
 }
 
-/// Collection of signal handling settings.
+/// Collection of event handling settings.
 ///
 /// See the [module documentation](self) for details.
 #[derive(Clone, Debug, Default)]
 pub struct TrapSet {
-    signals: BTreeMap<Signal, GrandState>,
+    traps: BTreeMap<Condition, GrandState>,
 }
 
 // TODO Extend internal handlers for other signals
 impl TrapSet {
-    /// Returns the current state for a signal.
+    /// Returns the current state for a condition.
     ///
     /// This function returns a pair of optional trap states. The first is the
     /// currently configured trap action, and the second is the action set
@@ -217,8 +284,15 @@ impl TrapSet {
     ///
     /// This function does not reflect the initial signal actions the shell
     /// inherited on startup.
-    pub fn get_state(&self, signal: Signal) -> (Option<&TrapState>, Option<&TrapState>) {
-        match self.signals.get(&signal) {
+    pub fn get_state<C: Into<Condition>>(
+        &self,
+        cond: C,
+    ) -> (Option<&TrapState>, Option<&TrapState>) {
+        self.get_state_impl(cond.into())
+    }
+
+    fn get_state_impl(&self, cond: Condition) -> (Option<&TrapState>, Option<&TrapState>) {
+        match self.traps.get(&cond) {
             None => (None, None),
             Some(state) => {
                 let current = &state.current_setting;
@@ -230,10 +304,10 @@ impl TrapSet {
         }
     }
 
-    /// Sets a trap action for a signal.
+    /// Sets a trap action for a condition.
     ///
-    /// This function installs a signal handler to the specified underlying
-    /// system.
+    /// If the condition is a signal, this function installs a signal handler to
+    /// the specified underlying system.
     ///
     /// If `override_ignore` is `false`, you cannot set a trap for a signal that
     /// has been ignored since the shell startup. An interactive shell should
@@ -246,19 +320,30 @@ impl TrapSet {
     /// behavior and can be referenced later by [`get_state`](Self::get_state).
     ///
     /// This function clears all parent states remembered when [entering a
-    /// subshell](Self::enter_subshell), not only for `signal` but also for
-    /// other signals.
-    pub fn set_action<S: SignalSystem>(
+    /// subshell](Self::enter_subshell), not only for the specified condition
+    /// but also for all other conditions.
+    pub fn set_action<S: SignalSystem, C: Into<Condition>>(
         &mut self,
         system: &mut S,
-        signal: Signal,
+        cond: C,
         action: Action,
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
-        match signal {
-            Signal::SIGKILL => return Err(SetActionError::SIGKILL),
-            Signal::SIGSTOP => return Err(SetActionError::SIGSTOP),
+        self.set_action_impl(system, cond.into(), action, origin, override_ignore)
+    }
+
+    fn set_action_impl<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+        cond: Condition,
+        action: Action,
+        origin: Location,
+        override_ignore: bool,
+    ) -> Result<(), SetActionError> {
+        match cond {
+            Condition::Signal(Signal::SIGKILL) => return Err(SetActionError::SIGKILL),
+            Condition::Signal(Signal::SIGSTOP) => return Err(SetActionError::SIGSTOP),
             _ => (),
         }
 
@@ -270,18 +355,20 @@ impl TrapSet {
             pending: false,
         };
 
-        let entry = match self.signals.entry(signal) {
+        let entry = match self.traps.entry(cond) {
             Entry::Vacant(vacant) => {
-                if !override_ignore {
-                    let initial_handling =
-                        system.set_signal_handling(signal, SignalHandling::Ignore)?;
-                    if initial_handling == SignalHandling::Ignore {
-                        vacant.insert(GrandState {
-                            current_setting: Setting::InitiallyIgnored,
-                            parent_setting: None,
-                            internal_handler_enabled: false,
-                        });
-                        return Err(SetActionError::InitiallyIgnored);
+                if let Condition::Signal(signal) = cond {
+                    if !override_ignore {
+                        let initial_handling =
+                            system.set_signal_handling(signal, SignalHandling::Ignore)?;
+                        if initial_handling == SignalHandling::Ignore {
+                            vacant.insert(GrandState {
+                                current_setting: Setting::InitiallyIgnored,
+                                parent_setting: None,
+                                internal_handler_enabled: false,
+                            });
+                            return Err(SetActionError::InitiallyIgnored);
+                        }
                     }
                 }
                 Entry::Vacant(vacant)
@@ -298,7 +385,9 @@ impl TrapSet {
             }
         };
 
-        system.set_signal_handling(signal, (&state.action).into())?;
+        if let Condition::Signal(signal) = cond {
+            system.set_signal_handling(signal, (&state.action).into())?;
+        }
 
         let state = GrandState {
             current_setting: Setting::UserSpecified(state),
@@ -315,7 +404,7 @@ impl TrapSet {
     }
 
     fn clear_parent_settings(&mut self) {
-        for state in self.signals.values_mut() {
+        for state in self.traps.values_mut() {
             state.parent_setting = None;
         }
     }
@@ -326,7 +415,7 @@ impl TrapSet {
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
     pub fn iter(&self) -> Iter<'_> {
-        let inner = self.signals.iter();
+        let inner = self.traps.iter();
         Iter { inner }
     }
 
@@ -344,19 +433,21 @@ impl TrapSet {
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S) {
         self.clear_parent_settings();
 
-        for (&signal, state) in &mut self.signals {
-            if let Setting::UserSpecified(trap) = &state.current_setting {
-                if let Action::Command(_) = &trap.action {
-                    state.parent_setting = Some(std::mem::replace(
-                        &mut state.current_setting,
-                        Setting::InitiallyDefaulted,
-                    ));
-                    if !state.internal_handler_enabled {
-                        system
-                            .set_signal_handling(signal, crate::system::SignalHandling::Default)
-                            .ok();
-                    }
-                }
+        for (cond, state) in &mut self.traps {
+            let Setting::UserSpecified(trap) = &state.current_setting else { continue; };
+            let Action::Command(_) = &trap.action else { continue; };
+
+            state.parent_setting = Some(std::mem::replace(
+                &mut state.current_setting,
+                Setting::InitiallyDefaulted,
+            ));
+
+            let Condition::Signal(signal) = cond else { continue; };
+
+            if !state.internal_handler_enabled {
+                system
+                    .set_signal_handling(*signal, crate::system::SignalHandling::Default)
+                    .ok();
             }
         }
     }
@@ -366,7 +457,7 @@ impl TrapSet {
     /// This function does nothing if no trap action has been
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
-        if let Some(state) = self.signals.get_mut(&signal) {
+        if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
             if let Setting::UserSpecified(trap) = &mut state.current_setting {
                 trap.pending = true;
             }
@@ -381,10 +472,10 @@ impl TrapSet {
     /// If there is more than one caught signal, it is unspecified which one of
     /// them is returned. If there is no caught signal, `None` is returned.
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
-        self.signals
+        self.traps
             .iter_mut()
-            .find_map(|(signal, state)| match &mut state.current_setting {
-                Setting::UserSpecified(trap) if trap.pending => {
+            .find_map(|(cond, state)| match (cond, &mut state.current_setting) {
+                (Condition::Signal(signal), Setting::UserSpecified(trap)) if trap.pending => {
                     trap.pending = false;
                     Some((*signal, &*trap))
                 }
@@ -401,7 +492,7 @@ impl TrapSet {
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
     pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
-        let entry = self.signals.entry(Signal::SIGCHLD);
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGCHLD));
         if let Entry::Occupied(occupied) = &entry {
             if occupied.get().internal_handler_enabled {
                 return Ok(());
@@ -441,7 +532,7 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        if let Some(state) = self.signals.get_mut(&Signal::SIGCHLD) {
+        if let Some(state) = self.traps.get_mut(&Condition::Signal(Signal::SIGCHLD)) {
             if state.internal_handler_enabled {
                 system.set_signal_handling(Signal::SIGCHLD, (&state.current_setting).into())?;
                 state.internal_handler_enabled = false;
@@ -470,6 +561,19 @@ mod tests {
                 .insert(signal, handling)
                 .unwrap_or(SignalHandling::Default))
         }
+    }
+
+    #[test]
+    fn condition_display() {
+        assert_eq!(Condition::Exit.to_string(), "EXIT");
+        assert_eq!(Condition::Signal(Signal::SIGINT).to_string(), "INT");
+    }
+
+    #[test]
+    fn condition_from_str() {
+        assert_eq!("EXIT".parse(), Ok(Condition::Exit));
+        assert_eq!("TERM".parse(), Ok(Condition::Signal(Signal::SIGTERM)));
+        assert_eq!("FOO".parse::<Condition>(), Err(ParseConditionError));
     }
 
     #[test]
@@ -738,12 +842,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR1);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Signal::SIGUSR2);
+        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1.unwrap().action, command);
         assert_eq!(second.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);
@@ -779,12 +883,12 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR1);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR1));
         assert_eq!(first.1.unwrap().action, Action::Ignore);
         assert_eq!(first.1.unwrap().origin, origin_1);
         assert_eq!(first.2, None);
         let second = i.next().unwrap();
-        assert_eq!(second.0, &Signal::SIGUSR2);
+        assert_eq!(second.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(second.1, None);
         assert_eq!(second.2.unwrap().action, command);
         assert_eq!(second.2.unwrap().origin, origin_2);
@@ -815,7 +919,7 @@ mod tests {
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
-        assert_eq!(first.0, &Signal::SIGUSR2);
+        assert_eq!(first.0, &Condition::Signal(Signal::SIGUSR2));
         assert_eq!(first.1.unwrap().action, command);
         assert_eq!(first.1.unwrap().origin, origin_2);
         assert_eq!(first.2, None);
