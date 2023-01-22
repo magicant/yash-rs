@@ -51,6 +51,7 @@ pub async fn run_exit_trap(env: &mut Env) -> Result {
                 Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
             let result = future.await;
             env.exit_status = previous_exit_status;
+            // TODO Should handle result here rather than returning it
             return result;
         }
     }
