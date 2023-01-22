@@ -39,7 +39,7 @@
 //!
 //! # Non-signal traps
 //!
-//! TODO: Not yet implemented
+//! TODO: Document
 
 use crate::ReadEvalLoop;
 use std::future::Future;
@@ -101,6 +101,9 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
 
     Continue(())
 }
+
+mod exit;
+pub use exit::run_exit_trap;
 
 #[cfg(test)]
 mod tests {
@@ -189,6 +192,8 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
+
+    // TODO allow_reentrance_in_exit_trap
 
     #[test]
     fn allow_reentrance_in_subshell() {

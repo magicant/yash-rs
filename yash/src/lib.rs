@@ -64,6 +64,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
             env.exit_status = exit_status;
         }
     }
+    // TODO Run EXIT trap
     env.exit_status.0
 }
 
