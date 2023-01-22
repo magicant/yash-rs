@@ -51,6 +51,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     }
     env.init_variables();
 
+    // Run the read-eval loop
     let mut input = Box::new(Stdin::new(env.system.clone()));
     let echo = Rc::new(Cell::new(Off));
     input.set_echo(Some(Rc::clone(&echo)));
@@ -64,7 +65,15 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
             env.exit_status = exit_status;
         }
     }
-    // TODO Run EXIT trap
+
+    // Run EXIT trap
+    let result = yash_semantics::trap::run_exit_trap(&mut env).await;
+    if let Break(divert) = result {
+        if let Some(exit_status) = divert.exit_status() {
+            env.exit_status = exit_status;
+        }
+    }
+
     env.exit_status.0
 }
 
