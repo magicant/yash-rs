@@ -16,15 +16,16 @@
 
 //! Handling traps.
 //!
-//! A _trap_ is an event handling mechanism in the shell. The user can prepare a
-//! trap by using the `trap` built-in so that the shell runs desired commands in
-//! response to a specific event happening later. This module contains functions
-//! to detect the occurrence of events and run trap commands accordingly.
+//! _Traps_ are an event-handling mechanism in the shell. The user can prepare a
+//! trap by using the trap built-in so that the shell performs a desired action
+//! in response to a specific condition that may occur later. This module
+//! contains functions to detect the conditions and run trap actions
+//! accordingly.
 //!
 //! # Related items
 //!
-//! Traps set by the user are stored in a [trap set](TrapSet) provided by the
-//! [`yash_env`] crate.
+//! Traps set by the user are stored in a [trap set](TrapSet) implemented in the
+//! [`yash_env::trap`] module.
 //! The `trap` built-in is implemented in the `yash_builtin` crate.
 //!
 //! # Signal traps
@@ -39,7 +40,9 @@
 //!
 //! # Non-signal traps
 //!
-//! TODO: Document
+//! The EXIT trap is executed when the shell exits normally, by running the exit
+//! built-in or reaching the end of the script. The [`run_exit_trap`] function,
+//! which should be called before exiting, runs the trap.
 
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
