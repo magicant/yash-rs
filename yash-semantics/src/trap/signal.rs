@@ -23,6 +23,7 @@ use std::pin::Pin;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
+use yash_env::trap::Condition;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
@@ -34,7 +35,7 @@ fn in_trap(env: &Env) -> bool {
         .iter()
         .rev()
         .take_while(|frame| **frame != Frame::Subshell)
-        .any(|frame| *frame == Frame::Trap)
+        .any(|frame| matches!(*frame, Frame::Trap(_)))
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -65,7 +66,7 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let condition = signal.to_string();
         let origin = state.origin.clone();
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
-        let mut env = env.push_frame(Frame::Trap);
+        let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
         let previous_exit_status = env.exit_status;
         // Boxing needed for recursion
         let future: Pin<Box<dyn Future<Output = Result>>> =
@@ -157,7 +158,7 @@ mod tests {
     fn no_reentrance() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let mut env = env.push_frame(Frame::Trap);
+        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -171,7 +172,7 @@ mod tests {
     fn allow_reentrance_in_subshell() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let mut env = env.push_frame(Frame::Trap);
+        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
         let mut env = env.push_frame(Frame::Subshell);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -187,7 +188,10 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(&env.stack[0], Frame::Trap);
+                assert_matches!(
+                    &env.stack[0],
+                    Frame::Trap(Condition::Signal(Signal::SIGINT))
+                );
                 Default::default()
             })
         }

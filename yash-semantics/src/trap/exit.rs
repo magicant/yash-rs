@@ -45,7 +45,7 @@ pub async fn run_exit_trap(env: &mut Env) {
     let condition = Condition::Exit.to_string();
     let origin = state.origin.clone();
     let mut lexer = Lexer::from_memory(&command, Source::Trap { condition, origin });
-    let mut env = env.push_frame(Frame::Trap);
+    let mut env = env.push_frame(Frame::Trap(Condition::Exit));
     let previous_exit_status = env.exit_status;
     // Boxing needed for recursion
     let future: Pin<Box<dyn Future<Output = Result>>> =
@@ -103,7 +103,7 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(&env.stack[0], Frame::Trap);
+                assert_matches!(&env.stack[0], Frame::Trap(Condition::Exit));
                 Default::default()
             })
         }

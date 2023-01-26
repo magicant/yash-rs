@@ -64,7 +64,7 @@ pub enum Frame {
     },
 
     /// Trap
-    Trap,
+    Trap(crate::trap::Condition),
     // TODO dot script, eval
 }
 
@@ -233,7 +233,7 @@ mod tests {
             is_special: false,
         });
         assert_eq!(stack.loop_count(usize::MAX), 0);
-        let stack = stack.push(Frame::Trap);
+        let stack = stack.push(Frame::Condition);
         assert_eq!(stack.loop_count(usize::MAX), 0);
     }
 
@@ -242,7 +242,7 @@ mod tests {
         let mut stack = Stack::default();
         let mut stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 1);
-        let stack = stack.push(Frame::Trap);
+        let stack = stack.push(Frame::Condition);
         assert_eq!(stack.loop_count(usize::MAX), 1);
     }
 
@@ -250,10 +250,10 @@ mod tests {
     fn loop_count_with_two_loops() {
         let mut stack = Stack::default();
         let mut stack = stack.push(Frame::Loop);
-        let mut stack = stack.push(Frame::Trap);
+        let mut stack = stack.push(Frame::Condition);
         let mut stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 2);
-        let stack = stack.push(Frame::Trap);
+        let stack = stack.push(Frame::Condition);
         assert_eq!(stack.loop_count(usize::MAX), 2);
     }
 
@@ -277,7 +277,7 @@ mod tests {
     fn loop_count_with_small_max_count() {
         let mut stack = Stack::default();
         let mut stack = stack.push(Frame::Loop);
-        let mut stack = stack.push(Frame::Trap);
+        let mut stack = stack.push(Frame::Condition);
         let mut stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 2);
         assert_eq!(stack.loop_count(3), 2);
