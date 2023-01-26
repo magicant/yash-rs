@@ -35,7 +35,7 @@ fn in_trap(env: &Env) -> bool {
         .iter()
         .rev()
         .take_while(|frame| **frame != Frame::Subshell)
-        .any(|frame| matches!(*frame, Frame::Trap(_)))
+        .any(|frame| matches!(*frame, Frame::Trap(Condition::Signal(_))))
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -166,7 +166,17 @@ mod tests {
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
 
-    // TODO allow_reentrance_in_exit_trap
+    #[test]
+    fn allow_reentrance_in_exit_trap() {
+        let (mut env, system) = signal_env();
+        raise_signal(&system, Signal::SIGINT);
+        let mut env = env.push_frame(Frame::Trap(Condition::Exit));
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Continue(()));
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "trapped\n"));
+    }
 
     #[test]
     fn allow_reentrance_in_subshell() {
