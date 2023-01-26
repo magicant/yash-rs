@@ -30,11 +30,11 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use env::option::State::Off;
     use std::cell::Cell;
     use std::num::NonZeroU64;
-    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
+    use yash_semantics::trap::run_exit_trap;
 
     let mut args = std::env::args();
     if let Some(arg0) = args.next() {
@@ -51,6 +51,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     }
     env.init_variables();
 
+    // Run the read-eval loop
     let mut input = Box::new(Stdin::new(env.system.clone()));
     let echo = Rc::new(Cell::new(Off));
     input.set_echo(Some(Rc::clone(&echo)));
@@ -59,11 +60,10 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     let mut rel = semantics::ReadEvalLoop::new(&mut env, &mut lexer);
     rel.set_verbose(Some(echo));
     let result = rel.run().await;
-    if let Break(divert) = result {
-        if let Some(exit_status) = divert.exit_status() {
-            env.exit_status = exit_status;
-        }
-    }
+    env.apply_result(result);
+
+    run_exit_trap(&mut env).await;
+
     env.exit_status.0
 }
 

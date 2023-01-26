@@ -16,8 +16,9 @@
 
 //! Semantics of subshell compound commands
 
+use crate::trap::run_exit_trap;
 use crate::Command;
-use std::ops::ControlFlow::Break;
+use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::semantics::Divert;
@@ -30,7 +31,7 @@ use yash_syntax::syntax::List;
 /// Executes a subshell command
 pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
     let result = env
-        .run_in_subshell(|sub_env| Box::pin(async move { body.execute(sub_env).await }))
+        .run_in_subshell(|sub_env| Box::pin(async move { subshell_main(sub_env, body).await }))
         .await;
     match result {
         Ok(exit_status) => {
@@ -50,6 +51,16 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     }
 }
 
+/// Executes the content of the shell.
+async fn subshell_main(env: &mut Env, body: Rc<List>) -> Result {
+    let result = body.execute(env).await;
+    env.apply_result(result);
+
+    run_exit_trap(env).await;
+
+    Continue(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,7 +70,8 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
-    use std::ops::ControlFlow::Continue;
+    use std::future::Future;
+    use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
@@ -77,6 +89,35 @@ mod tests {
             assert_eq!(env.exit_status, ExitStatus(123));
             assert_eq!(env.variables.get("foo"), None);
             assert_stdout(&state, |stdout| assert_eq!(stdout, "bar\n"));
+        })
+    }
+
+    #[test]
+    fn divert_in_subshell() {
+        fn exit_builtin(
+            _env: &mut Env,
+            _args: Vec<yash_env::semantics::Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                let mut result = yash_env::builtin::Result::default();
+                result.set_divert(Break(Divert::Exit(Some(ExitStatus(21)))));
+                result
+            })
+        }
+
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.builtins.insert(
+                "exit",
+                yash_env::builtin::Builtin {
+                    r#type: yash_env::builtin::Type::Special,
+                    execute: exit_builtin,
+                },
+            );
+
+            let command: CompoundCommand = "(exit)".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(21));
         })
     }
 
@@ -102,6 +143,45 @@ mod tests {
             let result = command.execute(&mut env).await;
             assert_eq!(result, Break(Divert::Exit(None)));
             assert_eq!(env.exit_status, ExitStatus(42));
+        })
+    }
+
+    #[test]
+    #[ignore]
+    fn exit_trap() {
+        fn trap_builtin(
+            env: &mut Env,
+            _args: Vec<yash_env::semantics::Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            Box::pin(async move {
+                env.traps
+                    .set_action(
+                        &mut env.system,
+                        yash_env::trap::Condition::Exit,
+                        yash_env::trap::Action::Command("echo exiting".into()),
+                        Location::dummy(""),
+                        false,
+                    )
+                    .unwrap();
+                yash_env::builtin::Result::default()
+            })
+        }
+
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert("echo", echo_builtin());
+            env.builtins.insert(
+                "trap",
+                yash_env::builtin::Builtin {
+                    r#type: yash_env::builtin::Type::Special,
+                    execute: trap_builtin,
+                },
+            );
+
+            let command: CompoundCommand = "(trap)".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "exiting\n"));
         })
     }
 }
