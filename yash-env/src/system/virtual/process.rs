@@ -42,6 +42,9 @@ pub struct Process {
     /// Process ID of the parent process.
     pub(crate) ppid: Pid,
 
+    /// Process group ID of this process
+    pub(crate) pgid: Pid,
+
     /// Set of file descriptors open in this process.
     pub(crate) fds: BTreeMap<Fd, FdBody>,
 
@@ -108,9 +111,10 @@ fn min_unused_fd<'a, I: IntoIterator<Item = &'a Fd>>(min: Fd, existings: I) -> F
 
 impl Process {
     /// Creates a new running process.
-    pub fn with_parent(ppid: Pid) -> Process {
+    pub fn with_parent_and_group(ppid: Pid, pgid: Pid) -> Process {
         Process {
             ppid,
+            pgid,
             fds: BTreeMap::new(),
             cwd: PathBuf::new(),
             state: ProcessState::Running,
@@ -129,7 +133,7 @@ impl Process {
     ///
     /// Some part of the parent process state is copied to the new process.
     pub fn fork_from(ppid: Pid, parent: &Process) -> Process {
-        let mut child = Self::with_parent(ppid);
+        let mut child = Self::with_parent_and_group(ppid, parent.pgid);
         child.fds = parent.fds.clone();
         child.signal_handlings = parent.signal_handlings.clone();
         child.blocked_signals = parent.blocked_signals;
@@ -142,6 +146,13 @@ impl Process {
     #[must_use]
     pub fn ppid(&self) -> Pid {
         self.ppid
+    }
+
+    /// Returns the process group ID of this process.
+    #[inline(always)]
+    #[must_use]
+    pub fn pgid(&self) -> Pid {
+        self.pgid
     }
 
     /// Returns FDs open in this process.
@@ -441,7 +452,7 @@ mod tests {
     }
 
     fn process_with_pipe() -> (Process, Fd, Fd) {
-        let mut process = Process::with_parent(Pid::from_raw(10));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
 
         let file = Rc::new(RefCell::new(INode {
             body: FileBody::Fifo {
@@ -496,7 +507,7 @@ mod tests {
 
     #[test]
     fn process_default_signal_blocking_mask() {
-        let process = Process::with_parent(Pid::from_raw(10));
+        let process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
         let initial_set = process.blocked_signals();
         for signal in Signal::iterator() {
             assert!(!initial_set.contains(signal), "contained signal {}", signal);
@@ -505,7 +516,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_setmask() {
-        let mut process = Process::with_parent(Pid::from_raw(10));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -531,7 +542,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_block() {
-        let mut process = Process::with_parent(Pid::from_raw(10));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -557,7 +568,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_unblock() {
-        let mut process = Process::with_parent(Pid::from_raw(10));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -578,7 +589,7 @@ mod tests {
 
     #[test]
     fn process_set_signal_handling() {
-        let mut process = Process::with_parent(Pid::from_raw(100));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(100), Pid::from_raw(11));
         let old_handling = process.set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
         assert_eq!(old_handling, SignalHandling::Default);
         let old_handling = process.set_signal_handling(Signal::SIGTERM, SignalHandling::Catch);
@@ -599,7 +610,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_nop() {
-        let mut process = Process::with_parent(Pid::from_raw(42));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.raise_signal(Signal::SIGCHLD);
         assert_eq!(process.state(), ProcessState::Running);
     }
@@ -607,7 +618,7 @@ mod tests {
     #[test]
     #[ignore] // TODO enable this test case
     fn process_raise_signal_default_terminating() {
-        let mut process = Process::with_parent(Pid::from_raw(42));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.raise_signal(Signal::SIGTERM);
         assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGTERM));
         assert_eq!(process.caught_signals, []);
@@ -619,7 +630,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_ignored() {
-        let mut process = Process::with_parent(Pid::from_raw(42));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Ignore);
         process.raise_signal(Signal::SIGCHLD);
         assert_eq!(process.state(), ProcessState::Running);
@@ -628,7 +639,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_caught() {
-        let mut process = Process::with_parent(Pid::from_raw(42));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
         process.raise_signal(Signal::SIGCHLD);
         assert_eq!(process.state(), ProcessState::Running);
@@ -646,7 +657,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_blocked() {
-        let mut process = Process::with_parent(Pid::from_raw(42));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
         process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCHLD]));
         process.raise_signal(Signal::SIGCHLD);

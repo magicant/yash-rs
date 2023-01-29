@@ -130,7 +130,7 @@ impl VirtualSystem {
     /// `/tmp`.
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
-        let mut process = Process::with_parent(Pid::from_raw(1));
+        let mut process = Process::with_parent_and_group(Pid::from_raw(1), Pid::from_raw(1));
 
         let mut set_std_fd = |path, fd| {
             let file = Rc::new(RefCell::new(INode::new([])));
