@@ -321,6 +321,10 @@ impl System for RealSystem {
         nix::unistd::getppid()
     }
 
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
+        nix::unistd::setpgid(pid, pgid)
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

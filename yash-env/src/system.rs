@@ -289,6 +289,11 @@ pub trait System: Debug {
     #[must_use]
     fn getppid(&self) -> Pid;
 
+    /// Modifies the process group ID of a process.
+    ///
+    /// This is a thin wrapper around the `setpgid` system call.
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()>;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -735,6 +740,9 @@ impl System for SharedSystem {
     }
     fn getppid(&self) -> Pid {
         self.0.borrow().getppid()
+    }
+    fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
+        self.0.borrow_mut().setpgid(pid, pgid)
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
