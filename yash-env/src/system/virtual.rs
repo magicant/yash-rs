@@ -680,6 +680,9 @@ impl System for VirtualSystem {
         self.current_process().ppid
     }
 
+    /// Modifies the process group ID of a process.
+    ///
+    /// The current implementation does not yet support the concept of sessions.
     fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> nix::Result<()> {
         if pgid.as_raw() < 0 {
             return Err(Errno::EINVAL);
@@ -706,6 +709,24 @@ impl System for VirtualSystem {
         process.pgid = pgid;
         Ok(())
         // TODO Support sessions
+    }
+
+    /// Switches the foreground process.
+    ///
+    /// The current implementation does not yet support the concept of
+    /// controlling terminals and sessions. It accepts any open file descriptor.
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+        // Make sure the FD is open
+        self.with_open_file_description(fd, |_| Ok(()))?;
+
+        // Make sure the process group exists
+        let mut state = self.state.borrow_mut();
+        if !state.processes.values().any(|p| p.pgid == pgid) {
+            return Err(Errno::EPERM);
+        }
+
+        state.foreground = Some(pgid);
+        Ok(())
     }
 
     /// Creates a new child process.
@@ -874,6 +895,13 @@ pub struct SystemState {
 
     /// Processes running in the system.
     pub processes: BTreeMap<Pid, Process>,
+
+    /// Process group ID of the foreground process group
+    ///
+    /// Note: The current implementation does not support the notion of
+    /// controlling terminals and sessions. This item may be replaced with a
+    /// more _correct_ implementation in the future.
+    pub foreground: Option<Pid>,
 
     /// Collection of files existing in the virtual system.
     pub file_system: FileSystem,
@@ -1853,6 +1881,38 @@ mod tests {
 
         let pgid = state.borrow().processes[&pid_2].pgid();
         assert_eq!(pgid, Pid::from_raw(1));
+    }
+
+    #[test]
+    fn tcsetpgrp_success() {
+        let mut system = VirtualSystem::new();
+        let pid = Pid::from_raw(10);
+        let ppid = system.process_id;
+        let pgid = Pid::from_raw(9);
+        system
+            .state
+            .borrow_mut()
+            .processes
+            .insert(pid, Process::with_parent_and_group(ppid, pgid));
+
+        system.tcsetpgrp(Fd::STDIN, pgid).unwrap();
+
+        let foreground = system.state.borrow().foreground;
+        assert_eq!(foreground, Some(pgid));
+    }
+
+    #[test]
+    fn tcsetpgrp_with_invalid_fd() {
+        let mut system = VirtualSystem::new();
+        let result = system.tcsetpgrp(Fd(100), Pid::from_raw(2));
+        assert_eq!(result, Err(Errno::EBADF));
+    }
+
+    #[test]
+    fn tcsetpgrp_with_nonexisting_pgrp() {
+        let mut system = VirtualSystem::new();
+        let result = system.tcsetpgrp(Fd::STDIN, Pid::from_raw(100));
+        assert_eq!(result, Err(Errno::EPERM));
     }
 
     #[test]

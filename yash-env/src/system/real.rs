@@ -325,6 +325,10 @@ impl System for RealSystem {
         nix::unistd::setpgid(pid, pgid)
     }
 
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+        nix::unistd::tcsetpgrp(fd.0, pgid)
+    }
+
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the

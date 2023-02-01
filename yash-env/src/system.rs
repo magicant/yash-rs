@@ -294,6 +294,11 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `setpgid` system call.
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()>;
 
+    /// Switches the foreground process group.
+    ///
+    /// This is a thin wrapper around the `tcsetpgrp` system call.
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()>;
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
@@ -743,6 +748,9 @@ impl System for SharedSystem {
     }
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().setpgid(pid, pgid)
+    }
+    fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+        self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
     fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
         self.0.borrow_mut().new_child_process()
