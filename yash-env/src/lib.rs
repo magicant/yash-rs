@@ -119,6 +119,9 @@ pub struct Env {
     /// Traps defined in the environment.
     pub traps: TrapSet,
 
+    /// File descriptor to the controlling terminal
+    pub tty: Option<Fd>,
+
     /// Variables and positional parameters defined in the environment.
     pub variables: VariableSet,
 
@@ -145,6 +148,7 @@ impl Env {
             options: Default::default(),
             stack: Default::default(),
             traps: Default::default(),
+            tty: Default::default(),
             variables: Default::default(),
             system: SharedSystem::new(system),
         }
@@ -174,6 +178,7 @@ impl Env {
             options: self.options,
             stack: self.stack.clone(),
             traps: self.traps.clone(),
+            tty: self.tty,
             variables: self.variables.clone(),
             system: SharedSystem::new(system),
         }
