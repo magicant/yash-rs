@@ -497,7 +497,10 @@ async fn perform(
     }
 
     // Save the current open file description at target_fd to a new FD
-    let save = match env.system.dup(target_fd, MIN_INTERNAL_FD, true) {
+    let save = match env
+        .system
+        .dup(target_fd, MIN_INTERNAL_FD, FdFlag::FD_CLOEXEC)
+    {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {

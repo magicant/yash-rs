@@ -29,6 +29,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::system::Errno;
+use yash_env::system::FdFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -232,7 +233,8 @@ impl PipeSet {
             env.system.close(reader)?;
             if writer != Fd::STDOUT {
                 if self.read_previous == Some(Fd::STDOUT) {
-                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false)?);
+                    self.read_previous =
+                        Some(env.system.dup(Fd::STDOUT, Fd(0), FdFlag::empty())?);
                 }
                 env.system.dup2(writer, Fd::STDOUT)?;
                 env.system.close(writer)?;
@@ -499,8 +501,8 @@ mod tests {
         assert_eq!(pipes.next, Some((Fd(3), Fd(4))));
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
-        assert!(!process.fds().get(&Fd(4)).unwrap().cloexec);
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(4)).unwrap().flag, FdFlag::empty());
     }
 
     #[test]
@@ -518,9 +520,9 @@ mod tests {
         assert_eq!(pipes.next, Some((Fd(4), Fd(5))));
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
-        assert!(!process.fds().get(&Fd(4)).unwrap().cloexec);
-        assert!(!process.fds().get(&Fd(5)).unwrap().cloexec);
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(4)).unwrap().flag, FdFlag::empty());
+        assert_eq!(process.fds().get(&Fd(5)).unwrap().flag, FdFlag::empty());
     }
 
     #[test]
@@ -538,7 +540,7 @@ mod tests {
         assert_eq!(pipes.next, None);
         let state = state.borrow();
         let process = &state.processes[&process_id];
-        assert!(!process.fds().get(&Fd(3)).unwrap().cloexec);
+        assert_eq!(process.fds().get(&Fd(3)).unwrap().flag, FdFlag::empty());
     }
 
     // TODO test PipeSet::move_to_stdin_stdout

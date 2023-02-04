@@ -287,7 +287,9 @@ impl Env {
             crate::system::OFlag::O_RDWR,
             crate::system::Mode::empty(),
         )?;
-        let final_fd = self.system.dup(first_fd, MIN_INTERNAL_FD, true);
+        let final_fd =
+            self.system
+                .dup(first_fd, MIN_INTERNAL_FD, crate::system::FdFlag::FD_CLOEXEC);
         let _ = self.system.close(first_fd);
         self.tty = final_fd.ok();
         final_fd

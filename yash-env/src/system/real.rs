@@ -143,9 +143,12 @@ impl System for RealSystem {
         nix::unistd::pipe().map(|(reader, writer)| (Fd(reader), Fd(writer)))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
-        use nix::fcntl::FcntlArg::{F_DUPFD, F_DUPFD_CLOEXEC};
-        let arg = if cloexec { F_DUPFD_CLOEXEC } else { F_DUPFD };
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
+        let arg = if flags.contains(FdFlag::FD_CLOEXEC) {
+            nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC
+        } else {
+            nix::fcntl::FcntlArg::F_DUPFD
+        };
         nix::fcntl::fcntl(from.0, arg(to_min.0)).map(Fd)
     }
 

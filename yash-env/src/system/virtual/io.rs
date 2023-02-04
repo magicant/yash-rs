@@ -16,6 +16,7 @@
 
 //! I/O within a virtual system.
 
+use super::FdFlag;
 use super::FileBody;
 use super::INode;
 use nix::errno::Errno;
@@ -238,14 +239,13 @@ impl OpenFileDescription {
 pub struct FdBody {
     /// Underlying open file description.
     pub open_file_description: Rc<RefCell<OpenFileDescription>>,
-    /// True if this FD has the CLOEXEC flag set.
-    pub cloexec: bool,
+    /// Flags for this file descriptor
+    pub flag: FdFlag,
 }
 
 impl PartialEq for FdBody {
     fn eq(&self, rhs: &Self) -> bool {
-        Rc::ptr_eq(&self.open_file_description, &rhs.open_file_description)
-            && self.cloexec == rhs.cloexec
+        Rc::ptr_eq(&self.open_file_description, &rhs.open_file_description) && self.flag == rhs.flag
     }
 }
 

@@ -424,6 +424,7 @@ mod tests {
     use super::*;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
+    use crate::system::FdFlag;
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::rc::Rc;
@@ -479,11 +480,11 @@ mod tests {
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),
-            cloexec: false,
+            flag: FdFlag::empty(),
         };
         let writer = FdBody {
             open_file_description: Rc::new(RefCell::new(writer)),
-            cloexec: false,
+            flag: FdFlag::empty(),
         };
 
         let reader = process.open_fd(reader).unwrap();

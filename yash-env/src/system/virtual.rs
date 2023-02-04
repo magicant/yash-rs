@@ -143,7 +143,7 @@ impl VirtualSystem {
                     is_writable: true,
                     is_appending: true,
                 })),
-                cloexec: false,
+                flag: FdFlag::empty(),
             };
             process.set_fd(fd, body).unwrap();
         };
@@ -352,11 +352,11 @@ impl System for VirtualSystem {
 
         let reader = FdBody {
             open_file_description: Rc::new(RefCell::new(reader)),
-            cloexec: false,
+            flag: FdFlag::empty(),
         };
         let writer = FdBody {
             open_file_description: Rc::new(RefCell::new(writer)),
-            cloexec: false,
+            flag: FdFlag::empty(),
         };
 
         let mut process = self.current_process_mut();
@@ -368,17 +368,17 @@ impl System for VirtualSystem {
         Ok((reader, writer))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> nix::Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
-        body.cloexec = cloexec;
+        body.flag = flags;
         process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
-        body.cloexec = false;
+        body.flag = FdFlag::empty();
         process.set_fd(to, body).map_err(|_| Errno::EBADF)?;
         Ok(to)
     }
@@ -442,7 +442,11 @@ impl System for VirtualSystem {
         }));
         let body = FdBody {
             open_file_description,
-            cloexec: option.contains(OFlag::O_CLOEXEC),
+            flag: if option.contains(OFlag::O_CLOEXEC) {
+                FdFlag::FD_CLOEXEC
+            } else {
+                FdFlag::empty()
+            },
         };
         let process = state.processes.get_mut(&self.process_id).unwrap();
         process.open_fd(body).map_err(|_| Errno::EMFILE)
@@ -459,7 +463,7 @@ impl System for VirtualSystem {
         }));
         let body = FdBody {
             open_file_description,
-            cloexec: false,
+            flag: FdFlag::empty(),
         };
         let mut state = self.state.borrow_mut();
         let process = state.processes.get_mut(&self.process_id).unwrap();
@@ -495,17 +499,13 @@ impl System for VirtualSystem {
     fn fcntl_getfd(&self, fd: Fd) -> nix::Result<FdFlag> {
         let process = self.current_process();
         let body = process.get_fd(fd).ok_or(Errno::EBADF)?;
-        Ok(if body.cloexec {
-            FdFlag::FD_CLOEXEC
-        } else {
-            FdFlag::empty()
-        })
+        Ok(body.flag)
     }
 
     fn fcntl_setfd(&mut self, fd: Fd, flags: FdFlag) -> nix::Result<()> {
         let mut process = self.current_process_mut();
         let body = process.get_fd_mut(fd).ok_or(Errno::EBADF)?;
-        body.cloexec = flags.contains(FdFlag::FD_CLOEXEC);
+        body.flag = flags;
         Ok(())
     }
 
@@ -1182,7 +1182,7 @@ mod tests {
     #[test]
     fn dup_shares_open_file_description() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, false);
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::empty());
         assert_eq!(result, Ok(Fd(3)));
 
         let process = system.current_process();
@@ -1194,12 +1194,12 @@ mod tests {
     #[test]
     fn dup_can_set_cloexec() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, true);
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::FD_CLOEXEC);
         assert_eq!(result, Ok(Fd(3)));
 
         let process = system.current_process();
         let fd3 = process.fds.get(&Fd(3)).unwrap();
-        assert!(fd3.cloexec);
+        assert_eq!(fd3.flag, FdFlag::FD_CLOEXEC);
     }
 
     #[test]
@@ -1218,7 +1218,7 @@ mod tests {
     fn dup2_clears_cloexec() {
         let mut system = VirtualSystem::new();
         let mut process = system.current_process_mut();
-        process.fds.get_mut(&Fd::STDOUT).unwrap().cloexec = true;
+        process.fds.get_mut(&Fd::STDOUT).unwrap().flag = FdFlag::FD_CLOEXEC;
         drop(process);
 
         let result = system.dup2(Fd::STDOUT, Fd(6));
@@ -1226,7 +1226,7 @@ mod tests {
 
         let process = system.current_process();
         let fd6 = process.fds.get(&Fd(6)).unwrap();
-        assert!(!fd6.cloexec);
+        assert_eq!(fd6.flag, FdFlag::empty());
     }
 
     #[test]
