@@ -86,6 +86,7 @@ use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use yash_env::io::Fd;
+use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
@@ -107,8 +108,6 @@ use yash_syntax::syntax::Redir;
 use yash_syntax::syntax::RedirBody;
 use yash_syntax::syntax::RedirOp;
 use yash_syntax::syntax::Unquote;
-
-const MIN_SAVE_FD: Fd = Fd(10);
 
 /// Record of saving an open file description in another file descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -498,7 +497,7 @@ async fn perform(
     }
 
     // Save the current open file description at target_fd to a new FD
-    let save = match env.system.dup(target_fd, MIN_SAVE_FD, true) {
+    let save = match env.system.dup(target_fd, MIN_INTERNAL_FD, true) {
         Ok(save_fd) => Some(save_fd),
         Err(Errno::EBADF) => None,
         Err(errno) => {
@@ -794,7 +793,7 @@ mod tests {
         let mut buffer = [0; 2];
         let read_count = env.system.read(Fd::STDIN, &mut buffer).unwrap();
         assert_eq!(read_count, 0);
-        let e = env.system.read(MIN_SAVE_FD, &mut buffer).unwrap_err();
+        let e = env.system.read(MIN_INTERNAL_FD, &mut buffer).unwrap_err();
         assert_eq!(e, Errno::EBADF);
     }
 

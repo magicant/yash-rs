@@ -27,6 +27,16 @@ use yash_syntax::source::Location;
 #[doc(no_inline)]
 pub use yash_syntax::syntax::Fd;
 
+/// Minimum file descriptor the shell may occupy for its internal use
+///
+/// POSIX reserves file descriptors below `MIN_INTERNAL_FD` so the user can use
+/// them freely. When the shell needs to open a file descriptor that is
+/// invisible to the user, it should be kept at `MIN_INTERNAL_FD` or above.
+/// (Hint: A typical way to move a file descriptor is to
+/// [`dup`](crate::system::System::dup) and
+/// [`close`](crate::system::System::close).)
+pub const MIN_INTERNAL_FD: Fd = Fd(10);
+
 /// Part of the execution environment that allows printing to the standard
 /// error.
 #[async_trait(?Send)]

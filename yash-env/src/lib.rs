@@ -34,6 +34,7 @@
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
+use self::io::MIN_INTERNAL_FD;
 use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
@@ -60,6 +61,7 @@ use self::variable::VariableSet;
 use async_trait::async_trait;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
+use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::ControlFlow::{self, Break, Continue};
@@ -120,6 +122,9 @@ pub struct Env {
     pub traps: TrapSet,
 
     /// File descriptor to the controlling terminal
+    ///
+    /// [`get_tty`](Self::get_tty) saves a file descriptor in this variable, so
+    /// you don't have to prepare it yourself.
     pub tty: Option<Fd>,
 
     /// Variables and positional parameters defined in the environment.
@@ -266,6 +271,26 @@ impl Env {
             return Some(signals);
         }
         None
+    }
+
+    /// Returns a file descriptor to the controlling terminal.
+    ///
+    /// This function returns `self.tty` if it is `Some` FD. Otherwise, it
+    /// opens `/dev/tty` and saves the new FD to `self.tty` before returning it.
+    pub fn get_tty(&mut self) -> nix::Result<Fd> {
+        if let Some(fd) = self.tty {
+            return Ok(fd);
+        }
+
+        let first_fd = self.system.open(
+            CStr::from_bytes_with_nul(b"/dev/tty\0").unwrap(),
+            crate::system::OFlag::O_RDWR,
+            crate::system::Mode::empty(),
+        )?;
+        let final_fd = self.system.dup(first_fd, MIN_INTERNAL_FD, true);
+        let _ = self.system.close(first_fd);
+        self.tty = final_fd.ok();
+        final_fd
     }
 
     /// Starts a subshell.
@@ -510,6 +535,7 @@ pub mod variable;
 mod tests {
     use super::*;
     use crate::job::Job;
+    use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
     use crate::trap::Action;
@@ -613,6 +639,42 @@ mod tests {
 
         let result = env.poll_signals().unwrap();
         assert_eq!(*result, [Signal::SIGCHLD]);
+    }
+
+    #[test]
+    fn get_tty_opens_tty() {
+        let system = VirtualSystem::new();
+        let tty = Rc::new(RefCell::new(INode::new([])));
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/dev/tty", Rc::clone(&tty))
+            .unwrap();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        let fd = env.get_tty().unwrap();
+        assert!(
+            fd >= MIN_INTERNAL_FD,
+            "get_tty returned {fd}, which should be >= {MIN_INTERNAL_FD}"
+        );
+        system
+            .with_open_file_description(fd, |ofd| {
+                assert!(Rc::ptr_eq(&ofd.file, &tty));
+                Ok(())
+            })
+            .unwrap();
+
+        system.state.borrow_mut().file_system = Default::default();
+
+        // get_tty returns cached FD
+        let fd = env.get_tty().unwrap();
+        system
+            .with_open_file_description(fd, |ofd| {
+                assert!(Rc::ptr_eq(&ofd.file, &tty));
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
