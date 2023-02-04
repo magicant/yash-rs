@@ -77,7 +77,7 @@ impl std::fmt::Display for Field {
 /// In the shell language, the special parameter `$?` expands to the exit status
 /// of the last executed command. Exit statuses also affect the behavior of some
 /// compound commands.
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ExitStatus(pub c_int);
 
 impl std::fmt::Display for ExitStatus {
@@ -170,7 +170,7 @@ impl ExitStatus {
 /// Result of interrupted command execution.
 ///
 /// `Divert` implements `Ord`. Values are ordered by severity.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Divert {
     /// Continue the current loop.
     Continue {

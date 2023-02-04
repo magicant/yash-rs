@@ -66,9 +66,7 @@ pub enum Type {
 ///
 /// The result type contains an exit status and optional flags that may affect
 /// the behavior of the shell following the built-in execution.
-// TODO derive Eq when ControlFlow implements Eq:
-// https://github.com/rust-lang/rust/pull/103084
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[must_use]
 pub struct Result {
     exit_status: ExitStatus,
