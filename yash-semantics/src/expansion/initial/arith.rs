@@ -90,7 +90,7 @@ impl std::fmt::Display for ArithError {
             QuestionWithoutColon { .. } => "expected `:`".fmt(f),
             ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
             InvalidOperator => "invalid use of operator".fmt(f),
-            InvalidVariableValue(value) => write!(f, "invalid variable value: {:?}", value),
+            InvalidVariableValue(value) => write!(f, "invalid variable value: {value:?}"),
             Overflow => "overflow".fmt(f),
             DivisionByZero => "division by zero".fmt(f),
             LeftShiftingNegative => "left-shifting a negative integer".fmt(f),

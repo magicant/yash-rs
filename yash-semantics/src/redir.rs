@@ -174,11 +174,11 @@ impl ErrorCause {
             Expansion(e) => e.label(),
             NulByte(_) => "pathname should not contain a nul byte".into(),
             FdNotOverwritten(_, errno) => errno.desc().into(),
-            ReservedFd(fd) => format!("file descriptor {} reserved by shell", fd).into(),
+            ReservedFd(fd) => format!("file descriptor {fd} reserved by shell").into(),
             OpenFile(path, errno) => format!("{}: {}", path.to_string_lossy(), errno.desc()).into(),
-            MalformedFd(value, error) => format!("{}: {}", value, error).into(),
-            UnreadableFd(fd) => format!("{}: not a readable file descriptor", fd).into(),
-            UnwritableFd(fd) => format!("{}: not a writable file descriptor", fd).into(),
+            MalformedFd(value, error) => format!("{value}: {error}").into(),
+            UnreadableFd(fd) => format!("{fd}: not a readable file descriptor").into(),
+            UnwritableFd(fd) => format!("{fd}: not a writable file descriptor").into(),
             TemporaryFileUnavailable(errno) => errno.desc().into(),
         }
     }
@@ -191,7 +191,7 @@ impl std::fmt::Display for ErrorCause {
             Expansion(e) => e.fmt(f),
             NulByte(error) => error.fmt(f),
             FdNotOverwritten(_fd, errno) => errno.fmt(f),
-            ReservedFd(fd) => write!(f, "file descriptor {} is reserved by shell", fd),
+            ReservedFd(fd) => write!(f, "file descriptor {fd} is reserved by shell"),
             OpenFile(path, errno) => write!(
                 f,
                 "cannot open file `{}`: {}",
@@ -199,11 +199,11 @@ impl std::fmt::Display for ErrorCause {
                 errno
             ),
             MalformedFd(value, error) => {
-                write!(f, "{:?} is not a valid file descriptor: {}", value, error)
+                write!(f, "{value:?} is not a valid file descriptor: {error}")
             }
-            UnreadableFd(fd) => write!(f, "{} is not a readable file descriptor", fd),
-            UnwritableFd(fd) => write!(f, "{} is not a writable file descriptor", fd),
-            TemporaryFileUnavailable(errno) => write!(f, "cannot prepare here-document: {}", errno),
+            UnreadableFd(fd) => write!(f, "{fd} is not a readable file descriptor"),
+            UnwritableFd(fd) => write!(f, "{fd} is not a writable file descriptor"),
+            TemporaryFileUnavailable(errno) => write!(f, "cannot prepare here-document: {errno}"),
         }
     }
 }
@@ -471,9 +471,9 @@ fn trace_normal(xtrace: Option<&mut XTrace>, target_fd: Fd, operator: RedirOp, o
 /// Prepares xtrace for a here-document.
 fn trace_here_doc(xtrace: Option<&mut XTrace>, target_fd: Fd, here_doc: &HereDoc, content: &str) {
     if let Some(xtrace) = xtrace {
-        write!(xtrace.redirs(), "{}{} ", target_fd, here_doc).unwrap();
+        write!(xtrace.redirs(), "{target_fd}{here_doc} ").unwrap();
         let (delimiter, _is_quoted) = here_doc.delimiter.unquote();
-        writeln!(xtrace.here_doc_contents(), "{}{}", content, delimiter).unwrap();
+        writeln!(xtrace.here_doc_contents(), "{content}{delimiter}").unwrap();
     }
 }
 
@@ -929,7 +929,7 @@ mod tests {
             let result = env.perform_redir(&redir, None).await.unwrap();
             assert_eq!(result, Some(ExitStatus(79)));
             let file = state.borrow().file_system.get("foo");
-            assert!(file.is_ok(), "{:?}", file);
+            assert!(file.is_ok(), "{file:?}");
         })
     }
 

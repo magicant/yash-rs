@@ -320,9 +320,7 @@ impl<'a> LexerCore<'a> {
         let end = self.index;
         assert!(
             begin < end,
-            "begin index {} should be less than end index {}",
-            begin,
-            end
+            "begin index {begin} should be less than end index {end}"
         );
 
         let source = Source::Alias {

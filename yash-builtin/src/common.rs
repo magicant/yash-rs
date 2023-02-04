@@ -64,7 +64,7 @@ impl BuiltinEnv for Stack {
     fn builtin_name(&self) -> &Field {
         self.iter()
             .filter_map(|frame| {
-                if let &Frame::Builtin { ref name, .. } = frame {
+                if let Frame::Builtin { name, .. } = frame {
                     Some(name)
                 } else {
                     None
@@ -162,7 +162,7 @@ impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
             Err(errno) => {
                 let message = Message {
                     r#type: AnnotationType::Error,
-                    title: format!("error printing results to stdout: {}", errno).into(),
+                    title: format!("error printing results to stdout: {errno}").into(),
                     annotations: vec![],
                 };
                 print_failure_message(self, message).await

@@ -471,9 +471,7 @@ mod tests {
                 |c| {
                     assert!(
                         matches!(c, 'a' | 'b' | 'c'),
-                        "unexpected call to is_delimiter({:?}), called={}",
-                        c,
-                        called
+                        "unexpected call to is_delimiter({c:?}), called={called}"
                     );
                     called += 1;
                     false
@@ -498,9 +496,7 @@ mod tests {
                 |c| {
                     assert!(
                         matches!(c, 'a' | 'b' | 'c'),
-                        "unexpected call to is_delimiter({:?}), called={}",
-                        c,
-                        called
+                        "unexpected call to is_delimiter({c:?}), called={called}"
                     );
                     called += 1;
                     c == 'c'

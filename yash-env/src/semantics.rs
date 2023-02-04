@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn signal_try_from_exit_status() {
         let result = Signal::try_from(ExitStatus(0));
-        assert!(result.is_err(), "{:?}", result);
+        assert!(result.is_err(), "result = {result:?}");
 
         assert_eq!(
             Signal::try_from(ExitStatus(Signal::SIGINT as c_int)),

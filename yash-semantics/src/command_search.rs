@@ -236,7 +236,7 @@ mod tests {
     fn nothing_is_found_in_empty_env() {
         let mut env = DummyEnv::default();
         let target = search(&mut env, "foo");
-        assert!(target.is_none(), "{:?}", target);
+        assert!(target.is_none(), "target = {target:?}");
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
         ));
 
         let target = search(&mut env, "bar");
-        assert!(target.is_none(), "{:?}", target);
+        assert!(target.is_none(), "target = {target:?}");
     }
 
     #[test]
@@ -374,7 +374,7 @@ mod tests {
         env.builtins.insert("foo", builtin);
 
         let target = search(&mut env, "foo");
-        assert!(target.is_none(), "{:?}", target);
+        assert!(target.is_none(), "target = {target:?}");
     }
 
     #[test]

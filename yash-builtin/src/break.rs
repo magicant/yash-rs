@@ -210,8 +210,8 @@ mod tests {
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("cannot break"), "{:?}", stderr);
-            assert!(stderr.contains("not in loop"), "{:?}", stderr);
+            assert!(stderr.contains("cannot break"), "stderr = {stderr:?}");
+            assert!(stderr.contains("not in loop"), "stderr = {stderr:?}");
         });
     }
 
@@ -346,7 +346,10 @@ mod tests {
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("not a positive integer"), "{:?}", stderr)
+            assert!(
+                stderr.contains("not a positive integer"),
+                "stderr = {stderr:?}"
+            )
         });
     }
 
@@ -390,7 +393,7 @@ mod tests {
         );
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("too many operands"), "{:?}", stderr)
+            assert!(stderr.contains("too many operands"), "stderr = {stderr:?}")
         });
     }
 

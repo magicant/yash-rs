@@ -1126,9 +1126,9 @@ mod tests {
         trap_set.catch_signal(Signal::SIGINT);
 
         let trap_state = trap_set.get_state(Signal::SIGINT).0.unwrap();
-        assert!(trap_state.pending, "{:?}", trap_state);
+        assert!(trap_state.pending, "trap_state = {trap_state:?}");
         let trap_state = trap_set.get_state(Signal::SIGTERM).0.unwrap();
-        assert!(!trap_state.pending, "{:?}", trap_state);
+        assert!(!trap_state.pending, "trap_state = {trap_state:?}");
     }
 
     #[test]
@@ -1178,7 +1178,7 @@ mod tests {
                 assert_eq!(result.1.action, Action::Command("echo INT".into()));
                 assert!(!result.1.pending);
             }
-            _ => panic!("wrong signal: {:?}", result),
+            _ => panic!("wrong signal: {result:?}"),
         }
 
         assert_eq!(trap_set.take_caught_signal(), None);

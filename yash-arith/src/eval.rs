@@ -51,7 +51,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EvalError::InvalidVariableValue(value) => {
-                write!(f, "invalid variable value: {:?}", value)
+                write!(f, "invalid variable value: {value:?}")
             }
             EvalError::Overflow => "overflow".fmt(f),
             EvalError::DivisionByZero => "division by zero".fmt(f),
@@ -145,8 +145,8 @@ fn assign<E: Env>(
 }
 
 /// Applies a prefix operator to a term.
-fn apply_prefix<'a, E: Env>(
-    term: Term<'a>,
+fn apply_prefix<E: Env>(
+    term: Term,
     operator: PrefixOperator,
     op_location: &Range<usize>,
     env: &mut E,
@@ -192,8 +192,8 @@ fn apply_prefix<'a, E: Env>(
 }
 
 /// Applies a postfix operator to a term.
-fn apply_postfix<'a, E: Env>(
-    term: Term<'a>,
+fn apply_postfix<E: Env>(
+    term: Term,
     operator: PostfixOperator,
     op_location: &Range<usize>,
     env: &mut E,
@@ -667,8 +667,7 @@ mod tests {
                     env
                 ),
                 Ok(Value::Integer(0)),
-                "i={:?}",
-                i
+                "i={i:?}"
             );
         }
     }

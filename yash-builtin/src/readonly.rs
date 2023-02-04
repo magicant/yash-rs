@@ -52,7 +52,7 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
                 }) => {
                     // TODO Better error message
                     // TODO Use Env rather than printing directly to stderr
-                    eprintln!("cannot assign to read-only variable {}", name);
+                    eprintln!("cannot assign to read-only variable {name}");
                     return ExitStatus::FAILURE.into();
                 }
             }

@@ -420,7 +420,7 @@ async fn execute_external_utility(
             }
             print_error(
                 env,
-                format!("cannot execute external utility {:?}", path).into(),
+                format!("cannot execute external utility {path:?}").into(),
                 errno.desc().into(),
                 &location,
             )
@@ -1209,8 +1209,7 @@ mod tests {
             assert_stderr(&state, |stderr| {
                 assert!(
                     stderr.starts_with("VAR=123 /some/file foo bar 1>/dev/null\n"),
-                    "stderr = {:?}",
-                    stderr
+                    "stderr = {stderr:?}"
                 )
             });
         });

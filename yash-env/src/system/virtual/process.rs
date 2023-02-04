@@ -511,7 +511,7 @@ mod tests {
         let process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
         let initial_set = process.blocked_signals();
         for signal in Signal::iterator() {
-            assert!(!initial_set.contains(signal), "contained signal {}", signal);
+            assert!(!initial_set.contains(signal), "contained signal {signal}");
         }
     }
 

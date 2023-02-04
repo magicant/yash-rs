@@ -203,6 +203,6 @@ pub(crate) mod tests {
     fn builtins_are_sorted() {
         super::BUILTINS
             .windows(2)
-            .for_each(|pair| assert!(pair[0].0 < pair[1].0, "disordered pair: {:?}", pair))
+            .for_each(|pair| assert!(pair[0].0 < pair[1].0, "disordered pair: {pair:?}"))
     }
 }

@@ -384,8 +384,7 @@ mod tests {
     fn ensure_sorted(trie: &Trie) {
         assert!(
             trie.0.windows(2).all(|pair| pair[0].key < pair[1].key),
-            "The trie should be sorted: {:?}",
-            trie
+            "trie should be sorted: {trie:?}"
         );
 
         for edge in trie.0 {
@@ -475,7 +474,7 @@ mod tests {
         let mut lexer = Lexer::from_memory("\\\n ", Source::Unknown);
 
         let r = lexer.operator().now_or_never().unwrap().unwrap();
-        assert!(r.is_none(), "Unexpected success: {:?}", r);
+        assert!(r.is_none(), "unexpected success: {r:?}");
     }
 
     #[test]

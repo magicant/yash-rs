@@ -392,8 +392,8 @@ pub enum BackquoteUnit {
 impl fmt::Display for BackquoteUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BackquoteUnit::Literal(c) => write!(f, "{}", c),
-            BackquoteUnit::Backslashed(c) => write!(f, "\\{}", c),
+            BackquoteUnit::Literal(c) => write!(f, "{c}"),
+            BackquoteUnit::Backslashed(c) => write!(f, "\\{c}"),
         }
     }
 }
@@ -463,17 +463,17 @@ pub use TextUnit::*;
 impl fmt::Display for TextUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Literal(c) => write!(f, "{}", c),
-            Backslashed(c) => write!(f, "\\{}", c),
-            RawParam { name, .. } => write!(f, "${}", name),
+            Literal(c) => write!(f, "{c}"),
+            Backslashed(c) => write!(f, "\\{c}"),
+            RawParam { name, .. } => write!(f, "${name}"),
             BracedParam(param) => param.fmt(f),
-            CommandSubst { content, .. } => write!(f, "$({})", content),
+            CommandSubst { content, .. } => write!(f, "$({content})"),
             Backquote { content, .. } => {
                 f.write_char('`')?;
                 content.iter().try_for_each(|unit| unit.fmt(f))?;
                 f.write_char('`')
             }
-            Arith { content, .. } => write!(f, "$(({}))", content),
+            Arith { content, .. } => write!(f, "$(({content}))"),
         }
     }
 }
@@ -490,14 +490,14 @@ impl Unquote for TextUnit {
                 Ok(true)
             }
             RawParam { name, .. } => {
-                write!(w, "${}", name)?;
+                write!(w, "${name}")?;
                 Ok(false)
             }
             BracedParam(param) => param.write_unquoted(w),
             // We don't remove quotes contained in the commands in command
             // substitutions. Existing shells disagree with each other.
             CommandSubst { content, .. } => {
-                write!(w, "$({})", content)?;
+                write!(w, "$({content})")?;
                 Ok(false)
             }
             Backquote { content, .. } => {
@@ -583,9 +583,9 @@ impl fmt::Display for WordUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Unquoted(dq) => dq.fmt(f),
-            SingleQuote(s) => write!(f, "'{}'", s),
-            DoubleQuote(content) => write!(f, "\"{}\"", content),
-            Tilde(s) => write!(f, "~{}", s),
+            SingleQuote(s) => write!(f, "'{s}'"),
+            DoubleQuote(content) => write!(f, "\"{content}\""),
+            Tilde(s) => write!(f, "~{s}"),
         }
     }
 }
@@ -600,7 +600,7 @@ impl Unquote for WordUnit {
             }
             DoubleQuote(inner) => inner.write_unquoted(w),
             Tilde(s) => {
-                write!(w, "~{}", s)?;
+                write!(w, "~{s}")?;
                 Ok(false)
             }
         }
@@ -637,7 +637,7 @@ pub struct Word {
 
 impl fmt::Display for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.units.iter().try_for_each(|unit| write!(f, "{}", unit))
+        self.units.iter().try_for_each(|unit| write!(f, "{unit}"))
     }
 }
 
@@ -889,8 +889,8 @@ impl RedirBody {
 impl fmt::Display for RedirBody {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RedirBody::Normal { operator, operand } => write!(f, "{}{}", operator, operand),
-            RedirBody::HereDoc(h) => write!(f, "{}", h),
+            RedirBody::Normal { operator, operand } => write!(f, "{operator}{operand}"),
+            RedirBody::HereDoc(h) => write!(f, "{h}"),
         }
     }
 }
@@ -930,7 +930,7 @@ impl Redir {
 impl fmt::Display for Redir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(fd) = self.fd {
-            write!(f, "{}", fd)?;
+            write!(f, "{fd}")?;
         }
         write!(f, "{}", self.body)
     }
@@ -1044,40 +1044,40 @@ impl fmt::Display for CompoundCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompoundCommand::*;
         match self {
-            Grouping(list) => write!(f, "{{ {:#} }}", list),
-            Subshell { body, .. } => write!(f, "({})", body),
+            Grouping(list) => write!(f, "{{ {list:#} }}"),
+            Subshell { body, .. } => write!(f, "({body})"),
             For { name, values, body } => {
-                write!(f, "for {}", name)?;
+                write!(f, "for {name}")?;
                 if let Some(values) = values {
                     f.write_str(" in")?;
                     for value in values {
-                        write!(f, " {}", value)?;
+                        write!(f, " {value}")?;
                     }
                     f.write_char(';')?;
                 }
-                write!(f, " do {:#} done", body)
+                write!(f, " do {body:#} done")
             }
-            While { condition, body } => write!(f, "while {:#} do {:#} done", condition, body),
-            Until { condition, body } => write!(f, "until {:#} do {:#} done", condition, body),
+            While { condition, body } => write!(f, "while {condition:#} do {body:#} done"),
+            Until { condition, body } => write!(f, "until {condition:#} do {body:#} done"),
             If {
                 condition,
                 body,
                 elifs,
                 r#else,
             } => {
-                write!(f, "if {:#} then {:#} ", condition, body)?;
+                write!(f, "if {condition:#} then {body:#} ")?;
                 for elif in elifs {
-                    write!(f, "{:#} ", elif)?;
+                    write!(f, "{elif:#} ")?;
                 }
                 if let Some(r#else) = r#else {
-                    write!(f, "else {:#} ", r#else)?;
+                    write!(f, "else {else:#} ")?;
                 }
                 f.write_str("fi")
             }
             Case { subject, items } => {
-                write!(f, "case {} in ", subject)?;
+                write!(f, "case {subject} in ")?;
                 for item in items {
-                    write!(f, "{} ", item)?;
+                    write!(f, "{item} ")?;
                 }
                 f.write_str("esac")
             }
@@ -1097,8 +1097,8 @@ pub struct FullCompoundCommand {
 impl fmt::Display for FullCompoundCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let FullCompoundCommand { command, redirs } = self;
-        write!(f, "{}", command)?;
-        redirs.iter().try_for_each(|redir| write!(f, " {}", redir))
+        write!(f, "{command}")?;
+        redirs.iter().try_for_each(|redir| write!(f, " {redir}"))
     }
 }
 
@@ -1216,7 +1216,7 @@ impl fmt::Display for AndOrList {
         write!(f, "{}", self.first)?;
         self.rest
             .iter()
-            .try_for_each(|(c, p)| write!(f, " {} {}", c, p))
+            .try_for_each(|(c, p)| write!(f, " {c} {p}"))
     }
 }
 
@@ -1265,12 +1265,12 @@ impl fmt::Display for List {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((last, others)) = self.0.split_last() {
             for item in others {
-                write!(f, "{:#} ", item)?;
+                write!(f, "{item:#} ")?;
             }
             if f.alternate() {
-                write!(f, "{:#}", last)
+                write!(f, "{last:#}")
             } else {
-                write!(f, "{}", last)
+                write!(f, "{last}")
             }
         } else {
             Ok(())
@@ -1924,14 +1924,14 @@ mod tests {
         let condition: List = "c 1& c 2".parse().unwrap();
         let body = "b 1& b 2".parse().unwrap();
         let elif = ElifThen { condition, body };
-        assert_eq!(format!("{}", elif), "elif c 1& c 2; then b 1& b 2");
-        assert_eq!(format!("{:#}", elif), "elif c 1& c 2; then b 1& b 2;");
+        assert_eq!(format!("{elif}"), "elif c 1& c 2; then b 1& b 2");
+        assert_eq!(format!("{elif:#}"), "elif c 1& c 2; then b 1& b 2;");
 
         let condition: List = "c&".parse().unwrap();
         let body = "b&".parse().unwrap();
         let elif = ElifThen { condition, body };
-        assert_eq!(format!("{}", elif), "elif c& then b&");
-        assert_eq!(format!("{:#}", elif), "elif c& then b&");
+        assert_eq!(format!("{elif}"), "elif c& then b&");
+        assert_eq!(format!("{elif:#}"), "elif c& then b&");
     }
 
     #[test]
@@ -2165,7 +2165,7 @@ mod tests {
             async_flag: None,
         };
         let mut list = List(vec![item]);
-        assert_eq!(format!("{:#}", list), "first;");
+        assert_eq!(format!("{list:#}"), "first;");
 
         let and_or = "second".parse().unwrap();
         let item = Item {
@@ -2173,7 +2173,7 @@ mod tests {
             async_flag: Some(Location::dummy("")),
         };
         list.0.push(item);
-        assert_eq!(format!("{:#}", list), "first; second&");
+        assert_eq!(format!("{list:#}"), "first; second&");
 
         let and_or = "third".parse().unwrap();
         let item = Item {
@@ -2181,6 +2181,6 @@ mod tests {
             async_flag: None,
         };
         list.0.push(item);
-        assert_eq!(format!("{:#}", list), "first; second& third;");
+        assert_eq!(format!("{list:#}"), "first; second& third;");
     }
 }
