@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   erroneous tokens.
 - Dependency versions
     - Rust 1.58.0 → 1.67.0
+    - async-trait 0.1.56 → 0.1.64
+    - futures-util 0.3.23 → 0.3.26
+    - itertools 0.10.3 → 0.10.5
 
 ## [0.6.0] - 2022-10-01
 
