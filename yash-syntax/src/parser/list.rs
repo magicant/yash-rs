@@ -296,7 +296,7 @@ mod tests {
         let item = items.first().unwrap();
         assert_eq!(item.async_flag, None);
         let AndOrList { first, rest } = &*item.and_or;
-        assert!(rest.is_empty(), "expected empty rest: {:?}", rest);
+        assert!(rest.is_empty(), "expected empty rest: {rest:?}");
         let Pipeline { commands, negation } = first;
         assert_eq!(*negation, false);
         assert_eq!(commands.len(), 1);

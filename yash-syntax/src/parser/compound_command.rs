@@ -111,7 +111,7 @@ mod tests {
         let mut parser = Parser::new(&mut lexer, &aliases);
 
         let result = parser.do_clause().now_or_never().unwrap().unwrap();
-        assert!(result.is_none(), "result should be none: {:?}", result);
+        assert!(result.is_none(), "result should be none: {result:?}");
     }
 
     #[test]

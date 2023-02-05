@@ -382,7 +382,7 @@ impl ErrorCause {
     pub fn message(&self) -> Cow<'static, str> {
         use ErrorCause::*;
         match self {
-            Io(e) => format!("cannot read commands: {}", e).into(),
+            Io(e) => format!("cannot read commands: {e}").into(),
             Syntax(e) => e.message().into(),
         }
     }

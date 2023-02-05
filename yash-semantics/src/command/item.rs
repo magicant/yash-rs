@@ -221,8 +221,7 @@ mod tests {
         assert_stderr(&state, |stderr| {
             assert!(
                 stderr.contains("asynchronous"),
-                "unexpected error message: {:?}",
-                stderr
+                "unexpected error message: {stderr:?}"
             )
         });
     }

@@ -939,7 +939,10 @@ mod tests {
         assert_ne!(previous_job_index_2, current_job_index_2);
         // The new previous job is chosen from suspended jobs other than the current job.
         let previous_job_2 = &set[previous_job_index_2];
-        assert!(previous_job_2.is_suspended(), "{:?}", previous_job_2);
+        assert!(
+            previous_job_2.is_suspended(),
+            "previous_job_2 = {previous_job_2:?}"
+        );
 
         set.remove(current_job_index_2);
         let current_job_index_3 = set.current_job().unwrap();
@@ -984,7 +987,10 @@ mod tests {
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
         let now_previous_job = &set[now_previous_job_index];
-        assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
+        assert!(
+            now_previous_job.is_suspended(),
+            "now_previous_job = {now_previous_job:?}"
+        );
     }
 
     #[test]
@@ -1135,7 +1141,10 @@ mod tests {
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
         let now_previous_job = &set[now_previous_job_index];
-        assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
+        assert!(
+            now_previous_job.is_suspended(),
+            "now_previous_job = {now_previous_job:?}"
+        );
     }
 
     #[test]
@@ -1160,7 +1169,10 @@ mod tests {
         assert_ne!(now_previous_job_index, now_current_job_index);
         // The new previous job is chosen from suspended jobs other than the current job.
         let now_previous_job = &set[now_previous_job_index];
-        assert!(now_previous_job.is_suspended(), "{:?}", now_previous_job);
+        assert!(
+            now_previous_job.is_suspended(),
+            "now_previous_job = {now_previous_job:?}"
+        );
     }
 
     #[test]

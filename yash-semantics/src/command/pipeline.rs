@@ -388,7 +388,7 @@ mod tests {
             let state = state.borrow();
             let fds = state.processes[&process_id].fds();
             for fd in 3..10 {
-                assert!(!fds.contains_key(&Fd(fd)), "fd={}", fd);
+                assert!(!fds.contains_key(&Fd(fd)), "fd={fd}");
             }
         });
     }

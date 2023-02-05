@@ -370,7 +370,7 @@ mod tests {
 
         let result = lexer
             .word_unit(|c| {
-                assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+                assert_eq!(c, '\'', "unexpected call to is_delimiter({c:?})");
                 false
             })
             .now_or_never()
@@ -544,7 +544,7 @@ mod tests {
 
         let result = lexer
             .word(|c| {
-                assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+                assert_eq!(c, '\'', "unexpected call to is_delimiter({c:?})");
                 false
             })
             .now_or_never()
@@ -567,7 +567,7 @@ mod tests {
 
         let result = lexer
             .word(|c| {
-                assert_eq!(c, '\'', "unexpected call to is_delimiter({:?})", c);
+                assert_eq!(c, '\'', "unexpected call to is_delimiter({c:?})");
                 false
             })
             .now_or_never()

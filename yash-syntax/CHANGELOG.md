@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SyntaxError` instead of `InvalidCommandToken` depending on the type of
   erroneous tokens.
 - Dependency versions
-    - Rust 1.58.0 → 1.66.0
+    - Rust 1.58.0 → 1.67.0
 
 ## [0.6.0] - 2022-10-01
 

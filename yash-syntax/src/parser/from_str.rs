@@ -120,7 +120,7 @@ impl FromStr for Word {
 impl FromStr for Value {
     type Err = Error;
     fn from_str(s: &str) -> Result<Value, Error> {
-        let s = format!("x={}", s);
+        let s = format!("x={s}");
         let a = Assign::from_str(&s).map_err(Option::unwrap)?;
         Ok(a.value)
     }

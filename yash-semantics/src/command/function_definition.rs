@@ -62,7 +62,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
     if let Some(function) = env.functions.get(name.as_str()) {
         if function.0.is_read_only {
             // TODO Use pretty::Message and annotate_snippet
-            env.print_error(&format!("cannot re-define read-only function {:?}\n", name))
+            env.print_error(&format!("cannot re-define read-only function {name:?}\n"))
                 .await;
             env.exit_status = ExitStatus::ERROR;
             return Continue(());
@@ -171,8 +171,7 @@ mod tests {
         assert_stderr(&state, |stderr| {
             assert!(
                 stderr.contains("foo"),
-                "The error message should contain the function name: {:?}",
-                stderr
+                "error message should contain function name: {stderr:?}"
             )
         });
     }

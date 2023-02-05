@@ -89,14 +89,14 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::UnknownShortOption(c, _field) => write!(f, "unknown option {:?}", c),
+            Error::UnknownShortOption(c, _field) => write!(f, "unknown option {c:?}"),
             Error::UnknownLongOption(field) => write!(f, "unknown option {:?}", field.value),
             Error::AmbiguousLongOption(field) => write!(f, "ambiguous option {:?}", field.value),
             Error::MissingOptionArgument(field) => {
                 write!(f, "option {:?} missing an argument", field.value)
             }
             Error::UnmodifiableShortOption(c, _field) => {
-                write!(f, "option {:?} not modifiable by the set built-in", c)
+                write!(f, "option {c:?} not modifiable by the set built-in")
             }
             Error::UnmodifiableLongOption(field) => write!(
                 f,

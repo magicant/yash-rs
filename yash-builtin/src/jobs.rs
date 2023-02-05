@@ -138,9 +138,9 @@ impl Accumulator {
         if self.pgid_only {
             writeln!(self.print, "{}", job.pid)
         } else if self.alternate_format {
-            writeln!(self.print, "{:#}", report)
+            writeln!(self.print, "{report:#}")
         } else {
-            writeln!(self.print, "{}", report)
+            writeln!(self.print, "{report}")
         }
         .unwrap();
 
@@ -414,7 +414,7 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("job not found"), "{:?}", stderr)
+            assert!(stderr.contains("job not found"), "stderr = {stderr:?}")
         });
     }
 
@@ -441,7 +441,7 @@ mod tests {
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("ambiguous"), "{:?}", stderr)
+            assert!(stderr.contains("ambiguous"), "stderr = {stderr:?}")
         });
     }
 

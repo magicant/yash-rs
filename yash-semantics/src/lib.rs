@@ -227,7 +227,7 @@ pub(crate) mod tests {
                     let name = value;
                     if let Some(var) = env.variables.get(&name) {
                         if let Some(Scalar(value)) = &var.value {
-                            let line = format!("{}={}\n", name, value);
+                            let line = format!("{name}={value}\n");
                             if let Err(errno) =
                                 env.system.write_all(Fd::STDOUT, line.as_bytes()).await
                             {
@@ -254,7 +254,7 @@ pub(crate) mod tests {
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
         Box::pin(async move {
             let fields = args.iter().map(|f| &f.value).format(" ");
-            let message = format!("{}\n", fields);
+            let message = format!("{fields}\n");
             let result = match env.system.write_all(Fd::STDOUT, message.as_bytes()).await {
                 Ok(_) => ExitStatus::SUCCESS,
                 Err(_) => ExitStatus::FAILURE,

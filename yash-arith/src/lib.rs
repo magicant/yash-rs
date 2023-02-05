@@ -302,13 +302,13 @@ mod tests {
             eval("1 ? 2 : (a = 3) ? b = 4 : (c = 5)", env),
             Ok(Value::Integer(2))
         );
-        assert!(env.is_empty(), "expected empty env: {:?}", env);
+        assert!(env.is_empty(), "expected empty env: {env:?}");
 
         assert_eq!(
             eval("0 ? (a = 1) ? b = 2 : (c = 3) : 4", env),
             Ok(Value::Integer(4))
         );
-        assert!(env.is_empty(), "expected empty env: {:?}", env);
+        assert!(env.is_empty(), "expected empty env: {env:?}");
     }
 
     #[test]
