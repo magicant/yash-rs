@@ -373,9 +373,29 @@ impl Default for SignalHandling {
     }
 }
 
-/// Type of an argument to [`ChildProcess::run`].
+/// Task executed in a child process
+///
+/// This is an argument passed to a [`ChildProcessStarter`]. The task is
+/// executed in a child process initiated by the starter. The environment passed
+/// to the task is a clone of the parent environment, but it has a different
+/// process ID than the parent.
 pub type ChildProcessTask =
     Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+
+/// Abstract function that starts a child process
+///
+/// [`System::new_child_process`] returns a child process starter. You need to
+/// pass the parent environment and a task to run in the child.
+///
+/// When called in the parent process, this function returns the process ID of
+/// the child. When in the child, this function never returns.
+///
+/// This function only starts the child, which continues to run asynchronously
+/// after the function returns its PID. To wait for the child to finish and
+/// obtain its exit status, use [`System::wait`].
+pub type ChildProcessStarter = Box<
+    dyn for<'a> FnOnce(&'a mut Env, ChildProcessTask) -> Pin<Box<dyn Future<Output = Pid> + 'a>>,
+>;
 
 /// Abstraction of a child process that can run a task.
 ///
