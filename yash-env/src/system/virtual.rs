@@ -841,7 +841,7 @@ struct DummyChildProcess {
 
 #[async_trait(?Send)]
 impl ChildProcess for DummyChildProcess {
-    async fn run(&mut self, env: &mut Env, mut task: super::ChildProcessTask) -> Pid {
+    async fn run(&mut self, env: &mut Env, task: super::ChildProcessTask) -> Pid {
         let state = Rc::clone(&self.state);
         let process_id = self.process_id;
         let system = VirtualSystem { state, process_id };

@@ -375,7 +375,7 @@ impl Default for SignalHandling {
 
 /// Type of an argument to [`ChildProcess::run`].
 pub type ChildProcessTask =
-    Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
+    Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>;
 
 /// Abstraction of a child process that can run a task.
 ///
@@ -388,9 +388,7 @@ pub trait ChildProcess: Debug {
     /// When called in the parent process, this function returns the process ID
     /// of the child. When in the child, this function never returns.
     async fn run(&mut self, env: &mut Env, task: ChildProcessTask) -> Pid;
-    // TODO When unsized_fn_params is stabilized,
-    // 1. `&mut self` should be `self`
-    // 2. `task` should be `FnOnce` rather than `FnMut`
+    // TODO When unsized_fn_params is stabilized, `&mut self` should be `self`
 }
 
 /// Metadata of a file contained in a directory

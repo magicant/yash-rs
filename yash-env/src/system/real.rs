@@ -405,7 +405,7 @@ impl ChildProcess for RealChildProcess {
     async fn run(
         &mut self,
         env: &mut Env,
-        mut task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
+        task: Box<dyn for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
     ) -> Pid {
         task(env).await;
         std::process::exit(env.exit_status.0)

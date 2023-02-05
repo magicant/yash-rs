@@ -322,9 +322,7 @@ impl Env {
             + 'static,
         // TODO Revisit to simplify this function type when impl Future is allowed in return type
     {
-        let mut f = Some(f);
         let task: ChildProcessTask = Box::new(move |env| {
-            let f = f.take().expect("child process task should run only once");
             Box::pin(async move {
                 let mut env = env.push_frame(Frame::Subshell);
                 let env = &mut *env;
