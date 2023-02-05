@@ -61,11 +61,9 @@ use super::TimeSpec;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
-use crate::system::ChildProcess;
-use crate::Env;
+use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
 use crate::System;
-use async_trait::async_trait;
 use nix::sys::stat::SFlag;
 use std::borrow::Cow;
 use std::cell::Ref;
@@ -732,8 +730,8 @@ impl System for VirtualSystem {
     /// Creates a new child process.
     ///
     /// This implementation does not create any real child process. Instead,
-    /// it returns an implementor of [`ChildProcess`] that `run`s its task
-    /// concurrently in the same process.
+    /// it returns a child process starter that runs its task concurrently in
+    /// the same process.
     ///
     /// To run the concurrent task, this function needs an executor that has
     /// been set in the system state. If the system state does not have an
@@ -741,7 +739,7 @@ impl System for VirtualSystem {
     ///
     /// The process ID of the child will be the maximum of existing process IDs
     /// plus 1. If there are no other processes, it will be 2.
-    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         let mut state = self.state.borrow_mut();
         let executor = state.executor.clone().ok_or(Errno::ENOSYS)?;
         let process_id = state
@@ -754,10 +752,44 @@ impl System for VirtualSystem {
         state.processes.insert(process_id, child_process);
         drop(state);
 
-        Ok(Box::new(DummyChildProcess {
-            state: self.state.clone(),
-            executor,
-            process_id,
+        let state = Rc::clone(&self.state);
+        Ok(Box::new(move |parent_env, task| {
+            Box::pin(async move {
+                let system = VirtualSystem { state, process_id };
+                let state = Rc::clone(&system.state);
+                let mut child_env = parent_env.clone_with_system(Box::new(system));
+
+                {
+                    let mut state = state.borrow_mut();
+                    let mut process = state
+                        .processes
+                        .get_mut(&process_id)
+                        .expect("missing child process");
+                    process.selector = Rc::downgrade(&child_env.system.0);
+                }
+
+                let run_task_and_set_exit_status = Box::pin(async move {
+                    task(&mut child_env).await;
+
+                    let mut state = state.borrow_mut();
+                    let process = state
+                        .processes
+                        .get_mut(&process_id)
+                        .expect("missing child process");
+                    if process.set_state(ProcessState::Exited(child_env.exit_status)) {
+                        let ppid = process.ppid;
+                        if let Some(parent) = state.processes.get_mut(&ppid) {
+                            parent.raise_signal(Signal::SIGCHLD);
+                        }
+                    }
+                });
+
+                executor
+                    .spawn(run_task_and_set_exit_status)
+                    .expect("the executor failed to start the child process task");
+
+                process_id
+            })
         }))
     }
 
@@ -824,60 +856,6 @@ impl System for VirtualSystem {
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         let state = self.state.borrow();
         Ok(state.home_dirs.get(name).cloned())
-    }
-}
-
-/// Implementor of [`ChildProcess`] that is returned from
-/// [`VirtualSystem::new_child_process`].
-#[derive(Debug)]
-struct DummyChildProcess {
-    /// State of the system.
-    state: Rc<RefCell<SystemState>>,
-    /// Executor to run the child process's task.
-    executor: Rc<dyn Executor>,
-    /// Process ID of this child process.
-    process_id: Pid,
-}
-
-#[async_trait(?Send)]
-impl ChildProcess for DummyChildProcess {
-    async fn run(&mut self, env: &mut Env, task: super::ChildProcessTask) -> Pid {
-        let state = Rc::clone(&self.state);
-        let process_id = self.process_id;
-        let system = VirtualSystem { state, process_id };
-        let mut child_env = env.clone_with_system(Box::new(system));
-
-        let state = Rc::clone(&self.state);
-        {
-            let mut state = state.borrow_mut();
-            let mut process = state
-                .processes
-                .get_mut(&process_id)
-                .expect("the child process is missing");
-            process.selector = Rc::downgrade(&child_env.system.0);
-        }
-
-        let run_task_and_set_exit_status = Box::pin(async move {
-            task(&mut child_env).await;
-
-            let mut state = state.borrow_mut();
-            let process = state
-                .processes
-                .get_mut(&process_id)
-                .expect("the child process is missing");
-            if process.set_state(ProcessState::Exited(child_env.exit_status)) {
-                let ppid = process.ppid;
-                if let Some(parent) = state.processes.get_mut(&ppid) {
-                    parent.raise_signal(Signal::SIGCHLD);
-                }
-            }
-        });
-
-        self.executor
-            .spawn(run_task_and_set_exit_status)
-            .expect("the executor failed to start the child process task");
-
-        process_id
     }
 }
 
@@ -991,6 +969,7 @@ pub trait Executor: Debug {
 mod tests {
     use super::*;
     use crate::semantics::ExitStatus;
+    use crate::Env;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::ffi::CString;
@@ -1732,8 +1711,8 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child = env.system.new_child_process().unwrap();
-        let future = child.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child = env.system.new_child_process().unwrap();
+        let future = child(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid = executor.run_until(future);
         executor.run_until_stalled();
 
@@ -1749,8 +1728,8 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child = env.system.new_child_process().unwrap();
-        let future = child.run(
+        let child = env.system.new_child_process().unwrap();
+        let future = child(
             &mut env,
             Box::new(|child_env| {
                 Box::pin(async move {
@@ -1771,12 +1750,12 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child_1 = env.system.new_child_process().unwrap();
-        let future = child_1.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child_1 = env.system.new_child_process().unwrap();
+        let future = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid_1 = executor.run_until(future);
         env.system.setpgid(pid_1, pid_1).unwrap();
-        let mut child_2 = env.system.new_child_process().unwrap();
-        let future = child_2.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child_2 = env.system.new_child_process().unwrap();
+        let future = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid_2 = executor.run_until(future);
         executor.run_until_stalled();
 
@@ -1792,8 +1771,8 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child = env.system.new_child_process().unwrap();
-        let future = child.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child = env.system.new_child_process().unwrap();
+        let future = child(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid = executor.run_until(future);
         executor.run_until_stalled();
 
@@ -1811,8 +1790,8 @@ mod tests {
         let parent_pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child = env.system.new_child_process().unwrap();
-        let future = child.run(
+        let child = env.system.new_child_process().unwrap();
+        let future = child(
             &mut env,
             Box::new(move |child_env| {
                 Box::pin(async move {
@@ -1842,8 +1821,8 @@ mod tests {
         let state = Rc::clone(&system.state);
         state.borrow_mut().file_system.save(path, content).unwrap();
         let mut env = Env::with_system(Box::new(system));
-        let mut child = env.system.new_child_process().unwrap();
-        let future = child.run(
+        let child = env.system.new_child_process().unwrap();
+        let future = child(
             &mut env,
             Box::new(move |child_env| {
                 Box::pin(async move {
@@ -1867,12 +1846,12 @@ mod tests {
         let (system, mut executor) = virtual_system_with_executor();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut child_1 = env.system.new_child_process().unwrap();
-        let future = child_1.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child_1 = env.system.new_child_process().unwrap();
+        let future = child_1(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid_1 = executor.run_until(future);
         // env.system.setpgid(pid_1, pid_1).unwrap();
-        let mut child_2 = env.system.new_child_process().unwrap();
-        let future = child_2.run(&mut env, Box::new(|_env| Box::pin(pending())));
+        let child_2 = env.system.new_child_process().unwrap();
+        let future = child_2(&mut env, Box::new(|_env| Box::pin(pending())));
         let pid_2 = executor.run_until(future);
         executor.run_until_stalled();
 
@@ -1919,7 +1898,10 @@ mod tests {
     fn new_child_process_without_executor() {
         let mut system = VirtualSystem::new();
         let result = system.new_child_process();
-        assert_eq!(result.unwrap_err(), Errno::ENOSYS);
+        match result {
+            Ok(_) => panic!("unexpected Ok value"),
+            Err(e) => assert_eq!(e, Errno::ENOSYS),
+        }
     }
 
     #[test]
@@ -1933,8 +1915,8 @@ mod tests {
         drop(state);
 
         let mut env = Env::with_system(Box::new(system));
-        let mut child_process = result.unwrap();
-        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
+        let child_process = result.unwrap();
+        let future = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
         let pid = executor.run_until(future);
         assert_eq!(pid, Pid::from_raw(3));
     }
@@ -1946,8 +1928,8 @@ mod tests {
         let child_process = system.new_child_process();
 
         let mut env = Env::with_system(Box::new(system));
-        let mut child_process = child_process.unwrap();
-        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async move {})));
+        let child_process = child_process.unwrap();
+        let future = child_process(&mut env, Box::new(|_env| Box::pin(async move {})));
         let pid = executor.run_until(future);
 
         let result = env.system.wait(pid);
@@ -1961,8 +1943,8 @@ mod tests {
         let child_process = system.new_child_process();
 
         let mut env = Env::with_system(Box::new(system));
-        let mut child_process = child_process.unwrap();
-        let future = child_process.run(
+        let child_process = child_process.unwrap();
+        let future = child_process(
             &mut env,
             Box::new(|env| {
                 Box::pin(async move {
@@ -2001,10 +1983,10 @@ mod tests {
             .sigaction(Signal::SIGCHLD, SignalHandling::Catch)
             .unwrap();
 
-        let mut child_process = system.new_child_process().unwrap();
+        let child_process = system.new_child_process().unwrap();
 
         let mut env = Env::with_system(Box::new(system));
-        let future = child_process.run(&mut env, Box::new(|_env| Box::pin(async {})));
+        let future = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
         executor.run_until(future);
         executor.run_until_stalled();
 

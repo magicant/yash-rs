@@ -25,7 +25,6 @@ use crate::job::WaitStatus;
 use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
-use async_trait::async_trait;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
 #[doc(no_inline)]
@@ -303,19 +302,14 @@ pub trait System: Debug {
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
-    /// should not call it directly. Instead, use [`Env::run_in_subshell`] so
-    /// that the environment can manage the created child process as a job
-    /// member.
+    /// should not call it directly. Instead, use [`Env::start_subshell`] so
+    /// that the environment can condition the state of the child process before
+    /// it starts running.
     ///
-    /// If successful, this function returns a [`ChildProcess`] object. The
-    /// caller must call [`ChildProcess::run`] exactly once so that the child
-    /// process performs its task and finally exit.
-    ///
-    /// This function does not return any information about whether the current
-    /// process is the original (parent) process or the new (child) process. The
-    /// caller does not have to (and should not) care that because
-    /// `ChildProcess::run` takes care of it.
-    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>>;
+    /// If successful, this function returns a [`ChildProcessStarter`] function. The
+    /// caller must call the starter exactly once to make sure the parent and
+    /// child processes perform correctly after forking.
+    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter>;
 
     /// Reports updated status of a child process.
     ///
@@ -396,20 +390,6 @@ pub type ChildProcessTask =
 pub type ChildProcessStarter = Box<
     dyn for<'a> FnOnce(&'a mut Env, ChildProcessTask) -> Pin<Box<dyn Future<Output = Pid> + 'a>>,
 >;
-
-/// Abstraction of a child process that can run a task.
-///
-/// [`System::new_child_process`] returns an implementor of `ChildProcess`. You
-/// must call [`run`](Self::run) exactly once.
-#[async_trait(?Send)]
-pub trait ChildProcess: Debug {
-    /// Runs a task in the child process.
-    ///
-    /// When called in the parent process, this function returns the process ID
-    /// of the child. When in the child, this function never returns.
-    async fn run(&mut self, env: &mut Env, task: ChildProcessTask) -> Pid;
-    // TODO When unsized_fn_params is stabilized, `&mut self` should be `self`
-}
 
 /// Metadata of a file contained in a directory
 ///
@@ -771,7 +751,7 @@ impl System for SharedSystem {
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)
     }
-    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         self.0.borrow_mut().new_child_process()
     }
     fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus> {

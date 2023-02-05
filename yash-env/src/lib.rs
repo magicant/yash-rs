@@ -331,8 +331,8 @@ impl Env {
                 env.apply_result(result);
             })
         });
-        let mut child = self.system.new_child_process()?;
-        let child_pid = child.run(self, task).await;
+        let child = self.system.new_child_process()?;
+        let child_pid = child(self, task).await;
         Ok(child_pid)
     }
 
