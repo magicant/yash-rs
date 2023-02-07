@@ -351,7 +351,7 @@ impl Env {
     /// of forking a real subshell when the function's task does not depend on a
     /// real subshell. Note that this function can start with a virtual subshell
     /// and then switch to a real subshell if needed in the middle of the
-    /// execution.
+    /// execution. (TODO: Virtual subshells are not yet implemented.)
     ///
     /// This function does not support job control. If the subshell suspends,
     /// the current shell continues waiting for the subshell to finish, so it
@@ -366,6 +366,11 @@ impl Env {
     /// obtained from the subshell environment after the argument function
     /// returns. If an error occurs in creating or awaiting a
     /// [`new_child_process`](System::new_child_process), the error is returned.
+    ///
+    /// # Related items
+    ///
+    /// If you want to execute a subshell asynchronously or with job control,
+    /// use [`Subshell`](crate::subshell::Subshell).
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
         F: for<'a> FnOnce(
@@ -374,7 +379,6 @@ impl Env {
                 -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
     {
-        // TODO Use a virtual subshell when possible
         let child_pid = self.start_subshell(f).await?;
 
         let (awaited_pid, exit_status) = self.wait_for_subshell_to_finish(child_pid).await?;
@@ -398,6 +402,10 @@ impl Env {
     ///
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
+    ///
+    /// If the target subshell is not job-controlled, you may want to use
+    /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
+    /// instead.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
