@@ -527,6 +527,7 @@ pub mod option;
 pub mod pwd;
 pub mod semantics;
 pub mod stack;
+pub mod subshell;
 pub mod system;
 pub mod trap;
 pub mod variable;
