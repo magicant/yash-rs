@@ -22,6 +22,8 @@ pub mod r#virtual;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
+#[cfg(doc)]
+use crate::subshell::Subshell;
 use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
@@ -302,9 +304,9 @@ pub trait System: Debug {
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
-    /// should not call it directly. Instead, use [`Env::start_subshell`] so
-    /// that the environment can condition the state of the child process before
-    /// it starts running.
+    /// should not call it directly. Instead, use [`Subshell`] so that the
+    /// environment can condition the state of the child process before it
+    /// starts running.
     ///
     /// If successful, this function returns a [`ChildProcessStarter`] function. The
     /// caller must call the starter exactly once to make sure the parent and

@@ -92,3 +92,80 @@ where
         Ok(child_pid)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::in_virtual_system;
+    use crate::trap::Action;
+    use crate::trap::Signal;
+    use assert_matches::assert_matches;
+    use std::cell::Cell;
+    use std::ops::ControlFlow::Continue;
+    use std::rc::Rc;
+    use yash_syntax::source::Location;
+
+    #[test]
+    fn subshell_start_returns_child_process_id() {
+        in_virtual_system(|mut env, parent_pid, _state| async move {
+            let child_pid = Rc::new(Cell::new(None));
+            let child_pid_2 = Rc::clone(&child_pid);
+            let subshell = Subshell::new(move |env| {
+                Box::pin(async move {
+                    child_pid_2.set(Some(env.system.getpid()));
+                    assert_eq!(env.system.getppid(), parent_pid);
+                    Continue(())
+                })
+            });
+            let result = subshell.start(&mut env).await.unwrap();
+            env.wait_for_subshell(result).await.unwrap();
+            assert_eq!(Some(result), child_pid.get());
+        });
+    }
+
+    #[test]
+    fn stack_frame_in_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    assert_eq!(env.stack[..], [Frame::Subshell]);
+                    Continue(())
+                })
+            });
+            let pid = subshell.start(&mut env).await.unwrap();
+            assert_eq!(env.stack[..], []);
+
+            env.wait_for_subshell(pid).await.unwrap();
+        });
+    }
+
+    #[test]
+    fn trap_reset_in_subshell() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            env.traps
+                .set_action(
+                    &mut env.system,
+                    Signal::SIGCHLD,
+                    Action::Command("echo foo".into()),
+                    Location::dummy(""),
+                    false,
+                )
+                .unwrap();
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    let trap_state = assert_matches!(
+                        env.traps.get_state(Signal::SIGCHLD),
+                        (None, Some(trap_state)) => trap_state
+                    );
+                    assert_matches!(
+                        &trap_state.action,
+                        Action::Command(body) => assert_eq!(&**body, "echo foo")
+                    );
+                    Continue(())
+                })
+            });
+            let pid = subshell.start(&mut env).await.unwrap();
+            env.wait_for_subshell(pid).await.unwrap();
+        });
+    }
+}
