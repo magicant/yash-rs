@@ -34,11 +34,22 @@ use crate::Env;
 use std::future::Future;
 use std::pin::Pin;
 
+/// Job state of a newly created subshell
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JobControl {
+    /// The subshell becomes the foreground process group.
+    Foreground,
+    /// The subshell becomes a background process group.
+    Background,
+}
+
 /// Subshell builder
 ///
 /// See the [module documentation](self) for details.
+#[must_use = "a subshell is not started unless you call `Subshell::start`"]
 pub struct Subshell<F> {
     task: F,
+    job_control: Option<JobControl>,
 }
 
 impl<F> std::fmt::Debug for Subshell<F> {
@@ -62,7 +73,19 @@ where
     ///   status in `Env`.
     /// - Other `Divert` values are ignored.
     pub fn new(task: F) -> Self {
-        Subshell { task }
+        let job_control = None;
+        Subshell { task, job_control }
+    }
+
+    /// Specifies disposition of the subshell with respect to job control.
+    ///
+    /// If the argument is `None`, the subshell runs in the same process group
+    /// as the parent process. If it is `Some(_)`, the subshell becomes a new
+    /// process group. For `JobControl::Foreground`, it also brings itself to
+    /// the foreground.
+    pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
+        self.job_control = job_control.into();
+        self
     }
 
     /// Starts a subshell.
@@ -78,17 +101,58 @@ where
     /// job control is active, you may want to add the process ID to `env.jobs`
     /// before waiting.
     pub async fn start(self, env: &mut Env) -> nix::Result<Pid> {
+        // Do some preparation before starting a child process
+        let tty = match self.job_control {
+            None | Some(JobControl::Background) => None,
+            // Open the tty in the parent process so we can reuse the FD for other jobs
+            Some(JobControl::Foreground) => Some(env.get_tty()?),
+        };
+
+        // Define the child process task
+        let me = Pid::from_raw(0);
         let task: ChildProcessTask = Box::new(move |env| {
             Box::pin(async move {
                 let mut env = env.push_frame(Frame::Subshell);
                 let env = &mut *env;
+
+                if let Some(job_control) = self.job_control {
+                    if let Ok(()) = env.system.setpgid(me, me) {
+                        match job_control {
+                            JobControl::Background => (),
+                            JobControl::Foreground => {
+                                // Since getpgid(0, 0) has succeeded, getpid() == getpgid()
+                                let pgid = env.system.getpid();
+                                if let Some(tty) = tty {
+                                    let _ = env.system.tcsetpgrp(tty, pgid);
+                                    // TODO block SIGTTOU
+                                }
+                            }
+                        }
+                    }
+                }
+
                 env.traps.enter_subshell(&mut env.system);
+
                 let result = (self.task)(env).await;
                 env.apply_result(result);
             })
         });
+
+        // Start the child
         let child = env.system.new_child_process()?;
         let child_pid = child(env, task).await;
+
+        // The finishing
+        if self.job_control.is_some() {
+            // We should setpgid not only in the child but also in the parent to
+            // make sure the child is in a new process group before the parent
+            // returns from the start function.
+            let _ = env.system.setpgid(child_pid, me);
+
+            // We don't tcsetpgrp in the parent. It would mess up the child
+            // which may have started another shell doing its own job control.
+        }
+
         Ok(child_pid)
     }
 }
@@ -96,11 +160,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::r#virtual::INode;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
     use crate::trap::Signal;
     use assert_matches::assert_matches;
     use std::cell::Cell;
+    use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_syntax::source::Location;
@@ -166,6 +232,107 @@ mod tests {
             });
             let pid = subshell.start(&mut env).await.unwrap();
             env.wait_for_subshell(pid).await.unwrap();
+        });
+    }
+
+    #[test]
+    fn subshell_with_no_job_control() {
+        in_virtual_system(|mut parent_env, parent_pid, state| async move {
+            let parent_pgid = state.borrow().processes[&parent_pid].pgid;
+            let state_2 = Rc::clone(&state);
+            let child_pid = Subshell::new(move |child_env| {
+                Box::pin(async move {
+                    let child_pid = child_env.system.getpid();
+                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
+                    assert_eq!(state_2.borrow().foreground, None);
+                    Continue(())
+                })
+            })
+            .job_control(None)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
+            assert_eq!(state.borrow().foreground, None);
+
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
+            assert_eq!(state.borrow().foreground, None);
+        });
+    }
+
+    #[test]
+    fn subshell_in_background() {
+        in_virtual_system(|mut parent_env, _pid, state| async move {
+            let state_2 = Rc::clone(&state);
+            let child_pid = Subshell::new(move |child_env| {
+                Box::pin(async move {
+                    let child_pid = child_env.system.getpid();
+                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                    assert_eq!(state_2.borrow().foreground, None);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Background)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+            assert_eq!(state.borrow().foreground, None);
+
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+            assert_eq!(state.borrow().foreground, None);
+        });
+    }
+
+    #[test]
+    fn subshell_in_foreground() {
+        in_virtual_system(|mut parent_env, _pid, state| async move {
+            state
+                .borrow_mut()
+                .file_system
+                .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+                .unwrap();
+
+            let state_2 = Rc::clone(&state);
+            let child_pid = Subshell::new(move |child_env| {
+                Box::pin(async move {
+                    let child_pid = child_env.system.getpid();
+                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
+                    assert_eq!(state_2.borrow().foreground, Some(child_pid));
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+            // The child may not yet have become the foreground job.
+            // assert_eq!(state.borrow().foreground, Some(child_pid));
+
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
+            assert_eq!(state.borrow().foreground, Some(child_pid));
+        });
+    }
+
+    #[test]
+    fn tty_after_starting_foreground_subshell() {
+        in_virtual_system(|mut parent_env, _pid, state| async move {
+            state
+                .borrow_mut()
+                .file_system
+                .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+                .unwrap();
+
+            let _ = Subshell::new(move |_env| Box::pin(async move { Continue(()) }))
+                .job_control(JobControl::Foreground)
+                .start(&mut parent_env)
+                .await
+                .unwrap();
+            assert_matches!(parent_env.tty, Some(_));
         });
     }
 }
