@@ -123,8 +123,7 @@ where
                                 // Since getpgid(0, 0) has succeeded, getpid() == getpgid()
                                 let pgid = env.system.getpid();
                                 if let Some(tty) = tty {
-                                    let _ = env.system.tcsetpgrp(tty, pgid);
-                                    // TODO block SIGTTOU
+                                    let _ = env.system.tcsetpgrp_with_block(tty, pgid);
                                 }
                             }
                         }

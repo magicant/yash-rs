@@ -301,6 +301,28 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `tcsetpgrp` system call.
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()>;
 
+    /// Switches the foreground process group with SIGTTOU blocked.
+    ///
+    /// This is a convenience function to change the foreground process group
+    /// safely. If you call [`tcsetpgrp`](Self::tcsetpgrp) from a background
+    /// process, the process is stopped by SIGTTOU by default. To prevent this
+    /// effect, SIGTTOU must be blocked or ignored when `tcsetpgrp` is called.
+    /// This function uses [`sigmask`](Self::sigmask) to block SIGTTOU before
+    /// calling [`tcsetpgrp`](Self::tcsetpgrp) and also to restore the original
+    /// signal mask after `tcsetpgrp`.
+    fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+        let mut sigttou = SigSet::empty();
+        let mut old_set = SigSet::empty();
+        sigttou.add(Signal::SIGTTOU);
+        self.sigmask(SigmaskHow::SIG_BLOCK, Some(&sigttou), Some(&mut old_set))?;
+
+        let result = self.tcsetpgrp(fd, pgid);
+
+        let result_2 = self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
+
+        result.or(result_2)
+    }
+
     /// Creates a new child process.
     ///
     /// This is a thin wrapper around the `fork` system call. Users of `Env`
