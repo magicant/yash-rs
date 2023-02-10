@@ -291,6 +291,10 @@ pub trait System: Debug {
     #[must_use]
     fn getppid(&self) -> Pid;
 
+    /// Returns the process group ID of the current process.
+    #[must_use]
+    fn getpgrp(&self) -> Pid;
+
     /// Modifies the process group ID of a process.
     ///
     /// This is a thin wrapper around the `setpgid` system call.
@@ -768,6 +772,9 @@ impl System for SharedSystem {
     }
     fn getppid(&self) -> Pid {
         self.0.borrow().getppid()
+    }
+    fn getpgrp(&self) -> Pid {
+        self.0.borrow().getpgrp()
     }
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().setpgid(pid, pgid)

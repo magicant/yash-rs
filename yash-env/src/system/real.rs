@@ -322,6 +322,10 @@ impl System for RealSystem {
         nix::unistd::getppid()
     }
 
+    fn getpgrp(&self) -> Pid {
+        nix::unistd::getpgrp()
+    }
+
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
         nix::unistd::setpgid(pid, pgid)
     }

@@ -678,6 +678,10 @@ impl System for VirtualSystem {
         self.current_process().ppid
     }
 
+    fn getpgrp(&self) -> Pid {
+        self.current_process().pgid
+    }
+
     /// Modifies the process group ID of a process.
     ///
     /// The current implementation does not yet support the concept of sessions.

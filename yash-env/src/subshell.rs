@@ -120,9 +120,8 @@ where
                         match job_control {
                             JobControl::Background => (),
                             JobControl::Foreground => {
-                                // Since getpgid(0, 0) has succeeded, getpid() == getpgid()
-                                let pgid = env.system.getpid();
                                 if let Some(tty) = tty {
+                                    let pgid = env.system.getpgrp();
                                     let _ = env.system.tcsetpgrp_with_block(tty, pgid);
                                 }
                             }
