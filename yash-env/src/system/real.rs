@@ -17,9 +17,10 @@
 //! Implementation of `System` that actually interacts with the system.
 
 use super::AtFlags;
-use super::ChildProcess;
+use super::ChildProcessStarter;
 use super::Dir;
 use super::DirEntry;
+#[cfg(doc)]
 use super::Env;
 use super::Errno;
 use super::FdFlag;
@@ -35,7 +36,6 @@ use super::TimeSpec;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::SignalHandling;
-use async_trait::async_trait;
 use nix::libc::DIR;
 use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
@@ -50,12 +50,10 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
-use std::future::Future;
 use std::io::SeekFrom;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
-use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
@@ -339,15 +337,18 @@ impl System for RealSystem {
     /// returned `ChildProcess` ignores arguments and returns the child process
     /// ID. In the child, the `run` function runs the task and exits the
     /// process.
-    fn new_child_process(&mut self) -> nix::Result<Box<dyn ChildProcess>> {
+    fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         use nix::unistd::ForkResult::*;
         // SAFETY: As stated on RealSystem::new, the caller is responsible for
         // making only one instance of RealSystem in the process.
         match unsafe { nix::unistd::fork()? } {
-            Parent { child } => Ok(Box::new(DummyChildProcess {
-                child_process_id: child,
+            Parent { child } => Ok(Box::new(move |_env, _task| Box::pin(async move { child }))),
+            Child => Ok(Box::new(|env, task| {
+                Box::pin(async move {
+                    task(env).await;
+                    std::process::exit(env.exit_status.0)
+                })
             })),
-            Child => Ok(Box::new(RealChildProcess)),
         }
     }
 
@@ -378,37 +379,6 @@ impl System for RealSystem {
 
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {
         nix::unistd::User::from_name(name).map(|o| o.map(|passwd| passwd.dir))
-    }
-}
-
-/// Implementor of [`ChildProcess`] that is returned from
-/// [`RealSystem::new_child_process`] in the parent process.
-#[derive(Debug)]
-struct DummyChildProcess {
-    child_process_id: Pid,
-}
-
-#[async_trait(?Send)]
-impl ChildProcess for DummyChildProcess {
-    async fn run(&mut self, _env: &mut Env, _task: super::ChildProcessTask) -> Pid {
-        self.child_process_id
-    }
-}
-
-/// Implementor of [`ChildProcess`] that is returned from
-/// [`RealSystem::new_child_process`] in the child process.
-#[derive(Debug)]
-struct RealChildProcess;
-
-#[async_trait(?Send)]
-impl ChildProcess for RealChildProcess {
-    async fn run(
-        &mut self,
-        env: &mut Env,
-        mut task: Box<dyn for<'a> FnMut(&'a mut Env) -> Pin<Box<dyn Future<Output = ()> + 'a>>>,
-    ) -> Pid {
-        task(env).await;
-        std::process::exit(env.exit_status.0)
     }
 }
 

@@ -28,6 +28,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
 use yash_env::Env;
@@ -112,11 +113,10 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         shift_or_fail(env, &mut pipes, has_next).await?;
 
         let pipes2 = pipes;
-        let subshell = env.start_subshell(move |env| {
+        let subshell = Subshell::new(move |env| {
             Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
-
-        let pid = subshell.await;
+        let pid = subshell.start(env).await;
         pids.push(pid_or_fail(env, pid).await?);
     }
 

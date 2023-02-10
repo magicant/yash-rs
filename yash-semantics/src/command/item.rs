@@ -25,6 +25,7 @@ use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::Subshell;
 use yash_env::Env;
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
@@ -61,9 +62,8 @@ impl Command for syntax::Item {
 
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
     let and_or_2 = Rc::clone(and_or);
-    let result = env
-        .start_subshell(|env| Box::pin(async move { and_or_2.execute(env).await }))
-        .await;
+    let subshell = Subshell::new(|env| Box::pin(async move { and_or_2.execute(env).await }));
+    let result = subshell.start(env).await;
     match result {
         Ok(pid) => {
             let mut job = Job::new(pid);

@@ -27,6 +27,7 @@ use crate::ReadEvalLoop;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
+use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::System;
 use yash_syntax::parser::lex::Lexer;
@@ -52,28 +53,25 @@ where
     };
 
     // Start a subshell to run the command
-    let subshell_result = env
-        .inner
-        .start_subshell(move |env| {
-            Box::pin(async move {
-                env.system.close(reader).ok();
-                if writer != Fd::STDOUT {
-                    if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
-                        let error = Error {
-                            cause: ErrorCause::CommandSubstError(errno),
-                            location: original,
-                        };
-                        return error.handle(env).await;
-                    }
-                    env.system.close(writer).ok();
+    let subshell = Subshell::new(move |env| {
+        Box::pin(async move {
+            env.system.close(reader).ok();
+            if writer != Fd::STDOUT {
+                if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
+                    let error = Error {
+                        cause: ErrorCause::CommandSubstError(errno),
+                        location: original,
+                    };
+                    return error.handle(env).await;
                 }
+                env.system.close(writer).ok();
+            }
 
-                let mut lexer =
-                    Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
-                ReadEvalLoop::new(env, &mut lexer).run().await
-            })
+            let mut lexer = Lexer::from_memory(command.as_ref(), Source::CommandSubst { original });
+            ReadEvalLoop::new(env, &mut lexer).run().await
         })
-        .await;
+    });
+    let subshell_result = subshell.start(env.inner).await;
 
     expand_common(reader, writer, subshell_result, location, env).await
 }

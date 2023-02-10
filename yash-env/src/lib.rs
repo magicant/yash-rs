@@ -46,9 +46,9 @@ use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
+use self::subshell::Subshell;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
-use self::system::ChildProcessTask;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
@@ -295,49 +295,6 @@ impl Env {
         final_fd
     }
 
-    /// Starts a subshell.
-    ///
-    /// This function creates a new child process in which the argument function
-    /// is run. If the child was started successfully, this function returns the
-    /// child's process ID. Otherwise, it returns an error.
-    ///
-    /// Although this function is `async`, it does not wait for the child to
-    /// finish, which means the parent and child processes will run
-    /// concurrently.
-    ///
-    /// If function `f` returns an `Err(Divert::...)`, it is handled as follows:
-    ///
-    /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
-    ///   status in `Env`.
-    /// - Other `Divert` values are ignored.
-    ///
-    /// This function does not add the created subshell to `self.jobs`. You have
-    /// to do it for yourself.
-    pub async fn start_subshell<F>(&mut self, f: F) -> nix::Result<Pid>
-    where
-        F: for<'a> FnOnce(
-                &'a mut Env,
-            )
-                -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
-            + 'static,
-        // TODO Revisit to simplify this function type when impl Future is allowed in return type
-    {
-        let mut f = Some(f);
-        let task: ChildProcessTask = Box::new(move |env| {
-            let f = f.take().expect("child process task should run only once");
-            Box::pin(async move {
-                let mut env = env.push_frame(Frame::Subshell);
-                let env = &mut *env;
-                env.traps.enter_subshell(&mut env.system);
-                let result = f(env).await;
-                env.apply_result(result);
-            })
-        });
-        let mut child = self.system.new_child_process()?;
-        let child_pid = child.run(self, task).await;
-        Ok(child_pid)
-    }
-
     /// Runs the argument function in a subshell.
     ///
     /// This function creates a new (real or virtual) subshell in which the
@@ -353,14 +310,14 @@ impl Env {
     /// of forking a real subshell when the function's task does not depend on a
     /// real subshell. Note that this function can start with a virtual subshell
     /// and then switch to a real subshell if needed in the middle of the
-    /// execution.
+    /// execution. (TODO: Virtual subshells are not yet implemented.)
     ///
     /// This function does not support job control. If the subshell suspends,
     /// the current shell continues waiting for the subshell to finish, so it
     /// must be resumed by some other means.
     ///
-    /// See [`start_subshell`](Self::start_subshell) for the behavior of the
-    /// subshell in case function `f` returns an `Err(Divert::...)`.
+    /// See [`Subshell::new`] for the behavior of the subshell in case function
+    /// `f` returns an `Err(Divert::...)`.
     ///
     /// # Return value
     ///
@@ -368,6 +325,11 @@ impl Env {
     /// obtained from the subshell environment after the argument function
     /// returns. If an error occurs in creating or awaiting a
     /// [`new_child_process`](System::new_child_process), the error is returned.
+    ///
+    /// # Related items
+    ///
+    /// If you want to execute a subshell asynchronously or with job control,
+    /// use [`Subshell`].
     pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
     where
         F: for<'a> FnOnce(
@@ -376,9 +338,7 @@ impl Env {
                 -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
     {
-        // TODO Use a virtual subshell when possible
-        let child_pid = self.start_subshell(f).await?;
-
+        let child_pid = Subshell::new(f).start(self).await?;
         let (awaited_pid, exit_status) = self.wait_for_subshell_to_finish(child_pid).await?;
         assert_eq!(awaited_pid, child_pid);
         Ok(exit_status)
@@ -400,6 +360,10 @@ impl Env {
     ///
     /// If there is no matching target, this function returns
     /// `Err(Errno::ECHILD)`.
+    ///
+    /// If the target subshell is not job-controlled, you may want to use
+    /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
+    /// instead.
     pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
@@ -529,6 +493,7 @@ pub mod option;
 pub mod pwd;
 pub mod semantics;
 pub mod stack;
+pub mod subshell;
 pub mod system;
 pub mod trap;
 pub mod variable;
@@ -541,7 +506,6 @@ mod tests {
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
     use crate::trap::Action;
-    use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
@@ -711,15 +675,13 @@ mod tests {
     #[test]
     fn start_and_wait_for_subshell() {
         in_virtual_system(|mut env, _pid, _state| async move {
-            let pid = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(42);
-                        Continue(())
-                    })
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(42);
+                    Continue(())
                 })
-                .await
-                .unwrap();
+            });
+            let pid = subshell.start(&mut env).await.unwrap();
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
         });
@@ -728,15 +690,13 @@ mod tests {
     #[test]
     fn start_and_wait_for_subshell_with_job_set() {
         in_virtual_system(|mut env, _pid, _state| async move {
-            let pid = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(42);
-                        Continue(())
-                    })
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(42);
+                    Continue(())
                 })
-                .await
-                .unwrap();
+            });
+            let pid = subshell.start(&mut env).await.unwrap();
             let mut job = Job::new(pid);
             job.name = "my job".to_string();
             let job_index = env.jobs.add(job.clone());
@@ -744,53 +704,6 @@ mod tests {
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
             job.status = WaitStatus::Exited(pid, 42);
             assert_eq!(env.jobs.get(job_index), Some(&job));
-        });
-    }
-
-    #[test]
-    fn stack_frame_in_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
-            env.run_in_subshell(|env| {
-                Box::pin(async move {
-                    assert_eq!(env.stack[..], [Frame::Subshell]);
-                    Continue(())
-                })
-            })
-            .await
-            .unwrap();
-            assert_eq!(env.stack[..], []);
-        });
-    }
-
-    #[test]
-    fn trap_reset_in_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
-            env.traps
-                .set_action(
-                    &mut env.system,
-                    Signal::SIGCHLD,
-                    Action::Command("echo foo".into()),
-                    Location::dummy(""),
-                    false,
-                )
-                .unwrap();
-            let pid = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        let trap_state = assert_matches!(
-                            env.traps.get_state(Signal::SIGCHLD),
-                            (None, Some(trap_state)) => trap_state
-                        );
-                        assert_matches!(
-                            &trap_state.action,
-                            Action::Command(body) => assert_eq!(&**body, "echo foo")
-                        );
-                        Continue(())
-                    })
-                })
-                .await
-                .unwrap();
-            env.wait_for_subshell(pid).await.unwrap();
         });
     }
 
@@ -822,40 +735,36 @@ mod tests {
 
         let [(pid_1, job_1), (pid_2, job_2), (_pid_3, job_3)] = executor.run_until(async {
             // Run a subshell.
-            let pid_1 = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(12);
-                        Continue(())
-                    })
+            let subshell_1 = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(12);
+                    Continue(())
                 })
-                .await
-                .unwrap();
+            });
+            let pid_1 = subshell_1.start(&mut env).await.unwrap();
+
             // Run another subshell.
-            let pid_2 = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(35);
-                        Continue(())
-                    })
+            let subshell_2 = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(35);
+                    Continue(())
                 })
-                .await
-                .unwrap();
+            });
+            let pid_2 = subshell_2.start(&mut env).await.unwrap();
+
             // This one will never finish.
-            let pid_3 = env
-                .start_subshell(|_env| Box::pin(futures_util::future::pending()))
-                .await
-                .unwrap();
+            let subshell_3 = Subshell::new(|_env| Box::pin(futures_util::future::pending()));
+            let pid_3 = subshell_3.start(&mut env).await.unwrap();
+
             // Yet another subshell. We don't make this into a job.
-            let _ = env
-                .start_subshell(|env| {
-                    Box::pin(async move {
-                        env.exit_status = ExitStatus(100);
-                        Continue(())
-                    })
+            let subshell_4 = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(100);
+                    Continue(())
                 })
-                .await
-                .unwrap();
+            });
+            let _pid_4 = subshell_4.start(&mut env).await.unwrap();
+
             // Create jobs.
             let job_1 = env.jobs.add(Job::new(pid_1));
             let job_2 = env.jobs.add(Job::new(pid_2));
