@@ -109,14 +109,14 @@ where
         };
 
         // Define the child process task
-        let me = Pid::from_raw(0);
+        const ME: Pid = Pid::from_raw(0);
         let task: ChildProcessTask = Box::new(move |env| {
             Box::pin(async move {
                 let mut env = env.push_frame(Frame::Subshell);
                 let env = &mut *env;
 
                 if let Some(job_control) = self.job_control {
-                    if let Ok(()) = env.system.setpgid(me, me) {
+                    if let Ok(()) = env.system.setpgid(ME, ME) {
                         match job_control {
                             JobControl::Background => (),
                             JobControl::Foreground => {
@@ -145,7 +145,7 @@ where
             // We should setpgid not only in the child but also in the parent to
             // make sure the child is in a new process group before the parent
             // returns from the start function.
-            let _ = env.system.setpgid(child_pid, me);
+            let _ = env.system.setpgid(child_pid, ME);
 
             // We don't tcsetpgrp in the parent. It would mess up the child
             // which may have started another shell doing its own job control.
