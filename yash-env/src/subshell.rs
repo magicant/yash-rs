@@ -27,6 +27,8 @@
 //! properly.
 
 use crate::job::Pid;
+use crate::option::Option::Monitor;
+use crate::option::State::On;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::System;
@@ -83,6 +85,10 @@ where
     /// as the parent process. If it is `Some(_)`, the subshell becomes a new
     /// process group. For `JobControl::Foreground`, it also brings itself to
     /// the foreground.
+    ///
+    /// Note that you can create a job only when the [`Monitor`] option is
+    /// enabled and the job is not a nested subshell. Otherwise, this parameter
+    /// will be ignored when starting the subshell.
     pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
         self.job_control = job_control.into();
         self
@@ -102,15 +108,14 @@ where
     /// before waiting.
     ///
     /// If you set [`job_control`](Self::job_control) to
-    /// `JobControl::Foreground`, this function opens the `tty` by calling
-    /// [`get_tty`](Self::get_tty). The `tty` is used to change the foreground
-    /// job to the new subshell. However, `job_control` is ignored if we are
-    /// already in another subshell.
+    /// `JobControl::Foreground`, this function opens `env.tty` by calling
+    /// [`Env::get_tty`]. The `tty` is used to change the foreground job to the
+    /// new subshell. However, `job_control` is ignored if [`Monitor`] is not
+    /// enabled in `env.options` or we are already in another subshell.
     pub async fn start(self, env: &mut Env) -> nix::Result<Pid> {
         // Do some preparation before starting a child process
-        let job_control = (!env.stack.contains(&Frame::Subshell))
-            .then_some(self.job_control)
-            .flatten();
+        let job_control = env.options.get(Monitor) == On && !env.stack.contains(&Frame::Subshell);
+        let job_control = job_control.then_some(self.job_control).flatten();
         let tty = match job_control {
             None | Some(JobControl::Background) => None,
             // Open the tty in the parent process so we can reuse the FD for other jobs
@@ -168,6 +173,7 @@ where
 mod tests {
     use super::*;
     use crate::system::r#virtual::INode;
+    use crate::system::r#virtual::SystemState;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
     use crate::trap::Signal;
@@ -178,6 +184,13 @@ mod tests {
     use std::rc::Rc;
     use yash_syntax::source::Location;
 
+    fn stub_tty(state: &RefCell<SystemState>) {
+        state
+            .borrow_mut()
+            .file_system
+            .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+            .unwrap();
+    }
     #[test]
     fn subshell_start_returns_child_process_id() {
         in_virtual_system(|mut env, parent_pid, _state| async move {
@@ -245,6 +258,8 @@ mod tests {
     #[test]
     fn subshell_with_no_job_control() {
         in_virtual_system(|mut parent_env, parent_pid, state| async move {
+            parent_env.options.set(Monitor, On);
+
             let parent_pgid = state.borrow().processes[&parent_pid].pgid;
             let state_2 = Rc::clone(&state);
             let child_pid = Subshell::new(move |child_env| {
@@ -271,6 +286,8 @@ mod tests {
     #[test]
     fn subshell_in_background() {
         in_virtual_system(|mut parent_env, _pid, state| async move {
+            parent_env.options.set(Monitor, On);
+
             let state_2 = Rc::clone(&state);
             let child_pid = Subshell::new(move |child_env| {
                 Box::pin(async move {
@@ -296,11 +313,8 @@ mod tests {
     #[test]
     fn subshell_in_foreground() {
         in_virtual_system(|mut parent_env, _pid, state| async move {
-            state
-                .borrow_mut()
-                .file_system
-                .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
-                .unwrap();
+            parent_env.options.set(Monitor, On);
+            stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
             let child_pid = Subshell::new(move |child_env| {
@@ -328,6 +342,7 @@ mod tests {
     #[test]
     fn tty_after_starting_foreground_subshell() {
         in_virtual_system(|mut parent_env, _pid, state| async move {
+            parent_env.options.set(Monitor, On);
             state
                 .borrow_mut()
                 .file_system
@@ -344,9 +359,39 @@ mod tests {
     }
 
     #[test]
+    fn no_job_control_with_option_disabled() {
+        in_virtual_system(|mut parent_env, parent_pid, state| async move {
+            stub_tty(&state);
+
+            let parent_pgid = state.borrow().processes[&parent_pid].pgid;
+            let state_2 = Rc::clone(&state);
+            let child_pid = Subshell::new(move |child_env| {
+                Box::pin(async move {
+                    let child_pid = child_env.system.getpid();
+                    assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
+                    assert_eq!(state_2.borrow().foreground, None);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
+            assert_eq!(state.borrow().foreground, None);
+
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
+            assert_eq!(state.borrow().foreground, None);
+        });
+    }
+
+    #[test]
     fn no_job_control_for_nested_subshell() {
         in_virtual_system(|mut parent_env, parent_pid, state| async move {
             let mut parent_env = parent_env.push_frame(Frame::Subshell);
+            parent_env.options.set(Monitor, On);
+            stub_tty(&state);
 
             let parent_pgid = state.borrow().processes[&parent_pid].pgid;
             let state_2 = Rc::clone(&state);
