@@ -40,7 +40,7 @@ use self::job::Pid;
 use self::job::WaitStatus;
 use self::job::WaitStatusEx;
 use self::option::OptionSet;
-use self::option::{AllExport, ErrExit};
+use self::option::{AllExport, ErrExit, Monitor};
 use self::option::{Off, On};
 use self::semantics::Divert;
 use self::semantics::ExitStatus;
@@ -293,6 +293,17 @@ impl Env {
         let _ = self.system.close(first_fd);
         self.tty = final_fd.ok();
         final_fd
+    }
+
+    /// Tests whether the shell is performing job control.
+    ///
+    /// This function returns true if and only if:
+    ///
+    /// - the [`Monitor`] option is `On` in `self.options`, and
+    /// - the current context is not in a subshell (no `Frame::Subshell` in `self.stack`).
+    #[must_use]
+    pub fn controls_jobs(&self) -> bool {
+        self.options.get(Monitor) == On && !self.stack.contains(&Frame::Subshell)
     }
 
     /// Runs the argument function in a subshell.

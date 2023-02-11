@@ -27,8 +27,6 @@
 //! properly.
 
 use crate::job::Pid;
-use crate::option::Option::Monitor;
-use crate::option::State::On;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::System;
@@ -86,9 +84,8 @@ where
     /// process group. For `JobControl::Foreground`, it also brings itself to
     /// the foreground.
     ///
-    /// Note that you can create a job only when the [`Monitor`] option is
-    /// enabled and the job is not a nested subshell. Otherwise, this parameter
-    /// will be ignored when starting the subshell.
+    /// This parameter is ignored if the shell is not [controlling
+    /// jobs](Env::controls_jobs).
     pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
         self.job_control = job_control.into();
         self
@@ -110,12 +107,11 @@ where
     /// If you set [`job_control`](Self::job_control) to
     /// `JobControl::Foreground`, this function opens `env.tty` by calling
     /// [`Env::get_tty`]. The `tty` is used to change the foreground job to the
-    /// new subshell. However, `job_control` is ignored if [`Monitor`] is not
-    /// enabled in `env.options` or we are already in another subshell.
+    /// new subshell. However, `job_control` is effective only when the shell is
+    /// [controlling jobs](Env::controls_jobs)
     pub async fn start(self, env: &mut Env) -> nix::Result<Pid> {
         // Do some preparation before starting a child process
-        let job_control = env.options.get(Monitor) == On && !env.stack.contains(&Frame::Subshell);
-        let job_control = job_control.then_some(self.job_control).flatten();
+        let job_control = env.controls_jobs().then_some(self.job_control).flatten();
         let tty = match job_control {
             None | Some(JobControl::Background) => None,
             // Open the tty in the parent process so we can reuse the FD for other jobs
@@ -172,6 +168,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::option::Option::Monitor;
+    use crate::option::State::On;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::tests::in_virtual_system;
