@@ -430,6 +430,10 @@ pub trait SystemEx: System {
     /// This function uses [`sigmask`](System::sigmask) to block SIGTTOU before
     /// calling [`tcsetpgrp`](System::tcsetpgrp) and also to restore the
     /// original signal mask after `tcsetpgrp`.
+    ///
+    /// Use [`tcsetpgrp_without_block`](Self::tcsetpgrp_without_block) if you
+    /// need to make sure the shell is in the foreground before changing the
+    /// foreground job.
     fn tcsetpgrp_with_block(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         let mut sigttou = SigSet::empty();
         let mut old_set = SigSet::empty();
@@ -441,6 +445,53 @@ pub trait SystemEx: System {
         let result_2 = self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
 
         result.or(result_2)
+    }
+
+    /// Switches the foreground process group with the default SIGTTOU settings.
+    ///
+    /// This is a convenience function to ensure the shell has been in the
+    /// foreground and optionally change the foreground process group. This
+    /// function calls [`sigaction`](System::sigaction) to restore the action
+    /// for SIGTTOU to the default disposition (which is to suspend the shell
+    /// process), [`sigmask`](System::sigmask) to unblock SIGTTOU, and
+    /// [`tcsetpgrp`](System::tcsetpgrp) to modify the foreground job. If the
+    /// calling process is not in the foreground, `tcsetpgrp` will suspend the
+    /// process with SIGTTOU until another job-controlling process resumes it in
+    /// the foreground. After `tcsetpgrp` completes, this function calls
+    /// `sigmask` and `sigaction` to restore the original state.
+    ///
+    /// Note that if `pgid` is the process group ID of the current process, this
+    /// function does not change the foreground job, but the process is still
+    /// subject to suspension if it has not been in the foreground.
+    ///
+    /// Use [`tcsetpgrp_with_block`](Self::tcsetpgrp_with_block) to change the
+    /// job even if the current shell is not in the foreground.
+    fn tcsetpgrp_without_block(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
+        match self.sigaction(Signal::SIGTTOU, SignalHandling::Default) {
+            Err(e) => Err(e),
+            Ok(old_handling) => {
+                let mut sigttou = SigSet::empty();
+                let mut old_set = SigSet::empty();
+                sigttou.add(Signal::SIGTTOU);
+                let result =
+                    match self.sigmask(SigmaskHow::SIG_UNBLOCK, Some(&sigttou), Some(&mut old_set))
+                    {
+                        Err(e) => Err(e),
+                        Ok(()) => {
+                            let result = self.tcsetpgrp(fd, pgid);
+
+                            let result_2 =
+                                self.sigmask(SigmaskHow::SIG_SETMASK, Some(&old_set), None);
+
+                            result.or(result_2)
+                        }
+                    };
+
+                let result_2 = self.sigaction(Signal::SIGTTOU, old_handling).map(drop);
+
+                result.or(result_2)
+            }
+        }
     }
 }
 
