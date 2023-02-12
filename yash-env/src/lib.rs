@@ -107,6 +107,9 @@ pub struct Env {
     /// Jobs managed in the environment.
     pub jobs: JobSet,
 
+    /// Process group ID of the main shell process.
+    pub main_pgid: Pid,
+
     /// Process ID of the main shell process.
     ///
     /// This PID represents the value of the `$` special parameter.
@@ -149,6 +152,7 @@ impl Env {
             exit_status: Default::default(),
             functions: Default::default(),
             jobs: Default::default(),
+            main_pgid: system.getpgrp(),
             main_pid: system.getpid(),
             options: Default::default(),
             stack: Default::default(),
@@ -179,6 +183,7 @@ impl Env {
             exit_status: self.exit_status,
             functions: self.functions.clone(),
             jobs: self.jobs.clone(),
+            main_pgid: self.main_pgid,
             main_pid: self.main_pid,
             options: self.options,
             stack: self.stack.clone(),
