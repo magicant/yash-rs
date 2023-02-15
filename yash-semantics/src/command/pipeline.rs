@@ -28,6 +28,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
@@ -116,8 +117,8 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         let subshell = Subshell::new(move |env| {
             Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
-        let pid = subshell.start(env).await;
-        pids.push(pid_or_fail(env, pid).await?);
+        let start_result = subshell.start(env).await;
+        pids.push(pid_or_fail(env, start_result).await?);
     }
 
     shift_or_fail(env, &mut pipes, false).await?;
@@ -170,9 +171,15 @@ async fn connect_pipe_and_execute_command(
     command.execute(env).await
 }
 
-async fn pid_or_fail(env: &mut Env, pid: std::result::Result<Pid, Errno>) -> Result<Pid> {
-    match pid {
-        Ok(pid) => Continue(pid),
+async fn pid_or_fail(
+    env: &mut Env,
+    start_result: std::result::Result<(Pid, Option<JobControl>), Errno>,
+) -> Result<Pid> {
+    match start_result {
+        Ok((pid, job_control)) => {
+            debug_assert_eq!(job_control, None);
+            Continue(pid)
+        }
         Err(errno) => {
             // TODO print error location using yash_env::io::print_error
             env.print_error(&format!(

@@ -354,7 +354,7 @@ impl Env {
                 -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
             + 'static,
     {
-        let child_pid = Subshell::new(f).start(self).await?;
+        let (child_pid, _job_control) = Subshell::new(f).start(self).await?;
         let (awaited_pid, exit_status) = self.wait_for_subshell_to_finish(child_pid).await?;
         assert_eq!(awaited_pid, child_pid);
         Ok(exit_status)
@@ -697,7 +697,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid = subshell.start(&mut env).await.unwrap();
+            let (pid, _) = subshell.start(&mut env).await.unwrap();
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
         });
@@ -712,7 +712,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid = subshell.start(&mut env).await.unwrap();
+            let (pid, _) = subshell.start(&mut env).await.unwrap();
             let mut job = Job::new(pid);
             job.name = "my job".to_string();
             let job_index = env.jobs.add(job.clone());
@@ -757,7 +757,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid_1 = subshell_1.start(&mut env).await.unwrap();
+            let (pid_1, _) = subshell_1.start(&mut env).await.unwrap();
 
             // Run another subshell.
             let subshell_2 = Subshell::new(|env| {
@@ -766,11 +766,11 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid_2 = subshell_2.start(&mut env).await.unwrap();
+            let (pid_2, _) = subshell_2.start(&mut env).await.unwrap();
 
             // This one will never finish.
             let subshell_3 = Subshell::new(|_env| Box::pin(futures_util::future::pending()));
-            let pid_3 = subshell_3.start(&mut env).await.unwrap();
+            let (pid_3, _) = subshell_3.start(&mut env).await.unwrap();
 
             // Yet another subshell. We don't make this into a job.
             let subshell_4 = Subshell::new(|env| {
@@ -779,7 +779,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let _pid_4 = subshell_4.start(&mut env).await.unwrap();
+            let (_pid_4, _) = subshell_4.start(&mut env).await.unwrap();
 
             // Create jobs.
             let job_1 = env.jobs.add(Job::new(pid_1));

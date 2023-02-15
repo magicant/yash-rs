@@ -65,7 +65,8 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     let subshell = Subshell::new(|env| Box::pin(async move { and_or_2.execute(env).await }));
     let result = subshell.start(env).await;
     match result {
-        Ok(pid) => {
+        Ok((pid, job_control)) => {
+            debug_assert_eq!(job_control, None);
             let mut job = Job::new(pid);
             job.name = and_or.to_string();
             env.jobs.add(job);

@@ -27,6 +27,7 @@ use crate::ReadEvalLoop;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
 use yash_env::semantics::ExitStatus;
+use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::System;
@@ -80,13 +81,16 @@ where
 async fn expand_common(
     reader: Fd,
     writer: Fd,
-    subshell_result: Result<Pid, Errno>,
+    subshell_result: Result<(Pid, Option<JobControl>), Errno>,
     location: Location,
     env: &mut Env<'_>,
 ) -> Result<Phrase, Error> {
     // See if the subshell has successfully started
     let pid = match subshell_result {
-        Ok(pid) => pid,
+        Ok((pid, job_control)) => {
+            debug_assert_eq!(job_control, None);
+            pid
+        }
         Err(errno) => {
             env.inner.system.close(reader).ok();
             env.inner.system.close(writer).ok();

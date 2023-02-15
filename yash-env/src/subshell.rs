@@ -95,8 +95,7 @@ where
     /// Starts a subshell.
     ///
     /// This function creates a new child process that runs the task contained
-    /// in this builder. If the child was started successfully, this function
-    /// returns the child's process ID. Otherwise, it returns an error.
+    /// in this builder.
     ///
     /// Although this function is `async`, it does not wait for the child to
     /// finish, which means the parent and child processes will run
@@ -110,7 +109,11 @@ where
     /// [`Env::get_tty`]. The `tty` is used to change the foreground job to the
     /// new subshell. However, `job_control` is effective only when the shell is
     /// [controlling jobs](Env::controls_jobs)
-    pub async fn start(self, env: &mut Env) -> nix::Result<Pid> {
+    ///
+    /// If the subshell started successfully, the return value is a pair of the
+    /// child process ID and the actual job control. Otherwise, it indicates the
+    /// error.
+    pub async fn start(self, env: &mut Env) -> nix::Result<(Pid, Option<JobControl>)> {
         // Do some preparation before starting a child process
         let job_control = env.controls_jobs().then_some(self.job_control).flatten();
         let tty = match job_control {
@@ -162,7 +165,7 @@ where
             // which may have started another shell doing its own job control.
         }
 
-        Ok(child_pid)
+        Ok((child_pid, job_control))
     }
 }
 
@@ -202,7 +205,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let result = subshell.start(&mut env).await.unwrap();
+            let result = subshell.start(&mut env).await.unwrap().0;
             env.wait_for_subshell(result).await.unwrap();
             assert_eq!(Some(result), child_pid.get());
         });
@@ -217,7 +220,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid = subshell.start(&mut env).await.unwrap();
+            let pid = subshell.start(&mut env).await.unwrap().0;
             assert_eq!(env.stack[..], []);
 
             env.wait_for_subshell(pid).await.unwrap();
@@ -249,7 +252,7 @@ mod tests {
                     Continue(())
                 })
             });
-            let pid = subshell.start(&mut env).await.unwrap();
+            let pid = subshell.start(&mut env).await.unwrap().0;
             env.wait_for_subshell(pid).await.unwrap();
         });
     }
@@ -261,7 +264,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let child_pid = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
@@ -273,6 +276,7 @@ mod tests {
             .start(&mut parent_env)
             .await
             .unwrap();
+            assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
 
@@ -288,7 +292,7 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let child_pid = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
@@ -300,6 +304,7 @@ mod tests {
             .start(&mut parent_env)
             .await
             .unwrap();
+            assert_eq!(job_control, Some(JobControl::Background));
             assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
             assert_eq!(state.borrow().foreground, None);
 
@@ -316,7 +321,7 @@ mod tests {
             stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
-            let child_pid = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
@@ -328,6 +333,7 @@ mod tests {
             .start(&mut parent_env)
             .await
             .unwrap();
+            assert_eq!(job_control, Some(JobControl::Foreground));
             assert_eq!(state.borrow().processes[&child_pid].pgid, child_pid);
             // The child may not yet have become the foreground job.
             // assert_eq!(state.borrow().foreground, Some(child_pid));
@@ -364,7 +370,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let child_pid = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
@@ -376,6 +382,7 @@ mod tests {
             .start(&mut parent_env)
             .await
             .unwrap();
+            assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
 
@@ -394,7 +401,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let child_pid = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
@@ -406,6 +413,7 @@ mod tests {
             .start(&mut parent_env)
             .await
             .unwrap();
+            assert_eq!(job_control, None);
             assert_eq!(state.borrow().processes[&child_pid].pgid, parent_pgid);
             assert_eq!(state.borrow().foreground, None);
 

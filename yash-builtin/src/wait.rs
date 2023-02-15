@@ -262,7 +262,7 @@ mod tests {
                         Continue(())
                     })
                 });
-                let pid = subshell.start(&mut env).await.unwrap();
+                let pid = subshell.start(&mut env).await.unwrap().0;
                 env.jobs.add(Job::new(pid));
             }
 
@@ -314,7 +314,7 @@ mod tests {
         in_virtual_system(|mut env, _pid, _state| async move {
             // Start a child process, but don't turn it into a job.
             let subshell = Subshell::new(|_| Box::pin(futures_util::future::pending()));
-            let pid = subshell.start(&mut env).await.unwrap();
+            let pid = subshell.start(&mut env).await.unwrap().0;
 
             let args = Field::dummies([pid.to_string()]);
             let result = builtin_body(&mut env, args).await;
@@ -333,7 +333,7 @@ mod tests {
                         Continue(())
                     })
                 });
-                let pid = subshell.start(&mut env).await.unwrap();
+                let pid = subshell.start(&mut env).await.unwrap().0;
                 pids.push(pid.to_string());
                 env.jobs.add(Job::new(pid));
             }
