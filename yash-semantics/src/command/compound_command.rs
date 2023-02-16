@@ -26,6 +26,8 @@ use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+#[cfg(doc)]
+use yash_env::subshell::Subshell;
 use yash_env::Env;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Redir;
@@ -82,8 +84,8 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// # Subshell
 ///
-/// A subshell is executed by running the contained list in a
-/// [subshell](Env::run_in_subshell).
+/// A subshell is executed by running the contained list in a separate
+/// environment ([`Subshell`]).
 ///
 /// After the subshell has finished, [`Env::apply_errexit`] is called.
 ///

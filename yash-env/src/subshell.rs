@@ -205,10 +205,12 @@ mod tests {
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
+    use crate::system::Errno;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
     use crate::trap::Signal;
     use assert_matches::assert_matches;
+    use futures_executor::LocalPool;
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
@@ -222,6 +224,7 @@ mod tests {
             .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
             .unwrap();
     }
+
     #[test]
     fn subshell_start_returns_child_process_id() {
         in_virtual_system(|mut env, parent_pid, _state| async move {
@@ -238,6 +241,15 @@ mod tests {
             env.wait_for_subshell(result).await.unwrap();
             assert_eq!(Some(result), child_pid.get());
         });
+    }
+
+    #[test]
+    fn subshell_start_failing() {
+        let mut executor = LocalPool::new();
+        let env = &mut Env::new_virtual();
+        let subshell = Subshell::new(|_env| unreachable!("subshell not expected to run"));
+        let result = executor.run_until(subshell.start(env));
+        assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]

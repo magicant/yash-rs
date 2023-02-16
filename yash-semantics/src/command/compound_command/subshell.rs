@@ -24,18 +24,17 @@ use yash_env::io::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::Subshell;
 use yash_env::Env;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::List;
 
 /// Executes a subshell command
 pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
-    let result = env
-        .run_in_subshell(|sub_env| Box::pin(async move { subshell_main(sub_env, body).await }))
-        .await;
-    match result {
-        Ok(exit_status) => {
-            env.exit_status = exit_status;
+    let subshell = Subshell::new(|sub_env| Box::pin(subshell_main(sub_env, body)));
+    match subshell.start_and_wait(env).await {
+        Ok(wait_status) => {
+            env.exit_status = wait_status.try_into().unwrap();
             env.apply_errexit()
         }
         Err(errno) => {

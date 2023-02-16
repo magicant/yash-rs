@@ -39,6 +39,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::variable::ContextType;
 use yash_env::variable::Scope;
@@ -227,7 +228,7 @@ async fn execute_absent_target(
     // Perform redirections in a subshell
     let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
-        let redir_results = env.run_in_subshell(move |env| {
+        let subshell = Subshell::new(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
                 let mut xtrace = XTrace::from_options(&env.options);
@@ -246,8 +247,8 @@ async fn execute_absent_target(
                 Continue(())
             })
         });
-        match redir_results.await {
-            Ok(exit_status) => exit_status,
+        match subshell.start_and_wait(env).await {
+            Ok(wait_status) => wait_status.try_into().unwrap(),
             Err(errno) => {
                 print_error(
                     env,
@@ -398,7 +399,7 @@ async fn execute_external_utility(
     }
 
     let args = to_c_strings(fields);
-    let subshell = env.run_in_subshell(move |env| {
+    let subshell = Subshell::new(move |env| {
         Box::pin(async move {
             env.traps.disable_internal_handlers(&mut env.system).ok();
 
@@ -429,9 +430,9 @@ async fn execute_external_utility(
         })
     });
 
-    match subshell.await {
-        Ok(exit_status) => {
-            env.exit_status = exit_status;
+    match subshell.start_and_wait(&mut env).await {
+        Ok(wait_status) => {
+            env.exit_status = wait_status.try_into().unwrap();
         }
         Err(errno) => {
             print_error(

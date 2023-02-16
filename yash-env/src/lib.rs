@@ -46,7 +46,6 @@ use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
 use self::stack::Stack;
-use self::subshell::Subshell;
 pub use self::system::r#virtual::VirtualSystem;
 pub use self::system::real::RealSystem;
 pub use self::system::SharedSystem;
@@ -65,7 +64,6 @@ use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::ControlFlow::{self, Break, Continue};
-use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
@@ -311,55 +309,6 @@ impl Env {
         self.options.get(Monitor) == On && !self.stack.contains(&Frame::Subshell)
     }
 
-    /// Runs the argument function in a subshell.
-    ///
-    /// This function creates a new (real or virtual) subshell in which the
-    /// argument function is run and waits for the subshell to finish.
-    ///
-    /// A real subshell is a subshell that is implemented as a child process of
-    /// the current shell process. After executing the argument function, the
-    /// child process must immediately exit with the exit status returned from
-    /// the function.
-    ///
-    /// A virtual subshell is a separate shell execution environment that is
-    /// simulated in the current shell process. It is used to avoid the overhead
-    /// of forking a real subshell when the function's task does not depend on a
-    /// real subshell. Note that this function can start with a virtual subshell
-    /// and then switch to a real subshell if needed in the middle of the
-    /// execution. (TODO: Virtual subshells are not yet implemented.)
-    ///
-    /// This function does not support job control. If the subshell suspends,
-    /// the current shell continues waiting for the subshell to finish, so it
-    /// must be resumed by some other means.
-    ///
-    /// See [`Subshell::new`] for the behavior of the subshell in case function
-    /// `f` returns an `Err(Divert::...)`.
-    ///
-    /// # Return value
-    ///
-    /// This function usually returns the exit status of the subshell that is
-    /// obtained from the subshell environment after the argument function
-    /// returns. If an error occurs in creating or awaiting a
-    /// [`new_child_process`](System::new_child_process), the error is returned.
-    ///
-    /// # Related items
-    ///
-    /// If you want to execute a subshell asynchronously or with job control,
-    /// use [`Subshell`].
-    pub async fn run_in_subshell<F>(&mut self, f: F) -> nix::Result<ExitStatus>
-    where
-        F: for<'a> FnOnce(
-                &'a mut Env,
-            )
-                -> Pin<Box<dyn Future<Output = self::semantics::Result> + 'a>>
-            + 'static,
-    {
-        let (child_pid, _job_control) = Subshell::new(f).start(self).await?;
-        let (awaited_pid, exit_status) = self.wait_for_subshell_to_finish(child_pid).await?;
-        assert_eq!(awaited_pid, child_pid);
-        Ok(exit_status)
-    }
-
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
     /// This function waits for a subshell to change its execution status. The
@@ -518,6 +467,7 @@ pub mod variable;
 mod tests {
     use super::*;
     use crate::job::Job;
+    use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
@@ -657,35 +607,6 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-    }
-
-    #[test]
-    fn run_in_subshell_with_child_normally_exiting() {
-        in_virtual_system(|mut env, _pid, _state| async move {
-            let status = ExitStatus(97);
-            let result = env
-                .run_in_subshell(move |env| {
-                    Box::pin(async move {
-                        env.exit_status = status;
-                        Continue(())
-                    })
-                })
-                .await;
-            assert_eq!(result, Ok(status));
-        });
-    }
-
-    // TODO Test case for parent with signaled child
-    // TODO Test case for parent with stopped child
-
-    #[test]
-    fn run_in_subshell_with_fork_failure() {
-        let system = VirtualSystem::new();
-        let mut executor = LocalPool::new();
-        let mut env = Env::with_system(Box::new(system));
-        let result = executor
-            .run_until(env.run_in_subshell(|_env| unreachable!("subshell not expected to run")));
-        assert_eq!(result, Err(Errno::ENOSYS));
     }
 
     #[test]
