@@ -27,6 +27,7 @@
 //! properly.
 
 use crate::job::Pid;
+use crate::job::WaitStatus;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::System;
@@ -92,7 +93,7 @@ where
         self
     }
 
-    /// Starts a subshell.
+    /// Starts the subshell.
     ///
     /// This function creates a new child process that runs the task contained
     /// in this builder.
@@ -167,6 +168,33 @@ where
 
         Ok((child_pid, job_control))
     }
+
+    /// Starts the subshell and waits for it to finish.
+    ///
+    /// This function [starts](Self::start) `self` and
+    /// [waits](Env::wait_for_subshell) for it to finish. This function returns
+    /// when the subshell process exits or is killed by a signal. If the
+    /// subshell is job-controlled, the function also returns when the job is
+    /// suspended.
+    ///
+    /// If the subshell started successfully, the return value is the wait
+    /// status of the subshell, which is `Exited`, `Signaled`, or `Stopped`. If
+    /// there was an error starting the subshell, this function returns the
+    /// error.
+    ///
+    /// When a job-controlled subshell suspends, this function does not add it
+    /// to `env.jobs`. You have to do it for yourself if necessary.
+    pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<WaitStatus> {
+        let (pid, job_control) = self.start(env).await?;
+        loop {
+            let wait_status = env.wait_for_subshell(pid).await?;
+            match wait_status {
+                WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _) => return Ok(wait_status),
+                WaitStatus::Stopped(_, _) if job_control.is_some() => return Ok(wait_status),
+                _ => (),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -174,6 +202,7 @@ mod tests {
     use super::*;
     use crate::option::Option::Monitor;
     use crate::option::State::On;
+    use crate::semantics::ExitStatus;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::tests::in_virtual_system;
@@ -422,4 +451,36 @@ mod tests {
             assert_eq!(state.borrow().foreground, None);
         });
     }
+
+    #[test]
+    fn wait_without_job_control() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(42);
+                    Continue(())
+                })
+            });
+            let result = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_matches!(result, WaitStatus::Exited(_pid, 42));
+        });
+    }
+
+    #[test]
+    fn wait_for_foreground_job_to_exit() {
+        in_virtual_system(|mut env, _pid, _state| async move {
+            let subshell = Subshell::new(|env| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let result = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_matches!(result, WaitStatus::Exited(_pid, 123));
+        });
+    }
+
+    // TODO wait_for_foreground_job_to_be_signaled
+    // TODO wait_for_foreground_job_to_be_stopped
 }
