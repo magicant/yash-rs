@@ -109,7 +109,7 @@ where
     /// `JobControl::Foreground`, this function opens `env.tty` by calling
     /// [`Env::get_tty`]. The `tty` is used to change the foreground job to the
     /// new subshell. However, `job_control` is effective only when the shell is
-    /// [controlling jobs](Env::controls_jobs)
+    /// [controlling jobs](Env::controls_jobs).
     ///
     /// If the subshell started successfully, the return value is a pair of the
     /// child process ID and the actual job control. Otherwise, it indicates the
@@ -182,20 +182,31 @@ where
     /// there was an error starting the subshell, this function returns the
     /// error.
     ///
+    /// If you set [`job_control`](Self::job_control) to
+    /// `JobControl::Foreground` and job control is effective as per
+    /// [`Env::controls_jobs`], this function makes the shell the foreground job
+    /// after the subshell terminated or suspended.
+    ///
     /// When a job-controlled subshell suspends, this function does not add it
-    /// to `env.jobs`. You have to do it for yourself if necessary. You also
-    /// need to move the shell back to the foreground after running a
-    /// job-controlled subshell.
+    /// to `env.jobs`. You have to do it for yourself if necessary.
     pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<WaitStatus> {
         let (pid, job_control) = self.start(env).await?;
-        loop {
+        let result = loop {
             let wait_status = env.wait_for_subshell(pid).await?;
             match wait_status {
-                WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _) => return Ok(wait_status),
-                WaitStatus::Stopped(_, _) if job_control.is_some() => return Ok(wait_status),
+                WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _) => break Ok(wait_status),
+                WaitStatus::Stopped(_, _) if job_control.is_some() => break Ok(wait_status),
                 _ => (),
             }
+        };
+
+        if job_control == Some(JobControl::Foreground) {
+            if let Some(tty) = env.tty {
+                env.system.tcsetpgrp_with_block(tty, env.main_pgid).ok();
+            }
         }
+
+        result
     }
 }
 
@@ -482,7 +493,10 @@ mod tests {
 
     #[test]
     fn wait_for_foreground_job_to_exit() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
             let subshell = Subshell::new(|env| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(123);
@@ -492,6 +506,7 @@ mod tests {
             .job_control(JobControl::Foreground);
             let result = subshell.start_and_wait(&mut env).await.unwrap();
             assert_matches!(result, WaitStatus::Exited(_pid, 123));
+            assert_eq!(state.borrow().foreground, Some(env.main_pgid));
         });
     }
 

@@ -32,7 +32,6 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
-use yash_env::system::SystemEx;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -116,13 +115,7 @@ async fn execute_job_controlled_pipeline(
     })
     .job_control(JobControl::Foreground);
 
-    let result = subshell.start_and_wait(env).await;
-
-    if let Ok(tty) = env.get_tty() {
-        env.system.tcsetpgrp_with_block(tty, env.main_pgid).ok();
-    }
-
-    match result {
+    match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
             env.exit_status = wait_status.try_into().unwrap();
             Continue(())
