@@ -66,6 +66,7 @@ pub(crate) mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
+    use yash_env::system::r#virtual::INode;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
     use yash_env::variable::Scalar;
@@ -119,6 +120,14 @@ pub(crate) mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
+    }
+
+    pub fn stub_tty(state: &RefCell<SystemState>) {
+        state
+            .borrow_mut()
+            .file_system
+            .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+            .unwrap();
     }
 
     /// Helper function for asserting on the content of /dev/stdout.

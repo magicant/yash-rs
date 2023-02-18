@@ -183,7 +183,9 @@ where
     /// error.
     ///
     /// When a job-controlled subshell suspends, this function does not add it
-    /// to `env.jobs`. You have to do it for yourself if necessary.
+    /// to `env.jobs`. You have to do it for yourself if necessary. You also
+    /// need to move the shell back to the foreground after running a
+    /// job-controlled subshell.
     pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<WaitStatus> {
         let (pid, job_control) = self.start(env).await?;
         loop {

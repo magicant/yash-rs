@@ -32,6 +32,7 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
+use yash_env::system::SystemEx;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -100,7 +101,41 @@ async fn execute_commands_in_pipeline(env: &mut Env, commands: &[Rc<syntax::Comm
             Continue(())
         }
         1 => commands[0].execute(env).await,
+        _ if env.controls_jobs() => execute_job_controlled_pipeline(env, commands).await,
         _ => execute_multi_command_pipeline(env, commands).await,
+    }
+}
+
+async fn execute_job_controlled_pipeline(
+    env: &mut Env,
+    commands: &[Rc<syntax::Command>],
+) -> Result {
+    let commands = commands.to_vec();
+    let subshell = Subshell::new(|sub_env| {
+        Box::pin(async move { execute_multi_command_pipeline(sub_env, &commands).await })
+    })
+    .job_control(JobControl::Foreground);
+
+    let result = subshell.start_and_wait(env).await;
+
+    if let Ok(tty) = env.get_tty() {
+        env.system.tcsetpgrp_with_block(tty, env.main_pgid).ok();
+    }
+
+    match result {
+        Ok(wait_status) => {
+            env.exit_status = wait_status.try_into().unwrap();
+            Continue(())
+        }
+        Err(errno) => {
+            // TODO print error location using yash_env::io::print_error
+            env.print_error(&format!(
+                "cannot start a subshell in the pipeline: {}\n",
+                errno.desc()
+            ))
+            .await;
+            Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
+        }
     }
 }
 
@@ -264,6 +299,7 @@ mod tests {
     use crate::tests::cat_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
+    use crate::tests::stub_tty;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::future::Future;
@@ -271,7 +307,8 @@ mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
-    use yash_env::option::State::Off;
+    use yash_env::option::Option::Monitor;
+    use yash_env::option::State::On;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
@@ -492,6 +529,38 @@ mod tests {
         let pipeline: syntax::Pipeline = "! foo".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
+    }
+
+    #[test]
+    fn process_group_id_of_job_controlled_pipeline() {
+        fn stub_builtin(
+            env: &mut Env,
+            _args: Vec<Field>,
+        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+            let pgid = env.system.getpgrp().as_raw() as _;
+            Box::pin(async move { yash_env::builtin::Result::new(ExitStatus(pgid)) })
+        }
+
+        in_virtual_system(|mut env, _pid, state| async move {
+            env.builtins.insert(
+                "foo",
+                Builtin {
+                    r#type: Special,
+                    execute: stub_builtin,
+                },
+            );
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            // TODO Better test all pipeline component exit statuses
+            let pipeline: syntax::Pipeline = "foo | foo".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_ne!(env.exit_status, ExitStatus(env.main_pgid.as_raw() as _));
+
+            // The shell should come back to the foreground after running the pipeline
+            assert_eq!(state.borrow().foreground, Some(env.main_pgid));
+        })
     }
 
     #[test]
