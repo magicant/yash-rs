@@ -39,6 +39,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
+use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::variable::ContextType;
@@ -428,7 +429,8 @@ async fn execute_external_utility(
             .await;
             Continue(())
         })
-    });
+    })
+    .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(&mut env).await {
         Ok(wait_status) => {
@@ -502,6 +504,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::local_builtin;
     use crate::tests::return_builtin;
+    use crate::tests::stub_tty;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::cell::RefCell;
@@ -1103,7 +1106,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_command_assigns_variables_in_volatile_context_for_external_command() {
+    fn simple_command_assigns_variables_in_volatile_context_for_external_utility() {
         in_virtual_system(|mut env, _state| async move {
             let command: syntax::SimpleCommand = "a=123 /foo/bar".parse().unwrap();
             command.execute(&mut env).await;
@@ -1132,10 +1135,38 @@ mod tests {
     }
 
     #[test]
+    fn job_control_for_external_utility() {
+        in_virtual_system(|mut env, state| async move {
+            env.options.set(yash_env::option::Monitor, On);
+            stub_tty(&state);
+
+            let mut content = INode::default();
+            content.body = FileBody::Regular {
+                content: Vec::new(),
+                is_native_executable: true,
+            };
+            content.permissions.0 |= 0o100;
+            let content = Rc::new(RefCell::new(content));
+            state
+                .borrow_mut()
+                .file_system
+                .save("/some/file", content)
+                .unwrap();
+
+            let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
+            let _ = command.execute(&mut env).await;
+
+            let state = state.borrow();
+            let (&pid, process) = state.processes.last_key_value().unwrap();
+            assert_ne!(pid, env.main_pid);
+            assert_ne!(process.pgid(), env.main_pgid);
+        })
+    }
+
+    #[test]
     fn xtrace_for_absent_target() {
         in_virtual_system(|mut env, state| async move {
-            env.options
-                .set(yash_env::option::XTrace, yash_env::option::On);
+            env.options.set(yash_env::option::XTrace, On);
 
             let command: syntax::SimpleCommand = "FOO=bar 3>/dev/null".parse().unwrap();
             let _ = command.execute(&mut env).await;
@@ -1152,8 +1183,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.options
-            .set(yash_env::option::XTrace, yash_env::option::On);
+        env.options.set(yash_env::option::XTrace, On);
         let command: syntax::SimpleCommand = "foo=bar echo hello >/dev/null".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
 
@@ -1174,8 +1204,7 @@ mod tests {
             origin: Location::dummy("dummy"),
             is_read_only: false,
         })));
-        env.options
-            .set(yash_env::option::XTrace, yash_env::option::On);
+        env.options.set(yash_env::option::XTrace, On);
         let command: syntax::SimpleCommand = "x=hello foo bar <>/dev/null".parse().unwrap();
         command.execute(&mut env).now_or_never().unwrap();
 
@@ -1185,10 +1214,9 @@ mod tests {
     }
 
     #[test]
-    fn xtrace_for_external_command() {
+    fn xtrace_for_external_utility() {
         in_virtual_system(|mut env, state| async move {
-            env.options
-                .set(yash_env::option::XTrace, yash_env::option::On);
+            env.options.set(yash_env::option::XTrace, On);
 
             let mut content = INode::default();
             content.body = FileBody::Regular {
