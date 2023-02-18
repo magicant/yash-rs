@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn command_subst() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             let mut env = Env::new(&mut env);
             let subst = TextUnit::CommandSubst {
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn backquote() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             let mut env = Env::new(&mut env);
             use yash_syntax::syntax::BackquoteUnit::*;

@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn perform_assignments_exit_status() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let assigns = [
                 "a=A$(return -n 1)".parse().unwrap(),

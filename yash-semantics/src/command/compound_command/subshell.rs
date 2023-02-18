@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn subshell_preserves_current_environment() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
             let command: CompoundCommand = "(foo=bar; echo $foo; return -n 123)".parse().unwrap();
@@ -104,7 +104,7 @@ mod tests {
             })
         }
 
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert(
                 "exit",
                 yash_env::builtin::Builtin {
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn errexit_in_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             env.options.set(ErrExit, On);
             let command: CompoundCommand = "(return -n 42)".parse().unwrap();
@@ -166,7 +166,7 @@ mod tests {
             })
         }
 
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert(
                 "trap",

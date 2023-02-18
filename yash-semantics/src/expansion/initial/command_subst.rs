@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn empty_substitution() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let command = "".to_string();
             let location = Location::dummy("");
             let mut env = Env::new(&mut env);
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn one_line_substitution() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             let command = "echo ok".to_string();
             let location = Location::dummy("");
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn many_line_substitution() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             let command = "echo 1; echo 2; echo; echo 3; echo; echo".to_string();
             let location = Location::dummy("");
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn exit_status_of_command_substitution() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command = "return -n 100".to_string();
             let location = Location::dummy("");

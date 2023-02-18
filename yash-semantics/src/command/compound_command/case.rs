@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn first_item_matched() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
             env.exit_status = ExitStatus(100);
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn first_pattern_of_second_item_matched() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.exit_status = ExitStatus(100);
             let command: CompoundCommand = "case 1 in
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn second_pattern_of_second_item_matched() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.exit_status = ExitStatus(100);
             let command: CompoundCommand = "case 2 in
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn third_item_matched() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.exit_status = ExitStatus(100);
             let command: CompoundCommand = "case 4 in

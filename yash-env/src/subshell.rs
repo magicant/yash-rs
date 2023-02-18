@@ -240,7 +240,8 @@ mod tests {
 
     #[test]
     fn subshell_start_returns_child_process_id() {
-        in_virtual_system(|mut env, parent_pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
+            let parent_pid = env.main_pid;
             let child_pid = Rc::new(Cell::new(None));
             let child_pid_2 = Rc::clone(&child_pid);
             let subshell = Subshell::new(move |env| {
@@ -267,7 +268,7 @@ mod tests {
 
     #[test]
     fn stack_frame_in_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env| {
                 Box::pin(async move {
                     assert_eq!(env.stack[..], [Frame::Subshell]);
@@ -283,7 +284,7 @@ mod tests {
 
     #[test]
     fn trap_reset_in_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.traps
                 .set_action(
                     &mut env.system,
@@ -313,10 +314,10 @@ mod tests {
 
     #[test]
     fn subshell_with_no_job_control() {
-        in_virtual_system(|mut parent_env, parent_pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
 
-            let parent_pgid = state.borrow().processes[&parent_pid].pgid;
+            let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
             let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
@@ -342,7 +343,7 @@ mod tests {
 
     #[test]
     fn subshell_in_background() {
-        in_virtual_system(|mut parent_env, _pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
@@ -370,7 +371,7 @@ mod tests {
 
     #[test]
     fn subshell_in_foreground() {
-        in_virtual_system(|mut parent_env, _pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
@@ -400,7 +401,7 @@ mod tests {
 
     #[test]
     fn tty_after_starting_foreground_subshell() {
-        in_virtual_system(|mut parent_env, _pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
             state
                 .borrow_mut()
@@ -419,10 +420,10 @@ mod tests {
 
     #[test]
     fn no_job_control_with_option_disabled() {
-        in_virtual_system(|mut parent_env, parent_pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             stub_tty(&state);
 
-            let parent_pgid = state.borrow().processes[&parent_pid].pgid;
+            let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
             let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
@@ -448,12 +449,12 @@ mod tests {
 
     #[test]
     fn no_job_control_for_nested_subshell() {
-        in_virtual_system(|mut parent_env, parent_pid, state| async move {
+        in_virtual_system(|mut parent_env, state| async move {
             let mut parent_env = parent_env.push_frame(Frame::Subshell);
             parent_env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let parent_pgid = state.borrow().processes[&parent_pid].pgid;
+            let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
             let (child_pid, job_control) = Subshell::new(move |child_env| {
                 Box::pin(async move {
@@ -479,7 +480,7 @@ mod tests {
 
     #[test]
     fn wait_without_job_control() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(42);
@@ -493,7 +494,7 @@ mod tests {
 
     #[test]
     fn wait_for_foreground_job_to_exit() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.options.set(Monitor, On);
             stub_tty(&state);
 

@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn exit_status_of_command_substitution_in_normal() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
             let mut env = RedirGuard::new(&mut env);
@@ -935,7 +935,7 @@ mod tests {
 
     #[test]
     fn exit_status_of_command_substitution_in_here_doc() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
             let mut env = RedirGuard::new(&mut env);

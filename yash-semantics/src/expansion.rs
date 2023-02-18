@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn expand_words_performs_initial_expansion() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("echo", echo_builtin());
             env.builtins.insert("return", return_builtin());
             let words = &["[$(echo echoed; return -n 42)]".parse().unwrap()];

@@ -481,18 +481,17 @@ mod tests {
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut>(f: F)
     where
-        F: FnOnce(Env, Pid, Rc<RefCell<SystemState>>) -> Fut,
+        F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
         Fut: Future<Output = ()> + 'static,
     {
         let system = VirtualSystem::new();
-        let pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
 
         let env = Env::with_system(Box::new(system));
         let shared_system = env.system.clone();
-        let task = f(env, pid, Rc::clone(&state));
+        let task = f(env, Rc::clone(&state));
         let done = Rc::new(Cell::new(false));
         let done_2 = Rc::clone(&done);
 
@@ -513,7 +512,7 @@ mod tests {
 
     #[test]
     fn wait_for_signal_remembers_signal_in_trap_set() {
-        in_virtual_system(|mut env, pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.traps
                 .set_action(
                     &mut env.system,
@@ -525,7 +524,7 @@ mod tests {
                 .unwrap();
             {
                 let mut state = state.borrow_mut();
-                let process = state.processes.get_mut(&pid).unwrap();
+                let process = state.processes.get_mut(&env.main_pid).unwrap();
                 assert!(process.blocked_signals().contains(Signal::SIGCHLD));
                 process.raise_signal(Signal::SIGCHLD);
             }
@@ -611,7 +610,7 @@ mod tests {
 
     #[test]
     fn start_and_wait_for_subshell() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(42);
@@ -626,7 +625,7 @@ mod tests {
 
     #[test]
     fn start_and_wait_for_subshell_with_job_set() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(42);

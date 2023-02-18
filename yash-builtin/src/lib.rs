@@ -122,7 +122,6 @@ pub(crate) mod tests {
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
-    use yash_env::job::Pid;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::Env;
@@ -145,18 +144,17 @@ pub(crate) mod tests {
     /// Helper function to perform a test in a virtual system with an executor.
     pub fn in_virtual_system<F, Fut>(f: F)
     where
-        F: FnOnce(Env, Pid, Rc<RefCell<SystemState>>) -> Fut,
+        F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
         Fut: Future<Output = ()> + 'static,
     {
         let system = VirtualSystem::new();
-        let pid = system.process_id;
         let state = Rc::clone(&system.state);
         let mut executor = futures_executor::LocalPool::new();
         state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
 
         let env = Env::with_system(Box::new(system));
         let shared_system = env.system.clone();
-        let task = f(env, pid, Rc::clone(&state));
+        let task = f(env, Rc::clone(&state));
         let done = Rc::new(Cell::new(false));
         let done_2 = Rc::clone(&done);
 

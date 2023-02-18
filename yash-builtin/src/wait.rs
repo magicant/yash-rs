@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn wait_no_operands_no_jobs() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             // Start a child process, but don't turn it into a job.
             let subshell = Subshell::new(|_| Box::pin(futures_util::future::pending()));
             subshell.start(&mut env).await.unwrap();
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn wait_no_operands_some_running_jobs() {
-        in_virtual_system(|mut env, pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             for i in 1..=2 {
                 let subshell = Subshell::new(move |env| {
                     Box::pin(async move {
@@ -272,7 +272,7 @@ mod tests {
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
-                if *cpid != pid {
+                if *cpid != env.main_pid {
                     assert!(!process.state_has_changed());
                     assert_matches!(process.state(), ProcessState::Exited(exit_status) => {
                         assert_ne!(exit_status, ExitStatus::SUCCESS);
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn wait_some_operands_no_jobs() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             // Start a child process, but don't turn it into a job.
             let subshell = Subshell::new(|_| Box::pin(futures_util::future::pending()));
             let pid = subshell.start(&mut env).await.unwrap().0;
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn wait_some_operands_some_running_jobs() {
-        in_virtual_system(|mut env, pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let mut pids = Vec::new();
             for i in 5..=6 {
                 let subshell = Subshell::new(move |env| {
@@ -345,7 +345,7 @@ mod tests {
 
             let state = state.borrow();
             for (cpid, process) in &state.processes {
-                if *cpid != pid {
+                if *cpid != env.main_pid {
                     assert!(!process.state_has_changed());
                     assert_matches!(process.state(), ProcessState::Exited(exit_status) => {
                         assert_ne!(exit_status, ExitStatus::SUCCESS);

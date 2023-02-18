@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn simple_command_performs_redirection_with_absent_target() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let command: syntax::SimpleCommand = ">/tmp/foo".parse().unwrap();
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_command_substitution_exit_status_from_redirection() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command: syntax::SimpleCommand = ">/tmp/foo$(return -n 42)".parse().unwrap();
             command.execute(&mut env).await;
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn simple_command_handles_redirection_error_with_absent_target() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command = &"$(return -n 11) < /no/such/file$(return -n 22)";
             let command: syntax::SimpleCommand = command.parse().unwrap();
@@ -580,7 +580,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_command_substitution_exit_status_from_assignment() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let command: syntax::SimpleCommand = "a=$(return -n 12)".parse().unwrap();
             command.execute(&mut env).await;
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn simple_command_calls_execve_with_correct_arguments() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let mut content = INode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
@@ -1008,7 +1008,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_exit_status_from_external_utility() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let mut content = INode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
@@ -1034,7 +1034,7 @@ mod tests {
 
     #[test]
     fn simple_command_skips_running_external_utility_on_redirection_error() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let mut content = INode::default();
             content.body = FileBody::Regular {
                 content: Vec::new(),
@@ -1057,7 +1057,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_127_for_non_existing_file() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let command: syntax::SimpleCommand = "/some/file".parse().unwrap();
             let result = command.execute(&mut env).await;
             assert_eq!(result, Continue(()));
@@ -1067,7 +1067,7 @@ mod tests {
 
     #[test]
     fn simple_command_returns_126_on_exec_failure() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let mut content = INode::default();
             content.permissions.0 |= 0o100;
             let content = Rc::new(RefCell::new(content));
@@ -1104,7 +1104,7 @@ mod tests {
 
     #[test]
     fn simple_command_assigns_variables_in_volatile_context_for_external_command() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             let command: syntax::SimpleCommand = "a=123 /foo/bar".parse().unwrap();
             command.execute(&mut env).await;
             assert_eq!(env.variables.get("a"), None);
@@ -1113,7 +1113,7 @@ mod tests {
 
     #[test]
     fn simple_command_performs_redirections_and_assignments_for_target_not_found() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             let command: syntax::SimpleCommand =
                 "foo=${bar=baz} no_such_utility >/tmp/file".parse().unwrap();
             command.execute(&mut env).await;
@@ -1133,7 +1133,7 @@ mod tests {
 
     #[test]
     fn xtrace_for_absent_target() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.options
                 .set(yash_env::option::XTrace, yash_env::option::On);
 
@@ -1186,7 +1186,7 @@ mod tests {
 
     #[test]
     fn xtrace_for_external_command() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.options
                 .set(yash_env::option::XTrace, yash_env::option::On);
 

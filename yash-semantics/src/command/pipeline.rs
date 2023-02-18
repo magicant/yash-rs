@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn multi_command_pipeline_returns_last_command_exit_status() {
-        in_virtual_system(|mut env, _pid, _state| async move {
+        in_virtual_system(|mut env, _state| async move {
             env.builtins.insert("return", return_builtin());
             let pipeline: syntax::Pipeline = "return -n 10 | return -n 20".parse().unwrap();
             let result = pipeline.execute(&mut env).await;
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn multi_command_pipeline_waits_for_all_child_commands() {
-        in_virtual_system(|mut env, main_pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("return", return_builtin());
             let pipeline: syntax::Pipeline =
                 "return -n 1 | return -n 2 | return -n 3".parse().unwrap();
@@ -360,7 +360,7 @@ mod tests {
 
             // Only the original process remains.
             for (pid, process) in &state.borrow().processes {
-                if *pid == main_pid {
+                if *pid == env.main_pid {
                     assert_eq!(process.state(), ProcessState::Running);
                 } else {
                     assert_matches!(process.state(), ProcessState::Exited(_));
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn multi_command_pipeline_does_not_wait_for_unrelated_child() {
-        in_virtual_system(|mut env, main_pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("return", return_builtin());
 
             let list: syntax::List = "return -n 7&".parse().unwrap();
@@ -379,7 +379,7 @@ mod tests {
             let async_pid = {
                 let state = state.borrow();
                 let mut iter = state.processes.keys();
-                assert_eq!(iter.next(), Some(&main_pid));
+                assert_eq!(iter.next(), Some(&env.main_pid));
                 let async_pid = *iter.next().unwrap();
                 assert_eq!(iter.next(), None);
                 async_pid
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn pipe_connects_commands_in_pipeline() {
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             {
                 let file = state.borrow().file_system.get("/dev/stdin").unwrap();
                 let mut file = file.borrow_mut();
@@ -417,13 +417,13 @@ mod tests {
 
     #[test]
     fn pipeline_leaves_no_pipe_fds_leftover() {
-        in_virtual_system(|mut env, process_id, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert("cat", cat_builtin());
             let pipeline: syntax::Pipeline = "cat | cat".parse().unwrap();
             let _ = pipeline.execute(&mut env).await;
 
             let state = state.borrow();
-            let fds = state.processes[&process_id].fds();
+            let fds = state.processes[&env.main_pid].fds();
             for fd in 3..10 {
                 assert!(!fds.contains_key(&Fd(fd)), "fd={fd}");
             }
@@ -534,7 +534,7 @@ mod tests {
             Box::pin(async move { yash_env::builtin::Result::new(ExitStatus(pgid)) })
         }
 
-        in_virtual_system(|mut env, _pid, state| async move {
+        in_virtual_system(|mut env, state| async move {
             env.builtins.insert(
                 "foo",
                 Builtin {

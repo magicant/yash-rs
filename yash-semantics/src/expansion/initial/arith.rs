@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn non_zero_exit_status_from_inner_text_expansion() {
-        in_virtual_system(|mut env, _, _| async move {
+        in_virtual_system(|mut env, _state| async move {
             let text = "$(echo 0; return -n 63)".parse().unwrap();
             let location = Location::dummy("my location");
             env.builtins.insert("echo", echo_builtin());
