@@ -25,6 +25,7 @@ use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::Env;
 use yash_syntax::source::Location;
@@ -63,10 +64,10 @@ impl Command for syntax::Item {
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
     let and_or_2 = Rc::clone(and_or);
     let subshell = Subshell::new(|env| Box::pin(async move { and_or_2.execute(env).await }));
-    let result = subshell.start(env).await;
-    match result {
+    let subshell = subshell.job_control(JobControl::Background);
+    match subshell.start(env).await {
         Ok((pid, job_control)) => {
-            debug_assert_eq!(job_control, None);
+            debug_assert_ne!(job_control, Some(JobControl::Foreground));
             let mut job = Job::new(pid);
             job.name = and_or.to_string();
             env.jobs.add(job);
@@ -94,12 +95,16 @@ mod tests {
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
+    use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
+    use crate::tests::stub_tty;
     use crate::tests::LocalExecutor;
     use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::job::WaitStatus;
+    use yash_env::option::Option::Monitor;
+    use yash_env::option::State::On;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -225,5 +230,25 @@ mod tests {
                 "unexpected error message: {stderr:?}"
             )
         });
+    }
+
+    #[test]
+    fn item_execute_async_background() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let item = syntax::Item {
+                and_or: Rc::new("return  -n  42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+
+            let _ = item.execute(&mut env).await;
+
+            let state = state.borrow();
+            let process = &state.processes[&env.jobs.last_async_pid()];
+            assert_ne!(process.pgid(), env.main_pgid);
+        })
     }
 }
