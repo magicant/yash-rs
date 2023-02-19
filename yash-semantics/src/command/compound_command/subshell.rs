@@ -24,6 +24,7 @@ use yash_env::io::print_error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
+use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::Env;
 use yash_syntax::source::Location;
@@ -32,6 +33,7 @@ use yash_syntax::syntax::List;
 /// Executes a subshell command
 pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
     let subshell = Subshell::new(|sub_env| Box::pin(subshell_main(sub_env, body)));
+    let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
             env.exit_status = wait_status.try_into().unwrap();
@@ -68,11 +70,12 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
+    use crate::tests::stub_tty;
     use futures_util::FutureExt;
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
-    use yash_env::option::Option::ErrExit;
+    use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -142,6 +145,25 @@ mod tests {
             let result = command.execute(&mut env).await;
             assert_eq!(result, Break(Divert::Exit(None)));
             assert_eq!(env.exit_status, ExitStatus(42));
+        })
+    }
+
+    #[test]
+    fn job_controlled_subshell() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let command: CompoundCommand = "(return -n 12)".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus(12));
+
+            let state = state.borrow();
+            let (&pid, process) = state.processes.last_key_value().unwrap();
+            assert_ne!(pid, env.main_pid);
+            assert_ne!(process.pgid(), env.main_pgid);
         })
     }
 
