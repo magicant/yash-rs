@@ -123,22 +123,18 @@ mod tests {
 
     #[test]
     fn item_execute_async_exit_status() {
-        let system = VirtualSystem::new();
-        let state = Rc::clone(&system.state);
-        let mut executor = futures_executor::LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("return", return_builtin());
-        env.exit_status = ExitStatus::FAILURE;
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.exit_status = ExitStatus::FAILURE;
 
-        let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
-        let item = syntax::Item {
-            and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
-        };
-        let result = executor.run_until(item.execute(&mut env));
-        assert_eq!(result, Continue(()));
-        assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+            let item = syntax::Item {
+                and_or: Rc::new("return -n 42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+            let result = item.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::SUCCESS);
+        })
     }
 
     #[test]
@@ -170,44 +166,36 @@ mod tests {
 
     #[test]
     fn item_execute_async_job() {
-        let system = VirtualSystem::new();
-        let mut executor = futures_executor::LocalPool::new();
-        system.state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("return", return_builtin());
+        in_virtual_system(|mut env, _state| async move {
+            env.builtins.insert("return", return_builtin());
 
-        let and_or: syntax::AndOrList = "return  -n  42".parse().unwrap();
-        let item = syntax::Item {
-            and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
-        };
-        executor.run_until(item.execute(&mut env));
+            let item = syntax::Item {
+                and_or: Rc::new("return  -n  42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+            item.execute(&mut env).await;
 
-        let job = env.jobs.get(0).unwrap();
-        assert!(job.status_changed);
-        assert_eq!(job.status, WaitStatus::StillAlive);
-        assert_eq!(job.name, "return -n 42");
+            let job = env.jobs.get(0).unwrap();
+            assert!(job.status_changed);
+            assert_eq!(job.status, WaitStatus::StillAlive);
+            assert_eq!(job.name, "return -n 42");
+        })
     }
 
     #[test]
     fn item_execute_async_pid() {
-        let system = VirtualSystem::new();
-        let main_pid = system.process_id;
-        let state = Rc::clone(&system.state);
-        let mut executor = futures_executor::LocalPool::new();
-        state.borrow_mut().executor = Some(Rc::new(LocalExecutor(executor.spawner())));
-        let mut env = Env::with_system(Box::new(system));
-        env.builtins.insert("return", return_builtin());
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
 
-        let and_or: syntax::AndOrList = "return -n 42".parse().unwrap();
-        let item = syntax::Item {
-            and_or: Rc::new(and_or),
-            async_flag: Some(Location::dummy("")),
-        };
-        executor.run_until(item.execute(&mut env));
+            let item = syntax::Item {
+                and_or: Rc::new("return -n 42".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+            item.execute(&mut env).await;
 
-        let pids = state.borrow().processes.keys().copied().collect::<Vec<_>>();
-        assert_eq!(pids, [main_pid, env.jobs.last_async_pid()]);
+            let pids = state.borrow().processes.keys().copied().collect::<Vec<_>>();
+            assert_eq!(pids, [env.main_pid, env.jobs.last_async_pid()]);
+        })
     }
 
     #[test]
@@ -244,7 +232,7 @@ mod tests {
                 async_flag: Some(Location::dummy("")),
             };
 
-            let _ = item.execute(&mut env).await;
+            item.execute(&mut env).await;
 
             let state = state.borrow();
             let process = &state.processes[&env.jobs.last_async_pid()];
