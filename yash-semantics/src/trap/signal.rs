@@ -124,7 +124,7 @@ mod tests {
     }
 
     fn raise_signal(system: &VirtualSystem, signal: Signal) {
-        system
+        let _ = system
             .state
             .borrow_mut()
             .processes

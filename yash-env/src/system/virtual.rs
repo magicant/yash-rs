@@ -573,13 +573,27 @@ impl System for VirtualSystem {
         set: Option<&SigSet>,
         oldset: Option<&mut SigSet>,
     ) -> nix::Result<()> {
-        let mut process = self.current_process_mut();
+        let mut state = self.state.borrow_mut();
+        let process = state
+            .processes
+            .get_mut(&self.process_id)
+            .expect("current process not found");
+
         if let Some(oldset) = oldset {
             *oldset = *process.blocked_signals();
         }
+
         if let Some(set) = set {
-            process.block_signals(how, set);
+            let result = process.block_signals(how, set);
+            if result.process_state_changed {
+                let parent_pid = process.ppid;
+                if let Some(parent) = state.processes.get_mut(&parent_pid) {
+                    let result = parent.raise_signal(Signal::SIGCHLD);
+                    debug_assert!(!result.process_state_changed);
+                }
+            }
         }
+
         Ok(())
     }
 
@@ -611,10 +625,10 @@ impl System for VirtualSystem {
 
         if let Some(signal_mask) = signal_mask {
             let save_mask = *process.blocked_signals();
-            let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
-            let delivered_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
-            assert!(!delivered_2);
-            if delivered {
+            let result_1 = process.block_signals(SigmaskHow::SIG_SETMASK, signal_mask);
+            let result_2 = process.block_signals(SigmaskHow::SIG_SETMASK, &save_mask);
+            assert!(!result_2.delivered);
+            if result_1.caught {
                 return Err(Errno::EINTR);
             }
         }
@@ -783,7 +797,8 @@ impl System for VirtualSystem {
                     if process.set_state(ProcessState::Exited(child_env.exit_status)) {
                         let ppid = process.ppid;
                         if let Some(parent) = state.processes.get_mut(&ppid) {
-                            parent.raise_signal(Signal::SIGCHLD);
+                            let result = parent.raise_signal(Signal::SIGCHLD);
+                            assert!(!result.process_state_changed);
                         }
                     }
                 });
@@ -1528,6 +1543,8 @@ mod tests {
         );
     }
 
+    // TODO Test sigmask
+
     #[test]
     fn select_regular_file_is_always_ready() {
         let mut system = VirtualSystem::new();
@@ -1670,7 +1687,7 @@ mod tests {
     #[test]
     fn select_on_pending_signal() {
         let mut system = system_for_catching_sigchld();
-        system.current_process_mut().raise_signal(Signal::SIGCHLD);
+        let _ = system.current_process_mut().raise_signal(Signal::SIGCHLD);
         let result = system.select(
             &mut FdSet::new(),
             &mut FdSet::new(),

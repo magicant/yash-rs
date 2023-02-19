@@ -1477,8 +1477,8 @@ mod tests {
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
             assert!(process.blocked_signals().contains(Signal::SIGINT));
             assert!(process.blocked_signals().contains(Signal::SIGUSR1));
-            process.raise_signal(Signal::SIGCHLD);
-            process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGINT);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1511,7 +1511,7 @@ mod tests {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGCHLD);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1542,8 +1542,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            process.raise_signal(Signal::SIGCHLD);
-            process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGTERM);
         }
         system.select(false).unwrap();
 
@@ -1567,8 +1567,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            process.raise_signal(Signal::SIGINT);
-            process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(Signal::SIGTERM);
         }
         system.select(false).unwrap();
 
