@@ -39,14 +39,21 @@
 //!
 //! Currently, read and write operations on files and unnamed pipes are
 //! supported.
+//!
+//! # Signals
+//!
+//! The virtual system can simulate sending signals to processes. Processes can
+//! block, ignore, and catch signals.
 
 mod file_system;
 mod io;
 mod process;
+mod signal;
 
 pub use self::file_system::*;
 pub use self::io::*;
 pub use self::process::*;
+pub use self::signal::*;
 use super::AtFlags;
 use super::Dir;
 use super::Errno;
