@@ -168,7 +168,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn exit_trap() {
         fn trap_builtin(
             env: &mut Env,
