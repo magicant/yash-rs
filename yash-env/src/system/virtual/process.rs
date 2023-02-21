@@ -17,6 +17,7 @@
 //! Processes in a virtual system.
 
 use super::io::FdBody;
+use super::signal::SignalEffect;
 use crate::io::Fd;
 use crate::semantics::ExitStatus;
 use crate::system::SelectSystem;
@@ -366,14 +367,20 @@ impl Process {
         } else {
             self.signal_handling(signal)
         };
-        // TODO SIGCONT should resume the process regardless of handling
+
         match handling {
             SignalHandling::Default => {
-                // TODO Do something depending on the signal
+                let process_state_changed = match SignalEffect::of(signal) {
+                    SignalEffect::None | SignalEffect::Resume => false,
+                    SignalEffect::Terminate { core_dump: _ } => {
+                        self.set_state(ProcessState::Signaled(signal))
+                    }
+                    SignalEffect::Suspend => self.set_state(ProcessState::Stopped(signal)),
+                };
                 SignalResult {
                     delivered: true,
                     caught: false,
-                    process_state_changed: false, // TODO state may change depending on signal
+                    process_state_changed,
                 }
             }
             SignalHandling::Ignore => SignalResult {
@@ -403,7 +410,10 @@ impl Process {
     /// process.
     #[must_use = "send SIGCHLD if process state has changed"]
     pub fn raise_signal(&mut self, signal: Signal) -> SignalResult {
-        if signal != Signal::SIGKILL
+        let process_state_changed =
+            signal == Signal::SIGCONT && self.set_state(ProcessState::Running);
+
+        let mut result = if signal != Signal::SIGKILL
             && signal != Signal::SIGSTOP
             && self.blocked_signals().contains(signal)
         {
@@ -411,7 +421,10 @@ impl Process {
             SignalResult::default()
         } else {
             self.deliver_signal(signal)
-        }
+        };
+
+        result.process_state_changed |= process_state_changed;
+        result
     }
 
     /// Returns the arguments to the last call to
@@ -693,7 +706,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO enable this test case
     fn process_raise_signal_default_terminating() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         let result = process.raise_signal(Signal::SIGTERM);
@@ -709,9 +721,55 @@ mod tests {
         assert_eq!(process.caught_signals, []);
     }
 
-    // TODO process_raise_signal_default_aborting
-    // TODO process_raise_signal_default_stopping
-    // TODO process_raise_signal_default_continuing
+    #[test]
+    fn process_raise_signal_default_aborting() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let result = process.raise_signal(Signal::SIGABRT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGABRT));
+        assert_eq!(process.caught_signals, []);
+        // TODO Check if core dump file has been created
+    }
+
+    #[test]
+    fn process_raise_signal_default_stopping() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let result = process.raise_signal(Signal::SIGTSTP);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Stopped(Signal::SIGTSTP));
+        assert_eq!(process.caught_signals, []);
+    }
+
+    #[test]
+    fn process_raise_signal_default_continuing() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let result = process.raise_signal(Signal::SIGCONT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+    }
 
     #[test]
     fn process_raise_signal_ignored() {
@@ -728,6 +786,26 @@ mod tests {
         );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
+    }
+
+    #[test]
+    fn process_raise_signal_ignored_and_blocked_sigcont() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let _ = process.set_signal_handling(Signal::SIGCONT, SignalHandling::Ignore);
+        let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
+        let result = process.raise_signal(Signal::SIGCONT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: false,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+        assert!(process.pending_signals.contains(Signal::SIGCONT));
     }
 
     #[test]
