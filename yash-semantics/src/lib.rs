@@ -52,6 +52,7 @@ pub(crate) mod tests {
     use itertools::Itertools;
     use std::cell::Cell;
     use std::cell::RefCell;
+    use std::future::pending;
     use std::future::ready;
     use std::future::Future;
     use std::ops::ControlFlow::{Break, Continue};
@@ -61,6 +62,7 @@ pub(crate) mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::{Intrinsic, Special};
     use yash_env::io::Fd;
+    use yash_env::job::Pid;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
@@ -68,10 +70,12 @@ pub(crate) mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::system::Errno;
+    use yash_env::trap::Signal;
     use yash_env::variable::Scalar;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
     use yash_env::Env;
+    use yash_env::System;
     use yash_env::VirtualSystem;
 
     #[derive(Clone, Debug)]
@@ -213,6 +217,24 @@ pub(crate) mod tests {
         Builtin {
             r#type: Special,
             execute: continue_builtin_main,
+        }
+    }
+
+    fn suspend_builtin_main(
+        env: &mut Env,
+        _args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
+        env.system
+            .kill(Pid::from_raw(0), Some(Signal::SIGSTOP))
+            .unwrap();
+        Box::pin(pending())
+    }
+
+    /// Returns a minimal implementation of the `suspend` built-in.
+    pub fn suspend_builtin() -> Builtin {
+        Builtin {
+            r#type: Special,
+            execute: suspend_builtin_main,
         }
     }
 
