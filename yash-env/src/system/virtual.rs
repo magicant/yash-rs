@@ -594,10 +594,7 @@ impl System for VirtualSystem {
             let result = process.block_signals(how, set);
             if result.process_state_changed {
                 let parent_pid = process.ppid;
-                if let Some(parent) = state.processes.get_mut(&parent_pid) {
-                    let result = parent.raise_signal(Signal::SIGCHLD);
-                    debug_assert!(!result.process_state_changed);
-                }
+                raise_sigchld(&mut state, parent_pid);
             }
         }
 
@@ -611,6 +608,39 @@ impl System for VirtualSystem {
 
     fn caught_signals(&mut self) -> Vec<Signal> {
         std::mem::take(&mut self.current_process_mut().caught_signals)
+    }
+
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+        match target.as_raw() {
+            0 => {
+                let target_pgid = self.current_process().pgid;
+                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
+            }
+
+            -1 => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
+
+            raw_pid if raw_pid >= 0 => {
+                let mut state = self.state.borrow_mut();
+                match state.processes.get_mut(&target) {
+                    Some(process) => {
+                        if let Some(signal) = signal {
+                            let result = process.raise_signal(signal);
+                            if result.process_state_changed {
+                                let parent_pid = process.ppid;
+                                raise_sigchld(&mut state, parent_pid);
+                            }
+                        }
+                        Ok(())
+                    }
+                    None => Err(Errno::ESRCH),
+                }
+            }
+
+            negative_pgid => {
+                let target_pgid = Pid::from_raw(-negative_pgid);
+                send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
+            }
+        }
     }
 
     /// Waits for a next event.
@@ -803,10 +833,7 @@ impl System for VirtualSystem {
                         .expect("missing child process");
                     if process.set_state(ProcessState::Exited(child_env.exit_status)) {
                         let ppid = process.ppid;
-                        if let Some(parent) = state.processes.get_mut(&ppid) {
-                            let result = parent.raise_signal(Signal::SIGCHLD);
-                            assert!(!result.process_state_changed);
-                        }
+                        raise_sigchld(&mut state, ppid);
                     }
                 });
 
@@ -882,6 +909,41 @@ impl System for VirtualSystem {
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         let state = self.state.borrow();
         Ok(state.home_dirs.get(name).cloned())
+    }
+}
+
+fn send_signal_to_processes(
+    state: &mut SystemState,
+    target_pgid: Option<Pid>,
+    signal: Option<Signal>,
+) -> nix::Result<()> {
+    let mut ppids = Vec::new();
+
+    if let Some(signal) = signal {
+        for (&_pid, process) in &mut state.processes {
+            if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
+                let result = process.raise_signal(signal);
+                if result.process_state_changed {
+                    ppids.push(process.ppid);
+                }
+            }
+        }
+    }
+
+    if ppids.is_empty() {
+        Err(Errno::ESRCH)
+    } else {
+        for ppid in ppids {
+            raise_sigchld(state, ppid);
+        }
+        Ok(())
+    }
+}
+
+fn raise_sigchld(state: &mut SystemState, target_pid: Pid) {
+    if let Some(target) = state.processes.get_mut(&target_pid) {
+        let result = target.raise_signal(Signal::SIGCHLD);
+        assert!(!result.process_state_changed);
     }
 }
 
@@ -1551,6 +1613,139 @@ mod tests {
     }
 
     // TODO Test sigmask
+
+    #[test]
+    fn kill_process() {
+        let mut system = VirtualSystem::new();
+        system.kill(system.process_id, None).unwrap();
+        assert_eq!(system.current_process().state(), ProcessState::Running);
+
+        system
+            .kill(system.process_id, Some(Signal::SIGINT))
+            .unwrap();
+        assert_eq!(
+            system.current_process().state(),
+            ProcessState::Signaled(Signal::SIGINT)
+        );
+
+        let state = system.state.borrow();
+        let max_pid = state.processes.keys().max().unwrap().as_raw();
+        drop(state);
+        let e = system
+            .kill(Pid::from_raw(max_pid + 1), Some(Signal::SIGINT))
+            .unwrap_err();
+        assert_eq!(e, Errno::ESRCH);
+    }
+
+    #[test]
+    fn kill_all_processes() {
+        let mut system = VirtualSystem::new();
+        let pgid = system.current_process().pgid;
+        let mut state = system.state.borrow_mut();
+        state.processes.insert(
+            Pid::from_raw(10),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        state.processes.insert(
+            Pid::from_raw(11),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        state.processes.insert(
+            Pid::from_raw(21),
+            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
+        );
+        drop(state);
+
+        system
+            .kill(Pid::from_raw(-1), Some(Signal::SIGTERM))
+            .unwrap();
+        let state = system.state.borrow();
+        for process in state.processes.values() {
+            assert_eq!(process.state, ProcessState::Signaled(Signal::SIGTERM));
+        }
+    }
+
+    #[test]
+    fn kill_processes_in_same_group() {
+        let mut system = VirtualSystem::new();
+        let pgid = system.current_process().pgid;
+        let mut state = system.state.borrow_mut();
+        state.processes.insert(
+            Pid::from_raw(10),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        state.processes.insert(
+            Pid::from_raw(11),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        state.processes.insert(
+            Pid::from_raw(21),
+            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
+        );
+        drop(state);
+
+        system
+            .kill(Pid::from_raw(0), Some(Signal::SIGQUIT))
+            .unwrap();
+        let state = system.state.borrow();
+        assert_eq!(
+            state.processes[&system.process_id].state,
+            ProcessState::Signaled(Signal::SIGQUIT)
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(10)].state,
+            ProcessState::Signaled(Signal::SIGQUIT)
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(11)].state,
+            ProcessState::Signaled(Signal::SIGQUIT)
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(21)].state,
+            ProcessState::Running
+        );
+    }
+
+    #[test]
+    fn kill_process_group() {
+        let mut system = VirtualSystem::new();
+        let pgid = system.current_process().pgid;
+        let mut state = system.state.borrow_mut();
+        state.processes.insert(
+            Pid::from_raw(10),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        state.processes.insert(
+            Pid::from_raw(11),
+            Process::with_parent_and_group(system.process_id, Pid::from_raw(21)),
+        );
+        state.processes.insert(
+            Pid::from_raw(21),
+            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
+        );
+        drop(state);
+
+        system
+            .kill(Pid::from_raw(-21), Some(Signal::SIGHUP))
+            .unwrap();
+        let state = system.state.borrow();
+        assert_eq!(
+            state.processes[&system.process_id].state,
+            ProcessState::Running
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(10)].state,
+            ProcessState::Running
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(11)].state,
+            ProcessState::Signaled(Signal::SIGHUP)
+        );
+        assert_eq!(
+            state.processes[&Pid::from_raw(21)].state,
+            ProcessState::Signaled(Signal::SIGHUP)
+        );
+    }
 
     #[test]
     fn select_regular_file_is_always_ready() {

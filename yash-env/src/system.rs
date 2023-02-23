@@ -248,6 +248,11 @@ pub trait System: Debug {
     /// caught and made available from this function.
     fn caught_signals(&mut self) -> Vec<Signal>;
 
+    /// Sends a signal.
+    ///
+    /// This is a thin wrapper around the `kill` system call.
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()>;
+
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
@@ -815,6 +820,9 @@ impl System for SharedSystem {
     }
     fn caught_signals(&mut self) -> Vec<Signal> {
         self.0.borrow_mut().caught_signals()
+    }
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+        self.0.borrow_mut().kill(target, signal)
     }
     fn select(
         &mut self,
