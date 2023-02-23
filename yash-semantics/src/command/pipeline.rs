@@ -35,6 +35,7 @@ use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
 use yash_env::system::FdFlag;
+use yash_env::system::SystemEx;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::syntax;
@@ -79,6 +80,17 @@ impl Command for syntax::Pipeline {
     async fn execute(&self, env: &mut Env) -> Result {
         if env.options.get(Exec) == Off {
             return Continue(());
+        }
+
+        if env.controls_jobs() {
+            if let Ok(tty) = env.get_tty() {
+                // If we try to do job control when we're in the background,
+                // we'll mess up the terminal state controlled by the foreground
+                // shell. Calling tcsetpgrp_without_block from the background
+                // suspends our shell process until it's resumed in the
+                // foreground.
+                env.system.tcsetpgrp_without_block(tty, env.main_pgid).ok();
+            }
         }
 
         if !self.negation {
