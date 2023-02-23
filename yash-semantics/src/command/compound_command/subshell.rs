@@ -21,6 +21,8 @@ use crate::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
+use yash_env::job::Job;
+use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -32,10 +34,19 @@ use yash_syntax::syntax::List;
 
 /// Executes a subshell command
 pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
-    let subshell = Subshell::new(|sub_env| Box::pin(subshell_main(sub_env, body)));
+    let body_2 = Rc::clone(&body);
+    let subshell = Subshell::new(|sub_env| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
+            if let Stopped(pid, _signal) = wait_status {
+                let mut job = Job::new(pid);
+                job.job_controlled = true;
+                job.status = wait_status;
+                job.name = body.to_string();
+                env.jobs.add(job);
+            }
+
             env.exit_status = wait_status.try_into().unwrap();
             env.apply_errexit()
         }
@@ -71,12 +82,16 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use crate::tests::stub_tty;
+    use crate::tests::suspend_builtin;
     use futures_util::FutureExt;
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::job::WaitStatus;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
+    use yash_env::system::r#virtual::ProcessState;
+    use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -164,6 +179,37 @@ mod tests {
             let (&pid, process) = state.processes.last_key_value().unwrap();
             assert_ne!(pid, env.main_pid);
             assert_ne!(process.pgid(), env.main_pgid);
+            assert_eq!(process.state(), ProcessState::Exited(ExitStatus(12)));
+
+            assert_eq!(env.jobs.len(), 0);
+        })
+    }
+
+    #[test]
+    fn job_controlled_suspended_subshell_in_job_set() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("suspend", suspend_builtin());
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let command: CompoundCommand = "(suspend foo)".parse().unwrap();
+            let result = command.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::from(Signal::SIGSTOP));
+
+            let state = state.borrow();
+            let (&pid, process) = state.processes.last_key_value().unwrap();
+            assert_ne!(pid, env.main_pid);
+            assert_ne!(process.pgid(), env.main_pgid);
+            assert_eq!(process.state(), ProcessState::Stopped(Signal::SIGSTOP));
+
+            assert_eq!(env.jobs.len(), 1);
+            let job = env.jobs.iter().next().unwrap().1;
+            assert_eq!(job.pid, pid);
+            assert!(job.job_controlled);
+            assert_eq!(job.status, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            assert!(job.status_changed);
+            assert_eq!(job.name, "suspend foo");
         })
     }
 

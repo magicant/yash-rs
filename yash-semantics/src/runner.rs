@@ -310,7 +310,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        state
+        let _ = state
             .borrow_mut()
             .processes
             .get_mut(&system.process_id)

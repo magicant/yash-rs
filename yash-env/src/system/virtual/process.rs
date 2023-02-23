@@ -17,6 +17,7 @@
 //! Processes in a virtual system.
 
 use super::io::FdBody;
+use super::signal::SignalEffect;
 use crate::io::Fd;
 use crate::semantics::ExitStatus;
 use crate::system::SelectSystem;
@@ -31,6 +32,8 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Debug;
+use std::ops::BitOr;
+use std::ops::BitOrAssign;
 use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::path::PathBuf;
@@ -298,8 +301,12 @@ impl Process {
     ///
     /// If this function unblocks a signal, any pending signal is delivered.
     ///
-    /// Returns true if any signal was delivered.
-    pub fn block_signals(&mut self, how: SigmaskHow, signals: &SigSet) -> bool {
+    /// If the signal changes the execution state of the process, this function
+    /// returns a `SignalResult` with `process_state_changed` being `true`. In
+    /// that case, the caller must send a SIGCHLD to the parent process of this
+    /// process.
+    #[must_use = "send SIGCHLD if process state has changed"]
+    pub fn block_signals(&mut self, how: SigmaskHow, signals: &SigSet) -> SignalResult {
         match how {
             SigmaskHow::SIG_SETMASK => self.blocked_signals = *signals,
             SigmaskHow::SIG_BLOCK => self.blocked_signals.extend(signals),
@@ -313,15 +320,14 @@ impl Process {
             _ => unreachable!(),
         }
 
-        let mut delivered = false;
+        let mut result = SignalResult::default();
         for signal in Signal::iterator() {
             if self.pending_signals.contains(signal) && !self.blocked_signals.contains(signal) {
                 self.pending_signals.remove(signal);
-                self.deliver_signal(signal);
-                delivered = true;
+                result |= self.deliver_signal(signal);
             }
         }
-        delivered
+        result
     }
 
     /// Returns the current handler for a signal.
@@ -349,34 +355,76 @@ impl Process {
     ///
     /// The action taken on the delivery depends on the current signal handling
     /// for the signal.
-    fn deliver_signal(&mut self, signal: Signal) {
+    ///
+    /// If the signal changes the execution state of the process, this function
+    /// returns a `SignalResult` with `process_state_changed` being `true`. In
+    /// that case, the caller must send a SIGCHLD to the parent process of this
+    /// process.
+    #[must_use = "send SIGCHLD if process state has changed"]
+    fn deliver_signal(&mut self, signal: Signal) -> SignalResult {
         let handling = if signal == Signal::SIGKILL || signal == Signal::SIGSTOP {
             SignalHandling::Default
         } else {
             self.signal_handling(signal)
         };
+
         match handling {
-            SignalHandling::Default => (), // TODO Do something depending on the signal
-            SignalHandling::Ignore => (),
-            SignalHandling::Catch => self.caught_signals.push(signal),
+            SignalHandling::Default => {
+                let process_state_changed = match SignalEffect::of(signal) {
+                    SignalEffect::None | SignalEffect::Resume => false,
+                    SignalEffect::Terminate { core_dump: _ } => {
+                        self.set_state(ProcessState::Signaled(signal))
+                    }
+                    SignalEffect::Suspend => self.set_state(ProcessState::Stopped(signal)),
+                };
+                SignalResult {
+                    delivered: true,
+                    caught: false,
+                    process_state_changed,
+                }
+            }
+            SignalHandling::Ignore => SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: false,
+            },
+            SignalHandling::Catch => {
+                self.caught_signals.push(signal);
+                SignalResult {
+                    delivered: true,
+                    caught: true,
+                    process_state_changed: false,
+                }
+            }
         }
-        // TODO If the Default action changes the process state, the parent
-        // should receive a SIGCHLD.
     }
 
     /// Sends a signal to this process.
     ///
     /// If the signal is being blocked, it will remain pending. Otherwise, it is
     /// immediately delivered.
-    pub fn raise_signal(&mut self, signal: Signal) {
-        if signal != Signal::SIGKILL
+    ///
+    /// If the signal changes the execution state of the process, this function
+    /// returns a `SignalResult` with `process_state_changed` being `true`. In
+    /// that case, the caller must send a SIGCHLD to the parent process of this
+    /// process.
+    #[must_use = "send SIGCHLD if process state has changed"]
+    pub fn raise_signal(&mut self, signal: Signal) -> SignalResult {
+        let process_state_changed =
+            signal == Signal::SIGCONT && self.set_state(ProcessState::Running);
+
+        let mut result = if signal != Signal::SIGKILL
             && signal != Signal::SIGSTOP
             && self.blocked_signals().contains(signal)
         {
-            self.pending_signals.add(signal)
+            self.pending_signals.add(signal);
+            SignalResult::default()
         } else {
             self.deliver_signal(signal)
-        }
+        };
+
+        result.process_state_changed |= process_state_changed;
+        result
     }
 
     /// Returns the arguments to the last call to
@@ -416,6 +464,39 @@ impl ProcessState {
             ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
             ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
         }
+    }
+}
+
+/// Result of operations that may deliver a signal to a process.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct SignalResult {
+    /// Whether the signal was delivered to the target process.
+    pub delivered: bool,
+
+    /// Whether the delivered signal was caught by a signal handler.
+    pub caught: bool,
+
+    /// Whether the signal changed the execution status of the target process.
+    ///
+    /// This flag is true when the process was terminated, suspended, or resumed.
+    pub process_state_changed: bool,
+}
+
+impl BitOr for SignalResult {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            delivered: self.delivered | rhs.delivered,
+            caught: self.caught | rhs.caught,
+            process_state_changed: self.process_state_changed | rhs.process_state_changed,
+        }
+    }
+}
+
+impl BitOrAssign for SignalResult {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs;
     }
 }
 
@@ -521,8 +602,8 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
         // TODO assert_eq!(result_set, some_set);
@@ -532,8 +613,8 @@ mod tests {
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_SETMASK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
         assert!(result_set.contains(Signal::SIGINT));
@@ -547,8 +628,8 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
         // TODO assert_eq!(result_set, some_set);
@@ -558,8 +639,8 @@ mod tests {
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
         assert!(result_set.contains(Signal::SIGINT));
@@ -573,14 +654,14 @@ mod tests {
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
-        let delivered = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_BLOCK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         some_set.clear();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGQUIT);
-        let delivered = process.block_signals(SigmaskHow::SIG_UNBLOCK, &some_set);
-        assert!(!delivered);
+        let result = process.block_signals(SigmaskHow::SIG_UNBLOCK, &some_set);
+        assert_eq!(result, SignalResult::default());
 
         let result_set = process.blocked_signals();
         assert!(!result_set.contains(Signal::SIGINT));
@@ -612,37 +693,134 @@ mod tests {
     #[test]
     fn process_raise_signal_default_nop() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
-        process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: false,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Running);
     }
 
     #[test]
-    #[ignore] // TODO enable this test case
     fn process_raise_signal_default_terminating() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
-        process.raise_signal(Signal::SIGTERM);
+        let result = process.raise_signal(Signal::SIGTERM);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGTERM));
         assert_eq!(process.caught_signals, []);
     }
 
-    // TODO process_raise_signal_default_aborting
-    // TODO process_raise_signal_default_stopping
-    // TODO process_raise_signal_default_continuing
+    #[test]
+    fn process_raise_signal_default_aborting() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let result = process.raise_signal(Signal::SIGABRT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGABRT));
+        assert_eq!(process.caught_signals, []);
+        // TODO Check if core dump file has been created
+    }
+
+    #[test]
+    fn process_raise_signal_default_stopping() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let result = process.raise_signal(Signal::SIGTSTP);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Stopped(Signal::SIGTSTP));
+        assert_eq!(process.caught_signals, []);
+    }
+
+    #[test]
+    fn process_raise_signal_default_continuing() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let result = process.raise_signal(Signal::SIGCONT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+    }
 
     #[test]
     fn process_raise_signal_ignored() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Ignore);
-        process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: false,
+                process_state_changed: false,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
+    }
+
+    #[test]
+    fn process_raise_signal_ignored_and_blocked_sigcont() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
+        let _ = process.set_signal_handling(Signal::SIGCONT, SignalHandling::Ignore);
+        let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
+        let result = process.raise_signal(Signal::SIGCONT);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: false,
+                caught: false,
+                process_state_changed: true,
+            }
+        );
+        assert_eq!(process.state(), ProcessState::Running);
+        assert_eq!(process.caught_signals, []);
+        assert!(process.pending_signals.contains(Signal::SIGCONT));
     }
 
     #[test]
     fn process_raise_signal_caught() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
-        process.raise_signal(Signal::SIGCHLD);
+        let result = process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: true,
+                process_state_changed: false,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
     }
@@ -660,13 +838,37 @@ mod tests {
     fn process_raise_signal_blocked() {
         let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
-        process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCHLD]));
-        process.raise_signal(Signal::SIGCHLD);
+        let result = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCHLD]));
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: false,
+                caught: false,
+                process_state_changed: false,
+            }
+        );
+
+        let result = process.raise_signal(Signal::SIGCHLD);
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: false,
+                caught: false,
+                process_state_changed: false,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, []);
 
-        let delivered = process.block_signals(SigmaskHow::SIG_SETMASK, &SigSet::empty());
-        assert!(delivered);
+        let result = process.block_signals(SigmaskHow::SIG_SETMASK, &SigSet::empty());
+        assert_eq!(
+            result,
+            SignalResult {
+                delivered: true,
+                caught: true,
+                process_state_changed: false,
+            }
+        );
         assert_eq!(process.state(), ProcessState::Running);
         assert_eq!(process.caught_signals, [Signal::SIGCHLD]);
     }

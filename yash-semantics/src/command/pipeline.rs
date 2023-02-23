@@ -18,10 +18,13 @@
 
 use super::Command;
 use async_trait::async_trait;
+use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::Fd;
+use yash_env::job::Job;
 use yash_env::job::Pid;
+use yash_env::job::WaitStatus::Stopped;
 use yash_env::option::Option::Exec;
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert;
@@ -109,14 +112,22 @@ async fn execute_job_controlled_pipeline(
     env: &mut Env,
     commands: &[Rc<syntax::Command>],
 ) -> Result {
-    let commands = commands.to_vec();
+    let commands_2 = commands.to_vec();
     let subshell = Subshell::new(|sub_env| {
-        Box::pin(async move { execute_multi_command_pipeline(sub_env, &commands).await })
+        Box::pin(async move { execute_multi_command_pipeline(sub_env, &commands_2).await })
     })
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
+            if let Stopped(pid, _signal) = wait_status {
+                let mut job = Job::new(pid);
+                job.job_controlled = true;
+                job.status = wait_status;
+                job.name = to_job_name(commands);
+                env.jobs.add(job);
+            }
+
             env.exit_status = wait_status.try_into().unwrap();
             Continue(())
         }
@@ -130,6 +141,13 @@ async fn execute_job_controlled_pipeline(
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
         }
     }
+}
+
+fn to_job_name(commands: &[Rc<syntax::Command>]) -> String {
+    commands
+        .iter()
+        .format_with(" | ", |cmd, f| f(&format_args!("{cmd}")))
+        .to_string()
 }
 
 async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Command>]) -> Result {
@@ -293,6 +311,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use crate::tests::stub_tty;
+    use crate::tests::suspend_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::future::Future;
@@ -300,11 +319,13 @@ mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
+    use yash_env::job::WaitStatus;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
+    use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -553,6 +574,28 @@ mod tests {
 
             // The shell should come back to the foreground after running the pipeline
             assert_eq!(state.borrow().foreground, Some(env.main_pgid));
+        })
+    }
+
+    #[test]
+    fn job_controlled_suspended_pipeline_in_job_set() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("return", return_builtin());
+            env.builtins.insert("suspend", suspend_builtin());
+            env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let pipeline: syntax::Pipeline = "return -n 0 | suspend x".parse().unwrap();
+            let result = pipeline.execute(&mut env).await;
+            assert_eq!(result, Continue(()));
+            assert_eq!(env.exit_status, ExitStatus::from(Signal::SIGSTOP));
+
+            assert_eq!(env.jobs.len(), 1);
+            let job = env.jobs.iter().next().unwrap().1;
+            assert!(job.job_controlled);
+            assert_eq!(job.status, WaitStatus::Stopped(job.pid, Signal::SIGSTOP));
+            assert!(job.status_changed);
+            assert_eq!(job.name, "return -n 0 | suspend x");
         })
     }
 

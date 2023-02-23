@@ -108,7 +108,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        system
+        let _ = system
             .state
             .borrow_mut()
             .processes

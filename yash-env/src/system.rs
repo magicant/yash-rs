@@ -248,6 +248,11 @@ pub trait System: Debug {
     /// caught and made available from this function.
     fn caught_signals(&mut self) -> Vec<Signal>;
 
+    /// Sends a signal.
+    ///
+    /// This is a thin wrapper around the `kill` system call.
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()>;
+
     /// Waits for a next event.
     ///
     /// This is a low-level function used internally by
@@ -815,6 +820,9 @@ impl System for SharedSystem {
     }
     fn caught_signals(&mut self) -> Vec<Signal> {
         self.0.borrow_mut().caught_signals()
+    }
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+        self.0.borrow_mut().kill(target, signal)
     }
     fn select(
         &mut self,
@@ -1477,8 +1485,8 @@ mod tests {
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
             assert!(process.blocked_signals().contains(Signal::SIGINT));
             assert!(process.blocked_signals().contains(Signal::SIGUSR1));
-            process.raise_signal(Signal::SIGCHLD);
-            process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGINT);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1511,7 +1519,7 @@ mod tests {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
             assert!(process.blocked_signals().contains(Signal::SIGCHLD));
-            process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGCHLD);
         }
         let result = future.as_mut().poll(&mut context);
         assert_eq!(result, Poll::Pending);
@@ -1542,8 +1550,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            process.raise_signal(Signal::SIGCHLD);
-            process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(Signal::SIGCHLD);
+            let _ = process.raise_signal(Signal::SIGTERM);
         }
         system.select(false).unwrap();
 
@@ -1567,8 +1575,8 @@ mod tests {
         {
             let mut state = state.borrow_mut();
             let process = state.processes.get_mut(&process_id).unwrap();
-            process.raise_signal(Signal::SIGINT);
-            process.raise_signal(Signal::SIGTERM);
+            let _ = process.raise_signal(Signal::SIGINT);
+            let _ = process.raise_signal(Signal::SIGTERM);
         }
         system.select(false).unwrap();
 

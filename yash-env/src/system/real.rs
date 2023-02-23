@@ -304,6 +304,10 @@ impl System for RealSystem {
         signals
     }
 
+    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+        nix::sys::signal::kill(target, signal)
+    }
+
     fn select(
         &mut self,
         readers: &mut FdSet,
