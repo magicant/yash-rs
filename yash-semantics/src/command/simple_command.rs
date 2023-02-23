@@ -26,6 +26,7 @@ use crate::Command;
 use crate::Handle;
 use assert_matches::assert_matches;
 use async_trait::async_trait;
+use itertools::Itertools;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ops::ControlFlow::{Break, Continue};
@@ -34,6 +35,8 @@ use yash_env::builtin::Builtin;
 use yash_env::builtin::Main;
 use yash_env::function::Function;
 use yash_env::io::print_error;
+use yash_env::job::Job;
+use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -193,7 +196,7 @@ impl Command for syntax::SimpleCommand {
             }
         } else {
             let exit_status = exit_status.unwrap_or_default();
-            execute_absent_target(env, &self.assigns, Rc::clone(&self.redirs), exit_status).await
+            execute_absent_target(env, &self.assigns, &self.redirs, exit_status).await
         }?;
 
         env.apply_errexit()
@@ -223,33 +226,50 @@ async fn perform_assignments(
 async fn execute_absent_target(
     env: &mut Env,
     assigns: &[Assign],
-    redirs: Rc<Vec<Redir>>,
+    redirs: &Rc<Vec<Redir>>,
     exit_status: ExitStatus,
 ) -> Result {
     // Perform redirections in a subshell
     let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
+        let redirs_2 = Rc::clone(redirs);
         let subshell = Subshell::new(move |env| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
                 let mut xtrace = XTrace::from_options(&env.options);
 
-                let redir_exit_status = match env.perform_redirs(&*redirs, xtrace.as_mut()).await {
-                    Ok(exit_status) => exit_status,
-                    Err(e) => {
-                        e.handle(env).await?;
-                        return Break(Divert::Exit(None));
-                    }
-                };
+                let redir_exit_status =
+                    match env.perform_redirs(redirs_2.iter(), xtrace.as_mut()).await {
+                        Ok(exit_status) => exit_status,
+                        Err(e) => {
+                            e.handle(env).await?;
+                            return Break(Divert::Exit(None));
+                        }
+                    };
 
                 print(env, xtrace).await;
 
                 env.exit_status = redir_exit_status.unwrap_or(exit_status);
                 Continue(())
             })
-        });
+        })
+        .job_control(JobControl::Foreground);
+
         match subshell.start_and_wait(env).await {
-            Ok(wait_status) => wait_status.try_into().unwrap(),
+            Ok(wait_status) => {
+                if let Stopped(pid, _signal) = wait_status {
+                    let mut job = Job::new(pid);
+                    job.job_controlled = true;
+                    job.status = wait_status;
+                    job.name = redirs
+                        .iter()
+                        .format_with(" ", |redir, f| f(&format_args!("{redir}")))
+                        .to_string();
+                    env.jobs.add(job);
+                }
+
+                wait_status.try_into().unwrap()
+            }
             Err(errno) => {
                 print_error(
                     env,
