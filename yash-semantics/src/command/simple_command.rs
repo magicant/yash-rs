@@ -419,6 +419,11 @@ async fn execute_external_utility(
         return Continue(());
     }
 
+    let job_name = if env.controls_jobs() {
+        to_job_name(&fields)
+    } else {
+        String::new()
+    };
     let args = to_c_strings(fields);
     let subshell = Subshell::new(move |env| {
         Box::pin(async move {
@@ -454,6 +459,14 @@ async fn execute_external_utility(
 
     match subshell.start_and_wait(&mut env).await {
         Ok(wait_status) => {
+            if let Stopped(pid, _signal) = wait_status {
+                let mut job = Job::new(pid);
+                job.job_controlled = true;
+                job.status = wait_status;
+                job.name = job_name;
+                env.jobs.add(job);
+            }
+
             env.exit_status = wait_status.try_into().unwrap();
         }
         Err(errno) => {
@@ -469,6 +482,13 @@ async fn execute_external_utility(
     }
 
     Continue(())
+}
+
+fn to_job_name(fields: &[Field]) -> String {
+    fields
+        .iter()
+        .format_with(" ", |field, f| f(&format_args!("{}", field.value)))
+        .to_string()
 }
 
 /// Converts fields to C strings.
