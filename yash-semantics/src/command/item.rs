@@ -18,9 +18,11 @@
 
 use super::Command;
 use async_trait::async_trait;
+use std::ffi::CStr;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
+use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -28,6 +30,7 @@ use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::Env;
+use yash_env::System;
 use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::AndOrList;
@@ -63,7 +66,10 @@ impl Command for syntax::Item {
 
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
     let and_or_2 = Rc::clone(and_or);
-    let subshell = Subshell::new(|env| Box::pin(async move { and_or_2.execute(env).await }));
+    let null_stdin = !env.controls_jobs();
+    let subshell = Subshell::new(move |env_2| {
+        Box::pin(async move { async_body(env_2, &and_or_2, null_stdin).await })
+    });
     let subshell = subshell.job_control(JobControl::Background);
     match subshell.start(env).await {
         Ok((pid, job_control)) => {
@@ -89,11 +95,29 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     }
 }
 
+async fn async_body(env: &mut Env, and_or: &AndOrList, null_stdin: bool) -> Result {
+    if null_stdin {
+        nullify_stdin(env).ok();
+    }
+    and_or.execute(env).await
+}
+
+fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {
+    env.system.close(Fd::STDIN)?;
+
+    use yash_env::system::{Mode, OFlag};
+    let path = CStr::from_bytes_with_nul(b"/dev/null\0").unwrap();
+    let fd = env.system.open(path, OFlag::O_RDONLY, Mode::empty())?;
+    assert_eq!(fd, Fd::STDIN);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
+    use crate::tests::cat_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
@@ -101,10 +125,14 @@ mod tests {
     use crate::tests::LocalExecutor;
     use futures_util::task::LocalSpawnExt;
     use futures_util::FutureExt;
+    use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::job::WaitStatus;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
+    use yash_env::system::r#virtual::FileBody;
+    use yash_env::system::r#virtual::INode;
+    use yash_env::system::r#virtual::SystemState;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -237,6 +265,75 @@ mod tests {
             let state = state.borrow();
             let process = &state.processes[&env.jobs.last_async_pid()];
             assert_ne!(process.pgid(), env.main_pgid);
+        })
+    }
+
+    fn ignore_sigttin(env: &mut Env) {
+        env.traps
+            .set_action(
+                &mut env.system,
+                yash_env::trap::Signal::SIGTTIN,
+                yash_env::trap::Action::Ignore,
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+    }
+
+    fn stub_dev_null_and_stdin(state: &RefCell<SystemState>) {
+        let mut state = state.borrow_mut();
+        state
+            .file_system
+            .save("/dev/null", Rc::new(RefCell::new(INode::new([]))))
+            .unwrap();
+        state
+            .file_system
+            .get("/dev/stdin")
+            .unwrap()
+            .borrow_mut()
+            .body = FileBody::new(*b"input\n");
+    }
+
+    #[test]
+    fn item_execute_async_stdin_not_job_controlled() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("cat", cat_builtin());
+            ignore_sigttin(&mut env);
+            stub_tty(&state);
+            stub_dev_null_and_stdin(&state);
+
+            let item = syntax::Item {
+                and_or: Rc::new("cat".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+
+            item.execute(&mut env).await;
+            env.wait_for_subshell(env.jobs.last_async_pid())
+                .await
+                .unwrap();
+            assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        })
+    }
+
+    #[test]
+    fn item_execute_async_stdin_job_controlled() {
+        in_virtual_system(|mut env, state| async move {
+            env.builtins.insert("cat", cat_builtin());
+            env.options.set(Monitor, On);
+            ignore_sigttin(&mut env);
+            stub_tty(&state);
+            stub_dev_null_and_stdin(&state);
+
+            let item = syntax::Item {
+                and_or: Rc::new("cat".parse().unwrap()),
+                async_flag: Some(Location::dummy("")),
+            };
+
+            item.execute(&mut env).await;
+            env.wait_for_subshell(env.jobs.last_async_pid())
+                .await
+                .unwrap();
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "input\n"));
         })
     }
 }
