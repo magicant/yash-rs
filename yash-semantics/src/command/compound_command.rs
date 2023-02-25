@@ -48,7 +48,7 @@ async fn perform_redirs(
 async fn evaluate_condition(env: &mut Env, condition: &syntax::List) -> Result<bool> {
     let mut env = env.push_frame(Frame::Condition);
     condition.execute(&mut env).await?;
-    Continue(env.exit_status == ExitStatus::SUCCESS)
+    Continue(env.exit_status.is_successful())
 }
 
 mod case;

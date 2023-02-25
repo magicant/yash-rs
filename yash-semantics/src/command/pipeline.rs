@@ -99,7 +99,7 @@ impl Command for syntax::Pipeline {
 
         let mut env = env.push_frame(Frame::Condition);
         execute_commands_in_pipeline(&mut env, &self.commands).await?;
-        env.exit_status = if env.exit_status == ExitStatus::SUCCESS {
+        env.exit_status = if env.exit_status.is_successful() {
             ExitStatus::FAILURE
         } else {
             ExitStatus::SUCCESS

@@ -414,7 +414,7 @@ impl Env {
     /// on, the current `self.exit_status` is non-zero, and the current stack
     /// has no `Condition` [frame](Frame); otherwise, `Continue(())`.
     pub fn apply_errexit(&self) -> ControlFlow<Divert> {
-        if self.exit_status != ExitStatus::SUCCESS && self.errexit_is_applicable() {
+        if !self.exit_status.is_successful() && self.errexit_is_applicable() {
             Break(Divert::Exit(None))
         } else {
             Continue(())
