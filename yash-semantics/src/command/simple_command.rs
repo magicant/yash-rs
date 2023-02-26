@@ -233,7 +233,7 @@ async fn execute_absent_target(
     let redir_exit_status = if let Some(redir) = redirs.first() {
         let first_redir_location = redir.body.operand().location.clone();
         let redirs_2 = Rc::clone(redirs);
-        let subshell = Subshell::new(move |env| {
+        let subshell = Subshell::new(move |env, _job_control| {
             Box::pin(async move {
                 let env = &mut RedirGuard::new(env);
                 let mut xtrace = XTrace::from_options(&env.options);
@@ -425,7 +425,7 @@ async fn execute_external_utility(
         String::new()
     };
     let args = to_c_strings(fields);
-    let subshell = Subshell::new(move |env| {
+    let subshell = Subshell::new(move |env, _job_control| {
         Box::pin(async move {
             env.traps.disable_internal_handlers(&mut env.system).ok();
 

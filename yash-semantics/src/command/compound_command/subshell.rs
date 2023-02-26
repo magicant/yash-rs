@@ -35,7 +35,7 @@ use yash_syntax::syntax::List;
 /// Executes a subshell command
 pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Result {
     let body_2 = Rc::clone(&body);
-    let subshell = Subshell::new(|sub_env| Box::pin(subshell_main(sub_env, body_2)));
+    let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {

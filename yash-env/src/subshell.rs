@@ -62,13 +62,21 @@ impl<F> std::fmt::Debug for Subshell<F> {
 
 impl<F> Subshell<F>
 where
-    F: for<'a> FnOnce(&'a mut Env) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>
+    F: for<'a> FnOnce(
+            &'a mut Env,
+            Option<JobControl>,
+        ) -> Pin<Box<dyn Future<Output = crate::semantics::Result> + 'a>>
         + 'static,
     // TODO Revisit to simplify this function type when impl Future is allowed in return type
 {
     /// Creates a new subshell builder with a task.
     ///
-    /// The task will run in a subshell after it is started.
+    /// The task will run in a subshell after it is started. The task takes two
+    /// arguments:
+    ///
+    /// 1. The environment in which the subshell runs, and
+    /// 2. Job control status for the subshell.
+    ///
     /// If the task returns an `Err(Divert::...)`, it is handled as follows:
     ///
     /// - `Interrupt` and `Exit` with `Some(exit_status)` override the exit
@@ -87,7 +95,10 @@ where
     /// the foreground.
     ///
     /// This parameter is ignored if the shell is not [controlling
-    /// jobs](Env::controls_jobs).
+    /// jobs](Env::controls_jobs) when starting the subshell. You can tell the
+    /// actual job control status of the subshell by the second return value of
+    /// [`start`](Self::start) in the parent environment and the second argument
+    /// passed to the task in the subshell environment.
     pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
         self.job_control = job_control.into();
         self
@@ -146,7 +157,7 @@ where
 
                 env.traps.enter_subshell(&mut env.system);
 
-                let result = (self.task)(env).await;
+                let result = (self.task)(env, job_control).await;
                 env.apply_result(result);
             })
         });
@@ -244,7 +255,7 @@ mod tests {
             let parent_pid = env.main_pid;
             let child_pid = Rc::new(Cell::new(None));
             let child_pid_2 = Rc::clone(&child_pid);
-            let subshell = Subshell::new(move |env| {
+            let subshell = Subshell::new(move |env, _job_control| {
                 Box::pin(async move {
                     child_pid_2.set(Some(env.system.getpid()));
                     assert_eq!(env.system.getppid(), parent_pid);
@@ -261,7 +272,8 @@ mod tests {
     fn subshell_start_failing() {
         let mut executor = LocalPool::new();
         let env = &mut Env::new_virtual();
-        let subshell = Subshell::new(|_env| unreachable!("subshell not expected to run"));
+        let subshell =
+            Subshell::new(|_env, _job_control| unreachable!("subshell not expected to run"));
         let result = executor.run_until(subshell.start(env));
         assert_eq!(result, Err(Errno::ENOSYS));
     }
@@ -269,7 +281,7 @@ mod tests {
     #[test]
     fn stack_frame_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env| {
+            let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
                     assert_eq!(env.stack[..], [Frame::Subshell]);
                     Continue(())
@@ -294,7 +306,7 @@ mod tests {
                     false,
                 )
                 .unwrap();
-            let subshell = Subshell::new(|env| {
+            let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
                     let trap_state = assert_matches!(
                         env.traps.get_state(Signal::SIGCHLD),
@@ -319,11 +331,12 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
                     assert_eq!(state_2.borrow().foreground, None);
+                    assert_eq!(job_control, None);
                     Continue(())
                 })
             })
@@ -347,11 +360,12 @@ mod tests {
             parent_env.options.set(Monitor, On);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                     assert_eq!(state_2.borrow().foreground, None);
+                    assert_eq!(job_control, Some(JobControl::Background));
                     Continue(())
                 })
             })
@@ -376,11 +390,12 @@ mod tests {
             stub_tty(&state);
 
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env, job_control| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, child_pid);
                     assert_eq!(state_2.borrow().foreground, Some(child_pid));
+                    assert_eq!(job_control, Some(JobControl::Foreground));
                     Continue(())
                 })
             })
@@ -409,7 +424,7 @@ mod tests {
                 .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
                 .unwrap();
 
-            let _ = Subshell::new(move |_env| Box::pin(async move { Continue(()) }))
+            let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(Continue(()))))
                 .job_control(JobControl::Foreground)
                 .start(&mut parent_env)
                 .await
@@ -425,7 +440,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env, _job_control| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
@@ -456,7 +471,7 @@ mod tests {
 
             let parent_pgid = state.borrow().processes[&parent_env.main_pid].pgid;
             let state_2 = Rc::clone(&state);
-            let (child_pid, job_control) = Subshell::new(move |child_env| {
+            let (child_pid, job_control) = Subshell::new(move |child_env, _job_control| {
                 Box::pin(async move {
                     let child_pid = child_env.system.getpid();
                     assert_eq!(state_2.borrow().processes[&child_pid].pgid, parent_pgid);
@@ -481,7 +496,7 @@ mod tests {
     #[test]
     fn wait_without_job_control() {
         in_virtual_system(|mut env, _state| async move {
-            let subshell = Subshell::new(|env| {
+            let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(42);
                     Continue(())
@@ -498,7 +513,7 @@ mod tests {
             env.options.set(Monitor, On);
             stub_tty(&state);
 
-            let subshell = Subshell::new(|env| {
+            let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
                     env.exit_status = ExitStatus(123);
                     Continue(())

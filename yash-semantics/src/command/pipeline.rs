@@ -125,7 +125,7 @@ async fn execute_job_controlled_pipeline(
     commands: &[Rc<syntax::Command>],
 ) -> Result {
     let commands_2 = commands.to_vec();
-    let subshell = Subshell::new(|sub_env| {
+    let subshell = Subshell::new(|sub_env, _job_control| {
         Box::pin(async move { execute_multi_command_pipeline(sub_env, &commands_2).await })
     })
     .job_control(JobControl::Foreground);
@@ -172,7 +172,7 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
         shift_or_fail(env, &mut pipes, has_next).await?;
 
         let pipes2 = pipes;
-        let subshell = Subshell::new(move |env| {
+        let subshell = Subshell::new(move |env, _job_control| {
             Box::pin(connect_pipe_and_execute_command(env, pipes2, command))
         });
         let start_result = subshell.start(env).await;

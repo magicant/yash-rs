@@ -66,9 +66,8 @@ impl Command for syntax::Item {
 
 async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Location) -> Result {
     let and_or_2 = Rc::clone(and_or);
-    let null_stdin = !env.controls_jobs();
-    let subshell = Subshell::new(move |env_2| {
-        Box::pin(async move { async_body(env_2, &and_or_2, null_stdin).await })
+    let subshell = Subshell::new(|env_2, job_control| {
+        Box::pin(async move { async_body(env_2, job_control, &and_or_2).await })
     });
     let subshell = subshell.job_control(JobControl::Background);
     match subshell.start(env).await {
@@ -95,8 +94,8 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     }
 }
 
-async fn async_body(env: &mut Env, and_or: &AndOrList, null_stdin: bool) -> Result {
-    if null_stdin {
+async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &AndOrList) -> Result {
+    if job_control.is_none() {
         nullify_stdin(env).ok();
     }
     and_or.execute(env).await

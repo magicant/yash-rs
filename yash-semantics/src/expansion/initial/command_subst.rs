@@ -54,7 +54,7 @@ where
     };
 
     // Start a subshell to run the command
-    let subshell = Subshell::new(move |env| {
+    let subshell = Subshell::new(move |env, _job_control| {
         Box::pin(async move {
             env.system.close(reader).ok();
             if writer != Fd::STDOUT {
