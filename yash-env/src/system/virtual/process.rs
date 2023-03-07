@@ -140,7 +140,7 @@ impl Process {
         child.fds = parent.fds.clone();
         child.signal_handlings = parent.signal_handlings.clone();
         child.blocked_signals = parent.blocked_signals;
-        child.pending_signals = parent.pending_signals;
+        child.pending_signals = SigSet::empty();
         child
     }
 
