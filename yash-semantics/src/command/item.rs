@@ -69,7 +69,9 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
     let subshell = Subshell::new(|env_2, job_control| {
         Box::pin(async move { async_body(env_2, job_control, &and_or_2).await })
     });
-    let subshell = subshell.job_control(JobControl::Background);
+    let subshell = subshell
+        .job_control(JobControl::Background)
+        .ignore_sigint_sigquit(true);
     match subshell.start(env).await {
         Ok((pid, job_control)) => {
             debug_assert_ne!(job_control, Some(JobControl::Foreground));

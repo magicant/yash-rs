@@ -30,8 +30,11 @@ use crate::job::Pid;
 use crate::job::WaitStatus;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
+use crate::system::SigSet;
+use crate::system::SigmaskHow::{SIG_BLOCK, SIG_SETMASK};
 use crate::system::System;
 use crate::system::SystemEx;
+use crate::trap::Signal::{SIGINT, SIGQUIT};
 use crate::Env;
 use std::future::Future;
 use std::pin::Pin;
@@ -52,6 +55,7 @@ pub enum JobControl {
 pub struct Subshell<F> {
     task: F,
     job_control: Option<JobControl>,
+    ignores_sigint_sigquit: bool,
 }
 
 impl<F> std::fmt::Debug for Subshell<F> {
@@ -83,16 +87,19 @@ where
     ///   status in `Env`.
     /// - Other `Divert` values are ignored.
     pub fn new(task: F) -> Self {
-        let job_control = None;
-        Subshell { task, job_control }
+        Subshell {
+            task,
+            job_control: None,
+            ignores_sigint_sigquit: false,
+        }
     }
 
     /// Specifies disposition of the subshell with respect to job control.
     ///
-    /// If the argument is `None`, the subshell runs in the same process group
-    /// as the parent process. If it is `Some(_)`, the subshell becomes a new
-    /// process group. For `JobControl::Foreground`, it also brings itself to
-    /// the foreground.
+    /// If the argument is `None` (which is the default), the subshell runs in
+    /// the same process group as the parent process. If it is `Some(_)`, the
+    /// subshell becomes a new process group. For `JobControl::Foreground`, it
+    /// also brings itself to the foreground.
     ///
     /// This parameter is ignored if the shell is not [controlling
     /// jobs](Env::controls_jobs) when starting the subshell. You can tell the
@@ -101,6 +108,17 @@ where
     /// passed to the task in the subshell environment.
     pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
         self.job_control = job_control.into();
+        self
+    }
+
+    /// Makes the subshell ignore SIGINT and SIGQUIT.
+    ///
+    /// If `ignore` is true and the subshell is not job-controlled, the subshell
+    /// sets its signal handlings for SIGINT and SIGQUIT to `Ignore`.
+    ///
+    /// The default is `false`.
+    pub fn ignore_sigint_sigquit(mut self, ignore: bool) -> Self {
+        self.ignores_sigint_sigquit = ignore;
         self
     }
 
@@ -133,6 +151,13 @@ where
             // Open the tty in the parent process so we can reuse the FD for other jobs
             Some(JobControl::Foreground) => Some(env.get_tty()?),
         };
+        // Block SIGINT and SIGQUIT before forking the child process to prevent
+        // the child from being killed by those signals until the child starts
+        // ignoring them.
+        let mut mask_guard = MaskGuard::new(env);
+        let ignores_sigint_sigquit = self.ignores_sigint_sigquit
+            && job_control.is_none()
+            && mask_guard.block_sigint_sigquit();
 
         // Define the child process task
         const ME: Pid = Pid::from_raw(0);
@@ -155,7 +180,8 @@ where
                     }
                 }
 
-                env.traps.enter_subshell(&mut env.system);
+                env.traps
+                    .enter_subshell(&mut env.system, ignores_sigint_sigquit);
 
                 let result = (self.task)(env, job_control).await;
                 env.apply_result(result);
@@ -163,15 +189,15 @@ where
         });
 
         // Start the child
-        let child = env.system.new_child_process()?;
-        let child_pid = child(env, task).await;
+        let child = mask_guard.env.system.new_child_process()?;
+        let child_pid = child(mask_guard.env, task).await;
 
         // The finishing
         if job_control.is_some() {
             // We should setpgid not only in the child but also in the parent to
             // make sure the child is in a new process group before the parent
             // returns from the start function.
-            let _ = env.system.setpgid(child_pid, ME);
+            let _ = mask_guard.env.system.setpgid(child_pid, ME);
 
             // We don't tcsetpgrp in the parent. It would mess up the child
             // which may have started another shell doing its own job control.
@@ -221,6 +247,53 @@ where
     }
 }
 
+/// Guard object for temporarily blocking signals
+///
+/// This object blocks SIGINT and SIGQUIT and remembers the previous signal
+/// blocking mask, which is restored when the object is dropped.
+#[derive(Debug)]
+struct MaskGuard<'a> {
+    env: &'a mut Env,
+    old_mask: Option<SigSet>,
+}
+
+impl<'a> MaskGuard<'a> {
+    fn new(env: &'a mut Env) -> Self {
+        let old_mask = None;
+        Self { env, old_mask }
+    }
+
+    fn block_sigint_sigquit(&mut self) -> bool {
+        assert_eq!(self.old_mask, None);
+
+        let mut sigint_sigquit = SigSet::empty();
+        let mut old_mask = SigSet::empty();
+        sigint_sigquit.add(SIGINT);
+        sigint_sigquit.add(SIGQUIT);
+
+        let success = self
+            .env
+            .system
+            .sigmask(SIG_BLOCK, Some(&sigint_sigquit), Some(&mut old_mask))
+            .is_ok();
+        if success {
+            self.old_mask = Some(old_mask);
+        }
+        success
+    }
+}
+
+impl<'a> Drop for MaskGuard<'a> {
+    fn drop(&mut self) {
+        if let Some(old_mask) = &self.old_mask {
+            self.env
+                .system
+                .sigmask(SIG_SETMASK, Some(old_mask), None)
+                .ok();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,9 +303,10 @@ mod tests {
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
     use crate::system::Errno;
+    use crate::system::SignalHandling;
     use crate::tests::in_virtual_system;
     use crate::trap::Action;
-    use crate::trap::Signal;
+    use crate::trap::Signal::SIGCHLD;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
     use std::cell::Cell;
@@ -300,7 +374,7 @@ mod tests {
             env.traps
                 .set_action(
                     &mut env.system,
-                    Signal::SIGCHLD,
+                    SIGCHLD,
                     Action::Command("echo foo".into()),
                     Location::dummy(""),
                     false,
@@ -309,7 +383,7 @@ mod tests {
             let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
                     let trap_state = assert_matches!(
-                        env.traps.get_state(Signal::SIGCHLD),
+                        env.traps.get_state(SIGCHLD),
                         (None, Some(trap_state)) => trap_state
                     );
                     assert_matches!(
@@ -528,4 +602,89 @@ mod tests {
 
     // TODO wait_for_foreground_job_to_be_signaled
     // TODO wait_for_foreground_job_to_be_stopped
+
+    #[test]
+    fn sigint_sigquit_not_ignored_by_default() {
+        in_virtual_system(|mut parent_env, state| async move {
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Background)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+
+            let state = state.borrow();
+            let process = &state.processes[&child_pid];
+            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Default);
+        })
+    }
+
+    #[test]
+    fn sigint_sigquit_ignored_in_uncontrolled_job() {
+        in_virtual_system(|mut parent_env, state| async move {
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Background)
+            .ignore_sigint_sigquit(true)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+
+            parent_env.system.kill(child_pid, Some(SIGINT)).unwrap();
+            parent_env.system.kill(child_pid, Some(SIGQUIT)).unwrap();
+
+            let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+
+            let state = state.borrow();
+            let parent_process = &state.processes[&parent_env.main_pid];
+            assert!(!parent_process.blocked_signals().contains(SIGINT));
+            assert!(!parent_process.blocked_signals().contains(SIGQUIT));
+            let child_process = &state.processes[&child_pid];
+            assert_eq!(
+                child_process.signal_handling(SIGINT),
+                SignalHandling::Ignore
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGQUIT),
+                SignalHandling::Ignore
+            );
+        })
+    }
+
+    #[test]
+    fn sigint_sigquit_not_ignored_if_job_controlled() {
+        in_virtual_system(|mut parent_env, state| async move {
+            parent_env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Background)
+            .ignore_sigint_sigquit(true)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+            parent_env.wait_for_subshell(child_pid).await.unwrap();
+
+            let state = state.borrow();
+            let process = &state.processes[&child_pid];
+            assert_eq!(process.signal_handling(SIGINT), SignalHandling::Default);
+            assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Default);
+        })
+    }
 }

@@ -233,7 +233,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        env.traps.enter_subshell(&mut env.system);
+        env.traps.enter_subshell(&mut env.system, false);
 
         let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
@@ -251,7 +251,7 @@ mod tests {
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
-        env.traps.enter_subshell(&mut env.system);
+        env.traps.enter_subshell(&mut env.system, false);
         let args = Field::dummies(["ls", "QUIT"]);
         let _ = builtin_body(&mut env, args).now_or_never().unwrap();
 
