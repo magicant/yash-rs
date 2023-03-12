@@ -17,18 +17,18 @@ publish = false
 
 [dependencies]
 annotate-snippets = "0.9.1"
-async-trait = "0.1.59"
+async-trait = "0.1.66"
 either = "1.8.1"
 enumset = "1.0.12"
-futures-util = "0.3.26"
+futures-util = "0.3.27"
 itertools = "0.10.3"
 nix = "0.23.2"
 slab = "0.4.7"
 tempfile = "3.3.0"
-yash-quote = { path = "../yash-quote", version = "1.0.0" }
+yash-quote = { path = "../yash-quote", version = "1.0.1" }
 yash-syntax = { path = "../yash-syntax", version = "0.6.0", features = ["annotate-snippets"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-futures-executor = "0.3.26"
+futures-executor = "0.3.27"
 futures-util = { version = "0.3.26", features = ["channel"] }
