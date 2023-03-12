@@ -262,6 +262,7 @@ impl Env {
         let system = self.system.clone();
 
         let future = self.wait_for_signals();
+        // TODO Require Rust 1.68.0 and use std::pin::pin
         futures_util::pin_mut!(future);
 
         let mut context = Context::from_waker(noop_waker_ref());
