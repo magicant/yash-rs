@@ -116,12 +116,13 @@ impl std::str::FromStr for Condition {
 }
 
 /// Action performed when a [`Condition`] is met
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum Action {
     /// Performs the default action.
     ///
     /// For signal conditions, the behavior depends on the signal delivered.
     /// For other conditions, this is equivalent to `Ignore`.
+    #[default]
     Default,
 
     /// Pretends as if the condition was not met.
@@ -129,12 +130,6 @@ pub enum Action {
 
     /// Executes a command string.
     Command(Rc<str>),
-}
-
-impl Default for Action {
-    fn default() -> Self {
-        Action::Default
-    }
 }
 
 impl From<&Action> for SignalHandling {

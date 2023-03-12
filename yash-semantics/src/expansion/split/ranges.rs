@@ -33,20 +33,19 @@ fn classify(c: AttrChar, ifs: &Ifs) -> Class {
 }
 
 /// State of a field-splitting iterator
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 enum State {
-    Midfield { start_index: usize },
+    Midfield {
+        start_index: usize,
+    },
+
     AfterIfsWhitespace,
+
+    #[default]
     AfterIfsNonWhitespace,
 }
 
 use State::*;
-
-impl Default for State {
-    fn default() -> Self {
-        AfterIfsNonWhitespace
-    }
-}
 
 /// Iterator that yields index ranges of separated fields
 ///

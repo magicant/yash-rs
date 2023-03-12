@@ -58,21 +58,16 @@ use yash_syntax::source::pretty::MessageBase;
 pub use yash_env::semantics::Field;
 
 /// Specification for an options's argument
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum OptionArgumentSpec {
     /// The option does not take an argument. (default)
+    #[default]
     None,
     /// The option requires an argument.
     Required,
     // /// The option may have an argument.
     // Optional,
-}
-
-impl Default for OptionArgumentSpec {
-    fn default() -> Self {
-        OptionArgumentSpec::None
-    }
 }
 
 /// Specification of an option

@@ -362,20 +362,15 @@ pub trait System: Debug {
 pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
 
 /// How to handle a signal.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum SignalHandling {
     /// Perform the default action for the signal.
+    #[default]
     Default,
     /// Ignore the signal.
     Ignore,
     /// Catch the signal.
     Catch,
-}
-
-impl Default for SignalHandling {
-    fn default() -> Self {
-        SignalHandling::Default
-    }
 }
 
 /// Task executed in a child process
