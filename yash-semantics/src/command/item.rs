@@ -103,7 +103,7 @@ async fn async_body(env: &mut Env, job_control: Option<JobControl>, and_or: &And
     and_or.execute(env).await
 }
 
-fn nullify_stdin(env: &mut Env) -> std::result::Result<(), yash_env::system::Errno> {
+fn nullify_stdin(env: &mut Env) -> std::io::Result<()> {
     env.system.close(Fd::STDIN)?;
 
     use yash_env::system::{Mode, OFlag};

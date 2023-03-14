@@ -87,6 +87,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::Error;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
@@ -475,7 +476,7 @@ impl System for VirtualSystem {
         process.open_fd(body).map_err(|_| Errno::EMFILE)
     }
 
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<(), Error> {
         self.current_process_mut().close_fd(fd);
         Ok(())
     }
@@ -1240,7 +1241,7 @@ mod tests {
         assert_eq!(buffer, [5, 42, 29, 1]);
 
         let result = system.close(writer);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
 
         let result = system.read(reader, &mut buffer);
         assert_eq!(result, Ok(0));
@@ -1530,11 +1531,11 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let result = system.close(Fd::STDERR);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
         assert_eq!(system.current_process().fds.get(&Fd::STDERR), None);
 
         let result = system.close(Fd::STDERR);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
     }
 
     #[test]

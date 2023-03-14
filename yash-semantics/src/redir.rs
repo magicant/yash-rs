@@ -546,7 +546,7 @@ async fn perform(
             }
         }
     } else {
-        let _: Result<(), Errno> = env.system.close(target_fd);
+        let _: Result<(), std::io::Error> = env.system.close(target_fd);
     }
 
     let original = target_fd;

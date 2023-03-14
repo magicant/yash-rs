@@ -19,6 +19,8 @@
 pub mod real;
 pub mod r#virtual;
 
+mod error;
+
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
@@ -59,6 +61,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::Error;
 use std::io::SeekFrom;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -129,7 +132,7 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `close` system call.
     ///
     /// This function returns `Ok(())` when the FD is already closed.
-    fn close(&mut self, fd: Fd) -> nix::Result<()>;
+    fn close(&mut self, fd: Fd) -> Result<(), Error>;
 
     /// Returns the file status flags for the open file description.
     ///
@@ -766,7 +769,7 @@ impl System for SharedSystem {
     fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)
     }
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<(), Error> {
         self.0.borrow_mut().close(fd)
     }
     fn fcntl_getfl(&self, fd: Fd) -> nix::Result<OFlag> {

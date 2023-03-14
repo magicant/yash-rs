@@ -215,11 +215,11 @@ async fn connect_pipe_and_execute_command(
 ) -> Result {
     match pipes.move_to_stdin_stdout(env) {
         Ok(()) => (),
-        Err(errno) => {
+        Err(error) => {
             // TODO print error location using yash_env::io::print_error
             env.print_error(&format!(
                 "cannot connect pipes in the pipeline: {}\n",
-                errno.desc()
+                error
             ))
             .await;
             return Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)));
@@ -289,7 +289,7 @@ impl PipeSet {
 
     /// Moves the pipe FDs to stdin/stdout and closes the FDs that are no longer
     /// necessary.
-    fn move_to_stdin_stdout(mut self, env: &mut Env) -> std::result::Result<(), Errno> {
+    fn move_to_stdin_stdout(mut self, env: &mut Env) -> std::io::Result<()> {
         if let Some((reader, writer)) = self.next {
             assert_ne!(reader, writer);
             assert_ne!(self.read_previous, Some(reader));

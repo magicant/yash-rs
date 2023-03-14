@@ -16,6 +16,7 @@
 
 //! Implementation of `System` that actually interacts with the system.
 
+use super::error::error_m1;
 use super::AtFlags;
 use super::ChildProcessStarter;
 use super::Dir;
@@ -50,6 +51,7 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::io::Error;
 use std::io::SeekFrom;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
@@ -174,12 +176,18 @@ impl System for RealSystem {
         }
     }
 
-    fn close(&mut self, fd: Fd) -> nix::Result<()> {
+    fn close(&mut self, fd: Fd) -> Result<(), Error> {
         loop {
-            match nix::unistd::close(fd.0) {
-                Err(Errno::EBADF) => return Ok(()),
-                Err(Errno::EINTR) => (),
-                other => return other,
+            let result = unsafe { libc::close(fd.0) };
+            let result = error_m1(result);
+            match &result {
+                Ok(()) => return Ok(()),
+                Err(error) => match error.raw_os_error() {
+                    Some(libc::EBADF) => return Ok(()),
+                    // TODO: Maybe it is a bad idea to call `close` again on `EINTR`
+                    Some(libc::EINTR) => continue,
+                    _ => return result,
+                },
             }
         }
     }
