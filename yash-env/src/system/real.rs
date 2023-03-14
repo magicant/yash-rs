@@ -38,13 +38,9 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::SignalHandling;
 use nix::libc::DIR;
-use nix::libc::{S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
-use nix::sys::stat::stat;
-use nix::unistd::access;
-use nix::unistd::AccessFlags;
 use std::convert::Infallible;
 use std::convert::TryInto;
 use std::ffi::c_int;
@@ -53,6 +49,7 @@ use std::ffi::CString;
 use std::ffi::OsStr;
 use std::io::Error;
 use std::io::SeekFrom;
+use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
@@ -63,15 +60,17 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 fn is_executable(path: &CStr) -> bool {
-    let flags = AccessFlags::X_OK;
-    access(path, flags).is_ok()
-    // TODO Should use eaccess
+    unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), libc::X_OK, libc::AT_EACCESS) == 0 }
 }
 
 fn is_regular_file(path: &CStr) -> bool {
-    match stat(path) {
-        Ok(stat) => stat.st_mode & S_IFMT == S_IFREG,
-        Err(_) => false,
+    // TODO Use RealSystem::fstatat
+    let mut stat = MaybeUninit::uninit();
+    unsafe {
+        libc::stat(path.as_ptr(), stat.as_mut_ptr()) == 0 && {
+            let stat = stat.assume_init();
+            stat.st_mode & libc::S_IFMT == libc::S_IFREG
+        }
     }
 }
 
