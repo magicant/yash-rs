@@ -24,7 +24,6 @@ use crate::variable::Scope::Global;
 use crate::variable::Value::Scalar;
 use crate::variable::Variable;
 use crate::System;
-use nix::sys::stat::FileStat;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::path::Path;
@@ -32,11 +31,6 @@ use std::path::Path;
 /// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
 fn has_dot_or_dot_dot(path: &str) -> bool {
     path.split('/').any(|c| c == "." || c == "..")
-}
-
-/// Tests whether two stats refer to the same file.
-fn same_files(a: &FileStat, b: &FileStat) -> bool {
-    a.st_dev == b.st_dev && a.st_ino == b.st_ino
 }
 
 /// Error in [`Env::prepare_pwd`]
@@ -79,10 +73,14 @@ impl Env {
                     Ok(pwd) => pwd,
                     Err(_) => return false,
                 };
-                let s1 = self.system.fstatat(AT_FDCWD, &pwd, AtFlags::empty());
+                let Ok(s1) = self.system.fstatat(AT_FDCWD, &pwd, AtFlags::empty()) else {
+                    return false;
+                };
                 let dot = CStr::from_bytes_with_nul(b".\0").unwrap();
-                let s2 = self.system.fstatat(AT_FDCWD, dot, AtFlags::empty());
-                matches!((s1, s2), (Ok(s1), Ok(s2)) if same_files(&s1, &s2))
+                let Ok(s2) = self.system.fstatat(AT_FDCWD, dot, AtFlags::empty()) else {
+                    return false;
+                };
+                s1.is_same_file_as(&s2)
             }
 
             _ => false,

@@ -20,7 +20,9 @@ pub mod real;
 pub mod r#virtual;
 
 mod error;
+mod stat;
 
+pub use self::stat::FileStat;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
@@ -46,7 +48,7 @@ pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigmaskHow;
 #[doc(no_inline)]
-pub use nix::sys::stat::{FileStat, Mode, SFlag};
+pub use nix::sys::stat::{Mode, SFlag};
 #[doc(no_inline)]
 pub use nix::sys::time::TimeSpec;
 use std::cell::RefCell;
@@ -85,10 +87,10 @@ use std::time::Instant;
 /// with asynchronous methods.
 pub trait System: Debug {
     /// Retrieves metadata of a file.
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat>;
+    fn fstat(&self, fd: Fd) -> Result<FileStat, Error>;
 
     /// Retrieves metadata of a file.
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat>;
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat, Error>;
 
     /// Whether there is an executable file at the specified path.
     #[must_use]
@@ -745,10 +747,10 @@ impl SharedSystem {
 }
 
 impl System for SharedSystem {
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
+    fn fstat(&self, fd: Fd) -> Result<FileStat, Error> {
         self.0.borrow().fstat(fd)
     }
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat, Error> {
         self.0.borrow().fstatat(dir_fd, path, flags)
     }
     fn is_executable_file(&self, path: &CStr) -> bool {

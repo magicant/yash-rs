@@ -126,12 +126,22 @@ impl RealSystem {
 }
 
 impl System for RealSystem {
-    fn fstat(&self, fd: Fd) -> nix::Result<FileStat> {
-        nix::sys::stat::fstat(fd.0)
+    fn fstat(&self, fd: Fd) -> Result<FileStat, Error> {
+        let mut stat = MaybeUninit::uninit();
+        unsafe {
+            let result = libc::fstat(fd.0, stat.as_mut_ptr());
+            error_m1(result)?;
+            Ok(stat.assume_init().into())
+        }
     }
 
-    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> nix::Result<FileStat> {
-        nix::sys::stat::fstatat(dir_fd.0, path, flags)
+    fn fstatat(&self, dir_fd: Fd, path: &CStr, flags: AtFlags) -> Result<FileStat, Error> {
+        let mut stat = MaybeUninit::uninit();
+        unsafe {
+            let result = libc::fstatat(dir_fd.0, path.as_ptr(), stat.as_mut_ptr(), flags.bits());
+            error_m1(result)?;
+            Ok(stat.assume_init().into())
+        }
     }
 
     fn is_executable_file(&self, path: &CStr) -> bool {

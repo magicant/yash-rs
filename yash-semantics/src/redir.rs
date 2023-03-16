@@ -95,7 +95,6 @@ use yash_env::system::Errno;
 use yash_env::system::FdFlag;
 use yash_env::system::Mode;
 use yash_env::system::OFlag;
-use yash_env::system::SFlag;
 use yash_env::Env;
 use yash_env::System;
 use yash_quote::quoted;
@@ -335,9 +334,8 @@ fn open_file_noclobber(env: &mut Env, path: Field) -> Result<(FdSpec, Location),
     // Okay, it seems there is an existing file. Try opening it.
     match env.system.open(&path, OFlag::O_WRONLY, MODE) {
         Ok(fd) => {
-            let is_regular = matches!(env.system.fstat(fd), Ok(stat)
-                    if SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT == SFlag::S_IFREG);
-            if is_regular {
+            // TODO Use Result::is_ok_and
+            if matches!(env.system.fstat(fd), Ok(stat) if stat.is_regular()) {
                 // We opened the FD without the O_CREAT flag, so somebody else
                 // must have created this file. Failure.
                 let _: Result<_, _> = env.system.close(fd);
