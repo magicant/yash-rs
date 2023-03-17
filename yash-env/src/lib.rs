@@ -291,12 +291,20 @@ impl Env {
             crate::system::OFlag::O_RDWR,
             crate::system::Mode::empty(),
         )?;
-        let final_fd =
-            self.system
-                .dup(first_fd, MIN_INTERNAL_FD, crate::system::FdFlag::FD_CLOEXEC);
+        let final_fd = self.system.dup(first_fd, MIN_INTERNAL_FD, true);
         let _ = self.system.close(first_fd);
-        self.tty = final_fd.ok();
-        final_fd
+        match final_fd {
+            Ok(fd) => {
+                self.tty = Some(fd);
+                Ok(fd)
+            }
+            Err(e) => {
+                self.tty = None;
+                Err(crate::system::Errno::from_i32(
+                    e.raw_os_error().unwrap_or_default(),
+                ))
+            }
+        }
     }
 
     /// Tests whether the shell is performing job control.

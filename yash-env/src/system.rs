@@ -110,7 +110,7 @@ pub trait System: Debug {
     /// new FD.
     ///
     /// If successful, returns `Ok(new_fd)`. On error, returns `Err(_)`.
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd>;
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Error>;
 
     /// Duplicates a file descriptor.
     ///
@@ -759,8 +759,8 @@ impl System for SharedSystem {
     fn pipe(&mut self) -> Result<(Fd, Fd), Error> {
         self.0.borrow_mut().pipe()
     }
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
-        self.0.borrow_mut().dup(from, to_min, flags)
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Error> {
+        self.0.borrow_mut().dup(from, to_min, cloexec)
     }
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
         self.0.borrow_mut().dup2(from, to)

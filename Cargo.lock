@@ -617,6 +617,7 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "itertools",
+ "libc",
  "yash-arith",
  "yash-env",
  "yash-fnmatch",

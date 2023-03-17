@@ -372,11 +372,17 @@ impl System for VirtualSystem {
         Ok((reader, writer))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Error> {
         let mut process = self.current_process_mut();
         let mut body = process.fds.get(&from).ok_or(Errno::EBADF)?.clone();
-        body.flag = flags;
-        process.open_fd_ge(to_min, body).map_err(|_| Errno::EMFILE)
+        body.flag = if cloexec {
+            FdFlag::FD_CLOEXEC
+        } else {
+            FdFlag::empty()
+        };
+        Ok(process
+            .open_fd_ge(to_min, body)
+            .map_err(|_| Errno::EMFILE)?)
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
@@ -1248,8 +1254,8 @@ mod tests {
     #[test]
     fn dup_shares_open_file_description() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::empty());
-        assert_eq!(result, Ok(Fd(3)));
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, false);
+        assert_matches!(result, Ok(Fd(3)));
 
         let process = system.current_process();
         let fd1 = process.fds.get(&Fd(1)).unwrap();
@@ -1260,8 +1266,8 @@ mod tests {
     #[test]
     fn dup_can_set_cloexec() {
         let mut system = VirtualSystem::new();
-        let result = system.dup(Fd::STDOUT, Fd::STDERR, FdFlag::FD_CLOEXEC);
-        assert_eq!(result, Ok(Fd(3)));
+        let result = system.dup(Fd::STDOUT, Fd::STDERR, true);
+        assert_matches!(result, Ok(Fd(3)));
 
         let process = system.current_process();
         let fd3 = process.fds.get(&Fd(3)).unwrap();

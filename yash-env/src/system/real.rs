@@ -157,13 +157,14 @@ impl System for RealSystem {
         Ok((Fd(reader), Fd(writer)))
     }
 
-    fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {
-        let arg = if flags.contains(FdFlag::FD_CLOEXEC) {
-            nix::fcntl::FcntlArg::F_DUPFD_CLOEXEC
+    fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Error> {
+        let command = if cloexec {
+            libc::F_DUPFD_CLOEXEC
         } else {
-            nix::fcntl::FcntlArg::F_DUPFD
+            libc::F_DUPFD
         };
-        nix::fcntl::fcntl(from.0, arg(to_min.0)).map(Fd)
+        let result = unsafe { libc::fcntl(from.0, command, to_min.0) };
+        Ok(Fd(error_m1(result)?))
     }
 
     fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
@@ -193,14 +194,13 @@ impl System for RealSystem {
     fn close(&mut self, fd: Fd) -> Result<(), Error> {
         loop {
             let result = unsafe { libc::close(fd.0) };
-            let result = error_m1(result);
-            match &result {
-                Ok(()) => return Ok(()),
+            match error_m1(result) {
+                Ok(_) => return Ok(()),
                 Err(error) => match error.raw_os_error() {
                     Some(libc::EBADF) => return Ok(()),
                     // TODO: Maybe it is a bad idea to call `close` again on `EINTR`
                     Some(libc::EINTR) => continue,
-                    _ => return result,
+                    _ => return Err(error),
                 },
             }
         }

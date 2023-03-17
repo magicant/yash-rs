@@ -20,9 +20,11 @@ use std::ffi::c_int;
 use std::io::Error;
 
 /// Returns the error from `errno` if the result is `-1`.
-pub fn error_m1(result: c_int) -> Result<(), Error> {
+///
+/// If the result is not `-1`, returns the result as `Ok`.
+pub fn error_m1(result: c_int) -> Result<c_int, Error> {
     if result != -1 {
-        Ok(())
+        Ok(result)
     } else {
         Err(Error::last_os_error())
     }

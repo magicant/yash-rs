@@ -34,7 +34,6 @@ use yash_env::stack::Frame;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
-use yash_env::system::FdFlag;
 use yash_env::system::SystemEx;
 use yash_env::Env;
 use yash_env::System;
@@ -298,8 +297,7 @@ impl PipeSet {
             env.system.close(reader)?;
             if writer != Fd::STDOUT {
                 if self.read_previous == Some(Fd::STDOUT) {
-                    self.read_previous =
-                        Some(env.system.dup(Fd::STDOUT, Fd(0), FdFlag::empty())?);
+                    self.read_previous = Some(env.system.dup(Fd::STDOUT, Fd(0), false)?);
                 }
                 env.system.dup2(writer, Fd::STDOUT)?;
                 env.system.close(writer)?;
@@ -337,6 +335,7 @@ mod tests {
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::ProcessState;
+    use yash_env::system::FdFlag;
     use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
 

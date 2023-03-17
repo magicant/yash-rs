@@ -495,17 +495,15 @@ async fn perform(
     }
 
     // Save the current open file description at target_fd to a new FD
-    let save = match env
-        .system
-        .dup(target_fd, MIN_INTERNAL_FD, FdFlag::FD_CLOEXEC)
-    {
+    let save = match env.system.dup(target_fd, MIN_INTERNAL_FD, true) {
         Ok(save_fd) => Some(save_fd),
-        Err(Errno::EBADF) => None,
-        Err(errno) => {
+        Err(error) if error.raw_os_error() == Some(libc::EBADF) => None,
+        Err(error) => {
+            let errno = Errno::from_i32(error.raw_os_error().unwrap_or_default());
             return Err(Error {
                 cause: ErrorCause::FdNotOverwritten(target_fd, errno),
                 location: redir.body.operand().location.clone(),
-            })
+            });
         }
     };
 
