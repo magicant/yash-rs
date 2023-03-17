@@ -196,11 +196,11 @@ async fn execute_multi_command_pipeline(env: &mut Env, commands: &[Rc<syntax::Co
 async fn shift_or_fail(env: &mut Env, pipes: &mut PipeSet, has_next: bool) -> Result {
     match pipes.shift(env, has_next) {
         Ok(()) => Continue(()),
-        Err(errno) => {
+        Err(error) => {
             // TODO print error location using yash_env::io::print_error
             env.print_error(&format!(
                 "cannot connect pipes in the pipeline: {}\n",
-                errno.desc()
+                error
             ))
             .await;
             Break(Divert::Interrupt(Some(ExitStatus::NOEXEC)))
@@ -267,7 +267,7 @@ impl PipeSet {
     ///
     /// Closes FDs that are no longer necessary and opens a new pipe if there is
     /// a next command.
-    fn shift(&mut self, env: &mut Env, has_next: bool) -> std::result::Result<(), Errno> {
+    fn shift(&mut self, env: &mut Env, has_next: bool) -> std::io::Result<()> {
         if let Some(fd) = self.read_previous {
             let _ = env.system.close(fd);
         }
@@ -620,7 +620,7 @@ mod tests {
         let mut pipes = PipeSet::new();
 
         let result = pipes.shift(&mut env, true);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
         assert_eq!(pipes.read_previous, None);
         assert_eq!(pipes.next, Some((Fd(3), Fd(4))));
         let state = state.borrow();
@@ -639,7 +639,7 @@ mod tests {
 
         let _ = pipes.shift(&mut env, true);
         let result = pipes.shift(&mut env, true);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
         assert_eq!(pipes.read_previous, Some(Fd(3)));
         assert_eq!(pipes.next, Some((Fd(4), Fd(5))));
         let state = state.borrow();
@@ -659,7 +659,7 @@ mod tests {
 
         let _ = pipes.shift(&mut env, true);
         let result = pipes.shift(&mut env, false);
-        assert_eq!(result, Ok(()));
+        assert!(result.is_ok(), "{:?}", result);
         assert_eq!(pipes.read_previous, Some(Fd(3)));
         assert_eq!(pipes.next, None);
         let state = state.borrow();

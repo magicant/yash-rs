@@ -330,7 +330,7 @@ impl System for VirtualSystem {
         }
     }
 
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+    fn pipe(&mut self) -> Result<(Fd, Fd), Error> {
         let file = Rc::new(RefCell::new(INode {
             body: FileBody::Fifo {
                 content: VecDeque::new(),

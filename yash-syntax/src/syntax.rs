@@ -735,6 +735,7 @@ impl TryFrom<Word> for Assign {
 /// This is the `newtype` pattern applied to [`RawFd`], which is merely a type
 /// alias.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(transparent)]
 pub struct Fd(pub RawFd);
 
 impl Fd {

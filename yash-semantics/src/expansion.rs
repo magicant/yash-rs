@@ -104,6 +104,7 @@ pub use yash_env::semantics::Field;
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorCause {
+    // TODO Replace Errno with std::io::Error
     /// System error while performing a command substitution.
     CommandSubstError(Errno),
     /// Error while evaluating an arithmetic expansion.

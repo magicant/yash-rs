@@ -50,6 +50,7 @@ use std::ffi::OsStr;
 use std::io::Error;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::os::fd::RawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
@@ -148,8 +149,12 @@ impl System for RealSystem {
         is_regular_file(path) && is_executable(path)
     }
 
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
-        nix::unistd::pipe().map(|(reader, writer)| (Fd(reader), Fd(writer)))
+    fn pipe(&mut self) -> Result<(Fd, Fd), Error> {
+        let mut fds = MaybeUninit::<[RawFd; 2]>::uninit();
+        let result = unsafe { libc::pipe(fds.as_mut_ptr().cast()) };
+        error_m1(result)?;
+        let [reader, writer] = unsafe { fds.assume_init() };
+        Ok((Fd(reader), Fd(writer)))
     }
 
     fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {

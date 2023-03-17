@@ -100,7 +100,7 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `pipe` system call.
     /// If successful, returns the reading and writing ends of the pipe.
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)>;
+    fn pipe(&mut self) -> Result<(Fd, Fd), Error>;
 
     /// Duplicates a file descriptor.
     ///
@@ -756,7 +756,7 @@ impl System for SharedSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
-    fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
+    fn pipe(&mut self) -> Result<(Fd, Fd), Error> {
         self.0.borrow_mut().pipe()
     }
     fn dup(&mut self, from: Fd, to_min: Fd, flags: FdFlag) -> nix::Result<Fd> {

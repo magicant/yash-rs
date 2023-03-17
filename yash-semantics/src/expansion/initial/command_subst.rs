@@ -45,9 +45,11 @@ where
     // Open a pipe to read the output from the command
     let (reader, writer) = match env.inner.system.pipe() {
         Ok(pipes) => pipes,
-        Err(errno) => {
+        Err(error) => {
             return Err(Error {
-                cause: ErrorCause::CommandSubstError(errno),
+                cause: ErrorCause::CommandSubstError(Errno::from_i32(
+                    error.raw_os_error().unwrap_or_default(),
+                )),
                 location,
             })
         }

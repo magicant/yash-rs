@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `syntax::Fd` to `#[repr(transparent)]`
 - `parser::Parser::command_line` to return the newly added variants of
   `SyntaxError` instead of `InvalidCommandToken` depending on the type of
   erroneous tokens.
