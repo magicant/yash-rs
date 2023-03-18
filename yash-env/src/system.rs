@@ -116,7 +116,7 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `dup2` system call. If successful,
     /// returns `Ok(to)`. On error, returns `Err(_)`.
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd>;
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd, Error>;
 
     /// Opens a file descriptor.
     ///
@@ -762,7 +762,7 @@ impl System for SharedSystem {
     fn dup(&mut self, from: Fd, to_min: Fd, cloexec: bool) -> Result<Fd, Error> {
         self.0.borrow_mut().dup(from, to_min, cloexec)
     }
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd, Error> {
         self.0.borrow_mut().dup2(from, to)
     }
     fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {

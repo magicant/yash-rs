@@ -167,12 +167,13 @@ impl System for RealSystem {
         Ok(Fd(error_m1(result)?))
     }
 
-    fn dup2(&mut self, from: Fd, to: Fd) -> nix::Result<Fd> {
+    fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd, Error> {
         loop {
-            match nix::unistd::dup2(from.0, to.0) {
+            let result = unsafe { libc::dup2(from.0, to.0) };
+            match error_m1(result) {
                 Ok(fd) => return Ok(Fd(fd)),
-                Err(Errno::EINTR) => (),
-                Err(e) => return Err(e),
+                Err(error) if error.raw_os_error() == Some(libc::EINTR) => continue,
+                Err(error) => return Err(error),
             }
         }
     }

@@ -533,7 +533,8 @@ async fn perform(
             fd_spec.close(&mut env.system);
             match dup_result {
                 Ok(new_fd) => assert_eq!(new_fd, target_fd),
-                Err(errno) => {
+                Err(error) => {
+                    let errno = Errno::from_i32(error.raw_os_error().unwrap_or_default());
                     return Err(Error {
                         cause: ErrorCause::FdNotOverwritten(target_fd, errno),
                         location,

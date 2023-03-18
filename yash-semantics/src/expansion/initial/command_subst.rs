@@ -60,7 +60,8 @@ where
         Box::pin(async move {
             env.system.close(reader).ok();
             if writer != Fd::STDOUT {
-                if let Err(errno) = env.system.dup2(writer, Fd::STDOUT) {
+                if let Err(error) = env.system.dup2(writer, Fd::STDOUT) {
+                    let errno = Errno::from_i32(error.raw_os_error().unwrap_or_default());
                     let error = Error {
                         cause: ErrorCause::CommandSubstError(errno),
                         location: original,
