@@ -27,7 +27,6 @@ use super::Errno;
 use super::FdFlag;
 use super::FdSet;
 use super::FileStat;
-use super::Mode;
 use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
@@ -178,8 +177,15 @@ impl System for RealSystem {
         }
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
-        nix::fcntl::open(path, option, mode).map(Fd)
+    fn openat(
+        &mut self,
+        dir_fd: Fd,
+        path: &CStr,
+        option: c_int,
+        mode: libc::mode_t,
+    ) -> Result<Fd, Error> {
+        let result = unsafe { libc::openat(dir_fd.0, path.as_ptr(), option, mode) };
+        Ok(Fd(error_m1(result)?))
     }
 
     fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {

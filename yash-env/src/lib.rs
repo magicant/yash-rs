@@ -286,10 +286,11 @@ impl Env {
             return Ok(fd);
         }
 
-        let first_fd = self.system.open(
+        let first_fd = self.system.openat(
+            libc::AT_FDCWD,
             CStr::from_bytes_with_nul(b"/dev/tty\0").unwrap(),
-            crate::system::OFlag::O_RDWR,
-            crate::system::Mode::empty(),
+            libc::O_RDWR,
+            0,
         )?;
         let final_fd = self.system.dup(first_fd, MIN_INTERNAL_FD, true);
         let _ = self.system.close(first_fd);

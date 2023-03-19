@@ -120,8 +120,14 @@ pub trait System: Debug {
 
     /// Opens a file descriptor.
     ///
-    /// This is a thin wrapper around the `open` system call.
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd>;
+    /// This is a thin wrapper around the `openat` system call.
+    fn openat(
+        &mut self,
+        dir_fd: Fd,
+        path: &CStr,
+        option: c_int,
+        mode: libc::mode_t,
+    ) -> Result<Fd, Error>;
 
     /// Opens a file descriptor associated with an anonymous temporary file.
     ///
@@ -765,8 +771,14 @@ impl System for SharedSystem {
     fn dup2(&mut self, from: Fd, to: Fd) -> Result<Fd, Error> {
         self.0.borrow_mut().dup2(from, to)
     }
-    fn open(&mut self, path: &CStr, option: OFlag, mode: Mode) -> nix::Result<Fd> {
-        self.0.borrow_mut().open(path, option, mode)
+    fn openat(
+        &mut self,
+        dir_fd: Fd,
+        path: &CStr,
+        option: c_int,
+        mode: libc::mode_t,
+    ) -> Result<Fd, Error> {
+        self.0.borrow_mut().openat(dir_fd, path, option, mode)
     }
     fn open_tmpfile(&mut self, parent_dir: &Path) -> nix::Result<Fd> {
         self.0.borrow_mut().open_tmpfile(parent_dir)

@@ -393,41 +393,48 @@ impl System for VirtualSystem {
         Ok(to)
     }
 
-    fn open(&mut self, path: &CStr, option: OFlag, mode: nix::sys::stat::Mode) -> nix::Result<Fd> {
+    /// The current implementation ignores the `_dir_fd` argument.
+    fn openat(
+        &mut self,
+        _dir_fd: Fd,
+        path: &CStr,
+        option: c_int,
+        mode: libc::mode_t,
+    ) -> Result<Fd, Error> {
         let path = self.resolve_relative_path(Path::new(OsStr::from_bytes(path.to_bytes())));
         let mut state = self.state.borrow_mut();
         let file = match state.file_system.get(&path) {
             Ok(inode) => {
-                if option.contains(OFlag::O_EXCL) {
-                    return Err(Errno::EEXIST);
+                if option & libc::O_EXCL != 0 {
+                    return Err(Error::from_raw_os_error(libc::EEXIST));
                 }
-                if option.contains(OFlag::O_DIRECTORY)
+                if option & libc::O_DIRECTORY != 0
                     && !matches!(inode.borrow().body, FileBody::Directory { .. })
                 {
-                    return Err(Errno::ENOTDIR);
+                    return Err(Error::from_raw_os_error(libc::ENOTDIR));
                 }
-                if option.contains(OFlag::O_TRUNC) {
+                if option & libc::O_TRUNC != 0 {
                     if let FileBody::Regular { content, .. } = &mut inode.borrow_mut().body {
                         content.clear();
                     };
                 }
                 inode
             }
-            Err(Errno::ENOENT) if option.contains(OFlag::O_CREAT) => {
+            Err(Errno::ENOENT) if option & libc::O_CREAT != 0 => {
                 let mut inode = INode::new([]);
                 // TODO Apply umask
-                inode.permissions = Mode(mode.bits());
+                inode.permissions = Mode(mode);
                 let inode = Rc::new(RefCell::new(inode));
                 state.file_system.save(&path, Rc::clone(&inode))?;
                 inode
             }
-            Err(errno) => return Err(errno),
+            Err(errno) => return Err(Error::from_raw_os_error(errno as i32)),
         };
 
-        let (is_readable, is_writable) = match option & OFlag::O_ACCMODE {
-            OFlag::O_RDONLY => (true, false),
-            OFlag::O_WRONLY => (false, true),
-            OFlag::O_RDWR => (true, true),
+        let (is_readable, is_writable) = match option & libc::O_ACCMODE {
+            libc::O_RDONLY => (true, false),
+            libc::O_WRONLY => (false, true),
+            libc::O_RDWR => (true, true),
             _ => (false, false),
         };
 
@@ -448,18 +455,20 @@ impl System for VirtualSystem {
             offset: 0,
             is_readable,
             is_writable,
-            is_appending: option.contains(OFlag::O_APPEND),
+            is_appending: option & libc::O_APPEND != 0,
         }));
         let body = FdBody {
             open_file_description,
-            flag: if option.contains(OFlag::O_CLOEXEC) {
+            flag: if option & libc::O_CLOEXEC != 0 {
                 FdFlag::FD_CLOEXEC
             } else {
                 FdFlag::empty()
             },
         };
         let process = state.processes.get_mut(&self.process_id).unwrap();
-        process.open_fd(body).map_err(|_| Errno::EMFILE)
+        process
+            .open_fd(body)
+            .map_err(|_| Error::from_raw_os_error(libc::EMFILE))
     }
 
     fn open_tmpfile(&mut self, _parent_dir: &Path) -> nix::Result<Fd> {
@@ -561,11 +570,14 @@ impl System for VirtualSystem {
 
     fn opendir(&mut self, path: &CStr) -> nix::Result<Box<dyn Dir>> {
         // TODO Should use O_SEARCH, but currently it is only supported on netbsd
-        let fd = self.open(
-            path,
-            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-            nix::sys::stat::Mode::empty(),
-        )?;
+        let fd = self
+            .openat(
+                Fd(libc::AT_FDCWD),
+                path,
+                libc::O_RDONLY | libc::O_DIRECTORY,
+                0,
+            )
+            .map_err(|error| Errno::from_i32(error.raw_os_error().unwrap_or_default()))?;
         self.fdopendir(fd)
     }
 
@@ -1305,8 +1317,9 @@ mod tests {
     fn open_non_existing_file_no_creation() {
         let mut system = VirtualSystem::new();
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("/no/such/file").unwrap(),
-            OFlag::O_RDONLY,
+            libc::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOENT));
@@ -1316,8 +1329,9 @@ mod tests {
     fn open_creating_non_existing_file() {
         let mut system = VirtualSystem::new();
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("new_file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(3)));
@@ -1335,8 +1349,9 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
+            libc::AT_FDCWD,
                 &CString::new("file").unwrap(),
-                OFlag::O_WRONLY | OFlag::O_CREAT,
+                libc::O_WRONLY | libc::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
             .unwrap();
@@ -1344,7 +1359,7 @@ mod tests {
 
         let result = system.open(
             &CString::new("file").unwrap(),
-            OFlag::O_RDONLY,
+            libc::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
@@ -1361,15 +1376,17 @@ mod tests {
     fn open_existing_file_excl() {
         let mut system = VirtualSystem::new();
         let first = system.open(
+            libc::AT_FDCWD,
             &CString::new("my_file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
+            libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(first, Ok(Fd(3)));
 
         let second = system.open(
+            libc::AT_FDCWD,
             &CString::new("my_file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL,
+            libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(second, Err(Errno::EEXIST));
@@ -1380,24 +1397,27 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
+            libc::AT_FDCWD,
                 &CString::new("file").unwrap(),
-                OFlag::O_WRONLY | OFlag::O_CREAT,
+                libc::O_WRONLY | libc::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_TRUNC,
+            libc::O_WRONLY | libc::O_TRUNC,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
 
         let reader = system
             .open(
+            libc::AT_FDCWD,
                 &CString::new("file").unwrap(),
-                OFlag::O_RDONLY,
+                libc::O_RDONLY,
                 nix::sys::stat::Mode::empty(),
             )
             .unwrap();
@@ -1410,16 +1430,18 @@ mod tests {
         let mut system = VirtualSystem::new();
         let fd = system
             .open(
+            libc::AT_FDCWD,
                 &CString::new("file").unwrap(),
-                OFlag::O_WRONLY | OFlag::O_CREAT,
+                libc::O_WRONLY | libc::O_CREAT,
                 nix::sys::stat::Mode::all(),
             )
             .unwrap();
         system.write(fd, &[1, 2, 3]).unwrap();
 
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_APPEND,
+            libc::O_WRONLY | libc::O_APPEND,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
@@ -1427,8 +1449,9 @@ mod tests {
 
         let reader = system
             .open(
+            libc::AT_FDCWD,
                 &CString::new("file").unwrap(),
-                OFlag::O_RDONLY,
+                libc::O_RDONLY,
                 nix::sys::stat::Mode::empty(),
             )
             .unwrap();
@@ -1444,14 +1467,16 @@ mod tests {
 
         // Create a regular file and its parent directory
         let _ = system.open(
+            libc::AT_FDCWD,
             &CString::new("/dir/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("/dir").unwrap(),
-            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+            libc::O_RDONLY | libc::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Ok(Fd(4)));
@@ -1463,14 +1488,16 @@ mod tests {
 
         // Create a regular file
         let _ = system.open(
+            libc::AT_FDCWD,
             &CString::new("/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("/file/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
@@ -1482,14 +1509,16 @@ mod tests {
 
         // Create a regular file
         let _ = system.open(
+            libc::AT_FDCWD,
             &CString::new("/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::empty(),
         );
 
         let result = system.open(
+            libc::AT_FDCWD,
             &CString::new("/file").unwrap(),
-            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+            libc::O_RDONLY | libc::O_DIRECTORY,
             nix::sys::stat::Mode::empty(),
         );
         assert_eq!(result, Err(Errno::ENOTDIR));
@@ -1501,15 +1530,17 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let writer = system.open(
+            libc::AT_FDCWD,
             &CString::new("/dir/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::all(),
         );
         system.write(writer.unwrap(), &[1, 2, 3, 42]).unwrap();
 
         let reader = system.open(
+            libc::AT_FDCWD,
             &CString::new("./dir/file").unwrap(),
-            OFlag::O_RDONLY,
+            libc::O_RDONLY,
             nix::sys::stat::Mode::empty(),
         );
         let mut buffer = [0; 10];
@@ -1547,15 +1578,15 @@ mod tests {
         let mut system = VirtualSystem::new();
         let mode = nix::sys::stat::Mode::all();
         let reader = system
-            .open(&CString::new("/dev/stdin").unwrap(), OFlag::O_RDONLY, mode)
+            .open(&CString::new("/dev/stdin").unwrap(), libc::O_RDONLY, mode)
             .unwrap();
         let writer = system
-            .open(&CString::new("/dev/stdout").unwrap(), OFlag::O_WRONLY, mode)
+            .open(&CString::new("/dev/stdout").unwrap(), libc::O_WRONLY, mode)
             .unwrap();
         let appender = system
             .open(
                 &CString::new("/dev/stdout").unwrap(),
-                OFlag::O_RDWR | OFlag::O_APPEND,
+                libc::O_RDWR | libc::O_APPEND,
                 mode,
             )
             .unwrap();
@@ -1596,8 +1627,9 @@ mod tests {
         let mut system = VirtualSystem::new();
 
         let _ = system.open(
+            libc::AT_FDCWD,
             &CString::new("/dir/file").unwrap(),
-            OFlag::O_WRONLY | OFlag::O_CREAT,
+            libc::O_WRONLY | libc::O_CREAT,
             nix::sys::stat::Mode::all(),
         );
 
