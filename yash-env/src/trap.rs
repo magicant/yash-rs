@@ -243,6 +243,8 @@ struct GrandState {
     internal_handler_enabled: bool,
 }
 
+// TODO Refactor by moving logic into GrandState impl
+
 /// Iterator of trap actions configured in a [trap set](TrapSet).
 ///
 /// [`TrapSet::iter`] returns this type of iterator.
@@ -380,6 +382,7 @@ impl TrapSet {
                     return Err(SetActionError::InitiallyIgnored);
                 }
                 if occupied.get().internal_handler_enabled {
+                    //TODO
                     occupied.get_mut().current_setting = Setting::UserSpecified(state);
                     return Ok(());
                 }
@@ -467,6 +470,7 @@ impl TrapSet {
             self.ignore_signal(system, Signal::SIGINT);
             self.ignore_signal(system, Signal::SIGQUIT);
         }
+        // TODO disable_terminator_handlers
     }
 
     fn ignore_signal<S: SignalSystem>(&mut self, system: &mut S, signal: Signal) {
@@ -478,6 +482,7 @@ impl TrapSet {
                     internal_handler_enabled: false,
                 });
             }
+            // TODO If occupied and internal_handler_enabled, set internal_handler_enabled to false
         }
     }
 
@@ -547,6 +552,133 @@ impl TrapSet {
         Ok(())
     }
 
+    /// Installs internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
+    ///
+    /// An interactive shell should install the handlers for these signals by
+    /// using this function.
+    ///
+    /// This function remembers that the handlers have been installed, so a second
+    /// call to the function will be a no-op.
+    pub fn enable_terminator_handlers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        // TODO Refactor similarity with enable_sigchld_handler
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGINT));
+        if let Entry::Occupied(occupied) = &entry {
+            if occupied.get().internal_handler_enabled {
+                return Ok(());
+            }
+        }
+
+        let previous_handler = system.set_signal_handling(Signal::SIGINT, SignalHandling::Catch)?;
+
+        match entry {
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().internal_handler_enabled = true;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(GrandState {
+                    current_setting: Setting::from_initial_handling(previous_handler),
+                    parent_setting: None,
+                    internal_handler_enabled: true,
+                });
+            }
+        }
+
+        // TODO Refactor
+        let mut entry = self.traps.entry(Condition::Signal(Signal::SIGTERM));
+        if let Entry::Occupied(occupied) = &mut entry {
+            if occupied.get().internal_handler_enabled {
+                return Ok(());
+            }
+            if let Setting::UserSpecified(trap) = &occupied.get().current_setting {
+                match &trap.action {
+                    Action::Default => (),
+                    Action::Ignore | Action::Command(_) => {
+                        occupied.get_mut().internal_handler_enabled = true;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        let previous_handler =
+            system.set_signal_handling(Signal::SIGTERM, SignalHandling::Ignore)?;
+
+        match entry {
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().internal_handler_enabled = true;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(GrandState {
+                    current_setting: Setting::from_initial_handling(previous_handler),
+                    parent_setting: None,
+                    internal_handler_enabled: true,
+                });
+            }
+        }
+
+        let mut entry = self.traps.entry(Condition::Signal(Signal::SIGQUIT));
+        if let Entry::Occupied(occupied) = &mut entry {
+            if occupied.get().internal_handler_enabled {
+                return Ok(());
+            }
+            if let Setting::UserSpecified(trap) = &occupied.get().current_setting {
+                match &trap.action {
+                    Action::Default => (),
+                    Action::Ignore | Action::Command(_) => {
+                        occupied.get_mut().internal_handler_enabled = true;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        let previous_handler =
+            system.set_signal_handling(Signal::SIGQUIT, SignalHandling::Ignore)?;
+
+        match entry {
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().internal_handler_enabled = true;
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(GrandState {
+                    current_setting: Setting::from_initial_handling(previous_handler),
+                    parent_setting: None,
+                    internal_handler_enabled: true,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    fn disable_internal_handler<S: SignalSystem>(
+        &mut self,
+        signal: Signal,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
+            if state.internal_handler_enabled {
+                system.set_signal_handling(signal, (&state.current_setting).into())?;
+                state.internal_handler_enabled = false;
+            }
+        }
+        Ok(())
+    }
+
+    /// Uninstalls the internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
+    pub fn disable_terminator_handlers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        for signal in [Signal::SIGINT, Signal::SIGTERM, Signal::SIGQUIT] {
+            self.disable_internal_handler(signal, system)?;
+        }
+        Ok(())
+    }
+
     /// Uninstalls all internal handlers.
     ///
     /// This function removes all internal handlers that have been previously
@@ -556,13 +688,8 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        if let Some(state) = self.traps.get_mut(&Condition::Signal(Signal::SIGCHLD)) {
-            if state.internal_handler_enabled {
-                system.set_signal_handling(Signal::SIGCHLD, (&state.current_setting).into())?;
-                state.internal_handler_enabled = false;
-            }
-        }
-        Ok(())
+        self.disable_internal_handler(Signal::SIGCHLD, system)?;
+        self.disable_terminator_handlers(system)
     }
 }
 
@@ -1021,7 +1148,7 @@ mod tests {
     }
 
     #[test]
-    fn entering_subshell_with_internal_handler() {
+    fn entering_subshell_with_internal_handler_for_sigchld() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         let action = Action::Command("".into());
@@ -1049,10 +1176,103 @@ mod tests {
                 })
             )
         );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler_for_sigint() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGINT,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
         assert_eq!(
-            system.0[&Signal::SIGCHLD],
-            crate::system::SignalHandling::Catch
+            trap_set.get_state(Signal::SIGINT),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
         );
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler_for_sigterm() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGTERM,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
+        assert_eq!(
+            trap_set.get_state(Signal::SIGTERM),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler_for_sigquit() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGQUIT,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
+        assert_eq!(
+            trap_set.get_state(Signal::SIGQUIT),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Catch);
     }
 
     #[test]
@@ -1272,42 +1492,79 @@ mod tests {
     }
 
     #[test]
-    fn disabling_internal_handler_for_initially_defaulted_sigchld() {
+    fn enabling_terminator_handlers() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enable_sigchld_handler(&mut system).unwrap();
-        trap_set.disable_internal_handlers(&mut system).unwrap();
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handler_for_initially_ignored_sigchld() {
+    fn disabling_internal_handler_for_initially_defaulted_signals() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.disable_internal_handlers(&mut system).unwrap();
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Default);
+    }
+
+    fn ignore_signals(system: &mut DummySystem) {
+        for signal in [
+            Signal::SIGCHLD,
+            Signal::SIGINT,
+            Signal::SIGTERM,
+            Signal::SIGQUIT,
+        ] {
+            system.0.insert(signal, SignalHandling::Ignore);
+        }
+    }
+
+    #[test]
+    fn disabling_internal_handler_for_initially_ignored_signals() {
+        let mut system = DummySystem::default();
+        ignore_signals(&mut system);
+        let mut trap_set = TrapSet::default();
+        trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
     fn disabling_internal_handler_after_enabling_twice() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
     fn disabling_internal_handler_without_enabling() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
@@ -1316,9 +1573,15 @@ mod tests {
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]
@@ -1336,46 +1599,69 @@ mod tests {
     #[test]
     fn resetting_trap_from_ignore_no_override_after_enabling_internal_handler() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
-        let origin = Location::dummy("origin");
-        let result =
-            trap_set.set_action(&mut system, Signal::SIGCHLD, Action::Ignore, origin, false);
-        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        for signal in [Signal::SIGCHLD, Signal::SIGINT] {
+            let origin = Location::dummy("origin");
+            let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
+            assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+            assert_eq!(system.0[&signal], SignalHandling::Catch);
+        }
+        for signal in [Signal::SIGTERM, Signal::SIGQUIT] {
+            let origin = Location::dummy("origin");
+            let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
+            assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+        }
     }
 
     #[test]
     fn resetting_trap_from_ignore_override_after_enabling_internal_handler() {
         let mut system = DummySystem::default();
-        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
-        let origin = Location::dummy("origin");
-        let result = trap_set.set_action(
-            &mut system,
-            Signal::SIGCHLD,
-            Action::Ignore,
-            origin.clone(),
-            true,
-        );
-        assert_eq!(result, Ok(()));
-        assert_eq!(
-            trap_set.get_state(Signal::SIGCHLD),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin,
-                    pending: false
-                }),
-                None
-            )
-        );
-        assert_eq!(
-            system.0[&Signal::SIGCHLD],
-            crate::system::SignalHandling::Catch
-        );
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        for signal in [Signal::SIGCHLD, Signal::SIGINT] {
+            let origin = Location::dummy("origin");
+            let result =
+                trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
+            assert_eq!(result, Ok(()));
+            assert_eq!(
+                trap_set.get_state(signal),
+                (
+                    Some(&TrapState {
+                        action: Action::Ignore,
+                        origin,
+                        pending: false
+                    }),
+                    None
+                )
+            );
+            assert_eq!(system.0[&signal], SignalHandling::Catch);
+        }
+        for signal in [Signal::SIGTERM, Signal::SIGQUIT] {
+            let origin = Location::dummy("origin");
+            let result =
+                trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
+            assert_eq!(result, Ok(()));
+            assert_eq!(
+                trap_set.get_state(signal),
+                (
+                    Some(&TrapState {
+                        action: Action::Ignore,
+                        origin,
+                        pending: false
+                    }),
+                    None
+                )
+            );
+            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+        }
     }
 
     #[test]
@@ -1383,32 +1669,38 @@ mod tests {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
         let origin = Location::dummy("origin");
-        trap_set
-            .set_action(
-                &mut system,
-                Signal::SIGCHLD,
-                Action::Ignore,
-                origin.clone(),
-                false,
-            )
-            .unwrap();
+        for signal in [
+            Signal::SIGCHLD,
+            Signal::SIGINT,
+            Signal::SIGTERM,
+            Signal::SIGQUIT,
+        ] {
+            trap_set
+                .set_action(&mut system, signal, Action::Ignore, origin.clone(), false)
+                .unwrap();
+        }
         trap_set.disable_internal_handlers(&mut system).unwrap();
 
-        assert_eq!(
-            trap_set.get_state(Signal::SIGCHLD),
-            (
-                Some(&TrapState {
-                    action: Action::Ignore,
-                    origin,
-                    pending: false
-                }),
-                None
-            )
-        );
-        assert_eq!(
-            system.0[&Signal::SIGCHLD],
-            crate::system::SignalHandling::Ignore
-        );
+        for signal in [
+            Signal::SIGCHLD,
+            Signal::SIGINT,
+            Signal::SIGTERM,
+            Signal::SIGQUIT,
+        ] {
+            assert_eq!(
+                trap_set.get_state(signal),
+                (
+                    Some(&TrapState {
+                        action: Action::Ignore,
+                        origin: origin.clone(),
+                        pending: false
+                    }),
+                    None
+                )
+            );
+            assert_eq!(system.0[&signal], SignalHandling::Ignore);
+        }
     }
 }
