@@ -33,16 +33,18 @@
 //! No signal handling is involved for conditions other than signals, and the
 //! trap set serves only as a storage for action settings.
 
+mod state;
+
+pub use self::state::{Action, SetActionError, TrapState};
+use self::state::{GrandState, Setting};
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
-use std::rc::Rc;
-use yash_syntax::source::Location;
-
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use yash_syntax::source::Location;
 
 /// System interface for signal handling configuration.
 pub trait SignalSystem {
@@ -113,134 +115,6 @@ impl std::str::FromStr for Condition {
             },
         }
     }
-}
-
-/// Action performed when a [`Condition`] is met
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub enum Action {
-    /// Performs the default action.
-    ///
-    /// For signal conditions, the behavior depends on the signal delivered.
-    /// For other conditions, this is equivalent to `Ignore`.
-    #[default]
-    Default,
-
-    /// Pretends as if the condition was not met.
-    Ignore,
-
-    /// Executes a command string.
-    Command(Rc<str>),
-}
-
-impl From<&Action> for SignalHandling {
-    fn from(trap: &Action) -> Self {
-        match trap {
-            Action::Default => SignalHandling::Default,
-            Action::Ignore => SignalHandling::Ignore,
-            Action::Command(_) => SignalHandling::Catch,
-        }
-    }
-}
-
-/// Error that may happen in [`TrapSet::set_action`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SetActionError {
-    /// Attempt to set a trap that has been ignored since the shell startup.
-    InitiallyIgnored,
-    /// Attempt to set a trap for the `SIGKILL` signal.
-    SIGKILL,
-    /// Attempt to set a trap for the `SIGSTOP` signal.
-    SIGSTOP,
-    /// Error from the underlying system interface.
-    SystemError(Errno),
-}
-
-impl std::fmt::Display for SetActionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use SetActionError::*;
-        match self {
-            InitiallyIgnored => "the signal has been ignored since startup".fmt(f),
-            SIGKILL => "cannot set a trap for SIGKILL".fmt(f),
-            SIGSTOP => "cannot set a trap for SIGSTOP".fmt(f),
-            SystemError(errno) => errno.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for SetActionError {}
-
-impl From<Errno> for SetActionError {
-    fn from(errno: Errno) -> Self {
-        SetActionError::SystemError(errno)
-    }
-}
-
-/// State of the trap action for a condition.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TrapState {
-    /// Action taken when the condition is met.
-    pub action: Action,
-    /// Location of the simple command that invoked the trap built-in that set
-    /// the current action.
-    pub origin: Location,
-    /// True iff a signal specified by the condition has been caught and the
-    /// action command has not yet executed.
-    pub pending: bool,
-}
-
-/// User-visible trap setting.
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum Setting {
-    /// The user has not yet set a trap for the signal specified by the
-    /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is `SIG_DFL`.
-    InitiallyDefaulted,
-    /// The user has not yet set a trap for the signal specified by the
-    /// condition, and the signal disposition the shell has inherited from the
-    /// pre-exec process is `SIG_IGN`.
-    InitiallyIgnored,
-    /// User-defined trap.
-    UserSpecified(TrapState),
-}
-
-impl Setting {
-    fn as_trap(&self) -> Option<&TrapState> {
-        if let Setting::UserSpecified(trap) = self {
-            Some(trap)
-        } else {
-            None
-        }
-    }
-
-    fn from_initial_handling(handling: SignalHandling) -> Self {
-        match handling {
-            SignalHandling::Default | SignalHandling::Catch => Self::InitiallyDefaulted,
-            SignalHandling::Ignore => Self::InitiallyIgnored,
-        }
-    }
-}
-
-impl From<&Setting> for SignalHandling {
-    fn from(state: &Setting) -> Self {
-        match state {
-            Setting::InitiallyDefaulted => SignalHandling::Default,
-            Setting::InitiallyIgnored => SignalHandling::Ignore,
-            Setting::UserSpecified(trap) => (&trap.action).into(),
-        }
-    }
-}
-
-/// Whole configuration and state for a trap condition.
-#[derive(Clone, Debug)]
-struct GrandState {
-    /// Setting that is effective in the current environment.
-    current_setting: Setting,
-
-    /// Setting that was effective in the parent environment.
-    parent_setting: Option<Setting>,
-
-    /// Whether the internal handler has been installed in the current environment.
-    internal_handler_enabled: bool,
 }
 
 // TODO Refactor by moving logic into GrandState impl
