@@ -33,15 +33,15 @@
 //! No signal handling is involved for conditions other than signals, and the
 //! trap set serves only as a storage for action settings.
 
+mod cond;
 mod state;
 
+pub use self::cond::{Condition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
 use self::state::{GrandState, Setting};
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
-#[doc(no_inline)]
-pub use nix::sys::signal::Signal;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use yash_syntax::source::Location;
@@ -57,64 +57,6 @@ pub trait SignalSystem {
         signal: Signal,
         handling: SignalHandling,
     ) -> Result<SignalHandling, Errno>;
-}
-
-/// Condition under which an [`Action`] is executed
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Condition {
-    /// When the shell exits
-    Exit,
-    /// When the specified signal is delivered to the shell process
-    Signal(Signal),
-}
-
-/// Conversion from `Signal` to `Condition`
-impl From<Signal> for Condition {
-    fn from(signal: Signal) -> Self {
-        Self::Signal(signal)
-    }
-}
-
-/// Conversion from `Condition` to `String`
-///
-/// The result is an uppercase string representing the condition such as
-/// `"EXIT"` and `"TERM"`.
-impl std::fmt::Display for Condition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Condition::Exit => "EXIT".fmt(f),
-            Condition::Signal(signal) => {
-                let full_name = signal.as_str();
-                let name = full_name.strip_prefix("SIG").unwrap_or(full_name);
-                name.fmt(f)
-            }
-        }
-    }
-}
-
-/// Error in conversion from string to [`Condition`]
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ParseConditionError;
-
-/// Conversion from `String` to `Condition`
-///
-/// This implementation supports parsing uppercase strings like `"EXIT"` and
-/// `"TERM"`.
-impl std::str::FromStr for Condition {
-    type Err = ParseConditionError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO Make case-insensitive
-        // TODO Allow SIG-prefix
-        // TODO Support real-time signals
-        match s {
-            "EXIT" => Ok(Self::Exit),
-            _ => match format!("SIG{s}").parse() {
-                Ok(signal) => Ok(Self::Signal(signal)),
-                Err(_) => Err(ParseConditionError),
-            },
-        }
-    }
 }
 
 // TODO Refactor by moving logic into GrandState impl
