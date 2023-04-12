@@ -16,10 +16,12 @@
 
 //! Items that manage the state of a single signal.
 
+use super::cond::Condition;
+use super::SignalSystem;
 #[cfg(doc)]
-use super::{Condition, TrapSet};
+use super::TrapSet;
 use crate::system::{Errno, SignalHandling};
-use std::rc::Rc;
+use std::{collections::btree_map::Entry, rc::Rc};
 use yash_syntax::source::Location;
 
 /// Action performed when a [`Condition`] is met
@@ -148,4 +150,213 @@ pub struct GrandState {
 
     /// Whether the internal handler has been installed in the current environment.
     pub internal_handler_enabled: bool,
+}
+
+impl GrandState {
+    /// Returns the current and parent trap states.
+    ///
+    /// This function returns a pair of optional trap states. The first is the
+    /// currently configured trap action, and the second is the action set
+    /// before [`enter_subshell`](Self::enter_subshell) was called.
+    ///
+    /// This function does not reflect the initial signal actions the shell
+    /// inherited on startup.
+    #[must_use]
+    pub fn get_state(&self) -> (Option<&TrapState>, Option<&TrapState>) {
+        let current = self.current_setting.as_trap();
+        let parent = self.parent_setting.as_ref().and_then(Setting::as_trap);
+        (current, parent)
+    }
+
+    /// Updates the entry with the new action.
+    pub fn set_action<S: SignalSystem>(
+        system: &mut S,
+        entry: Entry<Condition, GrandState>,
+        action: Action,
+        origin: Location,
+        override_ignore: bool,
+    ) -> Result<(), SetActionError> {
+        let state = TrapState {
+            action,
+            origin,
+            pending: false,
+        };
+        let cond = *entry.key();
+
+        let entry = match entry {
+            Entry::Vacant(vacant) => {
+                if let Condition::Signal(signal) = cond {
+                    if !override_ignore {
+                        let initial_handling =
+                            system.set_signal_handling(signal, SignalHandling::Ignore)?;
+                        if initial_handling == SignalHandling::Ignore {
+                            vacant.insert(GrandState {
+                                current_setting: Setting::InitiallyIgnored,
+                                parent_setting: None,
+                                internal_handler_enabled: false,
+                            });
+                            return Err(SetActionError::InitiallyIgnored);
+                        }
+                    }
+                }
+                Entry::Vacant(vacant)
+            }
+            Entry::Occupied(mut occupied) => {
+                if !override_ignore && occupied.get().current_setting == Setting::InitiallyIgnored {
+                    return Err(SetActionError::InitiallyIgnored);
+                }
+                if occupied.get().internal_handler_enabled {
+                    //TODO
+                    occupied.get_mut().current_setting = Setting::UserSpecified(state);
+                    return Ok(());
+                }
+                Entry::Occupied(occupied)
+            }
+        };
+
+        if let Condition::Signal(signal) = cond {
+            system.set_signal_handling(signal, (&state.action).into())?;
+        }
+
+        let state = GrandState {
+            current_setting: Setting::UserSpecified(state),
+            parent_setting: None,
+            internal_handler_enabled: false,
+        };
+        #[allow(clippy::drop_ref)]
+        match entry {
+            Entry::Vacant(vacant) => drop(vacant.insert(state)),
+            Entry::Occupied(mut occupied) => drop(occupied.insert(state)),
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::cond::Signal;
+    use super::super::tests::DummySystem;
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn setting_trap_to_ignore() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("origin");
+
+        let result =
+            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn setting_trap_to_command() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let action = Action::Command("echo".into());
+        let origin = Location::dummy("origin");
+
+        let result =
+            GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn setting_trap_to_default() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("foo");
+        GrandState::set_action(&mut system, entry, Action::Ignore, origin, false).unwrap();
+
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("bar");
+        let result =
+            GrandState::set_action(&mut system, entry, Action::Default, origin.clone(), false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Default,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+    }
+
+    #[test]
+    fn resetting_trap_from_ignore_no_override() {
+        let mut system = DummySystem::default();
+        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("foo");
+        let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+
+        // Idempotence
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("bar");
+        let result = GrandState::set_action(&mut system, entry, Action::Ignore, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+
+        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn resetting_trap_from_ignore_override() {
+        let mut system = DummySystem::default();
+        system.0.insert(Signal::SIGCHLD, SignalHandling::Ignore);
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("origin");
+        let result =
+            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
 }
