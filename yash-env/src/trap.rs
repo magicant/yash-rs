@@ -236,6 +236,7 @@ impl TrapSet {
                     current_setting: Setting::from_initial_handling(previous_handler),
                     parent_setting: None,
                     internal_handler_enabled: false,
+                    internal_handler: SignalHandling::Default,
                 });
             }
             // TODO If occupied and internal_handler_enabled, set internal_handler_enabled to false
@@ -283,29 +284,7 @@ impl TrapSet {
     /// call to the function will be a no-op.
     pub fn enable_sigchld_handler<S: SignalSystem>(&mut self, system: &mut S) -> Result<(), Errno> {
         let entry = self.traps.entry(Condition::Signal(Signal::SIGCHLD));
-        if let Entry::Occupied(occupied) = &entry {
-            if occupied.get().internal_handler_enabled {
-                return Ok(());
-            }
-        }
-
-        let previous_handler =
-            system.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch)?;
-
-        match entry {
-            Entry::Occupied(mut occupied) => {
-                occupied.get_mut().internal_handler_enabled = true;
-            }
-            Entry::Vacant(vacant) => {
-                vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(previous_handler),
-                    parent_setting: None,
-                    internal_handler_enabled: true,
-                });
-            }
-        }
-
-        Ok(())
+        GrandState::set_internal_handler(system, entry, SignalHandling::Catch)
     }
 
     /// Installs internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
@@ -319,95 +298,14 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        // TODO Refactor similarity with enable_sigchld_handler
         let entry = self.traps.entry(Condition::Signal(Signal::SIGINT));
-        if let Entry::Occupied(occupied) = &entry {
-            if occupied.get().internal_handler_enabled {
-                return Ok(());
-            }
-        }
+        GrandState::set_internal_handler(system, entry, SignalHandling::Catch)?;
 
-        let previous_handler = system.set_signal_handling(Signal::SIGINT, SignalHandling::Catch)?;
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGTERM));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
 
-        match entry {
-            Entry::Occupied(mut occupied) => {
-                occupied.get_mut().internal_handler_enabled = true;
-            }
-            Entry::Vacant(vacant) => {
-                vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(previous_handler),
-                    parent_setting: None,
-                    internal_handler_enabled: true,
-                });
-            }
-        }
-
-        // TODO Refactor
-        let mut entry = self.traps.entry(Condition::Signal(Signal::SIGTERM));
-        if let Entry::Occupied(occupied) = &mut entry {
-            if occupied.get().internal_handler_enabled {
-                return Ok(());
-            }
-            if let Setting::UserSpecified(trap) = &occupied.get().current_setting {
-                match &trap.action {
-                    Action::Default => (),
-                    Action::Ignore | Action::Command(_) => {
-                        occupied.get_mut().internal_handler_enabled = true;
-                        return Ok(());
-                    }
-                }
-            }
-        }
-
-        let previous_handler =
-            system.set_signal_handling(Signal::SIGTERM, SignalHandling::Ignore)?;
-
-        match entry {
-            Entry::Occupied(mut occupied) => {
-                occupied.get_mut().internal_handler_enabled = true;
-            }
-            Entry::Vacant(vacant) => {
-                vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(previous_handler),
-                    parent_setting: None,
-                    internal_handler_enabled: true,
-                });
-            }
-        }
-
-        let mut entry = self.traps.entry(Condition::Signal(Signal::SIGQUIT));
-        if let Entry::Occupied(occupied) = &mut entry {
-            if occupied.get().internal_handler_enabled {
-                return Ok(());
-            }
-            if let Setting::UserSpecified(trap) = &occupied.get().current_setting {
-                match &trap.action {
-                    Action::Default => (),
-                    Action::Ignore | Action::Command(_) => {
-                        occupied.get_mut().internal_handler_enabled = true;
-                        return Ok(());
-                    }
-                }
-            }
-        }
-
-        let previous_handler =
-            system.set_signal_handling(Signal::SIGQUIT, SignalHandling::Ignore)?;
-
-        match entry {
-            Entry::Occupied(mut occupied) => {
-                occupied.get_mut().internal_handler_enabled = true;
-            }
-            Entry::Vacant(vacant) => {
-                vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(previous_handler),
-                    parent_setting: None,
-                    internal_handler_enabled: true,
-                });
-            }
-        }
-
-        Ok(())
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGQUIT));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)
     }
 
     fn disable_internal_handler<S: SignalSystem>(
@@ -415,13 +313,8 @@ impl TrapSet {
         signal: Signal,
         system: &mut S,
     ) -> Result<(), Errno> {
-        if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
-            if state.internal_handler_enabled {
-                system.set_signal_handling(signal, (&state.current_setting).into())?;
-                state.internal_handler_enabled = false;
-            }
-        }
-        Ok(())
+        let entry = self.traps.entry(Condition::Signal(signal));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Default)
     }
 
     /// Uninstalls the internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.

@@ -142,14 +142,19 @@ impl From<&Setting> for SignalHandling {
 /// Whole configuration and state for a trap condition.
 #[derive(Clone, Debug)]
 pub struct GrandState {
+    // TODO Make the fields private
     /// Setting that is effective in the current environment.
     pub current_setting: Setting,
 
     /// Setting that was effective in the parent environment.
     pub parent_setting: Option<Setting>,
 
+    // TODO Remove this in favor of internal_handler
     /// Whether the internal handler has been installed in the current environment.
     pub internal_handler_enabled: bool,
+
+    /// Current internal handler configuration
+    pub internal_handler: SignalHandling,
 }
 
 impl GrandState {
@@ -176,14 +181,15 @@ impl GrandState {
         origin: Location,
         override_ignore: bool,
     ) -> Result<(), SetActionError> {
-        let state = TrapState {
+        let cond = *entry.key();
+        let setting = Setting::UserSpecified(TrapState {
             action,
             origin,
             pending: false,
-        };
-        let cond = *entry.key();
+        });
+        let handling = (&setting).into();
 
-        let entry = match entry {
+        match entry {
             Entry::Vacant(vacant) => {
                 if let Condition::Signal(signal) = cond {
                     if !override_ignore {
@@ -194,39 +200,83 @@ impl GrandState {
                                 current_setting: Setting::InitiallyIgnored,
                                 parent_setting: None,
                                 internal_handler_enabled: false,
+                                internal_handler: SignalHandling::Default,
                             });
                             return Err(SetActionError::InitiallyIgnored);
                         }
                     }
+
+                    if override_ignore || handling != SignalHandling::Ignore {
+                        system.set_signal_handling(signal, handling)?;
+                    }
                 }
-                Entry::Vacant(vacant)
+
+                vacant.insert(GrandState {
+                    current_setting: setting,
+                    parent_setting: None,
+                    internal_handler_enabled: false,
+                    internal_handler: SignalHandling::Default,
+                });
             }
+
             Entry::Occupied(mut occupied) => {
-                if !override_ignore && occupied.get().current_setting == Setting::InitiallyIgnored {
+                let state = occupied.get_mut();
+                if !override_ignore && state.current_setting == Setting::InitiallyIgnored {
                     return Err(SetActionError::InitiallyIgnored);
                 }
-                if occupied.get().internal_handler_enabled {
-                    //TODO
-                    occupied.get_mut().current_setting = Setting::UserSpecified(state);
-                    return Ok(());
-                }
-                Entry::Occupied(occupied)
-            }
-        };
 
-        if let Condition::Signal(signal) = cond {
-            system.set_signal_handling(signal, (&state.action).into())?;
+                if let Condition::Signal(signal) = cond {
+                    let old_handler = state.internal_handler.max((&state.current_setting).into());
+                    let new_handler = state.internal_handler.max(handling);
+                    if old_handler != new_handler {
+                        system.set_signal_handling(signal, new_handler)?;
+                    }
+                }
+
+                state.current_setting = setting;
+            }
         }
 
-        let state = GrandState {
-            current_setting: Setting::UserSpecified(state),
-            parent_setting: None,
-            internal_handler_enabled: false,
+        Ok(())
+    }
+
+    /// Sets the internal handler.
+    ///
+    /// The condition of the given entry must be a signal.
+    pub fn set_internal_handler<S: SignalSystem>(
+        system: &mut S,
+        entry: Entry<Condition, GrandState>,
+        handling: SignalHandling,
+    ) -> Result<(), Errno> {
+        let signal = match *entry.key() {
+            Condition::Signal(signal) => signal,
+            Condition::Exit => panic!("exit condition cannot have an internal handler"),
         };
-        #[allow(clippy::drop_ref)]
+
         match entry {
-            Entry::Vacant(vacant) => drop(vacant.insert(state)),
-            Entry::Occupied(mut occupied) => drop(occupied.insert(state)),
+            Entry::Vacant(_) if handling == SignalHandling::Default => (),
+
+            Entry::Vacant(vacant) => {
+                let initial_handling = system.set_signal_handling(signal, handling)?;
+                vacant.insert(GrandState {
+                    current_setting: Setting::from_initial_handling(initial_handling),
+                    parent_setting: None,
+                    internal_handler_enabled: true,
+                    internal_handler: handling,
+                });
+            }
+
+            Entry::Occupied(mut occupied) => {
+                let state = occupied.get_mut();
+                let setting = (&state.current_setting).into();
+                let old_handler = state.internal_handler.max(setting);
+                let new_handler = handling.max(setting);
+                if old_handler != new_handler {
+                    system.set_signal_handling(signal, new_handler)?;
+                }
+                state.internal_handler_enabled = handling != SignalHandling::Default;
+                state.internal_handler = handling;
+            }
         }
 
         Ok(())
@@ -238,10 +288,11 @@ mod tests {
     use super::super::cond::Signal;
     use super::super::tests::DummySystem;
     use super::*;
+    use assert_matches::assert_matches;
     use std::collections::BTreeMap;
 
     #[test]
-    fn setting_trap_to_ignore() {
+    fn setting_trap_to_ignore_without_override_ignore() {
         let mut system = DummySystem::default();
         let mut map = BTreeMap::new();
         let entry = map.entry(Signal::SIGCHLD.into());
@@ -249,6 +300,30 @@ mod tests {
 
         let result =
             GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn setting_trap_to_ignore_with_override_ignore() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("origin");
+
+        let result =
+            GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), true);
         assert_eq!(result, Ok(()));
         assert_eq!(
             map[&Signal::SIGCHLD.into()].get_state(),
@@ -358,5 +433,110 @@ mod tests {
             )
         );
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn internal_handler_ignore() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+
+        let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn internal_handler_catch() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+
+        let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn action_ignore_and_internal_handler_catch() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("origin");
+        let _ = GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false);
+        let entry = map.entry(Signal::SIGCHLD.into());
+
+        let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
+        assert_eq!(result, Ok(()));
+        assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
+            assert_eq!(state.action, Action::Ignore);
+            assert_eq!(state.origin, origin);
+        });
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn action_catch_and_internal_handler_ignore() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGCHLD.into());
+        let origin = Location::dummy("origin");
+        let action = Action::Command("echo".into());
+        let _ = GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
+        let entry = map.entry(Signal::SIGCHLD.into());
+
+        let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
+        assert_eq!(result, Ok(()));
+        assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
+            assert_eq!(state.action, action);
+            assert_eq!(state.origin, origin);
+        });
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn set_internal_handler_for_initially_defaulted_signal_then_allow_override() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGTTOU.into());
+        let _ = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
+        let entry = map.entry(Signal::SIGTTOU.into());
+        let origin = Location::dummy("origin");
+        let action = Action::Command("echo".into());
+
+        let result =
+            GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGTTOU.into()].get_state(),
+            (
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn set_internal_handler_for_initially_ignored_signal_then_reject_override() {
+        let mut system = DummySystem::default();
+        system.0.insert(Signal::SIGTTOU, SignalHandling::Ignore);
+        let mut map = BTreeMap::new();
+        let entry = map.entry(Signal::SIGTTOU.into());
+        let _ = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
+        let entry = map.entry(Signal::SIGTTOU.into());
+        let origin = Location::dummy("origin");
+        let action = Action::Command("echo".into());
+
+        let result = GrandState::set_action(&mut system, entry, action, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+        assert_eq!(map[&Signal::SIGTTOU.into()].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 }
