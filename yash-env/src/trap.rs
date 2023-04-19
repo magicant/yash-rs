@@ -166,7 +166,7 @@ impl TrapSet {
 
     fn clear_parent_settings(&mut self) {
         for state in self.traps.values_mut() {
-            state.parent_setting = None;
+            state.clear_parent_setting();
         }
     }
 

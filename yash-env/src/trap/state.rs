@@ -173,6 +173,11 @@ impl GrandState {
         (current, parent)
     }
 
+    /// Clears the parent trap state.
+    pub fn clear_parent_setting(&mut self) {
+        self.parent_setting = None;
+    }
+
     /// Updates the entry with the new action.
     pub fn set_action<S: SignalSystem>(
         system: &mut S,
@@ -539,4 +544,6 @@ mod tests {
         assert_eq!(map[&Signal::SIGTTOU.into()].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
+
+    // TODO Test clear_parent_setting
 }
