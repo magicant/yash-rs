@@ -38,7 +38,7 @@ mod state;
 
 pub use self::cond::{Condition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
-use self::state::{GrandState, Setting};
+use self::state::{EnterSubshellOption, GrandState, Setting};
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
@@ -198,48 +198,33 @@ impl TrapSet {
     ///
     /// If `ignore_sigint_sigquit` is true, this function sets the signal
     /// handlings for SIGINT and SIGQUIT to `Ignore`.
+    ///
+    /// ## Errors
+    ///
+    /// This function ignores any errors that may occur when setting signal
+    /// handlings.
     pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S, ignore_sigint_sigquit: bool) {
         self.clear_parent_settings();
 
-        for (cond, state) in &mut self.traps {
-            let Setting::UserSpecified(trap) = &state.current_setting else { continue; };
-            let Action::Command(_) = &trap.action else { continue; };
-
-            state.parent_setting = Some(std::mem::replace(
-                &mut state.current_setting,
-                Setting::InitiallyDefaulted,
-            ));
-
-            let &Condition::Signal(signal) = cond else { continue; };
-            if ignore_sigint_sigquit && (signal == Signal::SIGINT || signal == Signal::SIGQUIT) {
-                continue;
-            }
-
-            if !state.internal_handler_enabled {
-                system
-                    .set_signal_handling(signal, SignalHandling::Default)
-                    .ok();
-            }
+        for (&cond, state) in &mut self.traps {
+            let option = match cond {
+                Condition::Signal(Signal::SIGCHLD) => EnterSubshellOption::KeepInternalHandler,
+                Condition::Signal(Signal::SIGINT | Signal::SIGQUIT) if ignore_sigint_sigquit => {
+                    EnterSubshellOption::Ignore
+                }
+                Condition::Signal(_) | Condition::Exit => EnterSubshellOption::ClearInternalHandler,
+            };
+            _ = state.enter_subshell(system, cond, option);
         }
 
         if ignore_sigint_sigquit {
-            self.ignore_signal(system, Signal::SIGINT);
-            self.ignore_signal(system, Signal::SIGQUIT);
-        }
-        // TODO disable_terminator_handlers
-    }
-
-    fn ignore_signal<S: SignalSystem>(&mut self, system: &mut S, signal: Signal) {
-        if let Ok(previous_handler) = system.set_signal_handling(signal, SignalHandling::Ignore) {
-            if let Entry::Vacant(vacant) = self.traps.entry(signal.into()) {
-                vacant.insert(GrandState {
-                    current_setting: Setting::from_initial_handling(previous_handler),
-                    parent_setting: None,
-                    internal_handler_enabled: false,
-                    internal_handler: SignalHandling::Default,
-                });
+            for signal in [Signal::SIGINT, Signal::SIGQUIT] {
+                match self.traps.entry(signal.into()) {
+                    Entry::Vacant(vacant) => _ = GrandState::ignore(system, vacant),
+                    // If the entry is occupied, the signal is already ignored in the loop above.
+                    Entry::Occupied(_) => {}
+                }
             }
-            // TODO If occupied and internal_handler_enabled, set internal_handler_enabled to false
         }
     }
 
@@ -706,7 +691,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Default);
     }
 
     #[test]
@@ -738,7 +723,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Default);
     }
 
     #[test]
@@ -770,7 +755,7 @@ mod tests {
                 })
             )
         );
-        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Catch);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Default);
     }
 
     #[test]
@@ -853,7 +838,7 @@ mod tests {
     }
 
     #[test]
-    fn ignoring_sigint_on_entering_subshell() {
+    fn ignoring_sigint_on_entering_subshell_with_action_set() {
         in_virtual_system(|mut env, state| async move {
             env.traps
                 .set_action(
@@ -878,7 +863,7 @@ mod tests {
     }
 
     #[test]
-    fn ignoring_sigquit_on_entering_subshell() {
+    fn ignoring_sigquit_on_entering_subshell_with_action_set() {
         in_virtual_system(|mut env, state| async move {
             env.traps
                 .set_action(
@@ -902,6 +887,15 @@ mod tests {
             );
             assert_eq!(process.state(), ProcessState::Running);
         })
+    }
+
+    #[test]
+    fn ignoring_sigint_and_sigquit_on_entering_subshell_without_action_set() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        trap_set.enter_subshell(&mut system, true);
+        assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
     }
 
     #[test]

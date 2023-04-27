@@ -21,7 +21,8 @@ use super::SignalSystem;
 #[cfg(doc)]
 use super::TrapSet;
 use crate::system::{Errno, SignalHandling};
-use std::{collections::btree_map::Entry, rc::Rc};
+use std::collections::btree_map::{Entry, VacantEntry};
+use std::rc::Rc;
 use yash_syntax::source::Location;
 
 /// Action performed when a [`Condition`] is met
@@ -121,6 +122,16 @@ impl Setting {
         }
     }
 
+    fn is_user_defined_command(&self) -> bool {
+        matches!(
+            self,
+            Setting::UserSpecified(TrapState {
+                action: Action::Command(_),
+                ..
+            })
+        )
+    }
+
     pub fn from_initial_handling(handling: SignalHandling) -> Self {
         match handling {
             SignalHandling::Default | SignalHandling::Catch => Self::InitiallyDefaulted,
@@ -137,6 +148,18 @@ impl From<&Setting> for SignalHandling {
             Setting::UserSpecified(trap) => (&trap.action).into(),
         }
     }
+}
+
+/// Option for [`GrandState::enter_subshell`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnterSubshellOption {
+    /// Keeps the current internal handler configuration.
+    KeepInternalHandler,
+    /// Resets the internal handler configuration to the default.
+    ClearInternalHandler,
+    /// Resets the internal handler configuration to the default and sets the
+    /// signal handling to `Ignore`.
+    Ignore,
 }
 
 /// Whole configuration and state for a trap condition.
@@ -284,6 +307,76 @@ impl GrandState {
             }
         }
 
+        Ok(())
+    }
+
+    /// Updates the trap states and gets ready for executing the body a
+    /// subshell.
+    ///
+    /// If the current state has a user-specified command
+    /// (`Action::Command(_)`), it is saved in the parent state and reset to the
+    /// default. Additionally, the signal handling is updated depending on the
+    /// `option`.
+    pub fn enter_subshell<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+        cond: Condition,
+        option: EnterSubshellOption,
+    ) -> Result<(), Errno> {
+        let old_setting = (&self.current_setting).into();
+        let old_handler = self.internal_handler.max(old_setting);
+
+        if self.current_setting.is_user_defined_command() {
+            self.parent_setting = Some(std::mem::replace(
+                &mut self.current_setting,
+                Setting::InitiallyDefaulted,
+            ));
+        }
+
+        let new_setting = (&self.current_setting).into();
+        let new_handler = match option {
+            EnterSubshellOption::KeepInternalHandler => self.internal_handler.max(new_setting),
+            EnterSubshellOption::ClearInternalHandler => new_setting,
+            EnterSubshellOption::Ignore => SignalHandling::Ignore,
+        };
+        if old_handler != new_handler {
+            if let Condition::Signal(signal) = cond {
+                system.set_signal_handling(signal, new_handler)?;
+            }
+        }
+        self.internal_handler = match option {
+            EnterSubshellOption::KeepInternalHandler => self.internal_handler,
+            EnterSubshellOption::ClearInternalHandler | EnterSubshellOption::Ignore => {
+                SignalHandling::Default
+            }
+        };
+        Ok(())
+    }
+
+    /// Sets the handling to ignore for the given signal condition.
+    ///
+    /// This function creates a new entry having `Setting::InitiallyDefaulted`
+    /// or `Setting::InitiallyIgnored` based on the current setting.
+    ///
+    /// You should call this function in place of [`Self::enter_subshell`] if
+    /// there is no entry for the condition yet.
+    ///
+    /// This function panics if the condition is not a signal.
+    pub fn ignore<S: SignalSystem>(
+        system: &mut S,
+        vacant: VacantEntry<Condition, GrandState>,
+    ) -> Result<(), Errno> {
+        let signal = match *vacant.key() {
+            Condition::Signal(signal) => signal,
+            Condition::Exit => panic!("exit condition cannot be ignored"),
+        };
+        let initial_handling = system.set_signal_handling(signal, SignalHandling::Ignore)?;
+        vacant.insert(GrandState {
+            current_setting: Setting::from_initial_handling(initial_handling),
+            parent_setting: None,
+            internal_handler_enabled: false,
+            internal_handler: SignalHandling::Default,
+        });
         Ok(())
     }
 }
@@ -545,5 +638,282 @@ mod tests {
         assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
-    // TODO Test clear_parent_setting
+    #[test]
+    fn enter_subshell_with_internal_handler_keeping_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        GrandState::set_internal_handler(&mut system, map.entry(cond), SignalHandling::Catch)
+            .unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::KeepInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
+    }
+
+    #[test]
+    fn enter_subshell_with_internal_handler_clearing_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        let entry = map.entry(cond);
+        GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::ClearInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+    }
+
+    #[test]
+    fn enter_subshell_with_ignore_and_no_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::KeepInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn enter_subshell_with_ignore_clearing_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        GrandState::set_action(&mut system, entry, Action::Ignore, origin.clone(), false).unwrap();
+        let entry = map.entry(cond);
+        GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::ClearInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                Some(&TrapState {
+                    action: Action::Ignore,
+                    origin,
+                    pending: false
+                }),
+                None
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn enter_subshell_with_command_and_no_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::ClearInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
+    }
+
+    #[test]
+    fn enter_subshell_with_command_keeping_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGTSTP.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false).unwrap();
+        let entry = map.entry(cond);
+        GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::KeepInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn enter_subshell_with_command_clearing_internal_handler() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGTSTP.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false).unwrap();
+        let entry = map.entry(cond);
+        GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::ClearInternalHandler,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Default);
+    }
+
+    #[test]
+    fn enter_subshell_with_command_ignoring() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGQUIT.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false).unwrap();
+
+        let result = map.get_mut(&cond).unwrap().enter_subshell(
+            &mut system,
+            cond,
+            EnterSubshellOption::Ignore,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&cond].get_state(),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                }),
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn ignoring_initially_defaulted_signal() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGQUIT.into();
+        let entry = map.entry(cond);
+        let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
+
+        let result = GrandState::ignore(&mut system, vacant);
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        let result = GrandState::set_action(&mut system, entry, action, origin, false);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn ignoring_initially_ignored_signal() {
+        let mut system = DummySystem::default();
+        system.0.insert(Signal::SIGQUIT, SignalHandling::Ignore);
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGQUIT.into();
+        let entry = map.entry(cond);
+        let vacant = assert_matches!(entry, Entry::Vacant(vacant) => vacant);
+
+        let result = GrandState::ignore(&mut system, vacant);
+        assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].get_state(), (None, None));
+        assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        let result = GrandState::set_action(&mut system, entry, action, origin, false);
+        assert_eq!(result, Err(SetActionError::InitiallyIgnored));
+    }
+
+    #[test]
+    fn clearing_parent_setting() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGCHLD.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action, origin, false).unwrap();
+        let state = map.get_mut(&cond).unwrap();
+        state
+            .enter_subshell(&mut system, cond, EnterSubshellOption::ClearInternalHandler)
+            .unwrap();
+
+        state.clear_parent_setting();
+        assert_eq!(state.get_state(), (None, None));
+    }
 }
