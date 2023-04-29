@@ -172,10 +172,6 @@ pub struct GrandState {
     /// Setting that was effective in the parent environment.
     pub parent_setting: Option<Setting>,
 
-    // TODO Remove this in favor of internal_handler
-    /// Whether the internal handler has been installed in the current environment.
-    pub internal_handler_enabled: bool,
-
     /// Current internal handler configuration
     pub internal_handler: SignalHandling,
 }
@@ -227,7 +223,6 @@ impl GrandState {
                             vacant.insert(GrandState {
                                 current_setting: Setting::InitiallyIgnored,
                                 parent_setting: None,
-                                internal_handler_enabled: false,
                                 internal_handler: SignalHandling::Default,
                             });
                             return Err(SetActionError::InitiallyIgnored);
@@ -242,7 +237,6 @@ impl GrandState {
                 vacant.insert(GrandState {
                     current_setting: setting,
                     parent_setting: None,
-                    internal_handler_enabled: false,
                     internal_handler: SignalHandling::Default,
                 });
             }
@@ -289,7 +283,6 @@ impl GrandState {
                 vacant.insert(GrandState {
                     current_setting: Setting::from_initial_handling(initial_handling),
                     parent_setting: None,
-                    internal_handler_enabled: true,
                     internal_handler: handling,
                 });
             }
@@ -302,7 +295,6 @@ impl GrandState {
                 if old_handler != new_handler {
                     system.set_signal_handling(signal, new_handler)?;
                 }
-                state.internal_handler_enabled = handling != SignalHandling::Default;
                 state.internal_handler = handling;
             }
         }
@@ -374,7 +366,6 @@ impl GrandState {
         vacant.insert(GrandState {
             current_setting: Setting::from_initial_handling(initial_handling),
             parent_setting: None,
-            internal_handler_enabled: false,
             internal_handler: SignalHandling::Default,
         });
         Ok(())
