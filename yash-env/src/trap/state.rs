@@ -165,15 +165,14 @@ pub enum EnterSubshellOption {
 /// Whole configuration and state for a trap condition.
 #[derive(Clone, Debug)]
 pub struct GrandState {
-    // TODO Make the fields private
     /// Setting that is effective in the current environment.
-    pub current_setting: Setting,
+    current_setting: Setting,
 
     /// Setting that was effective in the parent environment.
-    pub parent_setting: Option<Setting>,
+    parent_setting: Option<Setting>,
 
     /// Current internal handler configuration
-    pub internal_handler: SignalHandling,
+    internal_handler: SignalHandling,
 }
 
 impl GrandState {
@@ -369,6 +368,26 @@ impl GrandState {
             internal_handler: SignalHandling::Default,
         });
         Ok(())
+    }
+
+    /// Marks this signal as caught.
+    ///
+    /// This function does nothing unless a user-specified trap action is set.
+    pub fn mark_as_caught(&mut self) {
+        if let Setting::UserSpecified(state) = &mut self.current_setting {
+            state.pending = true;
+        }
+    }
+
+    /// Clears the mark of this signal being caught and returns the trap state.
+    pub fn handle_if_caught(&mut self) -> Option<&TrapState> {
+        match &mut self.current_setting {
+            Setting::UserSpecified(trap) if trap.pending => {
+                trap.pending = false;
+                Some(trap)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -906,5 +925,35 @@ mod tests {
 
         state.clear_parent_setting();
         assert_eq!(state.get_state(), (None, None));
+    }
+
+    #[test]
+    fn marking_as_caught_and_handling() {
+        let mut system = DummySystem::default();
+        let mut map = BTreeMap::new();
+        let cond = Signal::SIGUSR1.into();
+        let entry = map.entry(cond);
+        let origin = Location::dummy("foo");
+        let action = Action::Command("echo".into());
+        GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false).unwrap();
+
+        let state = &mut map.get_mut(&cond).unwrap();
+        state.mark_as_caught();
+        let expected_trap = TrapState {
+            action,
+            origin,
+            pending: true,
+        };
+        assert_eq!(state.get_state(), (Some(&expected_trap), None));
+
+        let trap = state.handle_if_caught();
+        let expected_trap = TrapState {
+            pending: false,
+            ..expected_trap
+        };
+        assert_eq!(trap, Some(&expected_trap));
+
+        let trap = state.handle_if_caught();
+        assert_eq!(trap, None);
     }
 }

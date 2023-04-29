@@ -38,7 +38,7 @@ mod state;
 
 pub use self::cond::{Condition, ParseConditionError, Signal};
 pub use self::state::{Action, SetActionError, TrapState};
-use self::state::{EnterSubshellOption, GrandState, Setting};
+use self::state::{EnterSubshellOption, GrandState};
 use crate::system::{Errno, SignalHandling};
 #[cfg(doc)]
 use crate::system::{SharedSystem, System};
@@ -58,8 +58,6 @@ pub trait SignalSystem {
         handling: SignalHandling,
     ) -> Result<SignalHandling, Errno>;
 }
-
-// TODO Refactor by moving logic into GrandState impl
 
 /// Iterator of trap actions configured in a [trap set](TrapSet).
 ///
@@ -234,9 +232,7 @@ impl TrapSet {
     /// [set](Self::set_action) for the signal.
     pub fn catch_signal(&mut self, signal: Signal) {
         if let Some(state) = self.traps.get_mut(&Condition::Signal(signal)) {
-            if let Setting::UserSpecified(trap) = &mut state.current_setting {
-                trap.pending = true;
-            }
+            state.mark_as_caught();
         }
     }
 
@@ -248,15 +244,10 @@ impl TrapSet {
     /// If there is more than one caught signal, it is unspecified which one of
     /// them is returned. If there is no caught signal, `None` is returned.
     pub fn take_caught_signal(&mut self) -> Option<(Signal, &TrapState)> {
-        self.traps
-            .iter_mut()
-            .find_map(|(cond, state)| match (cond, &mut state.current_setting) {
-                (Condition::Signal(signal), Setting::UserSpecified(trap)) if trap.pending => {
-                    trap.pending = false;
-                    Some((*signal, &*trap))
-                }
-                _ => None,
-            })
+        self.traps.iter_mut().find_map(|(&cond, state)| match cond {
+            Condition::Signal(signal) => state.handle_if_caught().map(|trap| (signal, trap)),
+            _ => None,
+        })
     }
 
     /// Installs an internal handler for `SIGCHLD`.
