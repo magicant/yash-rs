@@ -161,14 +161,14 @@ mod tests {
     fn empty_input() {
         let ifs = Ifs::default();
         let ranges = ifs.ranges([]).collect::<Vec<_>>();
-        assert_eq!(ranges, []);
+        assert_eq!(ranges, [] as [Range<usize>; 0]);
     }
 
     #[test]
     fn input_containing_whitespace_separators_only() {
         let ifs = Ifs::default();
         let ranges = ifs.ranges(attr_chars(" \n\t")).collect::<Vec<_>>();
-        assert_eq!(ranges, []);
+        assert_eq!(ranges, [] as [Range<usize>; 0]);
     }
 
     #[test]
@@ -176,7 +176,7 @@ mod tests {
         let ifs = Ifs::new("-");
 
         let ranges = ifs.ranges(attr_chars("")).collect::<Vec<_>>();
-        assert_eq!(ranges, []);
+        assert_eq!(ranges, [] as [Range<usize>; 0]);
 
         let ranges = ifs.ranges(attr_chars("-")).collect::<Vec<_>>();
         assert_eq!(ranges, [0..0]);
