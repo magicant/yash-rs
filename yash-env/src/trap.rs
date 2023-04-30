@@ -192,6 +192,11 @@ impl TrapSet {
     ///
     /// Note that trap actions other than `Trap::Command` remain as before.
     ///
+    /// ## Clearing internal handlers
+    ///
+    /// Internal handlers that have been installed are cleared except for the
+    /// SIGCHLD handler.
+    ///
     /// ## Ignoring SIGINT and SIGQUIT
     ///
     /// If `ignore_sigint_sigquit` is true, this function sets the signal
@@ -254,7 +259,8 @@ impl TrapSet {
     ///
     /// You should install the `SIGCHLD` handler to the system by using this
     /// function before waiting for `SIGCHLD` with [`System::wait`] and
-    /// [`SharedSystem::wait_for_signal`].
+    /// [`SharedSystem::wait_for_signal`]. The handler allows catching
+    /// `SIGCHLD`.
     ///
     /// This function remembers that the handler has been installed, so a second
     /// call to the function will be a no-op.
@@ -266,7 +272,8 @@ impl TrapSet {
     /// Installs internal handlers for `SIGINT`, `SIGTERM`, and `SIGQUIT`.
     ///
     /// An interactive shell should install the handlers for these signals by
-    /// using this function.
+    /// using this function. The `SIGINT` handler allows catching `SIGINT` and
+    /// the `SIGTERM` and `SIGQUIT` handlers ignore the signals.
     ///
     /// This function remembers that the handlers have been installed, so a second
     /// call to the function will be a no-op.
@@ -298,10 +305,9 @@ impl TrapSet {
         &mut self,
         system: &mut S,
     ) -> Result<(), Errno> {
-        for signal in [Signal::SIGINT, Signal::SIGTERM, Signal::SIGQUIT] {
-            self.disable_internal_handler(signal, system)?;
-        }
-        Ok(())
+        self.disable_internal_handler(Signal::SIGINT, system)?;
+        self.disable_internal_handler(Signal::SIGTERM, system)?;
+        self.disable_internal_handler(Signal::SIGQUIT, system)
     }
 
     /// Uninstalls all internal handlers.
