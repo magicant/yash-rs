@@ -291,6 +291,27 @@ impl TrapSet {
         GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)
     }
 
+    /// Installs internal handlers for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
+    ///
+    /// An interactive job-controlling shell should install the handlers for
+    /// these signals by using this function. The handlers ignore the signals.
+    ///
+    /// This function remembers that the handlers have been installed, so a
+    /// second call to the function will be a no-op.
+    pub fn enable_stopper_handlers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGTSTP));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
+
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGTTIN));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)?;
+
+        let entry = self.traps.entry(Condition::Signal(Signal::SIGTTOU));
+        GrandState::set_internal_handler(system, entry, SignalHandling::Ignore)
+    }
+
     fn disable_internal_handler<S: SignalSystem>(
         &mut self,
         signal: Signal,
@@ -310,6 +331,16 @@ impl TrapSet {
         self.disable_internal_handler(Signal::SIGQUIT, system)
     }
 
+    /// Uninstalls the internal handlers for `SIGTSTP`, `SIGTTIN`, and `SIGTTOU`.
+    pub fn disable_stopper_handlers<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+    ) -> Result<(), Errno> {
+        self.disable_internal_handler(Signal::SIGTSTP, system)?;
+        self.disable_internal_handler(Signal::SIGTTIN, system)?;
+        self.disable_internal_handler(Signal::SIGTTOU, system)
+    }
+
     /// Uninstalls all internal handlers.
     ///
     /// This function removes all internal handlers that have been previously
@@ -320,7 +351,8 @@ impl TrapSet {
         system: &mut S,
     ) -> Result<(), Errno> {
         self.disable_internal_handler(Signal::SIGCHLD, system)?;
-        self.disable_terminator_handlers(system)
+        self.disable_terminator_handlers(system)?;
+        self.disable_stopper_handlers(system)
     }
 }
 
@@ -756,6 +788,102 @@ mod tests {
     }
 
     #[test]
+    fn entering_subshell_with_internal_handler_for_sigtstp() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGTSTP,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
+        assert_eq!(
+            trap_set.get_state(Signal::SIGTSTP),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Default);
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler_for_sigttin() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGTTIN,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
+        assert_eq!(
+            trap_set.get_state(Signal::SIGTTIN),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Default);
+    }
+
+    #[test]
+    fn entering_subshell_with_internal_handler_for_sigttou() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let action = Action::Command("".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(
+                &mut system,
+                Signal::SIGTTOU,
+                action.clone(),
+                origin.clone(),
+                false,
+            )
+            .unwrap();
+        trap_set.enable_terminator_handlers(&mut system).unwrap();
+
+        trap_set.enter_subshell(&mut system, false);
+        assert_eq!(
+            trap_set.get_state(Signal::SIGTTOU),
+            (
+                None,
+                Some(&TrapState {
+                    action,
+                    origin,
+                    pending: false
+                })
+            )
+        );
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Default);
+    }
+
+    #[test]
     fn setting_trap_after_entering_subshell_clears_parent_states() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
@@ -991,45 +1119,59 @@ mod tests {
     }
 
     #[test]
-    fn disabling_internal_handler_for_initially_defaulted_signals() {
+    fn enabling_stopper_handlers() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn disabling_internal_handlers_for_initially_defaulted_signals() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Default);
         assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Default);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Default);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Default);
     }
 
     fn ignore_signals(system: &mut DummySystem) {
-        for signal in [
-            Signal::SIGCHLD,
-            Signal::SIGINT,
-            Signal::SIGTERM,
-            Signal::SIGQUIT,
-        ] {
+        use Signal::*;
+        for signal in [SIGCHLD, SIGINT, SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             system.0.insert(signal, SignalHandling::Ignore);
         }
     }
 
     #[test]
-    fn disabling_internal_handler_for_initially_ignored_signals() {
+    fn disabling_internal_handlers_for_initially_ignored_signals() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handler_after_enabling_twice() {
+    fn disabling_internal_handlers_after_enabling_twice() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
@@ -1037,15 +1179,20 @@ mod tests {
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
     #[test]
-    fn disabling_internal_handler_without_enabling() {
+    fn disabling_internal_handlers_without_enabling() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
@@ -1054,23 +1201,32 @@ mod tests {
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
     #[test]
-    fn reenabling_internal_handler() {
+    fn reenabling_internal_handlers() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
         trap_set.disable_internal_handlers(&mut system).unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Catch);
         assert_eq!(system.0[&Signal::SIGTERM], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTSTP], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTIN], SignalHandling::Ignore);
+        assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
     #[test]
@@ -1086,20 +1242,22 @@ mod tests {
     }
 
     #[test]
-    fn resetting_trap_from_ignore_no_override_after_enabling_internal_handler() {
+    fn resetting_trap_from_ignore_no_override_after_enabling_internal_handlers() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
 
-        for signal in [Signal::SIGCHLD, Signal::SIGINT] {
+        use Signal::*;
+        for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
             let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
             assert_eq!(system.0[&signal], SignalHandling::Catch);
         }
-        for signal in [Signal::SIGTERM, Signal::SIGQUIT] {
+        for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
             let result = trap_set.set_action(&mut system, signal, Action::Default, origin, false);
             assert_eq!(result, Err(SetActionError::InitiallyIgnored));
@@ -1108,14 +1266,16 @@ mod tests {
     }
 
     #[test]
-    fn resetting_trap_from_ignore_override_after_enabling_internal_handler() {
+    fn resetting_trap_from_ignore_override_after_enabling_internal_handlers() {
         let mut system = DummySystem::default();
         ignore_signals(&mut system);
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
+        trap_set.enable_stopper_handlers(&mut system).unwrap();
 
-        for signal in [Signal::SIGCHLD, Signal::SIGINT] {
+        use Signal::*;
+        for signal in [SIGCHLD, SIGINT] {
             let origin = Location::dummy("origin");
             let result =
                 trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
@@ -1133,7 +1293,7 @@ mod tests {
             );
             assert_eq!(system.0[&signal], SignalHandling::Catch);
         }
-        for signal in [Signal::SIGTERM, Signal::SIGQUIT] {
+        for signal in [SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU] {
             let origin = Location::dummy("origin");
             let result =
                 trap_set.set_action(&mut system, signal, Action::Ignore, origin.clone(), true);
@@ -1155,29 +1315,22 @@ mod tests {
 
     #[test]
     fn disabling_internal_handler_with_ignore_trap() {
+        use Signal::*;
+        let signals = [SIGCHLD, SIGINT, SIGTERM, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU];
+
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
         let origin = Location::dummy("origin");
-        for signal in [
-            Signal::SIGCHLD,
-            Signal::SIGINT,
-            Signal::SIGTERM,
-            Signal::SIGQUIT,
-        ] {
+        for signal in signals {
             trap_set
                 .set_action(&mut system, signal, Action::Ignore, origin.clone(), false)
                 .unwrap();
         }
         trap_set.disable_internal_handlers(&mut system).unwrap();
 
-        for signal in [
-            Signal::SIGCHLD,
-            Signal::SIGINT,
-            Signal::SIGTERM,
-            Signal::SIGQUIT,
-        ] {
+        for signal in signals {
             assert_eq!(
                 trap_set.get_state(signal),
                 (
