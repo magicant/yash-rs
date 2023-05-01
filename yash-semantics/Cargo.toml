@@ -25,8 +25,8 @@ itertools = "0.10.5"
 yash-arith = { path = "../yash-arith", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-fnmatch = { path = "../yash-fnmatch", version = "1.1.0" }
-yash-quote = { path = "../yash-quote", version = "1.0.1" }
-yash-syntax = { path = "../yash-syntax", version = "0.6.0" }
+yash-quote = { path = "../yash-quote", version = "1.1.0" }
+yash-syntax = { path = "../yash-syntax", version = "0.6.1" }
 
 [dev-dependencies]
 futures-executor = "0.3.27"
