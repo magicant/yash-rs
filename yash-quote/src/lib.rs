@@ -45,12 +45,11 @@
 //! ```
 //!
 //! ```
-//! # use std::borrow::Cow::{Borrowed, Owned};
 //! # use yash_quote::quote;
-//! assert_eq!(quote("foo"), Borrowed("foo"));
-//! assert_eq!(quote(""), Owned::<str>("''".to_owned()));
-//! assert_eq!(quote("$foo"), Owned::<str>("'$foo'".to_owned()));
-//! assert_eq!(quote("'$foo'"), Owned::<str>(r#""'\$foo'""#.to_owned()));
+//! assert_eq!(quote("foo"), "foo");
+//! assert_eq!(quote(""), "''");
+//! assert_eq!(quote("$foo"), "'$foo'");
+//! assert_eq!(quote("'$foo'"), r#""'\$foo'""#);
 //! ```
 
 use std::borrow::Cow::{self, Borrowed, Owned};
@@ -181,7 +180,7 @@ pub fn quoted(raw: &str) -> Quoted {
 
 /// Quotes the argument.
 ///
-/// If the argument needs no quoting, the return value is `Borrowed(s)`.
+/// If the argument needs no quoting, the return value is `Borrowed(raw)`.
 /// Otherwise, it is `Owned(new_quoted_string)`.
 ///
 /// See the [module doc](self) for more details.
