@@ -362,7 +362,7 @@ pub trait System: Debug {
 pub const AT_FDCWD: Fd = Fd(nix::libc::AT_FDCWD);
 
 /// How to handle a signal.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SignalHandling {
     /// Perform the default action for the signal.
     #[default]
