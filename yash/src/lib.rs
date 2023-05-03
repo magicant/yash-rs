@@ -27,7 +27,8 @@ pub use yash_syntax::{alias, parser, source, syntax};
 
 // TODO Allow user to select input source
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
-    use env::option::State::Off;
+    use env::option::Option::{Interactive, Monitor};
+    use env::option::State::{Off, On};
     use std::cell::Cell;
     use std::num::NonZeroU64;
     use std::rc::Rc;
@@ -39,6 +40,20 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     let mut args = std::env::args();
     if let Some(arg0) = args.next() {
         env.arg0 = arg0;
+
+        for arg in args {
+            match arg.as_str() {
+                "-i" => {
+                    env.options.set(Interactive, On);
+                    _ = env.traps.enable_terminator_handlers(&mut env.system);
+                }
+                "-m" => {
+                    env.options.set(Monitor, On);
+                    _ = env.traps.enable_stopper_handlers(&mut env.system);
+                }
+                _ => todo!("sorry, this argument is not yet supported: {arg:?}"),
+            }
+        }
     }
 
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
