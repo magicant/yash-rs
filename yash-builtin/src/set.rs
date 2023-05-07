@@ -142,6 +142,36 @@ use yash_env::Env;
 
 pub mod arg;
 
+/// Enables or disables stopper handlers depending on the `Monitor` option
+/// state.
+fn update_stopper_handlers(env: &mut Env) {
+    _ = match env.options.get(yash_env::option::Monitor) {
+        State::On => env.traps.enable_stopper_handlers(&mut env.system),
+        State::Off => env.traps.disable_stopper_handlers(&mut env.system),
+    }
+}
+
+/// Modifies shell options and positional parameters.
+fn modify(
+    env: &mut Env,
+    options: Vec<(yash_env::option::Option, State)>,
+    positional_params: Option<Vec<Field>>,
+) {
+    // Modify options
+    for (option, state) in options {
+        env.options.set(option, state);
+    }
+    update_stopper_handlers(env);
+
+    // Modify positional parameters
+    if let Some(fields) = positional_params {
+        let location = env.builtin_name().origin.clone();
+        let params = env.variables.positional_params_mut();
+        params.value = Some(Array(fields.into_iter().map(|f| f.value).collect()));
+        params.last_assigned_location = Some(location);
+    }
+}
+
 /// Implementation of the set built-in.
 pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     match arg::parse(args) {
@@ -186,19 +216,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
             options,
             positional_params,
         }) => {
-            // Modify options
-            for (option, state) in options {
-                env.options.set(option, state);
-            }
-
-            // Modify positional parameters
-            if let Some(fields) = positional_params {
-                let location = env.builtin_name().origin.clone();
-                let params = env.variables.positional_params_mut();
-                params.value = Some(Array(fields.into_iter().map(|f| f.value).collect()));
-                params.last_assigned_location = Some(location);
-            }
-
+            modify(env, options, positional_params);
             Result::new(ExitStatus::SUCCESS)
         }
 
@@ -225,6 +243,8 @@ mod tests {
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
     use yash_env::stack::Frame;
+    use yash_env::system::SignalHandling;
+    use yash_env::trap::Signal::SIGTSTP;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
@@ -369,5 +389,43 @@ xtrace           off
         assert_eq!(v.value, Some(Value::array(["a", "b", "z"])));
         assert_eq!(v.read_only_location, None);
         assert_eq!(v.last_assigned_location.as_ref().unwrap(), &location);
+    }
+
+    #[test]
+    fn enabling_monitor_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Interactive, On);
+        let args = Field::dummies(["-m"]);
+
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        let mut expected_options = OptionSet::default();
+        expected_options.extend([Interactive, Monitor]);
+        assert_eq!(env.options, expected_options);
+        let state = state.borrow();
+        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
+        assert_eq!(handling, SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn disabling_monitor_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Box::new(system));
+        env.options.set(Interactive, On);
+        let args = Field::dummies(["-m"]);
+        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let args = Field::dummies(["+m"]);
+
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        let mut expected_options = OptionSet::default();
+        expected_options.set(Interactive, On);
+        assert_eq!(env.options, expected_options);
+        let state = state.borrow();
+        let handling = state.processes[&env.main_pid].signal_handling(SIGTSTP);
+        assert_eq!(handling, SignalHandling::Default);
     }
 }

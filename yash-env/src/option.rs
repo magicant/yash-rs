@@ -469,6 +469,12 @@ impl OptionSet {
     }
 }
 
+impl Extend<Option> for OptionSet {
+    fn extend<T: IntoIterator<Item = Option>>(&mut self, iter: T) {
+        self.enabled_options.extend(iter);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
