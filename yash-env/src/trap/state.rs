@@ -261,6 +261,12 @@ impl GrandState {
         Ok(())
     }
 
+    /// Returns the current internal handler.
+    #[must_use]
+    pub fn internal_handler(&self) -> SignalHandling {
+        self.internal_handler
+    }
+
     /// Sets the internal handler.
     ///
     /// The condition of the given entry must be a signal.
@@ -551,6 +557,10 @@ mod tests {
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
         assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].internal_handler(),
+            SignalHandling::Ignore
+        );
         assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Ignore);
     }
@@ -563,6 +573,10 @@ mod tests {
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
         assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].internal_handler(),
+            SignalHandling::Catch
+        );
         assert_eq!(map[&Signal::SIGCHLD.into()].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
     }
@@ -578,6 +592,10 @@ mod tests {
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Catch);
         assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].internal_handler(),
+            SignalHandling::Catch
+        );
         assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, Action::Ignore);
             assert_eq!(state.origin, origin);
@@ -597,6 +615,10 @@ mod tests {
 
         let result = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
         assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].internal_handler(),
+            SignalHandling::Ignore
+        );
         assert_matches!(map[&Signal::SIGCHLD.into()].get_state(), (Some(state), None) => {
             assert_eq!(state.action, action);
             assert_eq!(state.origin, origin);
@@ -618,6 +640,10 @@ mod tests {
             GrandState::set_action(&mut system, entry, action.clone(), origin.clone(), false);
         assert_eq!(result, Ok(()));
         assert_eq!(
+            map[&Signal::SIGTTOU.into()].internal_handler(),
+            SignalHandling::Ignore
+        );
+        assert_eq!(
             map[&Signal::SIGTTOU.into()].get_state(),
             (
                 Some(&TrapState {
@@ -636,15 +662,17 @@ mod tests {
         let mut system = DummySystem::default();
         system.0.insert(Signal::SIGTTOU, SignalHandling::Ignore);
         let mut map = BTreeMap::new();
-        let entry = map.entry(Signal::SIGTTOU.into());
+        let cond = Signal::SIGTTOU.into();
+        let entry = map.entry(cond);
         let _ = GrandState::set_internal_handler(&mut system, entry, SignalHandling::Ignore);
-        let entry = map.entry(Signal::SIGTTOU.into());
+        let entry = map.entry(cond);
         let origin = Location::dummy("origin");
         let action = Action::Command("echo".into());
 
         let result = GrandState::set_action(&mut system, entry, action, origin, false);
         assert_eq!(result, Err(SetActionError::InitiallyIgnored));
-        assert_eq!(map[&Signal::SIGTTOU.into()].get_state(), (None, None));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Ignore);
+        assert_eq!(map[&cond].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGTTOU], SignalHandling::Ignore);
     }
 
@@ -662,6 +690,7 @@ mod tests {
             EnterSubshellOption::KeepInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Catch);
         assert_eq!(map[&cond].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Catch);
     }
@@ -680,6 +709,10 @@ mod tests {
             EnterSubshellOption::ClearInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(
+            map[&Signal::SIGCHLD.into()].internal_handler(),
+            SignalHandling::Default
+        );
         assert_eq!(map[&cond].get_state(), (None, None));
         assert_eq!(system.0[&Signal::SIGCHLD], SignalHandling::Default);
     }
@@ -699,6 +732,7 @@ mod tests {
             EnterSubshellOption::KeepInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Default);
         assert_eq!(
             map[&cond].get_state(),
             (
@@ -730,6 +764,7 @@ mod tests {
             EnterSubshellOption::ClearInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Default);
         assert_eq!(
             map[&cond].get_state(),
             (
@@ -760,6 +795,7 @@ mod tests {
             EnterSubshellOption::ClearInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Default);
         assert_eq!(
             map[&cond].get_state(),
             (
@@ -792,6 +828,7 @@ mod tests {
             EnterSubshellOption::KeepInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Ignore);
         assert_eq!(
             map[&cond].get_state(),
             (
@@ -824,6 +861,7 @@ mod tests {
             EnterSubshellOption::ClearInternalHandler,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Default);
         assert_eq!(
             map[&cond].get_state(),
             (
@@ -854,6 +892,7 @@ mod tests {
             EnterSubshellOption::Ignore,
         );
         assert_eq!(result, Ok(()));
+        assert_eq!(map[&cond].internal_handler(), SignalHandling::Default);
         assert_eq!(
             map[&cond].get_state(),
             (
