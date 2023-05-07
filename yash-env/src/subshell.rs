@@ -158,6 +158,7 @@ where
         let ignores_sigint_sigquit = self.ignores_sigint_sigquit
             && job_control.is_none()
             && mask_guard.block_sigint_sigquit();
+        let keeps_stopper_handlers = false;
 
         // Define the child process task
         const ME: Pid = Pid::from_raw(0);
@@ -180,8 +181,11 @@ where
                     }
                 }
 
-                env.traps
-                    .enter_subshell(&mut env.system, ignores_sigint_sigquit);
+                env.traps.enter_subshell(
+                    &mut env.system,
+                    ignores_sigint_sigquit,
+                    keeps_stopper_handlers,
+                );
 
                 let result = (self.task)(env, job_control).await;
                 env.apply_result(result);
