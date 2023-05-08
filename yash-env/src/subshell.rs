@@ -106,6 +106,13 @@ where
     /// actual job control status of the subshell by the second return value of
     /// [`start`](Self::start) in the parent environment and the second argument
     /// passed to the task in the subshell environment.
+    ///
+    /// If the parent process is a job-controlling interactive shell, but the
+    /// subshell is not job-controlled, the subshell's signal handlings for
+    /// SIGTSTP, SIGTTIN, and SIGTTOU are set to `Ignore`. This is to prevent
+    /// the subshell from being stopped by a job-stopping signal. Were the
+    /// subshell stopped, you could never resume it since it is not
+    /// job-controlled.
     pub fn job_control<J: Into<Option<JobControl>>>(mut self, job_control: J) -> Self {
         self.job_control = job_control.into();
         self
@@ -158,7 +165,7 @@ where
         let ignores_sigint_sigquit = self.ignores_sigint_sigquit
             && job_control.is_none()
             && mask_guard.block_sigint_sigquit();
-        let keeps_stopper_handlers = false;
+        let keeps_stopper_handlers = job_control.is_none();
 
         // Define the child process task
         const ME: Pid = Pid::from_raw(0);
@@ -301,7 +308,7 @@ impl<'a> Drop for MaskGuard<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::option::Option::Monitor;
+    use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
     use crate::system::r#virtual::INode;
@@ -313,6 +320,7 @@ mod tests {
     use crate::trap::Signal::SIGCHLD;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
+    use nix::sys::signal::Signal::{SIGTSTP, SIGTTIN, SIGTTOU};
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Continue;
@@ -689,6 +697,161 @@ mod tests {
             let process = &state.processes[&child_pid];
             assert_eq!(process.signal_handling(SIGINT), SignalHandling::Default);
             assert_eq!(process.signal_handling(SIGQUIT), SignalHandling::Default);
+        })
+    }
+
+    #[test]
+    fn stopper_handlers_kept_in_uncontrolled_subshell_of_controlling_interactive_shell() {
+        in_virtual_system(|mut parent_env, state| async move {
+            parent_env.options.set(Interactive, On);
+            parent_env.options.set(Monitor, On);
+            parent_env
+                .traps
+                .enable_stopper_handlers(&mut parent_env.system)
+                .unwrap();
+            stub_tty(&state);
+
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+
+            let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+
+            let state = state.borrow();
+            let child_process = &state.processes[&child_pid];
+            assert_eq!(
+                child_process.signal_handling(SIGTSTP),
+                SignalHandling::Ignore
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTIN),
+                SignalHandling::Ignore
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTOU),
+                SignalHandling::Ignore
+            );
+        })
+    }
+
+    #[test]
+    fn stopper_handlers_reset_in_controlled_subshell_of_controlling_interactive_shell() {
+        in_virtual_system(|mut parent_env, state| async move {
+            parent_env.options.set(Interactive, On);
+            parent_env.options.set(Monitor, On);
+            parent_env
+                .traps
+                .enable_stopper_handlers(&mut parent_env.system)
+                .unwrap();
+            stub_tty(&state);
+
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Background)
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+
+            let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+
+            let state = state.borrow();
+            let child_process = &state.processes[&child_pid];
+            assert_eq!(
+                child_process.signal_handling(SIGTSTP),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTIN),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTOU),
+                SignalHandling::Default
+            );
+        })
+    }
+
+    #[test]
+    fn stopper_handlers_not_set_in_subshell_of_non_controlling_interactive_shell() {
+        in_virtual_system(|mut parent_env, state| async move {
+            parent_env.options.set(Interactive, On);
+            stub_tty(&state);
+
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+
+            let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+
+            let state = state.borrow();
+            let child_process = &state.processes[&child_pid];
+            assert_eq!(
+                child_process.signal_handling(SIGTSTP),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTIN),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTOU),
+                SignalHandling::Default
+            );
+        })
+    }
+
+    #[test]
+    fn stopper_handlers_not_set_in_uncontrolled_subshell_of_controlling_non_interactive_shell() {
+        in_virtual_system(|mut parent_env, state| async move {
+            parent_env.options.set(Monitor, On);
+            stub_tty(&state);
+
+            let (child_pid, _) = Subshell::new(|env, _job_control| {
+                Box::pin(async move {
+                    env.exit_status = ExitStatus(123);
+                    Continue(())
+                })
+            })
+            .start(&mut parent_env)
+            .await
+            .unwrap();
+
+            let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
+            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+
+            let state = state.borrow();
+            let child_process = &state.processes[&child_pid];
+            assert_eq!(
+                child_process.signal_handling(SIGTSTP),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTIN),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                child_process.signal_handling(SIGTTOU),
+                SignalHandling::Default
+            );
         })
     }
 }
