@@ -202,17 +202,34 @@ impl TrapSet {
     /// If `ignore_sigint_sigquit` is true, this function sets the signal
     /// handlings for SIGINT and SIGQUIT to `Ignore`.
     ///
+    /// ## Ignoring SIGTSTP, SIGTTIN, and SIGTTOU
+    ///
+    /// If `keep_stopper_handlers` is true and the stopper handlers have been
+    /// [enabled](Self::enable_stopper_handlers), this function leaves the
+    /// signal handlings for SIGTSTP, SIGTTIN, and SIGTTOU set to `Ignore`.
+    ///
     /// ## Errors
     ///
     /// This function ignores any errors that may occur when setting signal
     /// handlings.
-    pub fn enter_subshell<S: SignalSystem>(&mut self, system: &mut S, ignore_sigint_sigquit: bool) {
+    pub fn enter_subshell<S: SignalSystem>(
+        &mut self,
+        system: &mut S,
+        ignore_sigint_sigquit: bool,
+        keep_stopper_handlers: bool,
+    ) {
         self.clear_parent_settings();
 
         for (&cond, state) in &mut self.traps {
             let option = match cond {
                 Condition::Signal(Signal::SIGCHLD) => EnterSubshellOption::KeepInternalHandler,
                 Condition::Signal(Signal::SIGINT | Signal::SIGQUIT) if ignore_sigint_sigquit => {
+                    EnterSubshellOption::Ignore
+                }
+                Condition::Signal(Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU)
+                    if keep_stopper_handlers
+                        && state.internal_handler() != SignalHandling::Default =>
+                {
                     EnterSubshellOption::Ignore
                 }
                 Condition::Signal(_) | Condition::Exit => EnterSubshellOption::ClearInternalHandler,
@@ -545,7 +562,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
 
         let mut i = trap_set.iter();
         let first = i.next().unwrap();
@@ -570,7 +587,7 @@ mod tests {
         trap_set
             .set_action(&mut system, Signal::SIGUSR1, command, origin_1, false)
             .unwrap();
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         let origin_2 = Location::dummy("bar");
         let command = Action::Command("ls".into());
         trap_set
@@ -608,7 +625,7 @@ mod tests {
             )
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGCHLD),
             (
@@ -641,7 +658,7 @@ mod tests {
             )
             .unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGCHLD),
             (
@@ -676,7 +693,7 @@ mod tests {
             .unwrap();
         trap_set.enable_sigchld_handler(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGCHLD),
             (
@@ -708,7 +725,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGINT),
             (
@@ -740,7 +757,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGTERM),
             (
@@ -772,7 +789,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGQUIT),
             (
@@ -804,7 +821,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGTSTP),
             (
@@ -836,7 +853,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGTTIN),
             (
@@ -868,7 +885,7 @@ mod tests {
             .unwrap();
         trap_set.enable_terminator_handlers(&mut system).unwrap();
 
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
         assert_eq!(
             trap_set.get_state(Signal::SIGTTOU),
             (
@@ -897,7 +914,7 @@ mod tests {
         trap_set
             .set_action(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
 
         let command = Action::Command("echo 9".into());
         let origin_3 = Location::dummy("qux");
@@ -947,8 +964,8 @@ mod tests {
         trap_set
             .set_action(&mut system, Signal::SIGUSR2, command, origin_2, false)
             .unwrap();
-        trap_set.enter_subshell(&mut system, false);
-        trap_set.enter_subshell(&mut system, false);
+        trap_set.enter_subshell(&mut system, false, false);
+        trap_set.enter_subshell(&mut system, false, false);
 
         assert_eq!(trap_set.get_state(Signal::SIGUSR1), (None, None));
         assert_eq!(trap_set.get_state(Signal::SIGUSR2), (None, None));
@@ -975,7 +992,7 @@ mod tests {
                 )
                 .unwrap();
             env.system.kill(env.main_pid, Some(Signal::SIGINT)).unwrap();
-            env.traps.enter_subshell(&mut env.system, true);
+            env.traps.enter_subshell(&mut env.system, true, false);
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1002,7 +1019,7 @@ mod tests {
             env.system
                 .kill(env.main_pid, Some(Signal::SIGQUIT))
                 .unwrap();
-            env.traps.enter_subshell(&mut env.system, true);
+            env.traps.enter_subshell(&mut env.system, true, false);
 
             let state = state.borrow();
             let process = &state.processes[&env.main_pid];
@@ -1018,9 +1035,80 @@ mod tests {
     fn ignoring_sigint_and_sigquit_on_entering_subshell_without_action_set() {
         let mut system = DummySystem::default();
         let mut trap_set = TrapSet::default();
-        trap_set.enter_subshell(&mut system, true);
+        trap_set.enter_subshell(&mut system, true, false);
         assert_eq!(system.0[&Signal::SIGINT], SignalHandling::Ignore);
         assert_eq!(system.0[&Signal::SIGQUIT], SignalHandling::Ignore);
+    }
+
+    #[test]
+    fn keeping_stopper_handlers_ignored() {
+        in_virtual_system(|mut env, state| async move {
+            for signal in [Signal::SIGTSTP, Signal::SIGTTIN, Signal::SIGTTOU] {
+                env.traps
+                    .set_action(
+                        &mut env.system,
+                        signal,
+                        Action::Command("".into()),
+                        Location::dummy(""),
+                        false,
+                    )
+                    .unwrap();
+            }
+            env.traps.enable_stopper_handlers(&mut env.system).unwrap();
+            for signal in [Signal::SIGTSTP, Signal::SIGTTIN, Signal::SIGTTOU] {
+                env.system.kill(env.main_pid, Some(signal)).unwrap();
+            }
+            env.traps.enter_subshell(&mut env.system, false, true);
+
+            let state = state.borrow();
+            let process = &state.processes[&env.main_pid];
+            assert_eq!(
+                process.signal_handling(Signal::SIGTSTP),
+                SignalHandling::Ignore
+            );
+            assert_eq!(
+                process.signal_handling(Signal::SIGTTIN),
+                SignalHandling::Ignore
+            );
+            assert_eq!(
+                process.signal_handling(Signal::SIGTTOU),
+                SignalHandling::Ignore
+            );
+            assert_eq!(process.state(), ProcessState::Running);
+        })
+    }
+
+    #[test]
+    fn no_stopper_handlers_enabled_to_keep_ignored() {
+        in_virtual_system(|mut env, state| async move {
+            for signal in [Signal::SIGTSTP, Signal::SIGTTIN, Signal::SIGTTOU] {
+                env.traps
+                    .set_action(
+                        &mut env.system,
+                        signal,
+                        Action::Command("".into()),
+                        Location::dummy(""),
+                        false,
+                    )
+                    .unwrap();
+            }
+            env.traps.enter_subshell(&mut env.system, false, true);
+
+            let state = state.borrow();
+            let process = &state.processes[&env.main_pid];
+            assert_eq!(
+                process.signal_handling(Signal::SIGTSTP),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                process.signal_handling(Signal::SIGTTIN),
+                SignalHandling::Default
+            );
+            assert_eq!(
+                process.signal_handling(Signal::SIGTTOU),
+                SignalHandling::Default
+            );
+        })
     }
 
     #[test]
