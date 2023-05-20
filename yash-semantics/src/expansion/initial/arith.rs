@@ -23,7 +23,6 @@ use super::super::ErrorCause;
 use super::Env;
 use super::Error;
 use crate::expansion::expand_text;
-use std::convert::Infallible;
 use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;
@@ -128,13 +127,17 @@ impl ArithError {
     }
 }
 
+/// Error expanding an unset variable
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct UnsetVariable;
+
 /// Converts `yash_arith::ErrorCause` into `initial::ErrorCause`.
 ///
 /// The `source` argument must be the arithmetic expression being expanded.
 /// It is used to reproduce a location contained in the error cause.
 #[must_use]
-pub fn convert_error_cause(
-    cause: yash_arith::ErrorCause<Infallible, ReadOnlyError>,
+fn convert_error_cause(
+    cause: yash_arith::ErrorCause<UnsetVariable, ReadOnlyError>,
     source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
@@ -182,7 +185,7 @@ pub fn convert_error_cause(
             }
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
-            yash_arith::EvalError::GetVariableError(e) => match e {},
+            yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
             yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
         },
     }
@@ -195,11 +198,11 @@ struct VarEnv<'a> {
 }
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
-    type GetVariableError = Infallible;
+    type GetVariableError = UnsetVariable;
     type AssignVariableError = ReadOnlyError;
 
     #[rustfmt::skip]
-    fn get_variable(&self, name: &str) -> Result<Option<&str>, Infallible> {
+    fn get_variable(&self, name: &str) -> Result<Option<&str>, UnsetVariable> {
         if let Some(Variable { value: Some(Scalar(value)), .. }) = self.env.variables.get(name) {
             Ok(Some(value))
         } else {
