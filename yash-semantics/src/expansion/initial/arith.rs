@@ -26,6 +26,8 @@ use crate::expansion::expand_text;
 use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;
+use yash_env::option::Option::Unset;
+use yash_env::option::State::{Off, On};
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
@@ -206,7 +208,12 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
         if let Some(Variable { value: Some(Scalar(value)), .. }) = self.env.variables.get(name) {
             Ok(Some(value))
         } else {
-            Ok(None)
+            match self.env.options.get(Unset) {
+                // TODO If the variable exists but is not scalar, UnsetVariable
+                // does not seem to be the right error.
+                Off => Err(UnsetVariable),
+                On => Ok(None),
+            }
         }
     }
 
@@ -289,6 +296,56 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
+    use yash_env::variable::Scope::Global;
+
+    #[test]
+    fn var_env_get_variable_success() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(Global, "v".to_string(), Variable::new("value"))
+            .unwrap();
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Ok(Some("value")));
+    }
+
+    #[test]
+    fn var_env_get_variable_unset() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Ok(None));
+    }
+
+    #[test]
+    fn var_env_get_variable_nounset() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Unset, Off);
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Err(UnsetVariable));
+    }
 
     #[test]
     fn successful_inner_text_expansion() {
