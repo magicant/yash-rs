@@ -22,11 +22,20 @@ use std::ops::Range;
 
 /// Interface for accessing variables during evaluation
 pub trait Env {
+    /// Object returned on a variable access error
+    type GetVariableError;
+
     /// Object returned on an assignment error
     type AssignVariableError;
 
     /// Returns the value of the specified variable.
-    fn get_variable(&self, name: &str) -> Option<&str>;
+    ///
+    /// This function must return:
+    ///
+    /// - `Ok(Some(v))` if the variable is defined and has the value `v`,
+    /// - `Ok(None)` if the variable is not defined, or
+    /// - `Err(error)` if an error occurs.
+    fn get_variable(&self, name: &str) -> Result<Option<&str>, Self::GetVariableError>;
 
     /// Assigns a new value to the specified variable.
     ///
@@ -41,10 +50,11 @@ pub trait Env {
 }
 
 impl Env for HashMap<String, String> {
+    type GetVariableError = Infallible;
     type AssignVariableError = Infallible;
 
-    fn get_variable(&self, name: &str) -> Option<&str> {
-        self.get(name).map(String::as_str)
+    fn get_variable(&self, name: &str) -> Result<Option<&str>, Infallible> {
+        Ok(self.get(name).map(String::as_str))
     }
 
     fn assign_variable(
@@ -59,10 +69,11 @@ impl Env for HashMap<String, String> {
 }
 
 impl Env for BTreeMap<String, String> {
+    type GetVariableError = Infallible;
     type AssignVariableError = Infallible;
 
-    fn get_variable(&self, name: &str) -> Option<&str> {
-        self.get(name).map(String::as_str)
+    fn get_variable(&self, name: &str) -> Result<Option<&str>, Infallible> {
+        Ok(self.get(name).map(String::as_str))
     }
 
     fn assign_variable(

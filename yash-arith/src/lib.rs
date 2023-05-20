@@ -57,14 +57,18 @@ pub use eval::EvalError;
 
 /// Cause of an arithmetic expansion error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ErrorCause<E> {
+pub enum ErrorCause<E1, E2> {
     /// Syntax error parsing the expression
     SyntaxError(SyntaxError),
     /// Error evaluating the parsed expression
-    EvalError(EvalError<E>),
+    EvalError(EvalError<E1, E2>),
 }
 
-impl<E: Display> Display for ErrorCause<E> {
+impl<E1, E2> Display for ErrorCause<E1, E2>
+where
+    E1: Display,
+    E2: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorCause::*;
         match self {
@@ -74,42 +78,51 @@ impl<E: Display> Display for ErrorCause<E> {
     }
 }
 
-impl<E> From<TokenError> for ErrorCause<E> {
+impl<E1, E2> From<TokenError> for ErrorCause<E1, E2> {
     fn from(e: TokenError) -> Self {
         ErrorCause::SyntaxError(e.into())
     }
 }
 
-impl<E> From<SyntaxError> for ErrorCause<E> {
+impl<E1, E2> From<SyntaxError> for ErrorCause<E1, E2> {
     fn from(e: SyntaxError) -> Self {
         ErrorCause::SyntaxError(e)
     }
 }
 
-impl<E> From<EvalError<E>> for ErrorCause<E> {
-    fn from(e: EvalError<E>) -> Self {
+impl<E1, E2> From<EvalError<E1, E2>> for ErrorCause<E1, E2> {
+    fn from(e: EvalError<E1, E2>) -> Self {
         ErrorCause::EvalError(e)
     }
 }
 
 /// Description of an error that occurred during expansion
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Error<E> {
+pub struct Error<E1, E2> {
     /// Cause of the error
-    pub cause: ErrorCause<E>,
+    pub cause: ErrorCause<E1, E2>,
     /// Range of the substring in the evaluated expression string where the error occurred
     pub location: Range<usize>,
 }
 
-impl<E: Display> Display for Error<E> {
+impl<E1, E2: Display> Display for Error<E1, E2>
+where
+    E1: Display,
+    E2: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.cause.fmt(f)
     }
 }
 
-impl<E: std::fmt::Debug + Display> std::error::Error for Error<E> {}
+impl<E1, E2> std::error::Error for Error<E1, E2>
+where
+    E1: std::fmt::Debug + Display,
+    E2: std::fmt::Debug + Display,
+{
+}
 
-impl<E> From<ast::Error> for Error<E> {
+impl<E1, E2> From<ast::Error> for Error<E1, E2> {
     fn from(e: ast::Error) -> Self {
         Error {
             cause: e.cause.into(),
@@ -118,8 +131,8 @@ impl<E> From<ast::Error> for Error<E> {
     }
 }
 
-impl<E> From<eval::Error<E>> for Error<E> {
-    fn from(e: eval::Error<E>) -> Self {
+impl<E1, E2> From<eval::Error<E1, E2>> for Error<E1, E2> {
+    fn from(e: eval::Error<E1, E2>) -> Self {
         Error {
             cause: e.cause.into(),
             location: e.location,
@@ -128,7 +141,10 @@ impl<E> From<eval::Error<E>> for Error<E> {
 }
 
 /// Performs arithmetic expansion
-pub fn eval<E: Env>(expression: &str, env: &mut E) -> Result<Value, Error<E::AssignVariableError>> {
+pub fn eval<E: Env>(
+    expression: &str,
+    env: &mut E,
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     let tokens = PeekableTokens::from(expression);
     let ast = ast::parse(tokens)?;
     let term = eval::eval(&ast, env)?;
