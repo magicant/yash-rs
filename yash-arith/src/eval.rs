@@ -27,7 +27,7 @@ use std::ops::Range;
 
 /// Cause of an evaluation error
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum EvalError<E> {
+pub enum EvalError<E1, E2> {
     /// A variable value that is not a valid number
     InvalidVariableValue(String),
     /// Result out of bounds
@@ -40,13 +40,16 @@ pub enum EvalError<E> {
     ReverseShifting,
     /// Assignment with a left-hand-side operand not being a variable
     AssignmentToValue,
+    /// Error accessing a variable value.
+    GetVariableError(E1),
     /// Error assigning a variable value.
-    AssignVariableError(E),
+    AssignVariableError(E2),
 }
 
-impl<E> std::fmt::Display for EvalError<E>
+impl<E1, E2> std::fmt::Display for EvalError<E1, E2>
 where
-    E: std::fmt::Display,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -58,6 +61,7 @@ where
             EvalError::LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
             EvalError::ReverseShifting => "negative shift width".fmt(f),
             EvalError::AssignmentToValue => "assignment to a non-variable".fmt(f),
+            EvalError::GetVariableError(e) => e.fmt(f),
             EvalError::AssignVariableError(e) => e.fmt(f),
         }
     }
@@ -65,9 +69,9 @@ where
 
 /// Description of an error that occurred during evaluation
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Error<E> {
+pub struct Error<E1, E2> {
     /// Cause of the error
-    pub cause: EvalError<E>,
+    pub cause: EvalError<E1, E2>,
     /// Range of the substring in the evaluated expression string where the error occurred
     pub location: Range<usize>,
 }
@@ -77,23 +81,29 @@ fn expand_variable<E: Env>(
     name: &str,
     location: &Range<usize>,
     env: &E,
-) -> Result<Value, Error<E::AssignVariableError>> {
-    if let Some(value) = env.get_variable(name) {
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
+    match env.get_variable(name) {
+        Ok(None) => Ok(Value::Integer(0)),
         // TODO Parse non-decimal integer and float
-        match value.parse() {
+        Ok(Some(value)) => match value.parse() {
             Ok(number) => Ok(Value::Integer(number)),
             Err(_) => Err(Error {
                 cause: EvalError::InvalidVariableValue(value.to_string()),
                 location: location.clone(),
             }),
-        }
-    } else {
-        Ok(Value::Integer(0))
+        },
+        Err(e) => Err(Error {
+            cause: EvalError::GetVariableError(e),
+            location: location.clone(),
+        }),
     }
 }
 
 /// Evaluates a term into a value.
-pub fn into_value<E: Env>(term: Term, env: &E) -> Result<Value, Error<E::AssignVariableError>> {
+pub fn into_value<E: Env>(
+    term: Term,
+    env: &E,
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     match term {
         Term::Value(value) => Ok(value),
         Term::Variable { name, location } => expand_variable(name, &location, env),
@@ -104,10 +114,10 @@ pub fn into_value<E: Env>(term: Term, env: &E) -> Result<Value, Error<E::AssignV
 ///
 /// If the term is a value, returns an `AssignmentToValue` error with the given
 /// location.
-fn require_variable<'a, E>(
+fn require_variable<'a, E1, E2>(
     term: Term<'a>,
     op_location: &Range<usize>,
-) -> Result<(&'a str, Range<usize>), Error<E>> {
+) -> Result<(&'a str, Range<usize>), Error<E1, E2>> {
     match term {
         Term::Variable { name, location } => Ok((name, location)),
         Term::Value(_) => Err(Error {
@@ -118,10 +128,10 @@ fn require_variable<'a, E>(
 }
 
 /// Extracts a successful computation result or returns an overflow error.
-fn unwrap_or_overflow<T, E>(
+fn unwrap_or_overflow<T, E1, E2>(
     checked_computation: Option<T>,
     location: &Range<usize>,
-) -> Result<T, Error<E>> {
+) -> Result<T, Error<E1, E2>> {
     checked_computation.ok_or_else(|| Error {
         cause: EvalError::Overflow,
         location: location.clone(),
@@ -134,7 +144,7 @@ fn assign<E: Env>(
     value: Value,
     location: Range<usize>,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     match env.assign_variable(name, value.to_string(), location.clone()) {
         Ok(()) => Ok(value),
         Err(e) => Err(Error {
@@ -150,7 +160,7 @@ fn apply_prefix<E: Env>(
     operator: PrefixOperator,
     op_location: &Range<usize>,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     match operator {
         PrefixOperator::Increment => {
             let (name, location) = require_variable(term, op_location)?;
@@ -197,7 +207,7 @@ fn apply_postfix<E: Env>(
     operator: PostfixOperator,
     op_location: &Range<usize>,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     let (name, location) = require_variable(term, op_location)?;
     match expand_variable(name, &location, env)? {
         old_value @ Value::Integer(value) => {
@@ -216,13 +226,13 @@ fn apply_postfix<E: Env>(
 ///
 /// If `operator` is a compound assignment operator, this function only computes
 /// the result value without performing assignment.
-fn binary_result<E>(
+fn binary_result<E1, E2>(
     lhs: Value,
     rhs: Value,
     operator: BinaryOperator,
     op_location: &Range<usize>,
-) -> Result<Value, Error<E>> {
-    fn require_non_negative<E>(v: i64, location: &Range<usize>) -> Result<u32, Error<E>> {
+) -> Result<Value, Error<E1, E2>> {
+    fn require_non_negative<E1, E2>(v: i64, location: &Range<usize>) -> Result<u32, Error<E1, E2>> {
         v.try_into().map_err(|_| Error {
             cause: if v < 0 {
                 EvalError::ReverseShifting
@@ -232,7 +242,7 @@ fn binary_result<E>(
             location: location.clone(),
         })
     }
-    fn require_non_zero<E>(v: i64, location: &Range<usize>) -> Result<(), Error<E>> {
+    fn require_non_zero<E1, E2>(v: i64, location: &Range<usize>) -> Result<(), Error<E1, E2>> {
         if v != 0 {
             Ok(())
         } else {
@@ -297,7 +307,7 @@ fn apply_binary<'a, E: Env>(
     operator: BinaryOperator,
     op_location: &Range<usize>,
     env: &mut E,
-) -> Result<Value, Error<E::AssignVariableError>> {
+) -> Result<Value, Error<E::GetVariableError, E::AssignVariableError>> {
     use BinaryOperator::*;
     match operator {
         LogicalOr | LogicalAnd | BitwiseOr | BitwiseXor | BitwiseAnd | EqualTo | NotEqualTo
@@ -330,7 +340,7 @@ fn apply_binary<'a, E: Env>(
 pub fn eval<'a, E: Env>(
     ast: &[Ast<'a>],
     env: &mut E,
-) -> Result<Term<'a>, Error<E::AssignVariableError>> {
+) -> Result<Term<'a>, Error<E::GetVariableError, E::AssignVariableError>> {
     let (root, children) = ast.split_last().expect("evaluating an empty expression");
     match root {
         Ast::Term(term) => Ok(term.clone()),
@@ -843,13 +853,13 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::LogicalOr;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
     }
 
@@ -859,13 +869,13 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::LogicalAnd;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
     }
 
@@ -875,13 +885,13 @@ mod tests {
         let three = Value::Integer(3);
         let six = Value::Integer(6);
         for operator in [BinaryOperator::BitwiseOr, BinaryOperator::BitwiseOrAssign] {
-            let result = binary_result::<Infallible>(zero, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0)));
-            let result = binary_result::<Infallible>(three, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(3)));
-            let result = binary_result::<Infallible>(three, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(7)));
-            let result = binary_result::<Infallible>(zero, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(6)));
         }
     }
@@ -892,13 +902,13 @@ mod tests {
         let three = Value::Integer(3);
         let six = Value::Integer(6);
         for operator in [BinaryOperator::BitwiseXor, BinaryOperator::BitwiseXorAssign] {
-            let result = binary_result::<Infallible>(zero, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0)));
-            let result = binary_result::<Infallible>(three, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(3)));
-            let result = binary_result::<Infallible>(three, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(5)));
-            let result = binary_result::<Infallible>(zero, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(6)));
         }
     }
@@ -909,13 +919,13 @@ mod tests {
         let three = Value::Integer(3);
         let six = Value::Integer(6);
         for operator in [BinaryOperator::BitwiseAnd, BinaryOperator::BitwiseAndAssign] {
-            let result = binary_result::<Infallible>(zero, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0)));
-            let result = binary_result::<Infallible>(three, zero, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, zero, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0)));
-            let result = binary_result::<Infallible>(three, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(three, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(2)));
-            let result = binary_result::<Infallible>(zero, six, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(zero, six, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0)));
         }
     }
@@ -926,17 +936,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::EqualTo;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(two, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
     }
 
@@ -946,17 +956,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::NotEqualTo;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(two, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
     }
 
@@ -966,17 +976,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::LessThan;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(two, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
     }
 
@@ -986,17 +996,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::GreaterThan;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(two, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
     }
 
@@ -1006,17 +1016,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::LessThanOrEqualTo;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(two, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
     }
 
@@ -1026,17 +1036,17 @@ mod tests {
         let one = Value::Integer(1);
         let two = Value::Integer(2);
         let operator = BinaryOperator::GreaterThanOrEqualTo;
-        let result = binary_result::<Infallible>(zero, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(two, one, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(two, one, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, zero, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, zero, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(1)));
-        let result = binary_result::<Infallible>(one, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(one, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
-        let result = binary_result::<Infallible>(zero, two, operator, &(3..5));
+        let result = binary_result::<Infallible, Infallible>(zero, two, operator, &(3..5));
         assert_eq!(result, Ok(Value::Integer(0)));
     }
 
@@ -1045,7 +1055,7 @@ mod tests {
         let lhs = Value::Integer(0x94E239);
         let rhs = Value::Integer(7);
         for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0x94E239 << 7)));
         }
     }
@@ -1055,7 +1065,7 @@ mod tests {
         let lhs = Value::Integer(-1);
         let rhs = Value::Integer(0);
         for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1071,7 +1081,7 @@ mod tests {
         let lhs = Value::Integer(0);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1088,7 +1098,7 @@ mod tests {
         for rhs in [i64::BITS as i64, i64::MAX] {
             let rhs = Value::Integer(rhs);
             for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-                let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+                let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
                 assert_eq!(
                     result,
                     Err(Error {
@@ -1105,7 +1115,7 @@ mod tests {
         let lhs = Value::Integer(0x4000_0000_0000_0000);
         let rhs = Value::Integer(1);
         for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1121,7 +1131,7 @@ mod tests {
         let lhs = Value::Integer(0x4000_0000_0000_0000);
         let rhs = Value::Integer(2);
         for operator in [BinaryOperator::ShiftLeft, BinaryOperator::ShiftLeftAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1137,7 +1147,7 @@ mod tests {
         let lhs = Value::Integer(0x94E239);
         let rhs = Value::Integer(7);
         for operator in [BinaryOperator::ShiftRight, BinaryOperator::ShiftRightAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(0x94E239 >> 7)));
         }
     }
@@ -1147,7 +1157,7 @@ mod tests {
         let lhs = Value::Integer(0);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::ShiftRight, BinaryOperator::ShiftRightAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1163,7 +1173,7 @@ mod tests {
         let lhs = Value::Integer(0);
         let rhs = Value::Integer(i64::BITS as _);
         for operator in [BinaryOperator::ShiftRight, BinaryOperator::ShiftRightAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1179,7 +1189,7 @@ mod tests {
         let lhs = Value::Integer(15);
         let rhs = Value::Integer(27);
         for operator in [BinaryOperator::Add, BinaryOperator::AddAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(42)));
         }
     }
@@ -1189,7 +1199,7 @@ mod tests {
         let lhs = Value::Integer(i64::MIN);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::Add, BinaryOperator::AddAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1205,7 +1215,7 @@ mod tests {
         let lhs = Value::Integer(15);
         let rhs = Value::Integer(27);
         for operator in [BinaryOperator::Subtract, BinaryOperator::SubtractAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(-12)));
         }
     }
@@ -1215,7 +1225,7 @@ mod tests {
         let lhs = Value::Integer(i64::MAX);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::Subtract, BinaryOperator::SubtractAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1231,7 +1241,7 @@ mod tests {
         let lhs = Value::Integer(15);
         let rhs = Value::Integer(27);
         for operator in [BinaryOperator::Multiply, BinaryOperator::MultiplyAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(405)));
         }
     }
@@ -1241,7 +1251,7 @@ mod tests {
         let lhs = Value::Integer(0x4000_0000_0000_0000);
         let rhs = Value::Integer(2);
         for operator in [BinaryOperator::Multiply, BinaryOperator::MultiplyAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1257,7 +1267,7 @@ mod tests {
         let lhs = Value::Integer(268);
         let rhs = Value::Integer(17);
         for operator in [BinaryOperator::Divide, BinaryOperator::DivideAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(15)));
         }
     }
@@ -1267,7 +1277,7 @@ mod tests {
         let lhs = Value::Integer(i64::MIN);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::Divide, BinaryOperator::DivideAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1283,7 +1293,7 @@ mod tests {
         let lhs = Value::Integer(1);
         let rhs = Value::Integer(0);
         for operator in [BinaryOperator::Divide, BinaryOperator::DivideAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1299,7 +1309,7 @@ mod tests {
         let lhs = Value::Integer(268);
         let rhs = Value::Integer(17);
         for operator in [BinaryOperator::Remainder, BinaryOperator::RemainderAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(result, Ok(Value::Integer(13)));
         }
     }
@@ -1309,7 +1319,7 @@ mod tests {
         let lhs = Value::Integer(i64::MIN);
         let rhs = Value::Integer(-1);
         for operator in [BinaryOperator::Remainder, BinaryOperator::RemainderAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {
@@ -1325,7 +1335,7 @@ mod tests {
         let lhs = Value::Integer(1);
         let rhs = Value::Integer(0);
         for operator in [BinaryOperator::Remainder, BinaryOperator::RemainderAssign] {
-            let result = binary_result::<Infallible>(lhs, rhs, operator, &(3..4));
+            let result = binary_result::<Infallible, Infallible>(lhs, rhs, operator, &(3..4));
             assert_eq!(
                 result,
                 Err(Error {

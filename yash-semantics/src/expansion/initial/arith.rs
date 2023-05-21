@@ -26,6 +26,8 @@ use crate::expansion::expand_text;
 use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;
+use yash_env::option::Option::Unset;
+use yash_env::option::State::{Off, On};
 use yash_env::variable::ReadOnlyError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
@@ -127,13 +129,17 @@ impl ArithError {
     }
 }
 
+/// Error expanding an unset variable
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct UnsetVariable;
+
 /// Converts `yash_arith::ErrorCause` into `initial::ErrorCause`.
 ///
 /// The `source` argument must be the arithmetic expression being expanded.
 /// It is used to reproduce a location contained in the error cause.
 #[must_use]
-pub fn convert_error_cause(
-    cause: yash_arith::ErrorCause<ReadOnlyError>,
+fn convert_error_cause(
+    cause: yash_arith::ErrorCause<UnsetVariable, ReadOnlyError>,
     source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
@@ -181,6 +187,7 @@ pub fn convert_error_cause(
             }
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
+            yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
             yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
         },
     }
@@ -193,14 +200,20 @@ struct VarEnv<'a> {
 }
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
+    type GetVariableError = UnsetVariable;
     type AssignVariableError = ReadOnlyError;
 
     #[rustfmt::skip]
-    fn get_variable(&self, name: &str) -> Option<&str> {
+    fn get_variable(&self, name: &str) -> Result<Option<&str>, UnsetVariable> {
         if let Some(Variable { value: Some(Scalar(value)), .. }) = self.env.variables.get(name) {
-            Some(value)
+            Ok(Some(value))
         } else {
-            None
+            match self.env.options.get(Unset) {
+                // TODO If the variable exists but is not scalar, UnsetVariable
+                // does not seem to be the right error.
+                Off => Err(UnsetVariable),
+                On => Ok(None),
+            }
         }
     }
 
@@ -283,6 +296,56 @@ mod tests {
     use futures_util::FutureExt;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
+    use yash_env::variable::Scope::Global;
+
+    #[test]
+    fn var_env_get_variable_success() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        env.variables
+            .assign(Global, "v".to_string(), Variable::new("value"))
+            .unwrap();
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Ok(Some("value")));
+    }
+
+    #[test]
+    fn var_env_get_variable_unset() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Ok(None));
+    }
+
+    #[test]
+    fn var_env_get_variable_nounset() {
+        use yash_arith::Env;
+        let mut env = yash_env::Env::new_virtual();
+        env.options.set(Unset, Off);
+        let location = Location::dummy("my location");
+        let env = VarEnv {
+            env: &mut env,
+            expression: "v",
+            expansion_location: &location,
+        };
+
+        let result = env.get_variable("v");
+        assert_eq!(result, Err(UnsetVariable));
+    }
 
     #[test]
     fn successful_inner_text_expansion() {
