@@ -18,12 +18,12 @@
 
 use crate::assign::Error;
 use crate::assign::ErrorCause;
+use crate::command::Command;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
-use crate::Command;
 use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::{Break, Continue};
@@ -119,7 +119,6 @@ mod tests {
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use crate::Command;
     use futures_util::FutureExt;
     use std::future::Future;
     use std::pin::Pin;

@@ -16,13 +16,13 @@
 
 //! Execution of the case command
 
+use crate::command::Command;
 use crate::expansion::attr::fnmatch::apply_escapes;
 use crate::expansion::attr::fnmatch::to_pattern_chars;
 use crate::expansion::expand_word;
 use crate::expansion::expand_word_attr;
 use crate::xtrace::print;
 use crate::xtrace::XTrace;
-use crate::Command;
 use crate::Handle;
 use std::fmt::Write;
 use std::ops::ControlFlow::Continue;
@@ -100,7 +100,6 @@ mod tests {
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
-    use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::ops::ControlFlow::Break;

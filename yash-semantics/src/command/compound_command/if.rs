@@ -17,7 +17,7 @@
 //! Execution of the if command
 
 use super::evaluate_condition;
-use crate::Command;
+use crate::command::Command;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;

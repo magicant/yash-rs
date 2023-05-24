@@ -92,12 +92,23 @@ use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
+use yash_semantics::command_search::search_path;
 
 /// Implements the exec built-in.
-pub async fn builtin_body(_env: &mut Env, _args: Vec<Field>) -> Result {
-    // TODO Implement exec built-in
+pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+    // TODO Support non-POSIX options
     let mut result = Result::default();
     result.retain_redirs();
+
+    if let Some(name) = args.first() {
+        let path = search_path(env, name.value.as_str()).unwrap();
+        let location = name.origin.clone();
+        let args = to_c_strings(args);
+        replace_current_process(env, path, args, location).await;
+        result.set_exit_status(env.exit_status);
+    }
+
     result
 }
 
@@ -110,6 +121,12 @@ pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Outpu
 mod tests {
     use super::*;
     use futures_util::FutureExt;
+    use std::cell::RefCell;
+    use std::ffi::CString;
+    use std::rc::Rc;
+    use yash_env::system::r#virtual::{FileBody, INode};
+    use yash_env::variable::{Scope, Variable};
+    use yash_env::VirtualSystem;
     use yash_semantics::ExitStatus;
 
     #[test]
@@ -119,4 +136,89 @@ mod tests {
         assert_eq!(result.exit_status(), ExitStatus::SUCCESS);
         assert!(result.should_retain_redirs());
     }
+
+    #[test]
+    fn executes_external_utility_when_given_operand() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        // Prepare the external utility file
+        let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: Vec::new(),
+            is_native_executable: true,
+        };
+        content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/bin/echo", content)
+            .unwrap();
+
+        // Prepare the PATH variable
+        env.variables
+            .assign(
+                Scope::Global,
+                "PATH".to_string(),
+                Variable::new("/bin").export(),
+            )
+            .unwrap();
+
+        let args = Field::dummies(["echo"]);
+        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+
+        let process = &system.current_process();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, CString::new("/bin/echo").unwrap());
+        assert_eq!(arguments.1, [CString::new("echo").unwrap()]);
+        assert_eq!(arguments.2, [CString::new("PATH=/bin").unwrap()]);
+    }
+
+    #[test]
+    fn passing_argument_to_external_utility() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        // Prepare the external utility file
+        let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: Vec::new(),
+            is_native_executable: true,
+        };
+        content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/usr/bin/ls", content)
+            .unwrap();
+
+        // Prepare the PATH variable
+        env.variables
+            .assign(
+                Scope::Global,
+                "PATH".to_string(),
+                Variable::new("/usr/bin").export(),
+            )
+            .unwrap();
+
+        let args = Field::dummies(["ls", "-l"]);
+        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+
+        let process = &system.current_process();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, CString::new("/usr/bin/ls").unwrap());
+        assert_eq!(
+            arguments.1,
+            [CString::new("ls").unwrap(), CString::new("-l").unwrap()]
+        );
+        assert_eq!(arguments.2, [CString::new("PATH=/usr/bin").unwrap()]);
+    }
+
+    // TODO utility name containing slash
+    // TODO error in searching for the external utility
+    // TODO error in executing the external utility
 }

@@ -18,7 +18,8 @@
 //!
 //! This crate defines the standard semantics for the shell language. The core
 //! of the semantics is command execution and word expansion.
-//! A command can be executed by calling [`Command::execute`].
+//! A command can be executed by calling
+//! [`Command::execute`](command::Command::execute).
 //! A word can be expanded by using functions and traits defined in
 //! [`expansion`].
 //!
@@ -26,6 +27,7 @@
 //! input. It is a utility for running a shell script.
 
 pub mod assign;
+pub mod command;
 pub mod command_search;
 pub mod expansion;
 pub mod redir;
@@ -34,9 +36,6 @@ pub mod xtrace;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::*;
-
-mod command;
-pub use command::Command;
 
 mod handle;
 pub use handle::Handle;

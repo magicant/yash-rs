@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementations for Command.
+//! Command execution
 
 mod and_or;
 mod compound_command;
 mod function_definition;
 mod item;
 mod pipeline;
-mod simple_command;
+pub mod simple_command;
 
 use crate::trap::run_traps_for_caught_signals;
 use async_trait::async_trait;
