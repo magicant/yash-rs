@@ -18,6 +18,7 @@ cargo tomlfmt --dryrun --path yash-syntax/Cargo.toml
 
 cargo test --package 'yash-arith' -- $quiet
 cargo test --package 'yash-builtin' -- $quiet
+cargo test --package 'yash-builtin' --no-default-features -- $quiet
 cargo test --package 'yash-env' -- $quiet
 cargo test --package 'yash-fnmatch' -- $quiet
 cargo test --package 'yash-quote' -- $quiet

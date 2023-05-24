@@ -17,11 +17,20 @@
 //! Implementation of the shell built-in utilities.
 //!
 //! TODO Elaborate
+//!
+//! # Optional dependency
+//!
+//! The `yash-builtin` crate has an optional dependency on the `yash-semantics`
+//! crate, which is enabled by default. If you disable the `yash-semantics`
+//! feature, the following built-ins will be unavailable:
+//!
+//! - `exec`
 
 pub mod alias;
 pub mod r#break;
 pub mod common;
 pub mod r#continue;
+#[cfg(feature = "yash-semantics")]
 pub mod exec;
 pub mod jobs;
 pub mod readonly;
@@ -60,6 +69,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
             execute: r#continue::builtin_main,
         },
     ),
+    #[cfg(feature = "yash-semantics")]
     (
         "exec",
         Builtin {
