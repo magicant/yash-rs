@@ -87,6 +87,7 @@
 //! shell to exit. This behavior is not explicitly required by POSIX, but it is
 //! a common practice among existing shells.
 
+use std::ffi::CString;
 use std::future::Future;
 use std::pin::Pin;
 use yash_env::builtin::Result;
@@ -102,7 +103,11 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     result.retain_redirs();
 
     if let Some(name) = args.first() {
-        let path = search_path(env, name.value.as_str()).unwrap();
+        let path = if name.value.contains('/') {
+            CString::new(name.value.clone()).unwrap_or_default()
+        } else {
+            search_path(env, name.value.as_str()).unwrap()
+        };
         let location = name.origin.clone();
         let args = to_c_strings(args);
         replace_current_process(env, path, args, location).await;
@@ -122,7 +127,6 @@ mod tests {
     use super::*;
     use futures_util::FutureExt;
     use std::cell::RefCell;
-    use std::ffi::CString;
     use std::rc::Rc;
     use yash_env::system::r#virtual::{FileBody, INode};
     use yash_env::variable::{Scope, Variable};
@@ -218,7 +222,36 @@ mod tests {
         assert_eq!(arguments.2, [CString::new("PATH=/usr/bin").unwrap()]);
     }
 
-    // TODO utility name containing slash
+    #[test]
+    fn utility_name_with_slash() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        // Prepare the external utility file
+        let mut content = INode::default();
+        content.body = FileBody::Regular {
+            content: Vec::new(),
+            is_native_executable: true,
+        };
+        content.permissions.0 |= 0o100;
+        let content = Rc::new(RefCell::new(content));
+        system
+            .state
+            .borrow_mut()
+            .file_system
+            .save("/bin/echo", content)
+            .unwrap();
+
+        let args = Field::dummies(["/bin/echo"]);
+        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+
+        let process = &system.current_process();
+        let arguments = process.last_exec().as_ref().unwrap();
+        assert_eq!(arguments.0, CString::new("/bin/echo").unwrap());
+        assert_eq!(arguments.1, [CString::new("/bin/echo").unwrap()]);
+        assert_eq!(arguments.2, []);
+    }
+
     // TODO error in searching for the external utility
     // TODO error in executing the external utility
 }
