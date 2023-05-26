@@ -31,11 +31,13 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use env::option::State::{Off, On};
     use std::cell::Cell;
     use std::num::NonZeroU64;
+    use std::ops::ControlFlow::{Break, Continue};
     use std::rc::Rc;
     use yash_env::input::Stdin;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
     use yash_semantics::trap::run_exit_trap;
+    use yash_semantics::Divert;
 
     let mut args = std::env::args();
     if let Some(arg0) = args.next() {
@@ -77,7 +79,15 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     let result = rel.run().await;
     env.apply_result(result);
 
-    run_exit_trap(&mut env).await;
+    match result {
+        Continue(())
+        | Break(Divert::Continue { .. })
+        | Break(Divert::Break { .. })
+        | Break(Divert::Return)
+        | Break(Divert::Interrupt(_))
+        | Break(Divert::Exit(_)) => run_exit_trap(&mut env).await,
+        Break(Divert::Abort(_)) => (),
+    }
 
     env.exit_status.0
 }

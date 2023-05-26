@@ -96,7 +96,7 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_semantics::command::simple_command::{replace_current_process, to_c_strings};
 use yash_semantics::command_search::search_path;
-use yash_semantics::Divert::Exit;
+use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
 
 /// Implements the exec built-in.
@@ -106,8 +106,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     result.retain_redirs();
 
     if let Some(name) = args.first() {
-        // TODO Returning Exit will execute the EXIT trap before exiting, which is not expected
-        result.set_divert(Break(Exit(None)));
+        result.set_divert(Break(Abort(None)));
 
         let path = if name.value.contains('/') {
             CString::new(name.value.clone()).unwrap_or_default()
@@ -288,7 +287,7 @@ mod tests {
         let args = Field::dummies(["echo"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::NOT_FOUND);
-        assert_eq!(result.divert(), Break(Exit(None)));
+        assert_eq!(result.divert(), Break(Abort(None)));
 
         let process = &system.current_process();
         assert_eq!(process.last_exec(), &None);
@@ -317,6 +316,6 @@ mod tests {
         let args = Field::dummies(["/bin/echo"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::NOEXEC);
-        assert_eq!(result.divert(), Break(Exit(None)));
+        assert_eq!(result.divert(), Break(Abort(None)));
     }
 }
