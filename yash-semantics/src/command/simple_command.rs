@@ -14,15 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementation of simple command semantics.
+//! Implementation of the simple command semantics.
+//!
+//! This module exports some utility functions that are used in implementing the
+//! simple command semantics and can be used in other modules. For the execution
+//! of simple commands, see the implementation of [`Command`] for
+//! [`syntax::SimpleCommand`].
 
+use crate::command::Command;
 use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::redir::RedirGuard;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
-use crate::Command;
 use crate::Handle;
 use assert_matches::assert_matches;
 use async_trait::async_trait;
@@ -50,6 +55,7 @@ use yash_env::variable::Scope;
 use yash_env::variable::Value;
 use yash_env::Env;
 use yash_env::System;
+use yash_syntax::source::Location;
 use yash_syntax::syntax;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -427,31 +433,7 @@ async fn execute_external_utility(
     let args = to_c_strings(fields);
     let subshell = Subshell::new(move |env, _job_control| {
         Box::pin(async move {
-            env.traps.disable_internal_handlers(&mut env.system).ok();
-
-            let envs = env.variables.env_c_strings();
-            let result = env.system.execve(path.as_c_str(), &args, &envs);
-            // TODO Prefer into_err to unwrap_err
-            let errno = result.unwrap_err();
-            match errno {
-                Errno::ENOEXEC => {
-                    fall_back_on_sh(&mut env.system, path.clone(), args, envs);
-                    env.exit_status = ExitStatus::NOEXEC;
-                }
-                Errno::ENOENT | Errno::ENOTDIR => {
-                    env.exit_status = ExitStatus::NOT_FOUND;
-                }
-                _ => {
-                    env.exit_status = ExitStatus::NOEXEC;
-                }
-            }
-            print_error(
-                env,
-                format!("cannot execute external utility {path:?}").into(),
-                errno.desc().into(),
-                &location,
-            )
-            .await;
+            replace_current_process(env, path, args, location).await;
             Continue(())
         })
     })
@@ -492,7 +474,7 @@ fn to_job_name(fields: &[Field]) -> String {
 }
 
 /// Converts fields to C strings.
-fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
+pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
     s.into_iter()
         .filter_map(|f| {
             let bytes = f.value.into_bytes();
@@ -500,6 +482,46 @@ fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
             CString::new(bytes).ok()
         })
         .collect()
+}
+
+/// Substitutes the currently executing shell process with the external utility.
+///
+/// This function performs the very last step of the simple command execution.
+/// It disables the internal signal handlers and calls the `execve` system call.
+/// If the call fails, it prints an error message to the standard error and
+/// updates `env.exit_status`, in which case the caller should immediately exit
+/// the current process with the exit status.
+pub async fn replace_current_process(
+    env: &mut Env,
+    path: CString,
+    args: Vec<CString>,
+    location: Location,
+) {
+    env.traps.disable_internal_handlers(&mut env.system).ok();
+
+    let envs = env.variables.env_c_strings();
+    let result = env.system.execve(path.as_c_str(), &args, &envs);
+    // TODO Prefer into_err to unwrap_err
+    let errno = result.unwrap_err();
+    match errno {
+        Errno::ENOEXEC => {
+            fall_back_on_sh(&mut env.system, path.clone(), args, envs);
+            env.exit_status = ExitStatus::NOEXEC;
+        }
+        Errno::ENOENT | Errno::ENOTDIR => {
+            env.exit_status = ExitStatus::NOT_FOUND;
+        }
+        _ => {
+            env.exit_status = ExitStatus::NOEXEC;
+        }
+    }
+    print_error(
+        env,
+        format!("cannot execute external utility {path:?}").into(),
+        errno.desc().into(),
+        &location,
+    )
+    .await;
 }
 
 /// Invokes the shell with the given arguments.
@@ -559,7 +581,6 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
-    use yash_syntax::source::Location;
 
     #[test]
     fn simple_command_performs_redirection_with_absent_target() {

@@ -251,7 +251,7 @@ mod tests {
     use yash_env::variable::Value;
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
-    use yash_semantics::Command;
+    use yash_semantics::command::Command;
     use yash_syntax::syntax::List;
 
     #[test]

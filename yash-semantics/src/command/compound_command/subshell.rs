@@ -16,8 +16,8 @@
 
 //! Semantics of subshell compound commands
 
+use crate::command::Command;
 use crate::trap::run_exit_trap;
-use crate::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;

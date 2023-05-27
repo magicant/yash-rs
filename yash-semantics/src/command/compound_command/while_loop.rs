@@ -16,7 +16,7 @@
 
 //! Execution of the while and until loop
 
-use crate::Command;
+use crate::command::Command;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Divert;
 use yash_env::semantics::{ExitStatus, Result};
@@ -99,7 +99,6 @@ mod tests {
     use crate::tests::continue_builtin;
     use crate::tests::echo_builtin;
     use crate::tests::return_builtin;
-    use crate::Command;
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::future::Future;

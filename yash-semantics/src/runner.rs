@@ -16,8 +16,8 @@
 
 //! Implementation of the read-eval loop
 
+use crate::command::Command;
 use crate::trap::run_traps_for_caught_signals;
-use crate::Command;
 use crate::Handle;
 use std::cell::Cell;
 use std::ops::ControlFlow::Continue;

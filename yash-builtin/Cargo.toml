@@ -15,10 +15,14 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 publish = false
 
+[features]
+default = ["yash-semantics"]
+
 [dependencies]
 async-trait = "0.1.66"
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-quote = { path = "../yash-quote", version = "1.1.0" }
+yash-semantics = { path = "../yash-semantics", version = "0.1.0", optional = true }
 yash-syntax = { path = "../yash-syntax", version = "0.6.1" }
 
 [dev-dependencies]

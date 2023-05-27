@@ -193,13 +193,24 @@ pub enum Divert {
 
     /// Interrupt the current shell execution environment.
     ///
-    /// This is the same as `Exit` in a non-interactive shell. In an interactive
-    /// shell, this will abort the currently executed command and resume
-    /// prompting for a next command line.
+    /// This is the same as `Exit` in a non-interactive shell: it makes the
+    /// shell exit after executing the EXIT trap, if any. If this is used inside
+    /// the EXIT trap, the shell will exit immediately.
+    ///
+    /// In an interactive shell, this will abort the currently executed command
+    /// and resume prompting for a next command line.
     Interrupt(Option<ExitStatus>),
 
     /// Exit from the current shell execution environment.
+    ///
+    /// This makes the shell exit after executing the EXIT trap, if any.
+    /// If this is used inside the EXIT trap, the shell will exit immediately.
     Exit(Option<ExitStatus>),
+
+    /// Exit from the current shell execution environment immediately.
+    ///
+    /// This makes the shell exit without executing the EXIT trap.
+    Abort(Option<ExitStatus>),
 }
 
 impl Divert {
@@ -211,7 +222,7 @@ impl Divert {
         use Divert::*;
         match self {
             Continue { .. } | Break { .. } | Return => None,
-            Interrupt(exit_status) | Exit(exit_status) => *exit_status,
+            Interrupt(exit_status) | Exit(exit_status) | Abort(exit_status) => *exit_status,
         }
     }
 }
