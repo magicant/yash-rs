@@ -32,6 +32,7 @@ pub mod common;
 pub mod r#continue;
 #[cfg(feature = "yash-semantics")]
 pub mod exec;
+pub mod exit;
 pub mod jobs;
 pub mod readonly;
 pub mod r#return;
@@ -75,6 +76,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: exec::builtin_main,
+        },
+    ),
+    (
+        "exit",
+        Builtin {
+            r#type: Special,
+            execute: exit::builtin_main,
         },
     ),
     (

@@ -68,7 +68,10 @@
 //!
 //! # Implementation notes
 //!
-//! TODO Describe in terms of Divert.
+//! This implementation of the built-in does not actually quit the current
+//! function or dot script, but returns a [`Result`] having a
+//! [`Divert::Return`]. The caller is responsible for handling the divert value
+//! and returning from the function or script.
 
 use std::future::ready;
 use std::future::Future;
