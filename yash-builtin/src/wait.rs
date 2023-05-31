@@ -16,13 +16,24 @@
 
 //! Wait built-in
 //!
-//! The wait built-in waits for asynchronous jobs to finish.
+//! The **`wait`** built-in waits for asynchronous jobs to finish.
 //!
 //! # Syntax
 //!
 //! ```sh
 //! wait [job_id_or_process_id...]
 //! ```
+//!
+//! # Semantics
+//!
+//! If you specify one or more operands, the built-in waits for the specified
+//! job to finish. Otherwise, the built-in waits for all existing asynchronous
+//! jobs.
+//!
+//! If the job is already finished, the built-in returns without waiting. If the
+//! job is job-controlled (that is, running in its own process group), it is
+//! considered finished not only when it has exited but also when it has been
+//! suspended.
 //!
 //! # Options
 //!
@@ -33,16 +44,23 @@
 //! An operand can be a job ID or decimal process ID, specifying which job to
 //! wait for.
 //!
+//! ## Job ID
+//!
 //! TODO Elaborate on syntax of job ID
 //!
-//! If you don't specify any operand, the built-in waits for all existing
-//! asynchronous jobs.
+//! ## Process ID
+//!
+//! A process ID is a non-negative decimal integer.
+//!
+//! If a process ID does not specify a job contained in the [`JobSet`] of the
+//! current environment, the built-in treats it as an existing job that has
+//! already finished with exit status 127.
 //!
 //! # Exit status
 //!
 //! If you specify one or more operands, the built-in returns the exit status of
 //! the job specified by the last operand. If there is no operand, the exit
-//! status is 0.
+//! status is 0 regardless of the awaited jobs.
 //!
 //! If the built-in was interrupted by a signal, the exit status indicates the
 //! signal.

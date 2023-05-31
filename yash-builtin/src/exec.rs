@@ -16,7 +16,7 @@
 
 //! Exec built-in
 //!
-//! The exec built-in replaces the current shell process with an external
+//! The **`exec`** built-in replaces the current shell process with an external
 //! utility invoked by treating the specified operands as a command. Without
 //! operands, the built-in makes redirections applied to it permanent in the
 //! current shell process.

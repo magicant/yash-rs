@@ -16,7 +16,7 @@
 
 //! Break built-in
 //!
-//! The `break` built-in terminates the execution of a loop.
+//! The **`break`** built-in terminates the execution of a loop.
 //!
 //! # Syntax
 //!
@@ -36,7 +36,7 @@
 //!   in the body of a function definition command appearing inside the loop.
 //!
 //! It is an error if there is no loop enclosing the break command.
-//! If `n` is greater than the number of enclosing loops, the built-in exits the
+//! If *n* is greater than the number of enclosing loops, the built-in exits the
 //! outermost one.
 //!
 //! # Options
@@ -47,7 +47,7 @@
 //!
 //! # Operands
 //!
-//! Operand `n` specifies the nest level of the loop to exit.
+//! Operand *n* specifies the nest level of the loop to exit.
 //! If omitted, it defaults to 1.
 //! It is an error if the value is not a positive decimal integer.
 //!

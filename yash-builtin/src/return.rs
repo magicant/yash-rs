@@ -16,16 +16,21 @@
 
 //! Return built-in.
 //!
-//! The return built-in quits the currently executing innermost function or
-//! script.  If the shell is not currently executing any function or script, the
-//! built-in will exit the current shell execution environment unless it is an
-//! interactive session.
+//! The **`return`** built-in quits the currently executing innermost function
+//! or script.
 //!
 //! # Syntax
 //!
 //! ```sh
 //! return [-n] [exit_status]
 //! ```
+//!
+//! # Semantics
+//!
+//! `return exit_status` makes the shell return from the currently executing
+//! function or script with the specified exit status.
+//!
+//! It is an error to use the built-in outside a function or script.
 //!
 //! # Options
 //!
@@ -36,7 +41,7 @@
 //! # Operands
 //!
 //! The optional ***exit_status*** operand, if given, should be a non-negative
-//! integer and will be the exit status of the built-in.
+//! decimal integer and will be the exit status of the built-in.
 //!
 //! # Exit status
 //!
@@ -54,7 +59,7 @@
 //! it is a syntax error. In that case, an error message is printed, and the
 //! exit status will be 2, but the built-in still quits a function or script.
 //!
-//! This implementation treats an *exit_status* value greater than 4294967295 as
+//! This implementation treats an *exit_status* value greater than 2147483647 as
 //! a syntax error.
 //!
 //! # Portability
@@ -64,7 +69,9 @@
 //!
 //! The `-n` (`--no-return`) option is a non-standard extension.
 //!
-//! Many implementations do not support *exit_status* values greater than 255.
+//! The behavior is unspecified in POSIX if *exit_status* is greater than 255.
+//! The current implementation passes such a value as is in the result, but this
+//! behavior may change in the future.
 //!
 //! # Implementation notes
 //!

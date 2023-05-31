@@ -16,13 +16,21 @@
 
 //! Exit built-in
 //!
-//! The exit built-in causes the currently executing shell to exit.
+//! The **`exit`** built-in causes the currently executing shell to exit.
 //!
 //! # Syntax
 //!
 //! ```sh
 //! exit [exit_status]
 //! ```
+//!
+//! # Semantics
+//!
+//! `exit exit_status` makes the shell exit from the currently executing
+//! environment with the specified exit status.
+//!
+//! The shell executes the EXIT trap, if any, before exiting, except when the
+//! built-in is invoked in the trap itself.
 //!
 //! # Options
 //!
@@ -31,7 +39,7 @@
 //! # Operands
 //!
 //! The optional ***exit_status*** operand, if given, should be a non-negative
-//! integer and will be the exit status of the exiting shell process.
+//! decimal integer and will be the exit status of the exiting shell process.
 //!
 //! # Exit status
 //!
@@ -49,12 +57,14 @@
 //! it is a syntax error. In that case, an error message is printed, and the
 //! exit status will be 2 ([`ExitStatus::ERROR`]).
 //!
-//! This implementation treats an *exit_status* value greater than 4294967295 as
+//! This implementation treats an *exit_status* value greater than 2147483647 as
 //! a syntax error.
 //!
 //! # Portability
 //!
-//! Many implementations do not support *exit_status* values greater than 255.
+//! The behavior is undefined in POSIX if *exit_status* is greater than 255.
+//! The current implementation passes such a value as is in the result, but this
+//! behavior may change in the future.
 //!
 //! # Implementation notes
 //!

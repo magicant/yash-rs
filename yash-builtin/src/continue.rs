@@ -16,7 +16,8 @@
 
 //! Continue built-in
 //!
-//! The `continue` built-in skips the execution of a loop to the next iteration.
+//! The **`continue`** built-in skips the execution of a loop to the next
+//! iteration.
 //!
 //! # Syntax
 //!
@@ -26,7 +27,7 @@
 //!
 //! # Semantics
 //!
-//! `continue n` interrupts the execution of the nth innermost for, while, or
+//! `continue n` interrupts the execution of the *n*th innermost for, while, or
 //! until loop and resumes its next iteration.
 //! The specified loop must lexically enclose the continue command, that is:
 //!
@@ -37,7 +38,7 @@
 //!   loop.
 //!
 //! It is an error if there is no loop enclosing the continue command.
-//! If `n` is greater than the number of enclosing loops, the built-in affects
+//! If *n* is greater than the number of enclosing loops, the built-in affects
 //! the outermost one.
 //!
 //! # Options
@@ -48,7 +49,7 @@
 //!
 //! # Operands
 //!
-//! Operand `n` specifies the nest level of the affected loop.
+//! Operand *n* specifies the nest level of the affected loop.
 //! If omitted, it defaults to 1. It is an error if the value is not a positive
 //! decimal integer.
 //!

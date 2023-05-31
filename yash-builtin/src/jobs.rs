@@ -16,7 +16,7 @@
 
 //! Jobs built-in
 //!
-//! The `jobs` built-in reports job status.
+//! The **`jobs`** built-in reports job status.
 //!
 //! # Syntax
 //!
@@ -26,7 +26,7 @@
 //!
 //! # Semantics
 //!
-//! The "jobs" built-in prints information about jobs the shell is currently
+//! The jobs built-in prints information about jobs the shell is currently
 //! controlling, one line for each job. The results follow the
 //! [format](yash_env::job::fmt) specified by the POSIX.
 //!

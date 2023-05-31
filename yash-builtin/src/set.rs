@@ -16,11 +16,13 @@
 
 //! Set built-in
 //!
-//! The set built-in modifies [shell options](yash_env::option) and [positional
-//! parameters](yash_env::variable). It also can print a list of current options
-//! or variables.
+//! The **`set`** built-in modifies [shell options](yash_env::option) and
+//! [positional parameters](yash_env::variable). It also can print a list of
+//! current options or variables.
 //!
 //! # Syntax and semantics
+//!
+//! The built-in behaves differently depending on the invocation syntax.
 //!
 //! ## Printing variables
 //!
