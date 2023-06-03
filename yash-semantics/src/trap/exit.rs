@@ -45,8 +45,11 @@ pub async fn run_exit_trap(env: &mut Env) {
     let condition = Condition::Exit.to_string();
     let origin = state.origin.clone();
     let mut lexer = Lexer::from_memory(&command, Source::Trap { condition, origin });
-    let mut env = env.push_frame(Frame::Trap(Condition::Exit));
     let previous_exit_status = env.exit_status;
+    let mut env = env.push_frame(Frame::Trap {
+        condition: Condition::Exit,
+        previous_exit_status,
+    });
     // Boxing needed for recursion
     let future: Pin<Box<dyn Future<Output = Result>>> =
         Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
@@ -103,13 +106,20 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                assert_matches!(&env.stack[0], Frame::Trap(Condition::Exit));
+                assert_matches!(
+                    &env.stack[0],
+                    Frame::Trap {
+                        condition: Condition::Exit,
+                        previous_exit_status: ExitStatus(19),
+                    }
+                );
                 Default::default()
             })
         }
         let mut env = Env::new_virtual();
         let r#type = yash_env::builtin::Type::Intrinsic;
         env.builtins.insert("check", Builtin { r#type, execute });
+        env.exit_status = ExitStatus(19);
         env.traps
             .set_action(
                 &mut env.system,

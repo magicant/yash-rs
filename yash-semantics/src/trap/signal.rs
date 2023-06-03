@@ -35,7 +35,10 @@ fn in_trap(env: &Env) -> bool {
         .iter()
         .rev()
         .take_while(|frame| **frame != Frame::Subshell)
-        .any(|frame| matches!(*frame, Frame::Trap(Condition::Signal(_))))
+        .any(|frame| {
+            matches!(*frame, Frame::Trap { condition, .. }
+                if matches!(condition, Condition::Signal(_)))
+        })
 }
 
 /// Runs trap commands for signals that have been caught.
@@ -66,8 +69,11 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         let condition = signal.to_string();
         let origin = state.origin.clone();
         let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
         let previous_exit_status = env.exit_status;
+        let mut env = env.push_frame(Frame::Trap {
+            condition: Condition::Signal(signal),
+            previous_exit_status,
+        });
         // Boxing needed for recursion
         let future: Pin<Box<dyn Future<Output = Result>>> =
             Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
@@ -158,7 +164,10 @@ mod tests {
     fn no_reentrance() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap {
+            condition: Condition::Signal(Signal::SIGTERM),
+            previous_exit_status: ExitStatus(10),
+        });
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -170,7 +179,10 @@ mod tests {
     fn allow_reentrance_in_exit_trap() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Exit));
+        let mut env = env.push_frame(Frame::Trap {
+            condition: Condition::Exit,
+            previous_exit_status: ExitStatus(10),
+        });
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
@@ -182,7 +194,10 @@ mod tests {
     fn allow_reentrance_in_subshell() {
         let (mut env, system) = signal_env();
         raise_signal(&system, Signal::SIGINT);
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(Signal::SIGTERM)));
+        let mut env = env.push_frame(Frame::Trap {
+            condition: Condition::Signal(Signal::SIGTERM),
+            previous_exit_status: ExitStatus(10),
+        });
         let mut env = env.push_frame(Frame::Subshell);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
@@ -200,7 +215,10 @@ mod tests {
             Box::pin(async move {
                 assert_matches!(
                     &env.stack[0],
-                    Frame::Trap(Condition::Signal(Signal::SIGINT))
+                    Frame::Trap {
+                        condition: Condition::Signal(Signal::SIGINT),
+                        previous_exit_status: ExitStatus(42)
+                    }
                 );
                 Default::default()
             })
@@ -209,6 +227,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
         let r#type = yash_env::builtin::Type::Intrinsic;
         env.builtins.insert("check", Builtin { r#type, execute });
+        env.exit_status = ExitStatus(42);
         env.traps
             .set_action(
                 &mut env.system,

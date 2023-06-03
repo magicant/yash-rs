@@ -30,6 +30,7 @@
 //! `Stack`. [`Env::push_frame`] returns a [`EnvFrameGuard`] that implements
 //! `DerefMut<Target = Env>`.
 
+use crate::semantics::ExitStatus;
 use crate::semantics::Field;
 use crate::Env;
 use std::ops::Deref;
@@ -64,7 +65,12 @@ pub enum Frame {
     },
 
     /// Trap
-    Trap(crate::trap::Condition),
+    Trap {
+        /// Condition that triggered the trap
+        condition: crate::trap::Condition,
+        /// Exit status saved just before entering the trap
+        previous_exit_status: ExitStatus,
+    },
     // TODO dot script, eval
 }
 
