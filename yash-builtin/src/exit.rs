@@ -75,7 +75,7 @@
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
 
-use crate::common::print_error_message;
+use crate::common::syntax_error;
 use std::future::Future;
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
@@ -85,28 +85,7 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
-
-async fn handle_error(env: &mut Env, title: &str, annotation: Annotation<'_>) -> Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![annotation],
-    };
-    print_error_message(env, message).await
-}
-
-async fn syntax_error(env: &mut Env, label: &str, location: &Location) -> Result {
-    handle_error(
-        env,
-        "command argument syntax error",
-        Annotation::new(AnnotationType::Error, label.into(), location),
-    )
-    .await
-}
 
 async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
     syntax_error(env, &error.to_string(), location).await

@@ -19,6 +19,8 @@
 //! This module contains common traits to manipulate [`yash_env::Env`] from
 //! built-in implementations. These traits abstract the environment and reduce
 //! dependency on it.
+//!
+//! This module contains some utility functions for printing error messages.
 
 use async_trait::async_trait;
 use std::ops::ControlFlow::{self, Break, Continue};
@@ -34,6 +36,7 @@ use yash_env::system::Errno;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 
 pub mod arg;
 
@@ -229,6 +232,47 @@ where
     let mut result = yash_env::builtin::Result::new(ExitStatus::ERROR);
     result.set_divert(print_message(env, message).await);
     result
+}
+
+/// Prints a simple error message.
+///
+/// This function constructs a [`Message`] from the given title and annotation,
+/// and calls [`print_error_message`].
+#[inline]
+pub async fn print_simple_error_message<E>(
+    env: &mut E,
+    title: &str,
+    annotation: Annotation<'_>,
+) -> yash_env::builtin::Result
+where
+    E: BuiltinEnv + Stderr,
+{
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: title.into(),
+        annotations: vec![annotation],
+    };
+    print_error_message(env, message).await
+}
+
+/// Prints a simple error message for a command syntax error.
+///
+/// This function calls [`print_simple_error_message`] with a predefined title
+/// and an [`Annotation`] constructed with the given label and location.
+pub async fn syntax_error<E>(
+    env: &mut E,
+    label: &str,
+    location: &Location,
+) -> yash_env::builtin::Result
+where
+    E: BuiltinEnv + Stderr,
+{
+    print_simple_error_message(
+        env,
+        "command argument syntax error",
+        Annotation::new(AnnotationType::Error, label.into(), location),
+    )
+    .await
 }
 
 #[cfg(test)]

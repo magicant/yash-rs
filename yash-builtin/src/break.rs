@@ -74,6 +74,8 @@
 use crate::common::arg::parse_arguments;
 use crate::common::arg::Mode;
 use crate::common::print_error_message;
+use crate::common::print_simple_error_message;
+use crate::common::syntax_error;
 use crate::common::BuiltinEnv;
 use std::future::Future;
 use std::num::ParseIntError;
@@ -86,26 +88,7 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
-
-async fn handle_error(env: &mut Env, title: &str, annotation: Annotation<'_>) -> Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![annotation],
-    };
-    print_error_message(env, message).await
-}
-
-async fn syntax_error(env: &mut Env, label: &str, location: &Location) -> Result {
-    handle_error(
-        env,
-        "command argument syntax error",
-        Annotation::new(AnnotationType::Error, label.into(), location),
-    )
-    .await
-}
 
 async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
     syntax_error(env, &error.to_string(), location).await
@@ -119,7 +102,7 @@ async fn not_in_loop_error(env: &mut Env) -> Result {
     } else {
         "cannot break"
     };
-    handle_error(
+    print_simple_error_message(
         env,
         title,
         Annotation::new(AnnotationType::Error, "not in loop".into(), &location),
