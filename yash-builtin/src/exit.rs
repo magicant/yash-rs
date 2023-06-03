@@ -104,7 +104,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     }
 
     let exit_status = match args.first() {
-        None => env.exit_status,
+        None => env.stack.previous_exit_status().unwrap_or(env.exit_status),
         Some(arg) => match arg.value.parse() {
             Ok(exit_status) if exit_status >= 0 => ExitStatus(exit_status),
             Ok(_) => return syntax_error(env, "negative exit status", &arg.origin).await,
@@ -151,6 +151,25 @@ mod tests {
         env.exit_status = ExitStatus(42);
         let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus(42));
+        expected_result.set_divert(Break(Divert::Exit(None)));
+        assert_eq!(actual_result, expected_result);
+    }
+
+    #[test]
+    fn exit_without_arguments_inside_trap() {
+        let mut env = Env::new_virtual();
+        let mut env = env.push_frame(Frame::Trap {
+            condition: yash_env::trap::Condition::Signal(yash_env::trap::Signal::SIGINT),
+            previous_exit_status: ExitStatus(123),
+        });
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("exit"),
+            is_special: true,
+        });
+        env.exit_status = ExitStatus(42);
+
+        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus(123));
         expected_result.set_divert(Break(Divert::Exit(None)));
         assert_eq!(actual_result, expected_result);
     }
