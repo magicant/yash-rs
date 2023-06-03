@@ -148,6 +148,26 @@ impl Stack {
             .take(max_count)
             .count()
     }
+
+    /// Returns the exit status saved just before entering the current trap, if
+    /// any.
+    ///
+    /// This function takes into account only traps running in the current
+    /// execution environment.
+    #[must_use]
+    pub fn previous_exit_status(&self) -> Option<ExitStatus> {
+        self.inner
+            .iter()
+            .rev()
+            .take_while(|&frame| frame != &Frame::Subshell)
+            .find_map(|frame| match frame {
+                Frame::Trap {
+                    previous_exit_status,
+                    ..
+                } => Some(*previous_exit_status),
+                _ => None,
+            })
+    }
 }
 
 /// When the guard is dropped, the stack frame that was pushed when creating the
@@ -295,5 +315,37 @@ mod tests {
         assert_eq!(stack.loop_count(4), 3);
         assert_eq!(stack.loop_count(3), 3);
         assert_eq!(stack.loop_count(2), 2);
+    }
+
+    #[test]
+    fn previous_exit_status_empty() {
+        let stack = Stack::default();
+        assert_eq!(stack.previous_exit_status(), None);
+    }
+
+    #[test]
+    fn previous_exit_status_with_trap() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Trap {
+            condition: crate::trap::Condition::Exit,
+            previous_exit_status: ExitStatus::SUCCESS,
+        });
+        assert_eq!(stack.previous_exit_status(), Some(ExitStatus::SUCCESS));
+        let stack = stack.push(Frame::Trap {
+            condition: crate::trap::Condition::Signal(crate::trap::Signal::SIGINT),
+            previous_exit_status: ExitStatus::ERROR,
+        });
+        assert_eq!(stack.previous_exit_status(), Some(ExitStatus::ERROR));
+    }
+
+    #[test]
+    fn previous_exit_status_with_subshells() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Trap {
+            condition: crate::trap::Condition::Exit,
+            previous_exit_status: ExitStatus::SUCCESS,
+        });
+        let stack = stack.push(Frame::Subshell);
+        assert_eq!(stack.previous_exit_status(), None);
     }
 }
