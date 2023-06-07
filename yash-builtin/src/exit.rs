@@ -104,15 +104,15 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     }
 
     let exit_status = match args.first() {
-        None => env.exit_status,
+        None => None,
         Some(arg) => match arg.value.parse() {
-            Ok(exit_status) if exit_status >= 0 => ExitStatus(exit_status),
+            Ok(exit_status) if exit_status >= 0 => Some(ExitStatus(exit_status)),
             Ok(_) => return syntax_error(env, "negative exit status", &arg.origin).await,
             Err(e) => return operand_parse_error(env, &arg.origin, e).await,
         },
     };
-    let mut result = Result::new(exit_status);
-    result.set_divert(Break(Divert::Exit(None)));
+    let mut result = Result::new(env.exit_status);
+    result.set_divert(Break(Divert::Exit(exit_status)));
     result
 }
 
@@ -160,8 +160,8 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["123"]);
         let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus(123));
-        expected_result.set_divert(Break(Divert::Exit(None)));
+        let mut expected_result = Result::default();
+        expected_result.set_divert(Break(Divert::Exit(Some(ExitStatus(123)))));
         assert_eq!(actual_result, expected_result);
     }
 
