@@ -83,7 +83,7 @@ mod tests {
     use super::*;
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
-    use crate::tests::return_builtin;
+    use crate::tests::exit_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use std::ops::ControlFlow::Break;
@@ -101,21 +101,11 @@ mod tests {
         let system = VirtualSystem::default();
         let mut env = Env::with_system(Box::new(system.clone()));
         env.builtins.insert("echo", echo_builtin());
-        env.builtins.insert("return", return_builtin());
         env.traps
             .set_action(
                 &mut env.system,
                 Signal::SIGINT,
                 Action::Command("echo trapped".into()),
-                Location::dummy(""),
-                false,
-            )
-            .unwrap();
-        env.traps
-            .set_action(
-                &mut env.system,
-                Signal::SIGUSR1,
-                Action::Command("return 56".into()),
                 Location::dummy(""),
                 false,
             )
@@ -261,14 +251,25 @@ mod tests {
     }
 
     #[test]
-    fn exit_from_trap() {
+    fn exit_from_trap_with_specified_exit_status() {
         let (mut env, system) = signal_env();
+        env.builtins.insert("exit", exit_builtin());
+        env.traps
+            .set_action(
+                &mut env.system,
+                Signal::SIGUSR1,
+                Action::Command("exit 56".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
         raise_signal(&system, Signal::SIGUSR1);
+        env.exit_status = ExitStatus(42);
         let result = run_traps_for_caught_signals(&mut env)
             .now_or_never()
             .unwrap();
-        assert_eq!(result, Break(Divert::Return));
-        assert_eq!(env.exit_status, ExitStatus(56));
+        assert_eq!(result, Break(Divert::Exit(Some(ExitStatus(56)))));
+        assert_eq!(env.exit_status, ExitStatus(42));
     }
 
     // TODO Should we suppress return/break/continue from trap?
