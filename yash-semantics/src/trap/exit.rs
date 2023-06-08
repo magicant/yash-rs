@@ -60,11 +60,11 @@ mod tests {
     use super::*;
     use crate::tests::assert_stdout;
     use crate::tests::echo_builtin;
+    use crate::tests::exit_builtin;
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::builtin::Builtin;
-    use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::VirtualSystem;
@@ -182,25 +182,14 @@ mod tests {
     }
 
     #[test]
-    fn exit_from_trap() {
-        fn execute(
-            _env: &mut Env,
-            _args: Vec<Field>,
-        ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-            Box::pin(async move {
-                let mut result = yash_env::builtin::Result::default();
-                result.set_divert(Result::Break(Divert::Exit(Some(ExitStatus(31)))));
-                result
-            })
-        }
+    fn exit_from_trap_with_specified_exit_status() {
         let mut env = Env::new_virtual();
-        let r#type = yash_env::builtin::Type::Intrinsic;
-        env.builtins.insert("my_exit", Builtin { r#type, execute });
+        env.builtins.insert("exit", exit_builtin());
         env.traps
             .set_action(
                 &mut env.system,
                 Condition::Exit,
-                Action::Command("my_exit".into()),
+                Action::Command("exit 31".into()),
                 Location::dummy(""),
                 false,
             )
@@ -208,5 +197,25 @@ mod tests {
 
         run_exit_trap(&mut env).now_or_never().unwrap();
         assert_eq!(env.exit_status, ExitStatus(31));
+    }
+
+    #[test]
+    fn exit_from_trap_without_specified_exit_status() {
+        let mut env = Env::new_virtual();
+        env.builtins.insert("echo", echo_builtin());
+        env.builtins.insert("exit", exit_builtin());
+        env.traps
+            .set_action(
+                &mut env.system,
+                Condition::Exit,
+                Action::Command("echo; exit".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        env.exit_status = ExitStatus(72);
+
+        run_exit_trap(&mut env).now_or_never().unwrap();
+        assert_eq!(env.exit_status, ExitStatus(72));
     }
 }

@@ -46,3 +46,17 @@ fn default_exit_status_in_signal_trap() {
     let result = subject().stdin(stdin).output().unwrap();
     assert_eq!(result.status.code(), Some(0), "{:?}", result.status);
 }
+
+#[test]
+fn specified_exit_status_in_exit_trap() {
+    let stdin = file_with_content(b"trap '(exit 2); exit 3' EXIT; (exit 1); exit\n");
+    let result = subject().stdin(stdin).output().unwrap();
+    assert_eq!(result.status.code(), Some(3), "{:?}", result.status);
+}
+
+#[test]
+fn default_exit_status_in_exit_trap() {
+    let stdin = file_with_content(b"trap '(exit 2); exit' EXIT; (exit 1); exit\n");
+    let result = subject().stdin(stdin).output().unwrap();
+    assert_eq!(result.status.code(), Some(1), "{:?}", result.status);
+}
