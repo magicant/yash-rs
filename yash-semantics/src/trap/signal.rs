@@ -71,8 +71,9 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
         // Boxing needed for recursion
         let future: Pin<Box<dyn Future<Output = Result>>> =
             Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-        future.await?;
+        let result = future.await;
         env.exit_status = previous_exit_status;
+        result?;
     }
 
     Continue(())
@@ -258,7 +259,7 @@ mod tests {
             .set_action(
                 &mut env.system,
                 Signal::SIGUSR1,
-                Action::Command("exit 56".into()),
+                Action::Command("echo; exit 56".into()),
                 Location::dummy(""),
                 false,
             )
@@ -269,6 +270,28 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_eq!(result, Break(Divert::Exit(Some(ExitStatus(56)))));
+        assert_eq!(env.exit_status, ExitStatus(42));
+    }
+
+    #[test]
+    fn exit_from_trap_without_specified_exit_status() {
+        let (mut env, system) = signal_env();
+        env.builtins.insert("exit", exit_builtin());
+        env.traps
+            .set_action(
+                &mut env.system,
+                Signal::SIGUSR1,
+                Action::Command("echo; exit".into()),
+                Location::dummy(""),
+                false,
+            )
+            .unwrap();
+        raise_signal(&system, Signal::SIGUSR1);
+        env.exit_status = ExitStatus(42);
+        let result = run_traps_for_caught_signals(&mut env)
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, Break(Divert::Exit(None)));
         assert_eq!(env.exit_status, ExitStatus(42));
     }
 
