@@ -43,13 +43,11 @@
 //!
 //! # Exit status
 //!
-//! The *exit_status* operand will be the exit status of the built-in.
+//! The *exit_status* operand specifies the exit status of the exiting shell.
 //!
-//! If the operand is not given:
-//!
-//! - If the currently executing script is a trap, the exit status will be the
-//!   value of `$?` before entering the trap.
-//! - Otherwise, the exit status will be the current value of `$?`.
+//! If the operand is not given, the shell exits with the current exit status
+//! (`$?`). If the built-in is invoked in a trap, the exit status will be the
+//! value of `$?` before entering the trap.
 //!
 //! # Errors
 //!
@@ -71,6 +69,15 @@
 //! This implementation of the built-in does not actually exit the shell, but
 //! returns a [`Result`] having a [`Divert::Exit`]. The caller is responsible
 //! for handling the divert value and exiting the process.
+//!
+//! - If an operand specifies an exit status, the divert value will contain the
+//! specified exit status. The caller should use it as the exit status of the
+//! process.
+//! - If no operand is given, the divert value will contain no exit status. The
+//! built-in's exit status is the current value of `$?`, and the caller should
+//! use it as the exit status of the process. However, if the built-in is
+//! invoked in a trap, the caller should use the value of `$?` before entering
+//! trap.
 //!
 //! In case of an error, the result will have a [`Divert::Interrupt`] value
 //! instead, in which case the shell will not exit if it is interactive.
