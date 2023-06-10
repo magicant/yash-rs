@@ -60,3 +60,12 @@ fn default_exit_status_in_exit_trap() {
     let result = subject().stdin(stdin).output().unwrap();
     assert_eq!(result.status.code(), Some(1), "{:?}", result.status);
 }
+
+#[test]
+fn default_exit_status_in_subshell_in_trap() {
+    let stdin =
+        file_with_content(b"trap '((exit 2); exit); echo $?' INT; (exit 1); kill -INT $$\n");
+    let result = subject().stdin(stdin).output().unwrap();
+    assert_eq!(result.status.code(), Some(0), "{:?}", result.status);
+    assert_eq!(from_utf8(&result.stdout), Ok("2\n"));
+}
