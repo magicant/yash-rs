@@ -24,7 +24,7 @@ futures-util = "0.3.27"
 itertools = "0.10.5"
 nix = "0.23.2"
 slab = "0.4.7"
-tempfile = "3.3.0"
+tempfile = "3.5.0"
 yash-quote = { path = "../yash-quote", version = "1.1.0" }
 yash-syntax = { path = "../yash-syntax", version = "0.6.1", features = ["annotate-snippets"] }
 

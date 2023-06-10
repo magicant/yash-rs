@@ -155,6 +155,26 @@ pub(crate) mod tests {
         })
     }
 
+    fn exit_builtin_main(
+        env: &mut Env,
+        args: Vec<Field>,
+    ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
+        let mut result = yash_env::builtin::Result::new(env.exit_status);
+        let exit_status = args
+            .get(0)
+            .map(|field| ExitStatus(field.value.parse().unwrap_or(2)));
+        result.set_divert(Break(Divert::Exit(exit_status)));
+        Box::pin(ready(result))
+    }
+
+    /// Returns a minimal implementation of the `exit` built-in.
+    pub fn exit_builtin() -> Builtin {
+        Builtin {
+            r#type: Special,
+            execute: exit_builtin_main,
+        }
+    }
+
     fn return_builtin_main(
         _env: &mut Env,
         mut args: Vec<Field>,

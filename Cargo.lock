@@ -615,6 +615,7 @@ dependencies = [
  "async-trait",
  "futures-executor",
  "futures-util",
+ "tempfile",
  "yash-arith",
  "yash-builtin",
  "yash-env",
