@@ -169,7 +169,7 @@ mod tests {
         let command: CompoundCommand = "while return 36; echo X; do echo Y; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(36));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -180,7 +180,7 @@ mod tests {
         let command: CompoundCommand = "while echo A; do return 42; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(42));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "A\n"));
     }
@@ -202,7 +202,7 @@ mod tests {
         let command: CompoundCommand = "while check; do check; return; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.stack[..], []);
     }
@@ -413,7 +413,7 @@ mod tests {
         let command: CompoundCommand = "until return 12; echo X; do echo Y; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(12));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -424,7 +424,7 @@ mod tests {
         let command: CompoundCommand = "until return -n 9; do return 35; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(35));
     }
 
@@ -445,7 +445,7 @@ mod tests {
         let command: CompoundCommand = "until ! check; do check; return; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.stack[..], []);
     }

@@ -368,7 +368,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "return 37".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
 
@@ -489,7 +489,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let pipeline: syntax::Pipeline = "! return 15".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(15));
     }
 

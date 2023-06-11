@@ -140,7 +140,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: syntax::List = "return -n 1; return 2; return -n 4".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(2));
     }
 }

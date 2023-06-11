@@ -83,7 +83,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
         Continue(())
         | Break(Divert::Continue { .. })
         | Break(Divert::Break { .. })
-        | Break(Divert::Return)
+        | Break(Divert::Return(_))
         | Break(Divert::Interrupt(_))
         | Break(Divert::Exit(_)) => run_exit_trap(&mut env).await,
         Break(Divert::Abort(_)) => (),

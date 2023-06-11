@@ -350,7 +350,7 @@ mod tests {
             .unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(73));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }

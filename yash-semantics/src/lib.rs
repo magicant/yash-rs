@@ -184,7 +184,7 @@ pub(crate) mod tests {
                 args.remove(0);
                 Continue(())
             }
-            _ => Break(Divert::Return),
+            _ => Break(Divert::Return(None)),
         };
         let exit_status = match args.get(0) {
             Some(field) => field.value.parse().unwrap_or(2),

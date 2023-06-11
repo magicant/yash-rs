@@ -281,7 +281,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return 97".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(97));
     }
 
@@ -291,7 +291,7 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 7 || return 0 && X".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(0));
     }
 

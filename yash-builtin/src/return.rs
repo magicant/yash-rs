@@ -115,7 +115,7 @@ pub fn builtin_main_sync(_env: &mut Env, args: Vec<Field>) -> Result {
     };
     let mut result = Result::new(ExitStatus(exit_status));
     if !no_return {
-        result.set_divert(Break(Divert::Return));
+        result.set_divert(Break(Divert::Return(None)));
     }
     result
 }
@@ -142,7 +142,7 @@ mod tests {
         let args = Field::dummies(["42"]);
         let actual_result = builtin_main_sync(&mut env, args);
         let mut expected_result = Result::new(ExitStatus(42));
-        expected_result.set_divert(Break(Divert::Return));
+        expected_result.set_divert(Break(Divert::Return(None)));
         assert_eq!(actual_result, expected_result);
     }
 
