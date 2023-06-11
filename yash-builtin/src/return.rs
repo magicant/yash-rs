@@ -30,8 +30,6 @@
 //! `return exit_status` makes the shell return from the currently executing
 //! function or script with the specified exit status.
 //!
-//! It is an error to use the built-in outside a function or script.
-//!
 //! # Options
 //!
 //! The **`-n`** (**`--no-return`**) option makes the built-in not actually quit
@@ -47,20 +45,21 @@
 //!
 //! The *exit_status* operand will be the exit status of the built-in.
 //!
-//! If the operand is not given:
-//!
-//! - If the currently executing script is a trap, the exit status will be the
-//!   value of `$?` before entering the trap.
-//! - Otherwise, the exit status will be the current value of `$?`.
+//! If the operand is not given, the exit status will be the current exit status
+//! (`$?`). If the built-in is invoked in a trap executed in a function or
+//! script and the built-in returns from that function or script, the exit
+//! status will be the value of `$?` before entering the trap.
 //!
 //! # Errors
 //!
 //! If the *exit_status* operand is given but not a valid non-negative integer,
 //! it is a syntax error. In that case, an error message is printed, and the
-//! exit status will be 2, but the built-in still quits a function or script.
+//! exit status will be 2 ([`ExitStatus::ERROR`]).
 //!
 //! This implementation treats an *exit_status* value greater than 2147483647 as
 //! a syntax error.
+//!
+//! TODO: What if there is no function or script to return from?
 //!
 //! # Portability
 //!
@@ -79,6 +78,15 @@
 //! function or dot script, but returns a [`Result`] having a
 //! [`Divert::Return`]. The caller is responsible for handling the divert value
 //! and returning from the function or script.
+//!
+//! - If an operand specifies an exit status, the divert value will contain the
+//! specified exit status. The caller should use it as the exit status of the
+//! process.
+//! - If no operand is given, the divert value will contain no exit status. The
+//! built-in's exit status is the current value of `$?`, and the caller should
+//! use it as the exit status of the function or script. However, if the
+//! built-in is invoked in a trap executed in the function or script, the caller
+//! should use the value of `$?` before entering trap.
 
 use std::future::ready;
 use std::future::Future;
