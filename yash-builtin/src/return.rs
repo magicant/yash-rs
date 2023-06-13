@@ -136,6 +136,15 @@ mod tests {
     use yash_env::semantics::ExitStatus;
 
     #[test]
+    fn return_without_arguments_with_exit_status_0() {
+        let mut env = Env::new_virtual();
+        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let mut expected_result = Result::default();
+        expected_result.set_divert(Break(Divert::Return(None)));
+        assert_eq!(actual_result, expected_result);
+    }
+
+    #[test]
     fn returns_exit_status_specified_without_n_option() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["42"]);
