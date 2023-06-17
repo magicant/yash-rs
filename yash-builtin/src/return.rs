@@ -88,7 +88,9 @@
 //! built-in is invoked in a trap executed in the function or script, the caller
 //! should use the value of `$?` before entering trap.
 
+use crate::common::syntax_error;
 use std::future::Future;
+use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use std::pin::Pin;
 use yash_env::builtin::Result;
@@ -96,6 +98,11 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_syntax::source::Location;
+
+async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
+    syntax_error(env, &error.to_string(), location).await
+}
 
 /// Implementation of the return built-in.
 ///
@@ -106,12 +113,20 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     // "--" separator. We should reject the separator in the POSIXly-correct
     // mode.
     // TODO Reject returning from an interactive session
+
     let mut i = args.iter().peekable();
+
     let no_return = i.next_if(|field| field.value == "-n").is_some();
+
     let exit_status = match i.next() {
-        Some(field) => Some(ExitStatus(field.value.parse().expect("TODO"))),
         None => None,
+        Some(arg) => match arg.value.parse() {
+            Ok(exit_status) if exit_status >= 0 => Some(ExitStatus(exit_status)),
+            Ok(_) => return syntax_error(env, "negative exit status", &arg.origin).await,
+            Err(e) => return operand_parse_error(env, &arg.origin, e).await,
+        },
     };
+
     if no_return {
         Result::new(exit_status.unwrap_or(env.exit_status))
     } else {
@@ -134,8 +149,12 @@ pub fn builtin_main(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::assert_stderr;
     use futures_util::FutureExt;
+    use std::rc::Rc;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Frame;
+    use yash_env::VirtualSystem;
 
     #[test]
     fn return_without_arguments_with_exit_status_0() {
@@ -180,5 +199,68 @@ mod tests {
         let args = Field::dummies(["-n", "47"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(47)));
+    }
+
+    #[test]
+    fn return_with_negative_exit_status_operand() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("return"),
+            is_special: true,
+        });
+        let args = Field::dummies(["-1"]);
+
+        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus::ERROR);
+        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("-1"), "stderr = {stderr:?}")
+        });
+    }
+
+    #[test]
+    fn exit_with_non_integer_exit_status_operand() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("return"),
+            is_special: true,
+        });
+        let args = Field::dummies(["foo"]);
+
+        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus::ERROR);
+        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("foo"), "stderr = {stderr:?}")
+        });
+    }
+
+    #[test]
+    fn return_with_too_large_exit_status_operand() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin {
+            name: Field::dummy("return"),
+            is_special: true,
+        });
+        let args = Field::dummies(["999999999999999999999999999999"]);
+
+        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus::ERROR);
+        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("999999999999999999999999999999"),
+                "stderr = {stderr:?}"
+            )
+        });
     }
 }
