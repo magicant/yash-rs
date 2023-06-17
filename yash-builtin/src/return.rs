@@ -100,19 +100,19 @@ use yash_env::Env;
 /// Implementation of the return built-in.
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn builtin_body(_env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO Parse arguments correctly
+pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+    // TODO: POSIX does not require the return built-in to support XBD Utility
+    // Syntax Guidelines. That means the built-in does not have to recognize the
+    // "--" separator. We should reject the separator in the POSIXly-correct
+    // mode.
     // TODO Reject returning from an interactive session
     let mut i = args.iter().peekable();
-    let no_return = matches!(i.peek(), Some(Field { value, .. }) if value == "-n");
-    if no_return {
-        i.next();
-    }
+    let no_return = i.next_if(|field| field.value == "-n").is_some();
     let exit_status = match i.next() {
-        Some(field) => field.value.parse().unwrap_or(2),
-        None => 0,
+        Some(field) => ExitStatus(field.value.parse().expect("TODO")),
+        None => env.exit_status,
     };
-    let mut result = Result::new(ExitStatus(exit_status));
+    let mut result = Result::new(exit_status);
     if !no_return {
         result.set_divert(Break(Divert::Return(None)));
     }
@@ -140,6 +140,16 @@ mod tests {
         let mut env = Env::new_virtual();
         let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
         let mut expected_result = Result::default();
+        expected_result.set_divert(Break(Divert::Return(None)));
+        assert_eq!(actual_result, expected_result);
+    }
+
+    #[test]
+    fn return_without_arguments_with_non_zero_exit_status() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus(42);
+        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let mut expected_result = Result::new(ExitStatus(42));
         expected_result.set_divert(Break(Divert::Return(None)));
         assert_eq!(actual_result, expected_result);
     }
