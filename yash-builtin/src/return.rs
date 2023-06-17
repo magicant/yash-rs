@@ -201,9 +201,19 @@ mod tests {
     #[test]
     fn returns_exit_status_47_with_n_option() {
         let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus(24);
         let args = Field::dummies(["-n", "47"]);
         let result = builtin_body(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(47)));
+    }
+
+    #[test]
+    fn returns_previous_exit_status_with_n_option_without_operand() {
+        let mut env = Env::new_virtual();
+        env.exit_status = ExitStatus(24);
+        let args = Field::dummies(["-n"]);
+        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus(24)));
     }
 
     #[test]
@@ -288,4 +298,7 @@ mod tests {
             assert!(stderr.contains("too many operands"), "stderr = {stderr:?}")
         });
     }
+
+    // TODO return_with_invalid_option
+    // TODO return used outside a function or script
 }
