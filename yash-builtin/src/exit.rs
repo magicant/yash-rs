@@ -125,8 +125,7 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
 /// Implementation of the exit built-in.
 ///
-/// This function calls [`builtin_body`] and wraps the result in a
-/// `Future`.
+/// This function calls [`builtin_body`] and wraps the result in a pinned box.
 pub fn builtin_main(
     env: &mut yash_env::Env,
     args: Vec<Field>,
