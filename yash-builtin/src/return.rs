@@ -109,14 +109,16 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     let mut i = args.iter().peekable();
     let no_return = i.next_if(|field| field.value == "-n").is_some();
     let exit_status = match i.next() {
-        Some(field) => ExitStatus(field.value.parse().expect("TODO")),
-        None => env.exit_status,
+        Some(field) => Some(ExitStatus(field.value.parse().expect("TODO"))),
+        None => None,
     };
-    let mut result = Result::new(exit_status);
-    if !no_return {
-        result.set_divert(Break(Divert::Return(None)));
+    if no_return {
+        Result::new(exit_status.unwrap_or(env.exit_status))
+    } else {
+        let mut result = Result::new(env.exit_status);
+        result.set_divert(Break(Divert::Return(exit_status)));
+        result
     }
-    result
 }
 
 /// Implementation of the return built-in.
@@ -159,8 +161,8 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["42"]);
         let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus(42));
-        expected_result.set_divert(Break(Divert::Return(None)));
+        let mut expected_result = Result::default();
+        expected_result.set_divert(Break(Divert::Return(Some(ExitStatus(42)))));
         assert_eq!(actual_result, expected_result);
     }
 
