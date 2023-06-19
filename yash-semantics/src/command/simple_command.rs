@@ -383,8 +383,10 @@ async fn execute_function(
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;
-    if let Break(Divert::Return(_exit_status)) = result {
-        // TODO Honor exit_status
+    if let Break(Divert::Return(exit_status)) = result {
+        if let Some(exit_status) = exit_status {
+            inner.exit_status = exit_status;
+        }
         Continue(())
     } else {
         result
@@ -929,8 +931,25 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO
-    fn function_call_consumes_return() {
+    fn function_call_consumes_return_without_exit_status() {
+        use yash_env::function::HashEntry;
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ return; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        env.exit_status = ExitStatus(17);
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(17));
+    }
+
+    #[test]
+    fn function_call_consumes_return_with_exit_status() {
         use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
