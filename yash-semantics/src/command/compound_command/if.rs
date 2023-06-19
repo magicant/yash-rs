@@ -186,12 +186,12 @@ mod tests {
     fn return_from_condition() {
         let (mut env, state) = fixture();
         env.exit_status = ExitStatus(15);
-        let command = "if return 42; then echo not reached; fi";
+        let command = "if return -n 7; return 42; then echo not reached; fi";
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(42));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(42)))));
+        assert_eq!(env.exit_status, ExitStatus(7));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -199,12 +199,12 @@ mod tests {
     fn return_from_body() {
         let (mut env, state) = fixture();
         env.exit_status = ExitStatus(15);
-        let command = "if return -n 0; then return 73; fi";
+        let command = "if return -n 0; then return -n 9; return 73; fi";
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(73));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(73)))));
+        assert_eq!(env.exit_status, ExitStatus(9));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -217,8 +217,8 @@ mod tests {
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(52));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(52)))));
+        assert_eq!(env.exit_status, ExitStatus(2));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -227,12 +227,12 @@ mod tests {
         let (mut env, state) = fixture();
         env.exit_status = ExitStatus(15);
         let command = "if return -n 2; then echo not reached 1
-        elif return -n 0; then return 47; fi";
+        elif return -n 0; then return -n 6; return 47; fi";
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(47));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(47)))));
+        assert_eq!(env.exit_status, ExitStatus(6));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
@@ -243,8 +243,8 @@ mod tests {
         let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(17));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(17)))));
+        assert_eq!(env.exit_status, ExitStatus(13));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 }

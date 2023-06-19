@@ -170,7 +170,7 @@ mod tests {
             .set_action(
                 &mut env.system,
                 Condition::Exit,
-                Action::Command("return 53".into()),
+                Action::Command("return -n 53; return".into()),
                 Location::dummy(""),
                 false,
             )

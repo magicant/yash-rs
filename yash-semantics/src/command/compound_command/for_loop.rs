@@ -245,11 +245,12 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("return", return_builtin());
-        let command: CompoundCommand = "for i in 1; do return 2; echo X; done".parse().unwrap();
+        let command = "for i in 1; do return -n 5; return 2; echo X; done";
+        let command: CompoundCommand = command.parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return(None)));
-        assert_eq!(env.exit_status, ExitStatus(2));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(2)))));
+        assert_eq!(env.exit_status, ExitStatus(5));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
 
