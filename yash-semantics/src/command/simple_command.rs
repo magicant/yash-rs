@@ -111,6 +111,10 @@ use yash_syntax::syntax::Redir;
 /// After executing the function body, the contexts are
 /// [popped](yash_env::variable::VariableSet::pop_context).
 ///
+/// If the execution results in a [`Divert::Return`], it is consumed, and its
+/// associated exit status, if any, is set as the exit status of the simple
+/// command.
+///
 /// ## External utility
 ///
 /// If the target is an external utility, a subshell is created.  Redirections
