@@ -189,7 +189,7 @@ pub enum Divert {
     },
 
     /// Return from the current function or script.
-    Return,
+    Return(Option<ExitStatus>),
 
     /// Interrupt the current shell execution environment.
     ///
@@ -221,8 +221,11 @@ impl Divert {
     pub fn exit_status(&self) -> Option<ExitStatus> {
         use Divert::*;
         match self {
-            Continue { .. } | Break { .. } | Return => None,
-            Interrupt(exit_status) | Exit(exit_status) | Abort(exit_status) => *exit_status,
+            Continue { .. } | Break { .. } => None,
+            Return(exit_status)
+            | Interrupt(exit_status)
+            | Exit(exit_status)
+            | Abort(exit_status) => *exit_status,
         }
     }
 }
@@ -269,7 +272,7 @@ mod tests {
     fn apply_errexit_to_non_interrupt() {
         let mut env = Env::new_virtual();
         env.options.set(ErrExit, On);
-        let subject: Result = Break(Divert::Return);
+        let subject: Result = Break(Divert::Return(None));
         let result = apply_errexit(subject, &env);
         assert_eq!(result, subject);
     }

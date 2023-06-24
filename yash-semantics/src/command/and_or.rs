@@ -279,10 +279,11 @@ mod tests {
     fn diverting_first() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(77);
         let list: AndOrList = "return 97".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
-        assert_eq!(env.exit_status, ExitStatus(97));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(97)))));
+        assert_eq!(env.exit_status, ExitStatus(77));
     }
 
     #[test]
@@ -291,8 +292,8 @@ mod tests {
         env.builtins.insert("return", return_builtin());
         let list: AndOrList = "return -n 7 || return 0 && X".parse().unwrap();
         let result = list.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
-        assert_eq!(env.exit_status, ExitStatus(0));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(0)))));
+        assert_eq!(env.exit_status, ExitStatus(7));
     }
 
     #[test]

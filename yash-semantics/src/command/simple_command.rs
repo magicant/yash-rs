@@ -111,6 +111,10 @@ use yash_syntax::syntax::Redir;
 /// After executing the function body, the contexts are
 /// [popped](yash_env::variable::VariableSet::pop_context).
 ///
+/// If the execution results in a [`Divert::Return`], it is consumed, and its
+/// associated exit status, if any, is set as the exit status of the simple
+/// command.
+///
 /// ## External utility
 ///
 /// If the target is an external utility, a subshell is created.  Redirections
@@ -383,7 +387,10 @@ async fn execute_function(
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;
-    if result == Break(Divert::Return) {
+    if let Break(Divert::Return(exit_status)) = result {
+        if let Some(exit_status) = exit_status {
+            inner.exit_status = exit_status;
+        }
         Continue(())
     } else {
         result
@@ -683,10 +690,22 @@ mod tests {
     #[test]
     fn simple_command_returns_exit_status_from_builtin_with_divert() {
         let mut env = Env::new_virtual();
-        env.builtins.insert("return", return_builtin());
-        let command: syntax::SimpleCommand = "return 37".parse().unwrap();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: yash_env::builtin::Type::Special,
+                execute: |_env, _args| {
+                    Box::pin(std::future::ready({
+                        let mut result = yash_env::builtin::Result::new(ExitStatus(37));
+                        result.set_divert(Break(Divert::Return(None)));
+                        result
+                    }))
+                },
+            },
+        );
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
+        assert_eq!(result, Break(Divert::Return(None)));
         assert_eq!(env.exit_status, ExitStatus(37));
     }
 
@@ -916,7 +935,25 @@ mod tests {
     }
 
     #[test]
-    fn function_call_consumes_return() {
+    fn function_call_consumes_return_without_exit_status() {
+        use yash_env::function::HashEntry;
+        let mut env = Env::new_virtual();
+        env.builtins.insert("return", return_builtin());
+        env.functions.insert(HashEntry(Rc::new(Function {
+            name: "foo".to_string(),
+            body: Rc::new("{ return; }".parse().unwrap()),
+            origin: Location::dummy("dummy"),
+            is_read_only: false,
+        })));
+        env.exit_status = ExitStatus(17);
+        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let result = command.execute(&mut env).now_or_never().unwrap();
+        assert_eq!(result, Continue(()));
+        assert_eq!(env.exit_status, ExitStatus(17));
+    }
+
+    #[test]
+    fn function_call_consumes_return_with_exit_status() {
         use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());

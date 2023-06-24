@@ -366,10 +366,11 @@ mod tests {
     fn single_command_pipeline_returns_exit_status_intact_with_divert() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(17);
         let pipeline: syntax::Pipeline = "return 37".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
-        assert_eq!(env.exit_status, ExitStatus(37));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(37)))));
+        assert_eq!(env.exit_status, ExitStatus(17));
     }
 
     #[test]
@@ -487,10 +488,11 @@ mod tests {
     fn not_inverting_exit_status_with_divert() {
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
+        env.exit_status = ExitStatus(3);
         let pipeline: syntax::Pipeline = "! return 15".parse().unwrap();
         let result = pipeline.execute(&mut env).now_or_never().unwrap();
-        assert_eq!(result, Break(Divert::Return));
-        assert_eq!(env.exit_status, ExitStatus(15));
+        assert_eq!(result, Break(Divert::Return(Some(ExitStatus(15)))));
+        assert_eq!(env.exit_status, ExitStatus(3));
     }
 
     #[test]

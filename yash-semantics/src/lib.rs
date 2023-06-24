@@ -54,7 +54,7 @@ pub(crate) mod tests {
     use std::future::pending;
     use std::future::ready;
     use std::future::Future;
-    use std::ops::ControlFlow::{Break, Continue};
+    use std::ops::ControlFlow::Break;
     use std::pin::Pin;
     use std::rc::Rc;
     use std::str::from_utf8;
@@ -176,22 +176,19 @@ pub(crate) mod tests {
     }
 
     fn return_builtin_main(
-        _env: &mut Env,
-        mut args: Vec<Field>,
+        env: &mut Env,
+        args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let divert = match args.get(0) {
-            Some(field) if field.value == "-n" => {
-                args.remove(0);
-                Continue(())
-            }
-            _ => Break(Divert::Return),
+        let mut i = args.iter().peekable();
+        let no_return = i.next_if(|field| field.value == "-n").is_some();
+        let exit_status = i.next().map(|arg| ExitStatus(arg.value.parse().unwrap()));
+        let result = if no_return {
+            yash_env::builtin::Result::new(exit_status.unwrap_or(env.exit_status))
+        } else {
+            let mut result = yash_env::builtin::Result::new(env.exit_status);
+            result.set_divert(Break(Divert::Return(exit_status)));
+            result
         };
-        let exit_status = match args.get(0) {
-            Some(field) => field.value.parse().unwrap_or(2),
-            None => 0,
-        };
-        let mut result = yash_env::builtin::Result::new(ExitStatus(exit_status));
-        result.set_divert(divert);
         Box::pin(ready(result))
     }
 
