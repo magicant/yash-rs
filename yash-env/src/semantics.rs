@@ -21,6 +21,8 @@ use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use std::ffi::c_int;
 use std::ops::ControlFlow::{self, Break};
+use std::process::ExitCode;
+use std::process::Termination;
 use yash_syntax::source::Location;
 
 /// Resultant string of word expansion.
@@ -105,6 +107,16 @@ impl From<ExitStatus> for c_int {
 impl From<Signal> for ExitStatus {
     fn from(signal: Signal) -> Self {
         Self::from(signal as c_int + 0x180)
+    }
+}
+
+/// Converts the exit status to `ExitCode`.
+///
+/// Note that `ExitCode` only supports exit statuses in the range of 0 to 255.
+/// Only the lowest 8 bits of the exit status are used in the conversion.
+impl Termination for ExitStatus {
+    fn report(self) -> ExitCode {
+        (self.0 as u8).into()
     }
 }
 
