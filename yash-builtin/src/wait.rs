@@ -81,9 +81,7 @@ use crate::common::arg::Mode;
 use crate::common::print_error_message;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::future::Future;
 use std::num::ParseIntError;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
@@ -216,8 +214,8 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
     exit_status.into()
 }
 
-/// Implementation of the wait built-in.
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `wait` built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
@@ -228,14 +226,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     } else {
         wait_for_each_job(env, operands).await
     }
-}
-
-/// Wrapper of [`builtin_body`] that returns the future in a pinned box.
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
 }
 
 #[cfg(test)]
@@ -265,7 +255,7 @@ mod tests {
             let subshell = Subshell::new(|_, _| Box::pin(futures_util::future::pending()));
             subshell.start(&mut env).await.unwrap();
 
-            let result = builtin_body(&mut env, vec![]).await;
+            let result = main(&mut env, vec![]).await;
             assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         })
     }
@@ -284,7 +274,7 @@ mod tests {
                 env.jobs.add(Job::new(pid));
             }
 
-            let result = builtin_body(&mut env, vec![]).await;
+            let result = main(&mut env, vec![]).await;
             assert_eq!(result, Result::new(ExitStatus::SUCCESS));
             assert_eq!(env.jobs.len(), 0);
 
@@ -310,7 +300,7 @@ mod tests {
         job.status = WaitStatus::Exited(pid, 42);
         let index = env.jobs.add(job);
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_eq!(env.jobs.get(index), None);
     }
@@ -322,7 +312,7 @@ mod tests {
         // Add a running job that is not a proper subshell.
         let index = env.jobs.add(Job::new(Pid::from_raw(1)));
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_eq!(env.jobs.get(index).unwrap().status, WaitStatus::StillAlive);
     }
@@ -335,7 +325,7 @@ mod tests {
             let pid = subshell.start(&mut env).await.unwrap().0;
 
             let args = Field::dummies([pid.to_string()]);
-            let result = builtin_body(&mut env, args).await;
+            let result = main(&mut env, args).await;
             assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
         })
     }
@@ -357,7 +347,7 @@ mod tests {
             }
 
             let args = Field::dummies(pids);
-            let result = builtin_body(&mut env, args).await;
+            let result = main(&mut env, args).await;
             assert_eq!(result, Result::new(ExitStatus(6)));
             assert_eq!(env.jobs.len(), 0);
 
@@ -384,7 +374,7 @@ mod tests {
         let index = env.jobs.add(job);
 
         let args = Field::dummies([pid.to_string()]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(17)));
         assert_eq!(env.jobs.get(index), None);
     }
@@ -397,7 +387,7 @@ mod tests {
         let index = env.jobs.add(Job::new(Pid::from_raw(19)));
 
         let args = Field::dummies(["19".to_string()]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
         assert_eq!(env.jobs.get(index), None);
     }
@@ -406,7 +396,7 @@ mod tests {
     fn wait_unknown_process_id() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["9999999"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::NOT_FOUND));
     }
 
@@ -421,7 +411,7 @@ mod tests {
         });
         let args = Field::dummies(["abc"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::ERROR));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
@@ -437,7 +427,7 @@ mod tests {
         });
         let args = Field::dummies(["0"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::ERROR));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }

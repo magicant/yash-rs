@@ -43,6 +43,7 @@ pub mod wait;
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
 
+use std::future::ready;
 use Type::{Intrinsic, Special};
 
 /// Array of all the implemented built-in utilities.
@@ -53,21 +54,21 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "alias",
         Builtin {
             r#type: Intrinsic,
-            execute: alias::builtin_main,
+            execute: |env, args| Box::pin(ready(alias::main(env, args))),
         },
     ),
     (
         "break",
         Builtin {
             r#type: Special,
-            execute: r#break::builtin_main,
+            execute: |env, args| Box::pin(r#break::main(env, args)),
         },
     ),
     (
         "continue",
         Builtin {
             r#type: Special,
-            execute: r#continue::builtin_main,
+            execute: |env, args| Box::pin(r#continue::main(env, args)),
         },
     ),
     #[cfg(feature = "yash-semantics")]
@@ -75,56 +76,56 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "exec",
         Builtin {
             r#type: Special,
-            execute: exec::builtin_main,
+            execute: |env, args| Box::pin(exec::main(env, args)),
         },
     ),
     (
         "exit",
         Builtin {
             r#type: Special,
-            execute: exit::builtin_main,
+            execute: |env, args| Box::pin(exit::main(env, args)),
         },
     ),
     (
         "jobs",
         Builtin {
             r#type: Intrinsic,
-            execute: jobs::builtin_main,
+            execute: |env, args| Box::pin(jobs::main(env, args)),
         },
     ),
     (
         "readonly",
         Builtin {
             r#type: Special,
-            execute: readonly::builtin_main,
+            execute: |env, args| Box::pin(ready(readonly::main(env, args))),
         },
     ),
     (
         "return",
         Builtin {
             r#type: Special,
-            execute: r#return::builtin_main,
+            execute: |env, args| Box::pin(r#return::main(env, args)),
         },
     ),
     (
         "set",
         Builtin {
             r#type: Special,
-            execute: set::builtin_main,
+            execute: |env, args| Box::pin(set::main(env, args)),
         },
     ),
     (
         "trap",
         Builtin {
             r#type: Special,
-            execute: trap::builtin_main,
+            execute: |env, args| Box::pin(trap::main(env, args)),
         },
     ),
     (
         "wait",
         Builtin {
             r#type: Intrinsic,
-            execute: wait::builtin_main,
+            execute: |env, args| Box::pin(wait::main(env, args)),
         },
     ),
 ];

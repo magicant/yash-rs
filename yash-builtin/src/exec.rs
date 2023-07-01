@@ -88,9 +88,7 @@
 //! a common practice among existing shells.
 
 use std::ffi::CString;
-use std::future::Future;
 use std::ops::ControlFlow::Break;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -99,8 +97,8 @@ use yash_semantics::command_search::search_path;
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
 
-/// Implements the exec built-in.
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `exec` built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options
     let mut result = Result::default();
     result.retain_redirs();
@@ -128,11 +126,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     result
 }
 
-/// Wrapper of [`builtin_body`] that returns the future in a pinned box.
-pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,7 +139,7 @@ mod tests {
     #[test]
     fn retains_redirs_without_args() {
         let mut env = Env::new_virtual();
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::SUCCESS);
         assert!(result.should_retain_redirs());
     }
@@ -181,7 +174,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["echo"]);
-        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        _ = main(&mut env, args).now_or_never().unwrap();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -220,7 +213,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["ls", "-l"]);
-        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        _ = main(&mut env, args).now_or_never().unwrap();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -253,7 +246,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["/bin/echo"]);
-        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        _ = main(&mut env, args).now_or_never().unwrap();
 
         let process = &system.current_process();
         let arguments = process.last_exec().as_ref().unwrap();
@@ -285,7 +278,7 @@ mod tests {
         // No PATH variable
 
         let args = Field::dummies(["echo"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::NOT_FOUND);
         assert_eq!(result.divert(), Break(Abort(None)));
 
@@ -314,7 +307,7 @@ mod tests {
             .unwrap();
 
         let args = Field::dummies(["/bin/echo"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result.exit_status(), ExitStatus::NOEXEC);
         assert_eq!(result.divert(), Break(Abort(None)));
     }

@@ -89,10 +89,8 @@
 //! should use the value of `$?` before entering trap.
 
 use crate::common::syntax_error;
-use std::future::Future;
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -104,10 +102,10 @@ async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseInt
     syntax_error(env, &error.to_string(), location).await
 }
 
-/// Implementation of the return built-in.
+/// Entry point for executing the `return` built-in
 ///
 /// See the [module-level documentation](self) for details.
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the return built-in to support XBD Utility
     // Syntax Guidelines. That means the built-in does not have to recognize the
     // "--" separator. We should reject the separator in the POSIXly-correct
@@ -141,16 +139,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     }
 }
 
-/// Implementation of the return built-in.
-///
-/// This function calls [`builtin_body`] and wraps the result in a `Box`.
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,7 +152,7 @@ mod tests {
     #[test]
     fn return_without_arguments_with_exit_status_0() {
         let mut env = Env::new_virtual();
-        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let mut expected_result = Result::default();
         expected_result.set_divert(Break(Divert::Return(None)));
         assert_eq!(actual_result, expected_result);
@@ -174,7 +162,7 @@ mod tests {
     fn return_without_arguments_with_non_zero_exit_status() {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(42);
-        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus(42));
         expected_result.set_divert(Break(Divert::Return(None)));
         assert_eq!(actual_result, expected_result);
@@ -184,7 +172,7 @@ mod tests {
     fn returns_exit_status_specified_without_n_option() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["42"]);
-        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let mut expected_result = Result::default();
         expected_result.set_divert(Break(Divert::Return(Some(ExitStatus(42)))));
         assert_eq!(actual_result, expected_result);
@@ -194,7 +182,7 @@ mod tests {
     fn returns_exit_status_12_with_n_option() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["-n", "12"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(12)));
     }
 
@@ -203,7 +191,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(24);
         let args = Field::dummies(["-n", "47"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(47)));
     }
 
@@ -212,7 +200,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(24);
         let args = Field::dummies(["-n"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus(24)));
     }
 
@@ -227,7 +215,7 @@ mod tests {
         });
         let args = Field::dummies(["-1"]);
 
-        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus::ERROR);
         expected_result.set_divert(Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
@@ -247,7 +235,7 @@ mod tests {
         });
         let args = Field::dummies(["foo"]);
 
-        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus::ERROR);
         expected_result.set_divert(Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
@@ -267,7 +255,7 @@ mod tests {
         });
         let args = Field::dummies(["999999999999999999999999999999"]);
 
-        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus::ERROR);
         expected_result.set_divert(Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
@@ -290,7 +278,7 @@ mod tests {
         });
         let args = Field::dummies(["1", "2"]);
 
-        let actual_result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus::ERROR);
         expected_result.set_divert(Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);

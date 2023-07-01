@@ -18,17 +18,14 @@
 //!
 //! TODO Elaborate
 
-use std::future::ready;
-use std::future::Future;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::alias::HashEntry;
 
-/// Implementation of the alias built-in.
-pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `alias` built-in
+pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print alias definitions if there are no operands
 
@@ -55,16 +52,6 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
     ExitStatus::SUCCESS.into()
 }
 
-/// Implementation of the alias built-in.
-///
-/// This function calls [`builtin_main_sync`] and wraps the result in a `Future`.
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(builtin_main_sync(env, args)))
-}
-
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
@@ -77,7 +64,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=bar baz"]);
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = main(&mut env, args);
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);
@@ -97,7 +84,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["abc=xyz", "yes=no", "ls=ls --color"]);
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = main(&mut env, args);
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 3);
@@ -135,12 +122,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=1"]);
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = main(&mut env, args);
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let args = Field::dummies(["foo=2"]);
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = main(&mut env, args);
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);

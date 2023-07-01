@@ -18,9 +18,6 @@
 //!
 //! TODO Elaborate
 
-use std::future::ready;
-use std::future::Future;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -29,8 +26,8 @@ use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 use yash_env::Env;
 
-/// Implementation of the readonly built-in.
-pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `readonly` built-in
+pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options
     // TODO print read-only variables if there are no operands
 
@@ -66,16 +63,6 @@ pub fn builtin_main_sync(env: &mut Env, args: Vec<Field>) -> Result {
     ExitStatus::SUCCESS.into()
 }
 
-/// Implementation of the readonly built-in.
-///
-/// This function calls [`builtin_main_sync`] and wraps the result in a `Future`.
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result>>> {
-    Box::pin(ready(builtin_main_sync(env, args)))
-}
-
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
@@ -89,7 +76,7 @@ mod tests {
         let args = Field::dummies(["foo=bar baz"]);
         let location = args[0].origin.clone();
 
-        let result = builtin_main_sync(&mut env, args);
+        let result = main(&mut env, args);
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let v = env.variables.get("foo").unwrap();

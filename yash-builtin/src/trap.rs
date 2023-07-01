@@ -23,8 +23,6 @@ use crate::common::arg::Mode;
 use crate::common::print_error_message;
 use crate::common::Print;
 use std::fmt::Write;
-use std::future::Future;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -52,8 +50,8 @@ pub async fn print_traps(env: &mut Env) -> Result {
     env.print(&output).await
 }
 
-/// Implementation of the trap built-in.
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `trap` built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, mut operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return print_error_message(env, &error).await,
@@ -89,16 +87,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     }
 }
 
-/// Implementation of the trap built-in.
-///
-/// This function calls [`builtin_body`] and wraps the result in a pinned box.
-pub fn builtin_main(
-    env: &mut yash_env::Env,
-    args: Vec<Field>,
-) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,7 +110,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["", "USR1"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
@@ -138,7 +126,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "USR2"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
@@ -154,7 +142,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["-", "PIPE"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let process = &state.borrow().processes[&pid];
         assert_eq!(
@@ -169,7 +157,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
     }
@@ -180,9 +168,9 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "trap -- echo INT\n"));
     }
@@ -193,11 +181,11 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["echo t", "TERM"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- 'echo t' TERM\n")
@@ -215,9 +203,9 @@ mod tests {
             is_special: true,
         });
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
 
-        let actual_result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let mut expected_result = Result::new(ExitStatus::FAILURE);
         expected_result.set_divert(Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
@@ -230,12 +218,12 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
         env.traps.enter_subshell(&mut env.system, false, false);
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- echo INT\ntrap -- '' TERM\n")
@@ -248,14 +236,14 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let args = Field::dummies(["echo", "INT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["", "TERM"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
         env.traps.enter_subshell(&mut env.system, false, false);
         let args = Field::dummies(["ls", "QUIT"]);
-        let _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        let _ = main(&mut env, args).now_or_never().unwrap();
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "trap -- ls QUIT\ntrap -- '' TERM\n")

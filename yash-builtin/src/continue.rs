@@ -78,7 +78,7 @@
 //! break built-in.
 //! This module just re-exports functions from [`super::break`].
 
-pub use super::r#break::{builtin_body, builtin_main};
+pub use super::r#break::main;
 
 #[cfg(test)]
 mod tests {
@@ -112,7 +112,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -135,7 +135,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 0 })
@@ -157,7 +157,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 0 })
@@ -180,7 +180,7 @@ mod tests {
         });
         let args = Field::dummies(["1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 0 })
@@ -203,7 +203,7 @@ mod tests {
         });
         let args = Field::dummies(["3"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 2 })
@@ -227,7 +227,7 @@ mod tests {
         });
         let args = Field::dummies(["5"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 3 })
@@ -248,7 +248,7 @@ mod tests {
         });
         let args = Field::dummies(["0"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -274,7 +274,7 @@ mod tests {
         });
         let args = Field::dummies(["999999999999999999999999999999"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -295,7 +295,7 @@ mod tests {
         });
         let args = Field::dummies(["1", "1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -318,7 +318,7 @@ mod tests {
         });
         let args = Field::dummies(["--", "1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Continue { count: 0 })

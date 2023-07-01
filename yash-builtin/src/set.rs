@@ -126,8 +126,6 @@ use crate::common::print_error_message;
 use crate::common::BuiltinEnv;
 use crate::common::Print;
 use std::fmt::Write;
-use std::future::Future;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 #[cfg(doc)]
 use yash_env::option::canonicalize;
@@ -176,8 +174,8 @@ fn modify(
     }
 }
 
-/// Implementation of the set built-in.
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+/// Entry point for executing the `set` built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match arg::parse(args) {
         Ok(arg::Parse::PrintVariables) => {
             let mut vars: Vec<_> = env.variables.iter(Global).collect();
@@ -226,11 +224,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
 
         Err(error) => print_error_message(env, &error).await,
     }
-}
-
-/// Wrapper of [`builtin_body`] that returns the future in a pinned box.
-pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
 }
 
 #[cfg(test)]
@@ -284,7 +277,7 @@ mod tests {
             .unwrap();
 
         let args = vec![];
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(stdout, "bar='Hello, world!'\nbaz=(one '')\nfoo=value\n")
@@ -300,7 +293,7 @@ mod tests {
         env.options.set(Unset, Off);
 
         let args = Field::dummies(["-o"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| {
             assert_eq!(
@@ -339,7 +332,7 @@ xtrace           off
         let options = env.options;
 
         let args = Field::dummies(["+o"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         // The output from `set +o` should be parsable
@@ -349,7 +342,7 @@ xtrace           off
             "set",
             Builtin {
                 r#type: Special,
-                execute: builtin_main,
+                execute: |env, args| Box::pin(main(env, args)),
             },
         );
         env.options = Default::default();
@@ -368,7 +361,7 @@ xtrace           off
     fn setting_some_options() {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["-a", "-n"]);
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let mut options = OptionSet::default();
@@ -386,7 +379,7 @@ xtrace           off
         let mut env = env.push_frame(Frame::Builtin { name, is_special });
         let args = Field::dummies(["a", "b", "z"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let v = env.variables.positional_params();
@@ -403,7 +396,7 @@ xtrace           off
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let mut expected_options = OptionSet::default();
         expected_options.extend([Interactive, Monitor]);
@@ -420,10 +413,10 @@ xtrace           off
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Interactive, On);
         let args = Field::dummies(["-m"]);
-        _ = builtin_body(&mut env, args).now_or_never().unwrap();
+        _ = main(&mut env, args).now_or_never().unwrap();
         let args = Field::dummies(["+m"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let mut expected_options = OptionSet::default();
         expected_options.set(Interactive, On);
@@ -440,7 +433,7 @@ xtrace           off
         let mut env = Env::with_system(Box::new(system));
         let args = Field::dummies(["-m"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         let mut expected_options = OptionSet::default();
         expected_options.set(Monitor, On);

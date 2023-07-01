@@ -77,10 +77,8 @@ use crate::common::print_error_message;
 use crate::common::print_simple_error_message;
 use crate::common::syntax_error;
 use crate::common::BuiltinEnv;
-use std::future::Future;
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
-use std::pin::Pin;
 use yash_env::builtin::Result;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -110,14 +108,14 @@ async fn not_in_loop_error(env: &mut Env) -> Result {
     .await
 }
 
-/// Implementation of the break built-in.
+/// Entry point for executing the `break` built-in
 ///
 /// This function also implements the [continue](super::continue) built-in.
 /// The behavior depends on the built-in name stored in the topmost stack
 /// [frame](yash_env::stack::Frame) in the environment.
 /// If the stack does not contain a `Frame::Builtin`, this function will
 /// **panic!**
-pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the break built-in to support XBD Utility
     // Syntax Guidelines. That means the built-in does not have to recognize the
     // "--" separator. We should reject the separator in the POSIXly-correct mode.
@@ -155,11 +153,6 @@ pub async fn builtin_body(env: &mut Env, args: Vec<Field>) -> Result {
     }
 }
 
-/// Wrapper of [`builtin_body`] that returns the future in a pinned box.
-pub fn builtin_main(env: &mut Env, args: Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>> {
-    Box::pin(builtin_body(env, args))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,7 +179,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -209,7 +202,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
@@ -231,7 +224,7 @@ mod tests {
             is_special: true,
         });
 
-        let result = builtin_body(&mut env, vec![]).now_or_never().unwrap();
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
@@ -254,7 +247,7 @@ mod tests {
         });
         let args = Field::dummies(["1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
@@ -277,7 +270,7 @@ mod tests {
         });
         let args = Field::dummies(["3"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 2 })
@@ -301,7 +294,7 @@ mod tests {
         });
         let args = Field::dummies(["5"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 3 })
@@ -322,7 +315,7 @@ mod tests {
         });
         let args = Field::dummies(["0"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -348,7 +341,7 @@ mod tests {
         });
         let args = Field::dummies(["999999999999999999999999999999"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -369,7 +362,7 @@ mod tests {
         });
         let args = Field::dummies(["1", "1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
@@ -392,7 +385,7 @@ mod tests {
         });
         let args = Field::dummies(["--", "1"]);
 
-        let result = builtin_body(&mut env, args).now_or_never().unwrap();
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(
             result,
             result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
