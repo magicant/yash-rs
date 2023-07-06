@@ -159,11 +159,13 @@ pub(crate) mod tests {
         env: &mut Env,
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-        let mut result = yash_env::builtin::Result::new(env.exit_status);
         let exit_status = args
             .get(0)
             .map(|field| ExitStatus(field.value.parse().unwrap_or(2)));
-        result.set_divert(Break(Divert::Exit(exit_status)));
+        let result = yash_env::builtin::Result::with_exit_status_and_divert(
+            env.exit_status,
+            Break(Divert::Exit(exit_status)),
+        );
         Box::pin(ready(result))
     }
 
@@ -185,9 +187,10 @@ pub(crate) mod tests {
         let result = if no_return {
             yash_env::builtin::Result::new(exit_status.unwrap_or(env.exit_status))
         } else {
-            let mut result = yash_env::builtin::Result::new(env.exit_status);
-            result.set_divert(Break(Divert::Return(exit_status)));
-            result
+            yash_env::builtin::Result::with_exit_status_and_divert(
+                env.exit_status,
+                Break(Divert::Return(exit_status)),
+            )
         };
         Box::pin(ready(result))
     }
@@ -205,8 +208,10 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
-        let mut result = yash_env::builtin::Result::new(ExitStatus::SUCCESS);
-        result.set_divert(Break(Divert::Break { count: count - 1 }));
+        let result = yash_env::builtin::Result::with_exit_status_and_divert(
+            ExitStatus::SUCCESS,
+            Break(Divert::Break { count: count - 1 }),
+        );
         Box::pin(ready(result))
     }
 
@@ -223,8 +228,10 @@ pub(crate) mod tests {
         args: Vec<Field>,
     ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
         let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
-        let mut result = yash_env::builtin::Result::new(ExitStatus::SUCCESS);
-        result.set_divert(Break(Divert::Continue { count: count - 1 }));
+        let result = yash_env::builtin::Result::with_exit_status_and_divert(
+            ExitStatus::SUCCESS,
+            Break(Divert::Continue { count: count - 1 }),
+        );
         Box::pin(ready(result))
     }
 

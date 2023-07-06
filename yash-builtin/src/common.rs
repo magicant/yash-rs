@@ -214,9 +214,8 @@ where
     E: BuiltinEnv + Stderr,
     M: Into<Message<'a>> + 'a,
 {
-    let mut result = yash_env::builtin::Result::new(ExitStatus::FAILURE);
-    result.set_divert(print_message(env, message).await);
-    result
+    let result = print_message(env, message).await;
+    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, result)
 }
 
 /// Prints an error message.
@@ -229,9 +228,8 @@ where
     E: BuiltinEnv + Stderr,
     M: Into<Message<'a>> + 'a,
 {
-    let mut result = yash_env::builtin::Result::new(ExitStatus::ERROR);
-    result.set_divert(print_message(env, message).await);
-    result
+    let result = print_message(env, message).await;
+    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, result)
 }
 
 /// Prints a simple error message.

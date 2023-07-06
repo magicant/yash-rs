@@ -117,9 +117,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             Err(e) => return operand_parse_error(env, &arg.origin, e).await,
         },
     };
-    let mut result = Result::new(env.exit_status);
-    result.set_divert(Break(Divert::Exit(exit_status)));
-    result
+    Result::with_exit_status_and_divert(env.exit_status, Break(Divert::Exit(exit_status)))
 }
 
 #[cfg(test)]
@@ -135,8 +133,8 @@ mod tests {
     fn exit_without_arguments_with_exit_status_0() {
         let mut env = Env::new_virtual();
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
-        let mut expected_result = Result::default();
-        expected_result.set_divert(Break(Divert::Exit(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::SUCCESS, Break(Divert::Exit(None)));
         assert_eq!(actual_result, expected_result);
     }
 
@@ -145,8 +143,8 @@ mod tests {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus(42);
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus(42));
-        expected_result.set_divert(Break(Divert::Exit(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus(42), Break(Divert::Exit(None)));
         assert_eq!(actual_result, expected_result);
     }
 
@@ -155,8 +153,10 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["123"]);
         let actual_result = main(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::default();
-        expected_result.set_divert(Break(Divert::Exit(Some(ExitStatus(123)))));
+        let expected_result = Result::with_exit_status_and_divert(
+            ExitStatus::SUCCESS,
+            Break(Divert::Exit(Some(ExitStatus(123)))),
+        );
         assert_eq!(actual_result, expected_result);
     }
 
@@ -172,8 +172,8 @@ mod tests {
         let args = Field::dummies(["-1"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus::ERROR);
-        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("-1"), "stderr = {stderr:?}")
@@ -192,8 +192,8 @@ mod tests {
         let args = Field::dummies(["foo"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus::ERROR);
-        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("foo"), "stderr = {stderr:?}")
@@ -212,8 +212,8 @@ mod tests {
         let args = Field::dummies(["999999999999999999999999999999"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus::ERROR);
-        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(
@@ -235,8 +235,8 @@ mod tests {
         let args = Field::dummies(["1", "2"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus::ERROR);
-        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("too many operands"), "stderr = {stderr:?}")

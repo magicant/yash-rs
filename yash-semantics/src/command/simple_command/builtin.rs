@@ -131,9 +131,10 @@ mod tests {
                 r#type: yash_env::builtin::Type::Special,
                 execute: |_env, _args| {
                     Box::pin(std::future::ready({
-                        let mut result = yash_env::builtin::Result::new(ExitStatus(37));
-                        result.set_divert(Break(Divert::Return(None)));
-                        result
+                        yash_env::builtin::Result::with_exit_status_and_divert(
+                            ExitStatus(37),
+                            Break(Divert::Return(None)),
+                        )
                     }))
                 },
             },

@@ -116,9 +116,10 @@ mod tests {
             _args: Vec<yash_env::semantics::Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async move {
-                let mut result = yash_env::builtin::Result::default();
-                result.set_divert(Break(Divert::Exit(Some(ExitStatus(21)))));
-                result
+                yash_env::builtin::Result::with_exit_status_and_divert(
+                    ExitStatus::SUCCESS,
+                    Break(Divert::Exit(Some(ExitStatus(21)))),
+                )
             })
         }
 

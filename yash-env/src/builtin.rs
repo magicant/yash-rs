@@ -84,6 +84,19 @@ impl Result {
         }
     }
 
+    /// Creates a new result with a [`Divert`].
+    #[inline]
+    pub const fn with_exit_status_and_divert(
+        exit_status: ExitStatus,
+        divert: crate::semantics::Result,
+    ) -> Self {
+        Self {
+            exit_status,
+            divert,
+            should_retain_redirs: false,
+        }
+    }
+
     /// Returns the exit status of this result.
     ///
     /// The return value is the argument to the previous invocation of

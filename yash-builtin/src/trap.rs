@@ -206,8 +206,10 @@ mod tests {
         let _ = main(&mut env, args).now_or_never().unwrap();
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
-        let mut expected_result = Result::new(ExitStatus::FAILURE);
-        expected_result.set_divert(Break(Divert::Interrupt(None)));
+        let expected_result = Result::with_exit_status_and_divert(
+            ExitStatus::FAILURE,
+            Break(Divert::Interrupt(None)),
+        );
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
     }
