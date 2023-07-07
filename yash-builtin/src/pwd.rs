@@ -78,6 +78,22 @@ use yash_env::Env;
 use yash_env::System;
 use yash_semantics::Field;
 
+/// Choice of the behavior of the built-in
+#[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Mode {
+    /// The built-in prints the value of `$PWD` if it is
+    /// [correct](Env::has_correct_pwd).
+    ///
+    /// If `$PWD` is not a correct path, the built-in falls back to
+    /// [`Physical`](Self::Physical).
+    #[default]
+    Logical,
+
+    /// The built-in computes the canonical path to the working directory.
+    Physical,
+}
+
 pub mod semantics;
 pub mod syntax;
 
