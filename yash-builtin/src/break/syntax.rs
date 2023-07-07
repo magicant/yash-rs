@@ -30,16 +30,16 @@ use yash_syntax::source::pretty::MessageBase;
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub enum Error<'a> {
+pub enum Error {
     /// An error occurred in the common parser.
-    CommonError(crate::common::syntax::Error<'a>),
+    CommonError(crate::common::syntax::Error<'static>),
     /// More than one operand is given.
     TooManyOperands(Vec<Field>),
     /// The operand is not a valid positive integer.
     InvalidNumber(Field, ParseIntError),
 }
 
-impl std::fmt::Display for Error<'_> {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Error::*;
         match self {
@@ -50,15 +50,15 @@ impl std::fmt::Display for Error<'_> {
     }
 }
 
-impl std::error::Error for Error<'_> {}
+impl std::error::Error for Error {}
 
-impl<'a> From<crate::common::syntax::Error<'a>> for Error<'a> {
-    fn from(error: crate::common::syntax::Error<'a>) -> Self {
+impl From<crate::common::syntax::Error<'static>> for Error {
+    fn from(error: crate::common::syntax::Error<'static>) -> Self {
         Error::CommonError(error)
     }
 }
 
-impl MessageBase for Error<'_> {
+impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {
         self.to_string().into()
     }
@@ -84,10 +84,10 @@ impl MessageBase for Error<'_> {
 /// Result of parsing command line arguments
 ///
 /// If successful, the result is the number of levels to break.
-pub type Result<'a> = std::result::Result<NonZeroUsize, Error<'a>>;
+pub type Result = std::result::Result<NonZeroUsize, Error>;
 
 /// Parses command line arguments for the break/continue built-in.
-pub fn parse(env: &Env, args: Vec<Field>) -> Result<'static> {
+pub fn parse(env: &Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the break/continue built-in to support XBD
     // Utility Syntax Guidelines. That means the built-in does not have to
     // recognize the "--" separator. We should reject the separator in the
