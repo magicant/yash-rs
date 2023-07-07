@@ -94,6 +94,8 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 
+// TODO Split into syntax and semantics submodules
+
 // TODO Parse as a job ID if an operand starts with %
 // TODO Treat an unknown job as terminated with exit status 127
 // TODO Treat a suspended job as terminated if it is job-controlled.

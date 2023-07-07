@@ -98,6 +98,8 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::Location;
 
+// TODO Split into syntax and semantics submodules
+
 async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
     syntax_error(env, &error.to_string(), location).await
 }

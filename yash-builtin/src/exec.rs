@@ -97,6 +97,8 @@ use yash_semantics::command_search::search_path;
 use yash_semantics::Divert::Abort;
 use yash_semantics::ExitStatus;
 
+// TODO Split into syntax and semantics submodules
+
 /// Entry point for executing the `exec` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO Support non-POSIX options

@@ -98,6 +98,8 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 
+// TODO Split into syntax and semantics submodules
+
 const OPTIONS: &[OptionSpec] = &[
     OptionSpec::new().short('l').long("verbose"),
     OptionSpec::new().short('p').long("pgid-only"),

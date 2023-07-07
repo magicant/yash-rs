@@ -24,6 +24,8 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::alias::HashEntry;
 
+// TODO Split into syntax and semantics submodules
+
 /// Entry point for executing the `alias` built-in
 pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options

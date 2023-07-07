@@ -141,6 +141,7 @@ use yash_env::variable::Array;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
+// TODO Reorganize into syntax and semantics submodules
 pub mod arg;
 
 /// Enables or disables stopper handlers depending on the `Interactive` and

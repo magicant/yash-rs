@@ -26,6 +26,8 @@ use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 use yash_env::Env;
 
+// TODO Split into syntax and semantics submodules
+
 /// Entry point for executing the `readonly` built-in
 pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO support options

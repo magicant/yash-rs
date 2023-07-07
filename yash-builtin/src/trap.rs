@@ -31,6 +31,8 @@ use yash_env::trap::Condition;
 use yash_env::Env;
 use yash_quote::quoted;
 
+// TODO Split into syntax and semantics submodules
+
 /// Prints the currently configured traps.
 pub async fn print_traps(env: &mut Env) -> Result {
     let mut output = String::new();
