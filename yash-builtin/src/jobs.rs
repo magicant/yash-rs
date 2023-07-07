@@ -79,11 +79,11 @@
 //! A portable job ID must start with a `%`. If an operand does not have a
 //! leading `%`, the built-in assumes one silently, which is not portable.
 
-use crate::common::arg::parse_arguments;
-use crate::common::arg::Mode;
-use crate::common::arg::OptionSpec;
 use crate::common::print_error_message;
 use crate::common::print_failure_message;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
+use crate::common::syntax::OptionSpec;
 use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;

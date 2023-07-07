@@ -141,8 +141,8 @@ use yash_env::variable::Array;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
-// TODO Reorganize into syntax and semantics submodules
-pub mod arg;
+pub mod syntax;
+// TODO pub mod semantics;
 
 /// Enables or disables stopper handlers depending on the `Interactive` and
 /// `Monitor` option states.
@@ -177,8 +177,8 @@ fn modify(
 
 /// Entry point for executing the `set` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    match arg::parse(args) {
-        Ok(arg::Parse::PrintVariables) => {
+    match syntax::parse(args) {
+        Ok(syntax::Parse::PrintVariables) => {
             let mut vars: Vec<_> = env.variables.iter(Global).collect();
             // TODO apply current locale's collation
             vars.sort_unstable_by_key(|&(name, _)| name);
@@ -193,7 +193,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             env.print(&print).await
         }
 
-        Ok(arg::Parse::PrintOptionsHumanReadable) => {
+        Ok(syntax::Parse::PrintOptionsHumanReadable) => {
             let mut print = String::new();
             for option in yash_env::option::Option::iter() {
                 let state = env.options.get(option);
@@ -202,7 +202,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             env.print(&print).await
         }
 
-        Ok(arg::Parse::PrintOptionsMachineReadable) => {
+        Ok(syntax::Parse::PrintOptionsMachineReadable) => {
             let mut print = String::new();
             for option in yash_env::option::Option::iter() {
                 let skip = if option.is_modifiable() { "" } else { "#" };
@@ -215,7 +215,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             env.print(&print).await
         }
 
-        Ok(arg::Parse::Modify {
+        Ok(syntax::Parse::Modify {
             options,
             positional_params,
         }) => {

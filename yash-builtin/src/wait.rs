@@ -76,9 +76,9 @@
 //! The exact value of an exit status resulting from a signal is
 //! implementation-dependent.
 
-use crate::common::arg::parse_arguments;
-use crate::common::arg::Mode;
 use crate::common::print_error_message;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::num::ParseIntError;

@@ -38,7 +38,7 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
 
-pub mod arg;
+pub mod syntax;
 
 /// Execution environment extension for examining the currently running
 /// built-in.

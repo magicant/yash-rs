@@ -18,9 +18,9 @@
 //!
 //! TODO Elaborate
 
-use crate::common::arg::parse_arguments;
-use crate::common::arg::Mode;
 use crate::common::print_error_message;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
 use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;

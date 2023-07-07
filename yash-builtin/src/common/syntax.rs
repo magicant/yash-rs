@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Command-line argument parser
+//! Command-line argument syntax parser
 //!
 //! This module provides functionalities for parsing command-line arguments into
 //! options and operands.
@@ -28,7 +28,7 @@
 //! # Example
 //!
 //! ```
-//! use yash_builtin::common::arg::*;
+//! use yash_builtin::common::syntax::*;
 //! let specs = &[
 //!     OptionSpec::new().short('a'),
 //!     OptionSpec::new().short('b').long("bar"),
@@ -185,7 +185,7 @@ impl OptionSpec<'_> {
 /// The default configuration disables all non-portable extensions:
 ///
 /// ```
-/// # use yash_builtin::common::arg::Mode;
+/// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::default();
 /// assert!(!mode.accepts_long_options());
 /// # // TODO other properties
@@ -195,7 +195,7 @@ impl OptionSpec<'_> {
 /// with those extensions enabled.
 ///
 /// ```
-/// # use yash_builtin::common::arg::Mode;
+/// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::with_extensions();
 /// assert!(mode.accepts_long_options());
 /// # // TODO other properties

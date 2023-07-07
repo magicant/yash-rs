@@ -16,8 +16,8 @@
 
 //! Command line argument parser for the break/continue built-in
 
-use crate::common::arg::parse_arguments;
-use crate::common::arg::Mode;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::num::ParseIntError;
@@ -32,7 +32,7 @@ use yash_syntax::source::pretty::MessageBase;
 #[non_exhaustive]
 pub enum Error<'a> {
     /// An error occurred in the common parser.
-    CommonError(crate::common::arg::Error<'a>),
+    CommonError(crate::common::syntax::Error<'a>),
     /// More than one operand is given.
     TooManyOperands(Vec<Field>),
     /// The operand is not a valid positive integer.
@@ -52,8 +52,8 @@ impl std::fmt::Display for Error<'_> {
 
 impl std::error::Error for Error<'_> {}
 
-impl<'a> From<crate::common::arg::Error<'a>> for Error<'a> {
-    fn from(error: crate::common::arg::Error<'a>) -> Self {
+impl<'a> From<crate::common::syntax::Error<'a>> for Error<'a> {
+    fn from(error: crate::common::syntax::Error<'a>) -> Self {
         Error::CommonError(error)
     }
 }
