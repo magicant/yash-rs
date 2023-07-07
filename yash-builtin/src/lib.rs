@@ -34,6 +34,7 @@ pub mod r#continue;
 pub mod exec;
 pub mod exit;
 pub mod jobs;
+pub mod pwd;
 pub mod readonly;
 pub mod r#return;
 pub mod set;
@@ -91,6 +92,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Intrinsic,
             execute: |env, args| Box::pin(jobs::main(env, args)),
+        },
+    ),
+    (
+        "pwd",
+        Builtin {
+            r#type: Intrinsic,
+            execute: |env, args| Box::pin(pwd::main(env, args)),
         },
     ),
     (
