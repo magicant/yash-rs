@@ -69,17 +69,52 @@
 //!
 //! # Implementation notes
 //!
-//! A successful invocation of the built-in returns
-//! `Break(Divert::Continue(n-1))` as the second element of the returned tuple.
-//! The caller must pass the value to enclosing loops so that the target loop
-//! can handle it.
+//! A successful invocation of the built-in returns a [`Result`] containing
+//! `Break(Divert::Continue(n-1))` as its `divert` field. The caller must pass
+//! the value to enclosing loops so that the target loop can handle it.
 //!
-//! The implementation of the continue built-in is shared with the
-//! break built-in.
-//! This module just re-exports functions from [`super::break`].
+//! Part of the continue built-in implementation is shared with the
+//! break built-in implementation.
+//! This module re-exports [`super::break::syntax`].
 
-pub use super::r#break::main;
+use crate::common::print_error_message;
+use crate::common::print_simple_error_message;
+use crate::common::BuiltinEnv;
+use yash_env::builtin::Result;
+use yash_env::semantics::Field;
+use yash_env::Env;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
 
+// pub mod display;
+pub mod semantics;
+pub use super::r#break::syntax;
+
+async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
+    let builtin_name = &env.stack.builtin_name();
+    let location = builtin_name.origin.clone();
+    print_simple_error_message(
+        env,
+        "cannot continue",
+        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
+    )
+    .await
+}
+
+/// Entry point for executing the `continue` built-in
+///
+/// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    match syntax::parse(env, args) {
+        Ok(count) => match semantics::run(&env.stack, count) {
+            Ok(result) => result,
+            Err(e) => print_semantics_error(env, &e).await,
+        },
+        Err(e) => print_error_message(env, &e).await,
+    }
+}
+
+// TODO Replace with scripted integration tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,7 +155,7 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("cannot continue"), "stderr = {stderr:?}");
-            assert!(stderr.contains("not in loop"), "stderr = {stderr:?}");
+            assert!(stderr.contains("not in a loop"), "stderr = {stderr:?}");
         });
     }
 
@@ -256,7 +291,7 @@ mod tests {
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
         assert_stderr(&state, |stderr| {
             assert!(
-                stderr.contains("not a positive integer"),
+                stderr.contains("invalid numeric operand"),
                 "stderr = {stderr:?}"
             )
         });

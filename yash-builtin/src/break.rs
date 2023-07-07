@@ -67,330 +67,46 @@
 //!
 //! # Implementation notes
 //!
-//! A successful invocation of the built-in returns `Break(Divert::Break(n-1))`
-//! as the second element of the returned tuple. The caller must pass the value
-//! to enclosing loops so that the target loop can handle it.
+//! A successful invocation of the built-in returns a [`Result`] containing
+//! `Break(Divert::Break(n-1))` as its `divert` field. The caller must pass the
+//! value to enclosing loops so that the target loop can handle it.
+//!
+//! Part of the break built-in implementation is shared with the
+//! continue built-in implementation.
 
-use crate::common::arg::parse_arguments;
-use crate::common::arg::Mode;
 use crate::common::print_error_message;
 use crate::common::print_simple_error_message;
-use crate::common::syntax_error;
 use crate::common::BuiltinEnv;
-use std::num::ParseIntError;
-use std::ops::ControlFlow::Break;
 use yash_env::builtin::Result;
-use yash_env::semantics::Divert;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::Location;
 
-async fn operand_parse_error(env: &mut Env, location: &Location, error: ParseIntError) -> Result {
-    syntax_error(env, &error.to_string(), location).await
-}
+// pub mod display;
+pub mod semantics;
+pub mod syntax;
 
-async fn not_in_loop_error(env: &mut Env) -> Result {
+async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
     let builtin_name = &env.stack.builtin_name();
     let location = builtin_name.origin.clone();
-    let title = if builtin_name.value == "continue" {
-        "cannot continue"
-    } else {
-        "cannot break"
-    };
     print_simple_error_message(
         env,
-        title,
-        Annotation::new(AnnotationType::Error, "not in loop".into(), &location),
+        "cannot break",
+        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
     )
     .await
 }
 
 /// Entry point for executing the `break` built-in
 ///
-/// This function also implements the [continue](super::continue) built-in.
-/// The behavior depends on the built-in name stored in the topmost stack
-/// [frame](yash_env::stack::Frame) in the environment.
-/// If the stack does not contain a `Frame::Builtin`, this function will
-/// **panic!**
+/// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO: POSIX does not require the break built-in to support XBD Utility
-    // Syntax Guidelines. That means the built-in does not have to recognize the
-    // "--" separator. We should reject the separator in the POSIXly-correct mode.
-    let (_options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
-    };
-    if let Some(operand) = operands.get(1) {
-        return syntax_error(env, "too many operands", &operand.origin).await;
-    }
-
-    let max_count = if let Some(operand) = operands.first() {
-        match operand.value.parse() {
-            Ok(0) => return syntax_error(env, "not a positive integer", &operand.origin).await,
-            Ok(max_count) => max_count,
-            Err(error) => return operand_parse_error(env, &operand.origin, error).await,
-        }
-    } else {
-        1
-    };
-
-    let count = env.stack.loop_count(max_count);
-    if count == 0 {
-        not_in_loop_error(env).await
-    } else {
-        let count = count - 1;
-        let divert = if env.stack.builtin_name().value == "continue" {
-            Divert::Continue { count }
-        } else {
-            Divert::Break { count }
-        };
-        let mut result = Result::new(ExitStatus::SUCCESS);
-        result.set_divert(Break(divert));
-        result
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tests::assert_stderr;
-    use crate::tests::assert_stdout;
-    use futures_util::FutureExt;
-    use std::rc::Rc;
-    use yash_env::stack::Frame;
-    use yash_env::VirtualSystem;
-
-    fn result_with_divert(exit_status: ExitStatus, divert: Divert) -> Result {
-        let mut result = Result::new(exit_status);
-        result.set_divert(Break(divert));
-        result
-    }
-
-    #[test]
-    fn no_enclosing_loop() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-
-        let result = main(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("cannot break"), "stderr = {stderr:?}");
-            assert!(stderr.contains("not in loop"), "stderr = {stderr:?}");
-        });
-    }
-
-    #[test]
-    fn omitted_operand_with_one_enclosing_loop() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-
-        let result = main(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
-    }
-
-    #[test]
-    fn omitted_operand_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-
-        let result = main(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
-    }
-
-    #[test]
-    fn explicit_operand_1_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["1"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
-    }
-
-    #[test]
-    fn explicit_operand_3_with_many_enclosing_loops() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["3"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 2 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
-    }
-
-    #[test]
-    fn explicit_operand_greater_than_number_of_loops() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["5"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 3 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
-    }
-
-    #[test]
-    fn explicit_operand_0() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["0"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| {
-            assert!(
-                stderr.contains("not a positive integer"),
-                "stderr = {stderr:?}"
-            )
-        });
-    }
-
-    #[test]
-    fn explicit_operand_too_large() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["999999999999999999999999999999"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
-    }
-
-    #[test]
-    fn too_many_operands() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["1", "1"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::ERROR, Divert::Interrupt(None))
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| {
-            assert!(stderr.contains("too many operands"), "stderr = {stderr:?}")
-        });
-    }
-
-    #[test]
-    fn argument_separator() {
-        let system = Box::new(VirtualSystem::new());
-        let state = Rc::clone(&system.state);
-        let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
-            name: Field::dummy("break"),
-            is_special: true,
-        });
-        let args = Field::dummies(["--", "1"]);
-
-        let result = main(&mut env, args).now_or_never().unwrap();
-        assert_eq!(
-            result,
-            result_with_divert(ExitStatus::SUCCESS, Divert::Break { count: 0 })
-        );
-        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&state, |stderr| assert_eq!(stderr, ""));
+    match syntax::parse(env, args) {
+        Ok(count) => match semantics::run(&env.stack, count) {
+            Ok(result) => result,
+            Err(e) => print_semantics_error(env, &e).await,
+        },
+        Err(e) => print_error_message(env, &e).await,
     }
 }
