@@ -72,11 +72,17 @@
 //!
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
+use crate::common::print_error_message;
+use crate::common::print_simple_error_message;
+use crate::common::BuiltinEnv;
+use crate::common::Print;
 use yash_env::builtin::Result;
+use yash_env::semantics::Field;
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::System;
-use yash_semantics::Field;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -97,9 +103,26 @@ pub enum Mode {
 pub mod semantics;
 pub mod syntax;
 
-/// Entry point for executing the `break` built-in
+async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
+    let builtin_name = &env.stack.builtin_name();
+    let location = builtin_name.origin.clone();
+    print_simple_error_message(
+        env,
+        "cannot compute the working directory path",
+        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
+    )
+    .await
+}
+
+/// Entry point for executing the `pwd` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
-pub async fn main(_env: &mut Env, _args: Vec<Field>) -> Result {
-    todo!()
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    match syntax::parse(env, args) {
+        Ok(mode) => match semantics::compute(env, mode) {
+            Ok(result) => env.print(&result).await,
+            Err(e) => print_semantics_error(env, &e).await,
+        },
+        Err(e) => print_error_message(env, &e).await,
+    }
 }
