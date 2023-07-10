@@ -61,40 +61,47 @@ impl From<nix::Error> for PreparePwdError {
 }
 
 impl Env {
-    /// Tests if the `$PWD` variable is correct.
+    /// Returns the value of the `$PWD` variable if it is correct.
     ///
     /// The variable is correct if:
     ///
     /// - it is a scalar variable,
     /// - its value is a pathname of the current working directory (possibly
-    ///   including symbolic links in the pathname), and
+    ///   including symbolic link components), and
     /// - there is no dot (`.`) or dot-dot (`..`) component in the pathname.
-    fn has_correct_pwd(&self) -> bool {
+    #[must_use]
+    pub fn get_pwd_if_correct(&self) -> Option<&str> {
         match self.variables.get("PWD") {
             Some(Variable {
                 value: Some(Scalar(pwd)),
                 ..
             }) if Path::new(pwd).is_absolute() && !has_dot_or_dot_dot(pwd) => {
-                let pwd = match CString::new(pwd.as_bytes()) {
-                    Ok(pwd) => pwd,
-                    Err(_) => return false,
-                };
-                let s1 = self.system.fstatat(AT_FDCWD, &pwd, AtFlags::empty());
+                const AT_FLAGS: AtFlags = AtFlags::empty();
+                let cstr_pwd = CString::new(pwd.as_bytes()).ok()?;
+                let s1 = self.system.fstatat(AT_FDCWD, &cstr_pwd, AT_FLAGS).ok()?;
                 let dot = CStr::from_bytes_with_nul(b".\0").unwrap();
-                let s2 = self.system.fstatat(AT_FDCWD, dot, AtFlags::empty());
-                matches!((s1, s2), (Ok(s1), Ok(s2)) if same_files(&s1, &s2))
+                let s2 = self.system.fstatat(AT_FDCWD, dot, AT_FLAGS).ok()?;
+                same_files(&s1, &s2).then_some(pwd)
             }
-
-            _ => false,
+            _ => None,
         }
+    }
+
+    /// Tests if the `$PWD` variable is correct.
+    #[inline]
+    #[must_use]
+    fn has_correct_pwd(&self) -> bool {
+        self.get_pwd_if_correct().is_some()
     }
 
     /// Updates the `$PWD` variable with the current working directory.
     ///
-    /// If the value of `$PWD` is a path to the current working directory and
-    /// does not contain any single or double dot components, this function does
-    /// not modify it. Otherwise, this function sets the value to
+    /// If the value of `$PWD` is [correct](Self::get_pwd_if_correct), this
+    /// function does not modify it. Otherwise, this function sets the value to
     /// `self.system.getcwd()`.
+    ///
+    /// This function is meant for initializing the `$PWD` variable when the
+    /// shell starts.
     pub fn prepare_pwd(&mut self) -> Result<(), PreparePwdError> {
         if !self.has_correct_pwd() {
             let dir = self
