@@ -20,6 +20,7 @@ default = ["yash-semantics"]
 
 [dependencies]
 async-trait = "0.1.66"
+thiserror = "1.0.43"
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-quote = { path = "../yash-quote", version = "1.1.0" }
 yash-semantics = { path = "../yash-semantics", version = "0.1.0", optional = true }

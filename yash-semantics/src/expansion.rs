@@ -87,6 +87,7 @@ use self::initial::NonassignableError;
 use self::quote_removal::skip_quotes;
 use self::split::Ifs;
 use std::borrow::Cow;
+use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
 use yash_env::variable::ReadOnlyError;
@@ -102,19 +103,30 @@ use yash_syntax::syntax::Word;
 pub use yash_env::semantics::Field;
 
 /// Types of errors that may occur in the word expansion.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ErrorCause {
     /// System error while performing a command substitution.
+    #[error("error in command substitution: {0}")]
     CommandSubstError(Errno),
+
     /// Error while evaluating an arithmetic expansion.
+    #[error(transparent)]
     ArithError(ArithError),
+
     /// Assignment to a read-only variable.
+    #[error(transparent)]
     AssignReadOnly(ReadOnlyError),
+
     /// Expansion of an unset parameter with the `nounset` option
+    #[error("unset parameter")]
     UnsetParameter,
+
     /// Expansion of an empty value with an error switch
+    #[error(transparent)]
     EmptyExpansion(EmptyError),
+
     /// Assignment to a nonassignable parameter
+    #[error(transparent)]
     NonassignableParameter(NonassignableError),
 }
 
@@ -169,34 +181,13 @@ impl ErrorCause {
     }
 }
 
-impl std::fmt::Display for ErrorCause {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ErrorCause::*;
-        match self {
-            CommandSubstError(errno) => write!(f, "error in command substitution: {errno}"),
-            ArithError(error) => error.fmt(f),
-            AssignReadOnly(error) => error.fmt(f),
-            UnsetParameter => "unset parameter".fmt(f),
-            EmptyExpansion(error) => error.fmt(f),
-            NonassignableParameter(error) => error.fmt(f),
-        }
-    }
-}
-
 /// Explanation of an expansion failure.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("{cause}")]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.cause.fmt(f)
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {

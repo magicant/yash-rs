@@ -16,9 +16,8 @@
 
 //! Command line argument parser for the set built-in
 
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::iter::Peekable;
+use thiserror::Error;
 use yash_env::option::canonicalize;
 use yash_env::option::parse_long;
 use yash_env::option::parse_short;
@@ -51,24 +50,30 @@ pub enum Parse {
 }
 
 /// Error in command line parsing
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum Error {
     /// Short option that is not defined in the option specs
+    #[error("unknown option {0:?}")]
     UnknownShortOption(char, Field),
 
     /// Long option that is not defined in the option specs
+    #[error("unknown option {:?}", .0.value)]
     UnknownLongOption(Field),
 
     /// Long option that matches the prefix of more than one option name.
+    #[error("ambiguous option name {:?}", .0.value)]
     AmbiguousLongOption(Field),
 
     /// `-o` or `+o` used without an option name
+    #[error("option {:?} missing an argument", .0.value)]
     MissingOptionArgument(Field),
 
     /// Short option that is not modifiable by the set built-in
+    #[error("option {0:?} not modifiable by the set built-in")]
     UnmodifiableShortOption(char, Field),
 
     /// Long option that is not modifiable by the set built-in
+    #[error("option {:?} not modifiable by the set built-in", .0.value)]
     UnmodifiableLongOption(Field),
 }
 
@@ -85,29 +90,6 @@ impl Error {
         }
     }
 }
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::UnknownShortOption(c, _field) => write!(f, "unknown option {c:?}"),
-            Error::UnknownLongOption(field) => write!(f, "unknown option {:?}", field.value),
-            Error::AmbiguousLongOption(field) => write!(f, "ambiguous option {:?}", field.value),
-            Error::MissingOptionArgument(field) => {
-                write!(f, "option {:?} missing an argument", field.value)
-            }
-            Error::UnmodifiableShortOption(c, _field) => {
-                write!(f, "option {c:?} not modifiable by the set built-in")
-            }
-            Error::UnmodifiableLongOption(field) => write!(
-                f,
-                "option {:?} not modifiable by the set built-in",
-                field.value
-            ),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl MessageBase for Error {
     fn message_title(&self) -> std::borrow::Cow<str> {

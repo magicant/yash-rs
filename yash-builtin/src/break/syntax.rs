@@ -21,6 +21,7 @@ use crate::common::syntax::Mode;
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::num::ParseIntError;
+use thiserror::Error;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
@@ -28,34 +29,20 @@ use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 
 /// Error in parsing command line arguments
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
     /// An error occurred in the common parser.
-    CommonError(crate::common::syntax::Error<'static>),
+    #[error(transparent)]
+    CommonError(#[from] crate::common::syntax::Error<'static>),
+
     /// More than one operand is given.
+    #[error("too many operands")]
     TooManyOperands(Vec<Field>),
+
     /// The operand is not a valid positive integer.
+    #[error("invalid numeric operand")]
     InvalidNumber(Field, ParseIntError),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-        match self {
-            CommonError(e) => e.fmt(f),
-            TooManyOperands(_) => "too many operands".fmt(f),
-            InvalidNumber(_, _) => "invalid numeric operand".fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<crate::common::syntax::Error<'static>> for Error {
-    fn from(error: crate::common::syntax::Error<'static>) -> Self {
-        Error::CommonError(error)
-    }
 }
 
 impl MessageBase for Error {

@@ -34,8 +34,8 @@
 //! ```
 
 use std::fmt::Debug;
-use std::fmt::Display;
 use std::ops::Range;
+use thiserror::Error;
 
 mod token;
 
@@ -56,26 +56,13 @@ mod eval;
 pub use eval::EvalError;
 
 /// Cause of an arithmetic expansion error
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[error(transparent)]
 pub enum ErrorCause<E1, E2> {
     /// Syntax error parsing the expression
-    SyntaxError(SyntaxError),
+    SyntaxError(#[from] SyntaxError),
     /// Error evaluating the parsed expression
-    EvalError(EvalError<E1, E2>),
-}
-
-impl<E1, E2> Display for ErrorCause<E1, E2>
-where
-    E1: Display,
-    E2: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ErrorCause::*;
-        match self {
-            SyntaxError(e) => Display::fmt(e, f),
-            EvalError(e) => Display::fmt(e, f),
-        }
-    }
+    EvalError(#[from] EvalError<E1, E2>),
 }
 
 impl<E1, E2> From<TokenError> for ErrorCause<E1, E2> {
@@ -84,42 +71,14 @@ impl<E1, E2> From<TokenError> for ErrorCause<E1, E2> {
     }
 }
 
-impl<E1, E2> From<SyntaxError> for ErrorCause<E1, E2> {
-    fn from(e: SyntaxError) -> Self {
-        ErrorCause::SyntaxError(e)
-    }
-}
-
-impl<E1, E2> From<EvalError<E1, E2>> for ErrorCause<E1, E2> {
-    fn from(e: EvalError<E1, E2>) -> Self {
-        ErrorCause::EvalError(e)
-    }
-}
-
 /// Description of an error that occurred during expansion
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[error("{cause}")]
 pub struct Error<E1, E2> {
     /// Cause of the error
     pub cause: ErrorCause<E1, E2>,
     /// Range of the substring in the evaluated expression string where the error occurred
     pub location: Range<usize>,
-}
-
-impl<E1, E2: Display> Display for Error<E1, E2>
-where
-    E1: Display,
-    E2: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.cause.fmt(f)
-    }
-}
-
-impl<E1, E2> std::error::Error for Error<E1, E2>
-where
-    E1: std::fmt::Debug + Display,
-    E2: std::fmt::Debug + Display,
-{
 }
 
 impl<E1, E2> From<ast::Error> for Error<E1, E2> {

@@ -49,6 +49,7 @@ use slab::Slab;
 use std::collections::HashMap;
 use std::iter::FusedIterator;
 use std::ops::Deref;
+use thiserror::Error;
 
 /// Trait for adding some methods to [`WaitStatus`]
 pub trait WaitStatusEx {
@@ -563,12 +564,15 @@ impl JobSet {
 }
 
 /// Error type for [`JobSet::set_current_job`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
 pub enum SetCurrentJobError {
     /// The specified index does not refer to any job.
+    #[error("no such job")]
     NoSuchJob,
+
     /// The specified job is not a suspended job and there is another suspended
     /// job.
+    #[error("the current job must be selected from suspended jobs")]
     NotSuspended,
 }
 

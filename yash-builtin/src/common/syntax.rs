@@ -50,6 +50,7 @@
 //! ```
 
 use std::iter::Peekable;
+use thiserror::Error;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
@@ -256,29 +257,42 @@ pub struct OptionOccurrence<'a> {
 }
 
 /// Error in command line parsing
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
 pub enum Error<'a> {
     /// Short option that is not defined in the option specs
+    #[error("unknown option {0:?}")]
     UnknownShortOption(char, Field),
 
     /// Long option that is not defined in the option specs
+    #[error("unknown option {:?}", long_option_name(.0))]
     UnknownLongOption(Field),
 
     /// Long option that is defined in an option spec but disabled by
     /// configuration ([`Mode`]).
+    #[error("unsupported option {:?}", .0.value)]
     UnsupportedLongOption(Field, &'a OptionSpec<'a>),
 
     /// Long option that matches more than one option spec
     ///
     /// The second item of the tuple is a list of all option specs that matched.
+    #[error("ambiguous option {:?}", long_option_name(.0))]
     AmbiguousLongOption(Field, Vec<&'a OptionSpec<'a>>),
 
     /// Option missing its required argument
+    #[error("option {:?} missing an argument", .0.value)]
     MissingOptionArgument(Field, &'a OptionSpec<'a>),
 
     /// Long option having an unexpected argument
+    #[error("option {:?} with an unexpected argument", .0.value)]
     UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
+}
+
+fn long_option_name(field: &Field) -> &str {
+    match field.value.find('=') {
+        None => &field.value,
+        Some(index) => &field.value[..index],
+    }
 }
 
 impl Error<'_> {
@@ -295,39 +309,6 @@ impl Error<'_> {
         }
     }
 }
-
-impl std::fmt::Display for Error<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn long_option_name(field: &Field) -> &str {
-            match field.value.find('=') {
-                None => &field.value,
-                Some(index) => &field.value[..index],
-            }
-        }
-
-        use Error::*;
-        match self {
-            UnknownShortOption(c, _field) => write!(f, "unknown option {c:?}"),
-            UnknownLongOption(field) => {
-                write!(f, "unknown option {:?}", long_option_name(field))
-            }
-            UnsupportedLongOption(field, _spec) => {
-                write!(f, "unsupported option {:?}", field.value)
-            }
-            AmbiguousLongOption(field, _specs) => {
-                write!(f, "ambiguous option {:?}", long_option_name(field))
-            }
-            MissingOptionArgument(field, _spec) => {
-                write!(f, "option {:?} missing an argument", field.value)
-            }
-            UnexpectedOptionArgument(field, _spec) => {
-                write!(f, "option {:?} with an unexpected argument", field.value)
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error<'_> {}
 
 impl MessageBase for Error<'_> {
     fn message_title(&self) -> std::borrow::Cow<str> {

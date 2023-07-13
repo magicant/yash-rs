@@ -24,51 +24,40 @@ use crate::env::Env;
 use crate::token::Term;
 use crate::token::Value;
 use std::ops::Range;
+use thiserror::Error;
 
 /// Cause of an evaluation error
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 pub enum EvalError<E1, E2> {
     /// A variable value that is not a valid number
+    #[error("invalid variable value: {0:?}")]
     InvalidVariableValue(String),
     /// Result out of bounds
+    #[error("overflow")]
     Overflow,
     /// Division by zero
+    #[error("division by zero")]
     DivisionByZero,
     /// Left bit-shifting with a negative left-hand-side operand
+    #[error("left-shifting a negative integer")]
     LeftShiftingNegative,
     /// Bit-shifting with a negative right-hand-side operand
+    #[error("negative shift width")]
     ReverseShifting,
     /// Assignment with a left-hand-side operand not being a variable
+    #[error("assignment to a non-variable")]
     AssignmentToValue,
     /// Error accessing a variable value.
+    #[error(transparent)]
     GetVariableError(E1),
     /// Error assigning a variable value.
+    #[error(transparent)]
     AssignVariableError(E2),
 }
 
-impl<E1, E2> std::fmt::Display for EvalError<E1, E2>
-where
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EvalError::InvalidVariableValue(value) => {
-                write!(f, "invalid variable value: {value:?}")
-            }
-            EvalError::Overflow => "overflow".fmt(f),
-            EvalError::DivisionByZero => "division by zero".fmt(f),
-            EvalError::LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
-            EvalError::ReverseShifting => "negative shift width".fmt(f),
-            EvalError::AssignmentToValue => "assignment to a non-variable".fmt(f),
-            EvalError::GetVariableError(e) => e.fmt(f),
-            EvalError::AssignVariableError(e) => e.fmt(f),
-        }
-    }
-}
-
 /// Description of an error that occurred during evaluation
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[error("{cause}")]
 pub struct Error<E1, E2> {
     /// Cause of the error
     pub cause: EvalError<E1, E2>,

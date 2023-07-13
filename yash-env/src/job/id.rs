@@ -38,10 +38,10 @@
 
 use super::Job;
 use super::JobSet;
-use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::num::NonZeroUsize;
+use thiserror::Error;
 
 /// Result of parsing a job ID
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,16 +81,9 @@ impl Display for JobId<'_> {
 }
 
 /// Error that may occur in job ID [parsing](parse)
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
+#[error("a job ID must start with a '%'")]
 pub struct ParseError;
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        "a job ID must start with a '%'".fmt(f)
-    }
-}
-
-impl Error for ParseError {}
 
 /// Parses a job ID excluding the initial `%`.
 ///
@@ -154,25 +147,16 @@ impl<'a> TryFrom<&'a str> for JobId<'a> {
 }
 
 /// Error that may occur in [`JobId::find`]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
 pub enum FindError {
     /// There is no job that matches the job ID.
+    #[error("job not found")]
     NotFound,
+
     /// There are more than one job that matches the job ID.
+    #[error("ambiguous job")]
     Ambiguous,
 }
-
-impl Display for FindError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FindError::NotFound => "job not found",
-            FindError::Ambiguous => "ambiguous job",
-        }
-        .fmt(f)
-    }
-}
-
-impl Error for FindError {}
 
 impl JobId<'_> {
     /// Returns the index of a job matching the job ID.

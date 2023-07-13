@@ -22,11 +22,12 @@ use crate::source::pretty::MessageBase;
 use crate::source::Location;
 use crate::syntax::AndOr;
 use std::borrow::Cow;
-use std::fmt;
 use std::rc::Rc;
+use thiserror::Error;
 
 /// Types of syntax errors.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("{}", self.message())]
 #[non_exhaustive]
 pub enum SyntaxError {
     /// A `(` lacks a closing `)`.
@@ -352,19 +353,14 @@ impl SyntaxError {
     }
 }
 
-impl fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.message().fmt(f)
-    }
-}
-
 /// Types of errors that may happen in parsing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Error)]
+#[error("{}", self.message())]
 pub enum ErrorCause {
     /// Error in an underlying input function.
-    Io(Rc<std::io::Error>),
+    Io(#[from] Rc<std::io::Error>),
     /// Syntax error.
-    Syntax(SyntaxError),
+    Syntax(#[from] SyntaxError),
 }
 
 impl PartialEq for ErrorCause {
@@ -409,44 +405,19 @@ impl ErrorCause {
     }
 }
 
-impl fmt::Display for ErrorCause {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.message().fmt(f)
-    }
-}
-
-impl From<Rc<std::io::Error>> for ErrorCause {
-    fn from(e: Rc<std::io::Error>) -> ErrorCause {
-        ErrorCause::Io(e)
-    }
-}
-
 impl From<std::io::Error> for ErrorCause {
     fn from(e: std::io::Error) -> ErrorCause {
         ErrorCause::from(Rc::new(e))
     }
 }
 
-impl From<SyntaxError> for ErrorCause {
-    fn from(e: SyntaxError) -> ErrorCause {
-        ErrorCause::Syntax(e)
-    }
-}
-
 /// Explanation of a failure in parsing.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq)]
+#[error("{cause}")]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.cause.fmt(f)
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl MessageBase for Error {
     fn message_title(&self) -> Cow<str> {

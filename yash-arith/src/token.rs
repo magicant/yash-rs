@@ -19,6 +19,7 @@
 use std::fmt::Display;
 use std::iter::FusedIterator;
 use std::ops::Range;
+use thiserror::Error;
 
 /// Result of evaluating an expression
 ///
@@ -151,22 +152,16 @@ pub struct Token<'a> {
 }
 
 /// Cause of a tokenization error
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 pub enum TokenError {
     /// A value token contains an invalid character.
+    #[error("invalid numeric constant")]
     InvalidNumericConstant,
+
     /// An expression contains a character that is not a whitespace, operator,
     /// or number.
+    #[error("invalid character")]
     InvalidCharacter,
-}
-
-impl Display for TokenError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TokenError::InvalidNumericConstant => "invalid numeric constant".fmt(f),
-            TokenError::InvalidCharacter => "invalid character".fmt(f),
-        }
-    }
 }
 
 /// Description of an error that occurred during expansion

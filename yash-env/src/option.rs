@@ -31,6 +31,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::ops::Not;
 use std::str::FromStr;
+use thiserror::Error;
 
 /// State of an option: either enabled or disabled.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -202,11 +203,14 @@ impl Display for Option {
 }
 
 /// Error type indicating that the input string does not name a valid option.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
 pub enum FromStrError {
     /// The input string does not match any option name.
+    #[error("no such option")]
     NoSuchOption,
+
     /// The input string is a prefix of more than one valid option name.
+    #[error("ambiguous option name")]
     Ambiguous,
 }
 

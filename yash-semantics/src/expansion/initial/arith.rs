@@ -47,59 +47,64 @@ use yash_syntax::syntax::Text;
 /// - `ArithError` may contain informative [`Location`] that can be used to
 ///   produce an error message with annotated code while `ErrorCause` may just
 ///   specify a location as an index range.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ArithError {
     /// A value token contains an invalid character.
+    #[error("invalid numeric constant")]
     InvalidNumericConstant,
+
     /// An expression contains a character that is not a whitespace, number, or
     /// number.
+    #[error("invalid character")]
     InvalidCharacter,
-    /// Expression with a missing value
-    IncompleteExpression,
-    /// Operator missing
-    MissingOperator,
-    /// `(` without `)`
-    UnclosedParenthesis { opening_location: Location },
-    /// `?` without `:`
-    QuestionWithoutColon { question_location: Location },
-    /// `:` without `?`
-    ColonWithoutQuestion,
-    /// Other error in operator usage
-    InvalidOperator,
-    /// A variable value that is not a valid number
-    InvalidVariableValue(String),
-    /// Result out of bounds
-    Overflow,
-    /// Division by zero
-    DivisionByZero,
-    /// Left bit-shifting of a negative value
-    LeftShiftingNegative,
-    /// Bit-shifting with a negative right-hand-side operand
-    ReverseShifting,
-    /// Assignment with a left-hand-side operand not being a variable
-    AssignmentToValue,
-}
 
-impl std::fmt::Display for ArithError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use ArithError::*;
-        match self {
-            InvalidNumericConstant => "invalid numeric constant".fmt(f),
-            InvalidCharacter => "invalid character".fmt(f),
-            IncompleteExpression => "incomplete expression".fmt(f),
-            MissingOperator => "expected an operator".fmt(f),
-            UnclosedParenthesis { .. } => "unmatched parenthesis".fmt(f),
-            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
-            ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
-            InvalidOperator => "invalid use of operator".fmt(f),
-            InvalidVariableValue(value) => write!(f, "invalid variable value: {value:?}"),
-            Overflow => "overflow".fmt(f),
-            DivisionByZero => "division by zero".fmt(f),
-            LeftShiftingNegative => "left-shifting a negative integer".fmt(f),
-            ReverseShifting => "negative shift width".fmt(f),
-            AssignmentToValue => "assignment to a non-variable".fmt(f),
-        }
-    }
+    /// Expression with a missing value
+    #[error("incomplete expression")]
+    IncompleteExpression,
+
+    /// Operator missing
+    #[error("expected an operator")]
+    MissingOperator,
+
+    /// `(` without `)`
+    #[error("unmatched parenthesis")]
+    UnclosedParenthesis { opening_location: Location },
+
+    /// `?` without `:`
+    #[error("`?` without matching `:`")]
+    QuestionWithoutColon { question_location: Location },
+
+    /// `:` without `?`
+    #[error("`:` without matching `?`")]
+    ColonWithoutQuestion,
+
+    /// Other error in operator usage
+    #[error("invalid use of operator")]
+    InvalidOperator,
+
+    /// A variable value that is not a valid number
+    #[error("invalid variable value: {0:?}")]
+    InvalidVariableValue(String),
+
+    /// Result out of bounds
+    #[error("overflow")]
+    Overflow,
+
+    /// Division by zero
+    #[error("division by zero")]
+    DivisionByZero,
+
+    /// Left bit-shifting of a negative value
+    #[error("left-shifting a negative integer")]
+    LeftShiftingNegative,
+
+    /// Bit-shifting with a negative right-hand-side operand
+    #[error("negative shift width")]
+    ReverseShifting,
+
+    /// Assignment with a left-hand-side operand not being a variable
+    #[error("assignment to a non-variable")]
+    AssignmentToValue,
 }
 
 impl ArithError {

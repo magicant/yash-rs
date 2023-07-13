@@ -23,6 +23,7 @@ use crate::token::Token;
 use crate::token::TokenError;
 use crate::token::TokenValue;
 use std::ops::Range;
+use thiserror::Error;
 
 // TODO: POSIX does not require the increment/decrement operators. Maybe we
 // should provide an option to reject those non-portable operators.
@@ -261,49 +262,35 @@ pub enum Ast<'a> {
 }
 
 /// Cause of a syntax error
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 pub enum SyntaxError {
     /// Error in tokenization
-    TokenError(TokenError),
+    #[error(transparent)]
+    TokenError(#[from] TokenError),
     /// Expression with a missing value
+    #[error("incomplete expression")]
     IncompleteExpression,
     /// Operator missing
+    #[error("expected an operator")]
     MissingOperator,
     /// `(` without `)`
+    #[error("closing parenthesis missing")]
     UnclosedParenthesis {
         /// Range of the substring in the evaluated expression string where `(` appears
         opening_location: Range<usize>,
     },
     /// `?` without `:`
+    #[error("expected `:`")]
     QuestionWithoutColon {
         /// Range of the substring in the evaluated expression string where `?` appears
         question_location: Range<usize>,
     },
     /// `:` without `?`
+    #[error("`:` without matching `?`")]
     ColonWithoutQuestion,
     /// Other error in operator usage
+    #[error("invalid use of operator")]
     InvalidOperator,
-}
-
-impl std::fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use SyntaxError::*;
-        match self {
-            TokenError(e) => e.fmt(f),
-            IncompleteExpression => "incomplete expression".fmt(f),
-            MissingOperator => "expected an operator".fmt(f),
-            UnclosedParenthesis { .. } => "closing parenthesis missing".fmt(f),
-            QuestionWithoutColon { .. } => "expected `:`".fmt(f),
-            ColonWithoutQuestion => "`:` without matching `?`".fmt(f),
-            InvalidOperator => "invalid use of operator".fmt(f),
-        }
-    }
-}
-
-impl From<TokenError> for SyntaxError {
-    fn from(e: TokenError) -> Self {
-        SyntaxError::TokenError(e)
-    }
 }
 
 /// Description of an error that occurred during expansion

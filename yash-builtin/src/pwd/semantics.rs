@@ -17,26 +17,17 @@
 //! Main semantics of the pwd built-in
 
 use super::Mode;
+use thiserror::Error;
 use yash_env::system::Errno;
 use yash_env::{Env, System};
 
 /// Error in running the pwd built-in
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, Error, PartialEq)]
 pub enum Error {
     /// Error obtaining the current working directory path
+    #[error(transparent)]
     SystemError(Errno),
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-        match self {
-            SystemError(e) => e.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// Logical result of the pwd built-in
 ///

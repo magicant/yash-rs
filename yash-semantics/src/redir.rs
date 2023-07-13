@@ -85,6 +85,7 @@ use std::fmt::Write;
 use std::num::ParseIntError;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use thiserror::Error;
 use yash_env::io::Fd;
 use yash_env::io::MIN_INTERNAL_FD;
 use yash_env::option::Option::Clobber;
@@ -121,30 +122,47 @@ struct SavedFd {
 }
 
 /// Types of errors that may occur in the redirection.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ErrorCause {
     /// Expansion error.
-    Expansion(crate::expansion::ErrorCause),
+    #[error(transparent)]
+    Expansion(#[from] crate::expansion::ErrorCause),
+
     /// Pathname containing a nul byte.
-    NulByte(NulError),
+    #[error(transparent)]
+    NulByte(#[from] NulError),
+
     /// The target file descriptor could not be modified for the redirection.
+    #[error("{1}")]
     FdNotOverwritten(Fd, Errno),
+
     /// Use of an FD reserved by the shell
     ///
     /// This error occurs when a redirection tries to modify an existing FD with
     /// the CLOEXEC flag set. See the [module documentation](self) for details.
+    #[error("file descriptor {0} is reserved by the shell")]
     ReservedFd(Fd),
+
     /// Error while opening a file.
     ///
     /// The `CString` is the pathname of the file that could not be opened.
+    #[error("cannot open file '{}': {}", .0.to_string_lossy(), .1)]
     OpenFile(CString, Errno),
+
     /// Operand of `<&` or `>&` that cannot be parsed as an integer.
+    #[error("{0} is not a valid file descriptor: {1}")]
     MalformedFd(String, ParseIntError),
+
     /// `<&` applied to an unreadable file descriptor
+    #[error("{0} is not a readable file descriptor")]
     UnreadableFd(Fd),
+
     /// `>&` applied to an unwritable file descriptor
+    #[error("{0} is not a writable file descriptor")]
     UnwritableFd(Fd),
+
     /// Error preparing a temporary file to save here-document content
+    #[error("cannot prepare temporary file for here-document: {0}")]
     TemporaryFileUnavailable(Errno),
 }
 
@@ -184,56 +202,13 @@ impl ErrorCause {
     }
 }
 
-impl std::fmt::Display for ErrorCause {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ErrorCause::*;
-        match self {
-            Expansion(e) => e.fmt(f),
-            NulByte(error) => error.fmt(f),
-            FdNotOverwritten(_fd, errno) => errno.fmt(f),
-            ReservedFd(fd) => write!(f, "file descriptor {fd} is reserved by shell"),
-            OpenFile(path, errno) => write!(
-                f,
-                "cannot open file `{}`: {}",
-                path.to_string_lossy(),
-                errno
-            ),
-            MalformedFd(value, error) => {
-                write!(f, "{value:?} is not a valid file descriptor: {error}")
-            }
-            UnreadableFd(fd) => write!(f, "{fd} is not a readable file descriptor"),
-            UnwritableFd(fd) => write!(f, "{fd} is not a writable file descriptor"),
-            TemporaryFileUnavailable(errno) => write!(f, "cannot prepare here-document: {errno}"),
-        }
-    }
-}
-
-impl From<crate::expansion::ErrorCause> for ErrorCause {
-    fn from(cause: crate::expansion::ErrorCause) -> Self {
-        ErrorCause::Expansion(cause)
-    }
-}
-
-impl From<NulError> for ErrorCause {
-    fn from(e: NulError) -> Self {
-        ErrorCause::NulByte(e)
-    }
-}
-
 /// Explanation of a redirection error.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("{cause}")]
 pub struct Error {
     pub cause: ErrorCause,
     pub location: Location,
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.cause.fmt(f)
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl From<crate::expansion::Error> for Error {
     fn from(e: crate::expansion::Error) -> Self {

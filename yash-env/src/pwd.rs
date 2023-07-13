@@ -28,6 +28,7 @@ use nix::sys::stat::FileStat;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::path::Path;
+use thiserror::Error;
 
 /// Tests whether a path contains a dot (`.`) or dot-dot (`..`) component.
 fn has_dot_or_dot_dot(path: &str) -> bool {
@@ -40,24 +41,15 @@ fn same_files(a: &FileStat, b: &FileStat) -> bool {
 }
 
 /// Error in [`Env::prepare_pwd`]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum PreparePwdError {
     /// Error assigning to the `$PWD` variable
-    AssignError(ReadOnlyError),
+    #[error(transparent)]
+    AssignError(#[from] ReadOnlyError),
+
     /// Error obtaining the current working directory path
-    GetCwdError(nix::Error),
-}
-
-impl From<ReadOnlyError> for PreparePwdError {
-    fn from(error: ReadOnlyError) -> Self {
-        PreparePwdError::AssignError(error)
-    }
-}
-
-impl From<nix::Error> for PreparePwdError {
-    fn from(error: nix::Error) -> Self {
-        PreparePwdError::GetCwdError(error)
-    }
+    #[error("cannot obtain the current working directory path: {0}")]
+    GetCwdError(#[from] nix::Error),
 }
 
 impl Env {

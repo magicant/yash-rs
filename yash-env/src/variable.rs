@@ -56,6 +56,7 @@ use std::hash::Hash;
 use std::iter::FusedIterator;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use thiserror::Error;
 use yash_syntax::source::Location;
 
 /// Value of a variable.
@@ -405,7 +406,8 @@ pub enum Scope {
 // TODO Rename to AssignReadOnlyError
 // TODO Add UnsetReadOnlyError that does not have the new_value field
 /// Error that occurs when assigning to an existing read-only variable.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("variable `{name}` is read-only")]
 pub struct ReadOnlyError {
     /// Variable name.
     pub name: String,
@@ -414,14 +416,6 @@ pub struct ReadOnlyError {
     /// New variable that was tried to assign.
     pub new_value: Variable,
 }
-
-impl std::fmt::Display for ReadOnlyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "variable `{}` is read-only", self.name)
-    }
-}
-
-impl std::error::Error for ReadOnlyError {}
 
 /// Iterator of variables
 ///

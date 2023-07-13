@@ -23,6 +23,7 @@ use super::TrapSet;
 use crate::system::{Errno, SignalHandling};
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::rc::Rc;
+use thiserror::Error;
 use yash_syntax::source::Location;
 
 /// Action performed when a [`Condition`] is met
@@ -53,36 +54,23 @@ impl From<&Action> for SignalHandling {
 }
 
 /// Error that may happen in [`TrapSet::set_action`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum SetActionError {
     /// Attempt to set a trap that has been ignored since the shell startup.
+    #[error("the signal has been ignored since startup")]
     InitiallyIgnored,
+
     /// Attempt to set a trap for the `SIGKILL` signal.
+    #[error("cannot set a trap for SIGKILL")]
     SIGKILL,
+
     /// Attempt to set a trap for the `SIGSTOP` signal.
+    #[error("cannot set a trap for SIGSTOP")]
     SIGSTOP,
+
     /// Error from the underlying system interface.
-    SystemError(Errno),
-}
-
-impl std::fmt::Display for SetActionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use SetActionError::*;
-        match self {
-            InitiallyIgnored => "the signal has been ignored since startup".fmt(f),
-            SIGKILL => "cannot set a trap for SIGKILL".fmt(f),
-            SIGSTOP => "cannot set a trap for SIGSTOP".fmt(f),
-            SystemError(errno) => errno.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for SetActionError {}
-
-impl From<Errno> for SetActionError {
-    fn from(errno: Errno) -> Self {
-        SetActionError::SystemError(errno)
-    }
+    #[error(transparent)]
+    SystemError(#[from] Errno),
 }
 
 /// State of the trap action for a condition.

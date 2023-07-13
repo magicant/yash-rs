@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Rust 1.58.0 → 1.60.0
     - regex 1.5.6 → 1.8.1
     - regex-syntax 0.6.26 → 0.7.1
-    - thiserror 1.0.31 → 1.0.38
+    - thiserror 1.0.31 → 1.0.43
 
 ## [1.1.0] - 2022-10-22
 

@@ -79,9 +79,8 @@
 use crate::common::print_error_message;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::num::ParseIntError;
+use thiserror::Error;
 use yash_env::builtin::Result;
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
@@ -102,8 +101,11 @@ use yash_syntax::source::pretty::MessageBase;
 // TODO Interruption by trap
 // TODO Allow interrupting with SIGINT if interactive
 
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 enum JobSpecError {
+    #[error("{}: {}", .0.value, .1)]
     ParseInt(Field, ParseIntError),
+    #[error("{}: non-positive process ID", .0.value)]
     NonPositive(Field),
 }
 
@@ -112,17 +114,6 @@ impl JobSpecError {
         match self {
             JobSpecError::ParseInt(field, _) => field,
             JobSpecError::NonPositive(field) => field,
-        }
-    }
-}
-
-impl Display for JobSpecError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobSpecError::ParseInt(field, error) => write!(f, "{}: {}", field.value, error),
-            JobSpecError::NonPositive(field) => {
-                write!(f, "{}: non-positive process ID", field.value)
-            }
         }
     }
 }

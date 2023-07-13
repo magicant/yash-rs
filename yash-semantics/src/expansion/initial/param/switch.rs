@@ -92,7 +92,8 @@ impl std::fmt::Display for ValueState {
 ///
 /// `UnsetError` is an error that occurs when you apply a switch with
 /// `SwitchCondition::Error` to an empty value.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
+#[error("{} ({})", self.message_or_default(), .state.description())]
 #[non_exhaustive]
 pub struct EmptyError {
     /// State of the variable value that caused this error
@@ -114,39 +115,21 @@ impl EmptyError {
     }
 }
 
-impl std::fmt::Display for EmptyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} ({})",
-            self.message_or_default(),
-            self.state.description()
-        )
-    }
-}
-
-impl std::error::Error for EmptyError {}
-
 /// Error caused by an assign switch
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum NonassignableError {
     /// The parameter is not a variable.
+    #[error("not an assignable variable")]
     NotVariable,
     // /// The parameter expansion refers to an array but does not index a single
     // /// element.
+    // #[error("cannot assign to a non-scalar array range")]
     // TODO ArrayIndex,
-    // /// The parameter expansion is nested.
-    // TODO Nested,
-}
 
-impl std::fmt::Display for NonassignableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use NonassignableError::*;
-        match self {
-            NotVariable => "not an assignable variable".fmt(f),
-        }
-    }
+    // /// The parameter expansion is nested.
+    // #[error("cannot assign to a nested parameter expansion")]
+    // TODO Nested,
 }
 
 /// Abstract state of a [value](Value) that determines the effect of a switch

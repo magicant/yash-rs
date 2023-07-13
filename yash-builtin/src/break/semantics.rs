@@ -20,28 +20,19 @@
 
 use std::num::NonZeroUsize;
 use std::ops::ControlFlow;
+use thiserror::Error;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::stack::Stack;
 
 /// Error in running the break/continue built-in
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
     /// There is no lexically enclosing loop.
+    #[error("not in a loop")]
     NotInLoop,
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-        match self {
-            NotInLoop => "not in a loop".fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// Result of running the break/continue built-in
 pub type Result = std::result::Result<crate::Result, Error>;
