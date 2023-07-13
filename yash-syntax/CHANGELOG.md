@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parser::Parser::command_line` to return the newly added variants of
   `SyntaxError` instead of `InvalidCommandToken` depending on the type of
   erroneous tokens.
-- Dependency versions
+- External dependency versions
     - Rust 1.58.0 → 1.67.0
+- Internal dependency versions
     - async-trait 0.1.56 → 0.1.66
     - futures-util 0.3.23 → 0.3.27
     - itertools 0.10.3 → 0.10.5
@@ -34,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `syntax::CompoundCommand::Subshell` from a tuple variant `Subshell(List)`
   to a struct variant `Subshell { body: Rc<List>, location: Location }`.
-- Dependency versions
+- Internal dependency versions
     - futures-util 0.3.21 → 0.3.23
 
 ## [0.5.0] - 2022-07-02
@@ -58,7 +59,7 @@ This version contains variety of fixes.
 - `parser::Error::UnexpectedToken` renamed to `InvalidCommandToken`
 - `parser::Parser::maybe_compound_list` now returning an `InvalidCommandToken`
 error if the list is delimited by a token that is not a clause delimiter.
-- Dependency versions
+- Internal dependency versions
     - `async-trait` 0.1.52 → 0.1.56
 
 ### Removed
@@ -142,7 +143,7 @@ command.
     - `Context` now `non_exhaustive`
     - `Memory::new` no longer taking a `Source` parameter
 - `Lexer::new` now requiring the `start_line_number` and `source` parameters
-- Dependency versions
+- Internal dependency versions
     - `async-trait` 0.1.50 → 0.1.52
     - `futures-util` 0.3.18 → 0.3.19
     - `itertools` 0.10.1 → 0.10.3
