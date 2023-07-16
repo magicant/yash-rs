@@ -57,7 +57,7 @@ pub async fn execute_function(
     let mut inner = outer.push_context(ContextType::Regular);
 
     // Apply positional parameters
-    let mut params = inner.variables.positional_params_mut();
+    let params = inner.variables.positional_params_mut();
     let mut i = fields.into_iter();
     let field = i.next().unwrap();
     params.last_assigned_location = Some(field.origin);

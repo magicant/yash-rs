@@ -816,7 +816,7 @@ impl System for VirtualSystem {
 
                 {
                     let mut state = state.borrow_mut();
-                    let mut process = state
+                    let process = state
                         .processes
                         .get_mut(&process_id)
                         .expect("missing child process");
