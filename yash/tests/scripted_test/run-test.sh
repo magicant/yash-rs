@@ -197,7 +197,9 @@ exec_testee() {
 #
 # If the "skip" variable is defined non-empty, the test case is skipped.
 testcase() {
-    test_lineno="${1:?line number unspecified}"
+    # Shells without $LINENO support give an empty $1, in which case we fall
+    # back to a simple serial number.
+    test_lineno="${1:-$((test_lineno+1))}"
     shift 1
     OPTIND=1
     diagnostic_required="false"
@@ -364,15 +366,17 @@ testcase() {
     echo
 }
 
-alias test_x='testcase "$LINENO" 3<<\__IN__ 4<&- 5<&-'
-alias test_o='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5<&-'
-alias test_O='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5<&-'
-alias test_e='testcase "$LINENO" 3<<\__IN__ 4<&- 5<<\__ERR__'
-alias test_oe='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5<<\__ERR__'
-alias test_Oe='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5<<\__ERR__'
-alias test_E='testcase "$LINENO" 3<<\__IN__ 4<&- 5</dev/null'
-alias test_oE='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5</dev/null'
-alias test_OE='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5</dev/null'
+alias test_x='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5<&-'
+alias test_o='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5<&-'
+alias test_O='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5<&-'
+alias test_e='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5<<\__ERR__'
+alias test_oe='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5<<\__ERR__'
+alias test_Oe='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5<<\__ERR__'
+alias test_E='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5</dev/null'
+alias test_oE='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5</dev/null'
+alias test_OE='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5</dev/null'
+
+test_lineno=0
 
 ##### Run test
 
