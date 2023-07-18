@@ -55,3 +55,13 @@ fn run(name: &str) {
 fn break_builtin() {
     run("break-p.sh")
 }
+
+#[test]
+fn exit_builtin() {
+    run("exit-p.sh")
+}
+
+#[test]
+fn return_builtin() {
+    run("return-p.sh")
+}
