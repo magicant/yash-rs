@@ -57,6 +57,11 @@ fn break_builtin() {
 }
 
 #[test]
+fn continue_builtin() {
+    run("continue-p.sh")
+}
+
+#[test]
 fn exit_builtin() {
     run("exit-p.sh")
 }
