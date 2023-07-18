@@ -14,6 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//! Our scripted tests are performed by the `run-test.sh` script that runs the
+//! test subject with its standard input redirected to a prepared file and then
+//! examines the results. Test cases are written in script files named with the
+//! `-p.sh` or `-y.sh` suffix.
+
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
@@ -38,6 +43,9 @@ fn run(name: &str) {
         .output()
         .unwrap();
     assert!(result.status.success(), "{:?}", result);
+
+    // The `run-test.sh` script returns a successful exit status even if there
+    // is a failed test case. Check the log file to see if there is one.
 
     let log = std::fs::read_to_string(&log_file).unwrap();
     assert!(!log.contains("FAILED"), "{}", log);
