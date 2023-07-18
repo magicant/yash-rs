@@ -150,7 +150,7 @@ test_OE -e 17 'specifying exit status in returning from dot script'
 __IN__
 
 : TODO Needs the colon built-in <<\__OUT__
-test_oE -e 0 'default exit status in trap'
+test_oE -e 0 'default exit status in function in trap'
 fn() { true; return; }
 trap 'fn; echo trapped $?' USR1
 (exit 19)
@@ -158,6 +158,18 @@ trap 'fn; echo trapped $?' USR1
 : # null command to ensure the trap to be handled
 __IN__
 trapped 19
+__OUT__
+
+test_oE -e 0 'default exit status in trap in function'
+trap '(exit 1); return; echo X $?' INT
+f() {
+    (kill -INT $$; exit 2)
+    echo Y $?
+}
+f
+echo Z $?
+__IN__
+Z 2
 __OUT__
 
 : TODO Needs the eval built-in <<\__IN__
