@@ -52,8 +52,38 @@ fn run(name: &str) {
 }
 
 #[test]
+fn and_or_list() {
+    run("andor-p.sh")
+}
+
+#[test]
+fn arithmetic_expansion() {
+    run("arith-p.sh")
+}
+
+#[test]
+fn asynchronous_list() {
+    run("async-p.sh")
+}
+
+#[test]
 fn break_builtin() {
     run("break-p.sh")
+}
+
+#[test]
+fn case_command() {
+    run("case-p.sh")
+}
+
+#[test]
+fn command_substitution() {
+    run("cmdsub-p.sh")
+}
+
+#[test]
+fn comment() {
+    run("comment-p.sh")
 }
 
 #[test]
