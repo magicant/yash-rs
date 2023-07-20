@@ -88,6 +88,12 @@ unset -v A B C D E F G H I J K L M N O P Q R S T U V W X Y Z _
 unset -v a b c d e f g h i j k l m n o p q r s t u v w x y z
 unset -v posix skip
 
+# If the current shell does not support $LINENO, assign a dummy value to it and
+# let the testcase function handle it.
+lineno1=${LINENO-}
+lineno2=${LINENO-}
+[ "$lineno1" != "$lineno2" ] || LINENO=
+
 ##### Prepare temporary directory
 
 work_dir="${TMPDIR:-.}/tmp.$$"
@@ -366,15 +372,15 @@ testcase() {
     echo
 }
 
-alias test_x='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5<&-'
-alias test_o='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5<&-'
-alias test_O='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5<&-'
-alias test_e='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5<<\__ERR__'
-alias test_oe='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5<<\__ERR__'
-alias test_Oe='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5<<\__ERR__'
-alias test_E='testcase "${LINENO-}" 3<<\__IN__ 4<&- 5</dev/null'
-alias test_oE='testcase "${LINENO-}" 3<<\__IN__ 4<<\__OUT__ 5</dev/null'
-alias test_OE='testcase "${LINENO-}" 3<<\__IN__ 4</dev/null 5</dev/null'
+alias test_x='testcase "$LINENO" 3<<\__IN__ 4<&- 5<&-'
+alias test_o='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5<&-'
+alias test_O='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5<&-'
+alias test_e='testcase "$LINENO" 3<<\__IN__ 4<&- 5<<\__ERR__'
+alias test_oe='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5<<\__ERR__'
+alias test_Oe='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5<<\__ERR__'
+alias test_E='testcase "$LINENO" 3<<\__IN__ 4<&- 5</dev/null'
+alias test_oE='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5</dev/null'
+alias test_OE='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5</dev/null'
 
 test_lineno=0
 
