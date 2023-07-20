@@ -92,8 +92,28 @@ fn continue_builtin() {
 }
 
 #[test]
+fn exec_builtin() {
+    run("exec-p.sh")
+}
+
+#[test]
 fn exit_builtin() {
     run("exit-p.sh")
+}
+
+#[test]
+fn fnmatch() {
+    run("fnmatch-p.sh")
+}
+
+#[test]
+fn field_splitting() {
+    run("fsplit-p.sh")
+}
+
+#[test]
+fn function() {
+    run("function-p.sh")
 }
 
 #[test]
