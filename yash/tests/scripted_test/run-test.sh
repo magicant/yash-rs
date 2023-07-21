@@ -72,6 +72,7 @@ test_file="${2:?test file not specified}"
 log_file="${3:?log file not specified}"
 
 testee="$(absolute "$(command -v -- "$testee")")"
+log_file="$(absolute "$log_file")"
 
 exec >|"$log_file"
 
@@ -204,8 +205,8 @@ exec_testee() {
 # If the "skip" variable is defined non-empty, the test case is skipped.
 testcase() {
     # Shells without $LINENO support give an empty $1, in which case we fall
-    # back to a simple serial number.
-    test_lineno="${1:-$((test_lineno+1))}"
+    # back to the line count of the current log file.
+    test_lineno="${1:-$(wc -l <"$log_file")}"
     shift 1
     OPTIND=1
     diagnostic_required="false"
@@ -381,8 +382,6 @@ alias test_Oe='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5<<\__ERR__'
 alias test_E='testcase "$LINENO" 3<<\__IN__ 4<&- 5</dev/null'
 alias test_oE='testcase "$LINENO" 3<<\__IN__ 4<<\__OUT__ 5</dev/null'
 alias test_OE='testcase "$LINENO" 3<<\__IN__ 4</dev/null 5</dev/null'
-
-test_lineno=0
 
 ##### Run test
 
