@@ -117,6 +117,32 @@ fn function() {
 }
 
 #[test]
+fn grouping() {
+    run("grouping-p.sh")
+}
+
+#[test]
+fn if_command() {
+    run("if-p.sh")
+}
+
+// a.k.a. globbing
+#[test]
+fn pathname_expansion() {
+    run("path-p.sh")
+}
+
+#[test]
+fn pipeline() {
+    run("pipeline-p.sh")
+}
+
+#[test]
+fn ppid_variable() {
+    run("ppid-p.sh")
+}
+
+#[test]
 fn return_builtin() {
     run("return-p.sh")
 }
