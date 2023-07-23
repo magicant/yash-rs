@@ -143,6 +143,21 @@ fn ppid_variable() {
 }
 
 #[test]
+fn quotation() {
+    run("quote-p.sh")
+}
+
+#[test]
+fn redirection() {
+    run("redir-p.sh")
+}
+
+#[test]
 fn return_builtin() {
     run("return-p.sh")
+}
+
+#[test]
+fn simple_command() {
+    run("simple-p.sh")
 }
