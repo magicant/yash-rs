@@ -161,3 +161,18 @@ fn return_builtin() {
 fn simple_command() {
     run("simple-p.sh")
 }
+
+#[test]
+fn tilde_expansion() {
+    run("tilde-p.sh")
+}
+
+#[test]
+fn until_loop() {
+    run("until-p.sh")
+}
+
+#[test]
+fn while_loop() {
+    run("while-p.sh")
+}
