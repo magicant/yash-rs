@@ -93,8 +93,11 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
 }
 
 pub fn bin_main() -> i32 {
+    use env::system::SignalHandling;
+    use env::trap::Signal::SIGPIPE;
     use env::Env;
     use env::RealSystem;
+    use env::System;
     use futures_util::task::LocalSpawnExt;
     use std::cell::Cell;
     use std::rc::Rc;
@@ -103,7 +106,13 @@ pub fn bin_main() -> i32 {
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
     let system = unsafe { RealSystem::new() };
-    let env = Env::with_system(Box::new(system));
+    let mut env = Env::with_system(Box::new(system));
+
+    // Rust by default sets SIGPIPE to SIG_IGN, which is not desired.
+    // As an imperfect workaround, we set SIGPIPE to SIG_DFL here.
+    // TODO Use unix_sigpipe: https://github.com/rust-lang/rust/issues/97889
+    _ = env.system.sigaction(SIGPIPE, SignalHandling::Default);
+
     let system = env.system.clone();
     let mut pool = futures_executor::LocalPool::new();
     let task = parse_and_print(env);
