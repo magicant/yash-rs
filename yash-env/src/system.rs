@@ -349,6 +349,9 @@ pub trait System: Debug {
     /// Returns the current working directory path.
     fn getcwd(&self) -> nix::Result<PathBuf>;
 
+    /// Changes the working directory.
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()>;
+
     /// Returns the home directory path of the given user.
     ///
     /// Returns `Ok(None)` if the user is not found.
@@ -859,6 +862,9 @@ impl System for SharedSystem {
     }
     fn getcwd(&self) -> nix::Result<PathBuf> {
         self.0.borrow().getcwd()
+    }
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+        self.0.borrow_mut().chdir(path)
     }
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)

@@ -385,6 +385,10 @@ impl System for RealSystem {
         nix::unistd::getcwd()
     }
 
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+        nix::unistd::chdir(path)
+    }
+
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {
         nix::unistd::User::from_name(name).map(|o| o.map(|passwd| passwd.dir))
     }
