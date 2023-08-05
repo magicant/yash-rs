@@ -111,11 +111,11 @@ pub enum ErrorCause {
 
     /// Error while evaluating an arithmetic expansion.
     #[error(transparent)]
-    ArithError(ArithError),
+    ArithError(#[from] ArithError),
 
     /// Assignment to a read-only variable.
     #[error(transparent)]
-    AssignReadOnly(ReadOnlyError),
+    AssignReadOnly(#[from] ReadOnlyError),
 
     /// Expansion of an unset parameter with the `nounset` option
     #[error("unset parameter")]
@@ -123,11 +123,11 @@ pub enum ErrorCause {
 
     /// Expansion of an empty value with an error switch
     #[error(transparent)]
-    EmptyExpansion(EmptyError),
+    EmptyExpansion(#[from] EmptyError),
 
     /// Assignment to a nonassignable parameter
     #[error(transparent)]
-    NonassignableParameter(NonassignableError),
+    NonassignableParameter(#[from] NonassignableError),
 }
 
 impl ErrorCause {
