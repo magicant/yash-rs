@@ -67,7 +67,7 @@ pub async fn execute_external_utility(
 
     if path.to_bytes().is_empty() {
         print_error(
-            &mut *env,
+            &mut env.system,
             format!("cannot execute external utility {:?}", name.value).into(),
             "utility not found".into(),
             &name.origin,
@@ -105,7 +105,7 @@ pub async fn execute_external_utility(
         }
         Err(errno) => {
             print_error(
-                &mut *env,
+                &mut env.system,
                 format!("cannot execute external utility {:?}", name.value).into(),
                 errno.desc().into(),
                 &name.origin,
@@ -168,7 +168,7 @@ pub async fn replace_current_process(
         }
     }
     print_error(
-        env,
+        &mut env.system,
         format!("cannot execute external utility {path:?}").into(),
         errno.desc().into(),
         &location,

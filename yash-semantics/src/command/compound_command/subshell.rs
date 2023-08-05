@@ -52,7 +52,7 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
         }
         Err(errno) => {
             print_error(
-                env,
+                &mut env.system,
                 "cannot start subshell".into(),
                 errno.desc().into(),
                 location,

@@ -20,6 +20,7 @@ pub mod real;
 pub mod r#virtual;
 
 use crate::io::Fd;
+use crate::io::Stderr;
 use crate::job::Pid;
 use crate::job::WaitStatus;
 #[cfg(doc)]
@@ -27,6 +28,7 @@ use crate::subshell::Subshell;
 use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
+use async_trait::async_trait;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
 #[doc(no_inline)]
@@ -878,6 +880,18 @@ impl SignalSystem for SharedSystem {
         handling: SignalHandling,
     ) -> Result<SignalHandling, Errno> {
         self.0.borrow_mut().set_signal_handling(signal, handling)
+    }
+}
+
+#[async_trait(?Send)]
+impl Stderr for SharedSystem {
+    async fn print_error(&mut self, message: &str) {
+        _ = self.write_all(Fd::STDERR, message.as_bytes()).await;
+    }
+    fn should_print_error_in_color(&self) -> bool {
+        // TODO Enable color depending on user config (force/auto/never)
+        // TODO Check if the terminal really supports color (needs terminfo)
+        self.isatty(Fd::STDERR) == Ok(true)
     }
 }
 

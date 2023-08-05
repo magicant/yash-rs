@@ -72,9 +72,9 @@ impl Stderr for String {
 /// This function converts the `error` into a [`Message`] which in turn is
 /// converted into [`Snippet`] and then [`DisplayList`].
 /// The result is printed to the standard error using [`Stderr::print_error`].
-pub async fn print_message<'a, Env, E>(env: &mut Env, error: E)
+pub async fn print_message<'a, S, E>(stderr: &mut S, error: E)
 where
-    Env: Stderr,
+    S: Stderr,
     E: Into<Message<'a>> + 'a,
 {
     async fn inner(stderr: &mut dyn Stderr, m: Message<'_>) {
@@ -83,15 +83,15 @@ where
         let f = format!("{}\n", DisplayList::from(s));
         stderr.print_error(&f).await
     }
-    inner(env, error.into()).await
+    inner(stderr, error.into()).await
 }
 
 /// Convenience function for printing an error message.
 ///
 /// This function constructs a temporary [`Message`] based on the given `title`,
 /// `label`, and `location`. The message is printed using [`print_message`].
-pub async fn print_error<Env: Stderr>(
-    env: &mut Env,
+pub async fn print_error<S: Stderr>(
+    stderr: &mut S,
     title: Cow<'_, str>,
     label: Cow<'_, str>,
     location: &Location,
@@ -103,5 +103,5 @@ pub async fn print_error<Env: Stderr>(
         title,
         annotations: a,
     };
-    print_message(env, message).await;
+    print_message(stderr, message).await;
 }

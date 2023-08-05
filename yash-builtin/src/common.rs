@@ -33,6 +33,7 @@ use yash_env::semantics::Field;
 use yash_env::stack::Frame;
 use yash_env::stack::Stack;
 use yash_env::system::Errno;
+use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
@@ -130,12 +131,9 @@ pub trait Stdout {
 }
 
 #[async_trait(?Send)]
-impl Stdout for yash_env::Env {
+impl Stdout for SharedSystem {
     async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
-        self.system
-            .write_all(Fd::STDOUT, text.as_bytes())
-            .await
-            .map(drop)
+        self.write_all(Fd::STDOUT, text.as_bytes()).await.map(drop)
     }
 }
 
@@ -144,6 +142,74 @@ impl Stdout for String {
     async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
         self.push_str(text);
         Ok(())
+    }
+}
+
+/// Trait for types that can be cast to [`Stdout`].
+pub trait AsStdout {
+    type Stdout: Stdout;
+    fn as_stdout(&mut self) -> &mut Self::Stdout;
+}
+
+impl AsStdout for SharedSystem {
+    type Stdout = SharedSystem;
+    fn as_stdout(&mut self) -> &mut Self::Stdout {
+        self
+    }
+}
+
+impl AsStdout for yash_env::Env {
+    type Stdout = SharedSystem;
+    fn as_stdout(&mut self) -> &mut Self::Stdout {
+        &mut self.system
+    }
+}
+
+impl AsStdout for String {
+    type Stdout = String;
+    fn as_stdout(&mut self) -> &mut Self::Stdout {
+        self
+    }
+}
+
+impl<'a, 'b> AsStdout for (&'a mut String, &'b mut String) {
+    type Stdout = String;
+    fn as_stdout(&mut self) -> &mut Self::Stdout {
+        self.0
+    }
+}
+
+/// Trait for types that can be cast to [`Stderr`].
+pub trait AsStderr {
+    type Stderr: Stderr;
+    fn as_stderr(&mut self) -> &mut Self::Stderr;
+}
+
+impl AsStderr for SharedSystem {
+    type Stderr = SharedSystem;
+    fn as_stderr(&mut self) -> &mut Self::Stderr {
+        self
+    }
+}
+
+impl AsStderr for yash_env::Env {
+    type Stderr = SharedSystem;
+    fn as_stderr(&mut self) -> &mut Self::Stderr {
+        &mut self.system
+    }
+}
+
+impl AsStderr for String {
+    type Stderr = String;
+    fn as_stderr(&mut self) -> &mut Self::Stderr {
+        self
+    }
+}
+
+impl<'a, 'b> AsStderr for (&'a mut String, &'b mut String) {
+    type Stderr = String;
+    fn as_stderr(&mut self) -> &mut Self::Stderr {
+        self.1
     }
 }
 
@@ -158,9 +224,9 @@ pub trait Print {
 }
 
 #[async_trait(?Send)]
-impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
+impl<T: BuiltinEnv + AsStdout + AsStderr> Print for T {
     async fn print(&mut self, text: &str) -> yash_env::builtin::Result {
-        match self.try_print(text).await {
+        match self.as_stdout().try_print(text).await {
             Ok(()) => yash_env::builtin::Result::default(),
             Err(errno) => {
                 let message = Message {
@@ -183,7 +249,7 @@ impl<T: BuiltinEnv + Stdout + Stderr> Print for T {
 /// Returns [`env.builtin_error()`](BuiltinEnv::builtin_error).
 pub async fn print_message<'a, E, M>(env: &mut E, message: M) -> yash_env::semantics::Result
 where
-    E: BuiltinEnv + Stderr,
+    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
     let builtin_name = env.builtin_name();
@@ -199,7 +265,7 @@ where
         .source
         .complement_annotations(&mut message.annotations);
 
-    yash_env::io::print_message(env, message).await;
+    yash_env::io::print_message(env.as_stderr(), message).await;
 
     env.builtin_error()
 }
@@ -211,7 +277,7 @@ where
 #[inline]
 pub async fn print_failure_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + Stderr,
+    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
     let result = print_message(env, message).await;
@@ -225,7 +291,7 @@ where
 #[inline]
 pub async fn print_error_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + Stderr,
+    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
     let result = print_message(env, message).await;
@@ -243,7 +309,7 @@ pub async fn print_simple_error_message<E>(
     annotation: Annotation<'_>,
 ) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + Stderr,
+    E: BuiltinEnv + AsStderr,
 {
     let message = Message {
         r#type: AnnotationType::Error,
@@ -263,7 +329,7 @@ pub async fn syntax_error<E>(
     location: &Location,
 ) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + Stderr,
+    E: BuiltinEnv + AsStderr,
 {
     print_simple_error_message(
         env,
