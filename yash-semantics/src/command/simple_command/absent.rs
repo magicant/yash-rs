@@ -85,7 +85,7 @@ pub async fn execute_absent_target(
             }
             Err(errno) => {
                 print_error(
-                    env,
+                    &mut env.system,
                     "cannot start subshell to perform redirection".into(),
                     errno.desc().into(),
                     &first_redir_location,
