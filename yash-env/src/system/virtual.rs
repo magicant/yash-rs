@@ -325,11 +325,21 @@ impl System for VirtualSystem {
     /// The current implementation only checks if the file has any executable
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
-        let path = OsStr::from_bytes(path.to_bytes());
-        match self.state.borrow().file_system.get(path) {
-            Err(_) => false,
-            Ok(inode) => inode.borrow().permissions.0 & 0o111 != 0,
-        }
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
+            return false
+        };
+        let inode = inode.borrow();
+        inode.permissions.0 & 0o111 != 0
+    }
+
+    fn is_directory(&self, path: &CStr) -> bool {
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
+            return false
+        };
+        let inode = inode.borrow();
+        matches!(inode.body, FileBody::Directory { .. })
     }
 
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {

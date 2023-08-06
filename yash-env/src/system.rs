@@ -93,6 +93,10 @@ pub trait System: Debug {
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
 
+    /// Whether there is a directory at the specified path.
+    #[must_use]
+    fn is_directory(&self, path: &CStr) -> bool;
+
     /// Creates an unnamed pipe.
     ///
     /// This is a thin wrapper around the `pipe` system call.
@@ -755,6 +759,9 @@ impl System for SharedSystem {
     }
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
+    }
+    fn is_directory(&self, path: &CStr) -> bool {
+        self.0.borrow().is_directory(path)
     }
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
