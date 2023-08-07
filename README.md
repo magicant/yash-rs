@@ -1,6 +1,6 @@
 # Yash-rs
 
-This is a reimplementation project of Yet Another Shell (yash) in Rust.
+This is a reimplementation project of [Yet Another Shell (yash)](https://yash.osdn.jp/) in Rust.
 
 [![Build status](https://github.com/magicant/yash-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/magicant/yash-rs/actions/workflows/rust.yml)
 
