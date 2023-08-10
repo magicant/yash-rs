@@ -73,7 +73,7 @@
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
 use crate::common::print_error_message;
-use crate::common::print_simple_error_message;
+use crate::common::print_simple_failure_message;
 use crate::common::BuiltinEnv;
 use crate::common::Print;
 use yash_env::builtin::Result;
@@ -106,7 +106,7 @@ pub mod syntax;
 async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
     let builtin_name = &env.stack.builtin_name();
     let location = builtin_name.origin.clone();
-    print_simple_error_message(
+    print_simple_failure_message(
         env,
         "cannot compute the working directory path",
         Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
