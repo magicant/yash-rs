@@ -103,7 +103,7 @@ impl Env {
                 .into_string()
                 .map_err(|_| nix::Error::EILSEQ)?;
             self.variables
-                .assign(Global, "PWD".to_string(), Variable::new(dir))?;
+                .assign(Global, "PWD".to_string(), Variable::new(dir).export())?;
         }
         Ok(())
     }
@@ -184,6 +184,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
+        assert!(pwd.is_exported);
     }
 
     #[test]
@@ -210,6 +211,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
+        assert!(pwd.is_exported);
     }
 
     #[test]
@@ -223,6 +225,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
+        assert!(pwd.is_exported);
     }
 
     #[test]
@@ -236,6 +239,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/foo/bar/dir")));
+        assert!(pwd.is_exported);
     }
 
     #[test]
@@ -264,5 +268,6 @@ mod tests {
         assert_eq!(result, Ok(()));
         let pwd = env.variables.get("PWD").unwrap();
         assert_eq!(pwd.value, Some(Value::scalar("/")));
+        assert!(pwd.is_exported);
     }
 }
