@@ -64,9 +64,9 @@
 //! POSIX allows the built-in to apply the `-P` option if the `-L` option is
 //! specified and `$PWD` is longer than PATH_MAX.
 //!
-//! The shell sets `$PWD` on the startup and modifies it in the cd built-in <!--
-//! TBD: link to crate::cd -->. If `$PWD` is modified or unset otherwise, the
-//! behavior of the cd and pwd built-ins is unspecified.
+//! The shell sets `$PWD` on the startup and modifies it in the [cd](crate::cd)
+//! built-in. If `$PWD` is modified or unset otherwise, the behavior of the cd
+//! and pwd built-ins is unspecified.
 //!
 //! # Implementation notes
 //!
