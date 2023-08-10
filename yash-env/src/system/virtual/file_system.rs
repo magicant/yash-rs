@@ -130,22 +130,30 @@ impl FileSystem {
     pub fn get<P: AsRef<Path>>(&self, path: P) -> nix::Result<Rc<RefCell<INode>>> {
         fn main(fs: &FileSystem, path: &Path) -> nix::Result<Rc<RefCell<INode>>> {
             let components = path.components();
-            let mut node = Rc::clone(&fs.root);
+            let mut nodes = vec![Rc::clone(&fs.root)];
             for component in components {
                 let name = match component {
                     Component::Normal(name) => name,
                     Component::RootDir | Component::CurDir => continue,
+                    Component::ParentDir => {
+                        if nodes.len() > 1 {
+                            nodes.pop();
+                        }
+                        continue;
+                    }
                     _ => return Err(Errno::ENOENT),
                 };
-                let node_ref = node.borrow();
+                let node_ref = nodes.last().unwrap().borrow();
                 let children = match &node_ref.body {
                     FileBody::Directory { files } => files,
                     _ => return Err(Errno::ENOTDIR),
                 };
                 let child = Rc::clone(children.get(name).ok_or(Errno::ENOENT)?);
                 drop(node_ref);
-                node = child;
+                nodes.push(child);
             }
+
+            let node = nodes.pop().unwrap();
             if path.as_os_str().as_bytes().ends_with(b"/")
                 && !matches!(&node.borrow().body, FileBody::Directory { .. })
             {
@@ -367,6 +375,16 @@ mod tests {
         let mut fs = FileSystem::default();
         let old = fs.save("", Rc::default());
         assert_eq!(old, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn file_system_get_parents() {
+        let mut fs = FileSystem::default();
+        let file = Rc::new(RefCell::new(INode::new([123])));
+        _ = fs.save("/dir/dir1/file", Rc::clone(&file));
+        _ = fs.save("/dir/dir2/dir3/file", Rc::default());
+        assert_eq!(fs.get("/dir/dir2/dir3/../../dir1/file").unwrap(), file);
+        assert_eq!(fs.get("/../dir/dir1/file").unwrap(), file);
     }
 
     #[test]

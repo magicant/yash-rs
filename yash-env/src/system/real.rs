@@ -37,7 +37,7 @@ use crate::io::Fd;
 use crate::job::Pid;
 use crate::SignalHandling;
 use nix::libc::DIR;
-use nix::libc::{S_IFMT, S_IFREG};
+use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
@@ -67,10 +67,11 @@ fn is_executable(path: &CStr) -> bool {
 }
 
 fn is_regular_file(path: &CStr) -> bool {
-    match stat(path) {
-        Ok(stat) => stat.st_mode & S_IFMT == S_IFREG,
-        Err(_) => false,
-    }
+    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFREG)
+}
+
+fn is_directory(path: &CStr) -> bool {
+    matches!(stat(path), Ok(stat) if stat.st_mode & S_IFMT == S_IFDIR)
 }
 
 static CAUGHT_SIGNALS: [AtomicIsize; 8] = {
@@ -135,6 +136,10 @@ impl System for RealSystem {
 
     fn is_executable_file(&self, path: &CStr) -> bool {
         is_regular_file(path) && is_executable(path)
+    }
+
+    fn is_directory(&self, path: &CStr) -> bool {
+        is_directory(path)
     }
 
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
@@ -383,6 +388,10 @@ impl System for RealSystem {
 
     fn getcwd(&self) -> nix::Result<std::path::PathBuf> {
         nix::unistd::getcwd()
+    }
+
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+        nix::unistd::chdir(path)
     }
 
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<std::path::PathBuf>> {

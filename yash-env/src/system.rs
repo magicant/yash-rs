@@ -93,6 +93,10 @@ pub trait System: Debug {
     #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
 
+    /// Whether there is a directory at the specified path.
+    #[must_use]
+    fn is_directory(&self, path: &CStr) -> bool;
+
     /// Creates an unnamed pipe.
     ///
     /// This is a thin wrapper around the `pipe` system call.
@@ -350,6 +354,9 @@ pub trait System: Debug {
 
     /// Returns the current working directory path.
     fn getcwd(&self) -> nix::Result<PathBuf>;
+
+    /// Changes the working directory.
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()>;
 
     /// Returns the home directory path of the given user.
     ///
@@ -753,6 +760,9 @@ impl System for SharedSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.0.borrow().is_executable_file(path)
     }
+    fn is_directory(&self, path: &CStr) -> bool {
+        self.0.borrow().is_directory(path)
+    }
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
         self.0.borrow_mut().pipe()
     }
@@ -861,6 +871,9 @@ impl System for SharedSystem {
     }
     fn getcwd(&self) -> nix::Result<PathBuf> {
         self.0.borrow().getcwd()
+    }
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+        self.0.borrow_mut().chdir(path)
     }
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
         self.0.borrow().getpwnam_dir(name)

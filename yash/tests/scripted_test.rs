@@ -77,6 +77,11 @@ fn case_command() {
 }
 
 #[test]
+fn cd_builtin() {
+    run("cd-p.sh")
+}
+
+#[test]
 fn command_substitution() {
     run("cmdsub-p.sh")
 }

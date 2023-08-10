@@ -28,6 +28,7 @@
 
 pub mod alias;
 pub mod r#break;
+pub mod cd;
 pub mod common;
 pub mod r#continue;
 #[cfg(feature = "yash-semantics")]
@@ -63,6 +64,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(r#break::main(env, args)),
+        },
+    ),
+    (
+        "cd",
+        Builtin {
+            r#type: Intrinsic,
+            execute: |env, args| Box::pin(cd::main(env, args)),
         },
     ),
     (

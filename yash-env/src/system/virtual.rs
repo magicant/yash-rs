@@ -65,6 +65,7 @@ use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
 use super::TimeSpec;
+use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::WaitStatus;
@@ -324,11 +325,21 @@ impl System for VirtualSystem {
     /// The current implementation only checks if the file has any executable
     /// bit in the permissions. The file owner and group are not considered.
     fn is_executable_file(&self, path: &CStr) -> bool {
-        let path = OsStr::from_bytes(path.to_bytes());
-        match self.state.borrow().file_system.get(path) {
-            Err(_) => false,
-            Ok(inode) => inode.borrow().permissions.0 & 0o111 != 0,
-        }
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
+            return false
+        };
+        let inode = inode.borrow();
+        inode.permissions.0 & 0o111 != 0
+    }
+
+    fn is_directory(&self, path: &CStr) -> bool {
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
+            return false
+        };
+        let inode = inode.borrow();
+        matches!(inode.body, FileBody::Directory { .. })
     }
 
     fn pipe(&mut self) -> nix::Result<(Fd, Fd)> {
@@ -904,6 +915,23 @@ impl System for VirtualSystem {
 
     fn getcwd(&self) -> nix::Result<PathBuf> {
         Ok(self.current_process().cwd.clone())
+    }
+
+    /// Changes the current working directory.
+    ///
+    /// The current implementation does not canonicalize ".", "..", or symbolic
+    /// links in the new path set to the process.
+    fn chdir(&mut self, path: &CStr) -> nix::Result<()> {
+        let path = Path::new(OsStr::from_bytes(path.to_bytes()));
+        let inode = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty())?;
+        if matches!(&inode.borrow().body, FileBody::Directory { .. }) {
+            let mut process = self.current_process_mut();
+            let new_path = process.cwd.join(path);
+            process.chdir(new_path);
+            Ok(())
+        } else {
+            Err(Errno::ENOTDIR)
+        }
     }
 
     fn getpwnam_dir(&self, name: &str) -> nix::Result<Option<PathBuf>> {
@@ -2285,5 +2313,44 @@ mod tests {
         let path = CString::new("/no/such/file").unwrap();
         let result = system.execve(&path, &[], &[]);
         assert_eq!(result, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn chdir_changes_directory() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file and its parent directory
+        let _ = system.open(
+            &CString::new("/dir/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.chdir(CStr::from_bytes_with_nul(b"/dir\0").unwrap());
+        assert_eq!(result, Ok(()));
+        assert_eq!(system.current_process().cwd, Path::new("/dir"));
+    }
+
+    #[test]
+    fn chdir_fails_with_non_existing_directory() {
+        let mut system = VirtualSystem::new();
+
+        let result = system.chdir(CStr::from_bytes_with_nul(b"/no/such/dir\0").unwrap());
+        assert_eq!(result, Err(Errno::ENOENT));
+    }
+
+    #[test]
+    fn chdir_fails_with_non_directory_file() {
+        let mut system = VirtualSystem::new();
+
+        // Create a regular file and its parent directory
+        let _ = system.open(
+            &CString::new("/dir/file").unwrap(),
+            OFlag::O_WRONLY | OFlag::O_CREAT,
+            nix::sys::stat::Mode::empty(),
+        );
+
+        let result = system.chdir(CStr::from_bytes_with_nul(b"/dir/file\0").unwrap());
+        assert_eq!(result, Err(Errno::ENOTDIR));
     }
 }

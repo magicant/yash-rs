@@ -173,27 +173,26 @@ async fn assign(
     env: &mut Env<'_>,
     name: Option<Name<'_>>,
     value: &Word,
-    location: &Location,
+    location: Location,
 ) -> Result<Phrase, Error> {
     // TODO Support assignment to an array element
     let name = match name {
         Some(Name::Variable(name)) => name.to_owned(),
         _ => {
-            return Err(Error {
-                cause: ErrorCause::NonassignableParameter(NonassignableError::NotVariable),
-                location: location.clone(),
-            })
+            let cause = ErrorCause::NonassignableParameter(NonassignableError::NotVariable);
+            return Err(Error { cause, location });
         }
     };
     let value_phrase = attribute(expand(env, value).await?);
     let variable_value = value_phrase.clone().ifs_join(&env.inner.variables);
     let variable = Variable::new(skip_quotes(variable_value).strip().collect::<String>())
-        .set_assigned_location(location.clone());
+        .set_assigned_location(location);
     env.inner
         .assign_variable(Scope::Global, name, variable)
-        .map_err(|e| Error {
-            cause: ErrorCause::AssignReadOnly(e),
-            location: location.clone(),
+        .map_err(|e| {
+            let location = e.new_value.last_assigned_location.as_ref().unwrap().clone();
+            let cause = ErrorCause::AssignReadOnly(e);
+            Error { cause, location }
         })?;
     Ok(value_phrase)
 }
@@ -247,7 +246,7 @@ pub async fn apply(
     match (switch.r#type, cond) {
         (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
         (Alter, Set) | (Default, Unset(_)) => Some(expand(env, &switch.word).await.map(attribute)),
-        (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location).await),
+        (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
         (Error, Unset(state)) => Some(Err(empty_expansion_error(
             env,
             state,
