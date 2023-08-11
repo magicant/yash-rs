@@ -214,7 +214,7 @@ mod tests {
             })
         }
         let mut env = Env::new_virtual();
-        let r#type = yash_env::builtin::Type::Intrinsic;
+        let r#type = yash_env::builtin::Type::Mandatory;
         env.builtins.insert("check", Builtin { r#type, execute });
         let command: CompoundCommand = "for i in 1; do check; done".parse().unwrap();
 

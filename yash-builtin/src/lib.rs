@@ -46,7 +46,7 @@ pub mod wait;
 pub use yash_env::builtin::*;
 
 use std::future::ready;
-use Type::{Intrinsic, Special};
+use Type::{Mandatory, Special};
 
 /// Array of all the implemented built-in utilities.
 ///
@@ -55,7 +55,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     (
         "alias",
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |env, args| Box::pin(ready(alias::main(env, args))),
         },
     ),
@@ -69,7 +69,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     (
         "cd",
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |env, args| Box::pin(cd::main(env, args)),
         },
     ),
@@ -98,14 +98,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     (
         "jobs",
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |env, args| Box::pin(jobs::main(env, args)),
         },
     ),
     (
         "pwd",
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |env, args| Box::pin(pwd::main(env, args)),
         },
     ),
@@ -140,7 +140,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
     (
         "wait",
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |env, args| Box::pin(wait::main(env, args)),
         },
     ),

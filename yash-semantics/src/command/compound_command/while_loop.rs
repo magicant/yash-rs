@@ -199,7 +199,7 @@ mod tests {
             })
         }
         let (mut env, _state) = fixture();
-        let r#type = yash_env::builtin::Type::Intrinsic;
+        let r#type = yash_env::builtin::Type::Mandatory;
         env.builtins.insert("check", Builtin { r#type, execute });
         let command: CompoundCommand = "while check; do check; return; done".parse().unwrap();
 
@@ -443,7 +443,7 @@ mod tests {
             })
         }
         let (mut env, _state) = fixture();
-        let r#type = yash_env::builtin::Type::Intrinsic;
+        let r#type = yash_env::builtin::Type::Mandatory;
         env.builtins.insert("check", Builtin { r#type, execute });
         let command: CompoundCommand = "until ! check; do check; return; done".parse().unwrap();
 

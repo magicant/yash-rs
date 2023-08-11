@@ -52,7 +52,7 @@ pub async fn execute_builtin(
         e.handle(env).await?;
         return match builtin.r#type {
             Special => Break(Divert::Interrupt(None)),
-            Intrinsic | NonIntrinsic => Continue(()),
+            Mandatory | Elective | Extension | Substitutive => Continue(()),
         };
     };
 
@@ -75,7 +75,8 @@ pub async fn execute_builtin(
             perform_assignments(env, assigns, false, xtrace.as_mut()).await?;
             trace_and_execute(env, fields, builtin.execute, xtrace).await
         }
-        Intrinsic | NonIntrinsic => {
+        // TODO Reject elective and extension built-ins in POSIX mode
+        Mandatory | Elective | Extension | Substitutive => {
             let mut env = env.push_context(ContextType::Volatile);
             perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
             trace_and_execute(&mut env, fields, builtin.execute, xtrace).await
@@ -184,7 +185,7 @@ mod tests {
         env.builtins.insert(
             "exec",
             Builtin {
-                r#type: yash_env::builtin::Type::Intrinsic,
+                r#type: yash_env::builtin::Type::Mandatory,
                 execute: |_env, _args| {
                     Box::pin(async {
                         let mut result = yash_env::builtin::Result::default();
@@ -290,7 +291,7 @@ mod tests {
         env.builtins.insert(
             "builtin",
             Builtin {
-                r#type: yash_env::builtin::Type::Intrinsic,
+                r#type: yash_env::builtin::Type::Mandatory,
                 execute: builtin_main,
             },
         );

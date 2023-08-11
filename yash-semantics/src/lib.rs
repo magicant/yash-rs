@@ -59,7 +59,7 @@ pub(crate) mod tests {
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::builtin::Builtin;
-    use yash_env::builtin::Type::{Intrinsic, Special};
+    use yash_env::builtin::Type::{Mandatory, Special};
     use yash_env::io::Fd;
     use yash_env::job::Pid;
     use yash_env::semantics::Divert;
@@ -295,7 +295,7 @@ pub(crate) mod tests {
 
     pub fn local_builtin() -> Builtin {
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: local_builtin_main,
         }
     }
@@ -318,7 +318,7 @@ pub(crate) mod tests {
     /// Returns a minimal implementation of the `echo` built-in.
     pub fn echo_builtin() -> Builtin {
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: echo_builtin_main,
         }
     }
@@ -350,7 +350,7 @@ pub(crate) mod tests {
     /// Returns a minimal implementation of the `cat` built-in.
     pub fn cat_builtin() -> Builtin {
         Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: cat_builtin_main,
         }
     }

@@ -34,32 +34,70 @@ use std::pin::Pin;
 /// Types of built-in utilities.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Type {
-    /// Special built-in.
+    /// Special built-in
     ///
-    /// Special built-in utilities are treated differently from regular built-ins.
+    /// Special built-in utilities are built-ins that are defined in [POSIX XCU
+    /// section 2.14](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_14).
+    ///
+    /// They are treated differently from other built-ins.
     /// Especially, special built-ins are found in the first stage of command
-    /// search and cannot be overridden by functions or external utilities. Many
-    /// errors in special built-ins force the shell to exit.
+    /// search without the `$PATH` search and cannot be overridden by functions
+    /// or external utilities.
+    /// Many errors in special built-ins force the shell to exit.
     Special,
 
-    /// Intrinsic regular built-in.
+    /// Standard utility that can be used without `$PATH` search
     ///
-    /// Like special built-ins, intrinsic built-ins are not subject to $PATH in
-    /// command search; They are always found regardless of whether there is a
-    /// corresponding external utility in $PATH. However, intrinsic built-ins can
-    /// still be overridden by functions.
-    Intrinsic,
+    /// Mandatory built-ins are built-ins that are listed in step 1d of [Command
+    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
+    /// in POSIX XCU section 2.9.1.
+    ///
+    /// Like special built-ins, mandatory built-ins are not subject to `$PATH`
+    /// in command search; They are always found regardless of whether there is
+    /// a corresponding external utility in `$PATH`. However, mandatory
+    /// built-ins can still be overridden by functions.
+    ///
+    /// We call them "mandatory" because POSIX effectively requires them to be
+    /// implemented by the shell.
+    Mandatory,
 
-    /// Non-intrinsic regular built-in.
+    /// Non-portable built-in that can be used without `$PATH` search
     ///
-    /// Non-intrinsic built-ins are much like external utilities; They must be
-    /// found in $PATH in order to be executed.
-    NonIntrinsic,
-    // /// Non-portable extension.
-    // ///
-    // /// Extension built-ins are intrinsic built-ins that are not defined in POSIX.
-    // /// They are treated like non-existing utilities in the POSIX mode.
-    // TODO Extension,
+    /// Elective built-ins are built-ins that are listed in step 1b of [Command
+    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
+    /// in POSIX XCU section 2.9.1.
+    /// They are very similar to mandatory built-ins, but their behavior is not
+    /// specified by POSIX, so they are not portable. They cannot be used when
+    /// the (TODO TBD) option is set. <!-- An option that disables non-portable
+    /// behavior would make elective built-ins unusable even if found. An option
+    /// that disables non-conforming behavior would not affect elective
+    /// built-ins. -->
+    ///
+    /// We call them "elective" because it is up to the shell whether to
+    /// implement them.
+    Elective,
+
+    /// Non-portable extension
+    ///
+    /// Extension built-ins are non-conformant extensions to the POSIX shell.
+    /// Like elective built-ins, they can be executed without `$PATH` search
+    /// finding a corresponding external utility. However, since this behavior
+    /// does not conform to [Command
+    /// Search and Execution](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01)
+    /// in POSIX XCU section 2.9.1, they cannot be used when the (TODO TBD)
+    /// option is set. <!-- An option that disables non-conforming behavior
+    /// would make extension built-ins regarded as non-existing utilities. An
+    /// option that disables non-portable behavior would make extension
+    /// built-ins unusable even if found. -->
+    Extension,
+
+    /// Built-in that works as a standalone utility
+    ///
+    /// A substitutive built-in is a built-in that is executed instead of an
+    /// external utility to minimize invocation overhead. Since a substitutive
+    /// built-in behaves just as if it were an external utility, it must be
+    /// found in `$PATH` in order to be executed.
+    Substitutive,
 }
 
 /// Result of built-in utility execution.

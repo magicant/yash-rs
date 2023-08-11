@@ -25,16 +25,16 @@
 //! utility. Otherwise, the shell searches the following candidates for the
 //! target (in the order of priority):
 //!
-//! 1. Special built-ins
+//! 1. [Special] built-ins
 //! 1. Functions
-//! 1. Intrinsic built-ins
-//! 1. Non-intrinsic built-ins
+//! 1. Other built-ins
 //! 1. External utilities
 //!
-//! For a non-intrinsic built-in or external utility to be chosen as a target, a
-//! corresponding executable file must be present in a directory specified in
-//! the `$PATH` variable.
+//! For a [substitutive](Substitutive) built-in or external utility to be chosen
+//! as a target, a corresponding executable file must be present in a directory
+//! specified in the `$PATH` variable.
 
+use assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -42,7 +42,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
-use yash_env::builtin::Type::{Intrinsic, NonIntrinsic, Special};
+use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
 use yash_env::function::FunctionSet;
 use yash_env::variable::Variable;
@@ -87,8 +87,8 @@ impl From<Rc<Function>> for Target {
 }
 
 // impl From<CString> for Target
-// not implemented because of ambiguity between a non-intrinsic built-in and
-// external utility
+// not implemented because of ambiguity between substitutive built-ins and
+// external utilities
 
 /// Part of the shell execution environment command path search depends on.
 pub trait PathEnv {
@@ -126,6 +126,11 @@ impl SearchEnv for Env {
 }
 
 /// Performs command search.
+///
+/// This function requires a mutable reference to the environment because it may
+/// need to update a cache of the results of external utility search (TODO:
+/// which is not yet implemented). The function does not otherwise modify the
+/// environment.
 pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if name.contains('/') {
         return if let Ok(path) = CString::new(name) {
@@ -147,14 +152,15 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     }
 
     if let Some(builtin) = builtin {
-        if builtin.r#type == Intrinsic {
+        if builtin.r#type != Substitutive {
+            assert_matches!(builtin.r#type, Mandatory | Elective | Extension);
             return Some(builtin.into());
         }
     }
 
     if let Some(path) = search_path(env, name) {
         if let Some(builtin) = builtin {
-            assert_eq!(builtin.r#type, NonIntrinsic);
+            assert_eq!(builtin.r#type, Substitutive);
             return Some(builtin.into());
         }
         return Some(Target::External { path });
@@ -311,10 +317,10 @@ mod tests {
     }
 
     #[test]
-    fn intrinsic_builtin_is_found_if_not_hidden_by_function() {
+    fn mandatory_builtin_is_found_if_not_hidden_by_function() {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
-            r#type: Intrinsic,
+            r#type: Mandatory,
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
@@ -325,12 +331,40 @@ mod tests {
     }
 
     #[test]
-    fn function_takes_priority_over_intrinsic_builtin() {
+    fn elective_builtin_is_found_if_not_hidden_by_function() {
+        let mut env = DummyEnv::default();
+        let builtin = Builtin {
+            r#type: Elective,
+            execute: |_, _| unreachable!(),
+        };
+        env.builtins.insert("foo", builtin);
+
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
+    }
+
+    #[test]
+    fn extension_builtin_is_found_if_not_hidden_by_function_or_option() {
+        let mut env = DummyEnv::default();
+        let builtin = Builtin {
+            r#type: Extension,
+            execute: |_, _| unreachable!(),
+        };
+        env.builtins.insert("foo", builtin);
+
+        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
+            assert_eq!(result.r#type, builtin.r#type);
+        });
+    }
+
+    #[test]
+    fn function_takes_priority_over_mandatory_builtin() {
         let mut env = DummyEnv::default();
         env.builtins.insert(
             "foo",
             Builtin {
-                r#type: Intrinsic,
+                r#type: Mandatory,
                 execute: |_, _| unreachable!(),
             },
         );
@@ -349,10 +383,58 @@ mod tests {
     }
 
     #[test]
-    fn non_intrinsic_builtin_is_found_if_external_executable_exists() {
+    fn function_takes_priority_over_elective_builtin() {
+        let mut env = DummyEnv::default();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Elective,
+                execute: |_, _| unreachable!(),
+            },
+        );
+
+        let function = FunctionEntry::new(
+            "foo".to_string(),
+            full_compound_command("bar"),
+            Location::dummy("location"),
+            false,
+        );
+        env.functions.insert(function.clone());
+
+        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function.0);
+        });
+    }
+
+    #[test]
+    fn function_takes_priority_over_extension_builtin() {
+        let mut env = DummyEnv::default();
+        env.builtins.insert(
+            "foo",
+            Builtin {
+                r#type: Extension,
+                execute: |_, _| unreachable!(),
+            },
+        );
+
+        let function = FunctionEntry::new(
+            "foo".to_string(),
+            full_compound_command("bar"),
+            Location::dummy("location"),
+            false,
+        );
+        env.functions.insert(function.clone());
+
+        assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
+            assert_eq!(result, function.0);
+        });
+    }
+
+    #[test]
+    fn substitutive_builtin_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
-            r#type: NonIntrinsic,
+            r#type: Substitutive,
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
@@ -365,10 +447,10 @@ mod tests {
     }
 
     #[test]
-    fn non_intrinsic_builtin_is_not_found_without_external_executable() {
+    fn substitutive_builtin_is_not_found_without_external_executable() {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
-            r#type: NonIntrinsic,
+            r#type: Substitutive,
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
@@ -378,10 +460,10 @@ mod tests {
     }
 
     #[test]
-    fn function_takes_priority_over_non_intrinsic_builtin() {
+    fn function_takes_priority_over_substitutive_builtin() {
         let mut env = DummyEnv::default();
         let builtin = Builtin {
-            r#type: NonIntrinsic,
+            r#type: Substitutive,
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
@@ -414,19 +496,8 @@ mod tests {
 
     #[test]
     fn returns_external_utility_if_name_contains_slash() {
+        // In this case, the external utility file does not have to exist.
         let mut env = DummyEnv::default();
-        let builtin = Builtin {
-            r#type: NonIntrinsic,
-            execute: |_, _| unreachable!(),
-        };
-        env.builtins.insert("foo", builtin);
-        env.functions.insert(FunctionEntry::new(
-            "foo".to_string(),
-            full_compound_command("bar"),
-            Location::dummy("location"),
-            false,
-        ));
-
         assert_matches!(search(&mut env, "bar/baz"), Some(Target::External { path }) => {
             assert_eq!(path.to_bytes(), "bar/baz".as_bytes());
         });
