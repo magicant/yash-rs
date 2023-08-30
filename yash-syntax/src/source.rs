@@ -42,6 +42,12 @@ pub enum Source {
     /// Standard input.
     Stdin,
 
+    /// Command string specified with the `-c` option on the shell startup.
+    CommandString,
+
+    /// File specified on the shell startup.
+    CommandFile { path: String },
+
     /// Alias substitution.
     ///
     /// This applies to a code fragment that replaced another as a result of alias substitution.
@@ -133,6 +139,8 @@ impl Source {
         match self {
             Unknown => "<?>",
             Stdin => "<stdin>",
+            CommandString => "<command_string>",
+            CommandFile { path } => path,
             Alias { .. } => "<alias>",
             CommandSubst { .. } => "<command_substitution>",
             Arith { .. } => "<arith>",
