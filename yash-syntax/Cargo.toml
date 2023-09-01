@@ -15,11 +15,11 @@ categories = ["command-line-utilities", "parser-implementations"]
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", optional = true }
-async-trait = "0.1.66"
-futures-util = "0.3.27"
-itertools = "0.10.5"
-thiserror = "1.0.43"
+async-trait = "0.1.73"
+futures-util = "0.3.28"
+itertools = "0.11.0"
+thiserror = "1.0.47"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-futures-executor = "0.3.27"
+futures-executor = "0.3.28"

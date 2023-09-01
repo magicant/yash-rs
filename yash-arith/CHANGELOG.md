@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Changed the return type of `eval` from
       `Result<Value, Error<E::AssignVariableError>>` to
       `Result<Value, Error<E::GetVariableError, E::AssignVariableError>>`.
+- Internal dependency versions
+    - thiserror 1.0.43 → 1.0.47
 
 ## [0.1.0] - 2022-10-01
 

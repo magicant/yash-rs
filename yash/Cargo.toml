@@ -17,10 +17,10 @@ publish = false
 
 [dependencies]
 annotate-snippets = { version = "0.9.1", features = ["color"] }
-async-trait = "0.1.66"
-futures-executor = "0.3.27"
-futures-util = "0.3.27"
-thiserror = "1.0.43"
+async-trait = "0.1.73"
+futures-executor = "0.3.28"
+futures-util = "0.3.28"
+thiserror = "1.0.47"
 yash-arith = { path = "../yash-arith", version = "0.1.0" }
 yash-builtin = { path = "../yash-builtin", version = "0.1.0" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
@@ -32,4 +32,4 @@ yash-syntax = { path = "../yash-syntax", version = "0.6.1" }
 [dev-dependencies]
 assert_matches = "1.5.0"
 fuzed-iterator = "1.0.0"
-tempfile = "3.6.0"
+tempfile = "3.8.0"

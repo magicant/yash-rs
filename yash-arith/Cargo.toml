@@ -14,4 +14,4 @@ keywords = ["posix", "shell"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-thiserror = "1.0.43"
+thiserror = "1.0.47"
