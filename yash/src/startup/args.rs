@@ -200,7 +200,9 @@ where
             }
         }
 
-        let Some(option) = try_parse_long(&mut args)? else { break; };
+        let Some(option) = try_parse_long(&mut args)? else {
+            break;
+        };
         match option {
             LongOption::Shell(option, state) => result.options.push((option, state)),
             LongOption::Profile { path } => {

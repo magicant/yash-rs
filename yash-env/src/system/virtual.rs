@@ -327,7 +327,7 @@ impl System for VirtualSystem {
     fn is_executable_file(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false
+            return false;
         };
         let inode = inode.borrow();
         inode.permissions.0 & 0o111 != 0
@@ -336,7 +336,7 @@ impl System for VirtualSystem {
     fn is_directory(&self, path: &CStr) -> bool {
         let path = Path::new(OsStr::from_bytes(path.to_bytes()));
         let Ok(inode) = self.resolve_existing_file(AT_FDCWD, path, AtFlags::empty()) else {
-            return false
+            return false;
         };
         let inode = inode.borrow();
         matches!(inode.body, FileBody::Directory { .. })

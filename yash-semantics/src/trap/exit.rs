@@ -38,8 +38,12 @@ use yash_syntax::source::Source;
 /// with a `Break(divert)` where `divert.exit_status()` is `Some` exit status,
 /// that exit status is set to `env.exit_status`.
 pub async fn run_exit_trap(env: &mut Env) {
-    let Some(state) = env.traps.get_state(Condition::Exit).0 else { return; };
-    let Action::Command(command) = &state.action else { return; };
+    let Some(state) = env.traps.get_state(Condition::Exit).0 else {
+        return;
+    };
+    let Action::Command(command) = &state.action else {
+        return;
+    };
 
     let command = Rc::clone(command);
     let condition = Condition::Exit.to_string();
