@@ -218,6 +218,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuzed-iterator"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1117111ebe6c507ef1145e0dd4f4f9bd7f692838321a2dded4a09d13c38c5760"
+
+[[package]]
 name = "hermit-abi"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -548,10 +554,13 @@ name = "yash"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "assert_matches",
  "async-trait",
  "futures-executor",
  "futures-util",
+ "fuzed-iterator",
  "tempfile",
+ "thiserror",
  "yash-arith",
  "yash-builtin",
  "yash-env",

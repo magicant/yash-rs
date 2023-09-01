@@ -25,57 +25,79 @@ pub use yash_semantics as semantics;
 #[doc(no_inline)]
 pub use yash_syntax::{alias, parser, source, syntax};
 
-// TODO Allow user to select input source
+pub mod startup;
+// mod runner;
+
 async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     use env::option::Option::{Interactive, Monitor};
-    use env::option::State::{Off, On};
-    use std::cell::Cell;
+    use env::option::State::On;
+    use env::variable::Value::Array;
+    use semantics::trap::run_exit_trap;
+    use semantics::Divert;
+    use semantics::ExitStatus;
+    use startup::args::Parse;
+    use startup::prepare_input;
     use std::num::NonZeroU64;
     use std::ops::ControlFlow::{Break, Continue};
-    use std::rc::Rc;
-    use yash_env::input::Stdin;
-    use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
-    use yash_semantics::trap::run_exit_trap;
-    use yash_semantics::Divert;
 
-    let mut args = std::env::args();
-    if let Some(arg0) = args.next() {
-        env.arg0 = arg0;
+    let run = match startup::args::parse(std::env::args()) {
+        Ok(Parse::Help) => todo!("print help"),
+        Ok(Parse::Version) => todo!("print version"),
+        Ok(Parse::Run(run)) => run,
+        Err(e) => {
+            let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
+            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            return ExitStatus::ERROR.0;
+        }
+    };
+    if startup::auto_interactive(&env.system, &run) {
+        env.options.set(Interactive, On);
+    }
+    if run.source == startup::args::Source::Stdin {
+        env.options.set(env::option::Stdin, On);
+    }
+    for &(option, state) in &run.options {
+        env.options.set(option, state);
+    }
+    if env.options.get(Interactive) == On && !run.options.iter().any(|&(o, _)| o == Monitor) {
+        env.options.set(Monitor, On);
+    }
 
-        for arg in args {
-            match arg.as_str() {
-                "-i" => {
-                    env.options.set(Interactive, On);
-                    _ = env.traps.enable_terminator_handlers(&mut env.system);
-                }
-                "-m" => {
-                    env.options.set(Monitor, On);
-                    _ = env.traps.enable_stopper_handlers(&mut env.system);
-                }
-                _ => todo!("sorry, this argument is not yet supported: {arg:?}"),
-            }
+    env.arg0 = run.arg0;
+    env.variables.positional_params_mut().value = Some(Array(run.positional_params));
+
+    if env.options.get(Interactive) == On {
+        env.traps.enable_terminator_handlers(&mut env.system).ok();
+        if env.options.get(Monitor) == On {
+            env.traps.enable_stopper_handlers(&mut env.system).ok();
         }
     }
 
     env.builtins.extend(builtin::BUILTINS.iter().cloned());
 
-    // TODO std::env::vars() would panic on broken UTF-8, which should rather be
-    // ignored.
-    for (name, value) in std::env::vars() {
-        let value = Variable::new(value).export();
-        env.variables.assign(Scope::Global, name, value).unwrap();
-    }
+    env.variables.extend_env(std::env::vars());
     env.init_variables();
 
-    // Run the read-eval loop
-    let mut input = Box::new(Stdin::new(env.system.clone()));
-    let echo = Rc::new(Cell::new(Off));
-    input.set_echo(Some(Rc::clone(&echo)));
+    // TODO disable non-blocking I/O on stdin
+
+    // TODO run profile if login
+    // TODO run rcfile if interactive
+
+    // Prepare the input for the main read-eval loop
+    let input = match prepare_input(&env.system, &run.source) {
+        Ok(input) => input,
+        Err(e) => {
+            let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
+            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            return ExitStatus::FAILURE.0;
+        }
+    };
     let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = parser::lex::Lexer::new(input, line, source::Source::Stdin);
+    let mut lexer = parser::lex::Lexer::new(input.input, line, input.source);
+
+    // Run the read-eval loop
     let mut rel = semantics::ReadEvalLoop::new(&mut env, &mut lexer);
-    rel.set_verbose(Some(echo));
+    rel.set_verbose(input.verbose);
     let result = rel.run().await;
     env.apply_result(result);
 

@@ -617,6 +617,26 @@ impl VariableSet {
             .collect()
     }
 
+    /// Imports environment variables from an iterator.
+    ///
+    /// The argument iterator must yield name-value pairs. This function assigns
+    /// the values to the variable set, overwriting existing variables. The
+    /// variables are exported.
+    ///
+    /// If an assignment fails because of an existing read-only variable, this
+    /// function ignores the error and continues to the next assignment.
+    pub fn extend_env<I, K, V>(&mut self, vars: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        for (name, value) in vars {
+            self.assign(Scope::Global, name.into(), Variable::new(value).export())
+                .ok();
+        }
+    }
+
     /// Initializes default variables.
     ///
     /// This function assigns the following variables to `self`:
@@ -1275,6 +1295,20 @@ mod tests {
                 CString::new("foo=FOO").unwrap()
             ]
         );
+    }
+
+    #[test]
+    fn extend_env() {
+        let mut variables = VariableSet::new();
+
+        variables.extend_env([("foo", "FOO"), ("bar", "OK")]);
+
+        let foo = variables.get("foo").unwrap();
+        assert_eq!(foo.value, Some(Value::scalar("FOO")));
+        assert!(foo.is_exported);
+        let bar = variables.get("bar").unwrap();
+        assert_eq!(bar.value, Some(Value::scalar("OK")));
+        assert!(bar.is_exported);
     }
 
     #[test]
