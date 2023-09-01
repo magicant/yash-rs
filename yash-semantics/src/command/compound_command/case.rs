@@ -291,7 +291,7 @@ mod tests {
             .assign(Scope::Global, "one".to_string(), Variable::new(r"\"))
             .unwrap();
         env.variables
-            .assign(Scope::Global, "v".to_string(), Variable::new(r#"\\\a"#))
+            .assign(Scope::Global, "v".to_string(), Variable::new(r"\\\a"))
             .unwrap();
         let command: CompoundCommand = r#"case '\a' in
         ($empty) echo unquoted empty;;

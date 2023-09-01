@@ -295,7 +295,7 @@ impl TryFrom<&FileBody> for VirtualDir<std::vec::IntoIter<Rc<OsStr>>> {
             let i = entries.len() / 2;
             entries.insert(i, entry);
 
-            Ok(Self::new(entries.into_iter()))
+            Ok(Self::new(entries))
         } else {
             Err(Errno::ENOTDIR)
         }
