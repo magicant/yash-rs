@@ -212,8 +212,6 @@ command
 __OUT__
 
 (
-skip="true" # TODO Needs the cd built-in
-
 # Ensure $PWD is safe to assign to $PATH
 case $PWD in (*[:%]*)
     skip="true"
