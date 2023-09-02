@@ -125,7 +125,6 @@ test_x -e 13 'exit status of assignment with command substitution'
 a=$(exit 13)
 __IN__
 
-: TODO Needs command line option support <<\__OUT__
 test_o 'assignment is done even if command substitution fails (+e)' +e
 a=foo$(false)
 bracket "$a"
@@ -133,7 +132,6 @@ __IN__
 [foo]
 __OUT__
 
-: TODO Needs command line option support <<\__OUT__
 test_o 'assignment is done even if command substitution fails (-e)' -e
 trap 'bracket "$a"' EXIT
 a=foo$(false)
@@ -146,13 +144,11 @@ test_x -e 17 'exit status of redirection with command substitution'
 >/dev/null$(exit 17)
 __IN__
 
-: TODO Needs command line option support <<\__IN__
 test_x -e 0 'redirection is done even if command substitution fails (+e)' +e
 >f11$(false)
 [ -f f11 ]
 __IN__
 
-: TODO Needs command line option support <<\__OUT__
 test_o 'redirection is done even if command substitution fails (-e)' -e
 trap '[ -f f12 ] && echo f12 created' EXIT
 >f12$(false)
@@ -293,7 +289,6 @@ sh
 link_to_sh
 __OUT__
 
-: TODO Needs the command built-in <<\__OUT__
 testcase "${LINENO-}" 'argv[0] (command name with slash)' \
     3<<\__IN__ 4<<__OUT__ 5<&-
 "$(command -v sh)" -c 'echo "$0"'

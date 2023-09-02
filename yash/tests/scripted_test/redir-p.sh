@@ -120,7 +120,6 @@ __IN__
 foo
 __OUT__
 
-: TODO Needs command line option support <<\__OUT__
 test_oE 'overwrite redirection, -C, success' -C
 echo foo >overwrite3 # non-existing file
 echo bar >/dev/null  # existing non-regular file
@@ -131,13 +130,11 @@ __IN__
 foo
 __OUT__
 
-: TODO Needs command line option support <<\__IN__
 test_O -d -e n 'overwrite redirection, -C, existing file error' -C
 echo foo >overwrite4
 echo boo >overwrite4
 __IN__
 
-: TODO Needs command line option support <<\__OUT__
 test_o 'overwrite redirection, -C, existing file not modified' -C
 echo foo >overwrite5
 echo boo >overwrite5 || :
@@ -163,7 +160,6 @@ __IN__
 foo
 __OUT__
 
-: TODO Needs command line option support <<\__OUT__
 test_oE 'clobbering redirection, -C, success' -C
 echo foo >|clobber3  # non-existing file
 echo --- $?
@@ -516,7 +512,6 @@ END2
 foo
 __OUT__
 
-: TODO Needs command line option support <<\__OUT__
 test_o 'redirection is temporary' -e
 {
     cat </dev/null
@@ -547,7 +542,7 @@ __OUT__
     echo 'END'
 } >longhere
 
-: TODO Needs command line option support <<\__IN__
+: TODO Needs the source built-in <<\__IN__
 test_OE -e 0 'long here-document' -e
 . ./longhere |
 while read -r i; do

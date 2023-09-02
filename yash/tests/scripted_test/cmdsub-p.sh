@@ -195,7 +195,6 @@ EOF
 __IN__
 #))))
 
-: TODO Needs command line option support <<\__IN__
 test_O -d -e n 'ambiguity with arithmetic expansion, missing one )' -c \
 'echo $((cat <<EOF
 +(

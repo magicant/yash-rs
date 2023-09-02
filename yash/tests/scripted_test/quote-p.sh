@@ -248,7 +248,6 @@ __IN__
 2
 __OUT__
 
-: TODO Needs command line option support <<\__OUT__
 test_oE 'line continuation in operator >|' -C
 echo XXX >clobber
 echo foo \

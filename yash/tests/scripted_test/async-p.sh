@@ -45,7 +45,6 @@ __IN__
 1
 __OUT__
 
-: TODO Needs shell startup option support <<\__OUT__
 test_oE 'stdin of asynchronous list is null without job control' +m
 cat& wait
 echo this line should not be consumed by cat
@@ -55,7 +54,6 @@ __OUT__
 
 echo foo > file
 
-: TODO Needs shell startup option support <<\__IN__
 test_OE 'stdin of asynchronous list is null even if already redirected' +m -c '
 exec < file
 cat <&0 & wait
@@ -64,7 +62,6 @@ cat <&0 & wait
 # to prevent the test from being disrupted by the redirection.
 __IN__
 
-: TODO Needs shell startup option support <<\__OUT__
 test_oE 'stdin of asynchronous list is null for first command only' +m
 cat - file | cat | cat & wait
 exit
