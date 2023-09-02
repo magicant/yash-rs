@@ -84,7 +84,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
     // TODO run rcfile if interactive
 
     // Prepare the input for the main read-eval loop
-    let input = match prepare_input(&env.system, &run.source) {
+    let input = match prepare_input(&mut env.system, &run.source) {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());

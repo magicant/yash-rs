@@ -34,7 +34,6 @@
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
-use self::io::MIN_INTERNAL_FD;
 use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
@@ -66,6 +65,7 @@ use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
+use system::SystemEx;
 use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
@@ -287,13 +287,10 @@ impl Env {
 
         let first_fd = self.system.open(
             CStr::from_bytes_with_nul(b"/dev/tty\0").unwrap(),
-            crate::system::OFlag::O_RDWR,
+            crate::system::OFlag::O_RDWR | crate::system::OFlag::O_CLOEXEC,
             crate::system::Mode::empty(),
         )?;
-        let final_fd =
-            self.system
-                .dup(first_fd, MIN_INTERNAL_FD, crate::system::FdFlag::FD_CLOEXEC);
-        let _ = self.system.close(first_fd);
+        let final_fd = self.system.move_fd_internal(first_fd);
         self.tty = final_fd.ok();
         final_fd
     }
@@ -454,6 +451,7 @@ pub mod variable;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;

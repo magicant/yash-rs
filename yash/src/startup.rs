@@ -19,6 +19,7 @@
 use self::args::Run;
 use self::args::Source;
 use std::cell::Cell;
+use std::ffi::CString;
 use std::rc::Rc;
 use thiserror::Error;
 use yash_env::input::FdReader;
@@ -26,6 +27,9 @@ use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State;
 use yash_env::system::Errno;
+use yash_env::system::Mode;
+use yash_env::system::OFlag;
+use yash_env::system::SystemEx;
 use yash_env::SharedSystem;
 use yash_env::System;
 #[cfg(doc)]
@@ -67,18 +71,18 @@ pub struct SourceInput<'a> {
 /// Error returned by [`prepare_input`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("cannot open script file '{path}': {errno}")]
-pub struct PrepareInputError {
+pub struct PrepareInputError<'a> {
     /// Raw error value returned by the underlying system call.
     pub errno: Errno,
     /// Path of the script file that could not be opened.
-    pub path: String,
+    pub path: &'a str,
 }
 
 /// Prepares the input for the shell.
 pub fn prepare_input<'a>(
-    system: &SharedSystem,
+    system: &mut SharedSystem,
     source: &'a Source,
-) -> Result<SourceInput<'a>, PrepareInputError> {
+) -> Result<SourceInput<'a>, PrepareInputError<'a>> {
     match source {
         Source::Stdin => {
             let mut input = Box::new(FdReader::new(Fd::STDIN, system.clone()));
@@ -90,7 +94,28 @@ pub fn prepare_input<'a>(
                 verbose: Some(echo),
             })
         }
-        Source::File { .. } => todo!(),
+
+        Source::File { path } => {
+            let c_path = CString::new(path.as_str()).map_err(|_| PrepareInputError {
+                errno: Errno::EILSEQ,
+                path,
+            })?;
+            let fd = system
+                .open(&c_path, OFlag::O_RDONLY | OFlag::O_CLOEXEC, Mode::empty())
+                .and_then(|fd| system.move_fd_internal(fd))
+                .map_err(|errno| PrepareInputError { errno, path })?;
+            let mut input = Box::new(FdReader::new(fd, system.clone()));
+            let echo = Rc::new(Cell::new(State::Off));
+            input.set_echo(Some(Rc::clone(&echo)));
+            Ok(SourceInput {
+                input,
+                source: SyntaxSource::CommandFile {
+                    path: path.to_owned(),
+                },
+                verbose: Some(echo),
+            })
+        }
+
         Source::String(command) => {
             let input = Box::new(Memory::new(command));
             Ok(SourceInput {
