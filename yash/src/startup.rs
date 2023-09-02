@@ -81,7 +81,7 @@ pub fn prepare_input<'a>(
 ) -> Result<SourceInput<'a>, PrepareInputError> {
     match source {
         Source::Stdin => {
-            let mut input = Box::new(FdReader::new(system.clone()));
+            let mut input = Box::new(FdReader::new(Fd::STDIN, system.clone()));
             let echo = Rc::new(Cell::new(State::Off));
             input.set_echo(Some(Rc::clone(&echo)));
             Ok(SourceInput {

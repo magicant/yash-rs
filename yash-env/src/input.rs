@@ -31,8 +31,6 @@ use std::slice::from_mut;
 #[doc(no_inline)]
 pub use yash_syntax::input::*;
 
-// TODO Redefine Stdin as FdReader to support FDs other than stdin
-
 /// Input function that reads from a file descriptor.
 ///
 /// An instance of `FdReader` contains a [`SharedSystem`] to interact with the
@@ -44,6 +42,8 @@ pub use yash_syntax::input::*;
 /// one instance will affect the next read from the other.
 #[derive(Clone, Debug)]
 pub struct FdReader {
+    /// File descriptor to read from
+    fd: Fd,
     /// System to interact with the FD
     system: SharedSystem,
     /// Whether lines read are echoed to stderr
@@ -52,8 +52,13 @@ pub struct FdReader {
 
 impl FdReader {
     /// Creates a new `FdReader` instance.
-    pub fn new(system: SharedSystem) -> Self {
-        FdReader { system, echo: None }
+    ///
+    /// The `fd` argument is the file descriptor to read from. It should be
+    /// readable, have the close-on-exec flag set, and remain open for the
+    /// lifetime of the `FdReader` instance.
+    pub fn new(fd: Fd, system: SharedSystem) -> Self {
+        let echo = None;
+        FdReader { fd, system, echo }
     }
 
     /// Sets the "echo" flag.
@@ -81,7 +86,7 @@ impl Input for FdReader {
         let mut bytes = Vec::new();
         loop {
             let mut byte = 0;
-            match self.system.read_async(Fd::STDIN, from_mut(&mut byte)).await {
+            match self.system.read_async(self.fd, from_mut(&mut byte)).await {
                 // End of input
                 Ok(0) => break,
 
@@ -115,16 +120,21 @@ impl Input for FdReader {
 mod tests {
     use super::*;
     use crate::system::r#virtual::FileBody;
+    use crate::system::r#virtual::INode;
     use crate::system::r#virtual::VirtualSystem;
     use crate::system::Errno;
+    use crate::system::Mode;
+    use crate::system::OFlag;
+    use crate::System;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
+    use std::ffi::CStr;
 
     #[test]
     fn empty_reader() {
         let system = VirtualSystem::new();
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -143,7 +153,7 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -168,7 +178,7 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
 
         let line = reader
             .next_line(&Context::default())
@@ -197,11 +207,38 @@ mod tests {
     }
 
     #[test]
+    fn reading_from_file() {
+        let system = VirtualSystem::new();
+        {
+            let mut state = system.state.borrow_mut();
+            let file = Rc::new(INode::new("echo file\n").into());
+            state.file_system.save("/foo", file).unwrap();
+        }
+        let mut system = SharedSystem::new(Box::new(system));
+        let path = CStr::from_bytes_with_nul(b"/foo\0").unwrap();
+        let fd = system.open(path, OFlag::O_RDONLY, Mode::empty()).unwrap();
+        let mut reader = FdReader::new(fd, system);
+
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(line, "echo file\n");
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(line, "");
+    }
+
+    #[test]
     fn reader_error() {
         let mut system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
 
         let error = reader
             .next_line(&Context::default())
@@ -221,7 +258,7 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
         reader.set_echo(Some(Rc::new(Cell::new(State::Off))));
 
         let _ = reader
@@ -245,7 +282,7 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut reader = FdReader::new(system);
+        let mut reader = FdReader::new(Fd::STDIN, system);
         reader.set_echo(Some(Rc::new(Cell::new(State::On))));
 
         let _ = reader

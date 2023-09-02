@@ -103,13 +103,13 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// # use std::rc::Rc;
     /// # use yash_env::Env;
     /// # use yash_env::input::FdReader;
-    /// # use yash_env::option::Option::Verbose;
-    /// # use yash_env::option::State;
+    /// # use yash_env::io::Fd;
+    /// # use yash_env::option::{Verbose, State};
     /// # use yash_semantics::*;
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// let mut env = Env::new_virtual();
-    /// let mut input = Box::new(FdReader::new(Clone::clone(&env.system)));
+    /// let mut input = Box::new(FdReader::new(Fd::STDIN, Clone::clone(&env.system)));
     /// let verbose = Rc::new(Cell::new(State::Off));
     /// input.set_echo(Some(Rc::clone(&verbose)));
     /// let line = NonZeroU64::new(1).unwrap();
@@ -171,6 +171,7 @@ mod tests {
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::input::FdReader;
+    use yash_env::io::Fd;
     use yash_env::option::Option::Verbose;
     use yash_env::option::State::{Off, On};
     use yash_env::semantics::Divert;
@@ -255,7 +256,7 @@ mod tests {
             .body = FileBody::new(*b"case _ in esac\n");
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Verbose, On);
-        let mut input = Box::new(FdReader::new(Clone::clone(&env.system)));
+        let mut input = Box::new(FdReader::new(Fd::STDIN, Clone::clone(&env.system)));
         let verbose = Rc::new(Cell::new(Off));
         input.set_echo(Some(Rc::clone(&verbose)));
         let line = NonZeroU64::new(1).unwrap();
