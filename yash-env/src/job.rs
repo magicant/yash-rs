@@ -343,9 +343,9 @@ impl std::ops::Index<usize> for JobSet {
 
 /// Iterator that conditionally removes jobs from a job set.
 ///
-/// Call [`JobSet::drain_filter`] to get an instance of `DrainFilter`.
+/// Call [`JobSet::extract_if`] to get an instance of `ExtractIf`.
 #[derive(Debug)]
-pub struct DrainFilter<'a, F>
+pub struct ExtractIf<'a, F>
 where
     F: FnMut(usize, JobRefMut) -> bool,
 {
@@ -355,7 +355,7 @@ where
     len: usize,
 }
 
-impl<F> Iterator for DrainFilter<'_, F>
+impl<F> Iterator for ExtractIf<'_, F>
 where
     F: FnMut(usize, JobRefMut) -> bool,
 {
@@ -381,17 +381,7 @@ where
     }
 }
 
-impl<F> FusedIterator for DrainFilter<'_, F> where F: FnMut(usize, JobRefMut) -> bool {}
-
-impl<F> Drop for DrainFilter<'_, F>
-where
-    F: FnMut(usize, JobRefMut) -> bool,
-{
-    fn drop(&mut self) {
-        // Ensure all jobs are processed
-        self.for_each(drop)
-    }
-}
+impl<F> FusedIterator for ExtractIf<'_, F> where F: FnMut(usize, JobRefMut) -> bool {}
 
 impl JobSet {
     /// Adds a job to this job set.
@@ -482,25 +472,46 @@ impl JobSet {
         job
     }
 
-    /// Returns an iterator that conditionally modifies and removes jobs.
+    /// Removes jobs that satisfy the predicate.
     ///
-    /// The iterator uses the `should_remove` function to decide whether to
-    /// remove jobs. The function is called with every index and job reference.
-    /// If the function returns true, the job is removed and yielded from the
+    /// This function uses the `should_remove` function to decide whether to
+    /// remove jobs. If it returns true, the job is removed and yielded from the
     /// iterator. Otherwise, the job remains in the set.
     ///
     /// You can reset the `status_changed` flag of a job
     /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
     /// remove it or not.
     ///
-    /// Note that the `should_remove` function is called for all the remaining
-    /// jobs when the `DrainFilter` is dropped before iterating all jobs.
-    pub fn drain_filter<F>(&mut self, should_remove: F) -> DrainFilter<'_, F>
+    /// This function is a simplified version of [`JobSet::extract_if`] that
+    /// does not return removed jobs.
+    pub fn remove_if<F>(&mut self, should_remove: F)
+    where
+        F: FnMut(usize, JobRefMut) -> bool,
+    {
+        self.extract_if(should_remove).for_each(drop)
+    }
+
+    /// Returns an iterator that conditionally removes jobs.
+    ///
+    /// The iterator uses the `should_remove` function to decide whether to
+    /// remove jobs. If it returns true, the job is removed and yielded from the
+    /// iterator. Otherwise, the job remains in the set.
+    ///
+    /// You can reset the `status_changed` flag of a job
+    /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
+    /// remove it or not.
+    ///
+    /// If the returned iterator is dropped before iterating all jobs, the
+    /// remaining jobs are retained in the set.
+    ///
+    /// If you don't need to take the ownership of removed jobs, consider using
+    /// [`JobSet::remove_if`] instead.
+    pub fn extract_if<F>(&mut self, should_remove: F) -> ExtractIf<'_, F>
     where
         F: FnMut(usize, JobRefMut) -> bool,
     {
         let len = self.len();
-        DrainFilter {
+        ExtractIf {
             set: self,
             should_remove,
             next_index: 0,
@@ -755,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn job_set_drain_filter_consumed() {
+    fn job_set_extract_if() {
         let mut set = JobSet::default();
         let i21 = set.add(Job::new(Pid::from_raw(21)));
         let i22 = set.add(Job::new(Pid::from_raw(22)));
@@ -765,47 +776,25 @@ mod tests {
         let i26 = set.add(Job::new(Pid::from_raw(26)));
         set.remove(i23).unwrap();
 
-        let mut i = set.drain_filter(|index, mut job| {
+        let mut i = set.extract_if(|index, mut job| {
             assert_ne!(index, i23);
             if index % 2 == 0 {
                 job.status_reported();
             }
             index == 0 || job.pid == Pid::from_raw(26)
         });
-        let mut j21 = Job::new(Pid::from_raw(21));
-        j21.status_changed = false;
-        assert_eq!(i.next(), Some((i21, j21)));
+
+        let mut expected_job_21 = Job::new(Pid::from_raw(21));
+        expected_job_21.status_changed = false;
+        assert_eq!(i.next(), Some((i21, expected_job_21)));
         assert_eq!(i.next(), Some((i26, Job::new(Pid::from_raw(26)))));
         assert_eq!(i.next(), None);
-        assert_eq!(i.next(), None); // The drain filter is fused.
-        drop(i);
+        assert_eq!(i.next(), None); // ExtractIf is fused.
 
         let indices: Vec<usize> = set.iter().map(|(index, _)| index).collect();
         assert_eq!(indices, [i22, i24, i25]);
-        assert!(!set[i25].status_changed);
-    }
-
-    #[test]
-    fn job_set_drain_filter_unconsumed() {
-        let mut set = JobSet::default();
-        let _i21 = set.add(Job::new(Pid::from_raw(21)));
-        let i22 = set.add(Job::new(Pid::from_raw(22)));
-        let i23 = set.add(Job::new(Pid::from_raw(23)));
-        let i24 = set.add(Job::new(Pid::from_raw(24)));
-        let i25 = set.add(Job::new(Pid::from_raw(25)));
-        let _i26 = set.add(Job::new(Pid::from_raw(26)));
-        set.remove(i23).unwrap();
-
-        let i = set.drain_filter(|index, mut job| {
-            if index % 2 == 0 {
-                job.status_reported();
-            }
-            index == 0 || job.pid == Pid::from_raw(26)
-        });
-        drop(i);
-
-        let indices: Vec<usize> = set.iter().map(|(index, _)| index).collect();
-        assert_eq!(indices, [i22, i24, i25]);
+        assert!(set[i22].status_changed);
+        assert!(set[i24].status_changed);
         assert!(!set[i25].status_changed);
     }
 

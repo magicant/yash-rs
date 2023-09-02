@@ -142,7 +142,7 @@ fn to_job_result(status: WaitStatus) -> Option<(Pid, ExitStatus)> {
 }
 
 fn remove_finished_jobs(jobs: &mut JobSet) {
-    jobs.drain_filter(|_index, job| to_job_result(job.status).is_some());
+    jobs.remove_if(|_index, job| to_job_result(job.status).is_some());
 }
 
 async fn wait_for_all_jobs(env: &mut Env) -> ExitStatus {
