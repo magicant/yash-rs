@@ -1118,16 +1118,10 @@ impl AsyncIo {
     /// FDs in `readers` and `writers` are considered ready and corresponding
     /// awaiters are woken. Once woken, awaiters are removed from `self`.
     pub fn wake(&mut self, readers: FdSet, writers: FdSet) {
-        fn scan(awaiters: &mut Vec<FdAwaiter>, fds: FdSet) {
-            // TODO Use Vec::drain_filter
-            for i in (0..awaiters.len()).rev() {
-                if fds.contains(awaiters[i].fd.0) {
-                    awaiters.swap_remove(i);
-                }
-            }
-        }
-        scan(&mut self.readers, readers);
-        scan(&mut self.writers, writers);
+        self.readers
+            .retain(|awaiter| !readers.contains(awaiter.fd.0));
+        self.writers
+            .retain(|awaiter| !writers.contains(awaiter.fd.0));
     }
 
     /// Wakes and removes all awaiters.
@@ -1138,16 +1132,9 @@ impl AsyncIo {
 
     /// Discards `FdAwaiter`s having a defunct waker.
     pub fn gc(&mut self) {
-        fn scan(awaiters: &mut Vec<FdAwaiter>) {
-            // TODO Use Vec::drain_filter
-            for i in (0..awaiters.len()).rev() {
-                if awaiters[i].waker.strong_count() == 0 {
-                    awaiters.swap_remove(i);
-                }
-            }
-        }
-        scan(&mut self.readers);
-        scan(&mut self.writers);
+        let is_alive = |awaiter: &FdAwaiter| awaiter.waker.strong_count() > 0;
+        self.readers.retain(is_alive);
+        self.writers.retain(is_alive);
     }
 }
 
@@ -1263,12 +1250,7 @@ impl AsyncSignal {
 
     /// Removes internal weak pointers whose `SignalStatus` has gone.
     pub fn gc(&mut self) {
-        // TODO Use Vec::drain_filter
-        for i in (0..self.awaiters.len()).rev() {
-            if self.awaiters[i].strong_count() == 0 {
-                self.awaiters.swap_remove(i);
-            }
-        }
+        self.awaiters.retain(|awaiter| awaiter.strong_count() > 0);
     }
 
     /// Adds an awaiter for signals.
