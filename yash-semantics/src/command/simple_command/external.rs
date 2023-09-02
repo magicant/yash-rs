@@ -130,7 +130,7 @@ pub fn to_c_strings(s: Vec<Field>) -> Vec<CString> {
     s.into_iter()
         .filter_map(|f| {
             let bytes = f.value.into_bytes();
-            // TODO bytes.drain_filter(|b| *b == '\0' as u8);
+            // TODO Return NulError if the field contains a null byte
             CString::new(bytes).ok()
         })
         .collect()
