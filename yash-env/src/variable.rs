@@ -727,16 +727,16 @@ impl VariableSet {
         debug_assert!(!self.contexts.is_empty());
         assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
         self.contexts.pop();
-        // TODO Use HashMap::drain_filter to remove empty values
         // TODO Use complementary stack of hash tables to avoid scanning the
         // whole `self.all_variables`
-        for stack in self.all_variables.values_mut() {
+        self.all_variables.retain(|_, stack| {
             if let Some(vic) = stack.last() {
                 if vic.context_index >= self.contexts.len() {
                     stack.pop();
                 }
             }
-        }
+            !stack.is_empty()
+        })
     }
 }
 
