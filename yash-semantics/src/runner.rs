@@ -89,12 +89,12 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
 
     /// Sets a shared option state to which the verbose option is reflected.
     ///
-    /// This function is meant to be used with a lexer with a [`Stdin`] input. You
-    /// should set the same shared cell of an option state to the input function
-    /// and the loop. Before reading each command line, the loop copies the
-    /// value of `env.options.get(Verbose)` to the cell. The input function
-    /// checks it to see if it needs to echo the line it reads to the standard
-    /// error. That achieves the effect of the `Verbose` shell option.
+    /// This function is meant to be used with a lexer with an [`FdReader`]
+    /// input. You should set the same shared cell of an option state to the
+    /// input function and the loop. Before reading each command line, the loop
+    /// copies the value of `env.options.get(Verbose)` to the cell. The input
+    /// function checks it to see if it needs to echo the line it reads to the
+    /// standard error. That achieves the effect of the `Verbose` shell option.
     ///
     /// ```
     /// # futures_executor::block_on(async {
@@ -102,14 +102,14 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// # use std::num::NonZeroU64;
     /// # use std::rc::Rc;
     /// # use yash_env::Env;
-    /// # use yash_env::input::Stdin;
+    /// # use yash_env::input::FdReader;
     /// # use yash_env::option::Option::Verbose;
     /// # use yash_env::option::State;
     /// # use yash_semantics::*;
     /// # use yash_syntax::parser::lex::Lexer;
     /// # use yash_syntax::source::Source;
     /// let mut env = Env::new_virtual();
-    /// let mut input = Box::new(Stdin::new(Clone::clone(&env.system)));
+    /// let mut input = Box::new(FdReader::new(Clone::clone(&env.system)));
     /// let verbose = Rc::new(Cell::new(State::Off));
     /// input.set_echo(Some(Rc::clone(&verbose)));
     /// let line = NonZeroU64::new(1).unwrap();
@@ -120,7 +120,7 @@ impl<'a, 'b> ReadEvalLoop<'a, 'b> {
     /// # })
     /// ```
     ///
-    /// [`Stdin`]: yash_env::input::Stdin
+    /// [`FdReader`]: yash_env::input::FdReader
     pub fn set_verbose(&mut self, verbose: Option<Rc<Cell<State>>>) {
         self.verbose = verbose;
     }
@@ -170,7 +170,7 @@ mod tests {
     use std::num::NonZeroU64;
     use std::ops::ControlFlow::Break;
     use std::rc::Rc;
-    use yash_env::input::Stdin;
+    use yash_env::input::FdReader;
     use yash_env::option::Option::Verbose;
     use yash_env::option::State::{Off, On};
     use yash_env::semantics::Divert;
@@ -255,7 +255,7 @@ mod tests {
             .body = FileBody::new(*b"case _ in esac\n");
         let mut env = Env::with_system(Box::new(system));
         env.options.set(Verbose, On);
-        let mut input = Box::new(Stdin::new(Clone::clone(&env.system)));
+        let mut input = Box::new(FdReader::new(Clone::clone(&env.system)));
         let verbose = Rc::new(Cell::new(Off));
         input.set_echo(Some(Rc::clone(&verbose)));
         let line = NonZeroU64::new(1).unwrap();

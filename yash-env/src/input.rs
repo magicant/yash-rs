@@ -33,27 +33,27 @@ pub use yash_syntax::input::*;
 
 // TODO Redefine Stdin as FdReader to support FDs other than stdin
 
-/// Input function that reads from the standard input.
+/// Input function that reads from a file descriptor.
 ///
-/// An instance of `Stdin` contains a [`SharedSystem`] to read the input from,
-/// as well as the current line number.
+/// An instance of `FdReader` contains a [`SharedSystem`] to interact with the
+/// file descriptor.
 ///
-/// Although `Stdin` implements `Clone`, it does not mean you can create and
-/// keep a copy of a `Stdin` instance to replay the input later. Since both the
-/// original and clone share the same `SharedSystem`, reading a line from one
-/// instance will affect the next read from the other instance.
+/// Although `FdReader` implements `Clone`, it does not mean you can create and
+/// keep a copy of a `FdReader` instance to replay the input later. Since both
+/// the original and clone share the same `SharedSystem`, reading a line from
+/// one instance will affect the next read from the other.
 #[derive(Clone, Debug)]
-pub struct Stdin {
+pub struct FdReader {
     /// System to interact with the FD
     system: SharedSystem,
     /// Whether lines read are echoed to stderr
     echo: Option<Rc<Cell<State>>>,
 }
 
-impl Stdin {
-    /// Creates a new `Stdin` instance.
+impl FdReader {
+    /// Creates a new `FdReader` instance.
     pub fn new(system: SharedSystem) -> Self {
-        Stdin { system, echo: None }
+        FdReader { system, echo: None }
     }
 
     /// Sets the "echo" flag.
@@ -74,7 +74,7 @@ impl Stdin {
 }
 
 #[async_trait(?Send)]
-impl Input for Stdin {
+impl Input for FdReader {
     async fn next_line(&mut self, _context: &Context) -> Result {
         // TODO Read many bytes at once if seekable
 
@@ -121,18 +121,21 @@ mod tests {
     use futures_util::FutureExt;
 
     #[test]
-    fn stdin_empty() {
+    fn empty_reader() {
         let system = VirtualSystem::new();
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
+        let mut reader = FdReader::new(system);
 
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "");
     }
 
     #[test]
-    fn stdin_one_line() {
+    fn one_line_reader() {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
@@ -140,18 +143,24 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"echo ok\n");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
+        let mut reader = FdReader::new(system);
 
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "echo ok\n");
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "");
     }
 
     #[test]
-    fn stdin_many_lines() {
+    fn reader_with_many_lines() {
         let system = VirtualSystem::new();
         {
             let state = system.state.borrow_mut();
@@ -159,31 +168,46 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"#!/bin/sh\necho ok\nexit");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
+        let mut reader = FdReader::new(system);
 
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "#!/bin/sh\n");
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "echo ok\n");
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "exit");
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let line = result.unwrap();
+        let line = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(line, "");
     }
 
     #[test]
-    fn stdin_error() {
+    fn reader_error() {
         let mut system = VirtualSystem::new();
         system.current_process_mut().close_fd(Fd::STDIN);
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
+        let mut reader = FdReader::new(system);
 
-        let result = stdin.next_line(&Context::default()).now_or_never().unwrap();
-        let error = result.unwrap_err();
+        let error = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap()
+            .unwrap_err();
         assert_eq!(error.raw_os_error(), Some(Errno::EBADF as i32));
     }
 
@@ -197,10 +221,13 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
-        stdin.set_echo(Some(Rc::new(Cell::new(State::Off))));
+        let mut reader = FdReader::new(system);
+        reader.set_echo(Some(Rc::new(Cell::new(State::Off))));
 
-        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let _ = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
         let state = state.borrow();
         let file = state.file_system.get("/dev/stderr").unwrap();
         assert_matches!(&file.borrow().body, FileBody::Regular { content, .. } => {
@@ -218,10 +245,13 @@ mod tests {
             file.borrow_mut().body = FileBody::new(*b"one\ntwo");
         }
         let system = SharedSystem::new(Box::new(system));
-        let mut stdin = Stdin::new(system);
-        stdin.set_echo(Some(Rc::new(Cell::new(State::On))));
+        let mut reader = FdReader::new(system);
+        reader.set_echo(Some(Rc::new(Cell::new(State::On))));
 
-        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let _ = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
         {
             let state = state.borrow();
             let file = state.file_system.get("/dev/stderr").unwrap();
@@ -229,7 +259,10 @@ mod tests {
                 assert_eq!(content, b"one\n");
             });
         }
-        let _ = stdin.next_line(&Context::default()).now_or_never().unwrap();
+        let _ = reader
+            .next_line(&Context::default())
+            .now_or_never()
+            .unwrap();
         {
             let state = state.borrow();
             let file = state.file_system.get("/dev/stderr").unwrap();

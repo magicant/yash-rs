@@ -21,7 +21,7 @@ use self::args::Source;
 use std::cell::Cell;
 use std::rc::Rc;
 use thiserror::Error;
-use yash_env::input::Stdin;
+use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::option::Option::Interactive;
 use yash_env::option::State;
@@ -81,7 +81,7 @@ pub fn prepare_input<'a>(
 ) -> Result<SourceInput<'a>, PrepareInputError> {
     match source {
         Source::Stdin => {
-            let mut input = Box::new(Stdin::new(system.clone()));
+            let mut input = Box::new(FdReader::new(system.clone()));
             let echo = Rc::new(Cell::new(State::Off));
             input.set_echo(Some(Rc::clone(&echo)));
             Ok(SourceInput {
