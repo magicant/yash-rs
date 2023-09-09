@@ -17,7 +17,7 @@ jobs:
       RUSTFLAGS: -D warnings
       RUSTDOCFLAGS: -D warnings
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo build
@@ -26,7 +26,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - uses: giraffate/clippy-action@v1
       with:
@@ -36,7 +36,7 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Run extra tests
       run: |
@@ -49,7 +49,7 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
     - uses: dtolnay/rust-toolchain@1.56.0
     - uses: dtolnay/rust-toolchain@1.58.0
