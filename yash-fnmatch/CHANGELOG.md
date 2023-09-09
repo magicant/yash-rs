@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - External dependency versions
-    - Rust 1.58.0 → 1.60.0
+    - Rust 1.58.0 → 1.61.0
 - Internal dependency versions
     - regex 1.5.6 → 1.9.4
     - regex-syntax 0.6.26 → 0.7.5
