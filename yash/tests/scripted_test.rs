@@ -168,6 +168,11 @@ fn simple_command() {
 }
 
 #[test]
+fn startup() {
+    run("startup-p.sh")
+}
+
+#[test]
 fn tilde_expansion() {
     run("tilde-p.sh")
 }
