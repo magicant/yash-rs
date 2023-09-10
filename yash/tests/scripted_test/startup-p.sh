@@ -162,3 +162,14 @@ echo OK
 __IN__
 OK
 __OUT__
+
+test_oE 'first operand is ignored if it is a double-hyphen (-c)' -c -- 'echo OK'
+__IN__
+OK
+__OUT__
+
+test_oE 'first operand is ignored if it is a double-hyphen (no -c or -s)' --
+echo OK
+__IN__
+OK
+__OUT__
