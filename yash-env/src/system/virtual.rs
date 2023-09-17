@@ -681,9 +681,9 @@ impl System for VirtualSystem {
             }
         }
 
-        for fd in 0..(nix::sys::select::FD_SETSIZE as c_int) {
+        for fd in (0..(nix::sys::select::FD_SETSIZE as c_int)).map(Fd) {
             if readers.contains(fd) {
-                if let Some(body) = process.fds().get(&Fd(fd)) {
+                if let Some(body) = process.fds().get(&fd) {
                     let ofd = body.open_file_description.borrow();
                     if ofd.is_readable() {
                         if !ofd.is_ready_for_reading() {
@@ -698,7 +698,7 @@ impl System for VirtualSystem {
             }
 
             if writers.contains(fd) {
-                if let Some(body) = process.fds().get(&Fd(fd)) {
+                if let Some(body) = process.fds().get(&fd) {
                     let ofd = body.open_file_description.borrow();
                     if ofd.is_writable() {
                         if !ofd.is_ready_for_writing() {
@@ -715,8 +715,8 @@ impl System for VirtualSystem {
 
         drop(process);
 
-        let reader_count = readers.fds(None).count();
-        let writer_count = writers.fds(None).count();
+        let reader_count = readers.iter().count();
+        let writer_count = writers.iter().count();
         let count = (reader_count + writer_count).try_into().unwrap();
         if count == 0 {
             if let Some(timeout) = timeout {
@@ -1779,10 +1779,10 @@ mod tests {
     fn select_regular_file_is_always_ready() {
         let mut system = VirtualSystem::new();
         let mut readers = FdSet::new();
-        readers.insert(Fd::STDIN.0);
+        readers.insert(Fd::STDIN).unwrap();
         let mut writers = FdSet::new();
-        readers.insert(Fd::STDOUT.0);
-        readers.insert(Fd::STDERR.0);
+        readers.insert(Fd::STDOUT).unwrap();
+        readers.insert(Fd::STDERR).unwrap();
 
         let all_readers = readers;
         let all_writers = writers;
@@ -1799,7 +1799,7 @@ mod tests {
         system.close(writer).unwrap();
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
-        readers.insert(reader.0);
+        readers.insert(reader).unwrap();
 
         let all_readers = readers;
         let all_writers = writers;
@@ -1816,7 +1816,7 @@ mod tests {
         system.write(writer, &[0]).unwrap();
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
-        readers.insert(reader.0);
+        readers.insert(reader).unwrap();
 
         let all_readers = readers;
         let all_writers = writers;
@@ -1832,7 +1832,7 @@ mod tests {
         let (reader, _writer) = system.pipe().unwrap();
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
-        readers.insert(reader.0);
+        readers.insert(reader).unwrap();
 
         let result = system.select(&mut readers, &mut writers, None, None);
         assert_eq!(result, Ok(0));
@@ -1846,7 +1846,7 @@ mod tests {
         let (_reader, writer) = system.pipe().unwrap();
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
-        writers.insert(writer.0);
+        writers.insert(writer).unwrap();
 
         let all_readers = readers;
         let all_writers = writers;
@@ -1861,7 +1861,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let (_reader, writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
-        fds.insert(writer.0);
+        fds.insert(writer).unwrap();
         let result = system.select(&mut fds, &mut FdSet::new(), None, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
@@ -1871,7 +1871,7 @@ mod tests {
         let mut system = VirtualSystem::new();
         let (reader, _writer) = system.pipe().unwrap();
         let mut fds = FdSet::new();
-        fds.insert(reader.0);
+        fds.insert(reader).unwrap();
         let result = system.select(&mut FdSet::new(), &mut fds, None, None);
         assert_eq!(result, Err(Errno::EBADF));
     }
@@ -1880,7 +1880,7 @@ mod tests {
     fn select_on_closed_fd() {
         let mut system = VirtualSystem::new();
         let mut fds = FdSet::new();
-        fds.insert(17);
+        fds.insert(Fd(17)).unwrap();
         let result = system.select(&mut fds, &mut FdSet::new(), None, None);
         assert_eq!(result, Err(Errno::EBADF));
 
@@ -1937,7 +1937,7 @@ mod tests {
         let (reader, _writer) = system.pipe().unwrap();
         let mut readers = FdSet::new();
         let mut writers = FdSet::new();
-        readers.insert(reader.0);
+        readers.insert(reader).unwrap();
         let timeout = Duration::new(42, 195).into();
 
         let result = system.select(&mut readers, &mut writers, Some(&timeout), None);

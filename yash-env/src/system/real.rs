@@ -320,7 +320,16 @@ impl System for RealSystem {
         timeout: Option<&TimeSpec>,
         signal_mask: Option<&SigSet>,
     ) -> nix::Result<c_int> {
-        nix::sys::select::pselect(None, readers, writers, None, timeout, signal_mask)
+        use std::ptr::{null, null_mut};
+        let nfds = readers.upper_bound().max(writers.upper_bound()).0;
+        let readers = &mut readers.inner;
+        let writers = &mut writers.inner;
+        let errors = null_mut();
+        let timeout = timeout.map_or(null(), |timeout| timeout.as_ref());
+        let signal_mask = signal_mask.map_or(null(), |mask| mask.as_ref());
+        let raw_result =
+            unsafe { nix::libc::pselect(nfds, readers, writers, errors, timeout, signal_mask) };
+        Errno::result(raw_result)
     }
 
     fn getpid(&self) -> Pid {
