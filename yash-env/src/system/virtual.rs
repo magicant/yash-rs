@@ -681,35 +681,24 @@ impl System for VirtualSystem {
             }
         }
 
-        for fd in (0..(nix::sys::select::FD_SETSIZE as c_int)).map(Fd) {
-            if readers.contains(fd) {
-                if let Some(body) = process.fds().get(&fd) {
-                    let ofd = body.open_file_description.borrow();
-                    if ofd.is_readable() {
-                        if !ofd.is_ready_for_reading() {
-                            readers.remove(fd);
-                        }
-                    } else {
-                        return Err(Errno::EBADF);
-                    }
-                } else {
-                    return Err(Errno::EBADF);
-                }
+        for fd in &readers.clone() {
+            let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
+            let ofd = body.open_file_description.borrow();
+            if !ofd.is_readable() {
+                return Err(Errno::EBADF);
             }
-
-            if writers.contains(fd) {
-                if let Some(body) = process.fds().get(&fd) {
-                    let ofd = body.open_file_description.borrow();
-                    if ofd.is_writable() {
-                        if !ofd.is_ready_for_writing() {
-                            writers.remove(fd);
-                        }
-                    } else {
-                        return Err(Errno::EBADF);
-                    }
-                } else {
-                    return Err(Errno::EBADF);
-                }
+            if !ofd.is_ready_for_reading() {
+                readers.remove(fd);
+            }
+        }
+        for fd in &writers.clone() {
+            let body = process.fds().get(&fd).ok_or(Errno::EBADF)?;
+            let ofd = body.open_file_description.borrow();
+            if !ofd.is_writable() {
+                return Err(Errno::EBADF);
+            }
+            if !ofd.is_ready_for_writing() {
+                writers.remove(fd);
             }
         }
 

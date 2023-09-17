@@ -176,6 +176,14 @@ impl DoubleEndedIterator for Iter<'_> {
 
 impl std::iter::FusedIterator for Iter<'_> {}
 
+impl<'a> IntoIterator for &'a FdSet {
+    type Item = Fd;
+    type IntoIter = Iter<'a>;
+    fn into_iter(self) -> Iter<'a> {
+        self.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
