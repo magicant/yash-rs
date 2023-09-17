@@ -28,7 +28,14 @@ pub use yash_syntax::{alias, parser, source, syntax};
 pub mod startup;
 // mod runner;
 
-async fn parse_and_print(mut env: yash_env::Env) -> i32 {
+async fn print_version(env: &mut env::Env) -> i32 {
+    use builtin::common::Print;
+    let version = env!("CARGO_PKG_VERSION");
+    let result = &env.print(&format!("yash {}\n", version)).await;
+    result.exit_status().0
+}
+
+async fn parse_and_print(mut env: env::Env) -> i32 {
     use env::option::Option::{Interactive, Monitor};
     use env::option::State::On;
     use env::variable::Value::Array;
@@ -42,7 +49,7 @@ async fn parse_and_print(mut env: yash_env::Env) -> i32 {
 
     let run = match startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
-        Ok(Parse::Version) => todo!("print version"),
+        Ok(Parse::Version) => return print_version(&mut env).await,
         Ok(Parse::Run(run)) => run,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
