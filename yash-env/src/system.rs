@@ -16,9 +16,11 @@
 
 //! [System] and its implementors.
 
+pub mod fd_set;
 pub mod real;
 pub mod r#virtual;
 
+use self::fd_set::FdSet;
 use crate::io::Fd;
 use crate::io::Stderr;
 use crate::io::MIN_INTERNAL_FD;
@@ -40,8 +42,6 @@ pub use nix::fcntl::AtFlags;
 pub use nix::fcntl::FdFlag;
 #[doc(no_inline)]
 pub use nix::fcntl::OFlag;
-#[doc(no_inline)]
-pub use nix::sys::select::FdSet;
 #[doc(no_inline)]
 pub use nix::sys::signal::SigSet;
 #[doc(no_inline)]
@@ -1114,7 +1114,8 @@ impl AsyncIo {
     pub fn readers(&self) -> FdSet {
         let mut set = FdSet::new();
         for reader in &self.readers {
-            set.insert(reader.fd.0);
+            set.insert(reader.fd)
+                .expect("file descriptor out of supported range");
         }
         set
     }
@@ -1126,7 +1127,8 @@ impl AsyncIo {
     pub fn writers(&self) -> FdSet {
         let mut set = FdSet::new();
         for writer in &self.writers {
-            set.insert(writer.fd.0);
+            set.insert(writer.fd)
+                .expect("file descriptor out of supported range");
         }
         set
     }
@@ -1148,10 +1150,8 @@ impl AsyncIo {
     /// FDs in `readers` and `writers` are considered ready and corresponding
     /// awaiters are woken. Once woken, awaiters are removed from `self`.
     pub fn wake(&mut self, readers: FdSet, writers: FdSet) {
-        self.readers
-            .retain(|awaiter| !readers.contains(awaiter.fd.0));
-        self.writers
-            .retain(|awaiter| !writers.contains(awaiter.fd.0));
+        self.readers.retain(|awaiter| !readers.contains(awaiter.fd));
+        self.writers.retain(|awaiter| !writers.contains(awaiter.fd));
     }
 
     /// Wakes and removes all awaiters.
@@ -1688,10 +1688,10 @@ mod tests {
         async_io.wait_for_writing(Fd::STDERR, &waker);
 
         let mut expected_readers = FdSet::new();
-        expected_readers.insert(Fd::STDIN.0);
+        expected_readers.insert(Fd::STDIN).unwrap();
         let mut expected_writers = FdSet::new();
-        expected_writers.insert(Fd::STDOUT.0);
-        expected_writers.insert(Fd::STDERR.0);
+        expected_writers.insert(Fd::STDOUT).unwrap();
+        expected_writers.insert(Fd::STDERR).unwrap();
         assert_eq!(async_io.readers(), expected_readers);
         assert_eq!(async_io.writers(), expected_writers);
     }
@@ -1704,11 +1704,11 @@ mod tests {
         async_io.wait_for_reading(Fd(4), &waker);
         async_io.wait_for_writing(Fd(4), &waker);
         let mut fds = FdSet::new();
-        fds.insert(4);
+        fds.insert(Fd(4)).unwrap();
         async_io.wake(fds, fds);
 
         let mut expected_readers = FdSet::new();
-        expected_readers.insert(3);
+        expected_readers.insert(Fd(3)).unwrap();
         assert_eq!(async_io.readers(), expected_readers);
         assert_eq!(async_io.writers(), FdSet::new());
     }
