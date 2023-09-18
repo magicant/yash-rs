@@ -34,7 +34,10 @@ pub use yash_syntax::syntax::Fd;
 /// invisible to the user, it should be kept at `MIN_INTERNAL_FD` or above.
 /// (Hint: A typical way to move a file descriptor is to
 /// [`dup`](crate::system::System::dup) and
-/// [`close`](crate::system::System::close).)
+/// [`close`](crate::system::System::close). You can also use
+/// [`move_fd_internal`].)
+///
+/// [`move_fd_internal`]: crate::system::SystemEx::move_fd_internal
 pub const MIN_INTERNAL_FD: Fd = Fd(10);
 
 /// Part of the execution environment that allows printing to the standard
