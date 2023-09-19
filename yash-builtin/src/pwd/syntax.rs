@@ -38,7 +38,7 @@ pub enum Error {
 
     /// One or more operands are given.
     #[error("unexpected operand")]
-    OperandsUnexpected(Vec<Field>),
+    UnexpectedOperands(Vec<Field>),
 }
 
 impl MessageBase for Error {
@@ -50,7 +50,7 @@ impl MessageBase for Error {
         use Error::*;
         match self {
             CommonError(e) => e.main_annotation(),
-            OperandsUnexpected(operands) => Annotation::new(
+            UnexpectedOperands(operands) => Annotation::new(
                 AnnotationType::Error,
                 format!("{}: unexpected operand", operands[0].value).into(),
                 &operands[0].origin,
@@ -81,7 +81,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 
     if !operands.is_empty() {
-        return Err(Error::OperandsUnexpected(operands));
+        return Err(Error::UnexpectedOperands(operands));
     }
 
     Ok(options.last().map(mode_for_option).unwrap_or_default())
@@ -134,7 +134,7 @@ mod tests {
         let env = Env::new_virtual();
         let args = Field::dummies(["foo"]);
         let result = parse(&env, args.clone());
-        assert_eq!(result, Err(Error::OperandsUnexpected(args)));
+        assert_eq!(result, Err(Error::UnexpectedOperands(args)));
     }
 
     #[test]
@@ -143,6 +143,6 @@ mod tests {
         let args = Field::dummies(["-LP", "-L", "--", "one", "two"]);
         let operands = args[3..].to_vec();
         let result = parse(&env, args);
-        assert_eq!(result, Err(Error::OperandsUnexpected(operands)));
+        assert_eq!(result, Err(Error::UnexpectedOperands(operands)));
     }
 }
