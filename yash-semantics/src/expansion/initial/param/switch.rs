@@ -191,7 +191,7 @@ async fn assign(
         .assign_variable(Scope::Global, name, variable)
         .map_err(|e| {
             let location = e.new_value.last_assigned_location.as_ref().unwrap().clone();
-            let cause = ErrorCause::AssignReadOnly(e);
+            let cause = ErrorCause::AssignError(e);
             Error { cause, location }
         })?;
     Ok(value_phrase)
@@ -536,7 +536,7 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_matches!(result, Some(Err(error)) => {
-            assert_matches!(error.cause, ErrorCause::AssignReadOnly(e) => {
+            assert_matches!(error.cause, ErrorCause::AssignError(e) => {
                 assert_eq!(e.name, "var");
                 assert_eq!(e.read_only_location, Location::dummy("read-only"));
                 assert_eq!(e.new_value.value, Some(Value::scalar("foo")));

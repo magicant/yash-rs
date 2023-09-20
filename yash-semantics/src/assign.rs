@@ -67,7 +67,7 @@ pub async fn perform_assignment(
         read_only_location: None,
     };
     env.assign_variable(scope, name, value).map_err(|e| Error {
-        cause: ErrorCause::AssignReadOnly(e),
+        cause: ErrorCause::AssignError(e),
         location: assign.location.clone(),
     })?;
     Ok(exit_status)
@@ -158,7 +158,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap_err();
-        assert_matches!(e.cause, ErrorCause::AssignReadOnly(roe) => {
+        assert_matches!(e.cause, ErrorCause::AssignError(roe) => {
             assert_eq!(roe.name, "v");
             assert_eq!(roe.read_only_location, location);
             assert_eq!(roe.new_value.value, Some(Value::scalar("new")));

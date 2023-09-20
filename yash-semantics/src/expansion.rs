@@ -115,7 +115,7 @@ pub enum ErrorCause {
 
     /// Assignment to a read-only variable.
     #[error(transparent)]
-    AssignReadOnly(#[from] AssignError),
+    AssignError(#[from] AssignError),
 
     /// Expansion of an unset parameter with the `nounset` option
     #[error("unset parameter")]
@@ -139,7 +139,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
-            AssignReadOnly(_) => "cannot assign to read-only variable",
+            AssignError(_) => "cannot assign to read-only variable",
             UnsetParameter => "unset parameter",
             EmptyExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
@@ -154,7 +154,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(e) => e.desc().into(),
             ArithError(e) => e.to_string().into(),
-            AssignReadOnly(e) => e.to_string().into(),
+            AssignError(e) => e.to_string().into(),
             UnsetParameter => "unset parameter disallowed by the nounset option".into(),
             EmptyExpansion(e) => e.state.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
@@ -170,7 +170,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(_) => None,
             ArithError(e) => e.related_location(),
-            AssignReadOnly(e) => Some((
+            AssignError(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
@@ -374,7 +374,7 @@ mod tests {
         let location = Location { code, range: 2..4 };
         let new_value = Variable::new("value").set_assigned_location(Location::dummy("assigned"));
         let error = Error {
-            cause: ErrorCause::AssignReadOnly(AssignError {
+            cause: ErrorCause::AssignError(AssignError {
                 name: "var".into(),
                 read_only_location: Location::dummy("ROL"),
                 new_value,

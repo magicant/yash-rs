@@ -91,7 +91,7 @@ pub async fn execute(
                 other => other?,
             },
             Err(error) => {
-                let cause = ErrorCause::AssignReadOnly(error);
+                let cause = ErrorCause::AssignError(error);
                 let location = name.origin;
                 let error = Error { cause, location };
                 return apply_errexit(error.handle(env).await, env);

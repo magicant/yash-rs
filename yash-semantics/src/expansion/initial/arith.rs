@@ -193,7 +193,7 @@ fn convert_error_cause(
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
             yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
-            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
+            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignError(e),
         },
     }
 }
