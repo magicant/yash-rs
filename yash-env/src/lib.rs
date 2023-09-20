@@ -52,7 +52,7 @@ use self::system::SignalHandling;
 pub use self::system::System;
 use self::trap::Signal;
 use self::trap::TrapSet;
-use self::variable::ReadOnlyError;
+use self::variable::AssignError;
 use self::variable::Scope;
 use self::variable::Variable;
 use self::variable::VariableSet;
@@ -392,7 +392,7 @@ impl Env {
         scope: Scope,
         name: String,
         value: Variable,
-    ) -> Result<Option<Variable>, ReadOnlyError> {
+    ) -> Result<Option<Variable>, AssignError> {
         let value = match self.options.get(AllExport) {
             On => value.export(),
             Off => value,

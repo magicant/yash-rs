@@ -90,7 +90,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
-use yash_env::variable::ReadOnlyError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -115,7 +115,7 @@ pub enum ErrorCause {
 
     /// Assignment to a read-only variable.
     #[error(transparent)]
-    AssignReadOnly(#[from] ReadOnlyError),
+    AssignReadOnly(#[from] AssignError),
 
     /// Expansion of an unset parameter with the `nounset` option
     #[error("unset parameter")]
@@ -374,7 +374,7 @@ mod tests {
         let location = Location { code, range: 2..4 };
         let new_value = Variable::new("value").set_assigned_location(Location::dummy("assigned"));
         let error = Error {
-            cause: ErrorCause::AssignReadOnly(ReadOnlyError {
+            cause: ErrorCause::AssignReadOnly(AssignError {
                 name: "var".into(),
                 read_only_location: Location::dummy("ROL"),
                 new_value,

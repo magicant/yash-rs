@@ -403,12 +403,11 @@ pub enum Scope {
     Volatile,
 }
 
-// TODO Rename to AssignReadOnlyError
 // TODO Add UnsetReadOnlyError that does not have the new_value field
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("variable `{name}` is read-only")]
-pub struct ReadOnlyError {
+pub struct AssignError {
     /// Variable name.
     pub name: String,
     /// Location where the existing variable was made read-only.
@@ -488,7 +487,7 @@ impl VariableSet {
         scope: Scope,
         name: String,
         mut value: Variable,
-    ) -> Result<Option<Variable>, ReadOnlyError> {
+    ) -> Result<Option<Variable>, AssignError> {
         use std::collections::hash_map::Entry;
         // TODO Can we avoid cloning the name here?
         let stack = match self.all_variables.entry(name.clone()) {
@@ -500,7 +499,7 @@ impl VariableSet {
         if scope == Scope::Volatile {
             if let Some(vic) = stack.last() {
                 if let Some(location) = &vic.variable.read_only_location {
-                    return Err(ReadOnlyError {
+                    return Err(AssignError {
                         name,
                         read_only_location: location.clone(),
                         new_value: value,
@@ -548,7 +547,7 @@ impl VariableSet {
             .map(|vic| &mut vic.variable);
         if let Some(existing) = existing {
             if let Some(location) = &existing.read_only_location {
-                return Err(ReadOnlyError {
+                return Err(AssignError {
                     name,
                     read_only_location: location.clone(),
                     new_value: value,

@@ -21,7 +21,7 @@
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::variable::ReadOnlyError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Scope;
 use yash_env::variable::Variable;
 use yash_env::Env;
@@ -46,7 +46,7 @@ pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
             match env.assign_variable(Scope::Global, name, var) {
                 Ok(_old_value) => (),
-                Err(ReadOnlyError {
+                Err(AssignError {
                     name,
                     read_only_location: _,
                     new_value: _,
