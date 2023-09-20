@@ -139,7 +139,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
-            AssignError(_) => "cannot assign to read-only variable",
+            AssignError(_) => "error assigning to variable",
             UnsetParameter => "unset parameter",
             EmptyExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
@@ -383,10 +383,13 @@ mod tests {
         };
         let message = Message::from(&error);
         assert_eq!(message.r#type, AnnotationType::Error);
-        assert_eq!(message.title, "cannot assign to read-only variable");
+        assert_eq!(message.title, "error assigning to variable");
         assert_eq!(message.annotations.len(), 2);
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
-        assert_eq!(message.annotations[0].label, "variable `var` is read-only");
+        assert_eq!(
+            message.annotations[0].label,
+            "cannot assign to read-only variable `var`"
+        );
         assert_eq!(message.annotations[0].location, &error.location);
         assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
         assert_eq!(

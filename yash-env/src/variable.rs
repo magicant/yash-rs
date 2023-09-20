@@ -406,7 +406,7 @@ pub enum Scope {
 // TODO Add UnsetReadOnlyError that does not have the new_value field
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("variable `{name}` is read-only")]
+#[error("cannot assign to read-only variable `{name}`")]
 pub struct AssignError {
     /// Variable name.
     pub name: String,
