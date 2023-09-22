@@ -403,7 +403,6 @@ pub enum Scope {
     Volatile,
 }
 
-// TODO Add UnsetReadOnlyError that does not have the new_value field
 /// Error that occurs when assigning to an existing read-only variable.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("cannot assign to read-only variable `{name}`")]
@@ -414,6 +413,16 @@ pub struct AssignError {
     pub read_only_location: Location,
     /// New variable that was tried to assign.
     pub new_value: Variable,
+}
+
+/// Error that occurs when unsetting a read-only variable
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot unset read-only variable `{name}`")]
+pub struct UnsetError<'a> {
+    /// Variable name.
+    pub name: &'a str,
+    /// Location where the existing variable was made read-only.
+    pub read_only_location: &'a Location,
 }
 
 /// Iterator of variables
@@ -565,6 +574,87 @@ impl VariableSet {
         }
     }
 
+    /// Computes the index of the context that matches the specified scope.
+    fn index_of_context(scope: Scope, contexts: &[Context]) -> usize {
+        fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
+            contexts
+                .iter()
+                .rposition(|context| context.r#type == ContextType::Regular)
+                .expect("base context has gone")
+        }
+
+        match scope {
+            Scope::Global => 0,
+            Scope::Local => index_of_topmost_regular_context(contexts),
+            Scope::Volatile => index_of_topmost_regular_context(contexts) + 1,
+        }
+    }
+
+    /// Unsets a variable.
+    ///
+    /// If successful, the return value is the previous value. If the specified
+    /// variable is read-only, this function fails with [`UnsetError`].
+    ///
+    /// The behavior of unsetting depends on the `scope`:
+    ///
+    /// - If the scope is `Global`, this function removes the variable from all
+    ///   contexts.
+    /// - If the scope is `Local`, this function removes the variable from the
+    ///   topmost [regular] context and any [volatile] context above it.
+    /// - If the scope is `Volatile`, this function removes the variable from
+    ///   any [volatile] context above the topmost [regular] context.
+    ///
+    /// In any case, this function may remove a variable from more than one
+    /// context, in which case the return value is the value in the topmost
+    /// context. If any of the removed variables is read-only, this function
+    /// fails with [`UnsetError`] and does not remove any variable.
+    ///
+    /// You cannot modify positional parameters using this function.
+    /// See [`positional_params_mut`](Self::positional_params_mut).
+    ///
+    /// [regular]: ContextType::Regular
+    /// [volatile]: ContextType::Volatile
+    pub fn unset<'a>(
+        &'a mut self,
+        scope: Scope,
+        name: &'a str,
+    ) -> Result<Option<Variable>, UnsetError<'a>> {
+        let Some(stack) = self.all_variables.get_mut(name) else {
+            return Ok(None);
+        };
+
+        // From which context should we unset?
+        let index = Self::index_of_context(scope, &self.contexts);
+
+        // Return an error if the variable is read-only.
+        // Unfortunately, this code fragment does not compile because the
+        // current Rust borrow checker is not smart enough.
+        // TODO Uncomment this code when the borrow checker is improved
+        // if let Some(read_only_location) = stack[index..]
+        //     .iter()
+        //     .filter_map(|vic| vic.variable.read_only_location.as_ref())
+        //     .next_back()
+        // {
+        //     return Err(UnsetError {
+        //         name,
+        //         read_only_location,
+        //     });
+        // }
+        if let Some(read_only_position) = stack[index..]
+            .iter()
+            .rposition(|vic| vic.variable.is_read_only())
+        {
+            let read_only_index = index + read_only_position;
+            let read_only_location = &stack[read_only_index].variable.read_only_location;
+            return Err(UnsetError {
+                name,
+                read_only_location: read_only_location.as_ref().unwrap(),
+            });
+        }
+
+        Ok(stack.drain(index..).next_back().map(|vic| vic.variable))
+    }
+
     /// Returns an iterator of variables.
     ///
     /// The `scope` parameter chooses variables returned by the iterator:
@@ -579,20 +669,9 @@ impl VariableSet {
     ///
     /// The order of iterated variables is unspecified.
     pub fn iter(&self, scope: Scope) -> Iter {
-        fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
-            contexts
-                .iter()
-                .rposition(|context| context.r#type == ContextType::Regular)
-                .expect("base context has gone")
-        }
-
         Iter {
             inner: self.all_variables.iter(),
-            min_context_index: match scope {
-                Scope::Global => 0,
-                Scope::Local => index_of_topmost_regular_context(&self.contexts),
-                Scope::Volatile => index_of_topmost_regular_context(&self.contexts) + 1,
-            },
+            min_context_index: Self::index_of_context(scope, &self.contexts),
         }
     }
 
@@ -1110,6 +1189,160 @@ mod tests {
         assert_eq!(variable.value, Some(Value::scalar("0")));
         variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn unsetting_nonexisting_variable() {
+        let mut variables = VariableSet::new();
+        let result = variables.unset(Scope::Global, "").unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn unsetting_variable_with_one_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("X"))
+            .unwrap();
+
+        let result = variables.unset(Scope::Global, "foo").unwrap();
+        assert_eq!(result, Some(Variable::new("X")));
+        assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn unsetting_variables_from_all_contexts() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("X"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(Scope::Local, "foo".to_string(), Variable::new("Y"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("Z"))
+            .unwrap();
+
+        let result = variables.unset(Scope::Global, "foo").unwrap();
+        assert_eq!(result, Some(Variable::new("Z")));
+        assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn unsetting_variable_from_local_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("A"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        // Non-local read-only variable does not prevent unsetting
+        let value = Variable::new("B").make_read_only(Location::dummy("dummy"));
+        variables
+            .assign(Scope::Local, "foo".to_string(), value.clone())
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(Scope::Local, "foo".to_string(), Variable::new("C"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("D"))
+            .unwrap();
+
+        let result = variables.unset(Scope::Local, "foo").unwrap();
+        assert_eq!(result, Some(Variable::new("D")));
+        assert_eq!(variables.get("foo"), Some(&value));
+    }
+
+    #[test]
+    fn unsetting_nonexisting_variable_in_local_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("A"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+
+        let result = variables.unset(Scope::Local, "foo").unwrap();
+        assert_eq!(result, None);
+        assert_eq!(variables.get("foo"), Some(&Variable::new("A")));
+    }
+
+    #[test]
+    fn unsetting_variable_from_volatile_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("A"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(Scope::Local, "foo".to_string(), Variable::new("B"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("C"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Volatile);
+        variables
+            .assign(Scope::Volatile, "foo".to_string(), Variable::new("D"))
+            .unwrap();
+
+        let result = variables.unset(Scope::Volatile, "foo").unwrap();
+        assert_eq!(result, Some(Variable::new("D")));
+        assert_eq!(variables.get("foo"), Some(&Variable::new("B")));
+    }
+
+    #[test]
+    fn unsetting_nonexisting_variable_in_volatile_context() {
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("A"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Volatile);
+
+        let result = variables.unset(Scope::Volatile, "foo").unwrap();
+        assert_eq!(result, None);
+        assert_eq!(variables.get("foo"), Some(&Variable::new("A")));
+    }
+
+    #[test]
+    fn unsetting_readonly_variable() {
+        let read_only_location = &Location::dummy("read-only");
+        let mut variables = VariableSet::new();
+        variables
+            .assign(Scope::Global, "foo".to_string(), Variable::new("A"))
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(
+                Scope::Local,
+                "foo".to_string(),
+                Variable::new("B").make_read_only(Location::dummy("dummy")),
+            )
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(
+                Scope::Local,
+                "foo".to_string(),
+                Variable::new("C").make_read_only(read_only_location.clone()),
+            )
+            .unwrap();
+        variables.push_context_impl(ContextType::Regular);
+        variables
+            .assign(Scope::Local, "foo".to_string(), Variable::new("D"))
+            .unwrap();
+
+        let error = variables.unset(Scope::Global, "foo").unwrap_err();
+        assert_eq!(
+            error,
+            UnsetError {
+                name: "foo",
+                read_only_location
+            }
+        );
+        assert_eq!(variables.get("foo"), Some(&Variable::new("D")));
     }
 
     #[test]
