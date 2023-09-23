@@ -60,7 +60,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
 
     // Avoid overwriting a read-only function
     if let Some(function) = env.functions.get(name.as_str()) {
-        if function.0.is_read_only {
+        if function.0.is_read_only() {
             // TODO Use pretty::Message and annotate_snippet
             env.print_error(&format!("cannot re-define read-only function {name:?}\n"))
                 .await;
@@ -70,12 +70,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
     }
 
     // Define the function
-    let function = Function {
-        name,
-        body: Rc::clone(&def.body),
-        origin,
-        is_read_only: false,
-    };
+    let function = Function::new(name, Rc::clone(&def.body), origin);
     let entry = HashEntry(Rc::new(function));
     env.functions.replace(entry);
     env.exit_status = ExitStatus::SUCCESS;
@@ -94,7 +89,6 @@ mod tests {
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
 
-    #[allow(clippy::bool_assert_comparison)]
     #[test]
     fn function_definition_new() {
         let mut env = Env::new_virtual();
@@ -113,10 +107,9 @@ mod tests {
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
         assert_eq!(function.body, definition.body);
-        assert_eq!(function.is_read_only, false);
+        assert_eq!(function.read_only_location, None);
     }
 
-    #[allow(clippy::bool_assert_comparison)]
     #[test]
     fn function_definition_overwrite() {
         let mut env = Env::new_virtual();
@@ -125,7 +118,7 @@ mod tests {
             name: "foo".to_string(),
             body: Rc::new("{ :; }".parse().unwrap()),
             origin: Location::dummy("dummy"),
-            is_read_only: false,
+            read_only_location: None,
         })));
         let definition = syntax::FunctionDefinition {
             has_keyword: false,
@@ -141,10 +134,9 @@ mod tests {
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
         assert_eq!(function.body, definition.body);
-        assert_eq!(function.is_read_only, false);
+        assert_eq!(function.read_only_location, None);
     }
 
-    #[allow(clippy::bool_assert_comparison)]
     #[test]
     fn function_definition_read_only() {
         let system = VirtualSystem::new();
@@ -154,7 +146,7 @@ mod tests {
             name: "foo".to_string(),
             body: Rc::new("{ :; }".parse().unwrap()),
             origin: Location::dummy("dummy"),
-            is_read_only: true,
+            read_only_location: Some(Location::dummy("readonly")),
         });
         env.functions.insert(HashEntry(Rc::clone(&function)));
         let definition = syntax::FunctionDefinition {
@@ -199,7 +191,7 @@ mod tests {
             name: "foo".to_string(),
             body: Rc::new("{ :; }".parse().unwrap()),
             origin: Location::dummy("dummy"),
-            is_read_only: true,
+            read_only_location: Some(Location::dummy("readonly")),
         });
         env.functions.insert(HashEntry(Rc::clone(&function)));
         let definition = syntax::FunctionDefinition {

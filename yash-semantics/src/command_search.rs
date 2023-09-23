@@ -259,7 +259,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command(""),
             Location::dummy(""),
-            false,
+            None,
         ));
 
         let target = search(&mut env, "bar");
@@ -287,7 +287,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         );
         env.functions.insert(function.clone());
 
@@ -308,7 +308,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         ));
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
@@ -373,7 +373,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         );
         env.functions.insert(function.clone());
 
@@ -397,7 +397,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         );
         env.functions.insert(function.clone());
 
@@ -421,7 +421,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         );
         env.functions.insert(function.clone());
 
@@ -474,7 +474,7 @@ mod tests {
             "foo".to_string(),
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
+            None,
         );
         env.functions.insert(function.clone());
 

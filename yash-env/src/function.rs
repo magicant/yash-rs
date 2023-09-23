@@ -41,10 +41,50 @@ pub struct Function {
     /// Location of the function definition command that defined this function.
     pub origin: Location,
 
-    /// Whether this function is read-only or not.
+    /// Optional location where this function was made read-only.
     ///
-    /// A read-only function cannot be re-defined or unset.
-    pub is_read_only: bool,
+    /// If this function is not read-only, `read_only_location` is `None`.
+    /// Otherwise, `read_only_location` is the location of the simple command
+    /// that executed the `readonly` built-in that made this function read-only.
+    pub read_only_location: Option<Location>,
+}
+
+impl Function {
+    /// Creates a new function.
+    ///
+    /// This is a convenience function for constructing a `Function` object.
+    /// The `read_only_location` is set to `None`.
+    #[inline]
+    #[must_use]
+    pub fn new<N: Into<String>, C: Into<Rc<FullCompoundCommand>>>(
+        name: N,
+        body: C,
+        origin: Location,
+    ) -> Self {
+        Function {
+            name: name.into(),
+            body: body.into(),
+            origin,
+            read_only_location: None,
+        }
+    }
+
+    /// Makes the function read-only.
+    ///
+    /// This is a convenience function for doing
+    /// `self.read_only_location = Some(location)` in a method chain.
+    #[inline]
+    #[must_use]
+    pub fn make_read_only(mut self, location: Location) -> Self {
+        self.read_only_location = Some(location);
+        self
+    }
+
+    /// Whether this function is read-only or not.
+    #[must_use]
+    pub const fn is_read_only(&self) -> bool {
+        self.read_only_location.is_some()
+    }
 }
 
 /// Wrapper of [`Function`] for inserting into a hash set.
@@ -62,13 +102,13 @@ impl HashEntry {
         name: String,
         body: Rc<FullCompoundCommand>,
         origin: Location,
-        is_read_only: bool,
+        read_only_location: Option<Location>,
     ) -> HashEntry {
         HashEntry(Rc::new(Function {
             name,
             body,
             origin,
-            is_read_only,
+            read_only_location,
         }))
     }
 }
