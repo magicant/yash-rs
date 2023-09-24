@@ -146,6 +146,15 @@ pub struct DefineError {
     pub new: Rc<Function>,
 }
 
+/// Error unsetting a read-only function.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot unset read-only function `{}`", .existing.name)]
+#[non_exhaustive]
+pub struct UnsetError {
+    /// Existing read-only function
+    pub existing: Rc<Function>,
+}
+
 /// Unordered iterator over functions in a function set.
 ///
 /// This iterator is created by [`FunctionSet::iter`].
@@ -207,7 +216,20 @@ impl FunctionSet {
         inner(&mut self.entries, function.into())
     }
 
-    // TODO unset
+    /// Removes a function from the set.
+    ///
+    /// This function returns the previously defined function if it exists.
+    /// However, if the function is read-only, `UnsetError` is returned.
+    pub fn unset(&mut self, name: &str) -> Result<Option<Rc<Function>>, UnsetError> {
+        // TODO Use Option::is_some_and
+        match self.entries.get(name) {
+            Some(entry) if entry.0.is_read_only() => Err(UnsetError {
+                existing: Rc::clone(&entry.0),
+            }),
+
+            _ => Ok(self.entries.take(name).map(|entry| entry.0)),
+        }
+    }
 
     /// Returns an iterator over functions in the set.
     ///
@@ -304,6 +326,47 @@ mod tests {
         assert_eq!(error.existing, function1);
         assert_eq!(error.new, function2);
         assert_eq!(set.get("foo"), Some(&function1));
+    }
+
+    #[test]
+    fn unsetting_existing_function() {
+        let mut set = FunctionSet::new();
+        let function = Rc::new(Function::new(
+            "foo",
+            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo"),
+        ));
+        set.define(function.clone()).unwrap();
+
+        let result = set.unset("foo").unwrap();
+        assert_eq!(result, Some(function));
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn unsetting_nonexisting_function() {
+        let mut set = FunctionSet::new();
+
+        let result = set.unset("foo").unwrap();
+        assert_eq!(result, None);
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn unsetting_readonly_function() {
+        let mut set = FunctionSet::new();
+        let function = Rc::new(
+            Function::new(
+                "foo",
+                "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("foo"),
+            )
+            .make_read_only(Location::dummy("readonly")),
+        );
+        set.define(function.clone()).unwrap();
+
+        let error = set.unset("foo").unwrap_err();
+        assert_eq!(error.existing, function);
     }
 
     #[test]
