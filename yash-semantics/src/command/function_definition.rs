@@ -57,22 +57,18 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
         Err(error) => return error.handle(env).await,
     };
 
-    // TODO Handle the result of `define` rather than here
-    // Avoid overwriting a read-only function
-    if let Some(function) = env.functions.get(name.as_str()) {
-        if function.is_read_only() {
-            // TODO Use pretty::Message and annotate_snippet
-            env.print_error(&format!("cannot re-define read-only function {name:?}\n"))
-                .await;
-            env.exit_status = ExitStatus::ERROR;
-            return Continue(());
-        }
-    }
-
     // Define the function
     let function = Function::new(name, Rc::clone(&def.body), origin);
-    env.functions.define(function).ok();
-    env.exit_status = ExitStatus::SUCCESS;
+    match env.functions.define(function) {
+        Ok(_) => {
+            env.exit_status = ExitStatus::SUCCESS;
+        }
+        Err(error) => {
+            // TODO Use pretty::Message and annotate_snippet
+            env.print_error(&error.to_string()).await;
+            env.exit_status = ExitStatus::ERROR;
+        }
+    }
     Continue(())
 }
 

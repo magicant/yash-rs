@@ -138,9 +138,12 @@ pub struct FunctionSet {
 /// Error redefining a read-only function.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("cannot redefine read-only function `{}`", .existing.name)]
+#[non_exhaustive]
 pub struct DefineError {
-    existing: Rc<Function>,
-    new: Rc<Function>,
+    /// Existing read-only function
+    pub existing: Rc<Function>,
+    /// New function that tried to redefine the existing function
+    pub new: Rc<Function>,
 }
 
 /// Unordered iterator over functions in a function set.
@@ -189,10 +192,17 @@ impl FunctionSet {
     ) -> Result<Option<Rc<Function>>, DefineError> {
         fn inner(
             entries: &mut HashSet<HashEntry>,
-            function: Rc<Function>,
+            new: Rc<Function>,
         ) -> Result<Option<Rc<Function>>, DefineError> {
-            Ok(entries.replace(HashEntry(function)).map(|entry| entry.0))
-            // TODO: check if the existing function is read-only
+            // TODO Use Option::is_some_and
+            match entries.get(new.name.as_str()) {
+                Some(existing) if existing.0.is_read_only() => Err(DefineError {
+                    existing: Rc::clone(&existing.0),
+                    new,
+                }),
+
+                _ => Ok(entries.replace(HashEntry(new)).map(|entry| entry.0)),
+            }
         }
         inner(&mut self.entries, function.into())
     }
@@ -270,6 +280,30 @@ mod tests {
         let result = set.define(function2.clone());
         assert_eq!(result, Ok(Some(function1)));
         assert_eq!(set.get("foo"), Some(&function2));
+    }
+
+    #[test]
+    fn redefining_readonly_function() {
+        let mut set = FunctionSet::new();
+        let function1 = Rc::new(
+            Function::new(
+                "foo",
+                "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("foo 1"),
+            )
+            .make_read_only(Location::dummy("readonly")),
+        );
+        let function2 = Rc::new(Function::new(
+            "foo",
+            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo 2"),
+        ));
+        set.define(function1.clone()).unwrap();
+
+        let error = set.define(function2.clone()).unwrap_err();
+        assert_eq!(error.existing, function1);
+        assert_eq!(error.new, function2);
+        assert_eq!(set.get("foo"), Some(&function1));
     }
 
     #[test]
