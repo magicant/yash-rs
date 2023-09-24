@@ -34,8 +34,9 @@ pub struct Function {
 
     /// Command that is executed when the function is called.
     ///
-    /// This is wrapped in `Rc` so that a function can be defined and executed
-    /// without cloning the entire compound command.
+    /// This is wrapped in `Rc` so that we don't have to clone the entire
+    /// compound command when we define a function. The function definition
+    /// command only clones the `Rc` object from the abstract syntax tree.
     pub body: Rc<FullCompoundCommand>,
 
     /// Location of the function definition command that defined this function.
@@ -89,10 +90,14 @@ impl Function {
 
 /// Wrapper of [`Function`] for inserting into a hash set.
 ///
-/// A `HashEntry` wraps a `Function` in `Rc` so that the function can be
-/// referred to even after the function has been removed from the environment.
+/// A `HashEntry` wraps a `Function` in `Rc` so that the `Function` object can
+/// outlive the execution of the function which may redefine or unset the
+/// function itself. A simple command that executes the function clones the
+/// `Rc` object from the function set and retains it until the command
+/// terminates.
+///
 /// The `Hash` and `PartialEq` implementation for `HashEntry` only compares
-/// names.
+/// the names of the functions.
 #[derive(Clone, Debug, Eq)]
 pub struct HashEntry(pub Rc<Function>);
 
