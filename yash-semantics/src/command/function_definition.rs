@@ -24,7 +24,6 @@ use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::function::Function;
-use yash_env::function::HashEntry;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -58,9 +57,10 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
         Err(error) => return error.handle(env).await,
     };
 
+    // TODO Handle the result of `define` rather than here
     // Avoid overwriting a read-only function
     if let Some(function) = env.functions.get(name.as_str()) {
-        if function.0.is_read_only() {
+        if function.is_read_only() {
             // TODO Use pretty::Message and annotate_snippet
             env.print_error(&format!("cannot re-define read-only function {name:?}\n"))
                 .await;
@@ -71,8 +71,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
 
     // Define the function
     let function = Function::new(name, Rc::clone(&def.body), origin);
-    let entry = HashEntry(Rc::new(function));
-    env.functions.replace(entry);
+    env.functions.define(function).ok();
     env.exit_status = ExitStatus::SUCCESS;
     Continue(())
 }
@@ -103,7 +102,7 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
-        let function = &env.functions.get("foo").unwrap().0;
+        let function = env.functions.get("foo").unwrap();
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
         assert_eq!(function.body, definition.body);
@@ -114,12 +113,13 @@ mod tests {
     fn function_definition_overwrite() {
         let mut env = Env::new_virtual();
         env.exit_status = ExitStatus::ERROR;
-        env.functions.insert(HashEntry(Rc::new(Function {
+        let function = Function {
             name: "foo".to_string(),
             body: Rc::new("{ :; }".parse().unwrap()),
             origin: Location::dummy("dummy"),
             read_only_location: None,
-        })));
+        };
+        env.functions.define(function).unwrap();
         let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),
@@ -130,7 +130,7 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
         assert_eq!(env.functions.len(), 1);
-        let function = &env.functions.get("foo").unwrap().0;
+        let function = env.functions.get("foo").unwrap();
         assert_eq!(function.name, "foo");
         assert_eq!(function.origin, definition.name.location);
         assert_eq!(function.body, definition.body);
@@ -148,7 +148,7 @@ mod tests {
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
         });
-        env.functions.insert(HashEntry(Rc::clone(&function)));
+        env.functions.define(Rc::clone(&function)).unwrap();
         let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),
@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::ERROR);
         assert_eq!(env.functions.len(), 1);
-        assert_eq!(env.functions.get("foo").unwrap().0, function);
+        assert_eq!(env.functions.get("foo").unwrap(), &function);
         assert_stderr(&state, |stderr| {
             assert!(
                 stderr.contains("foo"),
@@ -180,20 +180,20 @@ mod tests {
         let result = definition.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus::SUCCESS);
-        let names: Vec<&str> = env.functions.iter().map(|f| f.0.name.as_str()).collect();
+        let names: Vec<&str> = env.functions.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, ["a"]);
     }
 
     #[test]
     fn errexit_in_function_definition() {
         let mut env = Env::new_virtual();
-        let function = Rc::new(Function {
+        let function = Function {
             name: "foo".to_string(),
             body: Rc::new("{ :; }".parse().unwrap()),
             origin: Location::dummy("dummy"),
             read_only_location: Some(Location::dummy("readonly")),
-        });
-        env.functions.insert(HashEntry(Rc::clone(&function)));
+        };
+        env.functions.define(function).unwrap();
         let definition = syntax::FunctionDefinition {
             has_keyword: false,
             name: "foo".parse().unwrap(),

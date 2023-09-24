@@ -22,7 +22,9 @@ use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::iter::FusedIterator;
 use std::rc::Rc;
+use thiserror::Error;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::FullCompoundCommand;
 
@@ -99,24 +101,7 @@ impl Function {
 /// The `Hash` and `PartialEq` implementation for `HashEntry` only compares
 /// the names of the functions.
 #[derive(Clone, Debug, Eq)]
-pub struct HashEntry(pub Rc<Function>);
-
-impl HashEntry {
-    /// Convenience method for creating a new function as a `HashEntry`.
-    pub fn new(
-        name: String,
-        body: Rc<FullCompoundCommand>,
-        origin: Location,
-        read_only_location: Option<Location>,
-    ) -> HashEntry {
-        HashEntry(Rc::new(Function {
-            name,
-            body,
-            origin,
-            read_only_location,
-        }))
-    }
-}
+struct HashEntry(Rc<Function>);
 
 impl PartialEq for HashEntry {
     /// Compares the names of two hash entries.
@@ -145,4 +130,168 @@ impl Borrow<str> for HashEntry {
 }
 
 /// Collection of functions.
-pub type FunctionSet = HashSet<HashEntry>;
+#[derive(Clone, Debug, Default)]
+pub struct FunctionSet {
+    entries: HashSet<HashEntry>,
+}
+
+/// Error redefining a read-only function.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot redefine read-only function `{}`", .existing.name)]
+pub struct DefineError {
+    existing: Rc<Function>,
+    new: Rc<Function>,
+}
+
+/// Unordered iterator over functions in a function set.
+///
+/// This iterator is created by [`FunctionSet::iter`].
+#[derive(Clone, Debug)]
+pub struct Iter<'a> {
+    inner: std::collections::hash_set::Iter<'a, HashEntry>,
+}
+
+impl FunctionSet {
+    /// Creates a new empty function set.
+    #[must_use]
+    pub fn new() -> Self {
+        FunctionSet::default()
+    }
+
+    /// Returns the function with the given name.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<&Rc<Function>> {
+        self.entries.get(name).map(|entry| &entry.0)
+    }
+
+    /// Returns the number of functions in the set.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the set contains no functions.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Inserts a function into the set.
+    ///
+    /// If a function with the same name already exists, it is replaced and
+    /// returned unless it is read-only, in which case `DefineError` is
+    /// returned.
+    pub fn define<F: Into<Rc<Function>>>(
+        &mut self,
+        function: F,
+    ) -> Result<Option<Rc<Function>>, DefineError> {
+        fn inner(
+            entries: &mut HashSet<HashEntry>,
+            function: Rc<Function>,
+        ) -> Result<Option<Rc<Function>>, DefineError> {
+            Ok(entries.replace(HashEntry(function)).map(|entry| entry.0))
+            // TODO: check if the existing function is read-only
+        }
+        inner(&mut self.entries, function.into())
+    }
+
+    // TODO unset
+
+    /// Returns an iterator over functions in the set.
+    ///
+    /// The order of iteration is not specified.
+    pub fn iter(&self) -> Iter {
+        let inner = self.entries.iter();
+        Iter { inner }
+    }
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a Rc<Function>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|entry| &entry.0)
+    }
+}
+
+impl ExactSizeIterator for Iter<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl FusedIterator for Iter<'_> {}
+
+impl<'a> IntoIterator for &'a FunctionSet {
+    type Item = &'a Rc<Function>;
+    type IntoIter = Iter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defining_new_function() {
+        let mut set = FunctionSet::new();
+        let function = Rc::new(Function::new(
+            "foo",
+            "{ :; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo"),
+        ));
+
+        let result = set.define(function.clone());
+        assert_eq!(result, Ok(None));
+        assert_eq!(set.get("foo"), Some(&function));
+    }
+
+    #[test]
+    fn redefining_existing_function() {
+        let mut set = FunctionSet::new();
+        let function1 = Rc::new(Function::new(
+            "foo",
+            "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo 1"),
+        ));
+        let function2 = Rc::new(Function::new(
+            "foo",
+            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo 2"),
+        ));
+        set.define(function1.clone()).unwrap();
+
+        let result = set.define(function2.clone());
+        assert_eq!(result, Ok(Some(function1)));
+        assert_eq!(set.get("foo"), Some(&function2));
+    }
+
+    #[test]
+    fn iteration() {
+        let mut set = FunctionSet::new();
+        let function1 = Rc::new(Function::new(
+            "foo",
+            "{ echo 1; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("foo"),
+        ));
+        let function2 = Rc::new(Function::new(
+            "bar",
+            "{ echo 2; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("bar"),
+        ));
+        set.define(function1.clone()).unwrap();
+        set.define(function2.clone()).unwrap();
+
+        let functions = set.iter().collect::<Vec<_>>();
+        assert!(
+            functions[..] == [&function1, &function2] || functions[..] == [&function2, &function1],
+            "{functions:?}"
+        );
+    }
+}
