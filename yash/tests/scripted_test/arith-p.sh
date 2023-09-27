@@ -19,7 +19,6 @@ __IN__
 0 1 100 1 -1
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE -e 0 'unset variable is considered 0 (direct)'
 unset x
 echoraw $((x))
@@ -169,7 +168,6 @@ echoraw $((a=5))
 echoraw not reached
 __IN__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE -e 0 'unset variable is considered 0 (assignment)'
 unset x
 echoraw $((a=x)) && echoraw $a
@@ -357,7 +355,6 @@ __OUT__
 #__IN__
 #__OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE 'assignment in parameter expansion in arithmetic expansion'
 unset a
 echoraw $((${a=1}))

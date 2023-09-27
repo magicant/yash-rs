@@ -66,7 +66,6 @@ __IN__
 4]
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE 'field splitting with unset IFS'
 unset IFS
 a='1 2	3

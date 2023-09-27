@@ -218,7 +218,6 @@ __IN__
 $ORIGPWD/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'cd paths are ignored for operand starting with dot-dot (-L)' \
     3<<\__IN__ 5</dev/null 4<<__OUT__
 unset CDPATH
@@ -232,7 +231,6 @@ __IN__
 $ORIGPWD/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'cd paths are ignored for operand starting with dot-dot (-P)' \
     3<<\__IN__ 5</dev/null 4<<__OUT__
 unset CDPATH
@@ -270,7 +268,6 @@ __OUT__
 
 )
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" -d 'directory not found (with unset CDPATH, -L)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -282,7 +279,6 @@ __IN__
 $ORIGPWD
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" -d 'directory not found (with unset CDPATH, -P)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -310,7 +306,6 @@ test_O -d -e n 'non-existing file in operand component (-P)'
 cd -P ./_no_such_file_/../dev
 __IN__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'target pathname is canonicalized (-L)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -322,7 +317,6 @@ PWD=$ORIGPWD/dev
 $ORIGPWD/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'symbolic links are resolved (in operand, -P)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -334,7 +328,6 @@ PWD=$ORIGPWD/cdpath2/dev
 $ORIGPWD/cdpath2/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'symbolic links are resolved (in old PWD, -P)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -347,7 +340,6 @@ PWD=$ORIGPWD/cdpath2/dev
 $ORIGPWD/cdpath2/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'default option is -L' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -359,7 +351,6 @@ PWD=$ORIGPWD/dev
 $ORIGPWD/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'the last option wins (-L)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -371,7 +362,6 @@ PWD=$ORIGPWD/dev
 $ORIGPWD/dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'the last option wins (-P)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
@@ -421,7 +411,6 @@ __IN__
 /dev
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 testcase "$LINENO" 'OLDPWD is set to old PWD (-L)' \
     3<<\__IN__ 5<&- 4<<__OUT__
 unset CDPATH
