@@ -178,6 +178,11 @@ fn tilde_expansion() {
 }
 
 #[test]
+fn unset_builtin() {
+    run("unset-p.sh")
+}
+
+#[test]
 fn until_loop() {
     run("until-p.sh")
 }

@@ -94,20 +94,21 @@ mod tests {
     use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
-    use yash_syntax::syntax;
+    use yash_syntax::syntax::FullCompoundCommand;
+    use yash_syntax::syntax::SimpleCommand;
 
     #[test]
     fn simple_command_returns_exit_status_from_function() {
-        use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ return -n 13; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ return -n 13; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "foo".parse().unwrap();
+
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(13));
@@ -115,20 +116,19 @@ mod tests {
 
     #[test]
     fn simple_command_applies_redirections_to_function() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ echo ok; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "foo >/tmp/file".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ echo ok; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "foo >/tmp/file".parse().unwrap();
 
+        command.execute(&mut env).now_or_never().unwrap();
         let file = state.borrow().file_system.get("/tmp/file").unwrap();
         let file = file.borrow();
         assert_matches!(&file.body, FileBody::Regular { content, .. } => {
@@ -138,18 +138,17 @@ mod tests {
 
     #[test]
     fn simple_command_skips_running_function_on_redirection_error() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ echo ok; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "a=v foo </no/such/file".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ echo ok; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "a=v foo </no/such/file".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
@@ -160,17 +159,17 @@ mod tests {
 
     #[test]
     fn function_call_consumes_return_without_exit_status() {
-        use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ return; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
+        let function = Function::new(
+            "foo",
+            "{ return; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
         env.exit_status = ExitStatus(17);
-        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let command: SimpleCommand = "foo".parse().unwrap();
+
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(17));
@@ -178,16 +177,16 @@ mod tests {
 
     #[test]
     fn function_call_consumes_return_with_exit_status() {
-        use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("return", return_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ return 26; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ return 26; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "foo".parse().unwrap();
+
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_eq!(env.exit_status, ExitStatus(26));
@@ -195,18 +194,18 @@ mod tests {
 
     #[test]
     fn simple_command_passes_arguments_to_function() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ echo $1-$2-$3; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "foo bar baz".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ echo $1-$2-$3; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "foo bar baz".parse().unwrap();
+
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Continue(()));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "bar-baz-\n"));
@@ -214,19 +213,21 @@ mod tests {
 
     #[test]
     fn simple_command_creates_temporary_context_executing_function() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.builtins.insert("local", local_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ local x=42; echo $x; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "foo".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ local x=42; echo $x; }"
+                .parse::<FullCompoundCommand>()
+                .unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "foo".parse().unwrap();
+
         command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n"));
@@ -234,18 +235,18 @@ mod tests {
 
     #[test]
     fn simple_command_performs_function_assignment_in_temporary_context() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ echo $x; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
-        let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
+        let function = Function::new(
+            "foo",
+            "{ echo $x; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
+        let command: SimpleCommand = "x=hello foo".parse().unwrap();
+
         command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(env.variables.get("x"), None);
         assert_stdout(&state, |stdout| assert_eq!(stdout, "hello\n"));
@@ -253,15 +254,14 @@ mod tests {
 
     #[test]
     fn function_fails_on_reassigning_to_read_only_variable() {
-        use yash_env::function::HashEntry;
         let mut env = Env::new_virtual();
         env.builtins.insert("echo", echo_builtin());
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("{ echo; }".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
+        let function = Function::new(
+            "foo",
+            "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
         env.variables
             .assign(
                 Scope::Global,
@@ -269,7 +269,8 @@ mod tests {
                 Variable::new("").make_read_only(Location::dummy("readonly")),
             )
             .unwrap();
-        let command: syntax::SimpleCommand = "x=hello foo".parse().unwrap();
+        let command: SimpleCommand = "x=hello foo".parse().unwrap();
+
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_matches!(result, Break(Divert::Interrupt(Some(exit_status))) => {
             assert_ne!(exit_status, ExitStatus::SUCCESS);
@@ -278,20 +279,21 @@ mod tests {
 
     #[test]
     fn xtrace_for_function() {
-        use yash_env::function::HashEntry;
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        env.functions.insert(HashEntry(Rc::new(Function {
-            name: "foo".to_string(),
-            body: Rc::new("for i in; do :; done".parse().unwrap()),
-            origin: Location::dummy("dummy"),
-            is_read_only: false,
-        })));
+        let function = Function::new(
+            "foo",
+            "for i in; do :; done"
+                .parse::<FullCompoundCommand>()
+                .unwrap(),
+            Location::dummy("dummy"),
+        );
+        env.functions.define(function).unwrap();
         env.options.set(yash_env::option::XTrace, On);
-        let command: syntax::SimpleCommand = "x=hello foo bar <>/dev/null".parse().unwrap();
-        command.execute(&mut env).now_or_never().unwrap();
+        let command: SimpleCommand = "x=hello foo bar <>/dev/null".parse().unwrap();
 
+        command.execute(&mut env).now_or_never().unwrap();
         assert_stderr(&state, |stderr| {
             assert_eq!(stderr, "x=hello foo bar 0<>/dev/null\nfor i in\n");
         });

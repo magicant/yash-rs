@@ -148,7 +148,7 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     }
 
     if let Some(function) = env.functions().get(name) {
-        return Some(function.0.clone().into());
+        return Some(Rc::clone(function).into());
     }
 
     if let Some(builtin) = builtin {
@@ -196,7 +196,6 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use std::collections::HashSet;
-    use yash_env::function::HashEntry as FunctionEntry;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -231,11 +230,11 @@ mod tests {
         }
     }
 
-    fn full_compound_command(s: &str) -> Rc<FullCompoundCommand> {
-        Rc::new(FullCompoundCommand {
+    fn full_compound_command(s: &str) -> FullCompoundCommand {
+        FullCompoundCommand {
             command: CompoundCommand::Grouping(s.parse().unwrap()),
             redirs: vec![],
-        })
+        }
     }
 
     #[test]
@@ -255,12 +254,8 @@ mod tests {
                 execute: |_, _| unreachable!(),
             },
         );
-        env.functions.insert(FunctionEntry::new(
-            "foo".to_string(),
-            full_compound_command(""),
-            Location::dummy(""),
-            false,
-        ));
+        let function = Function::new("foo", full_compound_command(""), Location::dummy(""));
+        env.functions.define(function).unwrap();
 
         let target = search(&mut env, "bar");
         assert!(target.is_none(), "target = {target:?}");
@@ -283,16 +278,15 @@ mod tests {
     #[test]
     fn function_is_found_if_not_hidden_by_special_builtin() {
         let mut env = DummyEnv::default();
-        let function = FunctionEntry::new(
-            "foo".to_string(),
+        let function = Rc::new(Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        );
-        env.functions.insert(function.clone());
+        ));
+        env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
-            assert_eq!(result, function.0);
+            assert_eq!(result, function);
         });
     }
 
@@ -304,12 +298,12 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.functions.insert(FunctionEntry::new(
-            "foo".to_string(),
+        let function = Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        ));
+        );
+        env.functions.define(function).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
             assert_eq!(result.r#type, builtin.r#type);
@@ -369,16 +363,15 @@ mod tests {
             },
         );
 
-        let function = FunctionEntry::new(
-            "foo".to_string(),
+        let function = Rc::new(Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        );
-        env.functions.insert(function.clone());
+        ));
+        env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
-            assert_eq!(result, function.0);
+            assert_eq!(result, function);
         });
     }
 
@@ -393,16 +386,15 @@ mod tests {
             },
         );
 
-        let function = FunctionEntry::new(
-            "foo".to_string(),
+        let function = Rc::new(Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        );
-        env.functions.insert(function.clone());
+        ));
+        env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
-            assert_eq!(result, function.0);
+            assert_eq!(result, function);
         });
     }
 
@@ -417,16 +409,15 @@ mod tests {
             },
         );
 
-        let function = FunctionEntry::new(
-            "foo".to_string(),
+        let function = Rc::new(Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        );
-        env.functions.insert(function.clone());
+        ));
+        env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
-            assert_eq!(result, function.0);
+            assert_eq!(result, function);
         });
     }
 
@@ -470,16 +461,15 @@ mod tests {
         env.path = Some(Variable::new("/bin").export());
         env.executables.insert("/bin/foo".to_string());
 
-        let function = FunctionEntry::new(
-            "foo".to_string(),
+        let function = Rc::new(Function::new(
+            "foo",
             full_compound_command("bar"),
             Location::dummy("location"),
-            false,
-        );
-        env.functions.insert(function.clone());
+        ));
+        env.functions.define(function.clone()).unwrap();
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Function(result)) => {
-            assert_eq!(result, function.0);
+            assert_eq!(result, function);
         });
     }
 

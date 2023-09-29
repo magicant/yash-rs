@@ -8,7 +8,6 @@ test_x -e 11 'exit status of empty command with command substitution'
 $(exit 11)
 __IN__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE 'command words are expanded before assignments and redirections'
 unset a
 a=$(echo A 3>|f1) 3>|f1 echo "$(test -f f1 || echo file does not exist $a)"
@@ -55,7 +54,6 @@ __IN__
 [A"B"C][A'B'C]['"C"']
 __OUT__
 
-: TODO Needs the unset built-in <<\__OUT__
 test_oE 'assignment is persistent for empty command'
 unset a b x
 a=A

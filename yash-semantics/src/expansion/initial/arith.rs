@@ -28,7 +28,7 @@ use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
-use yash_env::variable::ReadOnlyError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
@@ -144,7 +144,7 @@ struct UnsetVariable;
 /// It is used to reproduce a location contained in the error cause.
 #[must_use]
 fn convert_error_cause(
-    cause: yash_arith::ErrorCause<UnsetVariable, ReadOnlyError>,
+    cause: yash_arith::ErrorCause<UnsetVariable, AssignError>,
     source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
@@ -193,7 +193,7 @@ fn convert_error_cause(
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
             yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
-            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
+            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignError(e),
         },
     }
 }
@@ -206,7 +206,7 @@ struct VarEnv<'a> {
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
     type GetVariableError = UnsetVariable;
-    type AssignVariableError = ReadOnlyError;
+    type AssignVariableError = AssignError;
 
     #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Result<Option<&str>, UnsetVariable> {
@@ -227,7 +227,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
         name: &str,
         value: String,
         range: Range<usize>,
-    ) -> Result<(), ReadOnlyError> {
+    ) -> Result<(), AssignError> {
         let code = Rc::new(Code {
             value: self.expression.to_string().into(),
             start_line_number: 1.try_into().unwrap(),

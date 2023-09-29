@@ -19,7 +19,7 @@
 use super::Env;
 use crate::system::AtFlags;
 use crate::system::AT_FDCWD;
-use crate::variable::ReadOnlyError;
+use crate::variable::AssignError;
 use crate::variable::Scope::Global;
 use crate::variable::Value::Scalar;
 use crate::variable::Variable;
@@ -45,7 +45,7 @@ fn same_files(a: &FileStat, b: &FileStat) -> bool {
 pub enum PreparePwdError {
     /// Error assigning to the `$PWD` variable
     #[error(transparent)]
-    AssignError(#[from] ReadOnlyError),
+    AssignError(#[from] AssignError),
 
     /// Error obtaining the current working directory path
     #[error("cannot obtain the current working directory path: {0}")]

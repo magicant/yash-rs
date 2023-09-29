@@ -20,7 +20,7 @@ use super::Mode;
 use crate::common::BuiltinEnv;
 use std::path::Path;
 use std::path::PathBuf;
-use yash_env::variable::ReadOnlyError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
@@ -47,7 +47,7 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
     };
     match env.assign_variable(Global, "OLDPWD".to_string(), oldpwd) {
         Ok(_) => {}
-        Err(error) => handle_read_only_error(env, error).await,
+        Err(error) => handle_assign_error(env, error).await,
     }
 }
 
@@ -70,14 +70,14 @@ pub async fn set_pwd(env: &mut Env, path: PathBuf) {
     };
     match env.assign_variable(Global, "PWD".to_string(), pwd) {
         Ok(_) => {}
-        Err(error) => handle_read_only_error(env, error).await,
+        Err(error) => handle_assign_error(env, error).await,
     }
 }
 
 /// Prints a warning message for a read-only variable.
 ///
 /// The message is only a warning because it does not affect the exit status.
-async fn handle_read_only_error(env: &mut Env, error: ReadOnlyError) {
+async fn handle_assign_error(env: &mut Env, error: AssignError) {
     let builtin_name = env.stack.builtin_name();
     let message = Message {
         r#type: AnnotationType::Warning,

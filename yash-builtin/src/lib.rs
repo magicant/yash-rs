@@ -40,6 +40,7 @@ pub mod readonly;
 pub mod r#return;
 pub mod set;
 pub mod trap;
+pub mod unset;
 pub mod wait;
 
 #[doc(no_inline)]
@@ -135,6 +136,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(trap::main(env, args)),
+        },
+    ),
+    (
+        "unset",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(unset::main(env, args)),
         },
     ),
     (
