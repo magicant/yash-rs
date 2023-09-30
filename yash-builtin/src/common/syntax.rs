@@ -54,6 +54,7 @@ use thiserror::Error;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -241,11 +242,15 @@ impl Mode {
 
 /// Occurrence of an option
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct OptionOccurrence<'a> {
-    /// Specification for this option.
+    /// Specification for this option
     pub spec: &'a OptionSpec<'a>,
 
-    /// Argument to this option.
+    /// Location of the field containing this option
+    pub location: Location,
+
+    /// Argument to this option
     ///
     /// This value is always `None` for an option that does not take an argument.
     ///
@@ -358,11 +363,15 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
         };
         match spec.get_argument() {
             OptionArgumentSpec::None => {
-                let argument = None;
-                option_occurrences.push(OptionOccurrence { spec, argument });
+                option_occurrences.push(OptionOccurrence {
+                    spec,
+                    location: field.origin.clone(),
+                    argument: None,
+                });
             }
             OptionArgumentSpec::Required => {
                 let remainder_len = chars.as_str().len();
+                let location = field.origin.clone();
                 let argument = if remainder_len == 0 {
                     // The option argument is the next command-line argument.
                     arguments
@@ -375,8 +384,11 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                     field.value.drain(..prefix);
                     field
                 };
-                let argument = Some(argument);
-                option_occurrences.push(OptionOccurrence { spec, argument });
+                option_occurrences.push(OptionOccurrence {
+                    spec,
+                    location,
+                    argument: Some(argument),
+                });
                 break;
             }
         };
@@ -450,6 +462,8 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         }
     };
 
+    let location = field.origin.clone();
+
     let argument = match (spec.get_argument(), equal) {
         (OptionArgumentSpec::None, None) => None,
         (OptionArgumentSpec::None, Some(_)) => {
@@ -469,7 +483,11 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         }
     };
 
-    Ok(Some(OptionOccurrence { spec, argument }))
+    Ok(Some(OptionOccurrence {
+        spec,
+        location,
+        argument,
+    }))
 }
 
 /// Parses command-line arguments into options and operands.
@@ -568,12 +586,16 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-a"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["-a", "foo"]);
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-a"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, Field::dummies(["foo"]));
     }
 
@@ -624,7 +646,9 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('p'));
+        assert_eq!(options[0].location, Location::dummy("-pq"));
         assert_eq!(options[1].spec.get_short(), Some('q'));
+        assert_eq!(options[1].location, Location::dummy("-pq"));
         assert_eq!(operands, Field::dummies(["!"]));
 
         let arguments = Field::dummies(["-qpq"]);
@@ -683,9 +707,10 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-afoo"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "foo");
-            assert_eq!(*field.origin.code.value.borrow(), "-afoo");
+            assert_eq!(field.origin, Location::dummy("-afoo"));
         });
         assert_eq!(operands, []);
 
@@ -695,12 +720,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "1");
-            assert_eq!(*field.origin.code.value.borrow(), "-a1");
+            assert_eq!(field.origin, Location::dummy("-a1"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "2");
-            assert_eq!(*field.origin.code.value.borrow(), "-a2");
+            assert_eq!(field.origin, Location::dummy("-a2"));
         });
         assert_eq!(operands, Field::dummies(["3"]));
     }
@@ -717,7 +742,7 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "foo");
-            assert_eq!(*field.origin.code.value.borrow(), "foo");
+            assert_eq!(field.origin, Location::dummy("foo"));
         });
         assert_eq!(operands, []);
 
@@ -727,12 +752,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "1");
-            assert_eq!(*field.origin.code.value.borrow(), "1");
+            assert_eq!(field.origin, Location::dummy("1"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "2");
-            assert_eq!(*field.origin.code.value.borrow(), "2");
+            assert_eq!(field.origin, Location::dummy("2"));
         });
         assert_eq!(operands, Field::dummies(["3"]));
     }
@@ -761,7 +786,7 @@ mod tests {
         assert_eq!(options[2].spec.get_short(), Some('c'));
         assert_matches!(options[2].argument, Some(ref field) => {
             assert_eq!(field.value, "def");
-            assert_eq!(*field.origin.code.value.borrow(), "-abcdef");
+            assert_eq!(field.origin, Location::dummy("-abcdef"));
         });
         assert_eq!(operands, []);
     }
@@ -778,7 +803,7 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "");
+            assert_eq!(field.origin, Location::dummy(""));
         });
         assert_eq!(operands, []);
     }
@@ -809,6 +834,8 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["--option", "foo"]);
@@ -816,6 +843,8 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, Field::dummies(["foo"]));
     }
 
@@ -913,9 +942,10 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option="));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=");
+            assert_eq!(field.origin, Location::dummy("--option="));
         });
         assert_eq!(operands, []);
 
@@ -924,14 +954,16 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option=x"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "x");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=x");
+            assert_eq!(field.origin, Location::dummy("--option=x"));
         });
         assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_eq!(options[1].location, Location::dummy("--option=value"));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "value");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=value");
+            assert_eq!(field.origin, Location::dummy("--option=value"));
         });
         assert_eq!(operands, Field::dummies(["argument"]));
     }
@@ -947,9 +979,10 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "");
+            assert_eq!(field.origin, Location::dummy(""));
         });
         assert_eq!(operands, []);
 
@@ -958,14 +991,16 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "x");
-            assert_eq!(*field.origin.code.value.borrow(), "x");
+            assert_eq!(field.origin, Location::dummy("x"));
         });
         assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_eq!(options[1].location, Location::dummy("--option"));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "value");
-            assert_eq!(*field.origin.code.value.borrow(), "value");
+            assert_eq!(field.origin, Location::dummy("value"));
         });
         assert_eq!(operands, Field::dummies(["argument"]));
     }
@@ -983,12 +1018,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "argument");
-            assert_eq!(*field.origin.code.value.borrow(), "argument");
+            assert_eq!(field.origin, Location::dummy("argument"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "--");
-            assert_eq!(*field.origin.code.value.borrow(), "--");
+            assert_eq!(field.origin, Location::dummy("--"));
         });
         assert_eq!(operands, Field::dummies(["operand"]));
     }
