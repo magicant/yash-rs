@@ -1244,8 +1244,7 @@ impl AsyncTime {
     }
 
     fn gc(&mut self) {
-        // TODO Need BinaryHeap::retain
-        // self.timeouts.retain(|t| t.waker.strong_count() > 0);
+        self.timeouts.retain(|t| t.0.waker.strong_count() > 0);
     }
 }
 
