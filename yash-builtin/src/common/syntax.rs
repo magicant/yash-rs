@@ -25,6 +25,19 @@
 //!
 //! [POSIX Utility Syntax Guidelines]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html#tag_12_02
 //!
+//! # Usage
+//!
+//! To parse arguments, first create a list of [option specs](OptionSpec). Each
+//! option spec describes a single possible option. Then call
+//! [`parse_arguments`] with the option specs and the list of arguments to
+//! parse. The function returns a pair of [option occurrences](OptionOccurrence)
+//! and operands. In case of an error, the function returns a [`ParseError`].
+//!
+//! [`ConflictingOptionError`] is a helper object for constructing an error
+//! message from a list of conflicting option occurrences. You need to
+//! instantiate this object for yourself as this module does not provide a
+//! function for detecting conflicting options.
+//!
 //! # Example
 //!
 //! ```
@@ -54,6 +67,7 @@ use thiserror::Error;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
+use yash_syntax::source::Location;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
@@ -157,6 +171,26 @@ impl OptionSpec<'_> {
     }
 }
 
+/// Returns the option name like `-f` or `--foo`.
+///
+/// If the spec has both short and long names, the result is like `-f/--foo`.
+/// If the spec has neither of them, the result is `?`.
+impl std::fmt::Display for OptionSpec<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(short) = self.short {
+            write!(f, "-{}", short)?;
+            if let Some(long) = self.long {
+                write!(f, "/--{}", long)?;
+            }
+            Ok(())
+        } else if let Some(long) = self.long {
+            write!(f, "--{}", long)
+        } else {
+            write!(f, "?")
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LongMatch {
     None,
@@ -241,11 +275,15 @@ impl Mode {
 
 /// Occurrence of an option
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct OptionOccurrence<'a> {
-    /// Specification for this option.
+    /// Specification for this option
     pub spec: &'a OptionSpec<'a>,
 
-    /// Argument to this option.
+    /// Location of the field containing this option
+    pub location: Location,
+
+    /// Argument to this option
     ///
     /// This value is always `None` for an option that does not take an argument.
     ///
@@ -259,7 +297,7 @@ pub struct OptionOccurrence<'a> {
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
-pub enum Error<'a> {
+pub enum ParseError<'a> {
     /// Short option that is not defined in the option specs
     #[error("unknown option {0:?}")]
     UnknownShortOption(char, Field),
@@ -295,10 +333,10 @@ fn long_option_name(field: &Field) -> &str {
     }
 }
 
-impl Error<'_> {
+impl ParseError<'_> {
     /// Returns a reference to the field in which the error occurred.
     pub fn field(&self) -> &Field {
-        use Error::*;
+        use ParseError::*;
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
@@ -310,7 +348,7 @@ impl Error<'_> {
     }
 }
 
-impl MessageBase for Error<'_> {
+impl MessageBase for ParseError<'_> {
     fn message_title(&self) -> std::borrow::Cow<str> {
         self.to_string().into()
     }
@@ -337,7 +375,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
-) -> Result<bool, Error<'a>> {
+) -> Result<bool, ParseError<'a>> {
     fn starts_with_single_hyphen(field: &Field) -> bool {
         let mut chars = field.value.chars();
         chars.next() == Some('-') && !matches!(chars.next(), None | Some('-'))
@@ -353,21 +391,25 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
 
     while let Some(c) = chars.next() {
         let spec = match option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
-            None => return Err(Error::UnknownShortOption(c, field)),
+            None => return Err(ParseError::UnknownShortOption(c, field)),
             Some(spec) => spec,
         };
         match spec.get_argument() {
             OptionArgumentSpec::None => {
-                let argument = None;
-                option_occurrences.push(OptionOccurrence { spec, argument });
+                option_occurrences.push(OptionOccurrence {
+                    spec,
+                    location: field.origin.clone(),
+                    argument: None,
+                });
             }
             OptionArgumentSpec::Required => {
                 let remainder_len = chars.as_str().len();
+                let location = field.origin.clone();
                 let argument = if remainder_len == 0 {
                     // The option argument is the next command-line argument.
                     arguments
                         .next()
-                        .ok_or(Error::MissingOptionArgument(field, spec))?
+                        .ok_or(ParseError::MissingOptionArgument(field, spec))?
                 } else {
                     // The option argument is the rest of the current command-line argument.
                     let prefix = field.value.len() - remainder_len;
@@ -375,8 +417,11 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                     field.value.drain(..prefix);
                     field
                 };
-                let argument = Some(argument);
-                option_occurrences.push(OptionOccurrence { spec, argument });
+                option_occurrences.push(OptionOccurrence {
+                    spec,
+                    location,
+                    argument: Some(argument),
+                });
                 break;
             }
         };
@@ -418,7 +463,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
     arguments: &mut Peekable<I>,
-) -> Result<Option<OptionOccurrence<'a>>, Error<'a>> {
+) -> Result<Option<OptionOccurrence<'a>>, ParseError<'a>> {
     fn starts_with_double_hyphen(field: &Field) -> bool {
         match field.value.strip_prefix("--") {
             Some(body) => !body.is_empty(),
@@ -440,25 +485,27 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) if mode.accepts_long_options() => spec,
-        Ok(spec) => return Err(Error::UnsupportedLongOption(field, spec)),
+        Ok(spec) => return Err(ParseError::UnsupportedLongOption(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
-                Error::UnknownLongOption(field)
+                ParseError::UnknownLongOption(field)
             } else {
-                Error::AmbiguousLongOption(field, matched_specs)
+                ParseError::AmbiguousLongOption(field, matched_specs)
             })
         }
     };
 
+    let location = field.origin.clone();
+
     let argument = match (spec.get_argument(), equal) {
         (OptionArgumentSpec::None, None) => None,
         (OptionArgumentSpec::None, Some(_)) => {
-            return Err(Error::UnexpectedOptionArgument(field, spec))
+            return Err(ParseError::UnexpectedOptionArgument(field, spec))
         }
         (OptionArgumentSpec::Required, None) => {
             let argument = arguments.next();
             if argument.is_none() {
-                return Err(Error::MissingOptionArgument(field, spec));
+                return Err(ParseError::MissingOptionArgument(field, spec));
             }
             argument
         }
@@ -469,7 +516,11 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         }
     };
 
-    Ok(Some(OptionOccurrence { spec, argument }))
+    Ok(Some(OptionOccurrence {
+        spec,
+        location,
+        argument,
+    }))
 }
 
 /// Parses command-line arguments into options and operands.
@@ -481,7 +532,7 @@ pub fn parse_arguments<'a>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
     arguments: Vec<Field>,
-) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error<'a>> {
+) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), ParseError<'a>> {
     let mut arguments = arguments.into_iter().peekable();
 
     let mut option_occurrences = vec![];
@@ -500,6 +551,126 @@ pub fn parse_arguments<'a>(
 
     let operands = arguments.collect();
     Ok((option_occurrences, operands))
+}
+
+/// Error indicating that two or more options conflict with each other
+///
+/// This is a helper object for constructing an error message from a list of
+/// conflicting option occurrences. An instance of this type can be created
+/// using [`new`](Self::new) or [`pick_from_indexes`](Self::pick_from_indexes)
+/// and printed with
+/// [`print_error_message`](crate::common::print_error_message).
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("conflicting options")]
+pub struct ConflictingOptionError<'a> {
+    options: Vec<OptionOccurrence<'a>>,
+}
+
+impl<'a> ConflictingOptionError<'a> {
+    /// Creates a new `ConflictingOptionError` from a list of conflicting options.
+    ///
+    /// The vector should contain at least two elements, or the returned error
+    /// object may panic when formatted.
+    #[must_use]
+    pub fn new<T: Into<Vec<OptionOccurrence<'a>>>>(options: T) -> Self {
+        let options = options.into();
+        Self { options }
+    }
+
+    /// Creates a new `ConflictingOptionError` with conflicting options
+    /// extracted from a vector.
+    ///
+    /// This function retains only the options in the vector whose indexes are
+    /// specified in `indexes`. The other options are discarded.
+    ///
+    /// The `indexes` may be specified in any order as they are sorted in this
+    /// function.
+    ///
+    /// `indexes` should contain at least two elements, or the returned error
+    /// object may panic when formatted. This function panics immediately if
+    /// `indexes` contains a duplicate index.
+    ///
+    /// This function is useful for constructing a `ConflictingOptionError` from
+    /// the result of
+    /// [`parse_arguments`](crate::common::syntax::parse_arguments).
+    /// After examining the `OptionOccurrence` vector returned by the function,
+    /// the caller can pick the indexes of the conflicting options and pass them
+    /// to this function.
+    ///
+    /// For example, calling `ConflictingOptionError::pick_from_indexes(vec![a,
+    /// b, c, d, e], [3, 0])` is equivalent to `ConflictingOptionError::new([a,
+    /// d])`.
+    #[must_use]
+    pub fn pick_from_indexes<const N: usize>(
+        mut options: Vec<OptionOccurrence<'a>>,
+        mut indexes: [usize; N],
+    ) -> Self {
+        indexes.sort();
+
+        // Remove the options that are not picked.
+        let mut option_index = 0;
+        let mut index_index = 0;
+        options.retain(|_| {
+            if index_index >= N {
+                return false;
+            }
+            assert!(
+                option_index <= indexes[index_index],
+                "duplicate index {}",
+                indexes[index_index]
+            );
+            let pick = option_index == indexes[index_index];
+            option_index += 1;
+            if pick {
+                index_index += 1;
+            }
+            pick
+        });
+
+        Self { options }
+    }
+
+    /// Returns the list of conflicting options.
+    #[must_use]
+    pub fn options(&self) -> &[OptionOccurrence<'a>] {
+        &self.options
+    }
+}
+
+impl<'a> From<Vec<OptionOccurrence<'a>>> for ConflictingOptionError<'a> {
+    /// Creates a new `ConflictingOptionError` from a list of conflicting options.
+    ///
+    /// The vector should contain at least two elements, or the returned error
+    /// object may panic when formatted.
+    fn from(options: Vec<OptionOccurrence<'a>>) -> Self {
+        ConflictingOptionError { options }
+    }
+}
+
+impl<'a> From<ConflictingOptionError<'a>> for Vec<OptionOccurrence<'a>> {
+    fn from(error: ConflictingOptionError<'a>) -> Self {
+        error.options
+    }
+}
+
+impl MessageBase for ConflictingOptionError<'_> {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        self.to_string().into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        let label = format!("the {} option ...", &self.options[0].spec).into();
+        let location = &self.options[0].location;
+        Annotation::new(AnnotationType::Error, label, location)
+    }
+
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        results.extend(self.options[1..].iter().map(|option| {
+            let label = format!("... cannot be used with the {} option", &option.spec).into();
+            let location = &option.location;
+            Annotation::new(AnnotationType::Error, label, location)
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -568,12 +739,16 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-a"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["-a", "foo"]);
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-a"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, Field::dummies(["foo"]));
     }
 
@@ -624,7 +799,9 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('p'));
+        assert_eq!(options[0].location, Location::dummy("-pq"));
         assert_eq!(options[1].spec.get_short(), Some('q'));
+        assert_eq!(options[1].location, Location::dummy("-pq"));
         assert_eq!(operands, Field::dummies(["!"]));
 
         let arguments = Field::dummies(["-qpq"]);
@@ -683,9 +860,10 @@ mod tests {
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('a'));
+        assert_eq!(options[0].location, Location::dummy("-afoo"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "foo");
-            assert_eq!(*field.origin.code.value.borrow(), "-afoo");
+            assert_eq!(field.origin, Location::dummy("-afoo"));
         });
         assert_eq!(operands, []);
 
@@ -695,12 +873,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "1");
-            assert_eq!(*field.origin.code.value.borrow(), "-a1");
+            assert_eq!(field.origin, Location::dummy("-a1"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "2");
-            assert_eq!(*field.origin.code.value.borrow(), "-a2");
+            assert_eq!(field.origin, Location::dummy("-a2"));
         });
         assert_eq!(operands, Field::dummies(["3"]));
     }
@@ -717,7 +895,7 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "foo");
-            assert_eq!(*field.origin.code.value.borrow(), "foo");
+            assert_eq!(field.origin, Location::dummy("foo"));
         });
         assert_eq!(operands, []);
 
@@ -727,12 +905,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "1");
-            assert_eq!(*field.origin.code.value.borrow(), "1");
+            assert_eq!(field.origin, Location::dummy("1"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "2");
-            assert_eq!(*field.origin.code.value.borrow(), "2");
+            assert_eq!(field.origin, Location::dummy("2"));
         });
         assert_eq!(operands, Field::dummies(["3"]));
     }
@@ -761,7 +939,7 @@ mod tests {
         assert_eq!(options[2].spec.get_short(), Some('c'));
         assert_matches!(options[2].argument, Some(ref field) => {
             assert_eq!(field.value, "def");
-            assert_eq!(*field.origin.code.value.borrow(), "-abcdef");
+            assert_eq!(field.origin, Location::dummy("-abcdef"));
         });
         assert_eq!(operands, []);
     }
@@ -778,7 +956,7 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "");
+            assert_eq!(field.origin, Location::dummy(""));
         });
         assert_eq!(operands, []);
     }
@@ -809,6 +987,8 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, []);
 
         let arguments = Field::dummies(["--option", "foo"]);
@@ -816,6 +996,8 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
+        assert_eq!(options[0].argument, None);
         assert_eq!(operands, Field::dummies(["foo"]));
     }
 
@@ -913,9 +1095,10 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option="));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=");
+            assert_eq!(field.origin, Location::dummy("--option="));
         });
         assert_eq!(operands, []);
 
@@ -924,14 +1107,16 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option=x"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "x");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=x");
+            assert_eq!(field.origin, Location::dummy("--option=x"));
         });
         assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_eq!(options[1].location, Location::dummy("--option=value"));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "value");
-            assert_eq!(*field.origin.code.value.borrow(), "--option=value");
+            assert_eq!(field.origin, Location::dummy("--option=value"));
         });
         assert_eq!(operands, Field::dummies(["argument"]));
     }
@@ -947,9 +1132,10 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "");
-            assert_eq!(*field.origin.code.value.borrow(), "");
+            assert_eq!(field.origin, Location::dummy(""));
         });
         assert_eq!(operands, []);
 
@@ -958,14 +1144,16 @@ mod tests {
             parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
         assert_eq!(options.len(), 2, "options = {options:?}");
         assert_eq!(options[0].spec.get_long(), Some("option"));
+        assert_eq!(options[0].location, Location::dummy("--option"));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "x");
-            assert_eq!(*field.origin.code.value.borrow(), "x");
+            assert_eq!(field.origin, Location::dummy("x"));
         });
         assert_eq!(options[1].spec.get_long(), Some("option"));
+        assert_eq!(options[1].location, Location::dummy("--option"));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "value");
-            assert_eq!(*field.origin.code.value.borrow(), "value");
+            assert_eq!(field.origin, Location::dummy("value"));
         });
         assert_eq!(operands, Field::dummies(["argument"]));
     }
@@ -983,12 +1171,12 @@ mod tests {
         assert_eq!(options[0].spec.get_short(), Some('a'));
         assert_matches!(options[0].argument, Some(ref field) => {
             assert_eq!(field.value, "argument");
-            assert_eq!(*field.origin.code.value.borrow(), "argument");
+            assert_eq!(field.origin, Location::dummy("argument"));
         });
         assert_eq!(options[1].spec.get_short(), Some('a'));
         assert_matches!(options[1].argument, Some(ref field) => {
             assert_eq!(field.value, "--");
-            assert_eq!(*field.origin.code.value.borrow(), "--");
+            assert_eq!(field.origin, Location::dummy("--"));
         });
         assert_eq!(operands, Field::dummies(["operand"]));
     }
@@ -1003,14 +1191,14 @@ mod tests {
 
         let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
         });
         assert_eq!(error.to_string(), "unknown option 'x'");
 
         let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
         });
         assert_eq!(error.to_string(), "unknown option 'x'");
@@ -1022,14 +1210,14 @@ mod tests {
 
         let arguments = Field::dummies(["--two"]);
         let error = parse_arguments(&[], Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownLongOption(field) => {
+        assert_matches!(&error, ParseError::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two");
         });
         assert_eq!(error.to_string(), "unknown option \"--two\"");
 
         let arguments = Field::dummies(["--two=three"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownLongOption(field) => {
+        assert_matches!(&error, ParseError::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two=three");
         });
         assert_eq!(error.to_string(), "unknown option \"--two\"");
@@ -1042,7 +1230,7 @@ mod tests {
         let mode = *Mode::with_extensions().accept_long_options(false);
         let arguments = Field::dummies(["--option"]);
         let error = parse_arguments(specs, mode, arguments).unwrap_err();
-        assert_matches!(&error, &Error::UnsupportedLongOption(ref field, spec) => {
+        assert_matches!(&error, &ParseError::UnsupportedLongOption(ref field, spec) => {
             assert_eq!(field.value, "--option");
             assert_eq!(spec, &specs[0]);
         });
@@ -1059,7 +1247,7 @@ mod tests {
 
         let arguments = Field::dummies(["--m"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::AmbiguousLongOption(field, matched_specs) => {
+        assert_matches!(&error, ParseError::AmbiguousLongOption(field, matched_specs) => {
             assert_eq!(field.value, "--m");
             assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
         });
@@ -1076,7 +1264,7 @@ mod tests {
 
         let arguments = Field::dummies(["-a"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "-a");
             assert_eq!(spec, &specs[0]);
         });
@@ -1084,7 +1272,7 @@ mod tests {
 
         let arguments = Field::dummies(["-ba"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "-ba");
             assert_eq!(spec, &specs[0]);
         });
@@ -1101,7 +1289,7 @@ mod tests {
 
         let arguments = Field::dummies(["--fo"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--fo");
             assert_eq!(spec, &specs[0]);
         });
@@ -1118,7 +1306,7 @@ mod tests {
 
         let arguments = Field::dummies(["--bar=baz"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::UnexpectedOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::UnexpectedOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--bar=baz");
             assert_eq!(spec, &specs[1]);
         });
@@ -1126,5 +1314,91 @@ mod tests {
             error.to_string(),
             "option \"--bar=baz\" with an unexpected argument"
         );
+    }
+
+    const OPTION_SPEC_A: OptionSpec = OptionSpec::new().short('a');
+    const OPTION_SPEC_B: OptionSpec = OptionSpec::new().short('b');
+    const OPTION_SPEC_C: OptionSpec = OptionSpec::new().short('c');
+    const OPTION_SPEC_D: OptionSpec = OptionSpec::new().short('d');
+    const OPTION_SPEC_E: OptionSpec = OptionSpec::new().short('e');
+
+    fn dummy_options() -> Vec<OptionOccurrence<'static>> {
+        vec![
+            OptionOccurrence {
+                spec: &OPTION_SPEC_A,
+                location: Location::dummy("-a"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_B,
+                location: Location::dummy("-b"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_C,
+                location: Location::dummy("-c"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_D,
+                location: Location::dummy("-d"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_E,
+                location: Location::dummy("-e"),
+                argument: None,
+            },
+        ]
+    }
+
+    #[test]
+    fn pick_from_2_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [1, 3]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [b, d] => {
+            assert_eq!(b.spec, &OPTION_SPEC_B);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+        });
+    }
+
+    #[test]
+    fn pick_from_2_indexes_reversed() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [3, 1]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [b, d] => {
+            assert_eq!(b.spec, &OPTION_SPEC_B);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+        });
+    }
+
+    #[test]
+    fn pick_from_3_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [0, 2, 4]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [a, c, e] => {
+            assert_eq!(a.spec, &OPTION_SPEC_A);
+            assert_eq!(c.spec, &OPTION_SPEC_C);
+            assert_eq!(e.spec, &OPTION_SPEC_E);
+        });
+    }
+
+    #[test]
+    fn pick_from_4_indexes_shuffled() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [3, 0, 4, 2]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [a, c, d, e] => {
+            assert_eq!(a.spec, &OPTION_SPEC_A);
+            assert_eq!(c.spec, &OPTION_SPEC_C);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+            assert_eq!(e.spec, &OPTION_SPEC_E);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate index 1")]
+    fn pick_from_duplicate_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [1, 1]);
+        unreachable!("{result:?}");
     }
 }
