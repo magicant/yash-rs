@@ -545,7 +545,8 @@ pub fn parse_arguments<'a>(
 ///
 /// This is a helper object for constructing an error message from a list of
 /// conflicting option occurrences. An instance of this type can be created
-/// using [`new`](Self::new) and printed with
+/// using [`new`](Self::new) or [`pick_from_indexes`](Self::pick_from_indexes)
+/// and printed with
 /// [`print_error_message`](crate::common::print_error_message).
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("conflicting options")]
@@ -561,6 +562,59 @@ impl<'a> ConflictingOptionError<'a> {
     #[must_use]
     pub fn new<T: Into<Vec<OptionOccurrence<'a>>>>(options: T) -> Self {
         let options = options.into();
+        Self { options }
+    }
+
+    /// Creates a new `ConflictingOptionError` with conflicting options
+    /// extracted from a vector.
+    ///
+    /// This function retains only the options in the vector whose indexes are
+    /// specified in `indexes`. The other options are discarded.
+    ///
+    /// The `indexes` may be specified in any order as they are sorted in this
+    /// function.
+    ///
+    /// `indexes` should contain at least two elements, or the returned error
+    /// object may panic when formatted. This function panics immediately if
+    /// `indexes` contains a duplicate index.
+    ///
+    /// This function is useful for constructing a `ConflictingOptionError` from
+    /// the result of
+    /// [`parse_arguments`](crate::common::syntax::parse_arguments).
+    /// After examining the `OptionOccurrence` vector returned by the function,
+    /// the caller can pick the indexes of the conflicting options and pass them
+    /// to this function.
+    ///
+    /// For example, calling `ConflictingOptionError::pick_from_indexes(vec![a,
+    /// b, c, d, e], [3, 0])` is equivalent to `ConflictingOptionError::new([a,
+    /// d])`.
+    #[must_use]
+    pub fn pick_from_indexes<const N: usize>(
+        mut options: Vec<OptionOccurrence<'a>>,
+        mut indexes: [usize; N],
+    ) -> Self {
+        indexes.sort();
+
+        // Remove the options that are not picked.
+        let mut option_index = 0;
+        let mut index_index = 0;
+        options.retain(|_| {
+            if index_index >= N {
+                return false;
+            }
+            assert!(
+                option_index <= indexes[index_index],
+                "duplicate index {}",
+                indexes[index_index]
+            );
+            let pick = option_index == indexes[index_index];
+            option_index += 1;
+            if pick {
+                index_index += 1;
+            }
+            pick
+        });
+
         Self { options }
     }
 
@@ -1248,5 +1302,91 @@ mod tests {
             error.to_string(),
             "option \"--bar=baz\" with an unexpected argument"
         );
+    }
+
+    const OPTION_SPEC_A: OptionSpec = OptionSpec::new().short('a');
+    const OPTION_SPEC_B: OptionSpec = OptionSpec::new().short('b');
+    const OPTION_SPEC_C: OptionSpec = OptionSpec::new().short('c');
+    const OPTION_SPEC_D: OptionSpec = OptionSpec::new().short('d');
+    const OPTION_SPEC_E: OptionSpec = OptionSpec::new().short('e');
+
+    fn dummy_options() -> Vec<OptionOccurrence<'static>> {
+        vec![
+            OptionOccurrence {
+                spec: &OPTION_SPEC_A,
+                location: Location::dummy("-a"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_B,
+                location: Location::dummy("-b"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_C,
+                location: Location::dummy("-c"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_D,
+                location: Location::dummy("-d"),
+                argument: None,
+            },
+            OptionOccurrence {
+                spec: &OPTION_SPEC_E,
+                location: Location::dummy("-e"),
+                argument: None,
+            },
+        ]
+    }
+
+    #[test]
+    fn pick_from_2_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [1, 3]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [b, d] => {
+            assert_eq!(b.spec, &OPTION_SPEC_B);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+        });
+    }
+
+    #[test]
+    fn pick_from_2_indexes_reversed() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [3, 1]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [b, d] => {
+            assert_eq!(b.spec, &OPTION_SPEC_B);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+        });
+    }
+
+    #[test]
+    fn pick_from_3_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [0, 2, 4]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [a, c, e] => {
+            assert_eq!(a.spec, &OPTION_SPEC_A);
+            assert_eq!(c.spec, &OPTION_SPEC_C);
+            assert_eq!(e.spec, &OPTION_SPEC_E);
+        });
+    }
+
+    #[test]
+    fn pick_from_4_indexes_shuffled() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [3, 0, 4, 2]);
+        let options = Vec::from(result);
+        assert_matches!(options.as_slice(), [a, c, d, e] => {
+            assert_eq!(a.spec, &OPTION_SPEC_A);
+            assert_eq!(c.spec, &OPTION_SPEC_C);
+            assert_eq!(d.spec, &OPTION_SPEC_D);
+            assert_eq!(e.spec, &OPTION_SPEC_E);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate index 1")]
+    fn pick_from_duplicate_indexes() {
+        let result = ConflictingOptionError::pick_from_indexes(dummy_options(), [1, 1]);
+        unreachable!("{result:?}");
     }
 }

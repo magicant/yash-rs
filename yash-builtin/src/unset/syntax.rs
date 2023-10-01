@@ -18,7 +18,6 @@
 
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::ConflictingOptionError;
-use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use std::borrow::Cow;
 use thiserror::Error;
@@ -72,32 +71,25 @@ const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new().short('v').long("variables"),
 ];
 
-fn mode_for_option(option: &OptionOccurrence) -> Mode {
-    match option.spec.get_short() {
-        Some('f') => Mode::Functions,
-        Some('v') => Mode::Variables,
-        _ => unreachable!("{option:?}"),
-    }
-}
-
 /// Parses command line arguments for the unset built-in.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 
-    if let Some(f) = options.iter().find(|o| o.spec.get_short() == Some('f')) {
-        if let Some(v) = options.iter().find(|o| o.spec.get_short() == Some('v')) {
-            return Err(Error::ConflictingOption(ConflictingOptionError::new([
-                f.clone(),
-                v.clone(),
-            ])));
+    // Decide which to unset: variables or functions.
+    let f_option = options.iter().position(|o| o.spec.get_short() == Some('f'));
+    let v_option = options.iter().position(|o| o.spec.get_short() == Some('v'));
+    let mode = match (f_option, v_option) {
+        (None, None) => Mode::default(),
+        (None, Some(_)) => Mode::Variables,
+        (Some(_), None) => Mode::Functions,
+        (Some(f_pos), Some(v_pos)) => {
+            return Err(ConflictingOptionError::pick_from_indexes(options, [f_pos, v_pos]).into());
         }
-    }
+    };
 
-    Ok(Command {
-        mode: options.last().map(mode_for_option).unwrap_or_default(),
-        names: operands,
-    })
+    let names = operands;
+    Ok(Command { mode, names })
 }
 
 #[cfg(test)]
@@ -171,15 +163,14 @@ mod tests {
     fn v_and_f_option() {
         // Specifying both -v and -f is an error.
         let env = Env::new_virtual();
-        let args = Field::dummies(["-vf"]);
+        let args = Field::dummies(["-fv"]);
         let result = parse(&env, args.clone());
         assert_matches!(result, Err(Error::ConflictingOption(error)) => {
-            let mut short_options = error
+            let short_options = error
                 .options()
                 .iter()
                 .map(|o| o.spec.get_short())
                 .collect::<Vec<_>>();
-            short_options.sort();
             assert_eq!(short_options, [Some('f'), Some('v')], "{error:?}");
         });
     }
