@@ -158,6 +158,26 @@ impl OptionSpec<'_> {
     }
 }
 
+/// Returns the option name like `-f` or `--foo`.
+///
+/// If the spec has both short and long names, the result is like `-f/--foo`.
+/// If the spec has neither of them, the result is `?`.
+impl std::fmt::Display for OptionSpec<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(short) = self.short {
+            write!(f, "-{}", short)?;
+            if let Some(long) = self.long {
+                write!(f, "/--{}", long)?;
+            }
+            Ok(())
+        } else if let Some(long) = self.long {
+            write!(f, "--{}", long)
+        } else {
+            write!(f, "?")
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LongMatch {
     None,
@@ -261,6 +281,7 @@ pub struct OptionOccurrence<'a> {
     pub argument: Option<Field>,
 }
 
+// TODO Rename to ParseError
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
@@ -518,6 +539,72 @@ pub fn parse_arguments<'a>(
 
     let operands = arguments.collect();
     Ok((option_occurrences, operands))
+}
+
+/// Error indicating that two or more options conflict with each other
+///
+/// This is a helper object for constructing an error message from a list of
+/// conflicting option occurrences. An instance of this type can be created
+/// using [`new`](Self::new) and printed with
+/// [`print_error_message`](crate::common::print_error_message).
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("conflicting options")]
+pub struct ConflictingOptionError<'a> {
+    options: Vec<OptionOccurrence<'a>>,
+}
+
+impl<'a> ConflictingOptionError<'a> {
+    /// Creates a new `ConflictingOptionError` from a list of conflicting options.
+    ///
+    /// The vector should contain at least two elements, or the returned error
+    /// object may panic when formatted.
+    #[must_use]
+    pub fn new<T: Into<Vec<OptionOccurrence<'a>>>>(options: T) -> Self {
+        let options = options.into();
+        Self { options }
+    }
+
+    /// Returns the list of conflicting options.
+    #[must_use]
+    pub fn options(&self) -> &[OptionOccurrence<'a>] {
+        &self.options
+    }
+}
+
+impl<'a> From<Vec<OptionOccurrence<'a>>> for ConflictingOptionError<'a> {
+    /// Creates a new `ConflictingOptionError` from a list of conflicting options.
+    ///
+    /// The vector should contain at least two elements, or the returned error
+    /// object may panic when formatted.
+    fn from(options: Vec<OptionOccurrence<'a>>) -> Self {
+        ConflictingOptionError { options }
+    }
+}
+
+impl<'a> From<ConflictingOptionError<'a>> for Vec<OptionOccurrence<'a>> {
+    fn from(error: ConflictingOptionError<'a>) -> Self {
+        error.options
+    }
+}
+
+impl MessageBase for ConflictingOptionError<'_> {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        self.to_string().into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        let label = format!("the {} option ...", &self.options[0].spec).into();
+        let location = &self.options[0].location;
+        Annotation::new(AnnotationType::Error, label, location)
+    }
+
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        results.extend(self.options[1..].iter().map(|option| {
+            let label = format!("... cannot be used with the {} option", &option.spec).into();
+            let location = &option.location;
+            Annotation::new(AnnotationType::Error, label, location)
+        }))
+    }
 }
 
 #[cfg(test)]

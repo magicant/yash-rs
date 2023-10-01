@@ -17,6 +17,7 @@
 //! Parses the unset built-in command arguments.
 
 use crate::common::syntax::parse_arguments;
+use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use std::borrow::Cow;
@@ -36,6 +37,10 @@ pub enum Error {
     /// An error occurred in the common parser.
     #[error(transparent)]
     CommonError(#[from] crate::common::syntax::Error<'static>),
+
+    /// The `-f` and `-v` options are used together.
+    #[error(transparent)]
+    ConflictingOption(#[from] ConflictingOptionError<'static>),
     // TODO MissingOperand
 }
 
@@ -47,6 +52,14 @@ impl MessageBase for Error {
     fn main_annotation(&self) -> Annotation<'_> {
         match self {
             Error::CommonError(inner) => inner.main_annotation(),
+            Error::ConflictingOption(inner) => inner.main_annotation(),
+        }
+    }
+
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        match self {
+            Error::CommonError(inner) => inner.additional_annotations(results),
+            Error::ConflictingOption(inner) => inner.additional_annotations(results),
         }
     }
 }
@@ -72,6 +85,15 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 
+    if let Some(f) = options.iter().find(|o| o.spec.get_short() == Some('f')) {
+        if let Some(v) = options.iter().find(|o| o.spec.get_short() == Some('v')) {
+            return Err(Error::ConflictingOption(ConflictingOptionError::new([
+                f.clone(),
+                v.clone(),
+            ])));
+        }
+    }
+
     Ok(Command {
         mode: options.last().map(mode_for_option).unwrap_or_default(),
         names: operands,
@@ -81,6 +103,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn no_arguments_non_posix() {
@@ -147,7 +170,18 @@ mod tests {
     #[test]
     fn v_and_f_option() {
         // Specifying both -v and -f is an error.
-        // TODO Common argument parser should detect this.
+        let env = Env::new_virtual();
+        let args = Field::dummies(["-vf"]);
+        let result = parse(&env, args.clone());
+        assert_matches!(result, Err(Error::ConflictingOption(error)) => {
+            let mut short_options = error
+                .options()
+                .iter()
+                .map(|o| o.spec.get_short())
+                .collect::<Vec<_>>();
+            short_options.sort();
+            assert_eq!(short_options, [Some('f'), Some('v')], "{error:?}");
+        });
     }
 
     #[test]

@@ -20,7 +20,8 @@
 //! built-in implementations. These traits abstract the environment and reduce
 //! dependency on it.
 //!
-//! This module contains some utility functions for printing error messages.
+//! This module contains some utility functions for printing error messages and
+//! a submodule for [parsing command line arguments](syntax).
 
 use async_trait::async_trait;
 use std::ops::ControlFlow::{self, Break, Continue};
