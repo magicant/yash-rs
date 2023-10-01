@@ -203,7 +203,6 @@ impl FunctionSet {
             entries: &mut HashSet<HashEntry>,
             new: Rc<Function>,
         ) -> Result<Option<Rc<Function>>, DefineError> {
-            // TODO Use Option::is_some_and
             match entries.get(new.name.as_str()) {
                 Some(existing) if existing.0.is_read_only() => Err(DefineError {
                     existing: Rc::clone(&existing.0),
@@ -221,7 +220,6 @@ impl FunctionSet {
     /// This function returns the previously defined function if it exists.
     /// However, if the function is read-only, `UnsetError` is returned.
     pub fn unset(&mut self, name: &str) -> Result<Option<Rc<Function>>, UnsetError> {
-        // TODO Use Option::is_some_and
         match self.entries.get(name) {
             Some(entry) if entry.0.is_read_only() => Err(UnsetError {
                 existing: Rc::clone(&entry.0),
