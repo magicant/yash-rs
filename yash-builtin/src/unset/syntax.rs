@@ -35,7 +35,7 @@ use super::Mode;
 pub enum Error {
     /// An error occurred in the common parser.
     #[error(transparent)]
-    CommonError(#[from] crate::common::syntax::Error<'static>),
+    CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
     /// The `-f` and `-v` options are used together.
     #[error(transparent)]

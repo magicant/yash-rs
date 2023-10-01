@@ -25,6 +25,19 @@
 //!
 //! [POSIX Utility Syntax Guidelines]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html#tag_12_02
 //!
+//! # Usage
+//!
+//! To parse arguments, first create a list of [option specs](OptionSpec). Each
+//! option spec describes a single possible option. Then call
+//! [`parse_arguments`] with the option specs and the list of arguments to
+//! parse. The function returns a pair of [option occurrences](OptionOccurrence)
+//! and operands. In case of an error, the function returns a [`ParseError`].
+//!
+//! [`ConflictingOptionError`] is a helper object for constructing an error
+//! message from a list of conflicting option occurrences. You need to
+//! instantiate this object for yourself as this module does not provide a
+//! function for detecting conflicting options.
+//!
 //! # Example
 //!
 //! ```
@@ -281,11 +294,10 @@ pub struct OptionOccurrence<'a> {
     pub argument: Option<Field>,
 }
 
-// TODO Rename to ParseError
 /// Error in command line parsing
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
-pub enum Error<'a> {
+pub enum ParseError<'a> {
     /// Short option that is not defined in the option specs
     #[error("unknown option {0:?}")]
     UnknownShortOption(char, Field),
@@ -321,10 +333,10 @@ fn long_option_name(field: &Field) -> &str {
     }
 }
 
-impl Error<'_> {
+impl ParseError<'_> {
     /// Returns a reference to the field in which the error occurred.
     pub fn field(&self) -> &Field {
-        use Error::*;
+        use ParseError::*;
         match self {
             UnknownShortOption(_char, field) => field,
             UnknownLongOption(field) => field,
@@ -336,7 +348,7 @@ impl Error<'_> {
     }
 }
 
-impl MessageBase for Error<'_> {
+impl MessageBase for ParseError<'_> {
     fn message_title(&self) -> std::borrow::Cow<str> {
         self.to_string().into()
     }
@@ -363,7 +375,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     arguments: &mut Peekable<I>,
     option_occurrences: &mut Vec<OptionOccurrence<'a>>,
-) -> Result<bool, Error<'a>> {
+) -> Result<bool, ParseError<'a>> {
     fn starts_with_single_hyphen(field: &Field) -> bool {
         let mut chars = field.value.chars();
         chars.next() == Some('-') && !matches!(chars.next(), None | Some('-'))
@@ -379,7 +391,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
 
     while let Some(c) = chars.next() {
         let spec = match option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
-            None => return Err(Error::UnknownShortOption(c, field)),
+            None => return Err(ParseError::UnknownShortOption(c, field)),
             Some(spec) => spec,
         };
         match spec.get_argument() {
@@ -397,7 +409,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                     // The option argument is the next command-line argument.
                     arguments
                         .next()
-                        .ok_or(Error::MissingOptionArgument(field, spec))?
+                        .ok_or(ParseError::MissingOptionArgument(field, spec))?
                 } else {
                     // The option argument is the rest of the current command-line argument.
                     let prefix = field.value.len() - remainder_len;
@@ -451,7 +463,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
     arguments: &mut Peekable<I>,
-) -> Result<Option<OptionOccurrence<'a>>, Error<'a>> {
+) -> Result<Option<OptionOccurrence<'a>>, ParseError<'a>> {
     fn starts_with_double_hyphen(field: &Field) -> bool {
         match field.value.strip_prefix("--") {
             Some(body) => !body.is_empty(),
@@ -473,12 +485,12 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 
     let spec = match long_match(option_specs, name) {
         Ok(spec) if mode.accepts_long_options() => spec,
-        Ok(spec) => return Err(Error::UnsupportedLongOption(field, spec)),
+        Ok(spec) => return Err(ParseError::UnsupportedLongOption(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
-                Error::UnknownLongOption(field)
+                ParseError::UnknownLongOption(field)
             } else {
-                Error::AmbiguousLongOption(field, matched_specs)
+                ParseError::AmbiguousLongOption(field, matched_specs)
             })
         }
     };
@@ -488,12 +500,12 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     let argument = match (spec.get_argument(), equal) {
         (OptionArgumentSpec::None, None) => None,
         (OptionArgumentSpec::None, Some(_)) => {
-            return Err(Error::UnexpectedOptionArgument(field, spec))
+            return Err(ParseError::UnexpectedOptionArgument(field, spec))
         }
         (OptionArgumentSpec::Required, None) => {
             let argument = arguments.next();
             if argument.is_none() {
-                return Err(Error::MissingOptionArgument(field, spec));
+                return Err(ParseError::MissingOptionArgument(field, spec));
             }
             argument
         }
@@ -520,7 +532,7 @@ pub fn parse_arguments<'a>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
     arguments: Vec<Field>,
-) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), Error<'a>> {
+) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), ParseError<'a>> {
     let mut arguments = arguments.into_iter().peekable();
 
     let mut option_occurrences = vec![];
@@ -1179,14 +1191,14 @@ mod tests {
 
         let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
         });
         assert_eq!(error.to_string(), "unknown option 'x'");
 
         let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownShortOption('x', field) => {
+        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
         });
         assert_eq!(error.to_string(), "unknown option 'x'");
@@ -1198,14 +1210,14 @@ mod tests {
 
         let arguments = Field::dummies(["--two"]);
         let error = parse_arguments(&[], Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownLongOption(field) => {
+        assert_matches!(&error, ParseError::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two");
         });
         assert_eq!(error.to_string(), "unknown option \"--two\"");
 
         let arguments = Field::dummies(["--two=three"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::UnknownLongOption(field) => {
+        assert_matches!(&error, ParseError::UnknownLongOption(field) => {
             assert_eq!(field.value, "--two=three");
         });
         assert_eq!(error.to_string(), "unknown option \"--two\"");
@@ -1218,7 +1230,7 @@ mod tests {
         let mode = *Mode::with_extensions().accept_long_options(false);
         let arguments = Field::dummies(["--option"]);
         let error = parse_arguments(specs, mode, arguments).unwrap_err();
-        assert_matches!(&error, &Error::UnsupportedLongOption(ref field, spec) => {
+        assert_matches!(&error, &ParseError::UnsupportedLongOption(ref field, spec) => {
             assert_eq!(field.value, "--option");
             assert_eq!(spec, &specs[0]);
         });
@@ -1235,7 +1247,7 @@ mod tests {
 
         let arguments = Field::dummies(["--m"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, Error::AmbiguousLongOption(field, matched_specs) => {
+        assert_matches!(&error, ParseError::AmbiguousLongOption(field, matched_specs) => {
             assert_eq!(field.value, "--m");
             assert_eq!(matched_specs.as_slice(), [&specs[0], &specs[1]]);
         });
@@ -1252,7 +1264,7 @@ mod tests {
 
         let arguments = Field::dummies(["-a"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "-a");
             assert_eq!(spec, &specs[0]);
         });
@@ -1260,7 +1272,7 @@ mod tests {
 
         let arguments = Field::dummies(["-ba"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "-ba");
             assert_eq!(spec, &specs[0]);
         });
@@ -1277,7 +1289,7 @@ mod tests {
 
         let arguments = Field::dummies(["--fo"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::MissingOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::MissingOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--fo");
             assert_eq!(spec, &specs[0]);
         });
@@ -1294,7 +1306,7 @@ mod tests {
 
         let arguments = Field::dummies(["--bar=baz"]);
         let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(&error, &Error::UnexpectedOptionArgument(ref field, spec) => {
+        assert_matches!(&error, &ParseError::UnexpectedOptionArgument(ref field, spec) => {
             assert_eq!(field.value, "--bar=baz");
             assert_eq!(spec, &specs[1]);
         });

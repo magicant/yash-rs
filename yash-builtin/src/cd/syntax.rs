@@ -36,7 +36,7 @@ use yash_syntax::source::pretty::MessageBase;
 pub enum Error {
     /// An error occurred in the common parser.
     #[error(transparent)]
-    CommonError(#[from] crate::common::syntax::Error<'static>),
+    CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
     /// The operand is an empty string.
     // TODO: EmptyOperand(Field),
