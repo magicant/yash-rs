@@ -22,11 +22,11 @@ cargo +1.58.0 test --package yash-arith -- $quiet
 
 update_workspace_member yash-builtin
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.67.0 test --package yash-builtin -- $quiet
+cargo +1.70.0 test --package yash-builtin -- $quiet
 
 update_workspace_member yash-env
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.67.0 test --package yash-env -- $quiet
+cargo +1.70.0 test --package yash-env -- $quiet
 
 update_workspace_member yash-fnmatch
 cargo +nightly update -Z direct-minimal-versions
@@ -38,13 +38,13 @@ cargo +1.56.0 test --package yash-quote -- $quiet
 
 update_workspace_member yash-semantics
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.67.0 test --package yash-semantics -- $quiet
+cargo +1.70.0 test --package yash-semantics -- $quiet
 
 update_workspace_member yash-syntax
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.67.0 test --package yash-syntax -- $quiet
-cargo +1.67.0 test --package yash-syntax --features annotate-snippets -- $quiet
+cargo +1.70.0 test --package yash-syntax -- $quiet
+cargo +1.70.0 test --package yash-syntax --features annotate-snippets -- $quiet
 
 update_workspace_member yash
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.67.0 test --package yash -- $quiet
+cargo +1.70.0 test --package yash -- $quiet
