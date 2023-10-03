@@ -496,7 +496,9 @@ async fn perform(
             (fd, location, exit_status)
         }
         RedirBody::HereDoc(here_doc) => {
-            let (content, exit_status) = expand_text(env, &here_doc.content.borrow()).await?;
+            let content_ref = here_doc.content.get();
+            let content = content_ref.map(Cow::Borrowed).unwrap_or_default();
+            let (content, exit_status) = expand_text(env, &content).await?;
             trace_here_doc(xtrace, target_fd, here_doc, &content);
             let location = here_doc.delimiter.location.clone();
             match here_doc::open_fd(env, content).await {
@@ -668,6 +670,7 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::Env;
     use yash_env::VirtualSystem;
+    use yash_syntax::syntax::Text;
 
     #[test]
     fn basic_file_in_redirection() {
@@ -919,9 +922,10 @@ mod tests {
                 body: RedirBody::HereDoc(Rc::new(HereDoc {
                     delimiter: "-END".parse().unwrap(),
                     remove_tabs: false,
-                    content: RefCell::new(
-                        "$(echo foo)$(echo bar; return -n 42)\n".parse().unwrap(),
-                    ),
+                    content: "$(echo foo)$(echo bar; return -n 42)\n"
+                        .parse::<Text>()
+                        .unwrap()
+                        .into(),
                 })),
             };
             let result = env.perform_redir(&redir, None).await.unwrap();
@@ -962,7 +966,7 @@ mod tests {
             body: RedirBody::HereDoc(Rc::new(HereDoc {
                 delimiter: r"-\END".parse().unwrap(),
                 remove_tabs: false,
-                content: RefCell::new("foo\n".parse().unwrap()),
+                content: "foo\n".parse::<Text>().unwrap().into(),
             })),
         };
         env.perform_redir(&redir, Some(&mut xtrace))
@@ -975,7 +979,7 @@ mod tests {
             body: RedirBody::HereDoc(Rc::new(HereDoc {
                 delimiter: r"EOF".parse().unwrap(),
                 remove_tabs: false,
-                content: RefCell::new("bar${unset-}\n".parse().unwrap()),
+                content: "bar${unset-}\n".parse::<Text>().unwrap().into(),
             })),
         };
         env.perform_redir(&redir, Some(&mut xtrace))

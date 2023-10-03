@@ -307,7 +307,7 @@ mod tests {
         assert_matches!(cmd.redirs[0].body, RedirBody::HereDoc(ref here_doc) => {
             assert_eq!(here_doc.delimiter.to_string(), "END");
             assert_eq!(here_doc.remove_tabs, false);
-            assert_eq!(here_doc.content.borrow().to_string(), "foo\n");
+            assert_eq!(here_doc.content.get().unwrap().to_string(), "foo\n");
         });
     }
 

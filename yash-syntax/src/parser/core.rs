@@ -333,10 +333,9 @@ mod tests {
     use crate::alias::HashEntry;
     use crate::source::Location;
     use crate::source::Source;
-    use crate::syntax::Text;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::cell::RefCell;
+    use std::cell::OnceCell;
 
     #[test]
     fn parser_take_token_manual_successful_substitution() {
@@ -703,13 +702,13 @@ mod tests {
         let here_doc = Rc::new(HereDoc {
             delimiter,
             remove_tabs,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc));
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
         assert_eq!(here_doc.delimiter.to_string(), "END");
         assert_eq!(here_doc.remove_tabs, remove_tabs);
-        assert_eq!(here_doc.content.borrow().0, []);
+        assert_eq!(here_doc.content.get().unwrap().0, []);
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(location.code.start_line_number.get(), 1);
@@ -728,31 +727,31 @@ mod tests {
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
             remove_tabs: false,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc1));
         let here_doc2 = Rc::new(HereDoc {
             delimiter: delimiter2,
             remove_tabs: true,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc2));
         let here_doc3 = Rc::new(HereDoc {
             delimiter: delimiter3,
             remove_tabs: false,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc3));
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
         assert_eq!(here_doc1.delimiter.to_string(), "ONE");
         assert_eq!(here_doc1.remove_tabs, false);
-        assert_eq!(here_doc1.content.borrow().to_string(), "1\n");
+        assert_eq!(here_doc1.content.get().unwrap().to_string(), "1\n");
         assert_eq!(here_doc2.delimiter.to_string(), "TWO");
         assert_eq!(here_doc2.remove_tabs, true);
-        assert_eq!(here_doc2.content.borrow().to_string(), "");
+        assert_eq!(here_doc2.content.get().unwrap().to_string(), "");
         assert_eq!(here_doc3.delimiter.to_string(), "THREE");
         assert_eq!(here_doc3.remove_tabs, false);
-        assert_eq!(here_doc3.content.borrow().to_string(), "3\n");
+        assert_eq!(here_doc3.content.get().unwrap().to_string(), "3\n");
     }
 
     #[test]
@@ -766,23 +765,23 @@ mod tests {
         let here_doc1 = Rc::new(HereDoc {
             delimiter: delimiter1,
             remove_tabs: false,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc1));
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
         let here_doc2 = Rc::new(HereDoc {
             delimiter: delimiter2,
             remove_tabs: true,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         parser.memorize_unread_here_doc(Rc::clone(&here_doc2));
         parser.here_doc_contents().now_or_never().unwrap().unwrap();
         assert_eq!(here_doc1.delimiter.to_string(), "ONE");
         assert_eq!(here_doc1.remove_tabs, false);
-        assert_eq!(here_doc1.content.borrow().to_string(), "1\n");
+        assert_eq!(here_doc1.content.get().unwrap().to_string(), "1\n");
         assert_eq!(here_doc2.delimiter.to_string(), "TWO");
         assert_eq!(here_doc2.remove_tabs, true);
-        assert_eq!(here_doc2.content.borrow().to_string(), "2\n");
+        assert_eq!(here_doc2.content.get().unwrap().to_string(), "2\n");
     }
 
     #[test]

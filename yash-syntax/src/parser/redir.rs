@@ -28,9 +28,8 @@ use crate::syntax::HereDoc;
 use crate::syntax::Redir;
 use crate::syntax::RedirBody;
 use crate::syntax::RedirOp;
-use crate::syntax::Text;
 use crate::syntax::Word;
-use std::cell::RefCell;
+use std::cell::OnceCell;
 use std::rc::Rc;
 
 impl Parser<'_, '_> {
@@ -72,7 +71,7 @@ impl Parser<'_, '_> {
         let here_doc = Rc::new(HereDoc {
             delimiter,
             remove_tabs,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         });
         self.memorize_unread_here_doc(Rc::clone(&here_doc));
 
@@ -302,7 +301,7 @@ mod tests {
             .unwrap();
         assert_eq!(here_doc.delimiter.to_string(), "end");
         assert_eq!(here_doc.remove_tabs, false);
-        assert_eq!(here_doc.content.borrow().to_string(), "");
+        assert_eq!(here_doc.content.get().unwrap().to_string(), "");
     }
 
     #[test]
@@ -323,7 +322,7 @@ mod tests {
             .unwrap();
         assert_eq!(here_doc.delimiter.to_string(), "end");
         assert_eq!(here_doc.remove_tabs, true);
-        assert_eq!(here_doc.content.borrow().to_string(), "");
+        assert_eq!(here_doc.content.get().unwrap().to_string(), "");
     }
 
     #[test]

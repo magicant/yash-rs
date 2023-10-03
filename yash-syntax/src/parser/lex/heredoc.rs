@@ -69,7 +69,7 @@ impl Lexer<'_> {
 
         let (delimiter_string, literal) = here_doc.delimiter.unquote();
         // TODO Reject if the delimiter contains a newline
-        let mut content = here_doc.content.borrow_mut();
+        let mut content = Vec::new();
         loop {
             let (line_text, line_string) = if literal {
                 let line_string = self.line().await?;
@@ -96,12 +96,18 @@ impl Lexer<'_> {
                 0
             };
             if line_string[skip_count..] == delimiter_string {
-                return Ok(());
+                break;
             }
 
-            content.0.extend({ line_text }.0.drain(skip_count..));
-            content.0.push(Literal(NEWLINE));
+            content.extend({ line_text }.0.drain(skip_count..));
+            content.push(Literal(NEWLINE));
         }
+
+        here_doc
+            .content
+            .set(Text(content))
+            .expect("here-doc content must be read just once");
+        Ok(())
     }
 }
 
@@ -114,7 +120,7 @@ mod tests {
     use crate::syntax::TextUnit::*;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::cell::RefCell;
+    use std::cell::OnceCell;
 
     #[test]
     fn leading_tabs_test() {
@@ -143,7 +149,7 @@ mod tests {
         HereDoc {
             delimiter: delimiter.parse().unwrap(),
             remove_tabs,
-            content: RefCell::new(Text(Vec::new())),
+            content: OnceCell::new(),
         }
     }
 
@@ -159,7 +165,7 @@ mod tests {
             .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "END");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.borrow().0, []);
+        assert_eq!(heredoc.content.get().unwrap().0, []);
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "END\nX");
@@ -179,7 +185,7 @@ mod tests {
             .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "FOO");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.borrow().to_string(), "content\n");
+        assert_eq!(heredoc.content.get().unwrap().to_string(), "content\n");
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "content\nFOO\nX");
@@ -199,7 +205,10 @@ mod tests {
             .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, false);
-        assert_eq!(heredoc.content.borrow().to_string(), "foo\n\tBAR\n\nbaz\n");
+        assert_eq!(
+            heredoc.content.get().unwrap().to_string(),
+            "foo\n\tBAR\n\nbaz\n",
+        );
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "foo\n\tBAR\n\nbaz\nBAR\nX");
@@ -224,7 +233,7 @@ END
             .unwrap()
             .unwrap();
         assert_eq!(
-            heredoc.content.borrow().0,
+            heredoc.content.get().unwrap().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -258,7 +267,7 @@ END
             .unwrap()
             .unwrap();
         assert_eq!(
-            heredoc.content.borrow().0,
+            heredoc.content.get().unwrap().0,
             [
                 Literal('\\'),
                 Literal('a'),
@@ -292,7 +301,7 @@ END
             .unwrap();
         assert_eq!(heredoc.delimiter.to_string(), "BAR");
         assert_eq!(heredoc.remove_tabs, true);
-        assert_eq!(heredoc.content.borrow().to_string(), "foo\n");
+        assert_eq!(heredoc.content.get().unwrap().to_string(), "foo\n");
 
         let location = lexer.location().now_or_never().unwrap().unwrap();
         assert_eq!(*location.code.value.borrow(), "\t\t\tfoo\n\tBAR\n\n");
