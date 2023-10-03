@@ -76,7 +76,7 @@
 use crate::parser::lex::Operator;
 use crate::source::Location;
 use itertools::Itertools;
-use std::cell::RefCell;
+use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Write;
 use std::os::unix::io::RawFd;
@@ -534,7 +534,7 @@ impl MaybeLiteral for TextUnit {
 ///
 /// A text is a sequence of [text unit](TextUnit)s, which may contain some kinds
 /// of expansions.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Text(pub Vec<TextUnit>);
 
 impl Text {
@@ -846,11 +846,12 @@ pub struct HereDoc {
     /// each content line does not start with tabs as they are removed when
     /// parsed.
     ///
-    /// This value is wrapped in `RefCell` because the here-doc content is
+    /// This value is wrapped in `OnceCell` because the here-doc content is
     /// parsed separately from the here-doc operator. When the operator is
-    /// parsed, the `HereDoc` instance is created with an empty value. The value
-    /// is filled when the content is parsed later.
-    pub content: RefCell<Text>,
+    /// parsed, the `HereDoc` instance is created with an empty content. The
+    /// content is filled to the cell when it is parsed later. When accessing
+    /// the parsed content, you can safely unwrap the cell.
+    pub content: OnceCell<Text>,
 }
 
 impl fmt::Display for HereDoc {

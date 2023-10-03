@@ -260,9 +260,7 @@ impl Env {
     pub fn poll_signals(&mut self) -> Option<Rc<[Signal]>> {
         let system = self.system.clone();
 
-        let future = self.wait_for_signals();
-        // TODO Require Rust 1.68.0 and use std::pin::pin
-        futures_util::pin_mut!(future);
+        let mut future = std::pin::pin!(self.wait_for_signals());
 
         let mut context = Context::from_waker(noop_waker_ref());
         if let Poll::Ready(signals) = future.as_mut().poll(&mut context) {
