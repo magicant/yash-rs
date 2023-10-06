@@ -163,6 +163,11 @@ fn return_builtin() {
 }
 
 #[test]
+fn shift_builtin() {
+    run("shift-p.sh")
+}
+
+#[test]
 fn simple_command() {
     run("simple-p.sh")
 }

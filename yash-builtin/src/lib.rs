@@ -39,6 +39,7 @@ pub mod pwd;
 pub mod readonly;
 pub mod r#return;
 pub mod set;
+pub mod shift;
 pub mod trap;
 pub mod unset;
 pub mod wait;
@@ -129,6 +130,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(set::main(env, args)),
+        },
+    ),
+    (
+        "shift",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(shift::main(env, args)),
         },
     ),
     (
