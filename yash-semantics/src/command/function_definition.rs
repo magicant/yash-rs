@@ -24,6 +24,7 @@ use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::function::Function;
+use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
@@ -65,7 +66,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
         }
         Err(error) => {
             // TODO Use pretty::Message and annotate_snippet
-            env.print_error(&error.to_string()).await;
+            env.system.print_error(&error.to_string()).await;
             env.exit_status = ExitStatus::ERROR;
         }
     }

@@ -216,17 +216,6 @@ impl Env {
         let _ = self.prepare_pwd();
     }
 
-    /// Convenience function that prints the given error message.
-    ///
-    /// This function prints the `message` to the standard error of this
-    /// environment, ignoring any errors that may happen.
-    ///
-    /// No formatting takes place in this function. Use [`io::print_message`] or
-    /// [`io::print_error`] to format a message before printing.
-    pub async fn print_error(&mut self, message: &str) {
-        let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
-    }
-
     /// Waits for some signals to be caught in the current process.
     ///
     /// Returns an array of signals caught.

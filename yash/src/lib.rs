@@ -36,6 +36,7 @@ async fn print_version(env: &mut env::Env) -> i32 {
 }
 
 async fn parse_and_print(mut env: env::Env) -> i32 {
+    use env::io::Stderr;
     use env::option::Option::{Interactive, Monitor};
     use env::option::State::On;
     use env::variable::Value::Array;
@@ -53,7 +54,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         Ok(Parse::Run(run)) => run,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
             return ExitStatus::ERROR.0;
         }
     };
@@ -95,7 +96,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
             return ExitStatus::FAILURE.0;
         }
     };

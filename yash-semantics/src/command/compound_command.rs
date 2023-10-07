@@ -23,6 +23,7 @@ use crate::xtrace::XTrace;
 use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
+use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
@@ -40,7 +41,7 @@ async fn perform_redirs(
     let mut xtrace = XTrace::from_options(&env.options);
     let result = env.perform_redirs(redirs, xtrace.as_mut()).await;
     let xtrace = finish(env, xtrace).await;
-    env.print_error(&xtrace).await;
+    env.system.print_error(&xtrace).await;
     result
 }
 

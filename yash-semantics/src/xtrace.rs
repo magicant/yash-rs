@@ -36,6 +36,7 @@
 use crate::expansion::expand_text;
 use crate::Handle;
 use std::fmt::Write;
+use yash_env::io::Stderr;
 use yash_env::option::OptionSet;
 use yash_env::option::State;
 use yash_env::semantics::Field;
@@ -204,12 +205,12 @@ pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
     }
 }
 
-/// Convenience function for [finish]ing and [print](Env::print_error)ing an
+/// Convenience function for [finish]ing and [print](Stderr::print_error)ing an
 /// (optional) `XTrace`.
 pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
     async fn inner(env: &mut Env, xtrace: Option<XTrace>) {
         let s = finish(env, xtrace).await;
-        env.print_error(&s).await;
+        env.system.print_error(&s).await;
     }
     inner(env, xtrace.into()).await
 }
