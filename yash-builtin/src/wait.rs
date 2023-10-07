@@ -231,6 +231,7 @@ mod tests {
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::job::Job;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::ProcessState;
@@ -398,10 +399,10 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("wait"),
             is_special: false,
-        });
+        }));
         let args = Field::dummies(["abc"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -414,10 +415,10 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("wait"),
             is_special: false,
-        });
+        }));
         let args = Field::dummies(["0"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();

@@ -117,6 +117,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -128,10 +129,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
 
         set_oldpwd(&mut env, "/some/path".to_string())
             .now_or_never()
@@ -153,10 +154,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         env.assign_variable(Global, "OLDPWD".to_string(), Variable::new("/old/pwd"))
             .unwrap();
 
@@ -178,10 +179,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("cd"),
             is_special: false,
-        });
+        }));
         let read_only_location = Location::dummy("read-only");
         env.assign_variable(
             Global,
@@ -208,10 +209,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
 
         set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
@@ -233,10 +234,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         env.assign_variable(Global, "PWD".to_string(), Variable::new("/old/path"))
             .unwrap();
 
@@ -259,10 +260,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         let read_only_location = Location::dummy("read-only");
         env.assign_variable(
             Global,

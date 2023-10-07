@@ -240,7 +240,6 @@ mod tests {
     use yash_env::option::Option::*;
     use yash_env::option::OptionSet;
     use yash_env::option::State::*;
-    use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
     use yash_env::trap::Signal::SIGTSTP;
     use yash_env::variable::Scope;
@@ -377,7 +376,7 @@ xtrace           off
         let location = name.origin.clone();
         let is_special = true;
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin { name, is_special });
+        let mut env = env.push_frame(yash_env::stack::Builtin { name, is_special }.into());
         let args = Field::dummies(["a", "b", "z"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();

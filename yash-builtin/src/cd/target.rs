@@ -244,6 +244,7 @@ pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origi
 mod tests {
     use super::*;
     use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::variable::Scope;
     use yash_env::variable::Variable;
@@ -275,10 +276,10 @@ mod tests {
         };
         let arg0 = Field::dummy("cd");
         let location = arg0.origin.clone();
-        let env = env.push_frame(Frame::Builtin {
+        let env = env.push_frame(Frame::Builtin(Builtin {
             name: arg0,
             is_special: false,
-        });
+        }));
 
         let e = target(&env, &command, "").unwrap_err();
         assert_eq!(e, TargetError::UnsetHome { location });
@@ -293,10 +294,10 @@ mod tests {
         };
         let arg0 = Field::dummy("cd");
         let location = arg0.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: arg0,
             is_special: false,
-        });
+        }));
         env.assign_variable(Scope::Global, "HOME".to_string(), Variable::new(""))
             .unwrap();
 

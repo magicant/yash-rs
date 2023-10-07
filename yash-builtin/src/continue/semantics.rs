@@ -43,14 +43,15 @@ pub fn run(stack: &Stack, max_count: NonZeroUsize) -> Result {
 mod tests {
     use super::*;
     use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::stack::StackFrameGuard;
 
     fn push_continue_builtin(stack: &mut Stack) -> StackFrameGuard<'_> {
-        stack.push(Frame::Builtin {
+        stack.push(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        })
+        }))
     }
 
     #[test]

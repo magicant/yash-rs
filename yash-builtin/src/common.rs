@@ -69,8 +69,8 @@ impl BuiltinEnv for Stack {
     fn builtin_name(&self) -> &Field {
         self.iter()
             .filter_map(|frame| {
-                if let Frame::Builtin { name, .. } = frame {
-                    Some(name)
+                if let Frame::Builtin(builtin) = frame {
+                    Some(&builtin.name)
                 } else {
                     None
                 }
@@ -86,8 +86,8 @@ impl BuiltinEnv for Stack {
     fn is_executing_special_builtin(&self) -> bool {
         self.iter()
             .filter_map(|frame| {
-                if let &Frame::Builtin { is_special, .. } = frame {
-                    Some(is_special)
+                if let Frame::Builtin(builtin) = frame {
+                    Some(builtin.is_special)
                 } else {
                     None
                 }
@@ -364,12 +364,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::stack::Builtin;
 
     #[test]
     fn builtin_name_in_stack() {
         let name = Field::dummy("my built-in");
         let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
+        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
         // TODO Test with a stack containing a frame other than Frame::Builtin
         assert_eq!(stack.builtin_name().value, "my built-in");
     }
@@ -384,7 +385,7 @@ mod tests {
     fn is_executing_special_builtin_true_in_stack() {
         let name = Field::dummy("my built-in");
         let is_special = true;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
+        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
         assert!(stack.is_executing_special_builtin());
     }
 
@@ -392,7 +393,7 @@ mod tests {
     fn is_executing_special_builtin_false_in_stack() {
         let name = Field::dummy("my built-in");
         let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
+        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
         assert!(!stack.is_executing_special_builtin());
     }
 

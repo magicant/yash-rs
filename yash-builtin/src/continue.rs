@@ -127,6 +127,7 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
     use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::Env;
     use yash_env::VirtualSystem;
@@ -142,10 +143,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
@@ -165,10 +166,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
@@ -187,10 +188,10 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(
@@ -209,10 +210,10 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -232,10 +233,10 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["3"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -256,10 +257,10 @@ mod tests {
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["5"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -277,10 +278,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["0"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -303,10 +304,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["999999999999999999999999999999"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -324,10 +325,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1", "1"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();
@@ -347,10 +348,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let mut env = env.push_frame(Frame::Loop);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("continue"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["--", "1"]);
 
         let result = main(&mut env, args).now_or_never().unwrap();

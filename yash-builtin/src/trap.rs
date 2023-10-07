@@ -99,6 +99,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::semantics::Divert;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
     use yash_env::trap::Signal;
@@ -200,10 +201,10 @@ mod tests {
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["echo", "INT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
 

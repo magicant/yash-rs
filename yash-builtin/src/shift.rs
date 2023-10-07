@@ -153,6 +153,7 @@ mod tests {
     use std::vec;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -160,10 +161,10 @@ mod tests {
     #[test]
     fn shifting_without_operand() {
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -193,10 +194,10 @@ mod tests {
     #[test]
     fn shifting_with_operand() {
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value =
             Some(Value::array(["1", "2", "3", "4", "5", "6", "7"]));
 
@@ -230,10 +231,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result = Result::with_exit_status_and_divert(
@@ -254,10 +255,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
 
         let args = Field::dummies(["4"]);
@@ -281,10 +282,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         // TODO Enable POSIX mode
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1.5"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
@@ -304,10 +305,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1", "2"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();

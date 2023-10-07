@@ -232,6 +232,7 @@ mod tests {
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
@@ -401,10 +402,10 @@ mod tests {
         env.jobs.add(Job::new(Pid::from_raw(2)));
 
         let args = Field::dummies(["%2"]);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -428,10 +429,10 @@ mod tests {
         env.jobs.add(Job::new(Pid::from_raw(100)));
 
         let args = Field::dummies(["%?first", "%echo"]);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -451,10 +452,10 @@ mod tests {
         job.name = "exit 0".to_string();
         let i10 = env.jobs.add(job);
 
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
@@ -488,10 +489,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let i72 = env.jobs.add(Job::new(Pid::from_raw(72)));
 
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert!(env.jobs[i72].status_changed);
