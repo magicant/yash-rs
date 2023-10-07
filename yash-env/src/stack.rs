@@ -155,6 +155,15 @@ impl Stack {
             .take(max_count)
             .count()
     }
+
+    /// Returns the innermost built-in in the stack, if any.
+    #[must_use]
+    pub fn current_builtin(&self) -> Option<&Builtin> {
+        self.inner.iter().rev().find_map(|frame| match frame {
+            Frame::Builtin(builtin) => Some(builtin),
+            _ => None,
+        })
+    }
 }
 
 /// When the guard is dropped, the stack frame that was pushed when creating the
@@ -302,5 +311,28 @@ mod tests {
         assert_eq!(stack.loop_count(4), 3);
         assert_eq!(stack.loop_count(3), 3);
         assert_eq!(stack.loop_count(2), 2);
+    }
+
+    #[test]
+    fn current_builtin() {
+        let mut stack = Stack::default();
+        assert_eq!(stack.current_builtin(), None);
+
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.current_builtin(), None);
+
+        let builtin = Builtin {
+            name: Field::dummy(""),
+            is_special: false,
+        };
+        let mut stack = stack.push(Frame::Builtin(builtin.clone()));
+        assert_eq!(stack.current_builtin(), Some(&builtin));
+
+        let builtin = Builtin {
+            name: Field::dummy("foo"),
+            is_special: true,
+        };
+        let stack = stack.push(Frame::Builtin(builtin.clone()));
+        assert_eq!(stack.current_builtin(), Some(&builtin));
     }
 }

@@ -31,7 +31,6 @@ pub use yash_env::io::Stderr;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::stack::Frame;
 use yash_env::stack::Stack;
 use yash_env::system::Errno;
 use yash_env::SharedSystem;
@@ -67,16 +66,10 @@ impl BuiltinEnv for Stack {
     /// This function **panics** if `self` does not contain any `Frame::Builtin`
     /// item.
     fn builtin_name(&self) -> &Field {
-        self.iter()
-            .filter_map(|frame| {
-                if let Frame::Builtin(builtin) = frame {
-                    Some(&builtin.name)
-                } else {
-                    None
-                }
-            })
-            .next_back()
+        &self
+            .current_builtin()
             .expect("a Frame::Builtin must be in the stack")
+            .name
     }
 
     /// Returns whether the currently executing built-in is considered special.
@@ -84,16 +77,8 @@ impl BuiltinEnv for Stack {
     /// This function returns false if `self` does not contain any
     /// `Frame::Builtin` item.
     fn is_executing_special_builtin(&self) -> bool {
-        self.iter()
-            .filter_map(|frame| {
-                if let Frame::Builtin(builtin) = frame {
-                    Some(builtin.is_special)
-                } else {
-                    None
-                }
-            })
-            .next_back()
-            .unwrap_or(false)
+        self.current_builtin()
+            .map_or(false, |builtin| builtin.is_special)
     }
 
     fn builtin_error(&self) -> ControlFlow<Divert> {
@@ -365,6 +350,7 @@ where
 mod tests {
     use super::*;
     use yash_env::stack::Builtin;
+    use yash_env::stack::Frame;
 
     #[test]
     fn builtin_name_in_stack() {
