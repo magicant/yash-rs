@@ -185,20 +185,6 @@ impl AsStderr for yash_env::Env {
     }
 }
 
-impl AsStderr for String {
-    type Stderr = String;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self
-    }
-}
-
-impl<'a, 'b> AsStderr for (&'a mut String, &'b mut String) {
-    type Stderr = String;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self.1
-    }
-}
-
 /// Extension of [`Stdout`] that handles errors.
 #[async_trait(?Send)]
 pub trait Print {

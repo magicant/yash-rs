@@ -63,13 +63,6 @@ pub trait Stderr {
     }
 }
 
-#[async_trait(?Send)]
-impl Stderr for String {
-    async fn print_error(&mut self, message: &str) {
-        self.push_str(message)
-    }
-}
-
 /// Convenience function for printing an error message.
 ///
 /// This function converts the `error` into a [`Message`] which in turn is
