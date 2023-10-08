@@ -16,6 +16,9 @@
 
 //! Type definitions for I/O.
 
+#[cfg(doc)]
+use crate::system::SharedSystem;
+use crate::Env;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
 use async_trait::async_trait;
@@ -61,6 +64,20 @@ pub trait Stderr {
     fn should_print_error_in_color(&self) -> bool {
         false
     }
+}
+
+/// Convenience function for converting an error message into a string.
+///
+/// The returned string may contain ANSI color escape sequences if the given
+/// `env` allows it. The string will end with a newline.
+///
+/// To print the returned string to the standard error, you can use
+/// [`SharedSystem::print_error`].
+#[must_use]
+pub fn to_string(env: &Env, message: Message<'_>) -> String {
+    let mut s = Snippet::from(&message);
+    s.opt.color = env.system.should_print_error_in_color();
+    format!("{}\n", DisplayList::from(s))
 }
 
 /// Convenience function for printing an error message.

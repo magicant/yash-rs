@@ -33,6 +33,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Stack;
 use yash_env::system::Errno;
+use yash_env::Env;
 use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -242,6 +243,51 @@ where
     env.builtin_error()
 }
 
+/// Converts the given message into a string.
+///
+/// If the environment is currently executing a built-in
+/// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
+/// appended to the message. The message is then converted into a string using
+/// [`yash_env::io::to_string`].
+///
+/// This function returns an optional [`Divert`] value indicating whether the
+/// caller should divert the execution flow. If the environment is currently
+/// executing a special built-in, the divert value is `Divert::Interrupt(None)`;
+/// otherwise, `None`.
+///
+/// Note that this function does not print the message. Use
+/// [`SharedSystem::print_error`].
+#[must_use]
+pub fn builtin_message_and_divert<'e: 'm, 'm>(
+    env: &'e Env,
+    mut message: Message<'m>,
+) -> (String, yash_env::semantics::Result) {
+    let is_special_builtin;
+
+    if let Some(builtin) = env.stack.current_builtin() {
+        // Add an annotation indicating the built-in name
+        message.annotations.push(Annotation::new(
+            AnnotationType::Info,
+            format!("error occurred in the {} built-in", builtin.name.value).into(),
+            &builtin.name.origin,
+        ));
+        let source = &builtin.name.origin.code.source;
+        source.complement_annotations(&mut message.annotations);
+
+        is_special_builtin = builtin.is_special;
+    } else {
+        is_special_builtin = false;
+    }
+
+    let message = yash_env::io::to_string(env, message);
+    let divert = if is_special_builtin {
+        Break(Divert::Interrupt(None))
+    } else {
+        Continue(())
+    };
+    (message, divert)
+}
+
 /// Prints a failure message.
 ///
 /// This function uses [`print_message`] and returns a result with exit status
@@ -372,5 +418,44 @@ mod tests {
     #[test]
     fn is_executing_special_builtin_not_in_stack() {
         assert!(!Stack::from(vec![]).is_executing_special_builtin());
+    }
+
+    fn dummy_message() -> Message<'static> {
+        Message {
+            r#type: AnnotationType::Error,
+            title: "foo".into(),
+            annotations: vec![],
+        }
+    }
+
+    #[test]
+    fn divert_without_builtin() {
+        let env = Env::new_virtual();
+        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Continue(()));
+    }
+
+    #[test]
+    fn divert_with_special_builtin() {
+        let mut env = Env::new_virtual();
+        let env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("builtin"),
+            is_special: true,
+        }));
+
+        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Break(Divert::Interrupt(None)));
+    }
+
+    #[test]
+    fn divert_with_non_special_builtin() {
+        let mut env = Env::new_virtual();
+        let env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("builtin"),
+            is_special: false,
+        }));
+
+        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Continue(()));
     }
 }
