@@ -73,7 +73,7 @@
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
 use crate::common::print_error_message;
-use crate::common::print_simple_failure_message;
+use crate::common::print_failure_message;
 use crate::common::BuiltinEnv;
 use crate::common::Print;
 use yash_env::builtin::Result;
@@ -83,6 +83,7 @@ use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 
 /// Choice of the behavior of the built-in
 #[derive(Debug, Clone, Copy, Default, Eq, Hash, PartialEq)]
@@ -106,12 +107,13 @@ pub mod syntax;
 async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
     let builtin_name = &env.stack.builtin_name();
     let location = builtin_name.origin.clone();
-    print_simple_failure_message(
-        env,
-        "cannot compute the working directory path",
-        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
-    )
-    .await
+    let annotation = Annotation::new(AnnotationType::Error, error.to_string().into(), &location);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: "cannot compute the working directory path".into(),
+        annotations: vec![annotation],
+    };
+    print_failure_message(env, message).await
 }
 
 /// Entry point for executing the `pwd` built-in

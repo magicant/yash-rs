@@ -316,27 +316,6 @@ where
     yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, result)
 }
 
-/// Prints a simple failure message.
-///
-/// This function constructs a [`Message`] from the given title and annotation,
-/// and calls [`print_failure_message`].
-#[inline]
-pub async fn print_simple_failure_message<E>(
-    env: &mut E,
-    title: &str,
-    annotation: Annotation<'_>,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![annotation],
-    };
-    print_failure_message(env, message).await
-}
-
 /// Prints a simple error message.
 ///
 /// This function constructs a [`Message`] from the given title and annotation,
