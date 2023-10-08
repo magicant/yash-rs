@@ -307,9 +307,8 @@ where
 /// This function uses [`print_message`] and returns a result with exit status
 /// [`ExitStatus::ERROR`].
 #[inline]
-pub async fn print_error_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
+pub async fn print_error_message<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
     let result = print_message(env, message).await;
@@ -321,14 +320,11 @@ where
 /// This function constructs a [`Message`] from the given title and annotation,
 /// and calls [`print_error_message`].
 #[inline]
-pub async fn print_simple_error_message<E>(
-    env: &mut E,
+pub async fn print_simple_error_message(
+    env: &mut Env,
     title: &str,
     annotation: Annotation<'_>,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
+) -> yash_env::builtin::Result {
     let message = Message {
         r#type: AnnotationType::Error,
         title: title.into(),
@@ -341,14 +337,11 @@ where
 ///
 /// This function calls [`print_simple_error_message`] with a predefined title
 /// and an [`Annotation`] constructed with the given label and location.
-pub async fn syntax_error<E>(
-    env: &mut E,
+pub async fn syntax_error(
+    env: &mut Env,
     label: &str,
     location: &Location,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
+) -> yash_env::builtin::Result {
     print_simple_error_message(
         env,
         "command argument syntax error",
