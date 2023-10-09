@@ -350,6 +350,30 @@ pub async fn syntax_error(
     .await
 }
 
+/// Prints a text to the standard output.
+///
+/// This function prints the given text to the standard output, and returns
+/// the default result. In case of an error, an error message is printed to
+/// the standard error and the returned result has exit status
+/// [`ExitStatus::FAILURE`]. Any errors that occur while printing the error
+/// message are ignored.
+pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
+    match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
+        Ok(_) => Default::default(),
+
+        Err(errno) => {
+            let message = Message {
+                r#type: AnnotationType::Error,
+                title: format!("error printing results to stdout: {errno}").into(),
+                annotations: vec![],
+            };
+            let (message, divert) = builtin_message_and_divert(env, message);
+            env.system.print_error(&message).await;
+            yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
