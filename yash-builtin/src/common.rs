@@ -23,7 +23,6 @@
 //! This module contains some utility functions for printing error messages and
 //! a submodule for [parsing command line arguments](syntax).
 
-use async_trait::async_trait;
 use std::ops::ControlFlow::{self, Break, Continue};
 use yash_env::io::Fd;
 #[doc(no_inline)]
@@ -32,8 +31,8 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::stack::Stack;
-use yash_env::system::Errno;
 use yash_env::Env;
+#[cfg(doc)]
 use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -106,83 +105,6 @@ impl BuiltinEnv for yash_env::Env {
 
     fn builtin_error(&self) -> ControlFlow<Divert> {
         self.stack.builtin_error()
-    }
-}
-
-/// Part of the execution environment that allows printing to the standard
-/// output.
-#[async_trait(?Send)]
-pub trait Stdout {
-    /// Prints a string to the standard output.
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno>;
-}
-
-#[async_trait(?Send)]
-impl Stdout for SharedSystem {
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
-        self.write_all(Fd::STDOUT, text.as_bytes()).await.map(drop)
-    }
-}
-
-#[async_trait(?Send)]
-impl Stdout for String {
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
-        self.push_str(text);
-        Ok(())
-    }
-}
-
-/// Trait for types that can be cast to [`Stdout`].
-pub trait AsStdout {
-    type Stdout: Stdout;
-    fn as_stdout(&mut self) -> &mut Self::Stdout;
-}
-
-impl AsStdout for SharedSystem {
-    type Stdout = SharedSystem;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self
-    }
-}
-
-impl AsStdout for yash_env::Env {
-    type Stdout = SharedSystem;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        &mut self.system
-    }
-}
-
-impl AsStdout for String {
-    type Stdout = String;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self
-    }
-}
-
-impl<'a, 'b> AsStdout for (&'a mut String, &'b mut String) {
-    type Stdout = String;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self.0
-    }
-}
-
-/// Trait for types that can be cast to [`Stderr`].
-pub trait AsStderr {
-    type Stderr: Stderr;
-    fn as_stderr(&mut self) -> &mut Self::Stderr;
-}
-
-impl AsStderr for SharedSystem {
-    type Stderr = SharedSystem;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self
-    }
-}
-
-impl AsStderr for yash_env::Env {
-    type Stderr = SharedSystem;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        &mut self.system
     }
 }
 

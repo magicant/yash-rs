@@ -17,15 +17,14 @@
 //! Part of the cd built-in that prints the new working directory
 
 use super::target::Origin;
-use crate::common::AsStdout;
 use crate::common::BuiltinEnv;
-use crate::common::Stdout;
 use std::path::Path;
 use yash_env::system::Errno;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::syntax::Fd;
 
 impl Origin {
     /// Whether the built-in should print the target directory path.
@@ -45,8 +44,8 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
     }
 
     let line = format!("{}\n", path.display());
-    match env.as_stdout().try_print(&line).await {
-        Ok(()) => (),
+    match env.system.write_all(Fd::STDOUT, line.as_bytes()).await {
+        Ok(_) => (),
         Err(errno) => handle_print_error(env, errno).await,
     }
 }
