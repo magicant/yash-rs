@@ -75,27 +75,23 @@
 //! continue built-in implementation.
 
 use crate::common::print_error_message;
-use crate::common::print_simple_error_message;
-use crate::common::BuiltinEnv;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::Message;
 
 // pub mod display;
 pub mod semantics;
 pub mod syntax;
 
 async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    let builtin_name = &env.stack.builtin_name();
-    let location = builtin_name.origin.clone();
-    print_simple_error_message(
-        env,
-        "cannot break",
-        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
-    )
-    .await
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: format!("cannot break: {}", error).into(),
+        annotations: vec![],
+    };
+    print_error_message(env, message).await
 }
 
 /// Entry point for executing the `break` built-in
