@@ -21,7 +21,6 @@
 use crate::common::print_error_message;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
-use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
@@ -49,7 +48,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
         };
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
-    env.print(&output).await
+    crate::common::output(env, &output).await
 }
 
 /// Entry point for executing the `trap` built-in

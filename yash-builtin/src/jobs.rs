@@ -79,12 +79,12 @@
 //! A portable job ID must start with a `%`. If an operand does not have a
 //! leading `%`, the built-in assumes one silently, which is not portable.
 
+use crate::common::output;
 use crate::common::print_error_message;
 use crate::common::print_failure_message;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
-use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 use yash_env::job::id::parse;
@@ -203,7 +203,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         }
     }
 
-    let result = env.print(&accumulator.print).await;
+    let result = output(env, &accumulator.print).await;
 
     if result.exit_status().is_successful() {
         for index in accumulator.indices_reported {

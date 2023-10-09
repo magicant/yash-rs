@@ -72,10 +72,10 @@
 //!
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
+use crate::common::output;
 use crate::common::print_error_message;
 use crate::common::print_failure_message;
 use crate::common::BuiltinEnv;
-use crate::common::Print;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -122,7 +122,7 @@ async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Resul
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(mode) => match semantics::compute(env, mode) {
-            Ok(result) => env.print(&result).await,
+            Ok(result) => output(env, &result).await,
             Err(e) => print_semantics_error(env, &e).await,
         },
         Err(e) => print_error_message(env, &e).await,

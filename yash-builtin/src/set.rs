@@ -122,9 +122,9 @@
 //! Many (but not all) shells specially treat `+`, especially when it appears in
 //! place of an option-operand separator. This behavior is not portable either.
 
+use crate::common::output;
 use crate::common::print_error_message;
 use crate::common::BuiltinEnv;
-use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 #[cfg(doc)]
@@ -190,7 +190,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                     writeln!(print, "{}={}", name, value.quote()).unwrap();
                 }
             }
-            env.print(&print).await
+            output(env, &print).await
         }
 
         Ok(syntax::Parse::PrintOptionsHumanReadable) => {
@@ -199,7 +199,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                 let state = env.options.get(option);
                 writeln!(print, "{option:16} {state}").unwrap();
             }
-            env.print(&print).await
+            output(env, &print).await
         }
 
         Ok(syntax::Parse::PrintOptionsMachineReadable) => {
@@ -212,7 +212,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                 };
                 writeln!(print, "{skip}set {flag}o {option}").unwrap();
             }
-            env.print(&print).await
+            output(env, &print).await
         }
 
         Ok(syntax::Parse::Modify {

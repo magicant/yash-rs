@@ -186,33 +186,6 @@ impl AsStderr for yash_env::Env {
     }
 }
 
-/// Extension of [`Stdout`] that handles errors.
-#[async_trait(?Send)]
-pub trait Print {
-    /// Prints a string to the standard output.
-    ///
-    /// If an error occurs while printing, an error message is printed to the
-    /// standard error and a non-zero exit status is returned.
-    async fn print(&mut self, text: &str) -> yash_env::builtin::Result;
-}
-
-#[async_trait(?Send)]
-impl<T: BuiltinEnv + AsStdout + AsStderr> Print for T {
-    async fn print(&mut self, text: &str) -> yash_env::builtin::Result {
-        match self.as_stdout().try_print(text).await {
-            Ok(()) => yash_env::builtin::Result::default(),
-            Err(errno) => {
-                let message = Message {
-                    r#type: AnnotationType::Error,
-                    title: format!("error printing results to stdout: {errno}").into(),
-                    annotations: vec![],
-                };
-                print_failure_message(self, message).await
-            }
-        }
-    }
-}
-
 /// Prints a message.
 ///
 /// This function prepares a [`Message`] by inserting an annotation indicating
