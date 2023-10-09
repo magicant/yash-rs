@@ -263,12 +263,28 @@ pub fn builtin_message_and_divert<'e: 'm, 'm>(
 
 /// Prints a failure message.
 ///
-/// This function uses [`print_message`] and returns a result with exit status
-/// [`ExitStatus::FAILURE`].
+/// This function is only usable when the `message` argument does not contain
+/// any references borrowed from the environment. Otherwise, inline the body of
+/// this function into the caller:
+///
+/// ```
+/// # use futures_util::future::FutureExt;
+/// # use yash_builtin::common::builtin_message_and_divert;
+/// # use yash_builtin::common::Stderr;
+/// # use yash_env::builtin::Result;
+/// # use yash_env::semantics::ExitStatus;
+/// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # async {
+/// # let mut env = yash_env::Env::new_virtual();
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// let (message, divert) = builtin_message_and_divert(&env, message);
+/// env.system.print_error(&message).await;
+/// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+/// # }.now_or_never().unwrap();
+/// ```
 #[inline]
-pub async fn print_failure_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
+pub async fn print_failure_message<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
     let result = print_message(env, message).await;

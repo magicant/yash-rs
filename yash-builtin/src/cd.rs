@@ -214,7 +214,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
 
     match chdir::chdir(env, short_path) {
         Ok(()) => {}
-        Err(e) => return chdir::print_failure(env, command.operand.as_ref(), &path, &e).await,
+        Err(e) => return chdir::report_failure(env, command.operand.as_ref(), &path, &e).await,
     }
 
     let new_pwd = assign::new_pwd(env, command.mode, &path);

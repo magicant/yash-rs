@@ -61,10 +61,12 @@
 //! parameters](yash_env::variable::VariableSet::positional_params_mut) to be an
 //! array. If it is not an array, the built-in panics.
 
-use crate::common::print_failure_message;
+use crate::common::builtin_message_and_divert;
 use crate::common::syntax_error;
 use crate::common::BuiltinEnv;
 use yash_env::builtin::Result;
+use yash_env::io::Stderr;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Value;
 use yash_env::Env;
@@ -112,17 +114,17 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             ),
             Some(location) => (
                 format!(
-                    "requested to shift {} but there are only {}",
+                    "requested to shift {} but there {} only {}",
                     count,
-                    values.len()
+                    if values.len() == 1 { "is" } else { "are" },
+                    values.len(),
                 )
                 .into(),
                 location,
             ),
         };
-        let location = location.clone();
         let last_location = params.last_assigned_location.clone();
-        let mut annotations = vec![Annotation::new(AnnotationType::Error, label, &location)];
+        let mut annotations = vec![Annotation::new(AnnotationType::Error, label, location)];
         if let Some(last_location) = &last_location {
             annotations.push(Annotation::new(
                 AnnotationType::Info,
@@ -135,7 +137,9 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             title: "cannot shift positional parameters".into(),
             annotations,
         };
-        return print_failure_message(env, message).await;
+        let (message, divert) = builtin_message_and_divert(env, message);
+        env.system.print_error(&message).await;
+        return Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert);
     }
 
     values.drain(..count);

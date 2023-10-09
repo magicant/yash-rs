@@ -110,12 +110,12 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match command.mode {
         Mode::Variables => match semantics::unset_variables(env, &command.names) {
             Ok(()) => Result::default(),
-            Err(errors) => semantics::print_variables_error(env, &errors).await,
+            Err(errors) => semantics::report_variables_error(env, &errors).await,
         },
 
         Mode::Functions => match semantics::unset_functions(env, &command.names) {
             Ok(()) => Result::default(),
-            Err(errors) => semantics::print_functions_error(env, &errors).await,
+            Err(errors) => semantics::report_functions_error(env, &errors).await,
         },
     }
 }
