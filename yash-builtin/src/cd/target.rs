@@ -18,7 +18,6 @@
 
 use super::Command;
 use super::Mode;
-use crate::common::BuiltinEnv;
 use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
@@ -153,8 +152,11 @@ pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origi
     // Step 1 & 2: substitute $HOME and $OLDPWD
     let (mut curpath, mut origin) = match &command.operand {
         None => {
-            let home = get_scalar(env, "HOME").ok_or_else(|| TargetError::UnsetHome {
-                location: env.builtin_name().origin.clone(),
+            let home = get_scalar(env, "HOME").ok_or_else(|| {
+                let builtin = env.stack.current_builtin();
+                let location =
+                    builtin.map_or_else(|| Location::dummy(""), |b| b.name.origin.clone());
+                TargetError::UnsetHome { location }
             })?;
             (PathBuf::from(home), Origin::Home)
         }
@@ -194,8 +196,8 @@ pub fn target(env: &Env, command: &Command, pwd: &str) -> Result<(PathBuf, Origi
             target: curpath,
             location: {
                 let field = command.operand.as_ref();
-                let field = field.unwrap_or_else(|| env.builtin_name());
-                field.origin.clone()
+                let field = field.or_else(|| env.stack.current_builtin().map(|b| &b.name));
+                field.map_or_else(|| Location::dummy(""), |f| f.origin.clone())
             },
         }
     })?;

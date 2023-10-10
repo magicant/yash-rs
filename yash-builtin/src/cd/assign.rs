@@ -17,9 +17,10 @@
 //! Part of the cd built-in that updates `$PWD` and `$OLDPWD`
 
 use super::Mode;
-use crate::common::BuiltinEnv;
+use crate::common::builtin_message_and_divert;
 use std::path::Path;
 use std::path::PathBuf;
+use yash_env::io::Stderr;
 use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
@@ -38,10 +39,12 @@ use yash_syntax::source::pretty::Message;
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
 pub async fn set_oldpwd(env: &mut Env, value: String) {
+    let current_builtin = env.stack.current_builtin();
+    let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let oldpwd = Variable {
         value: Some(Scalar(value)),
         quirk: None,
-        last_assigned_location: Some(env.builtin_name().origin.clone()),
+        last_assigned_location: current_location,
         is_exported: true,
         read_only_location: None,
     };
@@ -61,10 +64,12 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
 /// the cd built-in.
 pub async fn set_pwd(env: &mut Env, path: PathBuf) {
     let value = path.into_os_string().into_string().unwrap_or_default();
+    let current_builtin = env.stack.current_builtin();
+    let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let pwd = Variable {
         value: Some(Scalar(value)),
         quirk: None,
-        last_assigned_location: Some(env.builtin_name().origin.clone()),
+        last_assigned_location: current_location,
         is_exported: true,
         read_only_location: None,
     };
@@ -78,24 +83,17 @@ pub async fn set_pwd(env: &mut Env, path: PathBuf) {
 ///
 /// The message is only a warning because it does not affect the exit status.
 async fn handle_assign_error(env: &mut Env, error: AssignError) {
-    let builtin_name = env.stack.builtin_name();
     let message = Message {
         r#type: AnnotationType::Warning,
         title: format!("cannot update read-only variable `{}`", error.name).into(),
-        annotations: vec![
-            Annotation::new(
-                AnnotationType::Info,
-                format!("error occurred in the {} built-in", builtin_name.value).into(),
-                &builtin_name.origin,
-            ),
-            Annotation::new(
-                AnnotationType::Info,
-                "the variable was made read-only here".into(),
-                &error.read_only_location,
-            ),
-        ],
+        annotations: vec![Annotation::new(
+            AnnotationType::Info,
+            "the variable was made read-only here".into(),
+            &error.read_only_location,
+        )],
     };
-    yash_env::io::print_message(&mut env.system, message).await;
+    let (message, _divert) = builtin_message_and_divert(env, message);
+    env.system.print_error(&message).await;
 }
 
 /// Computes the new value of `$PWD`.

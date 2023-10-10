@@ -63,7 +63,7 @@
 
 use crate::common::builtin_message_and_divert;
 use crate::common::syntax_error;
-use crate::common::BuiltinEnv;
+use std::borrow::Cow;
 use yash_env::builtin::Result;
 use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
@@ -73,6 +73,7 @@ use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the shift built-in to support XBD Utility
@@ -110,7 +111,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         let (label, location) = match operand_location {
             None => (
                 "there are no positional parameters".into(),
-                &env.stack.builtin_name().origin,
+                env.stack.current_builtin().map_or_else(
+                    || Cow::Owned(Location::dummy("")),
+                    |b| Cow::Borrowed(&b.name.origin),
+                ),
             ),
             Some(location) => (
                 format!(
@@ -120,11 +124,11 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                     values.len(),
                 )
                 .into(),
-                location,
+                Cow::Borrowed(location),
             ),
         };
         let last_location = params.last_assigned_location.clone();
-        let mut annotations = vec![Annotation::new(AnnotationType::Error, label, location)];
+        let mut annotations = vec![Annotation::new(AnnotationType::Error, label, &location)];
         if let Some(last_location) = &last_location {
             annotations.push(Annotation::new(
                 AnnotationType::Info,
@@ -143,7 +147,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     }
 
     values.drain(..count);
-    params.last_assigned_location = Some(env.stack.builtin_name().origin.clone());
+    params.last_assigned_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
     Result::default()
 }
 
@@ -248,7 +252,7 @@ mod tests {
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(
-                stderr.contains("no positional parameters"),
+                stderr.contains("there are no positional parameters"),
                 "stderr = {stderr:?}",
             )
         });

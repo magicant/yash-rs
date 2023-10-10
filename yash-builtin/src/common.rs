@@ -14,22 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Common items for implementing built-ins.
+//! Common items for implementing built-ins
 //!
-//! This module contains common traits to manipulate [`yash_env::Env`] from
-//! built-in implementations. These traits abstract the environment and reduce
-//! dependency on it.
-//!
-//! This module contains some utility functions for printing error messages and
-//! a submodule for [parsing command line arguments](syntax).
+//! This module contains some utility functions for printing messages and a
+//! submodule for [parsing command line arguments](syntax).
 
-use std::ops::ControlFlow::{self, Break, Continue};
+use std::ops::ControlFlow::{Break, Continue};
 use yash_env::io::Fd;
-#[doc(no_inline)]
-pub use yash_env::io::Stderr;
+use yash_env::io::Stderr;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
+#[cfg(doc)]
 use yash_env::stack::Stack;
 use yash_env::Env;
 #[cfg(doc)]
@@ -40,73 +35,6 @@ use yash_syntax::source::pretty::Message;
 use yash_syntax::source::Location;
 
 pub mod syntax;
-
-/// Execution environment extension for examining the currently running
-/// built-in.
-pub trait BuiltinEnv {
-    /// Returns the name of the currently-executing built-in.
-    #[must_use]
-    fn builtin_name(&self) -> &Field;
-
-    /// Returns whether the currently executing built-in is considered special.
-    #[must_use]
-    fn is_executing_special_builtin(&self) -> bool;
-
-    /// Returns `ControlFlow` on error in a built-in.
-    ///
-    /// If [`BuiltinEnv::is_executing_special_builtin`], the result is
-    /// `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
-    #[must_use]
-    fn builtin_error(&self) -> ControlFlow<Divert>;
-}
-
-impl BuiltinEnv for Stack {
-    /// Returns the name of the currently-executing built-in.
-    ///
-    /// This function **panics** if `self` does not contain any `Frame::Builtin`
-    /// item.
-    fn builtin_name(&self) -> &Field {
-        &self
-            .current_builtin()
-            .expect("a Frame::Builtin must be in the stack")
-            .name
-    }
-
-    /// Returns whether the currently executing built-in is considered special.
-    ///
-    /// This function returns false if `self` does not contain any
-    /// `Frame::Builtin` item.
-    fn is_executing_special_builtin(&self) -> bool {
-        self.current_builtin()
-            .map_or(false, |builtin| builtin.is_special)
-    }
-
-    fn builtin_error(&self) -> ControlFlow<Divert> {
-        if self.is_executing_special_builtin() {
-            Break(Divert::Interrupt(None))
-        } else {
-            Continue(())
-        }
-    }
-}
-
-impl BuiltinEnv for yash_env::Env {
-    /// Returns the name of the currently-executing built-in.
-    ///
-    /// This function **panics** if `self.stack` does not contain any
-    /// `Frame::Builtin` item.
-    fn builtin_name(&self) -> &Field {
-        self.stack.builtin_name()
-    }
-
-    fn is_executing_special_builtin(&self) -> bool {
-        self.stack.is_executing_special_builtin()
-    }
-
-    fn builtin_error(&self) -> ControlFlow<Divert> {
-        self.stack.builtin_error()
-    }
-}
 
 /// Converts the given message into a string.
 ///
@@ -162,8 +90,8 @@ pub fn builtin_message_and_divert<'e: 'm, 'm>(
 /// ```
 /// # use futures_util::future::FutureExt;
 /// # use yash_builtin::common::builtin_message_and_divert;
-/// # use yash_builtin::common::Stderr;
 /// # use yash_env::builtin::Result;
+/// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 /// # async {
@@ -193,8 +121,8 @@ where
 /// ```
 /// # use futures_util::future::FutureExt;
 /// # use yash_builtin::common::builtin_message_and_divert;
-/// # use yash_builtin::common::Stderr;
 /// # use yash_env::builtin::Result;
+/// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
 /// # async {
@@ -277,44 +205,9 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
-
-    #[test]
-    fn builtin_name_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
-        // TODO Test with a stack containing a frame other than Frame::Builtin
-        assert_eq!(stack.builtin_name().value, "my built-in");
-    }
-
-    #[test]
-    #[should_panic(expected = "a Frame::Builtin must be in the stack")]
-    fn builtin_name_not_in_stack() {
-        let _ = Stack::from(vec![]).builtin_name();
-    }
-
-    #[test]
-    fn is_executing_special_builtin_true_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = true;
-        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
-        assert!(stack.is_executing_special_builtin());
-    }
-
-    #[test]
-    fn is_executing_special_builtin_false_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin(Builtin { name, is_special })]);
-        assert!(!stack.is_executing_special_builtin());
-    }
-
-    #[test]
-    fn is_executing_special_builtin_not_in_stack() {
-        assert!(!Stack::from(vec![]).is_executing_special_builtin());
-    }
 
     fn dummy_message() -> Message<'static> {
         Message {

@@ -124,7 +124,6 @@
 
 use crate::common::output;
 use crate::common::print_error_message;
-use crate::common::BuiltinEnv;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 #[cfg(doc)]
@@ -168,10 +167,10 @@ fn modify(
 
     // Modify positional parameters
     if let Some(fields) = positional_params {
-        let location = env.builtin_name().origin.clone();
+        let location = env.stack.current_builtin().map(|b| b.name.origin.clone());
         let params = env.variables.positional_params_mut();
         params.value = Some(Array(fields.into_iter().map(|f| f.value).collect()));
-        params.last_assigned_location = Some(location);
+        params.last_assigned_location = location;
     }
 }
 
