@@ -143,39 +143,23 @@ where
     yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
 }
 
-/// Prints a simple error message.
-///
-/// This function constructs a [`Message`] from the given title and annotation,
-/// and calls [`report_error`].
-#[inline]
-pub async fn report_simple_error(
-    env: &mut Env,
-    title: &str,
-    annotation: Annotation<'_>,
-) -> yash_env::builtin::Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![annotation],
-    };
-    report_error(env, message).await
-}
-
 /// Prints a simple error message for a command syntax error.
 ///
-/// This function calls [`report_simple_error`] with a predefined title and an
-/// [`Annotation`] constructed with the given label and location.
+/// This function constructs a [`Message`] with a predefined title and an
+/// [`Annotation`] created from the given label and location, and calls
+/// [`report_error`].
 pub async fn syntax_error(
     env: &mut Env,
     label: &str,
     location: &Location,
 ) -> yash_env::builtin::Result {
-    report_simple_error(
-        env,
-        "command argument syntax error",
-        Annotation::new(AnnotationType::Error, label.into(), location),
-    )
-    .await
+    let annotation = Annotation::new(AnnotationType::Error, label.into(), location);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: "command argument syntax error".into(),
+        annotations: vec![annotation],
+    };
+    report_error(env, message).await
 }
 
 /// Prints a text to the standard output.
