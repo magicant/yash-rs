@@ -143,6 +143,20 @@ where
     yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
 }
 
+/// Prints a simple error message.
+///
+/// This function constructs a [`Message`] with the given title and prints it
+/// using [`report_error`]. The message has no annotations except for the
+/// built-in name which is added by [`builtin_message_and_divert`].
+pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: title.into(),
+        annotations: vec![],
+    };
+    report_error(env, message).await
+}
+
 /// Prints a simple error message for a command syntax error.
 ///
 /// This function constructs a [`Message`] with a predefined title and an

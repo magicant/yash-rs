@@ -78,23 +78,17 @@
 //! This module re-exports [`super::break::syntax`].
 
 use crate::common::report_error;
+use crate::common::report_simple_error;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_syntax::source::pretty::AnnotationType;
-use yash_syntax::source::pretty::Message;
 
 // pub mod display;
 pub mod semantics;
 pub use super::r#break::syntax;
 
 async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: format!("cannot continue: {}", error).into(),
-        annotations: vec![],
-    };
-    report_error(env, message).await
+    report_simple_error(env, &format!("cannot continue: {}", error)).await
 }
 
 /// Entry point for executing the `continue` built-in
