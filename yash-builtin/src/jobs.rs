@@ -80,8 +80,8 @@
 //! leading `%`, the built-in assumes one silently, which is not portable.
 
 use crate::common::output;
-use crate::common::print_error_message;
-use crate::common::print_failure_message;
+use crate::common::report_error;
+use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
@@ -164,7 +164,7 @@ fn find_error_message(error: FindError, operand: &Field) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
+        Err(error) => return report_error(env, &error).await,
     };
 
     let mut accumulator = Accumulator {
@@ -197,7 +197,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.report(index, &env.jobs[index]),
                 Err(error) => {
-                    return print_failure_message(env, find_error_message(error, &operand)).await
+                    return report_failure(env, find_error_message(error, &operand)).await
                 }
             }
         }

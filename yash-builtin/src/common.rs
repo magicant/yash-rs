@@ -103,7 +103,7 @@ pub fn builtin_message_and_divert<'e: 'm, 'm>(
 /// # }.now_or_never().unwrap();
 /// ```
 #[inline]
-pub async fn print_failure_message<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
+pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
     M: Into<Message<'a>> + 'a,
 {
@@ -134,7 +134,7 @@ where
 /// # }.now_or_never().unwrap();
 /// ```
 #[inline]
-pub async fn print_error_message<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
+pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
     M: Into<Message<'a>> + 'a,
 {
@@ -146,9 +146,9 @@ where
 /// Prints a simple error message.
 ///
 /// This function constructs a [`Message`] from the given title and annotation,
-/// and calls [`print_error_message`].
+/// and calls [`report_error`].
 #[inline]
-pub async fn print_simple_error_message(
+pub async fn report_simple_error(
     env: &mut Env,
     title: &str,
     annotation: Annotation<'_>,
@@ -158,19 +158,19 @@ pub async fn print_simple_error_message(
         title: title.into(),
         annotations: vec![annotation],
     };
-    print_error_message(env, message).await
+    report_error(env, message).await
 }
 
 /// Prints a simple error message for a command syntax error.
 ///
-/// This function calls [`print_simple_error_message`] with a predefined title
-/// and an [`Annotation`] constructed with the given label and location.
+/// This function calls [`report_simple_error`] with a predefined title and an
+/// [`Annotation`] constructed with the given label and location.
 pub async fn syntax_error(
     env: &mut Env,
     label: &str,
     location: &Location,
 ) -> yash_env::builtin::Result {
-    print_simple_error_message(
+    report_simple_error(
         env,
         "command argument syntax error",
         Annotation::new(AnnotationType::Error, label.into(), location),

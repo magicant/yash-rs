@@ -74,7 +74,7 @@
 
 use crate::common::builtin_message_and_divert;
 use crate::common::output;
-use crate::common::print_error_message;
+use crate::common::report_error;
 use std::borrow::Cow;
 use yash_env::builtin::Result;
 use yash_env::io::Stderr;
@@ -132,6 +132,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             Ok(result) => output(env, &result).await,
             Err(e) => report_semantics_error(env, &e).await,
         },
-        Err(e) => print_error_message(env, &e).await,
+        Err(e) => report_error(env, &e).await,
     }
 }

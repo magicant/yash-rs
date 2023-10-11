@@ -558,8 +558,7 @@ pub fn parse_arguments<'a>(
 /// This is a helper object for constructing an error message from a list of
 /// conflicting option occurrences. An instance of this type can be created
 /// using [`new`](Self::new) or [`pick_from_indexes`](Self::pick_from_indexes)
-/// and printed with
-/// [`print_error_message`](crate::common::print_error_message).
+/// and printed with [`report_error`](crate::common::report_error).
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("conflicting options")]
 pub struct ConflictingOptionError<'a> {

@@ -69,7 +69,7 @@
 //! implementation unsets the both. This is not portable. Old versions of yash
 //! used to unset the local variable only.
 
-use crate::common::print_error_message;
+use crate::common::report_error;
 use crate::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -104,7 +104,7 @@ pub mod syntax;
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
-        Err(e) => return print_error_message(env, &e).await,
+        Err(e) => return report_error(env, &e).await,
     };
 
     match command.mode {

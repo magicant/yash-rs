@@ -76,7 +76,7 @@
 //! The exact value of an exit status resulting from a signal is
 //! implementation-dependent.
 
-use crate::common::print_error_message;
+use crate::common::report_error;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use std::num::ParseIntError;
@@ -193,8 +193,8 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
     for job_spec in job_specs {
         let pid = match job_spec.value.parse() {
             Ok(pid) if pid > 0 => Pid::from_raw(pid),
-            Ok(_) => return print_error_message(env, &JobSpecError::NonPositive(job_spec)).await,
-            Err(e) => return print_error_message(env, &JobSpecError::ParseInt(job_spec, e)).await,
+            Ok(_) => return report_error(env, &JobSpecError::NonPositive(job_spec)).await,
+            Err(e) => return report_error(env, &JobSpecError::ParseInt(job_spec, e)).await,
         };
 
         exit_status = if let Some(index) = env.jobs.find_by_pid(pid) {
@@ -211,7 +211,7 @@ async fn wait_for_each_job(env: &mut Env, job_specs: Vec<Field>) -> Result {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
+        Err(error) => return report_error(env, &error).await,
     };
 
     if operands.is_empty() {

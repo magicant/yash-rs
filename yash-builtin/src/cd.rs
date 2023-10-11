@@ -144,8 +144,8 @@
 //! the above conditions are not met. The current implementation does it if and
 //! only if the final operand starts with `$PWD`.
 
-use crate::common::print_error_message;
-use crate::common::print_failure_message;
+use crate::common::report_error;
+use crate::common::report_failure;
 use crate::Result;
 use std::path::Path;
 use yash_env::semantics::Field;
@@ -200,14 +200,14 @@ fn get_pwd(env: &Env) -> String {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let command = match syntax::parse(env, args) {
         Ok(command) => command,
-        Err(e) => return print_error_message(env, &e).await,
+        Err(e) => return report_error(env, &e).await,
     };
 
     let pwd = get_pwd(env);
 
     let (path, origin) = match target::target(env, &command, &pwd) {
         Ok(target) => target,
-        Err(e) => return print_failure_message(env, &e).await,
+        Err(e) => return report_failure(env, &e).await,
     };
 
     let short_path = shorten::shorten(&path, Path::new(&pwd), command.mode);

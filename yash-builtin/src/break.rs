@@ -74,7 +74,7 @@
 //! Part of the break built-in implementation is shared with the
 //! continue built-in implementation.
 
-use crate::common::print_error_message;
+use crate::common::report_error;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -85,13 +85,13 @@ use yash_syntax::source::pretty::Message;
 pub mod semantics;
 pub mod syntax;
 
-async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
+async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
     let message = Message {
         r#type: AnnotationType::Error,
         title: format!("cannot break: {}", error).into(),
         annotations: vec![],
     };
-    print_error_message(env, message).await
+    report_error(env, message).await
 }
 
 /// Entry point for executing the `break` built-in
@@ -101,8 +101,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
-            Err(e) => print_semantics_error(env, &e).await,
+            Err(e) => report_semantics_error(env, &e).await,
         },
-        Err(e) => print_error_message(env, &e).await,
+        Err(e) => report_error(env, &e).await,
     }
 }

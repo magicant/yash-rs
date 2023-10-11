@@ -18,7 +18,7 @@
 //!
 //! TODO Elaborate
 
-use crate::common::print_error_message;
+use crate::common::report_error;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use std::fmt::Write;
@@ -55,7 +55,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, mut operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
+        Err(error) => return report_error(env, &error).await,
     };
 
     match operands.len() {

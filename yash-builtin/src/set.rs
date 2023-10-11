@@ -123,7 +123,7 @@
 //! place of an option-operand separator. This behavior is not portable either.
 
 use crate::common::output;
-use crate::common::print_error_message;
+use crate::common::report_error;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 #[cfg(doc)]
@@ -222,7 +222,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             Result::new(ExitStatus::SUCCESS)
         }
 
-        Err(error) => print_error_message(env, &error).await,
+        Err(error) => report_error(env, &error).await,
     }
 }
 
