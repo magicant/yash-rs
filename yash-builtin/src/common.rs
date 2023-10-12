@@ -36,20 +36,26 @@ use yash_syntax::source::Location;
 
 pub mod syntax;
 
-/// Converts the given message into a string.
+/// Convenience function for constructing an error message and a divert value.
 ///
 /// If the environment is currently executing a built-in
 /// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
-/// appended to the message. The message is then converted into a string using
-/// [`yash_env::io::to_string`].
+/// appended to the given message. The message is then converted into a string
+/// using [`yash_env::io::to_string`] and returned along with an optional divert
+/// value.
 ///
-/// This function returns an optional [`Divert`] value indicating whether the
-/// caller should divert the execution flow. If the environment is currently
-/// executing a special built-in, the divert value is `Divert::Interrupt(None)`;
-/// otherwise, `None`.
+/// The [`Divert`] value indicates whether the caller should divert the
+/// execution flow. If the current built-in is a special built-in, the second
+/// return value is `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
+/// 
+/// You should always use this function (or another function defined in this
+/// module which calls this function) to construct an error or warning message
+/// in a built-in. This ensures that the message contains the built-in name
+/// in a unified format.
 ///
-/// Note that this function does not print the message. Use
-/// [`SharedSystem::print_error`].
+/// Use [`SharedSystem::print_error`] to print the returned message and
+/// [`crate::Result::with_exit_status_and_divert`] to return the divert value
+/// along with an exit status.
 #[must_use]
 pub fn builtin_message_and_divert<'e: 'm, 'm>(
     env: &'e Env,

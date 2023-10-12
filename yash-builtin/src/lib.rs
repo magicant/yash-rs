@@ -16,7 +16,23 @@
 
 //! Implementation of the shell built-in utilities.
 //!
-//! TODO Elaborate
+//! Each built-in utility is implemented in the submodule named after the
+//! utility. The submodule contains the `main` function that implements the
+//! built-in utility. The submodule many also export other items that are used
+//! by the `main` function. The module documentation for each submodule
+//! describes the specification of the built-in utility.
+//!
+//! The [`common`] module provides common functions that are used for
+//! implementing built-in utilities.
+//!
+//! # Stack
+//!
+//! Many built-ins in this crate use [`Stack::current_builtin`] to obtain the
+//! command word that invoked the built-in. It is used to report the command
+//! location in error messages, switch the behavior of the built-in depending on
+//! the command, etc. For the built-ins to work correctly, the
+//! [stack](Env::stack) should contain a [built-in frame](Frame::Builtin) so
+//! that `Stack::current_builtin` provides the correct command word.
 //!
 //! # Optional dependency
 //!
@@ -46,6 +62,10 @@ pub mod wait;
 
 #[doc(no_inline)]
 pub use yash_env::builtin::*;
+#[cfg(doc)]
+use yash_env::stack::{Frame, Stack};
+#[cfg(doc)]
+use yash_env::Env;
 
 use std::future::ready;
 use Type::{Mandatory, Special};
