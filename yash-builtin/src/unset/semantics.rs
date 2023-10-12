@@ -16,7 +16,7 @@
 
 //! Defines the behavior of the unset built-in.
 
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use thiserror::Error;
 use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
@@ -79,7 +79,7 @@ pub fn unset_variables<'a>(
 
 /// Creates a message that describes the errors.
 ///
-/// See [`builtin_message_and_divert`] for the second return value.
+/// See [`arrange_message_and_divert`] for the second return value.
 #[must_use]
 pub fn unset_variables_error_message(
     env: &Env,
@@ -107,7 +107,7 @@ pub fn unset_variables_error_message(
         title: "cannot unset variable".into(),
         annotations,
     };
-    builtin_message_and_divert(env, message)
+    arrange_message_and_divert(env, message)
 }
 
 /// Prints an error message to the standard error.
@@ -161,7 +161,7 @@ pub fn unset_functions<'a>(
 
 /// Creates a message that describes the errors.
 ///
-/// See [`builtin_message_and_divert`] for the second return value.
+/// See [`arrange_message_and_divert`] for the second return value.
 #[must_use]
 pub fn unset_functions_error_message(
     env: &mut Env,
@@ -189,7 +189,7 @@ pub fn unset_functions_error_message(
         title: "cannot unset function".into(),
         annotations,
     };
-    builtin_message_and_divert(env, message)
+    arrange_message_and_divert(env, message)
 }
 
 /// Prints an error message to the standard error.

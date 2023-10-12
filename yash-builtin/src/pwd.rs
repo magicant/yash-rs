@@ -72,7 +72,7 @@
 //!
 //! The result for the `-P` option is obtained with [`System::getcwd`].
 
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use crate::common::output;
 use crate::common::report_error;
 use std::borrow::Cow;
@@ -118,7 +118,7 @@ async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Resu
         title: "cannot compute the working directory path".into(),
         annotations: vec![annotation],
     };
-    let (message, divert) = builtin_message_and_divert(env, message);
+    let (message, divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;
     Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 }

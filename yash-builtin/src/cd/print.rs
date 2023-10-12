@@ -17,7 +17,7 @@
 //! Part of the cd built-in that prints the new working directory
 
 use super::target::Origin;
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use std::path::Path;
 use yash_env::io::Stderr;
 use yash_env::system::Errno;
@@ -59,6 +59,6 @@ async fn handle_print_error(env: &mut Env, errno: Errno) {
         title: format!("cannot print new $PWD: {}", errno).into(),
         annotations: vec![],
     };
-    let (message, _divert) = builtin_message_and_divert(env, message);
+    let (message, _divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;
 }

@@ -16,7 +16,7 @@
 
 //! Part of the cd built-in that invokes the underlying system call
 
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use std::borrow::Cow;
 use std::ffi::CString;
 use std::ffi::NulError;
@@ -68,7 +68,7 @@ pub fn chdir(env: &mut Env, path: &Path) -> Result<(), Error> {
 /// If it returns `None`, the function will annotate the message with a dummy
 /// location.
 ///
-/// See [`builtin_message_and_divert`] for the second return value.
+/// See [`arrange_message_and_divert`] for the second return value.
 #[must_use]
 pub fn failure_message(
     env: &Env,
@@ -87,7 +87,7 @@ pub fn failure_message(
         title: "cannot change the working directory".into(),
         annotations: vec![error],
     };
-    builtin_message_and_divert(env, message)
+    arrange_message_and_divert(env, message)
 }
 
 /// Prints an error message to the standard error.

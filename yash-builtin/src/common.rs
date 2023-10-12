@@ -47,7 +47,7 @@ pub mod syntax;
 /// The [`Divert`] value indicates whether the caller should divert the
 /// execution flow. If the current built-in is a special built-in, the second
 /// return value is `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
-/// 
+///
 /// You should always use this function (or another function defined in this
 /// module which calls this function) to construct an error or warning message
 /// in a built-in. This ensures that the message contains the built-in name
@@ -57,7 +57,7 @@ pub mod syntax;
 /// [`crate::Result::with_exit_status_and_divert`] to return the divert value
 /// along with an exit status.
 #[must_use]
-pub fn builtin_message_and_divert<'e: 'm, 'm>(
+pub fn arrange_message_and_divert<'e: 'm, 'm>(
     env: &'e Env,
     mut message: Message<'m>,
 ) -> (String, yash_env::semantics::Result) {
@@ -95,7 +95,7 @@ pub fn builtin_message_and_divert<'e: 'm, 'm>(
 ///
 /// ```
 /// # use futures_util::future::FutureExt;
-/// # use yash_builtin::common::builtin_message_and_divert;
+/// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
 /// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
@@ -103,7 +103,7 @@ pub fn builtin_message_and_divert<'e: 'm, 'm>(
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
-/// let (message, divert) = builtin_message_and_divert(&env, message);
+/// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 /// # }.now_or_never().unwrap();
@@ -113,7 +113,7 @@ pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::built
 where
     M: Into<Message<'a>> + 'a,
 {
-    let (message, divert) = builtin_message_and_divert(env, message.into());
+    let (message, divert) = arrange_message_and_divert(env, message.into());
     env.system.print_error(&message).await;
     yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 }
@@ -126,7 +126,7 @@ where
 ///
 /// ```
 /// # use futures_util::future::FutureExt;
-/// # use yash_builtin::common::builtin_message_and_divert;
+/// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
 /// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
@@ -134,7 +134,7 @@ where
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
-/// let (message, divert) = builtin_message_and_divert(&env, message);
+/// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
 /// # }.now_or_never().unwrap();
@@ -144,7 +144,7 @@ pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin
 where
     M: Into<Message<'a>> + 'a,
 {
-    let (message, divert) = builtin_message_and_divert(env, message.into());
+    let (message, divert) = arrange_message_and_divert(env, message.into());
     env.system.print_error(&message).await;
     yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
 }
@@ -153,7 +153,7 @@ where
 ///
 /// This function constructs a [`Message`] with the given title and prints it
 /// using [`report_error`]. The message has no annotations except for the
-/// built-in name which is added by [`builtin_message_and_divert`].
+/// built-in name which is added by [`arrange_message_and_divert`].
 pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
     let message = Message {
         r#type: AnnotationType::Error,
@@ -199,7 +199,7 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
                 title: format!("error printing results to stdout: {errno}").into(),
                 annotations: vec![],
             };
-            let (message, divert) = builtin_message_and_divert(env, message);
+            let (message, divert) = arrange_message_and_divert(env, message);
             env.system.print_error(&message).await;
             yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
         }
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn divert_without_builtin() {
         let env = Env::new_virtual();
-        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
         assert_eq!(divert, Continue(()));
     }
 
@@ -236,7 +236,7 @@ mod tests {
             is_special: true,
         }));
 
-        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
         assert_eq!(divert, Break(Divert::Interrupt(None)));
     }
 
@@ -248,7 +248,7 @@ mod tests {
             is_special: false,
         }));
 
-        let (_message, divert) = builtin_message_and_divert(&env, dummy_message());
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
         assert_eq!(divert, Continue(()));
     }
 }

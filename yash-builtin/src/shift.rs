@@ -61,7 +61,7 @@
 //! parameters](yash_env::variable::VariableSet::positional_params_mut) to be an
 //! array. If it is not an array, the built-in panics.
 
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use crate::common::syntax_error;
 use std::borrow::Cow;
 use yash_env::builtin::Result;
@@ -141,7 +141,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             title: "cannot shift positional parameters".into(),
             annotations,
         };
-        let (message, divert) = builtin_message_and_divert(env, message);
+        let (message, divert) = arrange_message_and_divert(env, message);
         env.system.print_error(&message).await;
         return Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert);
     }

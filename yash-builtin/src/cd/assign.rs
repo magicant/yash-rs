@@ -17,7 +17,7 @@
 //! Part of the cd built-in that updates `$PWD` and `$OLDPWD`
 
 use super::Mode;
-use crate::common::builtin_message_and_divert;
+use crate::common::arrange_message_and_divert;
 use std::path::Path;
 use std::path::PathBuf;
 use yash_env::io::Stderr;
@@ -92,7 +92,7 @@ async fn handle_assign_error(env: &mut Env, error: AssignError) {
             &error.read_only_location,
         )],
     };
-    let (message, _divert) = builtin_message_and_divert(env, message);
+    let (message, _divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;
 }
 
