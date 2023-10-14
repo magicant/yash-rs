@@ -18,7 +18,6 @@
 
 use crate::common::arrange_message_and_divert;
 use thiserror::Error;
-use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 #[cfg(doc)]

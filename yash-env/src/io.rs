@@ -21,7 +21,6 @@ use crate::system::SharedSystem;
 use crate::Env;
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::snippet::Snippet;
-use async_trait::async_trait;
 use std::borrow::Cow;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -43,29 +42,6 @@ pub use yash_syntax::syntax::Fd;
 /// [`move_fd_internal`]: crate::system::SystemEx::move_fd_internal
 pub const MIN_INTERNAL_FD: Fd = Fd(10);
 
-/// Part of the execution environment that allows printing to the standard
-/// error.
-#[async_trait(?Send)]
-pub trait Stderr {
-    /// Convenience function that prints the given error message.
-    ///
-    /// This function prints the `message` to the standard error of this
-    /// environment, ignoring any errors that may happen.
-    async fn print_error(&mut self, message: &str);
-
-    /// Returns whether you should include color code in messages printed.
-    ///
-    /// If this function returns true, you can include escape sequences in the
-    /// message passed to [`print_error`](Self::print_error) so that the
-    /// terminal shows the message in color. Otherwise, the message should be
-    /// plain text.
-    ///
-    /// The default implementation returns false.
-    fn should_print_error_in_color(&self) -> bool {
-        false
-    }
-}
-
 /// Convenience function for converting an error message into a string.
 ///
 /// The returned string may contain ANSI color escape sequences if the given
@@ -76,35 +52,34 @@ pub trait Stderr {
 #[must_use]
 pub fn to_string(env: &Env, message: Message<'_>) -> String {
     let mut s = Snippet::from(&message);
-    s.opt.color = env.system.should_print_error_in_color();
+    s.opt.color = env.should_print_error_in_color();
     format!("{}\n", DisplayList::from(s))
 }
 
 /// Convenience function for printing an error message.
 ///
 /// This function converts the `error` into a [`Message`] which in turn is
-/// converted into [`Snippet`] and then [`DisplayList`].
-/// The result is printed to the standard error using [`Stderr::print_error`].
-pub async fn print_message<'a, S, E>(stderr: &mut S, error: E)
+/// converted into a string using [`to_string`].
+/// The result is printed to the standard error.
+pub async fn print_message<'a, E>(env: &mut Env, error: E)
 where
-    S: Stderr,
     E: Into<Message<'a>> + 'a,
 {
-    async fn inner(stderr: &mut dyn Stderr, m: Message<'_>) {
-        let mut s = Snippet::from(&m);
-        s.opt.color = stderr.should_print_error_in_color();
-        let f = format!("{}\n", DisplayList::from(s));
-        stderr.print_error(&f).await
+    async fn inner(env: &mut Env, message: Message<'_>) {
+        env.system
+            .write_all(Fd::STDERR, to_string(env, message).as_bytes())
+            .await
+            .ok();
     }
-    inner(stderr, error.into()).await
+    inner(env, error.into()).await;
 }
 
 /// Convenience function for printing an error message.
 ///
 /// This function constructs a temporary [`Message`] based on the given `title`,
 /// `label`, and `location`. The message is printed using [`print_message`].
-pub async fn print_error<S: Stderr>(
-    stderr: &mut S,
+pub async fn print_error(
+    env: &mut Env,
     title: Cow<'_, str>,
     label: Cow<'_, str>,
     location: &Location,
@@ -116,5 +91,5 @@ pub async fn print_error<S: Stderr>(
         title,
         annotations: a,
     };
-    print_message(stderr, message).await;
+    print_message(env, message).await;
 }

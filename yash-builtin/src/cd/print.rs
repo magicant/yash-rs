@@ -19,7 +19,6 @@
 use super::target::Origin;
 use crate::common::arrange_message_and_divert;
 use std::path::Path;
-use yash_env::io::Stderr;
 use yash_env::system::Errno;
 use yash_env::Env;
 use yash_syntax::source::pretty::AnnotationType;

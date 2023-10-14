@@ -23,7 +23,6 @@ use crate::xtrace::XTrace;
 use crate::Handle;
 use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
-use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;

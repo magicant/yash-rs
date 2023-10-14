@@ -23,7 +23,6 @@ use std::ffi::NulError;
 use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 use thiserror::Error;
-use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 #[cfg(doc)]

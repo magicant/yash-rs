@@ -22,7 +22,6 @@ pub mod r#virtual;
 
 use self::fd_set::FdSet;
 use crate::io::Fd;
-use crate::io::Stderr;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
 use crate::job::WaitStatus;
@@ -31,7 +30,6 @@ use crate::subshell::Subshell;
 use crate::trap::Signal;
 use crate::trap::SignalSystem;
 use crate::Env;
-use async_trait::async_trait;
 use futures_util::future::poll_fn;
 use futures_util::task::Poll;
 #[doc(no_inline)]
@@ -696,6 +694,11 @@ impl SharedSystem {
         result
     }
 
+    /// Convenience function for printing a message to the standard error
+    pub async fn print_error(&mut self, message: &str) {
+        _ = self.write_all(Fd::STDERR, message.as_bytes()).await;
+    }
+
     /// Waits until the specified time point.
     pub async fn wait_until(&self, target: Instant) {
         // We need to retain a strong reference to the waker outside the poll_fn
@@ -917,18 +920,6 @@ impl SignalSystem for SharedSystem {
         handling: SignalHandling,
     ) -> Result<SignalHandling, Errno> {
         self.0.borrow_mut().set_signal_handling(signal, handling)
-    }
-}
-
-#[async_trait(?Send)]
-impl Stderr for SharedSystem {
-    async fn print_error(&mut self, message: &str) {
-        _ = self.write_all(Fd::STDERR, message.as_bytes()).await;
-    }
-    fn should_print_error_in_color(&self) -> bool {
-        // TODO Enable color depending on user config (force/auto/never)
-        // TODO Check if the terminal really supports color (needs terminfo)
-        self.isatty(Fd::STDERR) == Ok(true)
     }
 }
 

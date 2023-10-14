@@ -35,7 +35,6 @@ async fn print_version(env: &mut env::Env) -> i32 {
 }
 
 async fn parse_and_print(mut env: env::Env) -> i32 {
-    use env::io::Stderr;
     use env::option::Option::{Interactive, Monitor};
     use env::option::State::On;
     use env::variable::Value::Array;

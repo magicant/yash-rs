@@ -20,7 +20,6 @@ use super::Mode;
 use crate::common::arrange_message_and_divert;
 use std::path::Path;
 use std::path::PathBuf;
-use yash_env::io::Stderr;
 use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;

@@ -21,7 +21,6 @@
 
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::io::Fd;
-use yash_env::io::Stderr;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 #[cfg(doc)]
@@ -87,6 +86,16 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
     (message, divert)
 }
 
+async fn report(
+    env: &mut Env,
+    message: Message<'_>,
+    exit_status: ExitStatus,
+) -> yash_env::builtin::Result {
+    let (message, divert) = arrange_message_and_divert(env, message);
+    _ = env.system.write_all(Fd::STDERR, message.as_bytes()).await;
+    yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
+}
+
 /// Prints a failure message.
 ///
 /// This function is only usable when the `message` argument does not contain
@@ -97,9 +106,9 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
 /// # use futures_util::future::FutureExt;
 /// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
-/// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
@@ -113,9 +122,7 @@ pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::built
 where
     M: Into<Message<'a>> + 'a,
 {
-    let (message, divert) = arrange_message_and_divert(env, message.into());
-    env.system.print_error(&message).await;
-    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+    report(env, message.into(), ExitStatus::FAILURE).await
 }
 
 /// Prints an error message.
@@ -128,9 +135,9 @@ where
 /// # use futures_util::future::FutureExt;
 /// # use yash_builtin::common::arrange_message_and_divert;
 /// # use yash_env::builtin::Result;
-/// # use yash_env::io::Stderr;
 /// # use yash_env::semantics::ExitStatus;
 /// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
 /// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
@@ -144,9 +151,7 @@ pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin
 where
     M: Into<Message<'a>> + 'a,
 {
-    let (message, divert) = arrange_message_and_divert(env, message.into());
-    env.system.print_error(&message).await;
-    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
+    report(env, message.into(), ExitStatus::ERROR).await
 }
 
 /// Prints a simple error message.
@@ -199,9 +204,7 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
                 title: format!("error printing results to stdout: {errno}").into(),
                 annotations: vec![],
             };
-            let (message, divert) = arrange_message_and_divert(env, message);
-            env.system.print_error(&message).await;
-            yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+            report_failure(env, message).await
         }
     }
 }

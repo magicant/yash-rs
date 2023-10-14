@@ -65,7 +65,6 @@ use crate::common::arrange_message_and_divert;
 use crate::common::syntax_error;
 use std::borrow::Cow;
 use yash_env::builtin::Result;
-use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Value;

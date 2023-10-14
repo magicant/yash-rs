@@ -22,7 +22,6 @@ use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::Fd;
-use yash_env::io::Stderr;
 use yash_env::job::Job;
 use yash_env::job::Pid;
 use yash_env::job::WaitStatus::Stopped;

@@ -24,7 +24,6 @@ use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::function::Function;
-use yash_env::io::Stderr;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
 use yash_env::Env;
