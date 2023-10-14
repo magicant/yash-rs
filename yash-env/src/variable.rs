@@ -766,7 +766,7 @@ impl VariableSet {
             .contexts
             .iter()
             .filter(|c| c.r#type == ContextType::Regular)
-            .last()
+            .next_back()
             .expect("base context has gone")
             .positional_params
     }
@@ -792,7 +792,7 @@ impl VariableSet {
             .contexts
             .iter_mut()
             .filter(|c| c.r#type == ContextType::Regular)
-            .last()
+            .next_back()
             .expect("base context has gone")
             .positional_params
     }
