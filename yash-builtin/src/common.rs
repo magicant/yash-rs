@@ -14,26 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Common items for implementing built-ins.
+//! Common items for implementing built-ins
 //!
-//! This module contains common traits to manipulate [`yash_env::Env`] from
-//! built-in implementations. These traits abstract the environment and reduce
-//! dependency on it.
-//!
-//! This module contains some utility functions for printing error messages and
-//! a submodule for [parsing command line arguments](syntax).
+//! This module contains some utility functions for printing messages and a
+//! submodule for [parsing command line arguments](syntax).
 
-use async_trait::async_trait;
-use std::ops::ControlFlow::{self, Break, Continue};
+use std::ops::ControlFlow::{Break, Continue};
 use yash_env::io::Fd;
-#[doc(no_inline)]
-pub use yash_env::io::Stderr;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
-use yash_env::semantics::Field;
-use yash_env::stack::Frame;
+#[cfg(doc)]
 use yash_env::stack::Stack;
-use yash_env::system::Errno;
+use yash_env::Env;
+#[cfg(doc)]
 use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -42,362 +35,223 @@ use yash_syntax::source::Location;
 
 pub mod syntax;
 
-/// Execution environment extension for examining the currently running
-/// built-in.
-pub trait BuiltinEnv {
-    /// Returns the name of the currently-executing built-in.
-    #[must_use]
-    fn builtin_name(&self) -> &Field;
-
-    /// Returns whether the currently executing built-in is considered special.
-    #[must_use]
-    fn is_executing_special_builtin(&self) -> bool;
-
-    /// Returns `ControlFlow` on error in a built-in.
-    ///
-    /// If [`BuiltinEnv::is_executing_special_builtin`], the result is
-    /// `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
-    #[must_use]
-    fn builtin_error(&self) -> ControlFlow<Divert>;
-}
-
-impl BuiltinEnv for Stack {
-    /// Returns the name of the currently-executing built-in.
-    ///
-    /// This function **panics** if `self` does not contain any `Frame::Builtin`
-    /// item.
-    fn builtin_name(&self) -> &Field {
-        self.iter()
-            .filter_map(|frame| {
-                if let Frame::Builtin { name, .. } = frame {
-                    Some(name)
-                } else {
-                    None
-                }
-            })
-            .next_back()
-            .expect("a Frame::Builtin must be in the stack")
-    }
-
-    /// Returns whether the currently executing built-in is considered special.
-    ///
-    /// This function returns false if `self` does not contain any
-    /// `Frame::Builtin` item.
-    fn is_executing_special_builtin(&self) -> bool {
-        self.iter()
-            .filter_map(|frame| {
-                if let &Frame::Builtin { is_special, .. } = frame {
-                    Some(is_special)
-                } else {
-                    None
-                }
-            })
-            .next_back()
-            .unwrap_or(false)
-    }
-
-    fn builtin_error(&self) -> ControlFlow<Divert> {
-        if self.is_executing_special_builtin() {
-            Break(Divert::Interrupt(None))
-        } else {
-            Continue(())
-        }
-    }
-}
-
-impl BuiltinEnv for yash_env::Env {
-    /// Returns the name of the currently-executing built-in.
-    ///
-    /// This function **panics** if `self.stack` does not contain any
-    /// `Frame::Builtin` item.
-    fn builtin_name(&self) -> &Field {
-        self.stack.builtin_name()
-    }
-
-    fn is_executing_special_builtin(&self) -> bool {
-        self.stack.is_executing_special_builtin()
-    }
-
-    fn builtin_error(&self) -> ControlFlow<Divert> {
-        self.stack.builtin_error()
-    }
-}
-
-/// Part of the execution environment that allows printing to the standard
-/// output.
-#[async_trait(?Send)]
-pub trait Stdout {
-    /// Prints a string to the standard output.
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno>;
-}
-
-#[async_trait(?Send)]
-impl Stdout for SharedSystem {
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
-        self.write_all(Fd::STDOUT, text.as_bytes()).await.map(drop)
-    }
-}
-
-#[async_trait(?Send)]
-impl Stdout for String {
-    async fn try_print(&mut self, text: &str) -> Result<(), Errno> {
-        self.push_str(text);
-        Ok(())
-    }
-}
-
-/// Trait for types that can be cast to [`Stdout`].
-pub trait AsStdout {
-    type Stdout: Stdout;
-    fn as_stdout(&mut self) -> &mut Self::Stdout;
-}
-
-impl AsStdout for SharedSystem {
-    type Stdout = SharedSystem;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self
-    }
-}
-
-impl AsStdout for yash_env::Env {
-    type Stdout = SharedSystem;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        &mut self.system
-    }
-}
-
-impl AsStdout for String {
-    type Stdout = String;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self
-    }
-}
-
-impl<'a, 'b> AsStdout for (&'a mut String, &'b mut String) {
-    type Stdout = String;
-    fn as_stdout(&mut self) -> &mut Self::Stdout {
-        self.0
-    }
-}
-
-/// Trait for types that can be cast to [`Stderr`].
-pub trait AsStderr {
-    type Stderr: Stderr;
-    fn as_stderr(&mut self) -> &mut Self::Stderr;
-}
-
-impl AsStderr for SharedSystem {
-    type Stderr = SharedSystem;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self
-    }
-}
-
-impl AsStderr for yash_env::Env {
-    type Stderr = SharedSystem;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        &mut self.system
-    }
-}
-
-impl AsStderr for String {
-    type Stderr = String;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self
-    }
-}
-
-impl<'a, 'b> AsStderr for (&'a mut String, &'b mut String) {
-    type Stderr = String;
-    fn as_stderr(&mut self) -> &mut Self::Stderr {
-        self.1
-    }
-}
-
-/// Extension of [`Stdout`] that handles errors.
-#[async_trait(?Send)]
-pub trait Print {
-    /// Prints a string to the standard output.
-    ///
-    /// If an error occurs while printing, an error message is printed to the
-    /// standard error and a non-zero exit status is returned.
-    async fn print(&mut self, text: &str) -> yash_env::builtin::Result;
-}
-
-#[async_trait(?Send)]
-impl<T: BuiltinEnv + AsStdout + AsStderr> Print for T {
-    async fn print(&mut self, text: &str) -> yash_env::builtin::Result {
-        match self.as_stdout().try_print(text).await {
-            Ok(()) => yash_env::builtin::Result::default(),
-            Err(errno) => {
-                let message = Message {
-                    r#type: AnnotationType::Error,
-                    title: format!("error printing results to stdout: {errno}").into(),
-                    annotations: vec![],
-                };
-                print_failure_message(self, message).await
-            }
-        }
-    }
-}
-
-/// Prints a message.
+/// Convenience function for constructing an error message and a divert value.
 ///
-/// This function prepares a [`Message`] by inserting an annotation indicating
-/// the [built-in name](BuiltinEnv::builtin_name), and prints it to the standard
-/// error using [`yash_env::io::print_message`].
+/// If the environment is currently executing a built-in
+/// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
+/// appended to the given message. The message is then converted into a string
+/// using [`yash_env::io::to_string`] and returned along with an optional divert
+/// value.
 ///
-/// Returns [`env.builtin_error()`](BuiltinEnv::builtin_error).
-pub async fn print_message<'a, E, M>(env: &mut E, message: M) -> yash_env::semantics::Result
-where
-    E: BuiltinEnv + AsStderr,
-    M: Into<Message<'a>> + 'a,
-{
-    let builtin_name = env.builtin_name();
-    let invocation_location = builtin_name.origin.clone();
-    let mut message = message.into();
-    message.annotations.push(Annotation::new(
-        AnnotationType::Info,
-        format!("error occurred in the {} built-in", builtin_name.value).into(),
-        &invocation_location,
-    ));
-    invocation_location
-        .code
-        .source
-        .complement_annotations(&mut message.annotations);
+/// The [`Divert`] value indicates whether the caller should divert the
+/// execution flow. If the current built-in is a special built-in, the second
+/// return value is `Break(Divert::Interrupt(None))`; otherwise, `Continue(())`.
+///
+/// You should always use this function (or another function defined in this
+/// module which calls this function) to construct an error or warning message
+/// in a built-in. This ensures that the message contains the built-in name
+/// in a unified format.
+///
+/// Use [`SharedSystem::print_error`] to print the returned message and
+/// [`crate::Result::with_exit_status_and_divert`] to return the divert value
+/// along with an exit status.
+#[must_use]
+pub fn arrange_message_and_divert<'e: 'm, 'm>(
+    env: &'e Env,
+    mut message: Message<'m>,
+) -> (String, yash_env::semantics::Result) {
+    let is_special_builtin;
 
-    yash_env::io::print_message(env.as_stderr(), message).await;
+    if let Some(builtin) = env.stack.current_builtin() {
+        // Add an annotation indicating the built-in name
+        message.annotations.push(Annotation::new(
+            AnnotationType::Info,
+            format!("error occurred in the {} built-in", builtin.name.value).into(),
+            &builtin.name.origin,
+        ));
+        let source = &builtin.name.origin.code.source;
+        source.complement_annotations(&mut message.annotations);
 
-    env.builtin_error()
+        is_special_builtin = builtin.is_special;
+    } else {
+        is_special_builtin = false;
+    }
+
+    let message = yash_env::io::to_string(env, message);
+    let divert = if is_special_builtin {
+        Break(Divert::Interrupt(None))
+    } else {
+        Continue(())
+    };
+    (message, divert)
+}
+
+async fn report(
+    env: &mut Env,
+    message: Message<'_>,
+    exit_status: ExitStatus,
+) -> yash_env::builtin::Result {
+    let (message, divert) = arrange_message_and_divert(env, message);
+    _ = env.system.write_all(Fd::STDERR, message.as_bytes()).await;
+    yash_env::builtin::Result::with_exit_status_and_divert(exit_status, divert)
 }
 
 /// Prints a failure message.
 ///
-/// This function uses [`print_message`] and returns a result with exit status
-/// [`ExitStatus::FAILURE`].
+/// This function is only usable when the `message` argument does not contain
+/// any references borrowed from the environment. Otherwise, inline the body of
+/// this function into the caller:
+///
+/// ```
+/// # use futures_util::future::FutureExt;
+/// # use yash_builtin::common::arrange_message_and_divert;
+/// # use yash_env::builtin::Result;
+/// # use yash_env::semantics::ExitStatus;
+/// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # use yash_syntax::syntax::Fd;
+/// # async {
+/// # let mut env = yash_env::Env::new_virtual();
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// let (message, divert) = arrange_message_and_divert(&env, message);
+/// env.system.print_error(&message).await;
+/// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
+/// # }.now_or_never().unwrap();
+/// ```
 #[inline]
-pub async fn print_failure_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
+pub async fn report_failure<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
-    let result = print_message(env, message).await;
-    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::FAILURE, result)
+    report(env, message.into(), ExitStatus::FAILURE).await
 }
 
 /// Prints an error message.
 ///
-/// This function uses [`print_message`] and returns a result with exit status
-/// [`ExitStatus::ERROR`].
+/// This function is only usable when the `message` argument does not contain
+/// any references borrowed from the environment. Otherwise, inline the body of
+/// this function into the caller:
+///
+/// ```
+/// # use futures_util::future::FutureExt;
+/// # use yash_builtin::common::arrange_message_and_divert;
+/// # use yash_env::builtin::Result;
+/// # use yash_env::semantics::ExitStatus;
+/// # use yash_syntax::source::pretty::{Annotation, AnnotationType, Message};
+/// # use yash_syntax::syntax::Fd;
+/// # async {
+/// # let mut env = yash_env::Env::new_virtual();
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// let (message, divert) = arrange_message_and_divert(&env, message);
+/// env.system.print_error(&message).await;
+/// Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
+/// # }.now_or_never().unwrap();
+/// ```
 #[inline]
-pub async fn print_error_message<'a, E, M>(env: &mut E, message: M) -> yash_env::builtin::Result
+pub async fn report_error<'a, M>(env: &mut Env, message: M) -> yash_env::builtin::Result
 where
-    E: BuiltinEnv + AsStderr,
     M: Into<Message<'a>> + 'a,
 {
-    let result = print_message(env, message).await;
-    yash_env::builtin::Result::with_exit_status_and_divert(ExitStatus::ERROR, result)
-}
-
-/// Prints a simple failure message.
-///
-/// This function constructs a [`Message`] from the given title and annotation,
-/// and calls [`print_failure_message`].
-#[inline]
-pub async fn print_simple_failure_message<E>(
-    env: &mut E,
-    title: &str,
-    annotation: Annotation<'_>,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
-    let message = Message {
-        r#type: AnnotationType::Error,
-        title: title.into(),
-        annotations: vec![annotation],
-    };
-    print_failure_message(env, message).await
+    report(env, message.into(), ExitStatus::ERROR).await
 }
 
 /// Prints a simple error message.
 ///
-/// This function constructs a [`Message`] from the given title and annotation,
-/// and calls [`print_error_message`].
-#[inline]
-pub async fn print_simple_error_message<E>(
-    env: &mut E,
-    title: &str,
-    annotation: Annotation<'_>,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
+/// This function constructs a [`Message`] with the given title and prints it
+/// using [`report_error`]. The message has no annotations except for the
+/// built-in name which is added by [`arrange_message_and_divert`].
+pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builtin::Result {
     let message = Message {
         r#type: AnnotationType::Error,
         title: title.into(),
-        annotations: vec![annotation],
+        annotations: vec![],
     };
-    print_error_message(env, message).await
+    report_error(env, message).await
 }
 
 /// Prints a simple error message for a command syntax error.
 ///
-/// This function calls [`print_simple_error_message`] with a predefined title
-/// and an [`Annotation`] constructed with the given label and location.
-pub async fn syntax_error<E>(
-    env: &mut E,
+/// This function constructs a [`Message`] with a predefined title and an
+/// [`Annotation`] created from the given label and location, and calls
+/// [`report_error`].
+pub async fn syntax_error(
+    env: &mut Env,
     label: &str,
     location: &Location,
-) -> yash_env::builtin::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
-    print_simple_error_message(
-        env,
-        "command argument syntax error",
-        Annotation::new(AnnotationType::Error, label.into(), location),
-    )
-    .await
+) -> yash_env::builtin::Result {
+    let annotation = Annotation::new(AnnotationType::Error, label.into(), location);
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: "command argument syntax error".into(),
+        annotations: vec![annotation],
+    };
+    report_error(env, message).await
+}
+
+/// Prints a text to the standard output.
+///
+/// This function prints the given text to the standard output, and returns
+/// the default result. In case of an error, an error message is printed to
+/// the standard error and the returned result has exit status
+/// [`ExitStatus::FAILURE`]. Any errors that occur while printing the error
+/// message are ignored.
+pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
+    match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
+        Ok(_) => Default::default(),
+
+        Err(errno) => {
+            let message = Message {
+                r#type: AnnotationType::Error,
+                title: format!("error printing results to stdout: {errno}").into(),
+                annotations: vec![],
+            };
+            report_failure(env, message).await
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
+    use yash_env::stack::Frame;
 
-    #[test]
-    fn builtin_name_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
-        // TODO Test with a stack containing a frame other than Frame::Builtin
-        assert_eq!(stack.builtin_name().value, "my built-in");
+    fn dummy_message() -> Message<'static> {
+        Message {
+            r#type: AnnotationType::Error,
+            title: "foo".into(),
+            annotations: vec![],
+        }
     }
 
     #[test]
-    #[should_panic(expected = "a Frame::Builtin must be in the stack")]
-    fn builtin_name_not_in_stack() {
-        let _ = Stack::from(vec![]).builtin_name();
+    fn divert_without_builtin() {
+        let env = Env::new_virtual();
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Continue(()));
     }
 
     #[test]
-    fn is_executing_special_builtin_true_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = true;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
-        assert!(stack.is_executing_special_builtin());
+    fn divert_with_special_builtin() {
+        let mut env = Env::new_virtual();
+        let env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("builtin"),
+            is_special: true,
+        }));
+
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Break(Divert::Interrupt(None)));
     }
 
     #[test]
-    fn is_executing_special_builtin_false_in_stack() {
-        let name = Field::dummy("my built-in");
-        let is_special = false;
-        let stack = Stack::from(vec![Frame::Builtin { name, is_special }]);
-        assert!(!stack.is_executing_special_builtin());
-    }
+    fn divert_with_non_special_builtin() {
+        let mut env = Env::new_virtual();
+        let env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("builtin"),
+            is_special: false,
+        }));
 
-    #[test]
-    fn is_executing_special_builtin_not_in_stack() {
-        assert!(!Stack::from(vec![]).is_executing_special_builtin());
+        let (_message, divert) = arrange_message_and_divert(&env, dummy_message());
+        assert_eq!(divert, Continue(()));
     }
 }

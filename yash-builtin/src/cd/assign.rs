@@ -17,7 +17,7 @@
 //! Part of the cd built-in that updates `$PWD` and `$OLDPWD`
 
 use super::Mode;
-use crate::common::BuiltinEnv;
+use crate::common::arrange_message_and_divert;
 use std::path::Path;
 use std::path::PathBuf;
 use yash_env::variable::AssignError;
@@ -38,10 +38,12 @@ use yash_syntax::source::pretty::Message;
 /// This function examines the stack to find the command location that invoked
 /// the cd built-in.
 pub async fn set_oldpwd(env: &mut Env, value: String) {
+    let current_builtin = env.stack.current_builtin();
+    let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let oldpwd = Variable {
         value: Some(Scalar(value)),
         quirk: None,
-        last_assigned_location: Some(env.builtin_name().origin.clone()),
+        last_assigned_location: current_location,
         is_exported: true,
         read_only_location: None,
     };
@@ -61,10 +63,12 @@ pub async fn set_oldpwd(env: &mut Env, value: String) {
 /// the cd built-in.
 pub async fn set_pwd(env: &mut Env, path: PathBuf) {
     let value = path.into_os_string().into_string().unwrap_or_default();
+    let current_builtin = env.stack.current_builtin();
+    let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
     let pwd = Variable {
         value: Some(Scalar(value)),
         quirk: None,
-        last_assigned_location: Some(env.builtin_name().origin.clone()),
+        last_assigned_location: current_location,
         is_exported: true,
         read_only_location: None,
     };
@@ -78,24 +82,17 @@ pub async fn set_pwd(env: &mut Env, path: PathBuf) {
 ///
 /// The message is only a warning because it does not affect the exit status.
 async fn handle_assign_error(env: &mut Env, error: AssignError) {
-    let builtin_name = env.stack.builtin_name();
     let message = Message {
         r#type: AnnotationType::Warning,
         title: format!("cannot update read-only variable `{}`", error.name).into(),
-        annotations: vec![
-            Annotation::new(
-                AnnotationType::Info,
-                format!("error occurred in the {} built-in", builtin_name.value).into(),
-                &builtin_name.origin,
-            ),
-            Annotation::new(
-                AnnotationType::Info,
-                "the variable was made read-only here".into(),
-                &error.read_only_location,
-            ),
-        ],
+        annotations: vec![Annotation::new(
+            AnnotationType::Info,
+            "the variable was made read-only here".into(),
+            &error.read_only_location,
+        )],
     };
-    yash_env::io::print_message(&mut env.system, message).await;
+    let (message, _divert) = arrange_message_and_divert(env, message);
+    env.system.print_error(&message).await;
 }
 
 /// Computes the new value of `$PWD`.
@@ -117,6 +114,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::rc::Rc;
     use yash_env::semantics::Field;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -128,10 +126,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
 
         set_oldpwd(&mut env, "/some/path".to_string())
             .now_or_never()
@@ -153,10 +151,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         env.assign_variable(Global, "OLDPWD".to_string(), Variable::new("/old/pwd"))
             .unwrap();
 
@@ -178,10 +176,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("cd"),
             is_special: false,
-        });
+        }));
         let read_only_location = Location::dummy("read-only");
         env.assign_variable(
             Global,
@@ -208,10 +206,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
 
         set_pwd(&mut env, PathBuf::from("/some/path"))
             .now_or_never()
@@ -233,10 +231,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
         let location = cd.origin.clone();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         env.assign_variable(Global, "PWD".to_string(), Variable::new("/old/path"))
             .unwrap();
 
@@ -259,10 +257,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         let cd = Field::dummy("cd");
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: cd,
             is_special: false,
-        });
+        }));
         let read_only_location = Location::dummy("read-only");
         env.assign_variable(
             Global,

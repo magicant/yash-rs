@@ -35,6 +35,23 @@ use crate::Env;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
+/// Information about the currently executing built-in
+///
+/// An instance of `Builtin` wrapped in a [`Frame::Builtin`] is pushed to the
+/// stack when executing a built-in.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Builtin {
+    /// Name of the built-in
+    pub name: Field,
+
+    /// Whether the utility acts as a special built-in
+    ///
+    /// This value determines whether an error in the built-in interrupts the
+    /// shell. This will be false if a special built-in is executed through the
+    /// `command` built-in.
+    pub is_special: bool,
+}
+
 /// Element of runtime execution context stack
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Frame {
@@ -51,21 +68,17 @@ pub enum Frame {
     Condition,
 
     /// Built-in utility
-    Builtin {
-        /// Name of the built-in
-        name: Field,
-
-        /// Whether the utility acts as a special built-in
-        ///
-        /// This value determines whether an error in the built-in interrupts
-        /// the shell. This will be false if a special built-in is executed
-        /// through the `command` built-in.
-        is_special: bool,
-    },
+    Builtin(Builtin),
 
     /// Trap
     Trap(crate::trap::Condition),
     // TODO dot script, eval
+}
+
+impl From<Builtin> for Frame {
+    fn from(builtin: Builtin) -> Self {
+        Frame::Builtin(builtin)
+    }
 }
 
 /// Runtime execution context stack
@@ -141,6 +154,15 @@ impl Stack {
             .filter(|&frame| frame == &Frame::Loop)
             .take(max_count)
             .count()
+    }
+
+    /// Returns the innermost built-in in the stack, if any.
+    #[must_use]
+    pub fn current_builtin(&self) -> Option<&Builtin> {
+        self.inner.iter().rev().find_map(|frame| match frame {
+            Frame::Builtin(builtin) => Some(builtin),
+            _ => None,
+        })
     }
 }
 
@@ -228,10 +250,10 @@ mod tests {
     #[test]
     fn loop_count_with_non_loop_frames() {
         let mut stack = Stack::default();
-        let mut stack = stack.push(Frame::Builtin {
+        let mut stack = stack.push(Frame::Builtin(Builtin {
             name: Field::dummy(""),
             is_special: false,
-        });
+        }));
         assert_eq!(stack.loop_count(usize::MAX), 0);
         let stack = stack.push(Frame::Condition);
         assert_eq!(stack.loop_count(usize::MAX), 0);
@@ -289,5 +311,28 @@ mod tests {
         assert_eq!(stack.loop_count(4), 3);
         assert_eq!(stack.loop_count(3), 3);
         assert_eq!(stack.loop_count(2), 2);
+    }
+
+    #[test]
+    fn current_builtin() {
+        let mut stack = Stack::default();
+        assert_eq!(stack.current_builtin(), None);
+
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.current_builtin(), None);
+
+        let builtin = Builtin {
+            name: Field::dummy(""),
+            is_special: false,
+        };
+        let mut stack = stack.push(Frame::Builtin(builtin.clone()));
+        assert_eq!(stack.current_builtin(), Some(&builtin));
+
+        let builtin = Builtin {
+            name: Field::dummy("foo"),
+            is_special: true,
+        };
+        let stack = stack.push(Frame::Builtin(builtin.clone()));
+        assert_eq!(stack.current_builtin(), Some(&builtin));
     }
 }

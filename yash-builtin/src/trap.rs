@@ -18,10 +18,9 @@
 //!
 //! TODO Elaborate
 
-use crate::common::print_error_message;
+use crate::common::report_error;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
-use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
@@ -49,14 +48,14 @@ pub async fn print_traps(env: &mut Env) -> Result {
         };
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
-    env.print(&output).await
+    crate::common::output(env, &output).await
 }
 
 /// Entry point for executing the `trap` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (_options, mut operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
+        Err(error) => return report_error(env, &error).await,
     };
 
     match operands.len() {
@@ -99,6 +98,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::semantics::Divert;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::SignalHandling;
     use yash_env::trap::Signal;
@@ -200,10 +200,10 @@ mod tests {
         system.current_process_mut().close_fd(Fd::STDOUT);
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("trap"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["echo", "INT"]);
         let _ = main(&mut env, args).now_or_never().unwrap();
 

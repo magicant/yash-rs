@@ -16,11 +16,12 @@
 
 //! Defines the behavior of the unset built-in.
 
-use crate::common::print_failure_message;
-use crate::common::AsStderr;
-use crate::common::BuiltinEnv;
+use crate::common::arrange_message_and_divert;
 use thiserror::Error;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
+#[cfg(doc)]
+use yash_env::system::SharedSystem;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
@@ -75,13 +76,14 @@ pub fn unset_variables<'a>(
     }
 }
 
-pub async fn print_variables_error<E>(
-    env: &mut E,
-    errors: &[UnsetVariablesError<'_>],
-) -> crate::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
+/// Creates a message that describes the errors.
+///
+/// See [`arrange_message_and_divert`] for the second return value.
+#[must_use]
+pub fn unset_variables_error_message(
+    env: &Env,
+    errors: &[UnsetVariablesError],
+) -> (String, yash_env::semantics::Result) {
     let annotations = errors
         .iter()
         .flat_map(|error| {
@@ -104,7 +106,20 @@ where
         title: "cannot unset variable".into(),
         annotations,
     };
-    print_failure_message(env, message).await
+    arrange_message_and_divert(env, message)
+}
+
+/// Prints an error message to the standard error.
+///
+/// This function constructs a message with [`unset_variables_error_message`]
+/// and prints it with [`SharedSystem::print_error`].
+pub async fn report_variables_error(
+    env: &mut Env,
+    errors: &[UnsetVariablesError<'_>],
+) -> crate::Result {
+    let (message, divert) = unset_variables_error_message(env, errors);
+    env.system.print_error(&message).await;
+    crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 }
 
 /// Error returned by [`unset_functions`].
@@ -143,13 +158,14 @@ pub fn unset_functions<'a>(
     }
 }
 
-pub async fn print_functions_error<E>(
-    env: &mut E,
+/// Creates a message that describes the errors.
+///
+/// See [`arrange_message_and_divert`] for the second return value.
+#[must_use]
+pub fn unset_functions_error_message(
+    env: &mut Env,
     errors: &[UnsetFunctionsError<'_>],
-) -> crate::Result
-where
-    E: BuiltinEnv + AsStderr,
-{
+) -> (String, yash_env::semantics::Result) {
     let annotations = errors
         .iter()
         .flat_map(|error| {
@@ -172,7 +188,20 @@ where
         title: "cannot unset function".into(),
         annotations,
     };
-    print_failure_message(env, message).await
+    arrange_message_and_divert(env, message)
+}
+
+/// Prints an error message to the standard error.
+///
+/// This function constructs a message with [`unset_functions_error_message`]
+/// and prints it with [`SharedSystem::print_error`].
+pub async fn report_functions_error(
+    env: &mut Env,
+    errors: &[UnsetFunctionsError<'_>],
+) -> crate::Result {
+    let (message, divert) = unset_functions_error_message(env, errors);
+    env.system.print_error(&message).await;
+    crate::Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
 }
 
 #[cfg(test)]

@@ -61,16 +61,18 @@
 //! parameters](yash_env::variable::VariableSet::positional_params_mut) to be an
 //! array. If it is not an array, the built-in panics.
 
-use crate::common::print_failure_message;
+use crate::common::arrange_message_and_divert;
 use crate::common::syntax_error;
-use crate::common::BuiltinEnv;
+use std::borrow::Cow;
 use yash_env::builtin::Result;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Value;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::Location;
 
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     // TODO: POSIX does not require the shift built-in to support XBD Utility
@@ -108,19 +110,22 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         let (label, location) = match operand_location {
             None => (
                 "there are no positional parameters".into(),
-                &env.stack.builtin_name().origin,
+                env.stack.current_builtin().map_or_else(
+                    || Cow::Owned(Location::dummy("")),
+                    |b| Cow::Borrowed(&b.name.origin),
+                ),
             ),
             Some(location) => (
                 format!(
-                    "requested to shift {} but there are only {}",
+                    "requested to shift {} but there {} only {}",
                     count,
-                    values.len()
+                    if values.len() == 1 { "is" } else { "are" },
+                    values.len(),
                 )
                 .into(),
-                location,
+                Cow::Borrowed(location),
             ),
         };
-        let location = location.clone();
         let last_location = params.last_assigned_location.clone();
         let mut annotations = vec![Annotation::new(AnnotationType::Error, label, &location)];
         if let Some(last_location) = &last_location {
@@ -135,11 +140,13 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             title: "cannot shift positional parameters".into(),
             annotations,
         };
-        return print_failure_message(env, message).await;
+        let (message, divert) = arrange_message_and_divert(env, message);
+        env.system.print_error(&message).await;
+        return Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert);
     }
 
     values.drain(..count);
-    params.last_assigned_location = Some(env.stack.builtin_name().origin.clone());
+    params.last_assigned_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
     Result::default()
 }
 
@@ -153,6 +160,7 @@ mod tests {
     use std::vec;
     use yash_env::semantics::Divert;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
@@ -160,10 +168,10 @@ mod tests {
     #[test]
     fn shifting_without_operand() {
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
@@ -193,10 +201,10 @@ mod tests {
     #[test]
     fn shifting_with_operand() {
         let mut env = Env::new_virtual();
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value =
             Some(Value::array(["1", "2", "3", "4", "5", "6", "7"]));
 
@@ -230,10 +238,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
         let expected_result = Result::with_exit_status_and_divert(
@@ -243,7 +251,7 @@ mod tests {
         assert_eq!(actual_result, expected_result);
         assert_stderr(&state, |stderr| {
             assert!(
-                stderr.contains("no positional parameters"),
+                stderr.contains("there are no positional parameters"),
                 "stderr = {stderr:?}",
             )
         });
@@ -254,10 +262,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
 
         let args = Field::dummies(["4"]);
@@ -281,10 +289,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
         // TODO Enable POSIX mode
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1.5"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
@@ -304,10 +312,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("shift"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1", "2"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();

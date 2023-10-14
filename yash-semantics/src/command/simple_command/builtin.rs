@@ -29,6 +29,7 @@ use yash_env::builtin::Main;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
+use yash_env::stack::Builtin as FrameBuiltin;
 use yash_env::stack::Frame;
 use yash_env::variable::ContextType;
 use yash_env::Env;
@@ -45,7 +46,7 @@ pub async fn execute_builtin(
     use yash_env::builtin::Type::*;
     let name = fields.remove(0);
     let is_special = builtin.r#type == Special;
-    let env = &mut env.push_frame(Frame::Builtin { name, is_special });
+    let env = &mut env.push_frame(FrameBuiltin { name, is_special }.into());
     let env = &mut RedirGuard::new(env);
     let mut xtrace = XTrace::from_options(&env.options);
     if let Err(e) = env.perform_redirs(redirs, xtrace.as_mut()).await {
@@ -62,8 +63,8 @@ pub async fn execute_builtin(
         main: Main,
         mut xtrace: Option<XTrace>,
     ) -> yash_env::builtin::Result {
-        let name = assert_matches!(env.stack.last(), Some(Frame::Builtin { name, .. }) => name);
-        trace_fields(xtrace.as_mut(), std::slice::from_ref(name));
+        let builtin = assert_matches!(env.stack.last(), Some(Frame::Builtin(builtin)) => builtin);
+        trace_fields(xtrace.as_mut(), std::slice::from_ref(&builtin.name));
         trace_fields(xtrace.as_mut(), &fields);
         print(env, xtrace).await;
 
@@ -267,9 +268,9 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async {
-                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name, is_special }] => {
-                    assert_eq!(name.value, "builtin");
-                    assert!(!is_special);
+                assert_matches!(&env.stack[..], [Frame::Builtin(builtin)] => {
+                    assert_eq!(builtin.name.value, "builtin");
+                    assert!(!builtin.is_special);
                 });
                 Default::default()
             })
@@ -279,9 +280,9 @@ mod tests {
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
             Box::pin(async {
-                assert_matches!(&env.stack[..], &[Frame::Builtin { ref name, is_special }] => {
-                    assert_eq!(name.value, "special");
-                    assert!(is_special);
+                assert_matches!(&env.stack[..], [Frame::Builtin(builtin)] => {
+                    assert_eq!(builtin.name.value, "special");
+                    assert!(builtin.is_special);
                 });
                 Default::default()
             })

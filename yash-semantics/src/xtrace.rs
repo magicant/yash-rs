@@ -204,12 +204,12 @@ pub async fn finish(env: &mut Env, xtrace: Option<XTrace>) -> String {
     }
 }
 
-/// Convenience function for [finish]ing and [print](Env::print_error)ing an
-/// (optional) `XTrace`.
+/// Convenience function for [finish]ing and
+/// [print](yash_env::SharedSystem::print_error)ing an (optional) `XTrace`.
 pub async fn print<X: Into<Option<XTrace>>>(env: &mut Env, xtrace: X) {
     async fn inner(env: &mut Env, xtrace: Option<XTrace>) {
         let s = finish(env, xtrace).await;
-        env.print_error(&s).await;
+        env.system.print_error(&s).await;
     }
     inner(env, xtrace.into()).await
 }

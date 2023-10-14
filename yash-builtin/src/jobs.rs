@@ -79,12 +79,12 @@
 //! A portable job ID must start with a `%`. If an operand does not have a
 //! leading `%`, the built-in assumes one silently, which is not portable.
 
-use crate::common::print_error_message;
-use crate::common::print_failure_message;
+use crate::common::output;
+use crate::common::report_error;
+use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
-use crate::common::Print;
 use std::fmt::Write;
 use yash_env::builtin::Result;
 use yash_env::job::id::parse;
@@ -164,7 +164,7 @@ fn find_error_message(error: FindError, operand: &Field) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
         Ok(result) => result,
-        Err(error) => return print_error_message(env, &error).await,
+        Err(error) => return report_error(env, &error).await,
     };
 
     let mut accumulator = Accumulator {
@@ -197,13 +197,13 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.report(index, &env.jobs[index]),
                 Err(error) => {
-                    return print_failure_message(env, find_error_message(error, &operand)).await
+                    return report_failure(env, find_error_message(error, &operand)).await
                 }
             }
         }
     }
 
-    let result = env.print(&accumulator.print).await;
+    let result = output(env, &accumulator.print).await;
 
     if result.exit_status().is_successful() {
         for index in accumulator.indices_reported {
@@ -232,6 +232,7 @@ mod tests {
     use yash_env::job::Pid;
     use yash_env::job::WaitStatus;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::trap::Signal;
@@ -401,10 +402,10 @@ mod tests {
         env.jobs.add(Job::new(Pid::from_raw(2)));
 
         let args = Field::dummies(["%2"]);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -428,10 +429,10 @@ mod tests {
         env.jobs.add(Job::new(Pid::from_raw(100)));
 
         let args = Field::dummies(["%?first", "%echo"]);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
@@ -451,10 +452,10 @@ mod tests {
         job.name = "exit 0".to_string();
         let i10 = env.jobs.add(job);
 
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
@@ -488,10 +489,10 @@ mod tests {
         let mut env = Env::with_system(system);
         let i72 = env.jobs.add(Job::new(Pid::from_raw(72)));
 
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("jobs"),
             is_special: false,
-        });
+        }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
         assert!(env.jobs[i72].status_changed);

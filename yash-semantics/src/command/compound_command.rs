@@ -40,7 +40,7 @@ async fn perform_redirs(
     let mut xtrace = XTrace::from_options(&env.options);
     let result = env.perform_redirs(redirs, xtrace.as_mut()).await;
     let xtrace = finish(env, xtrace).await;
-    env.print_error(&xtrace).await;
+    env.system.print_error(&xtrace).await;
     result
 }
 

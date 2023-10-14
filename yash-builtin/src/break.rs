@@ -74,28 +74,18 @@
 //! Part of the break built-in implementation is shared with the
 //! continue built-in implementation.
 
-use crate::common::print_error_message;
-use crate::common::print_simple_error_message;
-use crate::common::BuiltinEnv;
+use crate::common::report_error;
+use crate::common::report_simple_error;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_syntax::source::pretty::Annotation;
-use yash_syntax::source::pretty::AnnotationType;
 
 // pub mod display;
 pub mod semantics;
 pub mod syntax;
 
-async fn print_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
-    let builtin_name = &env.stack.builtin_name();
-    let location = builtin_name.origin.clone();
-    print_simple_error_message(
-        env,
-        "cannot break",
-        Annotation::new(AnnotationType::Error, error.to_string().into(), &location),
-    )
-    .await
+async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Result {
+    report_simple_error(env, &format!("cannot break: {}", error)).await
 }
 
 /// Entry point for executing the `break` built-in
@@ -105,8 +95,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     match syntax::parse(env, args) {
         Ok(count) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
-            Err(e) => print_semantics_error(env, &e).await,
+            Err(e) => report_semantics_error(env, &e).await,
         },
-        Err(e) => print_error_message(env, &e).await,
+        Err(e) => report_error(env, &e).await,
     }
 }

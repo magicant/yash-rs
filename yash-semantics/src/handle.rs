@@ -43,7 +43,7 @@ pub trait Handle {
 #[async_trait(?Send)]
 impl Handle for yash_syntax::parser::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(&mut env.system, self).await;
+        print_message(env, self).await;
         Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
     }
 }
@@ -57,7 +57,7 @@ impl Handle for yash_syntax::parser::Error {
 #[async_trait(?Send)]
 impl Handle for crate::expansion::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(&mut env.system, self).await;
+        print_message(env, self).await;
         Break(Divert::Interrupt(Some(ExitStatus::ERROR)))
     }
 }
@@ -77,7 +77,7 @@ impl Handle for crate::expansion::Error {
 #[async_trait(?Send)]
 impl Handle for crate::redir::Error {
     async fn handle(&self, env: &mut Env) -> super::Result {
-        print_message(&mut env.system, self).await;
+        print_message(env, self).await;
         env.exit_status = ExitStatus::ERROR;
         Continue(())
     }

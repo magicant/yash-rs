@@ -17,15 +17,13 @@
 //! Part of the cd built-in that prints the new working directory
 
 use super::target::Origin;
-use crate::common::AsStdout;
-use crate::common::BuiltinEnv;
-use crate::common::Stdout;
+use crate::common::arrange_message_and_divert;
 use std::path::Path;
 use yash_env::system::Errno;
 use yash_env::Env;
-use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::syntax::Fd;
 
 impl Origin {
     /// Whether the built-in should print the target directory path.
@@ -45,8 +43,8 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
     }
 
     let line = format!("{}\n", path.display());
-    match env.as_stdout().try_print(&line).await {
-        Ok(()) => (),
+    match env.system.write_all(Fd::STDOUT, line.as_bytes()).await {
+        Ok(_) => (),
         Err(errno) => handle_print_error(env, errno).await,
     }
 }
@@ -55,15 +53,11 @@ pub async fn print_path(env: &mut Env, path: &Path, origin: &Origin) {
 ///
 /// The message is only a warning because it does not affect the exit status.
 async fn handle_print_error(env: &mut Env, errno: Errno) {
-    let builtin_name = env.stack.builtin_name();
     let message = Message {
         r#type: AnnotationType::Warning,
         title: format!("cannot print new $PWD: {}", errno).into(),
-        annotations: vec![Annotation::new(
-            AnnotationType::Info,
-            format!("error occurred in the {} built-in", builtin_name.value).into(),
-            &builtin_name.origin,
-        )],
+        annotations: vec![],
     };
-    yash_env::io::print_message(&mut env.system, message).await;
+    let (message, _divert) = arrange_message_and_divert(env, message);
+    env.system.print_error(&message).await;
 }

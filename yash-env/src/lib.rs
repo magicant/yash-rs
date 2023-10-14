@@ -216,17 +216,6 @@ impl Env {
         let _ = self.prepare_pwd();
     }
 
-    /// Convenience function that prints the given error message.
-    ///
-    /// This function prints the `message` to the standard error of this
-    /// environment, ignoring any errors that may happen.
-    ///
-    /// No formatting takes place in this function. Use [`io::print_message`] or
-    /// [`io::print_error`] to format a message before printing.
-    pub async fn print_error(&mut self, message: &str) {
-        let _: Result<_, _> = self.system.write_all(Fd::STDERR, message.as_bytes()).await;
-    }
-
     /// Waits for some signals to be caught in the current process.
     ///
     /// Returns an array of signals caught.
@@ -272,6 +261,22 @@ impl Env {
             return Some(signals);
         }
         None
+    }
+
+    /// Whether error messages should be printed in color
+    ///
+    /// This function decides whether messages printed to the standard error
+    /// should contain ANSI color escape sequences. The result is true only if
+    /// the standard error is a terminal.
+    ///
+    /// The current implementaion simply checks if the standard error is a
+    /// terminal. This will be changed in the future to support user
+    /// configuration.
+    #[must_use]
+    fn should_print_error_in_color(&self) -> bool {
+        // TODO Enable color depending on user config (force/auto/never)
+        // TODO Check if the terminal really supports color (needs terminfo)
+        self.system.isatty(Fd::STDERR) == Ok(true)
     }
 
     /// Returns a file descriptor to the controlling terminal.

@@ -29,9 +29,8 @@ pub mod startup;
 // mod runner;
 
 async fn print_version(env: &mut env::Env) -> i32 {
-    use builtin::common::Print;
     let version = env!("CARGO_PKG_VERSION");
-    let result = &env.print(&format!("yash {}\n", version)).await;
+    let result = builtin::common::output(env, &format!("yash {}\n", version)).await;
     result.exit_status().0
 }
 
@@ -53,7 +52,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         Ok(Parse::Run(run)) => run,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
             return ExitStatus::ERROR.0;
         }
     };
@@ -95,7 +94,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         Ok(input) => input,
         Err(e) => {
             let arg0 = std::env::args().next().unwrap_or_else(|| "yash".to_owned());
-            env.print_error(&format!("{}: {}\n", arg0, e)).await;
+            env.system.print_error(&format!("{}: {}\n", arg0, e)).await;
             return ExitStatus::FAILURE.0;
         }
     };

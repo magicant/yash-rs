@@ -65,7 +65,7 @@ async fn define_function(env: &mut Env, def: &syntax::FunctionDefinition) -> Res
         }
         Err(error) => {
             // TODO Use pretty::Message and annotate_snippet
-            env.print_error(&error.to_string()).await;
+            env.system.print_error(&error.to_string()).await;
             env.exit_status = ExitStatus::ERROR;
         }
     }

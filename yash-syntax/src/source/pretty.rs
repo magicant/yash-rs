@@ -77,6 +77,9 @@ impl std::fmt::Debug for Annotation<'_> {
 
 impl<'a> Annotation<'a> {
     /// Creates a new annotation.
+    ///
+    /// This function makes a borrow of `location.code.value` and stores it in
+    /// `self.code`. If it has been mutually borrowed, this function panics.
     pub fn new(r#type: AnnotationType, label: Cow<'a, str>, location: &'a Location) -> Self {
         Annotation {
             r#type,

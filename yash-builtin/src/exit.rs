@@ -128,6 +128,7 @@ mod tests {
     use crate::tests::assert_stderr;
     use futures_util::FutureExt;
     use std::rc::Rc;
+    use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::VirtualSystem;
 
@@ -167,10 +168,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["-1"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
@@ -187,10 +188,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["foo"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
@@ -207,10 +208,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["999999999999999999999999999999"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
@@ -230,10 +231,10 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(system);
-        let mut env = env.push_frame(Frame::Builtin {
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
             name: Field::dummy("exit"),
             is_special: true,
-        });
+        }));
         let args = Field::dummies(["1", "2"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
