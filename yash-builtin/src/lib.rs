@@ -57,6 +57,7 @@ pub mod r#return;
 pub mod set;
 pub mod shift;
 pub mod trap;
+pub mod typeset;
 pub mod unset;
 pub mod wait;
 
