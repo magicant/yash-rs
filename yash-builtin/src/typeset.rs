@@ -253,3 +253,131 @@
 //! # Implementation notes
 //!
 //! TBD
+
+use yash_env::option::State;
+use yash_env::semantics::Field;
+
+pub mod syntax;
+
+/// Attribute that can be set on a variable
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum VariableAttr {
+    /// The variable is read-only.
+    ReadOnly,
+    /// The variable is exported to the environment.
+    Export,
+}
+
+/// Scope in which a variable is defined or selected
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Scope {
+    /// Operates on global scope.
+    ///
+    /// When defining variables: If an existing variable is visible in the
+    /// current scope, the variable is updated. Otherwise, a new variable is
+    /// created in the base context.
+    ///
+    /// When printing variables: All visible variables are printed.
+    Global,
+
+    /// Operates on local scope.
+    ///
+    /// When defining variables: The variable is defined in the local context of
+    /// the current function.
+    ///
+    /// When printing variables: Only variables defined in the local context of
+    /// the current function are printed.
+    Local,
+}
+
+/// Set of information to define variables
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SetVariables {
+    /// Names and optional values of the variables to be defined
+    pub variables: Vec<Field>,
+    /// Attributes to be set on the variables
+    pub attrs: Vec<(VariableAttr, State)>,
+    /// Scope in which the variables are defined
+    pub scope: Scope,
+}
+
+/// Set of information to print variables
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintVariables {
+    /// Names of the variables to be printed
+    ///
+    /// If empty, all variables are printed.
+    pub variables: Vec<Field>,
+    /// Attributes to select the variables to be printed
+    pub attrs: Vec<(VariableAttr, State)>,
+    /// Scope in which the variables are printed
+    pub scope: Scope,
+}
+
+/// Attribute that can be set on a function
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum FunctionAttr {
+    /// The function is read-only.
+    ReadOnly,
+}
+
+/// Set of information to modify functions
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SetFunctions {
+    /// Names of the functions to be modified
+    pub functions: Vec<Field>,
+    /// Attributes to be set on the functions
+    pub attrs: Vec<(FunctionAttr, State)>,
+}
+
+/// Set of information to print functions
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintFunctions {
+    /// Names of the functions to be printed
+    ///
+    /// If empty, all functions are printed.
+    pub functions: Vec<Field>,
+    /// Attributes to select the functions to be printed
+    pub attrs: Vec<(FunctionAttr, State)>,
+}
+
+/// Set of information that specifies the behavior of the typeset built-in
+///
+/// The [`syntax::parse`] function returns a value of this type after parsing
+/// the arguments of the built-in.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Command {
+    SetVariables(SetVariables),
+    PrintVariables(PrintVariables),
+    SetFunctions(SetFunctions),
+    PrintFunctions(PrintFunctions),
+}
+
+impl From<SetVariables> for Command {
+    fn from(v: SetVariables) -> Self {
+        Self::SetVariables(v)
+    }
+}
+
+impl From<PrintVariables> for Command {
+    fn from(v: PrintVariables) -> Self {
+        Self::PrintVariables(v)
+    }
+}
+
+impl From<SetFunctions> for Command {
+    fn from(v: SetFunctions) -> Self {
+        Self::SetFunctions(v)
+    }
+}
+
+impl From<PrintFunctions> for Command {
+    fn from(v: PrintFunctions) -> Self {
+        Self::PrintFunctions(v)
+    }
+}
+
+// TODO the main function
