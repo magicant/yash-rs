@@ -162,6 +162,13 @@ impl<'a> From<&'a Value> for QuotedValue<'a> {
     }
 }
 
+/// Extracts the wrapped reference to the value.
+impl AsRef<Value> for QuotedValue<'_> {
+    fn as_ref(&self) -> &Value {
+        self.value
+    }
+}
+
 /// Constructs a quoted string.
 impl<'a> From<QuotedValue<'a>> for Cow<'a, str> {
     fn from(value: QuotedValue<'a>) -> Self {
