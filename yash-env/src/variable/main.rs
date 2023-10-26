@@ -16,9 +16,12 @@
 
 //! Module that defines the main `Variable` type.
 
+use std::ops::Deref;
+
 use super::Expansion;
 use super::Quirk;
 use super::Value;
+use thiserror::Error;
 use yash_syntax::source::Location;
 
 /// Definition of a variable.
@@ -150,5 +153,148 @@ impl Variable {
     /// location.
     pub fn expand(&self, location: &Location) -> Expansion {
         super::quirk::expand(self, location)
+    }
+}
+
+/// Managed mutable reference to a variable.
+///
+/// This type allows you to mutate a variable in a variable set while
+/// maintaining the invariants of the variable set. To obtain an instance of
+/// `VariableRefMut`, use (TODO TBD).
+#[derive(Debug, Eq, PartialEq)]
+pub struct VariableRefMut<'a>(&'a mut Variable);
+
+/// Error that occurs when assigning a value to a read-only variable.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot assign to read-only variable")]
+pub struct AssignError {
+    /// Value that was being assigned.
+    pub new_value: Value,
+    /// Location of the failed assignment.
+    pub assigned_location: Option<Location>,
+    /// Location where the variable was made read-only.
+    pub read_only_location: Location,
+}
+
+impl<'a> From<&'a mut Variable> for VariableRefMut<'a> {
+    fn from(variable: &'a mut Variable) -> Self {
+        VariableRefMut(variable)
+    }
+}
+
+impl Deref for VariableRefMut<'_> {
+    type Target = Variable;
+
+    fn deref(&self) -> &Variable {
+        self.0
+    }
+}
+
+impl<'a> VariableRefMut<'a> {
+    /// Assigns a value to this variable.
+    ///
+    /// The `value` and `location` operands are set to the `value` and
+    /// `last_assigned_location` fields of this variable, respectively.
+    /// If successful, this function returns the previous value and location.
+    ///
+    /// This function fails if this variable is read-only. In that case, the
+    /// error contains the given operands as well as the location where this
+    /// variable was made read-only.
+    pub fn assign(
+        &mut self,
+        value: Value,
+        location: Option<Location>,
+    ) -> Result<(Option<Value>, Option<Location>), AssignError> {
+        if let Some(read_only_location) = self.0.read_only_location.clone() {
+            return Err(AssignError {
+                new_value: value,
+                assigned_location: location,
+                read_only_location,
+            });
+        }
+
+        let old_value = std::mem::replace(&mut self.0.value, Some(value));
+        let old_location = std::mem::replace(&mut self.0.last_assigned_location, location);
+        Ok((old_value, old_location))
+        // TODO Apply quirk
+    }
+
+    /// Sets whether this variable is exported or not.
+    pub fn export(&mut self, is_exported: bool) {
+        self.0.is_exported = is_exported;
+    }
+
+    /// Makes this variable read-only.
+    ///
+    /// The `location` operand is set to the `read_only_location` field of this
+    /// variable unless this variable is already read-only.
+    pub fn make_read_only(&mut self, location: Location) {
+        self.0.read_only_location.get_or_insert(location);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assigning_values() {
+        let mut var = Variable::default();
+        let mut var = VariableRefMut::from(&mut var);
+        let result = var.assign(Value::scalar("foo value"), None);
+        assert_eq!(result, Ok((None, None)));
+        assert_eq!(*var, Variable::new("foo value"));
+
+        let location = Location::dummy("bar location");
+        let result = var.assign(Value::scalar("bar value"), Some(location.clone()));
+        assert_eq!(result, Ok((Some(Value::scalar("foo value")), None)));
+        assert_eq!(var.value, Some(Value::scalar("bar value")));
+        assert_eq!(var.last_assigned_location.as_ref(), Some(&location));
+
+        assert_eq!(
+            var.assign(Value::array(["a", "b", "c"]), None),
+            Ok((Some(Value::scalar("bar value")), Some(location))),
+        );
+        assert_eq!(var.value, Some(Value::array(["a", "b", "c"])));
+    }
+
+    #[test]
+    fn exporting() {
+        let mut var = Variable::default();
+        let mut var = VariableRefMut::from(&mut var);
+        assert!(!var.is_exported);
+        var.export(true);
+        assert!(var.is_exported);
+        var.export(false);
+        assert!(!var.is_exported);
+    }
+
+    #[test]
+    fn making_variables_read_only() {
+        let mut var = Variable::default();
+        let mut var = VariableRefMut::from(&mut var);
+        let location = Location::dummy("read-only location");
+        var.make_read_only(location.clone());
+        assert_eq!(var.read_only_location.as_ref(), Some(&location));
+
+        var.make_read_only(Location::dummy("ignored location"));
+        assert_eq!(var.read_only_location.as_ref(), Some(&location));
+    }
+
+    #[test]
+    fn assigning_to_readonly_variable() {
+        let mut var = Variable::default();
+        let mut var = VariableRefMut::from(&mut var);
+        let assigned_location = Some(Location::dummy("assigned location"));
+        let read_only_location = Location::dummy("read-only location");
+        var.make_read_only(read_only_location.clone());
+        assert_eq!(
+            var.assign(Value::scalar("foo value"), assigned_location.clone()),
+            Err(AssignError {
+                new_value: Value::scalar("foo value"),
+                assigned_location,
+                read_only_location,
+            })
+        )
     }
 }

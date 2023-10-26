@@ -67,7 +67,9 @@ pub use self::quirk::Quirk;
 
 mod main;
 
+pub use self::main::AssignError as NewAssignError; // TODO Remove this alias
 pub use self::main::Variable;
+pub use self::main::VariableRefMut;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct VariableInContext {
