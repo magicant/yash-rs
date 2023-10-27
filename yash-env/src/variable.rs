@@ -657,13 +657,8 @@ impl VariableSet {
     /// See also [`positional_params_mut`](Self::positional_params_mut).
     #[must_use]
     pub fn positional_params(&self) -> &Variable {
-        &self
-            .contexts
-            .iter()
-            .filter(|c| c.r#type == ContextType::Regular)
-            .next_back()
-            .expect("base context has gone")
-            .positional_params
+        let index = Self::index_of_topmost_regular_context(&self.contexts);
+        &self.contexts[index].positional_params
     }
 
     /// Returns a mutable reference to the positional parameters.
@@ -683,13 +678,8 @@ impl VariableSet {
     /// topmost regular context.
     #[must_use]
     pub fn positional_params_mut(&mut self) -> &mut Variable {
-        &mut self
-            .contexts
-            .iter_mut()
-            .filter(|c| c.r#type == ContextType::Regular)
-            .next_back()
-            .expect("base context has gone")
-            .positional_params
+        let index = Self::index_of_topmost_regular_context(&self.contexts);
+        &mut self.contexts[index].positional_params
     }
 
     fn push_context_impl(&mut self, context_type: ContextType) {
