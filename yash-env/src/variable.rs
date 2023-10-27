@@ -48,6 +48,7 @@
 use crate::Env;
 use itertools::Itertools;
 use std::borrow::Borrow;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fmt::Write;
@@ -205,6 +206,11 @@ impl VariableSet {
 
     /// Gets a reference to the variable with the specified name.
     ///
+    /// This method searches for a variable of the specified name and returns a
+    /// reference to it if found. If variables with the same name are defined in
+    /// multiple contexts, the one in the topmost context is considered
+    /// _visible_ and returned.
+    ///
     /// You cannot retrieve positional parameters using this function.
     /// See [`positional_params`](Self::positional_params).
     #[must_use]
@@ -336,19 +342,146 @@ impl VariableSet {
         }
     }
 
+    /// Computes the index of the topmost regular context.
+    fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
+        contexts
+            .iter()
+            .rposition(|context| context.r#type == ContextType::Regular)
+            .expect("base context has gone")
+    }
+
     /// Computes the index of the context that matches the specified scope.
     fn index_of_context(scope: Scope, contexts: &[Context]) -> usize {
-        fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
-            contexts
-                .iter()
-                .rposition(|context| context.r#type == ContextType::Regular)
-                .expect("base context has gone")
-        }
-
         match scope {
             Scope::Global => 0,
-            Scope::Local => index_of_topmost_regular_context(contexts),
-            Scope::Volatile => index_of_topmost_regular_context(contexts) + 1,
+            Scope::Local => Self::index_of_topmost_regular_context(contexts),
+            Scope::Volatile => Self::index_of_topmost_regular_context(contexts) + 1,
+        }
+    }
+
+    /// Gets a mutable reference to the variable with the specified name.
+    ///
+    /// You use this method to create or modify a variable.
+    /// This method searches for a variable of the specified name, and returns
+    /// a mutable reference to it if found. Otherwise, this method creates a new
+    /// variable and returns a mutable reference to it. The `scope` parameter
+    /// determines the context the variable is searched for or created in:
+    ///
+    /// - If the scope is `Global`, an existing variable is searched for like
+    ///   [`get`](Self::get). If a variable is found in a [regular] context, the
+    ///   variable is returned. If there is no variable, a new defaulted
+    ///   variable is created in the base context and returned.
+    ///   - If a variable is in a [volatile] context, this method removes the
+    ///     variable from the volatile context and continues searching for a
+    ///     variable in a lower context. If a variable is found in a regular
+    ///     context, it is replaced with the variable removed from the volatile
+    ///     context. Otherwise, the removed variable is moved to the base
+    ///     context. In either case, the moved variable is returned.
+    /// - If the scope is `Local`, the behavior is the same as `Global` except
+    ///   that any contexts below the topmost [regular] context are ignored.
+    ///   If a variable is found in the topmost regular context, the variable is
+    ///   returned. If there is no variable, a new defaulted variable is created
+    ///   in the topmost regular context and returned.
+    ///   - If a variable is in a [volatile] context above the topmost regular
+    ///     context, the variable is moved to the topmost regular context,
+    ///     overwriting the existing variable if any. The moved variable is
+    ///     returned.
+    /// - If the scope is `Volatile`, this method requires the topmost context
+    ///   to be [volatile]. Otherwise, this method will **panic!** If the
+    ///   topmost context is volatile, an existing variable is searched for like
+    ///   [`get`](Self::get). If a variable is found in the topmost context, the
+    ///   variable is returned. If a variable is found in a lower context, the
+    ///   variable is cloned to the topmost context and returned. If there is
+    ///   no variable, a new defaulted variable is created in the topmost
+    ///   context and returned.
+    ///
+    /// You cannot modify positional parameters using this function.
+    /// See [`positional_params_mut`](Self::positional_params_mut).
+    ///
+    /// [regular]: ContextType::Regular
+    /// [volatile]: ContextType::Volatile
+    pub fn get_or_new(&mut self, name: String, scope: Scope) -> VariableRefMut {
+        let stack = match self.all_variables.entry(name) {
+            Vacant(vacant) => vacant.insert(Vec::new()),
+            Occupied(occupied) => occupied.into_mut(),
+        };
+        let context_index = match scope {
+            Scope::Global => 0,
+            Scope::Local => Self::index_of_topmost_regular_context(&self.contexts),
+            Scope::Volatile => self.contexts.len() - 1,
+        };
+
+        match scope {
+            Scope::Global | Scope::Local => 'branch: {
+                let mut removed_volatile_variable = None;
+
+                // Search the stack for a variable to return, and add one if not found.
+                // If a variable is in a volatile context, temporarily move it to
+                // removed_volatile_variable and put it in the target context before returning it.
+                while let Some(var) = stack.last_mut() {
+                    if var.context_index < context_index {
+                        break;
+                    }
+                    match self.contexts[var.context_index].r#type {
+                        ContextType::Regular => {
+                            if let Some(removed_volatile_variable) = removed_volatile_variable {
+                                var.variable = removed_volatile_variable;
+                            }
+                            break 'branch;
+                        }
+                        ContextType::Volatile => {
+                            removed_volatile_variable.get_or_insert(stack.pop().unwrap().variable);
+                        }
+                    }
+                }
+
+                stack.push(VariableInContext {
+                    variable: removed_volatile_variable.unwrap_or_default(),
+                    context_index,
+                });
+            }
+
+            Scope::Volatile => {
+                assert_eq!(
+                    self.contexts[context_index].r#type,
+                    ContextType::Volatile,
+                    "no volatile context to store the variable"
+                );
+                if let Some(var) = stack.last() {
+                    if var.context_index != context_index {
+                        stack.push(VariableInContext {
+                            variable: var.variable.clone(),
+                            context_index,
+                        });
+                    }
+                } else {
+                    stack.push(VariableInContext {
+                        variable: Variable::default(),
+                        context_index,
+                    });
+                }
+            }
+        }
+
+        VariableRefMut::from(&mut stack.last_mut().unwrap().variable)
+    }
+
+    /// Panics if the set contains any variable with an invalid context index.
+    #[cfg(test)]
+    fn assert_normalized(&self) {
+        for context in self.all_variables.values() {
+            for vars in context.windows(2) {
+                assert!(
+                    vars[0].context_index < vars[1].context_index,
+                    "invalid context index: {vars:?}",
+                );
+            }
+            if let Some(last) = context.last() {
+                assert!(
+                    last.context_index < self.contexts.len(),
+                    "invalid context index: {last:?}",
+                );
+            }
         }
     }
 
@@ -853,6 +986,319 @@ mod tests {
         assert_eq!(variable.value, Some(Value::scalar("0")));
         variables.pop_context_impl();
         assert_eq!(variables.get("foo"), None);
+    }
+
+    #[test]
+    fn new_variable_in_global_scope() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+
+        assert_eq!(*var, Variable::default());
+        var.assign(Value::scalar("VALUE"), None).unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The global variable still exists.
+        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("VALUE")));
+    }
+
+    #[test]
+    fn existing_variable_in_global_scope() {
+        let mut set = VariableSet::new();
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+        var.assign(Value::scalar("ONE"), None).unwrap();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+
+        assert_eq!(var.value, Some(Value::scalar("ONE")));
+        var.assign(Value::scalar("TWO"), Some(Location::dummy("somewhere")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The updated global variable still exists.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("TWO")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("somewhere")),
+        );
+    }
+
+    #[test]
+    fn new_variable_in_local_scope() {
+        // This test case creates two local variables in separate contexts.
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+
+        assert_eq!(*var, Variable::default());
+
+        var.assign(Value::scalar("OUTER"), None).unwrap();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+
+        assert_eq!(*var, Variable::default());
+        var.assign(Value::scalar("INNER"), Some(Location::dummy("location")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl(); // volatile
+        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("INNER")));
+        set.pop_context_impl(); // regular
+        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("OUTER")));
+        set.pop_context_impl(); // regular
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn existing_variable_in_local_scope() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+        var.assign(Value::scalar("OLD"), None).unwrap();
+
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+
+        assert_eq!(var.value, Some(Value::scalar("OLD")));
+        var.assign(Value::scalar("NEW"), None).unwrap();
+        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("NEW")));
+        set.assert_normalized();
+        set.pop_context_impl();
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn new_variable_in_volatile_scope() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+
+        assert_eq!(*var, Variable::default());
+        var.assign(Value::scalar("VOLATILE"), None).unwrap();
+        assert_eq!(
+            set.get("foo").unwrap().value,
+            Some(Value::scalar("VOLATILE")),
+        );
+        set.assert_normalized();
+        set.pop_context_impl();
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn cloning_existing_regular_variable_to_volatile_context() {
+        let mut set = VariableSet::new();
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+        var.assign(Value::scalar("VALUE"), None).unwrap();
+        var.make_read_only(Location::dummy("read-only location"));
+        let save_var = var.clone();
+        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+
+        assert_eq!(*var, save_var);
+        var.export(true);
+        assert!(set.get("foo").unwrap().is_exported);
+        set.assert_normalized();
+        set.pop_context_impl();
+        // The exported variable is a volatile clone of the global variable.
+        // The global variable is still not exported.
+        assert_eq!(set.get("foo"), Some(&save_var));
+    }
+
+    #[test]
+    fn existing_variable_in_volatile_scope() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("INITIAL"), None).unwrap();
+
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+
+        assert_eq!(var.value, Some(Value::scalar("INITIAL")));
+        var.assign(
+            Value::array(["MODIFIED"]),
+            Some(Location::dummy("somewhere")),
+        )
+        .unwrap();
+        assert_eq!(
+            set.get("foo").unwrap().value,
+            Some(Value::array(["MODIFIED"])),
+        );
+        set.assert_normalized();
+        set.pop_context_impl();
+        assert_eq!(set.get("foo"), None);
+    }
+
+    #[test]
+    fn lowering_volatile_variable_to_base_context() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+            .unwrap();
+        var.export(true);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+
+        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("anywhere")),
+        );
+        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The value DUMMY is now gone.
+        // The value VOLATILE has been overwritten by NEW.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("somewhere")),
+        );
+        // But it's still exported.
+        assert!(var.is_exported);
+    }
+
+    #[test]
+    fn lowering_volatile_variable_to_middle_regular_context() {
+        let mut set = VariableSet::new();
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+        var.assign(Value::scalar("ONE"), None).unwrap();
+        set.push_context_impl(ContextType::Regular);
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+        var.assign(Value::scalar("TWO"), None).unwrap();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+            .unwrap();
+        var.export(true);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Global);
+
+        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("anywhere")),
+        );
+        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The value TWO has been overwritten by NEW.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("somewhere")),
+        );
+        // But it's still exported.
+        assert!(var.is_exported);
+        set.pop_context_impl();
+        // The value ONE is still there.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("ONE")));
+    }
+
+    #[test]
+    fn lowering_volatile_variable_to_topmost_regular_context_without_existing_variable() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+            .unwrap();
+        var.export(true);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+
+        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("anywhere")),
+        );
+        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The value DUMMY is now gone.
+        // The value VOLATILE has been overwritten by NEW.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(
+            var.last_assigned_location,
+            Some(Location::dummy("somewhere")),
+        );
+        // But it's still exported.
+        assert!(var.is_exported);
+    }
+
+    #[test]
+    fn lowering_volatile_variable_to_topmost_regular_context_overwriting_existing_variable() {
+        let mut set = VariableSet::new();
+        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(ContextType::Regular);
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+        var.assign(Value::scalar("OLD"), None).unwrap();
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        set.push_context_impl(ContextType::Volatile);
+        let mut var = set.get_or_new("foo".into(), Scope::Volatile);
+        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("first")))
+            .unwrap();
+        var.export(true);
+        set.push_context_impl(ContextType::Volatile);
+
+        let mut var = set.get_or_new("foo".into(), Scope::Local);
+
+        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(var.last_assigned_location, Some(Location::dummy("first")));
+        var.assign(Value::scalar("NEW"), Some(Location::dummy("second")))
+            .unwrap();
+        set.assert_normalized();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        set.pop_context_impl();
+        // The value DUMMY is now gone.
+        // The value OLD has been overwritten by NEW.
+        let var = set.get("foo").unwrap();
+        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(var.last_assigned_location, Some(Location::dummy("second")));
+        // But it's still exported.
+        assert!(var.is_exported);
+    }
+
+    #[test]
+    #[should_panic(expected = "no volatile context to store the variable")]
+    fn missing_volatile_context() {
+        let mut set = VariableSet::new();
+        set.get_or_new("foo".into(), Scope::Volatile);
     }
 
     #[test]
