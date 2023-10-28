@@ -391,6 +391,7 @@ impl Env {
     /// automatically applies the `AllExport` [shell
     /// option](crate::option::Option). You should always prefer this unless you
     /// want to ignore the option.
+    #[deprecated(note = "Use `get_or_create_variable` instead")]
     pub fn assign_variable(
         &mut self,
         scope: Scope,

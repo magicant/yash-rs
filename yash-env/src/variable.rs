@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// TODO Elaborate overall module doc text, demonstrate how pushing and popping
+// contexts work with examples.
 //! Type definitions for shell variables.
 //!
 //! A [`VariableSet`] is a stack of contexts, and a _context_ is a map of
@@ -259,6 +261,7 @@ impl VariableSet {
     ///
     /// You cannot modify positional parameters using this function.
     /// See [`positional_params_mut`](Self::positional_params_mut).
+    #[deprecated(note = "use `get_or_new` instead")]
     pub fn assign(
         &mut self,
         scope: Scope,
