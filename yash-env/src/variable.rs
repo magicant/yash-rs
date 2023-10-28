@@ -992,33 +992,33 @@ mod tests {
         let mut var = set.get_or_new("foo".into(), Scope::Global);
 
         assert_eq!(*var, Variable::default());
-        var.assign(Value::scalar("VALUE"), None).unwrap();
+        var.assign("VALUE".into(), None).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
         // The global variable still exists.
-        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("VALUE")));
+        assert_eq!(set.get("foo").unwrap().value, Some("VALUE".into()));
     }
 
     #[test]
     fn existing_variable_in_global_scope() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo".into(), Scope::Global);
-        var.assign(Value::scalar("ONE"), None).unwrap();
+        var.assign("ONE".into(), None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
 
         let mut var = set.get_or_new("foo".into(), Scope::Global);
 
-        assert_eq!(var.value, Some(Value::scalar("ONE")));
-        var.assign(Value::scalar("TWO"), Some(Location::dummy("somewhere")))
+        assert_eq!(var.value, Some("ONE".into()));
+        var.assign("TWO".into(), Some(Location::dummy("somewhere")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
         // The updated global variable still exists.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("TWO")));
+        assert_eq!(var.value, Some("TWO".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("somewhere")),
@@ -1035,20 +1035,20 @@ mod tests {
 
         assert_eq!(*var, Variable::default());
 
-        var.assign(Value::scalar("OUTER"), None).unwrap();
+        var.assign("OUTER".into(), None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
 
         let mut var = set.get_or_new("foo".into(), Scope::Local);
 
         assert_eq!(*var, Variable::default());
-        var.assign(Value::scalar("INNER"), Some(Location::dummy("location")))
+        var.assign("INNER".into(), Some(Location::dummy("location")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl(); // volatile
-        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("INNER")));
+        assert_eq!(set.get("foo").unwrap().value, Some("INNER".into()));
         set.pop_context_impl(); // regular
-        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("OUTER")));
+        assert_eq!(set.get("foo").unwrap().value, Some("OUTER".into()));
         set.pop_context_impl(); // regular
         assert_eq!(set.get("foo"), None);
     }
@@ -1058,13 +1058,13 @@ mod tests {
         let mut set = VariableSet::new();
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo".into(), Scope::Local);
-        var.assign(Value::scalar("OLD"), None).unwrap();
+        var.assign("OLD".into(), None).unwrap();
 
         let mut var = set.get_or_new("foo".into(), Scope::Local);
 
-        assert_eq!(var.value, Some(Value::scalar("OLD")));
-        var.assign(Value::scalar("NEW"), None).unwrap();
-        assert_eq!(set.get("foo").unwrap().value, Some(Value::scalar("NEW")));
+        assert_eq!(var.value, Some("OLD".into()));
+        var.assign("NEW".into(), None).unwrap();
+        assert_eq!(set.get("foo").unwrap().value, Some("NEW".into()));
         set.assert_normalized();
         set.pop_context_impl();
         assert_eq!(set.get("foo"), None);
@@ -1079,11 +1079,8 @@ mod tests {
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
 
         assert_eq!(*var, Variable::default());
-        var.assign(Value::scalar("VOLATILE"), None).unwrap();
-        assert_eq!(
-            set.get("foo").unwrap().value,
-            Some(Value::scalar("VOLATILE")),
-        );
+        var.assign("VOLATILE".into(), None).unwrap();
+        assert_eq!(set.get("foo").unwrap().value, Some("VOLATILE".into()));
         set.assert_normalized();
         set.pop_context_impl();
         assert_eq!(set.get("foo"), None);
@@ -1093,7 +1090,7 @@ mod tests {
     fn cloning_existing_regular_variable_to_volatile_context() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo".into(), Scope::Global);
-        var.assign(Value::scalar("VALUE"), None).unwrap();
+        var.assign("VALUE".into(), None).unwrap();
         var.make_read_only(Location::dummy("read-only location"));
         let save_var = var.clone();
         set.push_context_impl(ContextType::Volatile);
@@ -1116,11 +1113,11 @@ mod tests {
         let mut set = VariableSet::new();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("INITIAL"), None).unwrap();
+        var.assign("INITIAL".into(), None).unwrap();
 
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
 
-        assert_eq!(var.value, Some(Value::scalar("INITIAL")));
+        assert_eq!(var.value, Some("INITIAL".into()));
         var.assign(
             Value::array(["MODIFIED"]),
             Some(Location::dummy("somewhere")),
@@ -1141,21 +1138,21 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        var.assign("DUMMY".into(), None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
             .unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo".into(), Scope::Global);
 
-        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(var.value, Some("VOLATILE".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl();
@@ -1164,7 +1161,7 @@ mod tests {
         // The value DUMMY is now gone.
         // The value VOLATILE has been overwritten by NEW.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(var.value, Some("NEW".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("somewhere")),
@@ -1177,32 +1174,32 @@ mod tests {
     fn lowering_volatile_variable_to_middle_regular_context() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo".into(), Scope::Local);
-        var.assign(Value::scalar("ONE"), None).unwrap();
+        var.assign("ONE".into(), None).unwrap();
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo".into(), Scope::Local);
-        var.assign(Value::scalar("TWO"), None).unwrap();
+        var.assign("TWO".into(), None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
             .unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo".into(), Scope::Global);
 
-        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(var.value, Some("VOLATILE".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
         // The value TWO has been overwritten by NEW.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(var.value, Some("NEW".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("somewhere")),
@@ -1212,7 +1209,7 @@ mod tests {
         set.pop_context_impl();
         // The value ONE is still there.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("ONE")));
+        assert_eq!(var.value, Some("ONE".into()));
     }
 
     #[test]
@@ -1222,21 +1219,21 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        var.assign("DUMMY".into(), None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("anywhere")))
+        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
             .unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo".into(), Scope::Local);
 
-        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(var.value, Some("VOLATILE".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign(Value::scalar("NEW"), Some(Location::dummy("somewhere")))
+        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl();
@@ -1244,7 +1241,7 @@ mod tests {
         // The value DUMMY is now gone.
         // The value VOLATILE has been overwritten by NEW.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(var.value, Some("NEW".into()));
         assert_eq!(
             var.last_assigned_location,
             Some(Location::dummy("somewhere")),
@@ -1259,22 +1256,22 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo".into(), Scope::Local);
-        var.assign(Value::scalar("OLD"), None).unwrap();
+        var.assign("OLD".into(), None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("DUMMY"), None).unwrap();
+        var.assign("DUMMY".into(), None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo".into(), Scope::Volatile);
-        var.assign(Value::scalar("VOLATILE"), Some(Location::dummy("first")))
+        var.assign("VOLATILE".into(), Some(Location::dummy("first")))
             .unwrap();
         var.export(true);
         set.push_context_impl(ContextType::Volatile);
 
         let mut var = set.get_or_new("foo".into(), Scope::Local);
 
-        assert_eq!(var.value, Some(Value::scalar("VOLATILE")));
+        assert_eq!(var.value, Some("VOLATILE".into()));
         assert_eq!(var.last_assigned_location, Some(Location::dummy("first")));
-        var.assign(Value::scalar("NEW"), Some(Location::dummy("second")))
+        var.assign("NEW".into(), Some(Location::dummy("second")))
             .unwrap();
         set.assert_normalized();
         set.pop_context_impl();
@@ -1283,7 +1280,7 @@ mod tests {
         // The value DUMMY is now gone.
         // The value OLD has been overwritten by NEW.
         let var = set.get("foo").unwrap();
-        assert_eq!(var.value, Some(Value::scalar("NEW")));
+        assert_eq!(var.value, Some("NEW".into()));
         assert_eq!(var.last_assigned_location, Some(Location::dummy("second")));
         // But it's still exported.
         assert!(var.is_exported);
@@ -1469,10 +1466,10 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), variable)
             .unwrap()
             .unwrap();
-        assert_eq!(old_value.value, Some(Value::scalar("first")));
+        assert_eq!(old_value.value, Some("first".into()));
         assert!(!old_value.is_exported);
         let new_value = variables.get("foo").unwrap();
-        assert_eq!(new_value.value, Some(Value::scalar("second")));
+        assert_eq!(new_value.value, Some("second".into()));
         assert!(new_value.is_exported);
     }
 
@@ -1487,10 +1484,10 @@ mod tests {
             .assign(Scope::Local, "foo".to_string(), Variable::new("second"))
             .unwrap()
             .unwrap();
-        assert_eq!(old_value.value, Some(Value::scalar("first")));
+        assert_eq!(old_value.value, Some("first".into()));
         assert!(old_value.is_exported);
         let new_value = variables.get("foo").unwrap();
-        assert_eq!(new_value.value, Some(Value::scalar("second")));
+        assert_eq!(new_value.value, Some("second".into()));
         assert!(new_value.is_exported);
     }
 
@@ -1641,10 +1638,10 @@ mod tests {
         variables.extend_env([("foo", "FOO"), ("bar", "OK")]);
 
         let foo = variables.get("foo").unwrap();
-        assert_eq!(foo.value, Some(Value::scalar("FOO")));
+        assert_eq!(foo.value, Some("FOO".into()));
         assert!(foo.is_exported);
         let bar = variables.get("bar").unwrap();
-        assert_eq!(bar.value, Some(Value::scalar("OK")));
+        assert_eq!(bar.value, Some("OK".into()));
         assert!(bar.is_exported);
     }
 

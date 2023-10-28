@@ -92,6 +92,27 @@ impl Value {
     }
 }
 
+/// Converts a string into a scalar value.
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Scalar(value)
+    }
+}
+
+/// Converts a string slice to a scalar value.
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Scalar(value.to_owned())
+    }
+}
+
+/// Converts a vector of strings into an array value.
+impl From<Vec<String>> for Value {
+    fn from(values: Vec<String>) -> Self {
+        Array(values)
+    }
+}
+
 /// Wrapper of [`Value`] for [quoting](Value::quote).
 #[derive(Clone, Copy, Debug)]
 pub struct QuotedValue<'a> {
