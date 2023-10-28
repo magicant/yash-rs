@@ -33,11 +33,6 @@ pub struct Variable {
     /// assignment.
     pub value: Option<Value>,
 
-    /// Special characteristics of the variable
-    ///
-    /// See [`Quirk`] and [`expand`](Self::expand) for details.
-    pub quirk: Option<Quirk>,
-
     /// Optional location where this variable was assigned.
     ///
     /// If the current variable value originates from an assignment performed in
@@ -56,6 +51,11 @@ pub struct Variable {
     /// Otherwise, `read_only_location` is the location of the simple command
     /// that executed the `readonly` built-in that made this variable read-only.
     pub read_only_location: Option<Location>,
+
+    /// Special characteristics of the variable
+    ///
+    /// See [`Quirk`] and [`expand`](Self::expand) for details.
+    pub quirk: Option<Quirk>,
 }
 
 impl Variable {
@@ -230,6 +230,13 @@ impl<'a> VariableRefMut<'a> {
     /// variable unless this variable is already read-only.
     pub fn make_read_only(&mut self, location: Location) {
         self.0.read_only_location.get_or_insert(location);
+    }
+
+    /// Sets the quirk of this variable.
+    ///
+    /// This function overwrites any existing quirk of this variable.
+    pub fn set_quirk(&mut self, quirk: Option<Quirk>) {
+        self.0.quirk = quirk;
     }
 }
 
