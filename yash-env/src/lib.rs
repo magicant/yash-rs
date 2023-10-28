@@ -55,6 +55,7 @@ use self::trap::TrapSet;
 use self::variable::AssignError;
 use self::variable::Scope;
 use self::variable::Variable;
+use self::variable::VariableRefMut;
 use self::variable::VariableSet;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
@@ -403,6 +404,23 @@ impl Env {
         self.variables.assign(scope, name, value)
     }
 
+    /// Get an existing variable or create a new one.
+    ///
+    /// This method is a thin wrapper around [`VariableSet::get_or_new`].
+    /// If the [`AllExport`] option is on, the variable is
+    /// [exported](VariableRefMut::export) before being returned from the
+    /// method.
+    ///
+    /// You should prefer using this method over [`VariableSet::get_or_new`] to
+    /// make sure that the [`AllExport`] option is applied.
+    pub fn get_or_create_variable(&mut self, name: String, scope: Scope) -> VariableRefMut {
+        let mut variable = self.variables.get_or_new(name, scope);
+        if self.options.get(AllExport) == On {
+            variable.export(true);
+        }
+        variable
+    }
+
     pub(crate) fn errexit_is_applicable(&self) -> bool {
         self.options.get(ErrExit) == On && !self.stack.contains(&Frame::Condition)
     }
@@ -747,6 +765,27 @@ mod tests {
 
         assert_eq!(env.variables.get("a").unwrap(), &a.export());
         assert_eq!(env.variables.get("b").unwrap(), &b);
+    }
+
+    #[test]
+    fn get_or_create_variable_with_all_export_off() {
+        let mut env = Env::new_virtual();
+        let mut a = env.get_or_create_variable("a".into(), Scope::Global);
+        assert!(!a.is_exported);
+        a.export(true);
+        let a = env.get_or_create_variable("a".into(), Scope::Global);
+        assert!(a.is_exported);
+    }
+
+    #[test]
+    fn get_or_create_variable_with_all_export_on() {
+        let mut env = Env::new_virtual();
+        env.options.set(AllExport, On);
+        let mut a = env.get_or_create_variable("a".into(), Scope::Global);
+        assert!(a.is_exported);
+        a.export(false);
+        let a = env.get_or_create_variable("a".into(), Scope::Global);
+        assert!(a.is_exported);
     }
 
     #[test]

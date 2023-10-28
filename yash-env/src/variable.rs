@@ -395,8 +395,13 @@ impl VariableSet {
     ///   no variable, a new defaulted variable is created in the topmost
     ///   context and returned.
     ///
-    /// You cannot modify positional parameters using this function.
+    /// You cannot modify positional parameters using this method.
     /// See [`positional_params_mut`](Self::positional_params_mut).
+    ///
+    /// This method does not apply the [`AllExport`](crate::option::AllExport)
+    /// option.  You need to [export](VariableRefMut::export) the variable
+    /// yourself, or use [`Env::get_or_create_variable`] to get the option
+    /// applied automatically.
     ///
     /// [regular]: ContextType::Regular
     /// [volatile]: ContextType::Volatile
