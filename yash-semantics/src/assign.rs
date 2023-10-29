@@ -60,7 +60,7 @@ pub async fn perform_assignment(
 
     let mut variable = env.get_or_create_variable(name, scope);
     variable
-        .assign(value, Some(assign.location.clone()))
+        .assign(value, assign.location.clone())
         .map_err(|e| Error {
             cause: ErrorCause::AssignError(e),
             location: assign.location.clone(),
@@ -163,7 +163,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let location = Location::dummy("read-only location");
         let mut var = env.variables.get_or_new("v", Scope::Global);
-        var.assign("read-only".into(), None).unwrap();
+        var.assign("read-only", None).unwrap();
         var.make_read_only(location.clone());
         let a: Assign = "v=new".parse().unwrap();
         let e = perform_assignment(&mut env, &a, Scope::Global, false, None)

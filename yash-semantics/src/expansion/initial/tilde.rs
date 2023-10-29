@@ -70,7 +70,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.variables
             .get_or_new("HOME", Scope::Global)
-            .assign("/home/foobar".into(), None)
+            .assign("/home/foobar", None)
             .unwrap();
 
         let expansion = expand("", &env);

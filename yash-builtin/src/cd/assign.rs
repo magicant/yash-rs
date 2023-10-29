@@ -142,7 +142,7 @@ mod tests {
             is_special: false,
         }));
         env.get_or_create_variable("OLDPWD", Global)
-            .assign("/old/pwd".into(), None)
+            .assign("/old/pwd", None)
             .unwrap();
 
         set_oldpwd(&mut env, "/some/dir".to_string())
@@ -169,7 +169,7 @@ mod tests {
         }));
         let read_only_location = Location::dummy("read-only");
         let mut oldpwd = env.get_or_create_variable("OLDPWD", Global);
-        oldpwd.assign("/old/pwd".into(), None).unwrap();
+        oldpwd.assign("/old/pwd", None).unwrap();
         oldpwd.make_read_only(read_only_location.clone());
 
         set_oldpwd(&mut env, "/foo".to_string())
@@ -220,7 +220,7 @@ mod tests {
             is_special: false,
         }));
         env.get_or_create_variable("PWD", Global)
-            .assign("/old/path".into(), None)
+            .assign("/old/path", None)
             .unwrap();
 
         set_pwd(&mut env, PathBuf::from("/some/path"))
@@ -248,7 +248,7 @@ mod tests {
         }));
         let read_only_location = Location::dummy("read-only");
         let mut pwd = env.get_or_create_variable("PWD", Global);
-        pwd.assign("/old/path".into(), None).unwrap();
+        pwd.assign("/old/path", None).unwrap();
         pwd.make_read_only(read_only_location.clone());
 
         set_pwd(&mut env, PathBuf::from("/some/path"))

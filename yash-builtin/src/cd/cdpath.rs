@@ -102,7 +102,7 @@ mod tests {
     fn directory_not_found_from_cdpath() {
         let mut env = Env::new_virtual();
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo:/bar".into(), None)
+            .assign("/foo:/bar", None)
             .unwrap();
         assert_eq!(search(&env, Path::new("one")), None);
         assert_eq!(search(&env, Path::new("/two")), None);
@@ -115,7 +115,7 @@ mod tests {
         create_dummy_file(&system, "/bar/two/file");
         let mut env = Env::with_system(system);
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo:/bar:/x".into(), None)
+            .assign("/foo:/bar:/x", None)
             .unwrap();
 
         assert_eq!(
@@ -156,7 +156,7 @@ mod tests {
         system.current_process_mut().chdir("/bar".into());
         let mut env = Env::with_system(system);
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo::/baz".into(), None)
+            .assign("/foo::/baz", None)
             .unwrap();
 
         assert_eq!(search(&env, Path::new("two")), None);
@@ -170,7 +170,7 @@ mod tests {
         system.current_process_mut().chdir("/".into());
         let mut env = Env::with_system(system);
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo:/bar:/x".into(), None)
+            .assign("/foo:/bar:/x", None)
             .unwrap();
 
         assert_eq!(search(&env, Path::new("./one")), None);
@@ -184,7 +184,7 @@ mod tests {
         system.current_process_mut().chdir("/bar/two".into());
         let mut env = Env::with_system(system);
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo:/bar:/x".into(), None)
+            .assign("/foo:/bar:/x", None)
             .unwrap();
 
         assert_eq!(search(&env, Path::new("../foo")), None);
@@ -196,7 +196,7 @@ mod tests {
         create_dummy_file(&system, "/foo/one/file");
         let mut env = Env::with_system(system);
         env.get_or_create_variable("CDPATH", Global)
-            .assign("/foo:/bar:/x".into(), None)
+            .assign("/foo:/bar:/x", None)
             .unwrap();
 
         assert_eq!(search(&env, Path::new("/foo")), None);

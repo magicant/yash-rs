@@ -242,7 +242,7 @@ fn local_builtin_main(
                 // TODO reject invalid name
                 let value = value[eq_index + 1..].to_owned();
                 let mut var = env.variables.get_or_new(name, Scope::Local);
-                if let Err(error) = var.assign(value.into(), Some(origin)) {
+                if let Err(error) = var.assign(value, origin) {
                     unimplemented!("assignment error: {:?}", error);
                 }
             } else {

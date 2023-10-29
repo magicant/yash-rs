@@ -253,10 +253,10 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut var = env.variables.get_or_new("foo", Scope::Global);
-        var.assign("value".into(), None).unwrap();
+        var.assign("value", None).unwrap();
         var.export(true);
         let mut var = env.variables.get_or_new("bar", Scope::Global);
-        var.assign("Hello, world!".into(), None).unwrap();
+        var.assign("Hello, world!", None).unwrap();
         let mut var = env.variables.get_or_new("baz", Scope::Global);
         var.assign(Value::array(["one", ""]), None).unwrap();
 

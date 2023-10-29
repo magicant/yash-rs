@@ -84,9 +84,9 @@ mod tests {
     fn variable_scalar() {
         let mut env = Env::new_virtual();
         let mut x = env.variables.get_or_new("x", Scope::Global);
-        x.assign("foo".into(), None).unwrap();
+        x.assign("foo", None).unwrap();
         let mut path = env.variables.get_or_new("PATH", Scope::Global);
-        path.assign("/bin:/usr/bin".into(), Some(Location::dummy("assigned")))
+        path.assign("/bin:/usr/bin", Location::dummy("assigned"))
             .unwrap();
         path.export(true);
         path.make_read_only(Location::dummy("read-only"));

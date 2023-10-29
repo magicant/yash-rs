@@ -1072,7 +1072,7 @@ mod tests {
     fn ifs_join_full_scalar_ifs() {
         let mut vars = VariableSet::new();
         vars.get_or_new("IFS", Scope::Global)
-            .assign("!?".into(), None)
+            .assign("!?", None)
             .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
@@ -1102,7 +1102,7 @@ mod tests {
     fn ifs_join_full_empty_scalar_ifs() {
         let mut vars = VariableSet::new();
         vars.get_or_new("IFS", Scope::Global)
-            .assign("".into(), None)
+            .assign("", None)
             .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),

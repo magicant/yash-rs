@@ -79,7 +79,7 @@ pub async fn execute(
 
     for Field { value, origin } in values {
         let mut var = env.get_or_create_variable(name.value.clone(), Scope::Global);
-        match var.assign(value.into(), Some(origin)) {
+        match var.assign(value, origin) {
             Ok(_) => match body.execute(env).await {
                 Break(Divert::Break { count: 0 }) => break,
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
@@ -286,7 +286,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -329,7 +329,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -404,7 +404,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         let mut var = env.variables.get_or_new("x", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
 
@@ -422,7 +422,7 @@ mod tests {
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
         let mut var = env.variables.get_or_new("x", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
 

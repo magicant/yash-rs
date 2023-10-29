@@ -110,7 +110,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/link".into(), None)
+            .assign("/foo/link", None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
         assert_eq!(result, "/foo/link\n");
@@ -121,7 +121,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/./link".into(), None)
+            .assign("/foo/./link", None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
         assert_eq!(result, "/foo/bar/dir\n");
@@ -132,7 +132,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/link".into(), None)
+            .assign("/foo/link", None)
             .unwrap();
         let result = compute(&env, Mode::Physical).unwrap();
         assert_eq!(result, "/foo/bar/dir\n");

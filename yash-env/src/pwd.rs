@@ -103,7 +103,7 @@ impl Env {
                 .into_string()
                 .map_err(|_| nix::Error::EILSEQ)?;
             let mut var = self.variables.get_or_new("PWD", Global);
-            var.assign(dir.into(), None)?;
+            var.assign(dir, None)?;
             var.export(true);
         }
         Ok(())
@@ -193,7 +193,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/link".into(), None)
+            .assign("/foo/link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -207,7 +207,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/./link".into(), None)
+            .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -222,7 +222,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/./link".into(), None)
+            .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -237,7 +237,7 @@ mod tests {
         let mut env = env_with_symlink_to_dir();
         env.variables
             .get_or_new("PWD", Global)
-            .assign("/foo/bar".into(), None)
+            .assign("/foo/bar", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -267,7 +267,7 @@ mod tests {
         let mut env = Env::with_system(system);
         env.variables
             .get_or_new("PWD", Global)
-            .assign("link".into(), None)
+            .assign("link", None)
             .unwrap();
 
         let result = env.prepare_pwd();

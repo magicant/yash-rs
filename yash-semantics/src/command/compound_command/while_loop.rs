@@ -274,7 +274,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -359,7 +359,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -516,7 +516,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -601,7 +601,7 @@ mod tests {
             env.exit_status = ExitStatus(123);
             env.variables
                 .get_or_new("n", Scope::Global)
-                .assign(n.to_string().into(), None)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();

@@ -242,7 +242,7 @@ mod tests {
         let mut env = Env::new_virtual();
         env.variables
             .get_or_new("PS4", Global)
-            .assign("+${X=x}+ ".into(), None)
+            .assign("+${X=x}+ ", None)
             .unwrap();
         env
     }

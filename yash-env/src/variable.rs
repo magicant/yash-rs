@@ -619,7 +619,7 @@ impl VariableSet {
     {
         for (name, value) in vars {
             let mut var = self.get_or_new(name, Scope::Global);
-            if var.assign(value.into().into(), None).is_ok() {
+            if var.assign(value.into(), None).is_ok() {
                 var.export(true)
             }
         }
@@ -653,7 +653,7 @@ impl VariableSet {
         ];
         for &(name, value) in VARIABLES {
             self.get_or_new(name, Scope::Global)
-                .assign(value.into(), None)
+                .assign(value, None)
                 .ok();
         }
 
@@ -1016,7 +1016,7 @@ mod tests {
         let mut var = set.get_or_new("foo", Scope::Global);
 
         assert_eq!(*var, Variable::default());
-        var.assign("VALUE".into(), None).unwrap();
+        var.assign("VALUE", None).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1028,15 +1028,14 @@ mod tests {
     fn existing_variable_in_global_scope() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo", Scope::Global);
-        var.assign("ONE".into(), None).unwrap();
+        var.assign("ONE", None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Global);
 
         assert_eq!(var.value, Some("ONE".into()));
-        var.assign("TWO".into(), Some(Location::dummy("somewhere")))
-            .unwrap();
+        var.assign("TWO", Location::dummy("somewhere")).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1059,15 +1058,14 @@ mod tests {
 
         assert_eq!(*var, Variable::default());
 
-        var.assign("OUTER".into(), None).unwrap();
+        var.assign("OUTER", None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Local);
 
         assert_eq!(*var, Variable::default());
-        var.assign("INNER".into(), Some(Location::dummy("location")))
-            .unwrap();
+        var.assign("INNER", Location::dummy("location")).unwrap();
         set.assert_normalized();
         set.pop_context_impl(); // volatile
         assert_eq!(set.get("foo").unwrap().value, Some("INNER".into()));
@@ -1082,12 +1080,12 @@ mod tests {
         let mut set = VariableSet::new();
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo", Scope::Local);
-        var.assign("OLD".into(), None).unwrap();
+        var.assign("OLD", None).unwrap();
 
         let mut var = set.get_or_new("foo", Scope::Local);
 
         assert_eq!(var.value, Some("OLD".into()));
-        var.assign("NEW".into(), None).unwrap();
+        var.assign("NEW", None).unwrap();
         assert_eq!(set.get("foo").unwrap().value, Some("NEW".into()));
         set.assert_normalized();
         set.pop_context_impl();
@@ -1103,7 +1101,7 @@ mod tests {
         let mut var = set.get_or_new("foo", Scope::Volatile);
 
         assert_eq!(*var, Variable::default());
-        var.assign("VOLATILE".into(), None).unwrap();
+        var.assign("VOLATILE", None).unwrap();
         assert_eq!(set.get("foo").unwrap().value, Some("VOLATILE".into()));
         set.assert_normalized();
         set.pop_context_impl();
@@ -1114,7 +1112,7 @@ mod tests {
     fn cloning_existing_regular_variable_to_volatile_context() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo", Scope::Global);
-        var.assign("VALUE".into(), None).unwrap();
+        var.assign("VALUE", None).unwrap();
         var.make_read_only(Location::dummy("read-only location"));
         let save_var = var.clone();
         set.push_context_impl(ContextType::Volatile);
@@ -1137,16 +1135,13 @@ mod tests {
         let mut set = VariableSet::new();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("INITIAL".into(), None).unwrap();
+        var.assign("INITIAL", None).unwrap();
 
         let mut var = set.get_or_new("foo", Scope::Volatile);
 
         assert_eq!(var.value, Some("INITIAL".into()));
-        var.assign(
-            Value::array(["MODIFIED"]),
-            Some(Location::dummy("somewhere")),
-        )
-        .unwrap();
+        var.assign(Value::array(["MODIFIED"]), Location::dummy("somewhere"))
+            .unwrap();
         assert_eq!(
             set.get("foo").unwrap().value,
             Some(Value::array(["MODIFIED"])),
@@ -1162,11 +1157,10 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("DUMMY".into(), None).unwrap();
+        var.assign("DUMMY", None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
-            .unwrap();
+        var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo", Scope::Global);
@@ -1176,8 +1170,7 @@ mod tests {
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
-            .unwrap();
+        var.assign("NEW", Location::dummy("somewhere")).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1198,15 +1191,14 @@ mod tests {
     fn lowering_volatile_variable_to_middle_regular_context() {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo", Scope::Local);
-        var.assign("ONE".into(), None).unwrap();
+        var.assign("ONE", None).unwrap();
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo", Scope::Local);
-        var.assign("TWO".into(), None).unwrap();
+        var.assign("TWO", None).unwrap();
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
-            .unwrap();
+        var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo", Scope::Global);
@@ -1216,8 +1208,7 @@ mod tests {
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
-            .unwrap();
+        var.assign("NEW", Location::dummy("somewhere")).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1243,11 +1234,10 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("DUMMY".into(), None).unwrap();
+        var.assign("DUMMY", None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("VOLATILE".into(), Some(Location::dummy("anywhere")))
-            .unwrap();
+        var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
 
         let mut var = set.get_or_new("foo", Scope::Local);
@@ -1257,8 +1247,7 @@ mod tests {
             var.last_assigned_location,
             Some(Location::dummy("anywhere")),
         );
-        var.assign("NEW".into(), Some(Location::dummy("somewhere")))
-            .unwrap();
+        var.assign("NEW", Location::dummy("somewhere")).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1280,14 +1269,13 @@ mod tests {
         set.push_context_impl(ContextType::Regular);
         set.push_context_impl(ContextType::Regular);
         let mut var = set.get_or_new("foo", Scope::Local);
-        var.assign("OLD".into(), None).unwrap();
+        var.assign("OLD", None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("DUMMY".into(), None).unwrap();
+        var.assign("DUMMY", None).unwrap();
         set.push_context_impl(ContextType::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
-        var.assign("VOLATILE".into(), Some(Location::dummy("first")))
-            .unwrap();
+        var.assign("VOLATILE", Location::dummy("first")).unwrap();
         var.export(true);
         set.push_context_impl(ContextType::Volatile);
 
@@ -1295,8 +1283,7 @@ mod tests {
 
         assert_eq!(var.value, Some("VOLATILE".into()));
         assert_eq!(var.last_assigned_location, Some(Location::dummy("first")));
-        var.assign("NEW".into(), Some(Location::dummy("second")))
-            .unwrap();
+        var.assign("NEW", Location::dummy("second")).unwrap();
         set.assert_normalized();
         set.pop_context_impl();
         set.pop_context_impl();
@@ -1329,7 +1316,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("X".into(), None)
+            .assign("X", None)
             .unwrap();
 
         let result = variables.unset(Scope::Global, "foo").unwrap();
@@ -1342,17 +1329,17 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("X".into(), None)
+            .assign("X", None)
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables
             .get_or_new("foo", Scope::Local)
-            .assign("Y".into(), None)
+            .assign("Y", None)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
-            .assign("Z".into(), None)
+            .assign("Z", None)
             .unwrap();
 
         let result = variables.unset(Scope::Global, "foo").unwrap();
@@ -1365,23 +1352,23 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("A".into(), None)
+            .assign("A", None)
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         // Non-local read-only variable does not prevent unsetting
         let mut readonly_foo = variables.get_or_new("foo", Scope::Local);
-        readonly_foo.assign("B".into(), None).unwrap();
+        readonly_foo.assign("B", None).unwrap();
         readonly_foo.make_read_only(Location::dummy("dummy"));
         let readonly_foo = readonly_foo.clone();
         variables.push_context_impl(ContextType::Regular);
         variables
             .get_or_new("foo", Scope::Local)
-            .assign("C".into(), None)
+            .assign("C", None)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
-            .assign("D".into(), None)
+            .assign("D", None)
             .unwrap();
 
         let result = variables.unset(Scope::Local, "foo").unwrap();
@@ -1394,7 +1381,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("A".into(), None)
+            .assign("A", None)
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
 
@@ -1408,22 +1395,22 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("A".into(), None)
+            .assign("A", None)
             .unwrap();
         variables.push_context_impl(ContextType::Regular);
         variables
             .get_or_new("foo", Scope::Local)
-            .assign("B".into(), None)
+            .assign("B", None)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
-            .assign("C".into(), None)
+            .assign("C", None)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
-            .assign("D".into(), None)
+            .assign("D", None)
             .unwrap();
 
         let result = variables.unset(Scope::Volatile, "foo").unwrap();
@@ -1436,7 +1423,7 @@ mod tests {
         let mut variables = VariableSet::new();
         variables
             .get_or_new("foo", Scope::Global)
-            .assign("A".into(), None)
+            .assign("A", None)
             .unwrap();
         variables.push_context_impl(ContextType::Volatile);
 
@@ -1450,18 +1437,18 @@ mod tests {
         let read_only_location = &Location::dummy("read-only");
         let mut variables = VariableSet::new();
         let mut foo = variables.get_or_new("foo", Scope::Global);
-        foo.assign("A".into(), None).unwrap();
+        foo.assign("A", None).unwrap();
         variables.push_context_impl(ContextType::Regular);
         let mut foo = variables.get_or_new("foo", Scope::Local);
-        foo.assign("B".into(), None).unwrap();
+        foo.assign("B", None).unwrap();
         foo.make_read_only(Location::dummy("dummy"));
         variables.push_context_impl(ContextType::Regular);
         let mut foo = variables.get_or_new("foo", Scope::Local);
-        foo.assign("C".into(), None).unwrap();
+        foo.assign("C", None).unwrap();
         foo.make_read_only(read_only_location.clone());
         variables.push_context_impl(ContextType::Regular);
         let mut foo = variables.get_or_new("foo", Scope::Local);
-        foo.assign("D".into(), None).unwrap();
+        foo.assign("D", None).unwrap();
 
         let error = variables.unset(Scope::Global, "foo").unwrap_err();
         assert_eq!(
@@ -1524,22 +1511,22 @@ mod tests {
         let mut set = VariableSet::new();
 
         let mut var = set.get_or_new("global", Scope::Global);
-        var.assign("global value".into(), None).unwrap();
+        var.assign("global value", None).unwrap();
         var.export(true);
         let mut var = set.get_or_new("local", Scope::Global);
-        var.assign("hidden value".into(), None).unwrap();
+        var.assign("hidden value", None).unwrap();
 
         let mut set = set.push_context(ContextType::Regular);
 
         let mut var = set.get_or_new("local", Scope::Local);
-        var.assign("visible value".into(), None).unwrap();
+        var.assign("visible value", None).unwrap();
         let mut var = set.get_or_new("volatile", Scope::Local);
-        var.assign("hidden value".into(), None).unwrap();
+        var.assign("hidden value", None).unwrap();
 
         let mut set = set.push_context(ContextType::Volatile);
 
         let mut var = set.get_or_new("volatile", Scope::Volatile);
-        var.assign("volatile value".into(), None).unwrap();
+        var.assign("volatile value", None).unwrap();
 
         f(&mut set);
     }
@@ -1599,7 +1586,7 @@ mod tests {
         assert_eq!(&variables.env_c_strings(), &[]);
 
         let mut var = variables.get_or_new("foo", Scope::Global);
-        var.assign("FOO".into(), None).unwrap();
+        var.assign("FOO", None).unwrap();
         var.export(true);
         let mut var = variables.get_or_new("bar", Scope::Global);
         var.assign(Value::array(["BAR"]), None).unwrap();
@@ -1608,7 +1595,7 @@ mod tests {
         var.assign(Value::array(["1", "two", "3"]), None).unwrap();
         var.export(true);
         let mut var = variables.get_or_new("null", Scope::Global);
-        var.assign("not exported".into(), None).unwrap();
+        var.assign("not exported", None).unwrap();
         variables.get_or_new("none", Scope::Global);
 
         let mut ss = variables.env_c_strings();

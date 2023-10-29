@@ -417,7 +417,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.variables
             .get_or_new("v", Scope::Global)
-            .assign("foo  bar ".into(), None)
+            .assign("foo  bar ", None)
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();
@@ -434,11 +434,11 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.variables
             .get_or_new("v", Scope::Global)
-            .assign("foo  bar ".into(), None)
+            .assign("foo  bar ", None)
             .unwrap();
         env.variables
             .get_or_new("IFS", Scope::Global)
-            .assign(" o".into(), None)
+            .assign(" o", None)
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();

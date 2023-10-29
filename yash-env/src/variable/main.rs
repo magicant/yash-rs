@@ -200,7 +200,16 @@ impl<'a> VariableRefMut<'a> {
     /// This function fails if this variable is read-only. In that case, the
     /// error contains the given operands as well as the location where this
     /// variable was made read-only.
-    pub fn assign(
+    #[inline]
+    pub fn assign<V: Into<Value>, L: Into<Option<Location>>>(
+        &mut self,
+        value: V,
+        location: L,
+    ) -> Result<(Option<Value>, Option<Location>), AssignError> {
+        self.assign_impl(value.into(), location.into())
+    }
+
+    fn assign_impl(
         &mut self,
         value: Value,
         location: Option<Location>,
@@ -253,7 +262,7 @@ mod tests {
         assert_eq!(*var, Variable::new("foo value"));
 
         let location = Location::dummy("bar location");
-        let result = var.assign(Value::scalar("bar value"), Some(location.clone()));
+        let result = var.assign(Value::scalar("bar value"), location.clone());
         assert_eq!(result, Ok((Some(Value::scalar("foo value")), None)));
         assert_eq!(var.value, Some(Value::scalar("bar value")));
         assert_eq!(var.last_assigned_location.as_ref(), Some(&location));

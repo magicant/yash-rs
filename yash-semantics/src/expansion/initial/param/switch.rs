@@ -187,7 +187,7 @@ async fn assign(
     let final_value = skip_quotes(joined_value).strip().collect::<String>();
     env.inner
         .get_or_create_variable(name, Scope::Global)
-        .assign(final_value.into(), Some(location))
+        .assign(final_value, location)
         .map_err(|e| {
             let location = e.assigned_location.as_ref().unwrap().clone();
             let cause = ErrorCause::AssignError(e);
@@ -439,7 +439,7 @@ mod tests {
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2  2", "3"]));
         env.variables
             .get_or_new("IFS", Scope::Global)
-            .assign("~".into(), None)
+            .assign("~", None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -519,7 +519,7 @@ mod tests {
     fn assign_with_read_only_variable() {
         let mut env = yash_env::Env::new_virtual();
         let mut var = env.variables.get_or_new("var", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         var.make_read_only(Location::dummy("read-only"));
         let save_var = var.clone();
         let mut env = Env::new(&mut env);

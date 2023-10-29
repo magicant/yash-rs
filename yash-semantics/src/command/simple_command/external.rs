@@ -246,10 +246,10 @@ mod tests {
                 .unwrap();
 
             let mut var = env.variables.get_or_new("env", Scope::Global);
-            var.assign("scalar".into(), None).unwrap();
+            var.assign("scalar", None).unwrap();
             var.export(true);
             let mut var = env.variables.get_or_new("local", Scope::Global);
-            var.assign("ignored".into(), None).unwrap();
+            var.assign("ignored", None).unwrap();
 
             let command: syntax::SimpleCommand = "var=123 /some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;

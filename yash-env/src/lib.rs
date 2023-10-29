@@ -210,7 +210,7 @@ impl Env {
 
         self.variables
             .get_or_new("PPID", Scope::Global)
-            .assign(self.system.getppid().to_string().into(), None)
+            .assign(self.system.getppid().to_string(), None)
             .ok();
 
         self.prepare_pwd().ok();

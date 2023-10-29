@@ -168,7 +168,7 @@ mod tests {
 
         // Prepare the PATH variable
         let path = &mut env.variables.get_or_new("PATH", Scope::Global);
-        path.assign("/bin".into(), None).unwrap();
+        path.assign("/bin", None).unwrap();
         path.export(true);
 
         let args = Field::dummies(["echo"]);
@@ -203,7 +203,7 @@ mod tests {
 
         // Prepare the PATH variable
         let path = &mut env.variables.get_or_new("PATH", Scope::Global);
-        path.assign("/usr/bin".into(), None).unwrap();
+        path.assign("/usr/bin", None).unwrap();
         path.export(true);
 
         let args = Field::dummies(["ls", "-l"]);

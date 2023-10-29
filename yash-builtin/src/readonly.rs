@@ -40,7 +40,7 @@ pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
             // TODO reject invalid name
 
             let mut var = env.get_or_create_variable(name.clone(), Scope::Global);
-            match var.assign(var_value.into(), Some(origin.clone())) {
+            match var.assign(var_value, origin.clone()) {
                 Ok(_) => var.make_read_only(origin),
                 Err(_) => {
                     // TODO Better error message

@@ -201,7 +201,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         let mut var = env.variables.get_or_new("a", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         var.make_read_only(Location::dummy("ROL"));
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();

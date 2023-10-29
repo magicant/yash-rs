@@ -258,7 +258,7 @@ mod tests {
             operand: None,
         };
         env.get_or_create_variable("HOME", Scope::Global)
-            .assign("/home/user".into(), None)
+            .assign("/home/user", None)
             .unwrap();
 
         let target = target(&env, &command, "").unwrap();
@@ -297,7 +297,7 @@ mod tests {
             is_special: false,
         }));
         env.get_or_create_variable("HOME", Scope::Global)
-            .assign("".into(), None)
+            .assign("", None)
             .unwrap();
 
         let e = target(&env, &command, "/ignored").unwrap_err();
@@ -312,7 +312,7 @@ mod tests {
             operand: Some(Field::dummy("-")),
         };
         env.get_or_create_variable("OLDPWD", Scope::Global)
-            .assign("/old/dir".into(), None)
+            .assign("/old/dir", None)
             .unwrap();
 
         let target = target(&env, &command, "/ignored").unwrap();
@@ -343,7 +343,7 @@ mod tests {
             operand: Some(operand),
         };
         env.get_or_create_variable("OLDPWD", Scope::Global)
-            .assign("".into(), None)
+            .assign("", None)
             .unwrap();
 
         let e = target(&env, &command, "/ignored").unwrap_err();

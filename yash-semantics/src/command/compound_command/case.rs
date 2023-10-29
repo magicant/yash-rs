@@ -284,11 +284,11 @@ mod tests {
     fn unquoted_backslash_escapes_next_char_in_pattern() {
         let (mut env, state) = fixture();
         let var = &mut env.variables.get_or_new("empty", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         let var = &mut env.variables.get_or_new("one", Scope::Global);
-        var.assign(r"\".into(), None).unwrap();
+        var.assign(r"\", None).unwrap();
         let var = &mut env.variables.get_or_new("v", Scope::Global);
-        var.assign(r"\\\a".into(), None).unwrap();
+        var.assign(r"\\\a", None).unwrap();
         let command: CompoundCommand = r#"case '\a' in
         ($empty) echo unquoted empty;;
         ("$empty") echo quoted empty;;

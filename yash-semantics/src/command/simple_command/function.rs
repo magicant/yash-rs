@@ -262,7 +262,7 @@ mod tests {
         );
         env.functions.define(function).unwrap();
         let mut var = env.variables.get_or_new("x", Scope::Global);
-        var.assign("".into(), None).unwrap();
+        var.assign("", None).unwrap();
         var.make_read_only(Location::dummy("readonly"));
         let command: SimpleCommand = "x=hello foo".parse().unwrap();
 
