@@ -56,7 +56,7 @@ pub async fn set_pwd(env: &mut Env, path: PathBuf) {
 async fn set_variable(env: &mut Env, name: &str, value: String) {
     let current_builtin = env.stack.current_builtin();
     let current_location = current_builtin.map(|builtin| builtin.name.origin.clone());
-    let var = &mut env.get_or_create_variable(name.to_string(), Global);
+    let var = &mut env.get_or_create_variable(name, Global);
     match var.assign(Scalar(value), current_location) {
         Ok(_) => {}
         Err(error) => return handle_assign_error(env, name, error).await,
@@ -141,7 +141,7 @@ mod tests {
             name: cd,
             is_special: false,
         }));
-        env.get_or_create_variable("OLDPWD".to_string(), Global)
+        env.get_or_create_variable("OLDPWD", Global)
             .assign("/old/pwd".into(), None)
             .unwrap();
 
@@ -168,7 +168,7 @@ mod tests {
             is_special: false,
         }));
         let read_only_location = Location::dummy("read-only");
-        let mut oldpwd = env.get_or_create_variable("OLDPWD".to_string(), Global);
+        let mut oldpwd = env.get_or_create_variable("OLDPWD", Global);
         oldpwd.assign("/old/pwd".into(), None).unwrap();
         oldpwd.make_read_only(read_only_location.clone());
 
@@ -219,7 +219,7 @@ mod tests {
             name: cd,
             is_special: false,
         }));
-        env.get_or_create_variable("PWD".to_string(), Global)
+        env.get_or_create_variable("PWD", Global)
             .assign("/old/path".into(), None)
             .unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
             is_special: false,
         }));
         let read_only_location = Location::dummy("read-only");
-        let mut pwd = env.get_or_create_variable("PWD".to_string(), Global);
+        let mut pwd = env.get_or_create_variable("PWD", Global);
         pwd.assign("/old/path".into(), None).unwrap();
         pwd.make_read_only(read_only_location.clone());
 

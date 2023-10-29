@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn directory_not_found_from_cdpath() {
         let mut env = Env::new_virtual();
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo:/bar".into(), None)
             .unwrap();
         assert_eq!(search(&env, Path::new("one")), None);
@@ -114,7 +114,7 @@ mod tests {
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo:/bar:/x".into(), None)
             .unwrap();
 
@@ -134,7 +134,7 @@ mod tests {
         create_dummy_file(&system, "/foo/one/file");
         create_dummy_file(&system, "/bar/two/file");
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign(Value::array(["/foo", "/bar", "/x"]), None)
             .unwrap();
 
@@ -155,7 +155,7 @@ mod tests {
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar".into());
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo::/baz".into(), None)
             .unwrap();
 
@@ -169,7 +169,7 @@ mod tests {
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/".into());
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo:/bar:/x".into(), None)
             .unwrap();
 
@@ -183,7 +183,7 @@ mod tests {
         create_dummy_file(&system, "/bar/two/file");
         system.current_process_mut().chdir("/bar/two".into());
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo:/bar:/x".into(), None)
             .unwrap();
 
@@ -195,7 +195,7 @@ mod tests {
         let system = Box::new(VirtualSystem::new());
         create_dummy_file(&system, "/foo/one/file");
         let mut env = Env::with_system(system);
-        env.get_or_create_variable("CDPATH".into(), Global)
+        env.get_or_create_variable("CDPATH", Global)
             .assign("/foo:/bar:/x".into(), None)
             .unwrap();
 

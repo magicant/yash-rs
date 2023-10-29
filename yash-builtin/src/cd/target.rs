@@ -257,7 +257,7 @@ mod tests {
             mode: Mode::default(),
             operand: None,
         };
-        env.get_or_create_variable("HOME".into(), Scope::Global)
+        env.get_or_create_variable("HOME", Scope::Global)
             .assign("/home/user".into(), None)
             .unwrap();
 
@@ -296,7 +296,7 @@ mod tests {
             name: arg0,
             is_special: false,
         }));
-        env.get_or_create_variable("HOME".into(), Scope::Global)
+        env.get_or_create_variable("HOME", Scope::Global)
             .assign("".into(), None)
             .unwrap();
 
@@ -311,7 +311,7 @@ mod tests {
             mode: Mode::default(),
             operand: Some(Field::dummy("-")),
         };
-        env.get_or_create_variable("OLDPWD".into(), Scope::Global)
+        env.get_or_create_variable("OLDPWD", Scope::Global)
             .assign("/old/dir".into(), None)
             .unwrap();
 
@@ -342,7 +342,7 @@ mod tests {
             mode: Mode::default(),
             operand: Some(operand),
         };
-        env.get_or_create_variable("OLDPWD".into(), Scope::Global)
+        env.get_or_create_variable("OLDPWD", Scope::Global)
             .assign("".into(), None)
             .unwrap();
 

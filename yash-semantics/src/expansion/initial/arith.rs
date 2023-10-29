@@ -237,7 +237,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
         });
         let location = Location { code, range };
         self.env
-            .get_or_create_variable(name.into(), Global)
+            .get_or_create_variable(name, Global)
             .assign(value.into(), Some(location))
             .map(drop)
     }

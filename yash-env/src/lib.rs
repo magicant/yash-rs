@@ -414,7 +414,10 @@ impl Env {
     ///
     /// You should prefer using this method over [`VariableSet::get_or_new`] to
     /// make sure that the [`AllExport`] option is applied.
-    pub fn get_or_create_variable(&mut self, name: String, scope: Scope) -> VariableRefMut {
+    pub fn get_or_create_variable<S>(&mut self, name: S, scope: Scope) -> VariableRefMut
+    where
+        S: Into<String>,
+    {
         let mut variable = self.variables.get_or_new(name, scope);
         if self.options.get(AllExport) == On {
             variable.export(true);
@@ -773,10 +776,10 @@ mod tests {
     #[test]
     fn get_or_create_variable_with_all_export_off() {
         let mut env = Env::new_virtual();
-        let mut a = env.get_or_create_variable("a".into(), Scope::Global);
+        let mut a = env.get_or_create_variable("a", Scope::Global);
         assert!(!a.is_exported);
         a.export(true);
-        let a = env.get_or_create_variable("a".into(), Scope::Global);
+        let a = env.get_or_create_variable("a", Scope::Global);
         assert!(a.is_exported);
     }
 
@@ -784,10 +787,10 @@ mod tests {
     fn get_or_create_variable_with_all_export_on() {
         let mut env = Env::new_virtual();
         env.options.set(AllExport, On);
-        let mut a = env.get_or_create_variable("a".into(), Scope::Global);
+        let mut a = env.get_or_create_variable("a", Scope::Global);
         assert!(a.is_exported);
         a.export(false);
-        let a = env.get_or_create_variable("a".into(), Scope::Global);
+        let a = env.get_or_create_variable("a", Scope::Global);
         assert!(a.is_exported);
     }
 
