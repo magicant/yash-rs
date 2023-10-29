@@ -102,7 +102,7 @@ impl Env {
                 .into_os_string()
                 .into_string()
                 .map_err(|_| nix::Error::EILSEQ)?;
-            let mut var = self.variables.get_or_new("PWD".to_string(), Global);
+            let mut var = self.variables.get_or_new("PWD", Global);
             var.assign(dir.into(), None)?;
             var.export(true);
         }
@@ -192,7 +192,7 @@ mod tests {
     fn prepare_pwd_with_correct_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/link".into(), None)
             .unwrap();
 
@@ -206,7 +206,7 @@ mod tests {
     fn prepare_pwd_with_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/./link".into(), None)
             .unwrap();
 
@@ -221,7 +221,7 @@ mod tests {
     fn prepare_pwd_with_dot_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/./link".into(), None)
             .unwrap();
 
@@ -236,7 +236,7 @@ mod tests {
     fn prepare_pwd_with_wrong_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/bar".into(), None)
             .unwrap();
 
@@ -266,7 +266,7 @@ mod tests {
 
         let mut env = Env::with_system(system);
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("link".into(), None)
             .unwrap();
 

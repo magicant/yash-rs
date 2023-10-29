@@ -69,7 +69,7 @@ mod tests {
     fn empty_name_with_scalar_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .get_or_new("HOME".into(), Scope::Global)
+            .get_or_new("HOME", Scope::Global)
             .assign("/home/foobar".into(), None)
             .unwrap();
 
@@ -101,7 +101,7 @@ mod tests {
     fn empty_name_with_array_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .get_or_new("HOME".into(), Scope::Global)
+            .get_or_new("HOME", Scope::Global)
             .assign(Value::Array(vec![]), None)
             .unwrap();
 

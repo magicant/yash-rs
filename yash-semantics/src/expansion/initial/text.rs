@@ -216,7 +216,7 @@ mod tests {
     fn raw_param() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("x".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
@@ -238,7 +238,7 @@ mod tests {
     fn braced_param() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("x".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);

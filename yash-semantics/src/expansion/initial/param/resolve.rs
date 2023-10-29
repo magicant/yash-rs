@@ -83,9 +83,9 @@ mod tests {
     #[test]
     fn variable_scalar() {
         let mut env = Env::new_virtual();
-        let mut x = env.variables.get_or_new("x".into(), Scope::Global);
+        let mut x = env.variables.get_or_new("x", Scope::Global);
         x.assign("foo".into(), None).unwrap();
-        let mut path = env.variables.get_or_new("PATH".into(), Scope::Global);
+        let mut path = env.variables.get_or_new("PATH", Scope::Global);
         path.assign("/bin:/usr/bin".into(), Some(Location::dummy("assigned")))
             .unwrap();
         path.export(true);
@@ -101,9 +101,9 @@ mod tests {
     #[test]
     fn variable_array() {
         let mut env = Env::new_virtual();
-        let mut x = env.variables.get_or_new("x".into(), Scope::Global);
+        let mut x = env.variables.get_or_new("x", Scope::Global);
         x.assign(Value::Array(vec![]), None).unwrap();
-        let mut path = env.variables.get_or_new("PATH".into(), Scope::Global);
+        let mut path = env.variables.get_or_new("PATH", Scope::Global);
         let values = ["/bin".to_string(), "/usr/bin".to_string()];
         path.assign(
             Value::array(values.clone()),

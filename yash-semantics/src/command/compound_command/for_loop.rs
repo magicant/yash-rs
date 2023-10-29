@@ -285,7 +285,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 
@@ -328,7 +328,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 
@@ -403,7 +403,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        let mut var = env.variables.get_or_new("x".into(), Scope::Global);
+        let mut var = env.variables.get_or_new("x", Scope::Global);
         var.assign("".into(), None).unwrap();
         var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
@@ -421,7 +421,7 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
-        let mut var = env.variables.get_or_new("x".into(), Scope::Global);
+        let mut var = env.variables.get_or_new("x", Scope::Global);
         var.assign("".into(), None).unwrap();
         var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();

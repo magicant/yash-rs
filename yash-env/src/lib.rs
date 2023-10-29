@@ -209,7 +209,7 @@ impl Env {
         self.variables.init();
 
         self.variables
-            .get_or_new("PPID".to_string(), Scope::Global)
+            .get_or_new("PPID", Scope::Global)
             .assign(self.system.getppid().to_string().into(), None)
             .ok();
 

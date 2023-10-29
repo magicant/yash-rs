@@ -438,7 +438,7 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2  2", "3"]));
         env.variables
-            .get_or_new("IFS".into(), Scope::Global)
+            .get_or_new("IFS", Scope::Global)
             .assign("~".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn assign_with_read_only_variable() {
         let mut env = yash_env::Env::new_virtual();
-        let mut var = env.variables.get_or_new("var".into(), Scope::Global);
+        let mut var = env.variables.get_or_new("var", Scope::Global);
         var.assign("".into(), None).unwrap();
         var.make_read_only(Location::dummy("read-only"));
         let save_var = var.clone();

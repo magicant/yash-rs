@@ -167,7 +167,7 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        let path = &mut env.variables.get_or_new("PATH".into(), Scope::Global);
+        let path = &mut env.variables.get_or_new("PATH", Scope::Global);
         path.assign("/bin".into(), None).unwrap();
         path.export(true);
 
@@ -202,7 +202,7 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        let path = &mut env.variables.get_or_new("PATH".into(), Scope::Global);
+        let path = &mut env.variables.get_or_new("PATH", Scope::Global);
         path.assign("/usr/bin".into(), None).unwrap();
         path.export(true);
 

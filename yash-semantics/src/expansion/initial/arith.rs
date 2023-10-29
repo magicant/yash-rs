@@ -308,7 +308,7 @@ mod tests {
         use yash_arith::Env;
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("v".into(), Global)
+            .get_or_new("v", Global)
             .assign("value".into(), None)
             .unwrap();
         let location = Location::dummy("my location");

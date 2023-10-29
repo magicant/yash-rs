@@ -158,7 +158,7 @@ pub mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().value = Some(Value::array(["a", "c"]));
         env.variables
-            .get_or_new("IFS".into(), Scope::Global)
+            .get_or_new("IFS", Scope::Global)
             .assign("&?!".into(), None)
             .unwrap();
         env
@@ -176,7 +176,7 @@ pub mod tests {
     fn basic_expansion() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("a1\u{30A4}".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
@@ -191,7 +191,7 @@ pub mod tests {
     fn length_of_scalar() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("a1\u{30A4}".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
@@ -207,7 +207,7 @@ pub mod tests {
     fn length_of_array() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign(Value::array(["", "foo", "1", "bar"]), None)
             .unwrap();
         let mut env = Env::new(&mut env);
@@ -233,7 +233,7 @@ pub mod tests {
 
         let mut env = env_with_positional_params_and_ifs();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("".into(), None)
             .unwrap();
         let mut param = param("foo");
@@ -255,7 +255,7 @@ pub mod tests {
 
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("abc".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);

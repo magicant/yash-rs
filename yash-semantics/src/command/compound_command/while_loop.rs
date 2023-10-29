@@ -273,7 +273,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 
@@ -358,7 +358,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 
@@ -515,7 +515,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 
@@ -600,7 +600,7 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .get_or_new("n".into(), Scope::Global)
+                .get_or_new("n", Scope::Global)
                 .assign(n.to_string().into(), None)
                 .unwrap();
 

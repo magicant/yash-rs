@@ -162,7 +162,7 @@ mod tests {
     fn perform_assignment_read_only() {
         let mut env = Env::new_virtual();
         let location = Location::dummy("read-only location");
-        let mut var = env.variables.get_or_new("v".into(), Scope::Global);
+        let mut var = env.variables.get_or_new("v", Scope::Global);
         var.assign("read-only".into(), None).unwrap();
         var.make_read_only(location.clone());
         let a: Assign = "v=new".parse().unwrap();

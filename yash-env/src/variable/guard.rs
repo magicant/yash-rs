@@ -133,11 +133,11 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut guard = env.variables.push_context(ContextType::Regular);
         guard
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("".into(), None)
             .unwrap();
         guard
-            .get_or_new("bar".into(), Scope::Local)
+            .get_or_new("bar", Scope::Local)
             .assign("".into(), None)
             .unwrap();
         VariableSet::pop_context(guard);
@@ -153,12 +153,12 @@ mod tests {
         let mut guard = env.push_context(ContextType::Regular);
         guard
             .variables
-            .get_or_new("foo".into(), Scope::Global)
+            .get_or_new("foo", Scope::Global)
             .assign("".into(), None)
             .unwrap();
         guard
             .variables
-            .get_or_new("bar".into(), Scope::Local)
+            .get_or_new("bar", Scope::Local)
             .assign("".into(), None)
             .unwrap();
         Env::pop_context(guard);

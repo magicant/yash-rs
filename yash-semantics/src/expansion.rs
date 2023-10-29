@@ -416,7 +416,7 @@ mod tests {
     fn expand_words_performs_field_splitting_possibly_with_default_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("v".into(), Scope::Global)
+            .get_or_new("v", Scope::Global)
             .assign("foo  bar ".into(), None)
             .unwrap();
         let words = &["$v".parse().unwrap()];
@@ -433,11 +433,11 @@ mod tests {
     fn expand_words_performs_field_splitting_with_current_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .get_or_new("v".into(), Scope::Global)
+            .get_or_new("v", Scope::Global)
             .assign("foo  bar ".into(), None)
             .unwrap();
         env.variables
-            .get_or_new("IFS".into(), Scope::Global)
+            .get_or_new("IFS", Scope::Global)
             .assign(" o".into(), None)
             .unwrap();
         let words = &["$v".parse().unwrap()];

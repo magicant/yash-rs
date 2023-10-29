@@ -109,7 +109,7 @@ mod tests {
     fn logical_with_correct_pwd() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/link".into(), None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
@@ -120,7 +120,7 @@ mod tests {
     fn logical_with_wrong_pwd() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/./link".into(), None)
             .unwrap();
         let result = compute(&env, Mode::Logical).unwrap();
@@ -131,7 +131,7 @@ mod tests {
     fn physical() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .get_or_new("PWD".into(), Global)
+            .get_or_new("PWD", Global)
             .assign("/foo/link".into(), None)
             .unwrap();
         let result = compute(&env, Mode::Physical).unwrap();
