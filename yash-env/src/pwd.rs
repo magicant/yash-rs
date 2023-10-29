@@ -19,7 +19,7 @@
 use super::Env;
 use crate::system::AtFlags;
 use crate::system::AT_FDCWD;
-use crate::variable::AssignError;
+use crate::variable::NewAssignError as AssignError;
 use crate::variable::Scope::Global;
 use crate::variable::Value::Scalar;
 use crate::variable::Variable;
@@ -102,8 +102,9 @@ impl Env {
                 .into_os_string()
                 .into_string()
                 .map_err(|_| nix::Error::EILSEQ)?;
-            self.variables
-                .assign(Global, "PWD".to_string(), Variable::new(dir).export())?;
+            let mut var = self.variables.get_or_new("PWD".to_string(), Global);
+            var.assign(dir.into(), None)?;
+            var.export(true);
         }
         Ok(())
     }
@@ -191,7 +192,8 @@ mod tests {
     fn prepare_pwd_with_correct_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/link"))
+            .get_or_new("PWD".into(), Global)
+            .assign("/foo/link".into(), None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -204,7 +206,8 @@ mod tests {
     fn prepare_pwd_with_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .get_or_new("PWD".into(), Global)
+            .assign("/foo/./link".into(), None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -218,7 +221,8 @@ mod tests {
     fn prepare_pwd_with_dot_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .get_or_new("PWD".into(), Global)
+            .assign("/foo/./link".into(), None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -232,7 +236,8 @@ mod tests {
     fn prepare_pwd_with_wrong_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/bar"))
+            .get_or_new("PWD".into(), Global)
+            .assign("/foo/bar".into(), None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -261,7 +266,8 @@ mod tests {
 
         let mut env = Env::with_system(system);
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("link"))
+            .get_or_new("PWD".into(), Global)
+            .assign("link".into(), None)
             .unwrap();
 
         let result = env.prepare_pwd();

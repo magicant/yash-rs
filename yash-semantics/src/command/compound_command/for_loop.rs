@@ -34,7 +34,6 @@ use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::variable::Scope;
 use yash_env::variable::Value::{Array, Scalar};
-use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::List;
@@ -79,8 +78,8 @@ pub async fn execute(
     let env = &mut env.push_frame(Frame::Loop);
 
     for Field { value, origin } in values {
-        let var = Variable::new(value).set_assigned_location(origin);
-        match env.assign_variable(Scope::Global, name.value.clone(), var) {
+        let mut var = env.get_or_create_variable(name.value.clone(), Scope::Global);
+        match var.assign(value.into(), Some(origin)) {
             Ok(_) => match body.execute(env).await {
                 Break(Divert::Break { count: 0 }) => break,
                 Break(Divert::Break { count }) => return Break(Divert::Break { count: count - 1 }),
@@ -286,7 +285,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n".into(), Scope::Global)
+                .assign(n.to_string().into(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -328,7 +328,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n".into(), Scope::Global)
+                .assign(n.to_string().into(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -402,13 +403,9 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.variables
-            .assign(
-                Scope::Global,
-                "x".to_string(),
-                Variable::new("").make_read_only(Location::dummy("")),
-            )
-            .unwrap();
+        let mut var = env.variables.get_or_new("x".into(), Scope::Global);
+        var.assign("".into(), None).unwrap();
+        var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -424,13 +421,9 @@ mod tests {
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
         env.options.set(ErrExit, On);
-        env.variables
-            .assign(
-                Scope::Global,
-                "x".to_string(),
-                Variable::new("").make_read_only(Location::dummy("")),
-            )
-            .unwrap();
+        let mut var = env.variables.get_or_new("x".into(), Scope::Global);
+        var.assign("".into(), None).unwrap();
+        var.make_read_only(Location::dummy(""));
         let command: CompoundCommand = "for x in x; do echo unreached; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

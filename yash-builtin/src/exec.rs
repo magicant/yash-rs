@@ -135,7 +135,7 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
     use yash_env::system::r#virtual::{FileBody, INode};
-    use yash_env::variable::{Scope, Variable};
+    use yash_env::variable::Scope;
     use yash_env::VirtualSystem;
 
     #[test]
@@ -167,13 +167,9 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        env.variables
-            .assign(
-                Scope::Global,
-                "PATH".to_string(),
-                Variable::new("/bin").export(),
-            )
-            .unwrap();
+        let path = &mut env.variables.get_or_new("PATH".into(), Scope::Global);
+        path.assign("/bin".into(), None).unwrap();
+        path.export(true);
 
         let args = Field::dummies(["echo"]);
         _ = main(&mut env, args).now_or_never().unwrap();
@@ -206,13 +202,9 @@ mod tests {
             .unwrap();
 
         // Prepare the PATH variable
-        env.variables
-            .assign(
-                Scope::Global,
-                "PATH".to_string(),
-                Variable::new("/usr/bin").export(),
-            )
-            .unwrap();
+        let path = &mut env.variables.get_or_new("PATH".into(), Scope::Global);
+        path.assign("/usr/bin".into(), None).unwrap();
+        path.export(true);
 
         let args = Field::dummies(["ls", "-l"]);
         _ = main(&mut env, args).now_or_never().unwrap();

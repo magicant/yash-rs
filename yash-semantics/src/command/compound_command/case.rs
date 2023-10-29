@@ -109,7 +109,6 @@ mod tests {
     use yash_env::semantics::Divert;
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -284,15 +283,12 @@ mod tests {
     #[test]
     fn unquoted_backslash_escapes_next_char_in_pattern() {
         let (mut env, state) = fixture();
-        env.variables
-            .assign(Scope::Global, "empty".to_string(), Variable::new(""))
-            .unwrap();
-        env.variables
-            .assign(Scope::Global, "one".to_string(), Variable::new(r"\"))
-            .unwrap();
-        env.variables
-            .assign(Scope::Global, "v".to_string(), Variable::new(r"\\\a"))
-            .unwrap();
+        let var = &mut env.variables.get_or_new("empty".into(), Scope::Global);
+        var.assign("".into(), None).unwrap();
+        let var = &mut env.variables.get_or_new("one".into(), Scope::Global);
+        var.assign(r"\".into(), None).unwrap();
+        let var = &mut env.variables.get_or_new("v".into(), Scope::Global);
+        var.assign(r"\\\a".into(), None).unwrap();
         let command: CompoundCommand = r#"case '\a' in
         ($empty) echo unquoted empty;;
         ("$empty") echo quoted empty;;

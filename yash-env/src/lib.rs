@@ -208,13 +208,12 @@ impl Env {
     pub fn init_variables(&mut self) {
         self.variables.init();
 
-        let _ = self.variables.assign(
-            Scope::Global,
-            "PPID".to_string(),
-            Variable::new(self.system.getppid().to_string()),
-        );
+        self.variables
+            .get_or_new("PPID".to_string(), Scope::Global)
+            .assign(self.system.getppid().to_string().into(), None)
+            .ok();
 
-        let _ = self.prepare_pwd();
+        self.prepare_pwd().ok();
     }
 
     /// Waits for some signals to be caught in the current process.
@@ -391,6 +390,7 @@ impl Env {
     /// automatically applies the `AllExport` [shell
     /// option](crate::option::Option). You should always prefer this unless you
     /// want to ignore the option.
+    #[allow(deprecated)]
     #[deprecated(note = "Use `get_or_create_variable` instead")]
     pub fn assign_variable(
         &mut self,
@@ -739,6 +739,7 @@ mod tests {
         assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn assign_variable_with_all_export_off() {
         let mut env = Env::new_virtual();
@@ -753,6 +754,7 @@ mod tests {
         assert_eq!(env.variables.get("b").unwrap(), &b);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn assign_variable_with_all_export_on() {
         let mut env = Env::new_virtual();

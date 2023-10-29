@@ -20,7 +20,6 @@ use crate::expansion::expand_value;
 use crate::xtrace::XTrace;
 use std::fmt::Write;
 use yash_env::semantics::ExitStatus;
-use yash_env::variable::Variable;
 use yash_env::Env;
 
 #[doc(no_inline)]
@@ -59,17 +58,16 @@ pub async fn perform_assignment(
         .unwrap();
     }
 
-    let value = Variable {
-        value: Some(value),
-        quirk: None,
-        last_assigned_location: Some(assign.location.clone()),
-        is_exported: export,
-        read_only_location: None,
-    };
-    env.assign_variable(scope, name, value).map_err(|e| Error {
-        cause: ErrorCause::AssignError(e),
-        location: assign.location.clone(),
-    })?;
+    let mut variable = env.get_or_create_variable(name, scope);
+    variable
+        .assign(value, Some(assign.location.clone()))
+        .map_err(|e| Error {
+            cause: ErrorCause::AssignError(e),
+            location: assign.location.clone(),
+        })?;
+    if export {
+        variable.export(true);
+    }
     Ok(exit_status)
 }
 
@@ -105,6 +103,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Value;
+    use yash_env::variable::Variable;
     use yash_syntax::source::Location;
 
     #[test]
@@ -126,11 +125,11 @@ mod tests {
     fn perform_assignment_overwriting() {
         let mut env = Env::new_virtual();
         let a: Assign = "foo=bar".parse().unwrap();
-        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false, None)
+        perform_assignment(&mut env, &a, Scope::Global, false, None)
             .now_or_never()
             .unwrap()
             .unwrap();
-        assert_eq!(exit_status, None);
+
         let a: Assign = "foo=baz".parse().unwrap();
         let exit_status = perform_assignment(&mut env, &a, Scope::Global, true, None)
             .now_or_never()
@@ -143,25 +142,38 @@ mod tests {
                 .export()
                 .set_assigned_location(a.location)
         );
+
+        let a: Assign = "foo=foo".parse().unwrap();
+        let exit_status = perform_assignment(&mut env, &a, Scope::Global, false, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+        assert_eq!(exit_status, None);
+        // The variable is still exported.
+        assert_eq!(
+            env.variables.get("foo").unwrap(),
+            &Variable::new("foo")
+                .export()
+                .set_assigned_location(a.location)
+        );
     }
 
     #[test]
     fn perform_assignment_read_only() {
         let mut env = Env::new_virtual();
         let location = Location::dummy("read-only location");
-        let v = Variable::new("read-only").make_read_only(location.clone());
-        env.variables
-            .assign(Scope::Global, "v".to_string(), v)
-            .unwrap();
+        let mut var = env.variables.get_or_new("v".into(), Scope::Global);
+        var.assign("read-only".into(), None).unwrap();
+        var.make_read_only(location.clone());
         let a: Assign = "v=new".parse().unwrap();
         let e = perform_assignment(&mut env, &a, Scope::Global, false, None)
             .now_or_never()
             .unwrap()
             .unwrap_err();
-        assert_matches!(e.cause, ErrorCause::AssignError(roe) => {
-            assert_eq!(roe.name, "v");
-            assert_eq!(roe.read_only_location, location);
-            assert_eq!(roe.new_value.value, Some(Value::scalar("new")));
+        assert_matches!(e.cause, ErrorCause::AssignError(error) => {
+            assert_eq!(error.new_value, Value::scalar("new"));
+            assert_eq!(error.assigned_location, Some(Location::dummy("v=new")));
+            assert_eq!(error.read_only_location, location);
         });
         assert_eq!(*e.location.code.value.borrow(), "v=new");
         assert_eq!(e.location.code.start_line_number.get(), 1);

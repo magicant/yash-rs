@@ -126,7 +126,6 @@ impl DerefMut for EnvContextGuard<'_> {
 mod tests {
     use super::super::Scope;
     use super::super::Value;
-    use super::super::Variable;
     use super::*;
 
     #[test]
@@ -134,10 +133,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let mut guard = env.variables.push_context(ContextType::Regular);
         guard
-            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("".into(), None)
             .unwrap();
         guard
-            .assign(Scope::Local, "bar".to_string(), Variable::new(""))
+            .get_or_new("bar".into(), Scope::Local)
+            .assign("".into(), None)
             .unwrap();
         VariableSet::pop_context(guard);
 
@@ -152,11 +153,13 @@ mod tests {
         let mut guard = env.push_context(ContextType::Regular);
         guard
             .variables
-            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("".into(), None)
             .unwrap();
         guard
             .variables
-            .assign(Scope::Local, "bar".to_string(), Variable::new(""))
+            .get_or_new("bar".into(), Scope::Local)
+            .assign("".into(), None)
             .unwrap();
         Env::pop_context(guard);
 

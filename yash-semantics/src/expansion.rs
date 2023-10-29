@@ -90,7 +90,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
-use yash_env::variable::AssignError;
+use yash_env::variable::NewAssignError as AssignError;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -113,6 +113,7 @@ pub enum ErrorCause {
     #[error(transparent)]
     ArithError(#[from] ArithError),
 
+    // TODO AssignError should convey the variable name
     /// Assignment to a read-only variable.
     #[error(transparent)]
     AssignError(#[from] AssignError),
@@ -359,7 +360,6 @@ mod tests {
     use std::num::NonZeroU64;
     use std::rc::Rc;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
     use yash_syntax::source::pretty::Message;
     use yash_syntax::source::Code;
     use yash_syntax::source::Source;
@@ -372,12 +372,11 @@ mod tests {
             source: Source::Unknown,
         });
         let location = Location { code, range: 2..4 };
-        let new_value = Variable::new("value").set_assigned_location(Location::dummy("assigned"));
         let error = Error {
             cause: ErrorCause::AssignError(AssignError {
-                name: "var".into(),
+                new_value: "value".into(),
+                assigned_location: Some(Location::dummy("assigned")),
                 read_only_location: Location::dummy("ROL"),
-                new_value,
             }),
             location,
         };
@@ -388,7 +387,7 @@ mod tests {
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(
             message.annotations[0].label,
-            "cannot assign to read-only variable `var`"
+            "cannot assign to read-only variable"
         );
         assert_eq!(message.annotations[0].location, &error.location);
         assert_eq!(message.annotations[1].r#type, AnnotationType::Info);
@@ -417,7 +416,8 @@ mod tests {
     fn expand_words_performs_field_splitting_possibly_with_default_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(Scope::Global, "v".to_string(), Variable::new("foo  bar "))
+            .get_or_new("v".into(), Scope::Global)
+            .assign("foo  bar ".into(), None)
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();
@@ -433,10 +433,12 @@ mod tests {
     fn expand_words_performs_field_splitting_with_current_ifs() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(Scope::Global, "v".to_string(), Variable::new("foo  bar "))
+            .get_or_new("v".into(), Scope::Global)
+            .assign("foo  bar ".into(), None)
             .unwrap();
         env.variables
-            .assign(Scope::Global, "IFS".to_string(), Variable::new(" o"))
+            .get_or_new("IFS".into(), Scope::Global)
+            .assign(" o".into(), None)
             .unwrap();
         let words = &["$v".parse().unwrap()];
         let result = expand_words(&mut env, words).now_or_never().unwrap();

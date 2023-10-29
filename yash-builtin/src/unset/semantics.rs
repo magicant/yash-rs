@@ -210,18 +210,20 @@ mod tests {
     use assert_matches::assert_matches;
     use yash_env::function::Function;
     use yash_env::variable::Value;
-    use yash_env::variable::Variable;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]
     fn unsetting_one_variable() {
         let mut env = Env::new_virtual();
-        env.assign_variable(Global, "foo".to_string(), Variable::new("FOO"))
+        env.get_or_create_variable("foo".into(), Global)
+            .assign("FOO".into(), None)
             .unwrap();
-        env.assign_variable(Global, "bar".to_string(), Variable::new("BAR"))
+        env.get_or_create_variable("bar".into(), Global)
+            .assign("BAR".into(), None)
             .unwrap();
-        env.assign_variable(Global, "baz".to_string(), Variable::new("BAZ"))
+        env.get_or_create_variable("baz".into(), Global)
+            .assign("BAZ".into(), None)
             .unwrap();
 
         unset_variables(&mut env, &Field::dummies(["bar"])).unwrap();
@@ -239,11 +241,14 @@ mod tests {
     #[test]
     fn unsetting_many_variables() {
         let mut env = Env::new_virtual();
-        env.assign_variable(Global, "foo".to_string(), Variable::new("FOO"))
+        env.get_or_create_variable("foo".into(), Global)
+            .assign("FOO".into(), None)
             .unwrap();
-        env.assign_variable(Global, "bar".to_string(), Variable::new("BAR"))
+        env.get_or_create_variable("bar".into(), Global)
+            .assign("BAR".into(), None)
             .unwrap();
-        env.assign_variable(Global, "baz".to_string(), Variable::new("BAZ"))
+        env.get_or_create_variable("baz".into(), Global)
+            .assign("BAZ".into(), None)
             .unwrap();
 
         unset_variables(&mut env, &Field::dummies(["bar", "foo", "baz"])).unwrap();
@@ -255,24 +260,18 @@ mod tests {
     #[test]
     fn unsetting_readonly_variables() {
         let mut env = Env::new_virtual();
-        env.assign_variable(Global, "a".to_string(), Variable::new("A"))
-            .unwrap();
+        let mut a = env.get_or_create_variable("a".into(), Global);
+        a.assign("A".into(), None).unwrap();
+        let mut b = env.get_or_create_variable("b".into(), Global);
+        b.assign("B".into(), None).unwrap();
         let location_b = Location::dummy("readonly b");
-        env.assign_variable(
-            Global,
-            "b".to_string(),
-            Variable::new("B").make_read_only(location_b.clone()),
-        )
-        .unwrap();
+        b.make_read_only(location_b.clone());
+        let mut c = env.get_or_create_variable("c".into(), Global);
+        c.assign("C".into(), None).unwrap();
         let location_c = Location::dummy("readonly c");
-        env.assign_variable(
-            Global,
-            "c".to_string(),
-            Variable::new("C").make_read_only(location_c.clone()),
-        )
-        .unwrap();
-        env.assign_variable(Global, "d".to_string(), Variable::new("D"))
-            .unwrap();
+        c.make_read_only(location_c.clone());
+        let mut d = env.get_or_create_variable("d".into(), Global);
+        d.assign("D".into(), None).unwrap();
         let names = Field::dummies(["a", "b", "c", "d"]);
 
         let errors = unset_variables(&mut env, &names).unwrap_err();

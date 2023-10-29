@@ -241,7 +241,8 @@ mod tests {
     fn fixture() -> Env {
         let mut env = Env::new_virtual();
         env.variables
-            .assign(Global, "PS4".to_owned(), Variable::new("+${X=x}+ "))
+            .get_or_new("PS4".into(), Global)
+            .assign("+${X=x}+ ".into(), None)
             .unwrap();
         env
     }

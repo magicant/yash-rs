@@ -43,7 +43,6 @@ use yash_env::system::Errno;
 use yash_env::trap::Signal;
 use yash_env::variable::Scalar;
 use yash_env::variable::Scope;
-use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_env::System;
 use yash_env::VirtualSystem;
@@ -242,8 +241,8 @@ fn local_builtin_main(
                 let name = value[..eq_index].to_owned();
                 // TODO reject invalid name
                 let value = value[eq_index + 1..].to_owned();
-                let value = Variable::new(value).set_assigned_location(origin);
-                if let Err(error) = env.variables.assign(Scope::Local, name, value) {
+                let mut var = env.variables.get_or_new(name, Scope::Local);
+                if let Err(error) = var.assign(value.into(), Some(origin)) {
                     unimplemented!("assignment error: {:?}", error);
                 }
             } else {

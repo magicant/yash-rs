@@ -249,7 +249,6 @@ mod tests {
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
 
     #[test]
     fn default_home() {
@@ -258,12 +257,9 @@ mod tests {
             mode: Mode::default(),
             operand: None,
         };
-        env.assign_variable(
-            Scope::Global,
-            "HOME".to_string(),
-            Variable::new("/home/user"),
-        )
-        .unwrap();
+        env.get_or_create_variable("HOME".into(), Scope::Global)
+            .assign("/home/user".into(), None)
+            .unwrap();
 
         let target = target(&env, &command, "").unwrap();
         assert_eq!(target, (PathBuf::from("/home/user"), Origin::Home));
@@ -300,7 +296,8 @@ mod tests {
             name: arg0,
             is_special: false,
         }));
-        env.assign_variable(Scope::Global, "HOME".to_string(), Variable::new(""))
+        env.get_or_create_variable("HOME".into(), Scope::Global)
+            .assign("".into(), None)
             .unwrap();
 
         let e = target(&env, &command, "/ignored").unwrap_err();
@@ -314,12 +311,9 @@ mod tests {
             mode: Mode::default(),
             operand: Some(Field::dummy("-")),
         };
-        env.assign_variable(
-            Scope::Global,
-            "OLDPWD".to_string(),
-            Variable::new("/old/dir"),
-        )
-        .unwrap();
+        env.get_or_create_variable("OLDPWD".into(), Scope::Global)
+            .assign("/old/dir".into(), None)
+            .unwrap();
 
         let target = target(&env, &command, "/ignored").unwrap();
         assert_eq!(target, (PathBuf::from("/old/dir"), Origin::Oldpwd));
@@ -348,7 +342,8 @@ mod tests {
             mode: Mode::default(),
             operand: Some(operand),
         };
-        env.assign_variable(Scope::Global, "OLDPWD".to_string(), Variable::new(""))
+        env.get_or_create_variable("OLDPWD".into(), Scope::Global)
+            .assign("".into(), None)
             .unwrap();
 
         let e = target(&env, &command, "/ignored").unwrap_err();

@@ -28,7 +28,6 @@ use crate::expansion::quote_removal::skip_quotes;
 use crate::expansion::ErrorCause;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
-use yash_env::variable::Variable;
 use yash_syntax::source::Location;
 use yash_syntax::syntax::Switch;
 use yash_syntax::syntax::SwitchCondition;
@@ -184,13 +183,13 @@ async fn assign(
         }
     };
     let value_phrase = attribute(expand(env, value).await?);
-    let variable_value = value_phrase.clone().ifs_join(&env.inner.variables);
-    let variable = Variable::new(skip_quotes(variable_value).strip().collect::<String>())
-        .set_assigned_location(location);
+    let joined_value = value_phrase.clone().ifs_join(&env.inner.variables);
+    let final_value = skip_quotes(joined_value).strip().collect::<String>();
     env.inner
-        .assign_variable(Scope::Global, name, variable)
+        .get_or_create_variable(name, Scope::Global)
+        .assign(final_value.into(), Some(location))
         .map_err(|e| {
-            let location = e.new_value.last_assigned_location.as_ref().unwrap().clone();
+            let location = e.assigned_location.as_ref().unwrap().clone();
             let cause = ErrorCause::AssignError(e);
             Error { cause, location }
         })?;
@@ -439,7 +438,8 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().value = Some(Value::array(["1", "2  2", "3"]));
         env.variables
-            .assign(Scope::Global, "IFS".to_string(), Variable::new("~"))
+            .get_or_new("IFS".into(), Scope::Global)
+            .assign("~".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let switch = Switch {
@@ -518,10 +518,10 @@ mod tests {
     #[test]
     fn assign_with_read_only_variable() {
         let mut env = yash_env::Env::new_virtual();
-        let variable = Variable::new("").make_read_only(Location::dummy("read-only"));
-        env.variables
-            .assign(Scope::Global, "var".to_string(), variable.clone())
-            .unwrap();
+        let mut var = env.variables.get_or_new("var".into(), Scope::Global);
+        var.assign("".into(), None).unwrap();
+        var.make_read_only(Location::dummy("read-only"));
+        let save_var = var.clone();
         let mut env = Env::new(&mut env);
         let switch = Switch {
             r#type: Assign,
@@ -536,16 +536,14 @@ mod tests {
             .now_or_never()
             .unwrap();
         assert_matches!(result, Some(Err(error)) => {
+            assert_eq!(error.location, location);
             assert_matches!(error.cause, ErrorCause::AssignError(e) => {
-                assert_eq!(e.name, "var");
+                assert_eq!(e.new_value, Value::scalar("foo"));
                 assert_eq!(e.read_only_location, Location::dummy("read-only"));
-                assert_eq!(e.new_value.value, Some(Value::scalar("foo")));
-                assert_eq!(e.new_value.last_assigned_location, Some(location));
-                assert!(!e.new_value.is_exported);
-                assert_eq!(e.new_value.read_only_location, None);
+                assert_eq!(e.assigned_location, Some(location));
             });
         });
-        assert_eq!(env.inner.variables.get("var"), Some(&variable));
+        assert_eq!(env.inner.variables.get("var"), Some(&save_var));
     }
 
     #[test]

@@ -153,13 +153,13 @@ pub mod tests {
     use super::*;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
 
     pub fn env_with_positional_params_and_ifs() -> yash_env::Env {
         let mut env = yash_env::Env::new_virtual();
         env.variables.positional_params_mut().value = Some(Value::array(["a", "c"]));
         env.variables
-            .assign(Scope::Global, "IFS".to_string(), Variable::new("&?!"))
+            .get_or_new("IFS".into(), Scope::Global)
+            .assign("&?!".into(), None)
             .unwrap();
         env
     }
@@ -176,11 +176,8 @@ pub mod tests {
     fn basic_expansion() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable::new("a1\u{30A4}"),
-            )
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("a1\u{30A4}".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let param = param("foo");
@@ -194,11 +191,8 @@ pub mod tests {
     fn length_of_scalar() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable::new("a1\u{30A4}"),
-            )
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("a1\u{30A4}".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let mut param = param("foo");
@@ -213,11 +207,8 @@ pub mod tests {
     fn length_of_array() {
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable::new_array(["", "foo", "1", "bar"]),
-            )
+            .get_or_new("foo".into(), Scope::Global)
+            .assign(Value::array(["", "foo", "1", "bar"]), None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let mut param = param("foo");
@@ -242,7 +233,8 @@ pub mod tests {
 
         let mut env = env_with_positional_params_and_ifs();
         env.variables
-            .assign(Scope::Global, "foo".to_string(), Variable::new(""))
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("".into(), None)
             .unwrap();
         let mut param = param("foo");
         param.modifier = Modifier::Switch(Switch {
@@ -263,7 +255,8 @@ pub mod tests {
 
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(Scope::Global, "foo".to_string(), Variable::new("abc"))
+            .get_or_new("foo".into(), Scope::Global)
+            .assign("abc".into(), None)
             .unwrap();
         let mut env = Env::new(&mut env);
         let mut param = param("foo");

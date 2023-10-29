@@ -28,7 +28,7 @@ use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
-use yash_env::variable::AssignError;
+use yash_env::variable::NewAssignError as AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
@@ -236,9 +236,9 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
             },
         });
         let location = Location { code, range };
-        let value = Variable::new(value).set_assigned_location(location);
         self.env
-            .assign_variable(Global, name.to_owned(), value)
+            .get_or_create_variable(name.into(), Global)
+            .assign(value.into(), Some(location))
             .map(drop)
     }
 }
@@ -308,7 +308,8 @@ mod tests {
         use yash_arith::Env;
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(Global, "v".to_string(), Variable::new("value"))
+            .get_or_new("v".into(), Global)
+            .assign("value".into(), None)
             .unwrap();
         let location = Location::dummy("my location");
         let env = VarEnv {
