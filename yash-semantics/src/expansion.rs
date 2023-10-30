@@ -90,7 +90,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
-use yash_env::variable::NewAssignError as AssignError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;

@@ -19,7 +19,7 @@
 use super::Env;
 use crate::system::AtFlags;
 use crate::system::AT_FDCWD;
-use crate::variable::NewAssignError as AssignError;
+use crate::variable::AssignError;
 use crate::variable::Scope::Global;
 use crate::variable::Value::Scalar;
 use crate::variable::Variable;

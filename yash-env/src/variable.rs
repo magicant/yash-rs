@@ -70,7 +70,7 @@ pub use self::quirk::Quirk;
 
 mod main;
 
-pub use self::main::AssignError as NewAssignError; // TODO Remove this alias
+pub use self::main::AssignError;
 pub use self::main::Variable;
 pub use self::main::VariableRefMut;
 
@@ -166,18 +166,6 @@ pub enum Scope {
     Global,
     Local,
     Volatile,
-}
-
-/// Error that occurs when assigning to an existing read-only variable.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("cannot assign to read-only variable `{name}`")]
-pub struct AssignError {
-    /// Variable name.
-    pub name: String,
-    /// Location where the existing variable was made read-only.
-    pub read_only_location: Location,
-    /// New variable that was tried to assign.
-    pub new_value: Variable,
 }
 
 /// Error that occurs when unsetting a read-only variable

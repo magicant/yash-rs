@@ -28,7 +28,7 @@ use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
-use yash_env::variable::NewAssignError as AssignError;
+use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
