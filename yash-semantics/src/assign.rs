@@ -32,7 +32,7 @@ pub use yash_syntax::syntax::Assign;
 /// Performs an assignment.
 ///
 /// This function [expands the value](expand_value) and then
-/// [assigns](yash_env::variable::VariableSet::assign) it to the environment.
+/// [assigns](yash_env::variable::VariableRefMut::assign) it to the environment.
 /// The return value is the exit status of the last command substitution
 /// performed during the expansion of the assigned value, if any
 ///

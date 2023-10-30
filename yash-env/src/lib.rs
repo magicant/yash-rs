@@ -38,9 +38,9 @@ use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
 use self::job::WaitStatusEx;
+use self::option::On;
 use self::option::OptionSet;
 use self::option::{AllExport, ErrExit, Monitor};
-use self::option::{Off, On};
 use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
@@ -50,11 +50,10 @@ pub use self::system::real::RealSystem;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
+use self::system::SystemEx;
 use self::trap::Signal;
 use self::trap::TrapSet;
-use self::variable::AssignError;
 use self::variable::Scope;
-use self::variable::Variable;
 use self::variable::VariableRefMut;
 use self::variable::VariableSet;
 use futures_util::task::noop_waker_ref;
@@ -66,7 +65,6 @@ use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
-use system::SystemEx;
 use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
@@ -382,27 +380,6 @@ impl Env {
                 Err(_) => break,
             };
         }
-    }
-
-    /// Assigns a variable.
-    ///
-    /// This function is a thin wrapper around [`VariableSet::assign`] that
-    /// automatically applies the `AllExport` [shell
-    /// option](crate::option::Option). You should always prefer this unless you
-    /// want to ignore the option.
-    #[allow(deprecated)]
-    #[deprecated(note = "Use `get_or_create_variable` instead")]
-    pub fn assign_variable(
-        &mut self,
-        scope: Scope,
-        name: String,
-        value: Variable,
-    ) -> Result<Option<Variable>, AssignError> {
-        let value = match self.options.get(AllExport) {
-            On => value.export(),
-            Off => value,
-        };
-        self.variables.assign(scope, name, value)
     }
 
     /// Get an existing variable or create a new one.
@@ -740,37 +717,6 @@ mod tests {
             WaitStatus::Exited(pid_2, 35)
         );
         assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn assign_variable_with_all_export_off() {
-        let mut env = Env::new_virtual();
-        let a = Variable::new("A");
-        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
-        assert_eq!(result, Ok(None));
-        let b = Variable::new("B").export();
-        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
-        assert_eq!(result, Ok(None));
-
-        assert_eq!(env.variables.get("a").unwrap(), &a);
-        assert_eq!(env.variables.get("b").unwrap(), &b);
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn assign_variable_with_all_export_on() {
-        let mut env = Env::new_virtual();
-        env.options.set(AllExport, On);
-        let a = Variable::new("A");
-        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
-        assert_eq!(result, Ok(None));
-        let b = Variable::new("B").export();
-        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
-        assert_eq!(result, Ok(None));
-
-        assert_eq!(env.variables.get("a").unwrap(), &a.export());
-        assert_eq!(env.variables.get("b").unwrap(), &b);
     }
 
     #[test]
