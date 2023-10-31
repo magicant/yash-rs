@@ -61,7 +61,8 @@ use yash_syntax::source::Location;
 
 mod value;
 
-pub use self::value::{Array, Scalar, Value};
+pub use self::value::QuotedValue;
+pub use self::value::Value::{self, Array, Scalar};
 
 mod quirk;
 

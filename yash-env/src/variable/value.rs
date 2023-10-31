@@ -27,7 +27,7 @@ pub enum Value {
     Array(Vec<String>),
 }
 
-pub use Value::*;
+use Value::*;
 
 impl Value {
     /// Creates a scalar value.
