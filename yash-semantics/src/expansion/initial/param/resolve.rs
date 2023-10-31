@@ -83,19 +83,13 @@ mod tests {
     #[test]
     fn variable_scalar() {
         let mut env = Env::new_virtual();
-        env.variables
-            .assign(Scope::Global, "x".to_string(), Variable::new("foo"))
+        let mut x = env.variables.get_or_new("x", Scope::Global);
+        x.assign("foo", None).unwrap();
+        let mut path = env.variables.get_or_new("PATH", Scope::Global);
+        path.assign("/bin:/usr/bin", Location::dummy("assigned"))
             .unwrap();
-        env.variables
-            .assign(
-                Scope::Global,
-                "PATH".to_string(),
-                Variable::new("/bin:/usr/bin")
-                    .export()
-                    .set_assigned_location(Location::dummy("assigned"))
-                    .make_read_only(Location::dummy("read-only")),
-            )
-            .unwrap();
+        path.export(true);
+        path.make_read_only(Location::dummy("read-only"));
         let loc = Location::dummy("");
 
         let result = resolve(Name::Variable("x"), &env, &loc);
@@ -107,20 +101,17 @@ mod tests {
     #[test]
     fn variable_array() {
         let mut env = Env::new_virtual();
+        let mut x = env.variables.get_or_new("x", Scope::Global);
+        x.assign(Value::Array(vec![]), None).unwrap();
+        let mut path = env.variables.get_or_new("PATH", Scope::Global);
         let values = ["/bin".to_string(), "/usr/bin".to_string()];
-        env.variables
-            .assign(Scope::Global, "x".to_string(), Variable::new_empty_array())
-            .unwrap();
-        env.variables
-            .assign(
-                Scope::Global,
-                "PATH".to_string(),
-                Variable::new_array(values.clone())
-                    .export()
-                    .set_assigned_location(Location::dummy("assigned"))
-                    .make_read_only(Location::dummy("read-only")),
-            )
-            .unwrap();
+        path.assign(
+            Value::array(values.clone()),
+            Some(Location::dummy("assigned")),
+        )
+        .unwrap();
+        path.export(true);
+        path.make_read_only(Location::dummy("read-only"));
         let loc = Location::dummy("");
 
         let result = resolve(Name::Variable("x"), &env, &loc);

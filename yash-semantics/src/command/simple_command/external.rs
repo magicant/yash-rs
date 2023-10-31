@@ -227,7 +227,6 @@ mod tests {
     use yash_env::system::r#virtual::INode;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::variable::Variable;
     use yash_syntax::syntax;
 
     #[test]
@@ -246,16 +245,11 @@ mod tests {
                 .save("/some/file", content)
                 .unwrap();
 
-            env.variables
-                .assign(
-                    Scope::Global,
-                    "env".to_string(),
-                    Variable::new("scalar").export(),
-                )
-                .unwrap();
-            env.variables
-                .assign(Scope::Global, "local".to_string(), Variable::new("ignored"))
-                .unwrap();
+            let mut var = env.variables.get_or_new("env", Scope::Global);
+            var.assign("scalar", None).unwrap();
+            var.export(true);
+            let mut var = env.variables.get_or_new("local", Scope::Global);
+            var.assign("ignored", None).unwrap();
 
             let command: syntax::SimpleCommand = "var=123 /some/file foo bar".parse().unwrap();
             let result = command.execute(&mut env).await;

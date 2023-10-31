@@ -30,7 +30,7 @@ cargo +1.70.0 test --package yash-env -- $quiet
 
 update_workspace_member yash-fnmatch
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.61.0 test --package yash-fnmatch -- $quiet
+cargo +1.65.0 test --package yash-fnmatch -- $quiet
 
 update_workspace_member yash-quote
 cargo +nightly update -Z direct-minimal-versions

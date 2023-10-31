@@ -62,7 +62,7 @@ impl Lexer<'_> {
 
         // Part 3: Parse `))`
         match self.peek_char().await? {
-            Some(sc) if sc == ')' => self.consume_char(),
+            Some(')') => self.consume_char(),
             Some(_) => unreachable!(),
             None => {
                 let cause = SyntaxError::UnclosedArith { opening_location }.into();
@@ -71,7 +71,7 @@ impl Lexer<'_> {
             }
         }
         match self.peek_char().await? {
-            Some(sc) if sc == ')' => self.consume_char(),
+            Some(')') => self.consume_char(),
             Some(_) => {
                 self.rewind(orig_index);
                 return Ok(None);

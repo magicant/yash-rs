@@ -21,9 +21,7 @@
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::variable::AssignError;
 use yash_env::variable::Scope;
-use yash_env::variable::Variable;
 use yash_env::Env;
 
 // TODO Split into syntax and semantics submodules
@@ -36,21 +34,15 @@ pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
     for Field { value, origin } in args {
         if let Some(eq_index) = value.find('=') {
             let var_value = value[eq_index + 1..].to_owned();
-            let var = Variable::new(var_value)
-                .set_assigned_location(origin.clone())
-                .make_read_only(origin);
 
             let mut name = value;
             name.truncate(eq_index);
             // TODO reject invalid name
 
-            match env.assign_variable(Scope::Global, name, var) {
-                Ok(_old_value) => (),
-                Err(AssignError {
-                    name,
-                    read_only_location: _,
-                    new_value: _,
-                }) => {
+            let mut var = env.get_or_create_variable(name.clone(), Scope::Global);
+            match var.assign(var_value, origin.clone()) {
+                Ok(_) => var.make_read_only(origin),
+                Err(_) => {
                     // TODO Better error message
                     // TODO Use Env rather than printing directly to stderr
                     eprintln!("cannot assign to read-only variable {name}");

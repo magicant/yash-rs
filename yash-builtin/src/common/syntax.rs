@@ -590,8 +590,7 @@ impl<'a> ConflictingOptionError<'a> {
     /// `indexes` contains a duplicate index.
     ///
     /// This function is useful for constructing a `ConflictingOptionError` from
-    /// the result of
-    /// [`parse_arguments`](crate::common::syntax::parse_arguments).
+    /// the result of [`parse_arguments`].
     /// After examining the `OptionOccurrence` vector returned by the function,
     /// the caller can pick the indexes of the conflicting options and pass them
     /// to this function.

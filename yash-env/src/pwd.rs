@@ -102,8 +102,9 @@ impl Env {
                 .into_os_string()
                 .into_string()
                 .map_err(|_| nix::Error::EILSEQ)?;
-            self.variables
-                .assign(Global, "PWD".to_string(), Variable::new(dir).export())?;
+            let mut var = self.variables.get_or_new("PWD", Global);
+            var.assign(dir, None)?;
+            var.export(true);
         }
         Ok(())
     }
@@ -191,7 +192,8 @@ mod tests {
     fn prepare_pwd_with_correct_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/link"))
+            .get_or_new("PWD", Global)
+            .assign("/foo/link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -204,7 +206,8 @@ mod tests {
     fn prepare_pwd_with_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .get_or_new("PWD", Global)
+            .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -218,7 +221,8 @@ mod tests {
     fn prepare_pwd_with_dot_dot() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/./link"))
+            .get_or_new("PWD", Global)
+            .assign("/foo/./link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -232,7 +236,8 @@ mod tests {
     fn prepare_pwd_with_wrong_path() {
         let mut env = env_with_symlink_to_dir();
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("/foo/bar"))
+            .get_or_new("PWD", Global)
+            .assign("/foo/bar", None)
             .unwrap();
 
         let result = env.prepare_pwd();
@@ -261,7 +266,8 @@ mod tests {
 
         let mut env = Env::with_system(system);
         env.variables
-            .assign(Global, "PWD".to_string(), Variable::new("link"))
+            .get_or_new("PWD", Global)
+            .assign("link", None)
             .unwrap();
 
         let result = env.prepare_pwd();
