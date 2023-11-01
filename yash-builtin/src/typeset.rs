@@ -221,8 +221,8 @@
 //! The read-only attribute cannot be removed from a variable or function. If a
 //! variable is already read-only, you cannot assign a value to it.
 //!
-//! When printing variables or functions, it is an error if the operand contains
-//! an equal sign (`=`) or names a non-existing variable or function.
+//! When printing variables or functions, it is an error if an operand names a
+//! non-existing variable or function.
 //!
 //! # Portability
 //!
@@ -254,9 +254,16 @@
 //!
 //! TBD
 
+use crate::common::{output, report_error, report_failure};
+use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::variable::AssignError;
+use yash_env::Env;
+use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
+use yash_syntax::source::Location;
 
+mod set_variables;
 pub mod syntax;
 
 /// Attribute that can be set on a variable
@@ -344,10 +351,12 @@ pub struct PrintFunctions {
     pub attrs: Vec<(FunctionAttr, State)>,
 }
 
-/// Set of information that specifies the behavior of the typeset built-in
+/// Set of information that defines the behavior of a single invocation of the
+/// typeset built-in
 ///
-/// The [`syntax::parse`] function returns a value of this type after parsing
-/// the arguments of the built-in.
+/// The [`syntax::interpret`] function returns a value of this type after
+/// parsing the arguments. Call the [`execute`](Self::execute) method to perform
+/// the actual operation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
     SetVariables(SetVariables),
@@ -380,4 +389,139 @@ impl From<PrintFunctions> for Command {
     }
 }
 
-// TODO the main function
+impl Command {
+    /// Executes the command (except for actual printing).
+    ///
+    /// This method updates the shell environment according to the command.
+    /// If there are no errors, the method returns a string that should be
+    /// printed to the standard output.
+    /// Otherwise, the method returns a non-empty vector of errors.
+    pub fn execute(self, env: &mut Env) -> Result<String, Vec<ExecuteError>> {
+        match self {
+            Self::SetVariables(command) => command.execute(env),
+            Self::PrintVariables(command) => todo!("{command:?}"), // command.execute(env),
+            Self::SetFunctions(command) => todo!("{command:?}"),   // command.execute(env),
+            Self::PrintFunctions(command) => todo!("{command:?}"), // command.execute(env),
+        }
+    }
+}
+
+/// Error that occurs when trying to cancel the read-only attribute of a
+/// variable or function
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("cannot cancel read-only-ness of {name}")]
+pub struct UndoReadOnlyError {
+    /// Name of the variable or function
+    pub name: Field,
+    /// Location where the variable or function was made read-only
+    pub read_only_location: Location,
+}
+
+/// Error that can occur during the execution of the typeset built-in
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum ExecuteError {
+    /// Assigning to a read-only variable
+    AssignReadOnlyVariable(#[from] AssignError),
+    /// Cancelling the read-only attribute of a variable
+    UndoReadOnlyVariable(UndoReadOnlyError),
+    /// Cancelling the read-only attribute of a function
+    UndoReadOnlyFunction(UndoReadOnlyError),
+    /// Printing a non-existing variable
+    PrintUnsetVariable(Field),
+    /// Printing a non-existing function
+    PrintUnsetFunction(Field),
+}
+
+impl MessageBase for ExecuteError {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        match self {
+            Self::AssignReadOnlyVariable(_) => "cannot assign to read-only variable",
+            Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",
+            Self::UndoReadOnlyFunction(_) => "cannot cancel read-only-ness of function",
+            Self::PrintUnsetVariable(_) => "cannot print non-existing variable",
+            Self::PrintUnsetFunction(_) => "cannot print non-existing function",
+        }
+        .into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        let (message, location) = match self {
+            Self::AssignReadOnlyVariable(error) => {
+                (error.to_string(), error.assigned_location.as_ref().unwrap())
+            }
+            Self::UndoReadOnlyVariable(error) => (
+                format!("read-only variable `{}`", error.name),
+                &error.name.origin,
+            ),
+            Self::UndoReadOnlyFunction(error) => (
+                format!("read-only function `{}`", error.name),
+                &error.name.origin,
+            ),
+            Self::PrintUnsetVariable(field) => {
+                (format!("non-existing variable `{field}`"), &field.origin)
+            }
+            Self::PrintUnsetFunction(field) => {
+                (format!("non-existing function `{field}`"), &field.origin)
+            }
+        };
+        Annotation::new(AnnotationType::Error, message.into(), location)
+    }
+
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        match self {
+            Self::AssignReadOnlyVariable(error) => {
+                results.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    "the variable was made read-only here".into(),
+                    &error.read_only_location,
+                )))
+            }
+
+            Self::UndoReadOnlyVariable(error) => results.extend(std::iter::once(Annotation::new(
+                AnnotationType::Info,
+                "the variable was made read-only here".into(),
+                &error.read_only_location,
+            ))),
+
+            Self::UndoReadOnlyFunction(error) => results.extend(std::iter::once(Annotation::new(
+                AnnotationType::Info,
+                "the function was made read-only here".into(),
+                &error.read_only_location,
+            ))),
+
+            Self::PrintUnsetVariable(_) | Self::PrintUnsetFunction(_) => {}
+        }
+    }
+}
+
+impl std::fmt::Display for ExecuteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.message_title().fmt(f)
+    }
+}
+
+/// Converts a non-empty slice of errors to a message.
+///
+/// The first error's title is used as the message title. The other errors are
+/// added as annotations.
+#[must_use]
+fn to_message(errors: &[ExecuteError]) -> Message {
+    let mut message = Message::from(&errors[0]);
+    let other_errors = errors[1..].iter().map(ExecuteError::main_annotation);
+    message.annotations.extend(other_errors);
+    message
+}
+
+/// Entry point of the typeset built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
+    match syntax::parse(syntax::ALL_OPTIONS, args) {
+        Ok((options, operands)) => match syntax::interpret(options, operands) {
+            Ok(command) => match command.execute(env) {
+                Ok(result) => output(env, &result).await,
+                Err(errors) => report_failure(env, to_message(&errors)).await,
+            },
+            Err(error) => report_error(env, &error).await,
+        },
+        Err(error) => report_error(env, &error).await,
+    }
+}
