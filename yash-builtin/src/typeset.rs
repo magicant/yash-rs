@@ -264,6 +264,7 @@ use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBa
 use yash_syntax::source::Location;
 
 mod print_variables;
+mod set_functions;
 mod set_variables;
 pub mod syntax;
 
@@ -413,7 +414,7 @@ impl Command {
         match self {
             Self::SetVariables(command) => command.execute(env),
             Self::PrintVariables(command) => command.execute(&env.variables),
-            Self::SetFunctions(command) => todo!("{command:?}"), // command.execute(env),
+            Self::SetFunctions(command) => command.execute(&mut env.functions),
             Self::PrintFunctions(command) => todo!("{command:?}"), // command.execute(env),
         }
     }
