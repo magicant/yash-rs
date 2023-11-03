@@ -38,9 +38,9 @@ use self::job::JobSet;
 use self::job::Pid;
 use self::job::WaitStatus;
 use self::job::WaitStatusEx;
+use self::option::On;
 use self::option::OptionSet;
 use self::option::{AllExport, ErrExit, Monitor};
-use self::option::{Off, On};
 use self::semantics::Divert;
 use self::semantics::ExitStatus;
 use self::stack::Frame;
@@ -50,11 +50,11 @@ pub use self::system::real::RealSystem;
 pub use self::system::SharedSystem;
 use self::system::SignalHandling;
 pub use self::system::System;
+use self::system::SystemEx;
 use self::trap::Signal;
 use self::trap::TrapSet;
-use self::variable::AssignError;
 use self::variable::Scope;
-use self::variable::Variable;
+use self::variable::VariableRefMut;
 use self::variable::VariableSet;
 use futures_util::task::noop_waker_ref;
 use std::collections::HashMap;
@@ -65,7 +65,6 @@ use std::ops::ControlFlow::{self, Break, Continue};
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
-use system::SystemEx;
 use yash_syntax::alias::AliasSet;
 
 /// Whole shell execution environment.
@@ -207,13 +206,12 @@ impl Env {
     pub fn init_variables(&mut self) {
         self.variables.init();
 
-        let _ = self.variables.assign(
-            Scope::Global,
-            "PPID".to_string(),
-            Variable::new(self.system.getppid().to_string()),
-        );
+        self.variables
+            .get_or_new("PPID", Scope::Global)
+            .assign(self.system.getppid().to_string(), None)
+            .ok();
 
-        let _ = self.prepare_pwd();
+        self.prepare_pwd().ok();
     }
 
     /// Waits for some signals to be caught in the current process.
@@ -384,23 +382,24 @@ impl Env {
         }
     }
 
-    /// Assigns a variable.
+    /// Get an existing variable or create a new one.
     ///
-    /// This function is a thin wrapper around [`VariableSet::assign`] that
-    /// automatically applies the `AllExport` [shell
-    /// option](crate::option::Option). You should always prefer this unless you
-    /// want to ignore the option.
-    pub fn assign_variable(
-        &mut self,
-        scope: Scope,
-        name: String,
-        value: Variable,
-    ) -> Result<Option<Variable>, AssignError> {
-        let value = match self.options.get(AllExport) {
-            On => value.export(),
-            Off => value,
-        };
-        self.variables.assign(scope, name, value)
+    /// This method is a thin wrapper around [`VariableSet::get_or_new`].
+    /// If the [`AllExport`] option is on, the variable is
+    /// [exported](VariableRefMut::export) before being returned from the
+    /// method.
+    ///
+    /// You should prefer using this method over [`VariableSet::get_or_new`] to
+    /// make sure that the [`AllExport`] option is applied.
+    pub fn get_or_create_variable<S>(&mut self, name: S, scope: Scope) -> VariableRefMut
+    where
+        S: Into<String>,
+    {
+        let mut variable = self.variables.get_or_new(name, scope);
+        if self.options.get(AllExport) == On {
+            variable.export(true);
+        }
+        variable
     }
 
     pub(crate) fn errexit_is_applicable(&self) -> bool {
@@ -721,32 +720,24 @@ mod tests {
     }
 
     #[test]
-    fn assign_variable_with_all_export_off() {
+    fn get_or_create_variable_with_all_export_off() {
         let mut env = Env::new_virtual();
-        let a = Variable::new("A");
-        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
-        assert_eq!(result, Ok(None));
-        let b = Variable::new("B").export();
-        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
-        assert_eq!(result, Ok(None));
-
-        assert_eq!(env.variables.get("a").unwrap(), &a);
-        assert_eq!(env.variables.get("b").unwrap(), &b);
+        let mut a = env.get_or_create_variable("a", Scope::Global);
+        assert!(!a.is_exported);
+        a.export(true);
+        let a = env.get_or_create_variable("a", Scope::Global);
+        assert!(a.is_exported);
     }
 
     #[test]
-    fn assign_variable_with_all_export_on() {
+    fn get_or_create_variable_with_all_export_on() {
         let mut env = Env::new_virtual();
         env.options.set(AllExport, On);
-        let a = Variable::new("A");
-        let result = env.assign_variable(Scope::Global, "a".to_string(), a.clone());
-        assert_eq!(result, Ok(None));
-        let b = Variable::new("B").export();
-        let result = env.assign_variable(Scope::Global, "b".to_string(), b.clone());
-        assert_eq!(result, Ok(None));
-
-        assert_eq!(env.variables.get("a").unwrap(), &a.export());
-        assert_eq!(env.variables.get("b").unwrap(), &b);
+        let mut a = env.get_or_create_variable("a", Scope::Global);
+        assert!(a.is_exported);
+        a.export(false);
+        let a = env.get_or_create_variable("a", Scope::Global);
+        assert!(a.is_exported);
     }
 
     #[test]

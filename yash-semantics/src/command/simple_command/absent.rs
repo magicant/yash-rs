@@ -121,7 +121,6 @@ mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax;
@@ -201,13 +200,9 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        env.variables
-            .assign(
-                Scope::Global,
-                "a".to_string(),
-                Variable::new("").make_read_only(Location::dummy("ROL")),
-            )
-            .unwrap();
+        let mut var = env.variables.get_or_new("a", Scope::Global);
+        var.assign("", None).unwrap();
+        var.make_read_only(Location::dummy("ROL"));
         let command: syntax::SimpleCommand = "a=b".parse().unwrap();
         let result = command.execute(&mut env).now_or_never().unwrap();
         assert_eq!(result, Break(Divert::Interrupt(Some(ExitStatus::ERROR))));

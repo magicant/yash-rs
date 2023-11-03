@@ -91,7 +91,6 @@ mod tests {
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -262,13 +261,9 @@ mod tests {
             Location::dummy("dummy"),
         );
         env.functions.define(function).unwrap();
-        env.variables
-            .assign(
-                Scope::Global,
-                "x".to_string(),
-                Variable::new("").make_read_only(Location::dummy("readonly")),
-            )
-            .unwrap();
+        let mut var = env.variables.get_or_new("x", Scope::Global);
+        var.assign("", None).unwrap();
+        var.make_read_only(Location::dummy("readonly"));
         let command: SimpleCommand = "x=hello foo".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

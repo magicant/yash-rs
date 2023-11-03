@@ -63,18 +63,14 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
 
     #[test]
     fn empty_name_with_scalar_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "HOME".to_string(),
-                Variable::new("/home/foobar"),
-            )
+            .get_or_new("HOME", Scope::Global)
+            .assign("/home/foobar", None)
             .unwrap();
 
         let expansion = expand("", &env);
@@ -105,11 +101,8 @@ mod tests {
     fn empty_name_with_array_home() {
         let mut env = Env::new_virtual();
         env.variables
-            .assign(
-                Scope::Global,
-                "HOME".to_string(),
-                Variable::new_empty_array(),
-            )
+            .get_or_new("HOME", Scope::Global)
+            .assign(Value::Array(vec![]), None)
             .unwrap();
 
         assert_eq!(

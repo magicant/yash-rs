@@ -459,7 +459,6 @@ impl Add for Phrase {
 mod tests {
     use super::*;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
 
     #[test]
     fn partial_eq() {
@@ -1059,8 +1058,7 @@ mod tests {
     #[test]
     fn ifs_join_full_unassigned_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(Scope::Global, "IFS".to_string(), Variable::default())
-            .unwrap();
+        vars.get_or_new("IFS", Scope::Global);
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1073,7 +1071,8 @@ mod tests {
     #[test]
     fn ifs_join_full_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(Scope::Global, "IFS".to_string(), Variable::new("!?"))
+        vars.get_or_new("IFS", Scope::Global)
+            .assign("!?", None)
             .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
@@ -1087,12 +1086,9 @@ mod tests {
     #[test]
     fn ifs_join_full_array_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "IFS".to_string(),
-            Variable::new_array(["-+", "abc"]),
-        )
-        .unwrap();
+        vars.get_or_new("IFS", Scope::Global)
+            .assign(Value::array(["-+", "abc"]), None)
+            .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1105,7 +1101,8 @@ mod tests {
     #[test]
     fn ifs_join_full_empty_scalar_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(Scope::Global, "IFS".to_string(), Variable::new(""))
+        vars.get_or_new("IFS", Scope::Global)
+            .assign("", None)
             .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
@@ -1119,12 +1116,9 @@ mod tests {
     #[test]
     fn ifs_join_full_empty_array_ifs() {
         let mut vars = VariableSet::new();
-        vars.assign(
-            Scope::Global,
-            "IFS".to_string(),
-            Variable::new_empty_array(),
-        )
-        .unwrap();
+        vars.get_or_new("IFS", Scope::Global)
+            .assign(Value::Array(vec![]), None)
+            .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),
@@ -1133,12 +1127,9 @@ mod tests {
         let field = phrase.ifs_join(&vars);
         assert_eq!(field, dummy_field("foobarbaz"));
 
-        vars.assign(
-            Scope::Global,
-            "IFS".to_string(),
-            Variable::new_array(["", "abc"]),
-        )
-        .unwrap();
+        vars.get_or_new("IFS", Scope::Global)
+            .assign(Value::array(["", "abc"]), None)
+            .unwrap();
         let phrase = Full(vec![
             dummy_field("foo"),
             dummy_field("bar"),

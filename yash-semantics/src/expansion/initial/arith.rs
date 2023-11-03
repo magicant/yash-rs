@@ -235,10 +235,9 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
                 original: self.expansion_location.clone(),
             },
         });
-        let location = Location { code, range };
-        let value = Variable::new(value).set_assigned_location(location);
         self.env
-            .assign_variable(Global, name.to_owned(), value)
+            .get_or_create_variable(name, Global)
+            .assign(value, Location { code, range })
             .map(drop)
     }
 }
@@ -308,7 +307,8 @@ mod tests {
         use yash_arith::Env;
         let mut env = yash_env::Env::new_virtual();
         env.variables
-            .assign(Global, "v".to_string(), Variable::new("value"))
+            .get_or_new("v", Global)
+            .assign("value", None)
             .unwrap();
         let location = Location::dummy("my location");
         let env = VarEnv {

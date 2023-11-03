@@ -243,7 +243,6 @@ mod tests {
     use yash_env::trap::Signal::SIGTSTP;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_semantics::command::Command;
     use yash_syntax::syntax::List;
@@ -253,27 +252,13 @@ mod tests {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        env.variables
-            .assign(
-                Scope::Global,
-                "foo".to_string(),
-                Variable::new("value").export(),
-            )
-            .unwrap();
-        env.variables
-            .assign(
-                Scope::Global,
-                "bar".to_string(),
-                Variable::new("Hello, world!"),
-            )
-            .unwrap();
-        env.variables
-            .assign(
-                Scope::Global,
-                "baz".to_string(),
-                Variable::new_array(["one", ""]),
-            )
-            .unwrap();
+        let mut var = env.variables.get_or_new("foo", Scope::Global);
+        var.assign("value", None).unwrap();
+        var.export(true);
+        let mut var = env.variables.get_or_new("bar", Scope::Global);
+        var.assign("Hello, world!", None).unwrap();
+        let mut var = env.variables.get_or_new("baz", Scope::Global);
+        var.assign(Value::array(["one", ""]), None).unwrap();
 
         let args = vec![];
         let result = main(&mut env, args).now_or_never().unwrap();

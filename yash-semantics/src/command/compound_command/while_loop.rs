@@ -110,7 +110,6 @@ mod tests {
     use yash_env::system::r#virtual::SystemState;
     use yash_env::variable::Scope;
     use yash_env::variable::Value;
-    use yash_env::variable::Variable;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
 
@@ -274,7 +273,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n", Scope::Global)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -358,7 +358,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n", Scope::Global)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -514,7 +515,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n", Scope::Global)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
@@ -598,7 +600,8 @@ mod tests {
         for n in 2..5 {
             env.exit_status = ExitStatus(123);
             env.variables
-                .assign(Scope::Global, "n".to_string(), Variable::new(n.to_string()))
+                .get_or_new("n", Scope::Global)
+                .assign(n.to_string(), None)
                 .unwrap();
 
             let result = command.execute(&mut env).now_or_never().unwrap();
