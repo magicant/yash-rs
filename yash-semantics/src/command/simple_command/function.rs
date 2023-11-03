@@ -30,7 +30,6 @@ use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::variable::ContextType;
-use yash_env::variable::Value;
 use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -60,8 +59,8 @@ pub async fn execute_function(
     let params = inner.variables.positional_params_mut();
     let mut i = fields.into_iter();
     let field = i.next().unwrap();
-    params.last_assigned_location = Some(field.origin);
-    params.value = Some(Value::array(i.map(|f| f.value)));
+    params.last_modified_location = Some(field.origin);
+    params.values = i.map(|f| f.value).collect();
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;

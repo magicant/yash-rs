@@ -81,6 +81,15 @@ struct VariableInContext {
     context_index: usize,
 }
 
+/// Positional parameters
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PositionalParams {
+    /// Values of positional parameters
+    pub values: Vec<String>,
+    /// Location of the last modification of positional parameters
+    pub last_modified_location: Option<Location>,
+}
+
 /// Type of a context.
 ///
 /// The context type affects the behavior of variable
@@ -109,20 +118,15 @@ struct Context {
     /// Context type.
     r#type: ContextType,
 
-    /// Positional parameters.
-    ///
-    /// This variable is very special:
-    ///
-    /// - Its value is always an `Array`.
-    /// - It is never exported nor read-only.
-    positional_params: Variable,
+    /// Positional parameters
+    positional_params: PositionalParams,
 }
 
 impl Context {
     fn new(r#type: ContextType) -> Self {
         Context {
             r#type,
-            positional_params: Variable::new_empty_array(),
+            positional_params: PositionalParams::default(),
         }
     }
 }
@@ -538,28 +542,19 @@ impl VariableSet {
     ///
     /// See also [`positional_params_mut`](Self::positional_params_mut).
     #[must_use]
-    pub fn positional_params(&self) -> &Variable {
+    pub fn positional_params(&self) -> &PositionalParams {
         let index = Self::index_of_topmost_regular_context(&self.contexts);
         &self.contexts[index].positional_params
     }
 
     /// Returns a mutable reference to the positional parameters.
     ///
-    /// Although positional parameters are not considered a variable in the
-    /// POSIX standard, we implement them as an anonymous array variable. It is
-    /// the caller's responsibility to keep the variable in a correct state:
-    ///
-    /// - The variable value should be an array. Not a scalar.
-    /// - The variable should not be exported nor made read-only.
-    ///
-    /// The `VariableSet` does not check if these rules are maintained.
-    ///
     /// Every regular context starts with an empty array of positional
     /// parameters, and volatile contexts cannot have positional parameters.
     /// This function returns a reference to the positional parameters of the
     /// topmost regular context.
     #[must_use]
-    pub fn positional_params_mut(&mut self) -> &mut Variable {
+    pub fn positional_params_mut(&mut self) -> &mut PositionalParams {
         let index = Self::index_of_topmost_regular_context(&self.contexts);
         &mut self.contexts[index].positional_params
     }
@@ -614,7 +609,6 @@ pub use self::guard::{ContextGuard, EnvContextGuard};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
 
     #[test]
     fn new_variable_in_global_scope() {
@@ -1209,50 +1203,44 @@ mod tests {
     #[test]
     fn positional_params_in_base_context() {
         let mut variables = VariableSet::new();
-        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
+        assert_eq!(variables.positional_params().values, [] as [String; 0]);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("foo".to_string());
-            values.push("bar".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("foo".to_string());
+        params.values.push("bar".to_string());
 
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["foo".to_string(), "bar".to_string()]);
-        });
+        assert_eq!(
+            variables.positional_params().values,
+            ["foo".to_string(), "bar".to_string()],
+        );
     }
 
     #[test]
     fn positional_params_in_second_regular_context() {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Regular);
-        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
+        assert_eq!(variables.positional_params().values, [] as [String; 0]);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("1".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("1".to_string());
 
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["1".to_string()]);
-        });
+        assert_eq!(variables.positional_params().values, ["1".to_string()]);
     }
 
     #[test]
     fn getting_positional_params_in_volatile_context() {
         let mut variables = VariableSet::new();
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("a".to_string());
-            values.push("b".to_string());
-            values.push("c".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("a".to_string());
+        params.values.push("b".to_string());
+        params.values.push("c".to_string());
 
         variables.push_context_impl(ContextType::Volatile);
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["a".to_string(), "b".to_string(), "c".to_string()]);
-        });
+        assert_eq!(
+            variables.positional_params().values,
+            ["a".to_string(), "b".to_string(), "c".to_string()],
+        );
     }
 
     #[test]
@@ -1260,14 +1248,10 @@ mod tests {
         let mut variables = VariableSet::new();
         variables.push_context_impl(ContextType::Volatile);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("x".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("x".to_string());
 
         variables.pop_context_impl();
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["x".to_string()]);
-        });
+        assert_eq!(variables.positional_params().values, ["x".to_string()]);
     }
 }

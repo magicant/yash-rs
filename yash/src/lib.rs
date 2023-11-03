@@ -37,7 +37,6 @@ async fn print_version(env: &mut env::Env) -> i32 {
 async fn parse_and_print(mut env: env::Env) -> i32 {
     use env::option::Option::{Interactive, Monitor};
     use env::option::State::On;
-    use env::variable::Value::Array;
     use semantics::trap::run_exit_trap;
     use semantics::Divert;
     use semantics::ExitStatus;
@@ -70,7 +69,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
     }
 
     env.arg0 = run.arg0;
-    env.variables.positional_params_mut().value = Some(Array(run.positional_params));
+    env.variables.positional_params_mut().values = run.positional_params;
 
     if env.options.get(Interactive) == On {
         env.traps.enable_terminator_handlers(&mut env.system).ok();

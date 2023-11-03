@@ -436,7 +436,8 @@ mod tests {
     #[test]
     fn assign_array_word() {
         let mut env = yash_env::Env::new_virtual();
-        env.variables.positional_params_mut().value = Some(Value::array(["1", "2  2", "3"]));
+        env.variables.positional_params_mut().values =
+            vec!["1".to_string(), "2  2".to_string(), "3".to_string()];
         env.variables
             .get_or_new("IFS", Scope::Global)
             .assign("~", None)

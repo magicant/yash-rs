@@ -18,7 +18,6 @@
 
 use super::name::Name;
 use yash_env::variable::Expansion;
-use yash_env::variable::Value;
 use yash_env::Env;
 use yash_syntax::source::Location;
 
@@ -41,13 +40,13 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Expansi
         }
         value.into()
     }
-    fn positional(env: &Env) -> Expansion {
-        env.variables.positional_params().value.as_ref().into()
+    fn positional(env: &Env) -> &[String] {
+        &env.variables.positional_params().values
     }
 
     match name {
         Name::Variable(name) => variable(env, name, location),
-        Name::Special('@' | '*') => positional(env),
+        Name::Special('@' | '*') => positional(env).into(),
         Name::Special('#') => positional(env).len().to_string().into(),
         Name::Special('?') => env.exit_status.to_string().into(),
         Name::Special('-') => options(env),
@@ -56,10 +55,7 @@ pub fn resolve<'a>(name: Name<'_>, env: &'a Env, location: &Location) -> Expansi
         Name::Special('0') => env.arg0.as_str().into(),
         Name::Special(_) => Expansion::Unset,
         Name::Positional(0) => Expansion::Unset,
-        Name::Positional(index) => match &env.variables.positional_params().value {
-            Some(Value::Array(params)) => params.get(index - 1).into(),
-            _ => Expansion::Unset,
-        },
+        Name::Positional(index) => positional(env).get(index - 1).into(),
     }
 }
 
@@ -68,7 +64,7 @@ mod tests {
     use super::*;
     use yash_env::job::Pid;
     use yash_env::variable::Scope;
-    use yash_env::variable::Variable;
+    use yash_env::variable::Value;
     use yash_syntax::source::Location;
 
     #[test]
@@ -128,7 +124,7 @@ mod tests {
         assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
+        env.variables.positional_params_mut().values = params.clone();
         let result = resolve(Name::Special('@'), &env, &loc);
         assert_eq!(result, Expansion::Array(params.into()));
     }
@@ -141,7 +137,7 @@ mod tests {
         assert_eq!(result, Expansion::Array([].as_slice().into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Some(Value::Array(params.clone()));
+        env.variables.positional_params_mut().values = params.clone();
         let result = resolve(Name::Special('*'), &env, &loc);
         assert_eq!(result, Expansion::Array(params.into()));
     }
@@ -154,7 +150,7 @@ mod tests {
         assert_eq!(result, Expansion::Scalar("0".into()));
 
         let params = vec!["a".to_string(), "foo bar".to_string(), "9".to_string()];
-        env.variables.positional_params_mut().value = Some(Value::Array(params));
+        env.variables.positional_params_mut().values = params;
         let result = resolve(Name::Special('#'), &env, &loc);
         assert_eq!(result, Expansion::Scalar("3".into()));
     }
@@ -240,7 +236,7 @@ mod tests {
     #[test]
     fn positional_set() {
         let mut env = Env::new_virtual();
-        *env.variables.positional_params_mut() = Variable::new_array(["a", "b"]);
+        env.variables.positional_params_mut().values = vec!["a".to_string(), "b".to_string()];
         let loc = Location::dummy("");
 
         assert_eq!(resolve(Name::Positional(0), &env, &loc), Expansion::Unset);
