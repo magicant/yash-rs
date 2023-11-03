@@ -16,15 +16,21 @@
 
 //! Module that defines the main `Variable` type.
 
-use std::ops::Deref;
-
 use super::Expansion;
 use super::Quirk;
 use super::Value;
+use std::ops::Deref;
 use thiserror::Error;
 use yash_syntax::source::Location;
 
 /// Definition of a variable.
+///
+/// The methods of `Variable` are designed to be used in a method chain,
+/// but you usually don't create a `Variable` instance directly.
+/// Instead, use [`VariableSet::get_or_new`](super::VariableSet::get_or_new) or
+/// [`Env::get_or_create_variable`](crate::Env::get_or_create_variable) to
+/// create a variable in a variable set and obtain a mutable reference to it
+/// ([`VariableRefMut`]), which allows you to modify the variable.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Variable {
     /// Value of the variable.
@@ -63,8 +69,6 @@ impl Variable {
     ///
     /// The returned variable's `last_assigned_location` and
     /// `read_only_location` are `None` and `is_exported` is false.
-    /// You should update these fields as necessary before assigning to a
-    /// variable set.
     #[must_use]
     pub fn new<S: Into<String>>(value: S) -> Self {
         Variable {
@@ -77,8 +81,6 @@ impl Variable {
     ///
     /// The returned variable's `last_assigned_location` and
     /// `read_only_location` are `None` and `is_exported` is false.
-    /// You should update these fields as necessary before assigning to a
-    /// variable set.
     #[must_use]
     pub fn new_array<I, S>(values: I) -> Self
     where
@@ -95,8 +97,6 @@ impl Variable {
     ///
     /// The returned variable's `last_assigned_location` and
     /// `read_only_location` are `None` and `is_exported` is false.
-    /// You should update these fields as necessary before assigning to a
-    /// variable set.
     #[must_use]
     pub fn new_empty_array() -> Self {
         Self::new_array([] as [&str; 0])
