@@ -73,6 +73,27 @@ impl Not for State {
     }
 }
 
+/// Converts a Boolean to a state
+impl From<bool> for State {
+    fn from(is_on: bool) -> Self {
+        if is_on {
+            On
+        } else {
+            Off
+        }
+    }
+}
+
+/// Converts a state to a Boolean
+impl From<State> for bool {
+    fn from(state: State) -> Self {
+        match state {
+            On => true,
+            Off => false,
+        }
+    }
+}
+
 /// Shell option
 #[derive(Clone, Copy, Debug, EnumSetType, Eq, Hash, PartialEq)]
 #[enumset(no_super_impls)]

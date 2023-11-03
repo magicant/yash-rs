@@ -258,11 +258,12 @@ use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_env::variable::AssignError;
+use yash_env::variable::{AssignError, Variable};
 use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 use yash_syntax::source::Location;
 
+mod print_variables;
 mod set_variables;
 pub mod syntax;
 
@@ -274,6 +275,18 @@ pub enum VariableAttr {
     ReadOnly,
     /// The variable is exported to the environment.
     Export,
+}
+
+impl VariableAttr {
+    /// Tests if the attribute is set on a variable
+    #[must_use]
+    pub fn test(&self, var: &Variable) -> State {
+        let is_on = match self {
+            VariableAttr::ReadOnly => var.is_read_only(),
+            VariableAttr::Export => var.is_exported,
+        };
+        State::from(is_on)
+    }
 }
 
 /// Scope in which a variable is defined or selected
@@ -399,8 +412,8 @@ impl Command {
     pub fn execute(self, env: &mut Env) -> Result<String, Vec<ExecuteError>> {
         match self {
             Self::SetVariables(command) => command.execute(env),
-            Self::PrintVariables(command) => todo!("{command:?}"), // command.execute(env),
-            Self::SetFunctions(command) => todo!("{command:?}"),   // command.execute(env),
+            Self::PrintVariables(command) => command.execute(&env.variables),
+            Self::SetFunctions(command) => todo!("{command:?}"), // command.execute(env),
             Self::PrintFunctions(command) => todo!("{command:?}"), // command.execute(env),
         }
     }
