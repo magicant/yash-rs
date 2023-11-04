@@ -57,6 +57,7 @@ pub mod r#return;
 pub mod set;
 pub mod shift;
 pub mod trap;
+pub mod typeset;
 pub mod unset;
 pub mod wait;
 
@@ -68,7 +69,7 @@ use yash_env::stack::{Frame, Stack};
 use yash_env::Env;
 
 use std::future::ready;
-use Type::{Mandatory, Special};
+use Type::{Elective, Mandatory, Special};
 
 /// Array of all the implemented built-in utilities.
 ///
@@ -164,6 +165,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(trap::main(env, args)),
+        },
+    ),
+    (
+        "typeset",
+        Builtin {
+            r#type: Elective,
+            execute: |env, args| Box::pin(typeset::main(env, args)),
         },
     ),
     (
