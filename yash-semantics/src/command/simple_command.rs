@@ -36,7 +36,7 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 #[cfg(doc)]
-use yash_env::variable::ContextType;
+use yash_env::variable::Context;
 use yash_env::variable::Scope;
 use yash_env::Env;
 use yash_syntax::syntax;
@@ -85,8 +85,8 @@ use yash_syntax::syntax::Assign;
 ///
 /// If the target is a function, redirections are performed in the same way as a
 /// regular built-in. Then, assignments are performed in a
-/// [volatile](ContextType::Volatile) variable context and exported. Next, a
-/// [regular](ContextType::Regular) context is
+/// [volatile](Context::Volatile) variable context and exported. Next, a
+/// [regular](Context::Regular) context is
 /// [pushed](yash_env::variable::VariableSet::push_context) to allow local
 /// variable assignment during the function execution. The remaining fields not
 /// used in the command search become positional parameters in the new context.

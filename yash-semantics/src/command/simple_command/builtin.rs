@@ -31,7 +31,7 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Builtin as FrameBuiltin;
 use yash_env::stack::Frame;
-use yash_env::variable::ContextType;
+use yash_env::variable::Context;
 use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -78,7 +78,7 @@ pub async fn execute_builtin(
         }
         // TODO Reject elective and extension built-ins in POSIX mode
         Mandatory | Elective | Extension | Substitutive => {
-            let mut env = env.push_context(ContextType::Volatile);
+            let mut env = env.push_context(Context::Volatile);
             perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
             trace_and_execute(&mut env, fields, builtin.execute, xtrace).await
         }

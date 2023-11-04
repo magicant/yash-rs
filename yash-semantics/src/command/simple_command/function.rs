@@ -29,7 +29,8 @@ use yash_env::function::Function;
 use yash_env::semantics::Divert;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
-use yash_env::variable::ContextType;
+use yash_env::variable::Context;
+use yash_env::variable::PositionalParams;
 use yash_env::Env;
 use yash_syntax::syntax::Assign;
 use yash_syntax::syntax::Redir;
@@ -47,20 +48,22 @@ pub async fn execute_function(
         return e.handle(env).await;
     };
 
-    let mut outer = env.push_context(ContextType::Volatile);
+    let mut outer = env.push_context(Context::Volatile);
     perform_assignments(&mut outer, assigns, true, xtrace.as_mut()).await?;
 
     trace_fields(xtrace.as_mut(), &fields);
     print(&mut outer, xtrace).await;
 
-    let mut inner = outer.push_context(ContextType::Regular);
-
-    // Apply positional parameters
-    let params = inner.variables.positional_params_mut();
+    // Prepare positional parameters
     let mut i = fields.into_iter();
-    let field = i.next().unwrap();
-    params.last_modified_location = Some(field.origin);
-    params.values = i.map(|f| f.value).collect();
+    let last_modified_location = Some(i.next().unwrap().origin);
+    let values = i.map(|f| f.value).collect();
+    let positional_params = PositionalParams {
+        values,
+        last_modified_location,
+    };
+
+    let mut inner = outer.push_context(Context::Regular { positional_params });
 
     // TODO Update control flow stack
     let result = function.body.execute(&mut inner).await;
