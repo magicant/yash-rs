@@ -112,7 +112,7 @@ impl std::fmt::Display for AttributeOption<'_> {
 mod tests {
     use super::*;
     use yash_env::option::{Off, On};
-    use yash_env::variable::ContextType;
+    use yash_env::variable::Context;
 
     #[test]
     fn printing_one_variable() {
@@ -215,7 +215,7 @@ mod tests {
             .get_or_new("global", Scope::Global.into())
             .assign("global value", None)
             .unwrap();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         inner
             .get_or_new("local", Scope::Local.into())
             .assign("local value", None)
@@ -241,7 +241,7 @@ mod tests {
             .get_or_new("global", Scope::Global.into())
             .assign("global value", None)
             .unwrap();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         inner
             .get_or_new("local", Scope::Local.into())
             .assign("local value", None)
@@ -263,7 +263,7 @@ mod tests {
             .get_or_new("one", Scope::Global.into())
             .assign("1", None)
             .unwrap();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         inner
             .get_or_new("two", Scope::Local.into())
             .assign("2", None)
@@ -294,7 +294,7 @@ mod tests {
             .get_or_new("one", Scope::Global.into())
             .assign("1", None)
             .unwrap();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         inner
             .get_or_new("two", Scope::Local.into())
             .assign("2", None)

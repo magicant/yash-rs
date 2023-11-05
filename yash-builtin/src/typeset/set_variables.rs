@@ -86,13 +86,13 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::option::Option::AllExport;
-    use yash_env::variable::{ContextType, Variable};
+    use yash_env::variable::{Context, Variable};
     use yash_syntax::source::Location;
 
     #[test]
     fn setting_local_variables() {
         let mut outer = Env::new_virtual();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         let baz_location = Location::dummy("baz assigned");
         let mut baz = inner.get_or_create_variable("baz", Scope::Local.into());
         baz.assign("BAZ", baz_location.clone()).unwrap();
@@ -134,7 +134,7 @@ mod tests {
         let baz_location = Location::dummy("assign");
         let mut baz = outer.get_or_create_variable("baz", Scope::Global.into());
         baz.assign("BAZ", baz_location.clone()).unwrap();
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         let sv = SetVariables {
             variables: Field::dummies(["foo=FOO", "bar", "baz"]),
             attrs: vec![],
@@ -326,7 +326,7 @@ mod tests {
         let mut var = outer.get_or_create_variable("var", Scope::Global.into());
         var.assign("VAR", assign_location.clone()).unwrap();
         var.make_read_only(assign_location.clone());
-        let mut inner = outer.push_context(ContextType::Regular);
+        let mut inner = outer.push_context(Context::default());
         let sv = SetVariables {
             variables: Field::dummies(["var=NEW"]),
             attrs: vec![(VariableAttr::ReadOnly, State::Off)],
