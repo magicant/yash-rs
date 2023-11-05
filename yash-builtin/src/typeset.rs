@@ -258,7 +258,7 @@ use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
 use yash_env::option::State;
 use yash_env::semantics::Field;
-use yash_env::variable::{AssignError, Variable};
+use yash_env::variable::{Value, Variable};
 use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 use yash_syntax::source::Location;
@@ -420,6 +420,43 @@ impl Command {
     }
 }
 
+/// Error returned on assigning to a read-only variable
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot assign to read-only variable {name:?}")]
+pub struct AssignReadOnlyError {
+    /// Name of the read-only variable
+    pub name: String,
+    /// Value that was being assigned
+    pub new_value: Value,
+    /// Location where the variable was tried to be assigned
+    pub assigned_location: Location,
+    /// Location where the variable was made read-only
+    pub read_only_location: Location,
+}
+
+impl From<AssignReadOnlyError> for yash_env::variable::AssignError {
+    fn from(e: AssignReadOnlyError) -> Self {
+        Self {
+            new_value: e.new_value,
+            assigned_location: Some(e.assigned_location),
+            read_only_location: e.read_only_location,
+        }
+    }
+}
+
+/// This conversion is available only when the optional `yash-semantics`
+/// dependency is enabled.
+#[cfg(feature = "yash-semantics")]
+impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyError {
+    fn from(e: AssignReadOnlyError) -> Self {
+        Self {
+            name: e.name,
+            new_value: e.new_value,
+            read_only_location: e.read_only_location,
+        }
+    }
+}
+
 /// Error that occurs when trying to cancel the read-only attribute of a
 /// variable or function
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -435,7 +472,7 @@ pub struct UndoReadOnlyError {
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum ExecuteError {
     /// Assigning to a read-only variable
-    AssignReadOnlyVariable(#[from] AssignError),
+    AssignReadOnlyVariable(#[from] AssignReadOnlyError),
     /// Cancelling the read-only attribute of a variable
     UndoReadOnlyVariable(UndoReadOnlyError),
     /// Cancelling the read-only attribute of a function
@@ -460,9 +497,7 @@ impl MessageBase for ExecuteError {
 
     fn main_annotation(&self) -> Annotation<'_> {
         let (message, location) = match self {
-            Self::AssignReadOnlyVariable(error) => {
-                (error.to_string(), error.assigned_location.as_ref().unwrap())
-            }
+            Self::AssignReadOnlyVariable(error) => (error.to_string(), &error.assigned_location),
             Self::UndoReadOnlyVariable(error) => (
                 format!("read-only variable `{}`", error.name),
                 &error.name.origin,

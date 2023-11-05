@@ -37,17 +37,21 @@ impl SetVariables {
             if let Some((name, value)) = field.value.split_once('=') {
                 value_to_assign = Some(Value::scalar(value));
 
-                // Make the name out of the field value.
+                // Modify the field value so that it contains only the name.
                 field.value.truncate(name.len());
             }
-            let name = field.value.clone();
 
-            let mut variable = env.get_or_create_variable(name, self.scope.into());
+            let mut variable = env.get_or_create_variable(&field.value, self.scope.into());
 
             // Assign the value to the variable.
             if let Some(value) = value_to_assign {
                 if let Err(error) = variable.assign(value, field.origin.clone()) {
-                    errors.push(error.into());
+                    errors.push(ExecuteError::AssignReadOnlyVariable(AssignReadOnlyError {
+                        name: field.value,
+                        new_value: error.new_value,
+                        assigned_location: error.assigned_location.unwrap(),
+                        read_only_location: error.read_only_location,
+                    }));
                     continue;
                 }
             }
@@ -313,7 +317,7 @@ mod tests {
         let errors = sv.execute(&mut env).unwrap_err();
         assert_matches!(&errors[..], [ExecuteError::AssignReadOnlyVariable(error)] => {
             assert_eq!(error.new_value, Value::scalar("foo"));
-            assert_eq!(error.assigned_location.as_ref(), Some(&assigned_location));
+            assert_eq!(error.assigned_location, assigned_location);
             assert_eq!(error.read_only_location, ro_location);
         });
         assert_eq!(env.variables.get("ro"), Some(&ro));
