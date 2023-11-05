@@ -25,6 +25,7 @@ use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
 use crate::expansion::initial::expand;
 use crate::expansion::quote_removal::skip_quotes;
+use crate::expansion::AssignReadOnlyError;
 use crate::expansion::ErrorCause;
 use yash_env::variable::Scope;
 use yash_env::variable::Value;
@@ -176,7 +177,7 @@ async fn assign(
 ) -> Result<Phrase, Error> {
     // TODO Support assignment to an array element
     let name = match name {
-        Some(Name::Variable(name)) => name.to_owned(),
+        Some(Name::Variable(name)) => name,
         _ => {
             let cause = ErrorCause::NonassignableParameter(NonassignableError::NotVariable);
             return Err(Error { cause, location });
@@ -189,8 +190,12 @@ async fn assign(
         .get_or_create_variable(name, Scope::Global)
         .assign(final_value, location)
         .map_err(|e| {
-            let location = e.assigned_location.as_ref().unwrap().clone();
-            let cause = ErrorCause::AssignError(e);
+            let location = e.assigned_location.unwrap();
+            let cause = ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                name: name.to_owned(),
+                new_value: e.new_value,
+                read_only_location: e.read_only_location,
+            });
             Error { cause, location }
         })?;
     Ok(value_phrase)
@@ -538,10 +543,10 @@ mod tests {
             .unwrap();
         assert_matches!(result, Some(Err(error)) => {
             assert_eq!(error.location, location);
-            assert_matches!(error.cause, ErrorCause::AssignError(e) => {
+            assert_matches!(error.cause, ErrorCause::AssignReadOnly(e) => {
+                assert_eq!(e.name, "var");
                 assert_eq!(e.new_value, Value::scalar("foo"));
                 assert_eq!(e.read_only_location, Location::dummy("read-only"));
-                assert_eq!(e.assigned_location, Some(location));
             });
         });
         assert_eq!(env.inner.variables.get("var"), Some(&save_var));

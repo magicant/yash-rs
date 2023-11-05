@@ -17,6 +17,7 @@
 //! Assignment.
 
 use crate::expansion::expand_value;
+use crate::expansion::AssignReadOnlyError;
 use crate::xtrace::XTrace;
 use std::fmt::Write;
 use yash_env::semantics::ExitStatus;
@@ -62,8 +63,12 @@ pub async fn perform_assignment(
     variable
         .assign(value, assign.location.clone())
         .map_err(|e| Error {
-            cause: ErrorCause::AssignError(e),
-            location: assign.location.clone(),
+            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                name: assign.name.clone(),
+                new_value: e.new_value,
+                read_only_location: e.read_only_location,
+            }),
+            location: e.assigned_location.unwrap(),
         })?;
     if export {
         variable.export(true);
@@ -170,14 +175,12 @@ mod tests {
             .now_or_never()
             .unwrap()
             .unwrap_err();
-        assert_matches!(e.cause, ErrorCause::AssignError(error) => {
+        assert_matches!(e.cause, ErrorCause::AssignReadOnly(error) => {
+            assert_eq!(error.name, "v");
             assert_eq!(error.new_value, Value::scalar("new"));
-            assert_eq!(error.assigned_location, Some(Location::dummy("v=new")));
             assert_eq!(error.read_only_location, location);
         });
-        assert_eq!(*e.location.code.value.borrow(), "v=new");
-        assert_eq!(e.location.code.start_line_number.get(), 1);
-        assert_eq!(e.location.range, 0..5);
+        assert_eq!(e.location, Location::dummy("v=new"));
     }
 
     #[test]

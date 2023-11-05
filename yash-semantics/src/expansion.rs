@@ -90,7 +90,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::semantics::ExitStatus;
 use yash_env::system::Errno;
-use yash_env::variable::AssignError;
+use yash_env::variable::Value;
 use yash_env::variable::Variable;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -101,6 +101,18 @@ use yash_syntax::syntax::Word;
 
 #[doc(no_inline)]
 pub use yash_env::semantics::Field;
+
+/// Error returned on assigning to a read-only variable
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("cannot assign to read-only variable {name:?}")]
+pub struct AssignReadOnlyError {
+    /// Name of the read-only variable
+    pub name: String,
+    /// Value that was being assigned.
+    pub new_value: Value,
+    /// Location where the variable was made read-only.
+    pub read_only_location: Location,
+}
 
 /// Types of errors that may occur in the word expansion.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -113,10 +125,9 @@ pub enum ErrorCause {
     #[error(transparent)]
     ArithError(#[from] ArithError),
 
-    // TODO AssignError should convey the variable name
     /// Assignment to a read-only variable.
     #[error(transparent)]
-    AssignError(#[from] AssignError),
+    AssignReadOnly(#[from] AssignReadOnlyError),
 
     /// Expansion of an unset parameter with the `nounset` option
     #[error("unset parameter")]
@@ -140,7 +151,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(_) => "error performing the command substitution",
             ArithError(_) => "error evaluating the arithmetic expansion",
-            AssignError(_) => "error assigning to variable",
+            AssignReadOnly(_) => "error assigning to variable",
             UnsetParameter => "unset parameter",
             EmptyExpansion(error) => error.message_or_default(),
             NonassignableParameter(_) => "cannot assign to parameter",
@@ -155,7 +166,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(e) => e.desc().into(),
             ArithError(e) => e.to_string().into(),
-            AssignError(e) => e.to_string().into(),
+            AssignReadOnly(e) => e.to_string().into(),
             UnsetParameter => "unset parameter disallowed by the nounset option".into(),
             EmptyExpansion(e) => e.state.description().into(),
             NonassignableParameter(e) => e.to_string().into(),
@@ -171,7 +182,7 @@ impl ErrorCause {
         match self {
             CommandSubstError(_) => None,
             ArithError(e) => e.related_location(),
-            AssignError(e) => Some((
+            AssignReadOnly(e) => Some((
                 &e.read_only_location,
                 "the variable was made read-only here",
             )),
@@ -357,28 +368,21 @@ mod tests {
     use crate::tests::return_builtin;
     use assert_matches::assert_matches;
     use futures_util::FutureExt;
-    use std::num::NonZeroU64;
-    use std::rc::Rc;
     use yash_env::variable::Scope;
     use yash_syntax::source::pretty::Message;
-    use yash_syntax::source::Code;
-    use yash_syntax::source::Source;
 
     #[test]
     fn from_error_for_message() {
-        let code = Rc::new(Code {
-            value: "hello".to_string().into(),
-            start_line_number: NonZeroU64::new(1).unwrap(),
-            source: Source::Unknown,
-        });
-        let location = Location { code, range: 2..4 };
         let error = Error {
-            cause: ErrorCause::AssignError(AssignError {
+            cause: ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                name: "foo".into(),
                 new_value: "value".into(),
-                assigned_location: Some(Location::dummy("assigned")),
                 read_only_location: Location::dummy("ROL"),
             }),
-            location,
+            location: Location {
+                range: 2..4,
+                ..Location::dummy("hello")
+            },
         };
         let message = Message::from(&error);
         assert_eq!(message.r#type, AnnotationType::Error);
@@ -387,7 +391,7 @@ mod tests {
         assert_eq!(message.annotations[0].r#type, AnnotationType::Error);
         assert_eq!(
             message.annotations[0].label,
-            "cannot assign to read-only variable"
+            "cannot assign to read-only variable \"foo\""
         );
         assert_eq!(message.annotations[0].location, &error.location);
         assert_eq!(message.annotations[1].r#type, AnnotationType::Info);

@@ -23,12 +23,12 @@ use super::super::ErrorCause;
 use super::Env;
 use super::Error;
 use crate::expansion::expand_text;
+use crate::expansion::AssignReadOnlyError;
 use std::ops::Range;
 use std::rc::Rc;
 use yash_arith::eval;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::{Off, On};
-use yash_env::variable::AssignError;
 use yash_env::variable::Scope::Global;
 use yash_env::variable::Value::Scalar;
 use yash_env::variable::Variable;
@@ -144,7 +144,7 @@ struct UnsetVariable;
 /// It is used to reproduce a location contained in the error cause.
 #[must_use]
 fn convert_error_cause(
-    cause: yash_arith::ErrorCause<UnsetVariable, AssignError>,
+    cause: yash_arith::ErrorCause<UnsetVariable, AssignReadOnlyError>,
     source: &Rc<Code>,
 ) -> ErrorCause {
     use ArithError::*;
@@ -193,7 +193,7 @@ fn convert_error_cause(
             yash_arith::EvalError::ReverseShifting => ErrorCause::ArithError(ReverseShifting),
             yash_arith::EvalError::AssignmentToValue => ErrorCause::ArithError(AssignmentToValue),
             yash_arith::EvalError::GetVariableError(UnsetVariable) => ErrorCause::UnsetParameter,
-            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignError(e),
+            yash_arith::EvalError::AssignVariableError(e) => ErrorCause::AssignReadOnly(e),
         },
     }
 }
@@ -206,7 +206,7 @@ struct VarEnv<'a> {
 
 impl<'a> yash_arith::Env for VarEnv<'a> {
     type GetVariableError = UnsetVariable;
-    type AssignVariableError = AssignError;
+    type AssignVariableError = AssignReadOnlyError;
 
     #[rustfmt::skip]
     fn get_variable(&self, name: &str) -> Result<Option<&str>, UnsetVariable> {
@@ -227,7 +227,7 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
         name: &str,
         value: String,
         range: Range<usize>,
-    ) -> Result<(), AssignError> {
+    ) -> Result<(), AssignReadOnlyError> {
         let code = Rc::new(Code {
             value: self.expression.to_string().into(),
             start_line_number: 1.try_into().unwrap(),
@@ -239,6 +239,11 @@ impl<'a> yash_arith::Env for VarEnv<'a> {
             .get_or_create_variable(name, Global)
             .assign(value, Location { code, range })
             .map(drop)
+            .map_err(|e| AssignReadOnlyError {
+                name: name.to_owned(),
+                new_value: e.new_value,
+                read_only_location: e.read_only_location,
+            })
     }
 }
 

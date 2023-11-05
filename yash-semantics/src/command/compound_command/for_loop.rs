@@ -21,6 +21,7 @@ use crate::assign::ErrorCause;
 use crate::command::Command;
 use crate::expansion::expand_word;
 use crate::expansion::expand_words;
+use crate::expansion::AssignReadOnlyError;
 use crate::xtrace::print;
 use crate::xtrace::trace_fields;
 use crate::xtrace::XTrace;
@@ -84,7 +85,11 @@ pub async fn execute(
                 other => other?,
             },
             Err(error) => {
-                let cause = ErrorCause::AssignError(error);
+                let cause = ErrorCause::AssignReadOnly(AssignReadOnlyError {
+                    name: name.value,
+                    new_value: error.new_value,
+                    read_only_location: error.read_only_location,
+                });
                 let location = name.origin;
                 let error = Error { cause, location };
                 return apply_errexit(error.handle(env).await, env);
