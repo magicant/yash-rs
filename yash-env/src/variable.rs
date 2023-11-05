@@ -194,15 +194,16 @@ impl VariableSet {
     /// This method searches for a variable of the specified name and returns a
     /// reference to it if found. If variables with the same name are defined in
     /// multiple contexts, the one in the topmost context is considered
-    /// _visible_ and returned.
+    /// _visible_ and returned. To limit the search to the local context, use
+    /// [`get_scoped`](Self::get_scoped).
     ///
     /// You cannot retrieve positional parameters using this function.
     /// See [`positional_params`](Self::positional_params).
     #[must_use]
-    pub fn get<N: ?Sized>(&self, name: &N) -> Option<&Variable>
+    pub fn get<N>(&self, name: &N) -> Option<&Variable>
     where
         String: Borrow<N>,
-        N: Hash + Eq,
+        N: Hash + Eq + ?Sized,
     {
         Some(&self.all_variables.get(name)?.last()?.variable)
     }
@@ -222,6 +223,37 @@ impl VariableSet {
             Scope::Local => Self::index_of_topmost_regular_context(contexts),
             Scope::Volatile => Self::index_of_topmost_regular_context(contexts) + 1,
         }
+    }
+
+    /// Returns a reference to the variable with the specified name.
+    ///
+    /// This method searches for a variable of the specified name and returns a
+    /// reference to it if found. The `scope` parameter determines the context
+    /// the variable is searched for:
+    ///
+    /// - If the scope is `Global`, the variable is searched for in all contexts
+    ///   from the topmost to the base context.
+    /// - If the scope is `Local`, the variable is searched for from the topmost
+    ///   to the topmost regular context.
+    /// - If the scope is `Volatile`, the variable is searched for in volatile
+    ///   contexts above the topmost regular context.
+    ///
+    /// `get_scoped` with `Scope::Global` is equivalent to [`get`](Self::get).
+    ///
+    /// You cannot retrieve positional parameters using this function.
+    /// See [`positional_params`](Self::positional_params).
+    #[must_use]
+    pub fn get_scoped<N>(&self, name: &N, scope: Scope) -> Option<&Variable>
+    where
+        String: Borrow<N>,
+        N: Hash + Eq + ?Sized,
+    {
+        let index = Self::index_of_context(scope, &self.contexts);
+        self.all_variables
+            .get(name)?
+            .last()
+            .filter(|vic| vic.context_index >= index)
+            .map(|vic| &vic.variable)
     }
 
     /// Gets a mutable reference to the variable with the specified name.
@@ -905,6 +937,52 @@ mod tests {
     fn missing_volatile_context() {
         let mut set = VariableSet::new();
         set.get_or_new("foo", Scope::Volatile);
+    }
+
+    #[test]
+    fn getting_variables_with_scopes() {
+        let mut set = VariableSet::new();
+        set.get_or_new("global", Scope::Global)
+            .assign("G", None)
+            .unwrap();
+        set.push_context_impl(Context::default());
+        set.get_or_new("local", Scope::Local)
+            .assign("L", None)
+            .unwrap();
+        set.push_context_impl(Context::Volatile);
+        set.get_or_new("volatile", Scope::Volatile)
+            .assign("V", None)
+            .unwrap();
+
+        assert_eq!(
+            set.get_scoped("global", Scope::Global),
+            Some(&Variable::new("G")),
+        );
+        assert_eq!(set.get_scoped("global", Scope::Local), None);
+        assert_eq!(set.get_scoped("global", Scope::Volatile), None);
+
+        assert_eq!(
+            set.get_scoped("local", Scope::Global),
+            Some(&Variable::new("L"))
+        );
+        assert_eq!(
+            set.get_scoped("local", Scope::Local),
+            Some(&Variable::new("L"))
+        );
+        assert_eq!(set.get_scoped("local", Scope::Volatile), None);
+
+        assert_eq!(
+            set.get_scoped("volatile", Scope::Global),
+            Some(&Variable::new("V"))
+        );
+        assert_eq!(
+            set.get_scoped("volatile", Scope::Local),
+            Some(&Variable::new("V"))
+        );
+        assert_eq!(
+            set.get_scoped("volatile", Scope::Volatile),
+            Some(&Variable::new("V"))
+        );
     }
 
     #[test]

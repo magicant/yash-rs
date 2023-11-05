@@ -33,7 +33,7 @@ impl PrintVariables {
             }
         } else {
             for name in self.variables {
-                match variables.get(&name.value) {
+                match variables.get_scoped(&name.value, self.scope.into()) {
                     Some(var) => print_one(&name.value, var, &self.attrs, &mut output),
                     None => errors.push(ExecuteError::PrintUnsetVariable(name)),
                 }
@@ -234,7 +234,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs VariableSet::get_scoped"]
     fn printing_local_variables_only() {
         let mut outer = VariableSet::new();
         outer
@@ -246,14 +245,24 @@ mod tests {
             .get_or_new("local", Scope::Local.into())
             .assign("local value", None)
             .unwrap();
+
         let pv = PrintVariables {
-            variables: Field::dummies(["global", "local"]),
+            variables: Field::dummies(["local"]),
             attrs: vec![],
             scope: Scope::Local,
         };
-
         let output = pv.execute(&inner).unwrap();
         assert_eq!(output, "typeset local='local value'\n");
+
+        let pv = PrintVariables {
+            variables: Field::dummies(["global"]),
+            attrs: vec![],
+            scope: Scope::Local,
+        };
+        assert_eq!(
+            pv.execute(&inner).unwrap_err(),
+            [ExecuteError::PrintUnsetVariable(Field::dummy("global"))]
+        );
     }
 
     #[test]
