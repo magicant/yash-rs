@@ -81,17 +81,30 @@ struct VariableInContext {
     context_index: usize,
 }
 
-/// Type of a context.
+/// Positional parameters
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PositionalParams {
+    /// Values of positional parameters
+    pub values: Vec<String>,
+    /// Location of the last modification of positional parameters
+    pub last_modified_location: Option<Location>,
+}
+
+/// Variable context
 ///
-/// The context type affects the behavior of variable
-/// [assignment](VariableRefMut::assign).
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ContextType {
+/// This enum defines the type of a context. The context type affects the
+/// behavior of variable [assignment](VariableRefMut::assign). A regular context
+/// is the default context type and may have positional parameters. A volatile
+/// context is used for holding temporary variables when executing a built-in or
+/// function.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Context {
     /// Context for normal assignments.
     ///
-    /// The base context is a regular context. The context for a function's
-    /// local assignment is also regular.
-    Regular,
+    /// The base context is a regular context. Every function invocation also
+    /// creates a regular context for local assignments and positional
+    /// parameters.
+    Regular { positional_params: PositionalParams },
 
     /// Context for temporary assignments.
     ///
@@ -100,29 +113,10 @@ pub enum ContextType {
     Volatile,
 }
 
-/// Variable context.
-///
-/// Variables defined in the context are not stored in this struct.
-/// See `VariableSet::all_variables`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Context {
-    /// Context type.
-    r#type: ContextType,
-
-    /// Positional parameters.
-    ///
-    /// This variable is very special:
-    ///
-    /// - Its value is always an `Array`.
-    /// - It is never exported nor read-only.
-    positional_params: Variable,
-}
-
-impl Context {
-    fn new(r#type: ContextType) -> Self {
-        Context {
-            r#type,
-            positional_params: Variable::new_empty_array(),
+impl Default for Context {
+    fn default() -> Self {
+        Context::Regular {
+            positional_params: Default::default(),
         }
     }
 }
@@ -153,7 +147,7 @@ impl Default for VariableSet {
     fn default() -> Self {
         VariableSet {
             all_variables: Default::default(),
-            contexts: vec![Context::new(ContextType::Regular)],
+            contexts: vec![Context::default()],
         }
     }
 }
@@ -217,7 +211,7 @@ impl VariableSet {
     fn index_of_topmost_regular_context(contexts: &[Context]) -> usize {
         contexts
             .iter()
-            .rposition(|context| context.r#type == ContextType::Regular)
+            .rposition(|context| matches!(context, Context::Regular { .. }))
             .expect("base context has gone")
     }
 
@@ -274,8 +268,8 @@ impl VariableSet {
     /// yourself, or use [`Env::get_or_create_variable`] to get the option
     /// applied automatically.
     ///
-    /// [regular]: ContextType::Regular
-    /// [volatile]: ContextType::Volatile
+    /// [regular]: Context::Regular
+    /// [volatile]: Context::Volatile
     #[inline]
     pub fn get_or_new<S: Into<String>>(&mut self, name: S, scope: Scope) -> VariableRefMut {
         self.get_or_new_impl(name.into(), scope)
@@ -303,14 +297,14 @@ impl VariableSet {
                     if var.context_index < context_index {
                         break;
                     }
-                    match self.contexts[var.context_index].r#type {
-                        ContextType::Regular => {
+                    match self.contexts[var.context_index] {
+                        Context::Regular { .. } => {
                             if let Some(removed_volatile_variable) = removed_volatile_variable {
                                 var.variable = removed_volatile_variable;
                             }
                             break 'branch;
                         }
-                        ContextType::Volatile => {
+                        Context::Volatile => {
                             removed_volatile_variable.get_or_insert(stack.pop().unwrap().variable);
                         }
                     }
@@ -324,9 +318,9 @@ impl VariableSet {
 
             Scope::Volatile => {
                 assert_eq!(
-                    self.contexts[context_index].r#type,
-                    ContextType::Volatile,
-                    "no volatile context to store the variable"
+                    self.contexts[context_index],
+                    Context::Volatile,
+                    "no volatile context to store the variable",
                 );
                 if let Some(var) = stack.last() {
                     if var.context_index != context_index {
@@ -388,8 +382,8 @@ impl VariableSet {
     /// You cannot modify positional parameters using this function.
     /// See [`positional_params_mut`](Self::positional_params_mut).
     ///
-    /// [regular]: ContextType::Regular
-    /// [volatile]: ContextType::Volatile
+    /// [regular]: Context::Regular
+    /// [volatile]: Context::Volatile
     pub fn unset<'a>(
         &'a mut self,
         scope: Scope,
@@ -436,14 +430,14 @@ impl VariableSet {
     /// The `scope` parameter chooses variables returned by the iterator:
     ///
     /// - `Global`: all variables
-    /// - `Local`: variables in the topmost [regular](ContextType::Regular)
-    ///   context or above.
-    /// - `Volatile`: variables above the topmost
-    ///   [regular](ContextType::Regular) context
+    /// - `Local`: variables in the topmost [regular] context or above.
+    /// - `Volatile`: variables above the topmost [regular] context
     ///
     /// In all cases, the iterator ignores variables hidden by another.
     ///
     /// The order of iterated variables is unspecified.
+    ///
+    /// [regular]: Context::Regular
     pub fn iter(&self, scope: Scope) -> Iter {
         Iter {
             inner: self.all_variables.iter(),
@@ -538,42 +532,43 @@ impl VariableSet {
     ///
     /// See also [`positional_params_mut`](Self::positional_params_mut).
     #[must_use]
-    pub fn positional_params(&self) -> &Variable {
-        let index = Self::index_of_topmost_regular_context(&self.contexts);
-        &self.contexts[index].positional_params
+    pub fn positional_params(&self) -> &PositionalParams {
+        self.contexts
+            .iter()
+            .rev()
+            .find_map(|context| match context {
+                Context::Regular { positional_params } => Some(positional_params),
+                Context::Volatile => None,
+            })
+            .expect("base context has gone")
     }
 
     /// Returns a mutable reference to the positional parameters.
-    ///
-    /// Although positional parameters are not considered a variable in the
-    /// POSIX standard, we implement them as an anonymous array variable. It is
-    /// the caller's responsibility to keep the variable in a correct state:
-    ///
-    /// - The variable value should be an array. Not a scalar.
-    /// - The variable should not be exported nor made read-only.
-    ///
-    /// The `VariableSet` does not check if these rules are maintained.
     ///
     /// Every regular context starts with an empty array of positional
     /// parameters, and volatile contexts cannot have positional parameters.
     /// This function returns a reference to the positional parameters of the
     /// topmost regular context.
     #[must_use]
-    pub fn positional_params_mut(&mut self) -> &mut Variable {
-        let index = Self::index_of_topmost_regular_context(&self.contexts);
-        &mut self.contexts[index].positional_params
+    pub fn positional_params_mut(&mut self) -> &mut PositionalParams {
+        self.contexts
+            .iter_mut()
+            .rev()
+            .find_map(|context| match context {
+                Context::Regular { positional_params } => Some(positional_params),
+                Context::Volatile => None,
+            })
+            .expect("base context has gone")
     }
 
-    fn push_context_impl(&mut self, context_type: ContextType) {
-        self.contexts.push(Context::new(context_type));
+    fn push_context_impl(&mut self, context: Context) {
+        self.contexts.push(context);
     }
 
     fn pop_context_impl(&mut self) {
         debug_assert!(!self.contexts.is_empty());
         assert_ne!(self.contexts.len(), 1, "cannot pop the base context");
         self.contexts.pop();
-        // TODO Use complementary stack of hash tables to avoid scanning the
-        // whole `self.all_variables`
         self.all_variables.retain(|_, stack| {
             if let Some(vic) = stack.last() {
                 if vic.context_index >= self.contexts.len() {
@@ -614,13 +609,12 @@ pub use self::guard::{ContextGuard, EnvContextGuard};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
 
     #[test]
     fn new_variable_in_global_scope() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Global);
 
@@ -638,8 +632,8 @@ mod tests {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo", Scope::Global);
         var.assign("ONE", None).unwrap();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Global);
 
@@ -661,15 +655,15 @@ mod tests {
     fn new_variable_in_local_scope() {
         // This test case creates two local variables in separate contexts.
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(Context::default());
 
         let mut var = set.get_or_new("foo", Scope::Local);
 
         assert_eq!(*var, Variable::default());
 
         var.assign("OUTER", None).unwrap();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Local);
 
@@ -687,7 +681,7 @@ mod tests {
     #[test]
     fn existing_variable_in_local_scope() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(Context::default());
         let mut var = set.get_or_new("foo", Scope::Local);
         var.assign("OLD", None).unwrap();
 
@@ -704,8 +698,8 @@ mod tests {
     #[test]
     fn new_variable_in_volatile_scope() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Volatile);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Volatile);
 
@@ -724,8 +718,8 @@ mod tests {
         var.assign("VALUE", None).unwrap();
         var.make_read_only(Location::dummy("read-only location"));
         let save_var = var.clone();
-        set.push_context_impl(ContextType::Volatile);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Volatile);
 
@@ -742,7 +736,7 @@ mod tests {
     #[test]
     fn existing_variable_in_volatile_scope() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("INITIAL", None).unwrap();
 
@@ -763,11 +757,11 @@ mod tests {
     #[test]
     fn lowering_volatile_variable_to_base_context() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("DUMMY", None).unwrap();
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
@@ -801,11 +795,11 @@ mod tests {
         let mut set = VariableSet::new();
         let mut var = set.get_or_new("foo", Scope::Local);
         var.assign("ONE", None).unwrap();
-        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(Context::default());
         let mut var = set.get_or_new("foo", Scope::Local);
         var.assign("TWO", None).unwrap();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
@@ -839,12 +833,12 @@ mod tests {
     #[test]
     fn lowering_volatile_variable_to_topmost_regular_context_without_existing_variable() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("DUMMY", None).unwrap();
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("VOLATILE", Location::dummy("anywhere")).unwrap();
         var.export(true);
@@ -875,18 +869,18 @@ mod tests {
     #[test]
     fn lowering_volatile_variable_to_topmost_regular_context_overwriting_existing_variable() {
         let mut set = VariableSet::new();
-        set.push_context_impl(ContextType::Regular);
-        set.push_context_impl(ContextType::Regular);
+        set.push_context_impl(Context::default());
+        set.push_context_impl(Context::default());
         let mut var = set.get_or_new("foo", Scope::Local);
         var.assign("OLD", None).unwrap();
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("DUMMY", None).unwrap();
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
         let mut var = set.get_or_new("foo", Scope::Volatile);
         var.assign("VOLATILE", Location::dummy("first")).unwrap();
         var.export(true);
-        set.push_context_impl(ContextType::Volatile);
+        set.push_context_impl(Context::Volatile);
 
         let mut var = set.get_or_new("foo", Scope::Local);
 
@@ -940,12 +934,12 @@ mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("X", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         variables
             .get_or_new("foo", Scope::Local)
             .assign("Y", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
             .assign("Z", None)
@@ -963,18 +957,18 @@ mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("A", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         // Non-local read-only variable does not prevent unsetting
         let mut readonly_foo = variables.get_or_new("foo", Scope::Local);
         readonly_foo.assign("B", None).unwrap();
         readonly_foo.make_read_only(Location::dummy("dummy"));
         let readonly_foo = readonly_foo.clone();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         variables
             .get_or_new("foo", Scope::Local)
             .assign("C", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
             .assign("D", None)
@@ -992,7 +986,7 @@ mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("A", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
 
         let result = variables.unset(Scope::Local, "foo").unwrap();
         assert_eq!(result, None);
@@ -1006,17 +1000,17 @@ mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("A", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         variables
             .get_or_new("foo", Scope::Local)
             .assign("B", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
             .assign("C", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
         variables
             .get_or_new("foo", Scope::Volatile)
             .assign("D", None)
@@ -1034,7 +1028,7 @@ mod tests {
             .get_or_new("foo", Scope::Global)
             .assign("A", None)
             .unwrap();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
 
         let result = variables.unset(Scope::Volatile, "foo").unwrap();
         assert_eq!(result, None);
@@ -1047,15 +1041,15 @@ mod tests {
         let mut variables = VariableSet::new();
         let mut foo = variables.get_or_new("foo", Scope::Global);
         foo.assign("A", None).unwrap();
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         let mut foo = variables.get_or_new("foo", Scope::Local);
         foo.assign("B", None).unwrap();
         foo.make_read_only(Location::dummy("dummy"));
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         let mut foo = variables.get_or_new("foo", Scope::Local);
         foo.assign("C", None).unwrap();
         foo.make_read_only(read_only_location.clone());
-        variables.push_context_impl(ContextType::Regular);
+        variables.push_context_impl(Context::default());
         let mut foo = variables.get_or_new("foo", Scope::Local);
         foo.assign("D", None).unwrap();
 
@@ -1086,14 +1080,14 @@ mod tests {
         let mut var = set.get_or_new("local", Scope::Global);
         var.assign("hidden value", None).unwrap();
 
-        let mut set = set.push_context(ContextType::Regular);
+        let mut set = set.push_context(Context::default());
 
         let mut var = set.get_or_new("local", Scope::Local);
         var.assign("visible value", None).unwrap();
         let mut var = set.get_or_new("volatile", Scope::Local);
         var.assign("hidden value", None).unwrap();
 
-        let mut set = set.push_context(ContextType::Volatile);
+        let mut set = set.push_context(Context::Volatile);
 
         let mut var = set.get_or_new("volatile", Scope::Volatile);
         var.assign("volatile value", None).unwrap();
@@ -1209,65 +1203,55 @@ mod tests {
     #[test]
     fn positional_params_in_base_context() {
         let mut variables = VariableSet::new();
-        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
+        assert_eq!(variables.positional_params().values, [] as [String; 0]);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("foo".to_string());
-            values.push("bar".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("foo".to_string());
+        params.values.push("bar".to_string());
 
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["foo".to_string(), "bar".to_string()]);
-        });
+        assert_eq!(
+            variables.positional_params().values,
+            ["foo".to_string(), "bar".to_string()],
+        );
     }
 
     #[test]
     fn positional_params_in_second_regular_context() {
         let mut variables = VariableSet::new();
-        variables.push_context_impl(ContextType::Regular);
-        assert_eq!(variables.positional_params().value, Some(Array(vec![])));
+        variables.push_context_impl(Context::default());
+        assert_eq!(variables.positional_params().values, [] as [String; 0]);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("1".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("1".to_string());
 
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["1".to_string()]);
-        });
+        assert_eq!(variables.positional_params().values, ["1".to_string()]);
     }
 
     #[test]
     fn getting_positional_params_in_volatile_context() {
         let mut variables = VariableSet::new();
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("a".to_string());
-            values.push("b".to_string());
-            values.push("c".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("a".to_string());
+        params.values.push("b".to_string());
+        params.values.push("c".to_string());
 
-        variables.push_context_impl(ContextType::Volatile);
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["a".to_string(), "b".to_string(), "c".to_string()]);
-        });
+        variables.push_context_impl(Context::Volatile);
+        assert_eq!(
+            variables.positional_params().values,
+            ["a".to_string(), "b".to_string(), "c".to_string()],
+        );
     }
 
     #[test]
     fn setting_positional_params_in_volatile_context() {
         let mut variables = VariableSet::new();
-        variables.push_context_impl(ContextType::Volatile);
+        variables.push_context_impl(Context::Volatile);
 
-        let v = variables.positional_params_mut();
-        assert_matches!(&mut v.value, Some(Array(values)) => {
-            values.push("x".to_string());
-        });
+        let params = variables.positional_params_mut();
+        params.values.push("x".to_string());
 
         variables.pop_context_impl();
-        assert_matches!(&variables.positional_params().value, Some(Array(values)) => {
-            assert_eq!(values.as_ref(), ["x".to_string()]);
-        });
+        assert_eq!(variables.positional_params().values, ["x".to_string()]);
     }
 }

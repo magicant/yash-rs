@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::ContextType;
+use super::Context;
 use super::VariableSet;
 use crate::Env;
 use std::ops::Deref;
@@ -30,12 +30,12 @@ pub struct ContextGuard<'a> {
 }
 
 impl VariableSet {
-    /// Pushes a new empty context to this variable set.
+    /// Pushes a new context to this variable set.
     ///
     /// This function returns a scope guard that will pop the context when dropped.
     #[inline]
-    pub fn push_context(&mut self, context_type: ContextType) -> ContextGuard<'_> {
-        self.push_context_impl(context_type);
+    pub fn push_context(&mut self, context: Context) -> ContextGuard<'_> {
+        self.push_context_impl(context);
         ContextGuard { stack: self }
     }
 
@@ -86,8 +86,8 @@ impl Env {
     /// `self.variables.push_context(context_type)`, but returns an
     /// `EnvContextGuard` that allows re-borrowing the `Env`.
     #[inline]
-    pub fn push_context(&mut self, context_type: ContextType) -> EnvContextGuard<'_> {
-        self.variables.push_context_impl(context_type);
+    pub fn push_context(&mut self, context: Context) -> EnvContextGuard<'_> {
+        self.variables.push_context_impl(context);
         EnvContextGuard { env: self }
     }
 
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.variables.push_context(ContextType::Regular);
+        let mut guard = env.variables.push_context(Context::default());
         guard
             .get_or_new("foo", Scope::Global)
             .assign("", None)
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn env_scope_guard() {
         let mut env = Env::new_virtual();
-        let mut guard = env.push_context(ContextType::Regular);
+        let mut guard = env.push_context(Context::default());
         guard
             .variables
             .get_or_new("foo", Scope::Global)

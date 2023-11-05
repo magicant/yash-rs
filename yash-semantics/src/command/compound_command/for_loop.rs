@@ -33,7 +33,6 @@ use yash_env::semantics::Field;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::variable::Scope;
-use yash_env::variable::Value::{Array, Scalar};
 use yash_env::Env;
 use yash_quote::quoted;
 use yash_syntax::syntax::List;
@@ -57,20 +56,15 @@ pub async fn execute(
             Err(error) => return apply_errexit(error.handle(env).await, env),
         }
     } else {
-        match env.variables.positional_params().value {
-            None => vec![],
-            Some(Scalar(ref value)) => vec![Field {
+        env.variables
+            .positional_params()
+            .values
+            .iter()
+            .map(|value| Field {
                 value: value.clone(),
                 origin: name.origin.clone(),
-            }],
-            Some(Array(ref values)) => values
-                .iter()
-                .map(|value| Field {
-                    value: value.clone(),
-                    origin: name.origin.clone(),
-                })
-                .collect(),
-        }
+            })
+            .collect()
     };
 
     trace_values(env, &name, &values).await;
@@ -126,7 +120,6 @@ mod tests {
     use yash_env::option::Option::ErrExit;
     use yash_env::option::State::On;
     use yash_env::semantics::ExitStatus;
-    use yash_env::variable::Value;
     use yash_env::VirtualSystem;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
@@ -147,7 +140,7 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.variables.positional_params_mut().value = Some(Value::array(["foo"]));
+        env.variables.positional_params_mut().values = vec!["foo".to_string()];
         let command: CompoundCommand = "for v do echo :$v:; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();
@@ -162,7 +155,8 @@ mod tests {
         let state = Rc::clone(&system.state);
         let mut env = Env::with_system(Box::new(system));
         env.builtins.insert("echo", echo_builtin());
-        env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "three"]));
+        env.variables.positional_params_mut().values =
+            vec!["1".to_string(), "2".to_string(), "three".to_string()];
         let command: CompoundCommand = "for foo do echo :$foo:; done".parse().unwrap();
 
         let result = command.execute(&mut env).now_or_never().unwrap();

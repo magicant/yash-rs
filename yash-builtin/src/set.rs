@@ -136,7 +136,6 @@ use yash_env::option::State;
 use yash_env::option::{Interactive, Monitor};
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::variable::Array;
 use yash_env::variable::Scope::Global;
 use yash_env::Env;
 
@@ -167,10 +166,9 @@ fn modify(
 
     // Modify positional parameters
     if let Some(fields) = positional_params {
-        let location = env.stack.current_builtin().map(|b| b.name.origin.clone());
         let params = env.variables.positional_params_mut();
-        params.value = Some(Array(fields.into_iter().map(|f| f.value).collect()));
-        params.last_assigned_location = location;
+        params.values = fields.into_iter().map(|f| f.value).collect();
+        params.last_modified_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
     }
 }
 
@@ -366,10 +364,12 @@ xtrace           off
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
-        let v = env.variables.positional_params();
-        assert_eq!(v.value, Some(Value::array(["a", "b", "z"])));
-        assert_eq!(v.read_only_location, None);
-        assert_eq!(v.last_assigned_location.as_ref().unwrap(), &location);
+        let params = env.variables.positional_params();
+        assert_eq!(
+            params.values,
+            ["a".to_string(), "b".to_string(), "z".to_string()],
+        );
+        assert_eq!(params.last_modified_location, Some(location));
     }
 
     #[test]

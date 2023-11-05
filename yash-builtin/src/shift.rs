@@ -67,7 +67,6 @@ use std::borrow::Cow;
 use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::variable::Value;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -99,13 +98,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     let params = env.variables.positional_params_mut();
-    let values = match params.value.as_mut() {
-        None => panic!("positional parameters are undefined"),
-        Some(Value::Scalar(value)) => panic!("positional parameters are not an array: {value:?}"),
-        Some(Value::Array(params)) => params,
-    };
-
-    if values.len() < count {
+    let len = params.values.len();
+    if len < count {
         // Failure: cannot shift so many positional parameters
         let (label, location) = match operand_location {
             None => (
@@ -119,14 +113,14 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
                 format!(
                     "requested to shift {} but there {} only {}",
                     count,
-                    if values.len() == 1 { "is" } else { "are" },
-                    values.len(),
+                    if len == 1 { "is" } else { "are" },
+                    len,
                 )
                 .into(),
                 Cow::Borrowed(location),
             ),
         };
-        let last_location = params.last_assigned_location.clone();
+        let last_location = params.last_modified_location.clone();
         let mut annotations = vec![Annotation::new(AnnotationType::Error, label, &location)];
         if let Some(last_location) = &last_location {
             annotations.push(Annotation::new(
@@ -145,8 +139,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         return Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert);
     }
 
-    values.drain(..count);
-    params.last_assigned_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
+    params.values.drain(..count);
+    params.last_modified_location = env.stack.current_builtin().map(|b| b.name.origin.clone());
     Result::default()
 }
 
@@ -172,28 +166,26 @@ mod tests {
             name: Field::dummy("shift"),
             is_special: true,
         }));
-        env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
+        env.variables.positional_params_mut().values =
+            vec!["1".to_string(), "2".to_string(), "3".to_string()];
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::default());
         assert_eq!(
-            env.variables.positional_params().value,
-            Some(Value::array(["2", "3"])),
+            env.variables.positional_params().values,
+            ["2".to_string(), "3".to_string()],
         );
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::default());
-        assert_eq!(
-            env.variables.positional_params().value,
-            Some(Value::array(["3"])),
-        );
+        assert_eq!(env.variables.positional_params().values, ["3".to_string()],);
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::default());
         let params = env.variables.positional_params();
-        assert_eq!(params.value, Some(Value::Array(vec![])));
+        assert_eq!(params.values, [] as [String; 0]);
         assert_eq!(
-            params.last_assigned_location,
+            params.last_modified_location,
             Some(Location::dummy("shift")),
         );
     }
@@ -205,32 +197,37 @@ mod tests {
             name: Field::dummy("shift"),
             is_special: true,
         }));
-        env.variables.positional_params_mut().value =
-            Some(Value::array(["1", "2", "3", "4", "5", "6", "7"]));
+        env.variables.positional_params_mut().values = ["1", "2", "3", "4", "5", "6", "7"]
+            .into_iter()
+            .map(Into::into)
+            .collect();
 
         let args = Field::dummies(["2"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::default());
         assert_eq!(
-            env.variables.positional_params().value,
-            Some(Value::array(["3", "4", "5", "6", "7"])),
+            env.variables.positional_params().values,
+            [
+                "3".to_string(),
+                "4".to_string(),
+                "5".to_string(),
+                "6".to_string(),
+                "7".to_string(),
+            ],
         );
 
         let args = Field::dummies(["3"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::default());
         assert_eq!(
-            env.variables.positional_params().value,
-            Some(Value::array(["6", "7"])),
+            env.variables.positional_params().values,
+            ["6".to_string(), "7".to_string(),],
         );
 
         let args = Field::dummies(["2"]);
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::default());
-        assert_eq!(
-            env.variables.positional_params().value,
-            Some(Value::Array(vec![])),
-        );
+        assert_eq!(env.variables.positional_params().values, [] as [String; 0]);
     }
 
     #[test]
@@ -266,7 +263,8 @@ mod tests {
             name: Field::dummy("shift"),
             is_special: true,
         }));
-        env.variables.positional_params_mut().value = Some(Value::array(["1", "2", "3"]));
+        env.variables.positional_params_mut().values =
+            vec!["1".to_string(), "2".to_string(), "3".to_string()];
 
         let args = Field::dummies(["4"]);
         let actual_result = main(&mut env, args).now_or_never().unwrap();

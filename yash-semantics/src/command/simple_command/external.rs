@@ -35,7 +35,7 @@ use yash_env::semantics::Result;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
-use yash_env::variable::ContextType;
+use yash_env::variable::Context;
 use yash_env::Env;
 use yash_env::System;
 use yash_syntax::source::Location;
@@ -59,7 +59,7 @@ pub async fn execute_external_utility(
         return e.handle(env).await;
     };
 
-    let mut env = env.push_context(ContextType::Volatile);
+    let mut env = env.push_context(Context::Volatile);
     perform_assignments(&mut env, assigns, true, xtrace.as_mut()).await?;
 
     trace_fields(xtrace.as_mut(), &fields);
