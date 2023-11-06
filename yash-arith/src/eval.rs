@@ -27,6 +27,9 @@ use std::ops::Range;
 use thiserror::Error;
 
 /// Cause of an evaluation error
+///
+/// The type parameters `E1` and `E2` define the types of errors returned by the
+/// [`Env::get_variable`] and [`Env::assign_variable`] methods, respectively.
 #[derive(Clone, Debug, Eq, Error, Hash, PartialEq)]
 pub enum EvalError<E1, E2> {
     /// A variable value that is not a valid number
@@ -48,9 +51,15 @@ pub enum EvalError<E1, E2> {
     #[error("assignment to a non-variable")]
     AssignmentToValue,
     /// Error accessing a variable value.
+    ///
+    /// The associated value is the error returned by the [`Env::get_variable`]
+    /// method.
     #[error(transparent)]
     GetVariableError(E1),
     /// Error assigning a variable value.
+    ///
+    /// The associated value is the error returned by the
+    /// [`Env::assign_variable`] method.
     #[error(transparent)]
     AssignVariableError(E2),
 }

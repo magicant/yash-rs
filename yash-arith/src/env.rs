@@ -21,6 +21,11 @@ use std::convert::Infallible;
 use std::ops::Range;
 
 /// Interface for accessing variables during evaluation
+///
+/// This crate does not implement any mechanism for storing variables. The
+/// caller of [`eval`](crate::eval()) must provide an implementation of this
+/// trait, which is used to access variables that appear in the evaluated
+/// expression.
 pub trait Env {
     /// Object returned on a variable access error
     type GetVariableError;
