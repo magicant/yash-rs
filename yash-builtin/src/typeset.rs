@@ -477,6 +477,8 @@ pub enum ExecuteError {
     UndoReadOnlyVariable(UndoReadOnlyError),
     /// Cancelling the read-only attribute of a function
     UndoReadOnlyFunction(UndoReadOnlyError),
+    /// Modifying a non-existing function
+    ModifyUnsetFunction(Field),
     /// Printing a non-existing variable
     PrintUnsetVariable(Field),
     /// Printing a non-existing function
@@ -489,6 +491,7 @@ impl MessageBase for ExecuteError {
             Self::AssignReadOnlyVariable(_) => "cannot assign to read-only variable",
             Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",
             Self::UndoReadOnlyFunction(_) => "cannot cancel read-only-ness of function",
+            Self::ModifyUnsetFunction(_) => "cannot modify non-existing function",
             Self::PrintUnsetVariable(_) => "cannot print non-existing variable",
             Self::PrintUnsetFunction(_) => "cannot print non-existing function",
         }
@@ -509,7 +512,7 @@ impl MessageBase for ExecuteError {
             Self::PrintUnsetVariable(field) => {
                 (format!("non-existing variable `{field}`"), &field.origin)
             }
-            Self::PrintUnsetFunction(field) => {
+            Self::ModifyUnsetFunction(field) | Self::PrintUnsetFunction(field) => {
                 (format!("non-existing function `{field}`"), &field.origin)
             }
         };
@@ -538,7 +541,9 @@ impl MessageBase for ExecuteError {
                 &error.read_only_location,
             ))),
 
-            Self::PrintUnsetVariable(_) | Self::PrintUnsetFunction(_) => {}
+            Self::ModifyUnsetFunction(_)
+            | Self::PrintUnsetVariable(_)
+            | Self::PrintUnsetFunction(_) => {}
         }
     }
 }
