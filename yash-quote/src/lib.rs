@@ -54,6 +54,7 @@
 
 use std::borrow::Cow::{self, Borrowed, Owned};
 
+#[must_use]
 fn char_needs_quoting(c: char) -> bool {
     match c {
         ';' | '&' | '|' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n' => true,
@@ -62,6 +63,7 @@ fn char_needs_quoting(c: char) -> bool {
     }
 }
 
+#[must_use]
 fn str_needs_quoting(s: &str) -> bool {
     if s.is_empty() {
         return true;
@@ -108,6 +110,7 @@ fn str_needs_quoting(s: &str) -> bool {
 /// may be more efficient if the result is to be part of a larger string built
 /// with a formatter.
 #[derive(Clone, Copy, Debug)]
+#[must_use = "`Quoted` does nothing unless printed"]
 pub struct Quoted<'a> {
     raw: &'a str,
     needs_quoting: bool,
@@ -115,11 +118,15 @@ pub struct Quoted<'a> {
 
 impl<'a> Quoted<'a> {
     /// Returns the original string.
+    #[inline]
+    #[must_use]
     pub fn as_raw(&self) -> &'a str {
         self.raw
     }
 
     /// Tests whether the contained string requires quoting.
+    #[inline]
+    #[must_use]
     pub fn needs_quoting(&self) -> bool {
         self.needs_quoting
     }
@@ -151,6 +158,7 @@ impl std::fmt::Display for Quoted<'_> {
 /// This function scans the string to cache the value for
 /// [`Quoted::needs_quoting`], so this is an _O_(_n_) operation.
 impl<'a> From<&'a str> for Quoted<'a> {
+    #[inline]
     fn from(raw: &'a str) -> Self {
         let needs_quoting = str_needs_quoting(raw);
         Quoted { raw, needs_quoting }
@@ -159,6 +167,7 @@ impl<'a> From<&'a str> for Quoted<'a> {
 
 /// Constructs a quoted string.
 impl<'a> From<Quoted<'a>> for Cow<'a, str> {
+    #[must_use]
     fn from(q: Quoted<'a>) -> Self {
         if q.needs_quoting() {
             Owned(q.to_string())
@@ -173,7 +182,6 @@ impl<'a> From<Quoted<'a>> for Cow<'a, str> {
 /// This function scans the string to cache the value for
 /// [`Quoted::needs_quoting`], so this is an _O_(_n_) operation.
 #[inline]
-#[must_use]
 pub fn quoted(raw: &str) -> Quoted {
     Quoted::from(raw)
 }
@@ -184,6 +192,8 @@ pub fn quoted(raw: &str) -> Quoted {
 /// Otherwise, it is `Owned(new_quoted_string)`.
 ///
 /// See the [module doc](self) for more details.
+#[inline]
+#[must_use]
 pub fn quote(raw: &str) -> Cow<'_, str> {
     quoted(raw).into()
 }
