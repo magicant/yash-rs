@@ -20,11 +20,11 @@ assert_matches = "1.5.0"
 async-trait = "0.1.73"
 itertools = "0.11.0"
 thiserror = "1.0.47"
-yash-arith = { path = "../yash-arith", version = "0.2.0" }
+yash-arith = { path = "../yash-arith", version = "0.2.1" }
 yash-env = { path = "../yash-env", version = "0.1.0" }
 yash-fnmatch = { path = "../yash-fnmatch", version = "1.1.0" }
-yash-quote = { path = "../yash-quote", version = "1.1.0" }
-yash-syntax = { path = "../yash-syntax", version = "0.6.1" }
+yash-quote = { path = "../yash-quote", version = "1.1.1" }
+yash-syntax = { path = "../yash-syntax", version = "0.7.0" }
 
 [dev-dependencies]
 futures-executor = "0.3.28"
