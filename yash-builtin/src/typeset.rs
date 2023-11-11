@@ -256,6 +256,7 @@
 
 use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
+use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::{Value, Variable};
@@ -263,6 +264,7 @@ use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 use yash_syntax::source::Location;
 
+mod print_functions;
 mod print_variables;
 mod set_functions;
 mod set_variables;
@@ -343,6 +345,17 @@ pub struct PrintVariables {
 pub enum FunctionAttr {
     /// The function is read-only.
     ReadOnly,
+}
+
+impl FunctionAttr {
+    /// Tests if the attribute is set on a function.
+    #[must_use]
+    fn test(&self, function: &Function) -> State {
+        let is_on = match self {
+            Self::ReadOnly => function.is_read_only(),
+        };
+        State::from(is_on)
+    }
 }
 
 /// Set of information to modify functions
@@ -477,6 +490,8 @@ pub enum ExecuteError {
     UndoReadOnlyVariable(UndoReadOnlyError),
     /// Cancelling the read-only attribute of a function
     UndoReadOnlyFunction(UndoReadOnlyError),
+    /// Modifying a non-existing function
+    ModifyUnsetFunction(Field),
     /// Printing a non-existing variable
     PrintUnsetVariable(Field),
     /// Printing a non-existing function
@@ -489,6 +504,7 @@ impl MessageBase for ExecuteError {
             Self::AssignReadOnlyVariable(_) => "cannot assign to read-only variable",
             Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",
             Self::UndoReadOnlyFunction(_) => "cannot cancel read-only-ness of function",
+            Self::ModifyUnsetFunction(_) => "cannot modify non-existing function",
             Self::PrintUnsetVariable(_) => "cannot print non-existing variable",
             Self::PrintUnsetFunction(_) => "cannot print non-existing function",
         }
@@ -509,7 +525,7 @@ impl MessageBase for ExecuteError {
             Self::PrintUnsetVariable(field) => {
                 (format!("non-existing variable `{field}`"), &field.origin)
             }
-            Self::PrintUnsetFunction(field) => {
+            Self::ModifyUnsetFunction(field) | Self::PrintUnsetFunction(field) => {
                 (format!("non-existing function `{field}`"), &field.origin)
             }
         };
@@ -538,7 +554,9 @@ impl MessageBase for ExecuteError {
                 &error.read_only_location,
             ))),
 
-            Self::PrintUnsetVariable(_) | Self::PrintUnsetFunction(_) => {}
+            Self::ModifyUnsetFunction(_)
+            | Self::PrintUnsetVariable(_)
+            | Self::PrintUnsetFunction(_) => {}
         }
     }
 }
