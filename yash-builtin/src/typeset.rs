@@ -256,6 +256,7 @@
 
 use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
+use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::{Value, Variable};
@@ -263,6 +264,7 @@ use yash_env::Env;
 use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
 use yash_syntax::source::Location;
 
+mod print_functions;
 mod print_variables;
 mod set_functions;
 mod set_variables;
@@ -343,6 +345,17 @@ pub struct PrintVariables {
 pub enum FunctionAttr {
     /// The function is read-only.
     ReadOnly,
+}
+
+impl FunctionAttr {
+    /// Tests if the attribute is set on a function.
+    #[must_use]
+    fn test(&self, function: &Function) -> State {
+        let is_on = match self {
+            Self::ReadOnly => function.is_read_only(),
+        };
+        State::from(is_on)
+    }
 }
 
 /// Set of information to modify functions
