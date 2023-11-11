@@ -39,7 +39,10 @@ impl SetFunctions {
                                     Some(name.origin.clone());
                                 functions
                                     .define(function)
-                                    .unwrap_or_else(|e| unreachable!("{e:?}"));
+                                    // The define function fails only when the set has a read-only
+                                    // function with the same name. This is impossible because we
+                                    // have just unset the function.
+                                    .expect("unreachable error case");
                             }
                         }
                     }
