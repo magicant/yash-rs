@@ -428,7 +428,7 @@ impl Command {
             Self::SetVariables(command) => command.execute(env),
             Self::PrintVariables(command) => command.execute(&env.variables),
             Self::SetFunctions(command) => command.execute(&mut env.functions),
-            Self::PrintFunctions(command) => todo!("{command:?}"), // command.execute(env),
+            Self::PrintFunctions(command) => command.execute(&env.functions),
         }
     }
 }
