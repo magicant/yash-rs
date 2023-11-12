@@ -183,6 +183,11 @@ fn tilde_expansion() {
 }
 
 #[test]
+fn typeset_builtin() {
+    run("typeset-y.sh")
+}
+
+#[test]
 fn unset_builtin() {
     run("unset-p.sh")
 }
