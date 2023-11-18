@@ -46,7 +46,8 @@
 //!
 //! ## Job ID
 //!
-//! TODO Elaborate on syntax of job ID
+//! A job ID must start with `%` and has the format described in the
+//! [`yash_env::job::id`] module documentation.
 //!
 //! ## Process ID
 //!

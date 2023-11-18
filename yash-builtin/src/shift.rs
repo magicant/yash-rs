@@ -26,8 +26,8 @@
 //!
 //! # Description
 //!
-//! The built-in removes the first `n` positional parameters from the list of
-//! positional parameters. If `n` is omitted, it is assumed to be `1`.
+//! The built-in removes the first *n* positional parameters from the list of
+//! positional parameters. If *n* is omitted, it is assumed to be `1`.
 //!
 //! # Options
 //!
@@ -54,12 +54,6 @@
 //! runtime error. This implementation treats it as a syntax error.
 //!
 //! (TODO: the array option and negative operands)
-//!
-//! # Implementation notes
-//!
-//! This built-in expects the [positional
-//! parameters](yash_env::variable::VariableSet::positional_params_mut) to be an
-//! array. If it is not an array, the built-in panics.
 
 use crate::common::arrange_message_and_divert;
 use crate::common::syntax_error;

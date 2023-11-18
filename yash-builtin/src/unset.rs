@@ -16,7 +16,7 @@
 
 //! Unset built-in
 //!
-//! The **`unset`** built-in unsets the values of shell variables.
+//! The **`unset`** built-in unsets shell variables or functions.
 //!
 //! # Synopsis
 //!
@@ -48,7 +48,7 @@
 //!
 //! # Errors
 //!
-//! Unsetting a read-only variable is an error.
+//! Unsetting a read-only variable or function is an error.
 //!
 //! It is not an error to unset a variable or function that is not set.
 //! The built-in ignores such operands.
