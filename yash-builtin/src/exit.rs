@@ -18,13 +18,13 @@
 //!
 //! The **`exit`** built-in causes the currently executing shell to exit.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! exit [exit_status]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! `exit exit_status` makes the shell exit from the currently executing
 //! environment with the specified exit status.

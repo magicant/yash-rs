@@ -18,13 +18,13 @@
 //!
 //! The **`break`** built-in terminates the execution of a loop.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! break [n]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! `break n` quits the execution of the *n*th innermost `for`, `while`, or
 //! `until` loop. The specified loop must lexically enclose the break command,

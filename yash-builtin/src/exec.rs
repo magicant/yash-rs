@@ -21,13 +21,13 @@
 //! operands, the built-in makes redirections applied to it permanent in the
 //! current shell process.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! exec [name [arguments...]]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! When invoked with operands, the exec built-in replaces the currently
 //! executing shell process with a new process image, regarding the operands as

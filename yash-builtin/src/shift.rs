@@ -18,13 +18,13 @@
 //!
 //! The **`shift`** built-in removes some positional parameters.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! shift [n]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! The built-in removes the first `n` positional parameters from the list of
 //! positional parameters. If `n` is omitted, it is assumed to be `1`.

@@ -19,13 +19,13 @@
 //! The **`return`** built-in quits the currently executing innermost function
 //! or script.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! return [-n] [exit_status]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! `return exit_status` makes the shell return from the currently executing
 //! function or script with the specified exit status.

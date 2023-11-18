@@ -18,13 +18,13 @@
 //!
 //! The **`pwd`** built-in prints the working directory path.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! pwd [-L|-P]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! The built-in prints the pathname of the current working directory followed
 //! by a newline to the standard output.

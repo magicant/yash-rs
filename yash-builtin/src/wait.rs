@@ -18,13 +18,13 @@
 //!
 //! The **`wait`** built-in waits for asynchronous jobs to finish.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! wait [job_id_or_process_id...]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! If you specify one or more operands, the built-in waits for the specified
 //! job to finish. Otherwise, the built-in waits for all existing asynchronous

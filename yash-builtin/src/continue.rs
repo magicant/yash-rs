@@ -19,13 +19,13 @@
 //! The **`continue`** built-in skips the execution of a loop to the next
 //! iteration.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! continue [n]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! `continue n` interrupts the execution of the *n*th innermost for, while, or
 //! until loop and resumes its next iteration.

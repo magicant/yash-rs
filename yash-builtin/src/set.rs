@@ -20,7 +20,7 @@
 //! [positional parameters](yash_env::variable). It also can print a list of
 //! current options or variables.
 //!
-//! # Syntax and semantics
+//! # Description
 //!
 //! The built-in behaves differently depending on the invocation syntax.
 //!

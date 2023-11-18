@@ -18,13 +18,13 @@
 //!
 //! The **`cd`** built-in changes the working directory.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! cd [-L|-P] [directory]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! The built-in changes the working directory to the specified directory. The
 //! new working directory is determined from the option and operand as follows:

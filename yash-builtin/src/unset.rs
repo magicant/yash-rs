@@ -18,13 +18,13 @@
 //!
 //! The **`unset`** built-in unsets the values of shell variables.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! unset [-fv] name...
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! The built-in unsets shell variables or functions named by the operands.
 //!

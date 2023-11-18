@@ -18,13 +18,13 @@
 //!
 //! The **`jobs`** built-in reports job status.
 //!
-//! # Syntax
+//! # Synopsis
 //!
 //! ```sh
 //! jobs [-lnprst] [job_id…]
 //! ```
 //!
-//! # Semantics
+//! # Description
 //!
 //! The jobs built-in prints information about jobs the shell is currently
 //! controlling, one line for each job. The results follow the
