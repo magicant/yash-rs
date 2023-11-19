@@ -339,6 +339,18 @@ pub struct PrintVariables {
     pub scope: Scope,
 }
 
+/// Set of information used when printing variables
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintVariablesContext<'a> {
+    /// Name of the built-in printed as the command name
+    pub builtin_name: &'a str,
+}
+
+/// Variable printing context for the typeset built-in
+pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
+    builtin_name: "typeset",
+};
+
 /// Attribute that can be set on a function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -423,10 +435,16 @@ impl Command {
     /// If there are no errors, the method returns a string that should be
     /// printed to the standard output.
     /// Otherwise, the method returns a non-empty vector of errors.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute(
+        self,
+        env: &mut Env,
+        print_variables_context: &PrintVariablesContext,
+    ) -> Result<String, Vec<ExecuteError>> {
         match self {
             Self::SetVariables(command) => command.execute(env),
-            Self::PrintVariables(command) => command.execute(&env.variables),
+            Self::PrintVariables(command) => {
+                command.execute(&env.variables, print_variables_context)
+            }
             Self::SetFunctions(command) => command.execute(&mut env.functions),
             Self::PrintFunctions(command) => command.execute(&env.functions),
         }
@@ -586,7 +604,7 @@ pub fn to_message(errors: &[ExecuteError]) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
-            Ok(command) => match command.execute(env) {
+            Ok(command) => match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
                 Ok(result) => output(env, &result).await,
                 Err(errors) => report_failure(env, to_message(&errors)).await,
             },

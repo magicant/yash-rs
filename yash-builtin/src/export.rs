@@ -76,6 +76,7 @@ use crate::typeset::syntax::OptionSpec;
 use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::to_message;
 use crate::typeset::Command;
+use crate::typeset::PrintVariablesContext;
 use crate::typeset::Scope::Global;
 use crate::typeset::VariableAttr::Export;
 use yash_env::option::State::On;
@@ -84,6 +85,11 @@ use yash_env::Env;
 
 /// List of portable options applicable to the export built-in
 pub static PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
+
+/// Variable printing context for the export built-in
+pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
+    builtin_name: "export",
+};
 
 /// Entry point of the export built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
@@ -95,7 +101,6 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                         sv.attrs.push((Export, On));
                         sv.scope = Global;
                     }
-                    // TODO print as export rather than typeset
                     Command::PrintVariables(pv) => {
                         pv.attrs.push((Export, On));
                         pv.scope = Global;
@@ -103,7 +108,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                     Command::SetFunctions(sf) => unreachable!("{sf:?}"),
                     Command::PrintFunctions(pf) => unreachable!("{pf:?}"),
                 }
-                match command.execute(env) {
+                match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
                     Ok(result) => output(env, &result).await,
                     Err(errors) => report_failure(env, to_message(&errors)).await,
                 }
