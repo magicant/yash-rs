@@ -571,8 +571,11 @@ impl std::fmt::Display for ExecuteError {
 ///
 /// The first error's title is used as the message title. The other errors are
 /// added as annotations.
+///
+/// This is a utility for printing errors returned by [`Command::execute`].
+/// The returned message can be passed to [`report_failure`].
 #[must_use]
-fn to_message(errors: &[ExecuteError]) -> Message {
+pub fn to_message(errors: &[ExecuteError]) -> Message {
     let mut message = Message::from(&errors[0]);
     let other_errors = errors[1..].iter().map(ExecuteError::main_annotation);
     message.annotations.extend(other_errors);
