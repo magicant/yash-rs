@@ -154,7 +154,6 @@ __IN__
 f12 created
 __OUT__
 
-: TODO Needs the export built-in <<\__OUT__
 test_o 'assignment-like command argument'
 export foo=F
 sh -c 'echo $1 $foo' X foo=bar
