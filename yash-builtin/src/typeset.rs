@@ -252,7 +252,13 @@
 //!
 //! # Implementation notes
 //!
-//! TBD
+//! The implementation of this built-in is also used by the
+//! [`export`](crate::export) built-in. Functions that are common to both
+//! built-ins are parameterized to support the different behaviors of the
+//! built-ins. By customizing the contents of [`Command`] and the
+//! [`PrintVariablesContext`] passed to [`Command::execute`], you can even
+//! implement a new built-in that behaves differently from both `typeset` and
+//! `export`.
 
 use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
