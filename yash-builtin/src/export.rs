@@ -89,6 +89,7 @@ pub static PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 /// Variable printing context for the export built-in
 pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
     builtin_name: "export",
+    options_allowed: &[],
 };
 
 /// Entry point of the export built-in

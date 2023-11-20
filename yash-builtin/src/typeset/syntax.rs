@@ -122,7 +122,7 @@ pub const UNEXPORT_OPTION: OptionSpec<'static> = OptionSpec {
 };
 
 /// List of all option specifications applicable to the typeset built-in
-pub static ALL_OPTIONS: &[OptionSpec<'static>] = &[
+pub const ALL_OPTIONS: &[OptionSpec<'static>] = &[
     FUNCTIONS_OPTION,
     GLOBAL_OPTION,
     PRINT_OPTION,

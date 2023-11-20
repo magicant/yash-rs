@@ -254,6 +254,7 @@
 //!
 //! TBD
 
+use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
 use yash_env::function::Function;
@@ -340,15 +341,22 @@ pub struct PrintVariables {
 }
 
 /// Set of information used when printing variables
+///
+/// [`PrintVariables::execute`] prints a list of commands that invoke a built-in
+/// to recreate the variables. This context is used to determine the name of the
+/// built-in and the attributes possibly indicated as options to the built-in.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PrintVariablesContext<'a> {
     /// Name of the built-in printed as the command name
     pub builtin_name: &'a str,
+    /// Options that may be printed for the built-in
+    pub options_allowed: &'a [OptionSpec<'a>],
 }
 
 /// Variable printing context for the typeset built-in
 pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
     builtin_name: "typeset",
+    options_allowed: self::syntax::ALL_OPTIONS,
 };
 
 /// Attribute that can be set on a function

@@ -69,7 +69,10 @@ fn print_one(
     }
 
     // Do the formatting.
-    let options = AttributeOption { var };
+    let options = AttributeOption {
+        var,
+        options_allowed: context.options_allowed,
+    };
     let quoted_name = yash_quote::quoted(name);
     match &var.value {
         Some(value @ Value::Scalar(_)) => writeln!(
@@ -109,17 +112,22 @@ fn print_one(
 /// variable attributes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AttributeOption<'a> {
+    /// Variable to be printed
     var: &'a Variable,
+    /// Options that are printed if they are set
+    options_allowed: &'a [OptionSpec<'a>],
 }
 
 impl std::fmt::Display for AttributeOption<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO Filter printable options
-        if self.var.is_read_only() {
-            f.write_str("-r ")?;
-        }
-        if self.var.is_exported {
-            f.write_str("-x ")?;
+        for option in self.options_allowed {
+            if let Some(attr) = option.attr {
+                if let Ok(attr) = VariableAttr::try_from(attr) {
+                    if attr.test(self.var).into() {
+                        write!(f, "-{} ", option.short)?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -540,6 +548,7 @@ mod tests {
 
     mod non_default_context {
         use super::*;
+        use crate::typeset::syntax::{EXPORT_OPTION, READONLY_OPTION};
 
         #[test]
         fn builtin_name() {
@@ -558,6 +567,7 @@ mod tests {
             };
             let context = PrintVariablesContext {
                 builtin_name: "export",
+                ..PRINT_VARIABLES_CONTEXT
             };
 
             assert_eq!(
@@ -566,6 +576,64 @@ mod tests {
                  bar=(1 2)\n\
                  export -r bar\n\
                  export baz\n"
+            );
+        }
+
+        #[test]
+        fn attrs_to_print() {
+            let mut vars = VariableSet::new();
+            let mut a = vars.get_or_new("a", Scope::Global.into());
+            a.assign("A", None).unwrap();
+            let mut b = vars.get_or_new("b", Scope::Global.into());
+            b.assign("B", None).unwrap();
+            b.export(true);
+            let mut c = vars.get_or_new("c", Scope::Global.into());
+            c.assign("C", None).unwrap();
+            c.make_read_only(Location::dummy("c location"));
+            let mut d = vars.get_or_new("d", Scope::Global.into());
+            d.assign("D", None).unwrap();
+            d.export(true);
+            d.make_read_only(Location::dummy("d location"));
+            let pv = PrintVariables {
+                variables: vec![],
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintVariablesContext {
+                options_allowed: &[READONLY_OPTION],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset b=B\n\
+                 typeset -r c=C\n\
+                 typeset -r d=D\n",
+            );
+
+            let context = PrintVariablesContext {
+                options_allowed: &[EXPORT_OPTION],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset -x b=B\n\
+                 typeset c=C\n\
+                 typeset -x d=D\n",
+            );
+
+            let context = PrintVariablesContext {
+                options_allowed: &[],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset b=B\n\
+                 typeset c=C\n\
+                 typeset d=D\n",
             );
         }
     }
