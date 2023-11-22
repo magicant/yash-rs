@@ -20,7 +20,11 @@ use yash_env::variable::{Value, VariableSet};
 
 impl PrintVariables {
     /// Executes the command.
-    pub fn execute(self, variables: &VariableSet) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute(
+        self,
+        variables: &VariableSet,
+        context: &PrintVariablesContext,
+    ) -> Result<String, Vec<ExecuteError>> {
         let mut output = String::new();
         let mut errors = Vec::new();
 
@@ -29,12 +33,12 @@ impl PrintVariables {
             // TODO Honor the collation order in the locale.
             variables.sort_unstable_by_key(|&(name, _)| name);
             for (name, var) in variables {
-                print_one(name, var, &self.attrs, &mut output);
+                print_one(name, var, &self.attrs, context, &mut output);
             }
         } else {
             for name in self.variables {
                 match variables.get_scoped(&name.value, self.scope.into()) {
-                    Some(var) => print_one(&name.value, var, &self.attrs, &mut output),
+                    Some(var) => print_one(&name.value, var, &self.attrs, context, &mut output),
                     None => errors.push(ExecuteError::PrintUnsetVariable(name)),
                 }
             }
@@ -53,6 +57,7 @@ fn print_one(
     name: &str,
     var: &Variable,
     filter_attrs: &[(VariableAttr, State)],
+    context: &PrintVariablesContext,
     output: &mut String,
 ) {
     // Skip if the variable does not match the filter.
@@ -64,12 +69,16 @@ fn print_one(
     }
 
     // Do the formatting.
-    let options = AttributeOption { var };
+    let options = AttributeOption {
+        var,
+        options_allowed: context.options_allowed,
+    };
     let quoted_name = yash_quote::quoted(name);
     match &var.value {
         Some(value @ Value::Scalar(_)) => writeln!(
             output,
-            "typeset {}{}={}",
+            "{} {}{}={}",
+            context.builtin_name,
             options,
             quoted_name,
             value.quote()
@@ -81,11 +90,21 @@ fn print_one(
 
             let options = options.to_string();
             if !options.is_empty() {
-                writeln!(output, "typeset {}{}", options, quoted_name).unwrap();
+                writeln!(
+                    output,
+                    "{} {}{}",
+                    context.builtin_name, options, quoted_name
+                )
+                .unwrap();
             }
         }
 
-        None => writeln!(output, "typeset {}{}", options, quoted_name).unwrap(),
+        None => writeln!(
+            output,
+            "{} {}{}",
+            context.builtin_name, options, quoted_name
+        )
+        .unwrap(),
     }
 }
 
@@ -93,16 +112,22 @@ fn print_one(
 /// variable attributes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AttributeOption<'a> {
+    /// Variable to be printed
     var: &'a Variable,
+    /// Options that are printed if they are set
+    options_allowed: &'a [OptionSpec<'a>],
 }
 
 impl std::fmt::Display for AttributeOption<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.var.is_read_only() {
-            f.write_str("-r ")?;
-        }
-        if self.var.is_exported {
-            f.write_str("-x ")?;
+        for option in self.options_allowed {
+            if let Some(attr) = option.attr {
+                if let Ok(attr) = VariableAttr::try_from(attr) {
+                    if attr.test(self.var).into() {
+                        write!(f, "-{} ", option.short)?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -126,7 +151,7 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let output = pv.execute(&vars).unwrap();
+        let output = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
         assert_eq!(output, "typeset foo=value\n")
     }
 
@@ -149,7 +174,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset first=1\n\
              typeset second=2\n\
              typeset third=3\n",
@@ -168,7 +193,8 @@ mod tests {
             scope: Scope::Global,
         };
 
-        assert_eq!(pv.execute(&vars).unwrap(), "a=(1 '2  2' 3)\n");
+        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        assert_eq!(result, "a=(1 '2  2' 3)\n");
     }
 
     #[test]
@@ -181,7 +207,8 @@ mod tests {
             scope: Scope::Global,
         };
 
-        assert_eq!(pv.execute(&vars).unwrap(), "typeset x\n");
+        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        assert_eq!(result, "typeset x\n");
     }
 
     #[test]
@@ -201,7 +228,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset 'valueless$'\n\
              typeset 'scalar$'='=;'\n\
              'array$'=('~' \"'\" '*?')\n",
@@ -227,7 +254,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner).unwrap(),
+            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset global='global value'\n\
              typeset local='local value'\n",
         );
@@ -251,7 +278,7 @@ mod tests {
             attrs: vec![],
             scope: Scope::Local,
         };
-        let output = pv.execute(&inner).unwrap();
+        let output = pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap();
         assert_eq!(output, "typeset local='local value'\n");
 
         let pv = PrintVariables {
@@ -260,7 +287,7 @@ mod tests {
             scope: Scope::Local,
         };
         assert_eq!(
-            pv.execute(&inner).unwrap_err(),
+            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap_err(),
             [ExecuteError::PrintUnsetVariable(Field::dummy("global"))]
         );
     }
@@ -288,7 +315,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner).unwrap(),
+            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
             // sorted by name
             "typeset one=1\n\
              typeset three=3\n\
@@ -319,7 +346,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner).unwrap(),
+            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
             // sorted by name
             "typeset three=3\n\
              typeset two=2\n",
@@ -343,7 +370,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -x x\n\
              typeset -r y\n\
              typeset -r -x z\n",
@@ -370,7 +397,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -x x=X\n\
              typeset -r y=Y\n\
              typeset -r -x z=Z\n",
@@ -397,7 +424,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "x=(X)\n\
              typeset -x x\n\
              y=(Y)\n\
@@ -430,7 +457,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -r b\n\
              typeset -r -x c\n",
         );
@@ -446,7 +473,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -x a\n\
              typeset d\n",
         );
@@ -462,7 +489,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -x a\n\
              typeset -r -x c\n",
         );
@@ -478,7 +505,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars).unwrap(),
+            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
             "typeset -r b\n\
              typeset d\n",
         );
@@ -493,7 +520,8 @@ mod tests {
             scope: Scope::Global,
         };
 
-        assert_eq!(pv.execute(&vars).unwrap(), "typeset -r b\n");
+        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        assert_eq!(result, "typeset -r b\n");
     }
 
     #[test]
@@ -506,12 +534,107 @@ mod tests {
             scope: Scope::Global,
         };
 
+        let error = pv
+            .execute(&VariableSet::new(), &PRINT_VARIABLES_CONTEXT)
+            .unwrap_err();
         assert_eq!(
-            pv.execute(&VariableSet::new()).unwrap_err(),
+            error,
             [
                 ExecuteError::PrintUnsetVariable(foo),
                 ExecuteError::PrintUnsetVariable(bar)
             ]
         );
+    }
+
+    mod non_default_context {
+        use super::*;
+        use crate::typeset::syntax::{EXPORT_OPTION, READONLY_OPTION};
+
+        #[test]
+        fn builtin_name() {
+            let mut vars = VariableSet::new();
+            vars.get_or_new("foo", Scope::Global.into())
+                .assign("value", None)
+                .unwrap();
+            let bar = &mut vars.get_or_new("bar", Scope::Global.into());
+            bar.assign(Value::array(["1", "2"]), None).unwrap();
+            bar.make_read_only(Location::dummy("bar location"));
+            vars.get_or_new("baz", Scope::Global.into());
+            let pv = PrintVariables {
+                variables: Field::dummies(["foo", "bar", "baz"]),
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+            let context = PrintVariablesContext {
+                builtin_name: "export",
+                ..PRINT_VARIABLES_CONTEXT
+            };
+
+            assert_eq!(
+                pv.execute(&vars, &context).unwrap(),
+                "export foo=value\n\
+                 bar=(1 2)\n\
+                 export -r bar\n\
+                 export baz\n"
+            );
+        }
+
+        #[test]
+        fn attrs_to_print() {
+            let mut vars = VariableSet::new();
+            let mut a = vars.get_or_new("a", Scope::Global.into());
+            a.assign("A", None).unwrap();
+            let mut b = vars.get_or_new("b", Scope::Global.into());
+            b.assign("B", None).unwrap();
+            b.export(true);
+            let mut c = vars.get_or_new("c", Scope::Global.into());
+            c.assign("C", None).unwrap();
+            c.make_read_only(Location::dummy("c location"));
+            let mut d = vars.get_or_new("d", Scope::Global.into());
+            d.assign("D", None).unwrap();
+            d.export(true);
+            d.make_read_only(Location::dummy("d location"));
+            let pv = PrintVariables {
+                variables: vec![],
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintVariablesContext {
+                options_allowed: &[READONLY_OPTION],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset b=B\n\
+                 typeset -r c=C\n\
+                 typeset -r d=D\n",
+            );
+
+            let context = PrintVariablesContext {
+                options_allowed: &[EXPORT_OPTION],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset -x b=B\n\
+                 typeset c=C\n\
+                 typeset -x d=D\n",
+            );
+
+            let context = PrintVariablesContext {
+                options_allowed: &[],
+                ..PRINT_VARIABLES_CONTEXT
+            };
+            assert_eq!(
+                pv.execute(&vars, &context).unwrap(),
+                "typeset a=A\n\
+                 typeset b=B\n\
+                 typeset c=C\n\
+                 typeset d=D\n",
+            );
+        }
     }
 }

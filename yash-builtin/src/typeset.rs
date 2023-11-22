@@ -252,8 +252,15 @@
 //!
 //! # Implementation notes
 //!
-//! TBD
+//! The implementation of this built-in is also used by the
+//! [`export`](crate::export) built-in. Functions that are common to both
+//! built-ins are parameterized to support the different behaviors of the
+//! built-ins. By customizing the contents of [`Command`] and the
+//! [`PrintVariablesContext`] passed to [`Command::execute`], you can even
+//! implement a new built-in that behaves differently from both `typeset` and
+//! `export`.
 
+use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
 use thiserror::Error;
 use yash_env::function::Function;
@@ -339,6 +346,25 @@ pub struct PrintVariables {
     pub scope: Scope,
 }
 
+/// Set of information used when printing variables
+///
+/// [`PrintVariables::execute`] prints a list of commands that invoke a built-in
+/// to recreate the variables. This context is used to determine the name of the
+/// built-in and the attributes possibly indicated as options to the built-in.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintVariablesContext<'a> {
+    /// Name of the built-in printed as the command name
+    pub builtin_name: &'a str,
+    /// Options that may be printed for the built-in
+    pub options_allowed: &'a [OptionSpec<'a>],
+}
+
+/// Variable printing context for the typeset built-in
+pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
+    builtin_name: "typeset",
+    options_allowed: self::syntax::ALL_OPTIONS,
+};
+
 /// Attribute that can be set on a function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -423,10 +449,16 @@ impl Command {
     /// If there are no errors, the method returns a string that should be
     /// printed to the standard output.
     /// Otherwise, the method returns a non-empty vector of errors.
-    pub fn execute(self, env: &mut Env) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute(
+        self,
+        env: &mut Env,
+        print_variables_context: &PrintVariablesContext,
+    ) -> Result<String, Vec<ExecuteError>> {
         match self {
             Self::SetVariables(command) => command.execute(env),
-            Self::PrintVariables(command) => command.execute(&env.variables),
+            Self::PrintVariables(command) => {
+                command.execute(&env.variables, print_variables_context)
+            }
             Self::SetFunctions(command) => command.execute(&mut env.functions),
             Self::PrintFunctions(command) => command.execute(&env.functions),
         }
@@ -571,8 +603,11 @@ impl std::fmt::Display for ExecuteError {
 ///
 /// The first error's title is used as the message title. The other errors are
 /// added as annotations.
+///
+/// This is a utility for printing errors returned by [`Command::execute`].
+/// The returned message can be passed to [`report_failure`].
 #[must_use]
-fn to_message(errors: &[ExecuteError]) -> Message {
+pub fn to_message(errors: &[ExecuteError]) -> Message {
     let mut message = Message::from(&errors[0]);
     let other_errors = errors[1..].iter().map(ExecuteError::main_annotation);
     message.annotations.extend(other_errors);
@@ -583,7 +618,7 @@ fn to_message(errors: &[ExecuteError]) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
-            Ok(command) => match command.execute(env) {
+            Ok(command) => match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
                 Ok(result) => output(env, &result).await,
                 Err(errors) => report_failure(env, to_message(&errors)).await,
             },

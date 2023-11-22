@@ -107,6 +107,11 @@ fn exit_builtin() {
 }
 
 #[test]
+fn export_builtin() {
+    run("export-p.sh")
+}
+
+#[test]
 fn fnmatch() {
     run("fnmatch-p.sh")
 }
