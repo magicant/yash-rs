@@ -89,7 +89,7 @@ fn print_one(
             writeln!(output, "{}={}", quoted_name, value.quote()).unwrap();
 
             let options = options.to_string();
-            if !options.is_empty() {
+            if !options.is_empty() || context.builtin_is_significant {
                 writeln!(
                     output,
                     "{} {}{}",
@@ -573,6 +573,59 @@ mod tests {
                  bar=(1 2)\n\
                  export -r bar\n\
                  export baz\n"
+            );
+        }
+
+        #[test]
+        fn builtin_is_significant() {
+            let mut vars = VariableSet::new();
+            vars.get_or_new("a", Scope::Global.into())
+                .assign(Value::array(["foo", "bar"]), None)
+                .unwrap();
+            let pv = PrintVariables {
+                variables: Field::dummies(["a"]),
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\n"
+            );
+
+            let context = PrintContext {
+                builtin_is_significant: true,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\ntypeset a\n"
+            );
+        }
+
+        #[test]
+        fn insignificant_builtin_with_attributed_array() {
+            let mut vars = VariableSet::new();
+            let a = &mut vars.get_or_new("a", Scope::Global.into());
+            a.assign(Value::array(["foo", "bar"]), None).unwrap();
+            a.make_read_only(Location::dummy("a location"));
+            let pv = PrintVariables {
+                variables: Field::dummies(["a"]),
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\ntypeset -r a\n"
             );
         }
 

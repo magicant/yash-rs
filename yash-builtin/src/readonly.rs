@@ -92,6 +92,10 @@
 //! fail (unless the variable is declared without a value) because the variable
 //! is already defined and read-only.
 //!
+//! For array variables, the readonly built-in invocation is preceded by a
+//! separate assignment command since the readonly built-in does not support
+//! assigning values to array variables.
+//!
 //! # Making functions read-only
 //!
 //! If the `-f` (`--functions`) option is specified, the built-in makes the
@@ -209,6 +213,7 @@ pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 /// Printing context for the readonly built-in
 pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "readonly",
+    builtin_is_significant: true,
     options_allowed: &[],
 };
 

@@ -56,6 +56,10 @@
 //! Note that the commands do not include options to restore the attributes of
 //! the variables, such as the `-r` option to make variables read-only.
 //!
+//! For array variables, the export built-in invocation is preceded by a
+//! separate assignment command since the export built-in does not support
+//! assigning values to array variables.
+//!
 //! # Exit status
 //!
 //! Zero unless an error occurs.
@@ -104,6 +108,7 @@ pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 /// Printing context for the export built-in
 pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "export",
+    builtin_is_significant: true,
     options_allowed: &[],
 };
 

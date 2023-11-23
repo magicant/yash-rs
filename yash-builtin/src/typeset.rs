@@ -124,7 +124,11 @@
 //! ## Standard output
 //!
 //! A command string that invokes the typeset built-in to recreate the variable
-//! is printed for each variable.
+//! is printed for each variable. Exceptionally, for array variables, the
+//! typeset command is preceded by a separate assignment command since the
+//! typeset built-in does not support assigning values to array variables. In
+//! this case, the typeset command is even omitted if no options are applied to
+//! the variable.
 //!
 //! Note that evaluating the printed commands in the current context may fail if
 //! variables are read-only since the read-only variables cannot be assigned
@@ -393,19 +397,40 @@ pub struct PrintFunctions {
 ///
 /// [`PrintVariables::execute`] and [`PrintFunctions::execute`] print a list of
 /// commands that invoke a built-in to recreate variables and functions,
-/// respectively. This context is used to determine the name of the printed
-/// built-in and the attributes possibly indicated as options to the built-in.
+/// respectively. This context is used to control the details of the commands.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PrintContext<'a> {
-    /// Name of the built-in printed as part of the commands
+    /// Name of the built-in printed as part of the commands to recreate the
+    /// variables or functions
     pub builtin_name: &'a str,
+
+    /// Whether the command that invokes the built-in should always be printed
+    ///
+    /// The typeset built-in does not itself modify the attributes of variables
+    /// or functions when invoked simply with a name operand. If a separate
+    /// array assignment or function definition command is sufficient to
+    /// reproduce an array variable or function, the command that invokes the
+    /// typeset built-in may be omitted. This field indicates whether the
+    /// command should always be printed regardless of the attributes of the
+    /// variables or functions.
+    ///
+    /// This field should be false for the typeset built-in to allow omitting,
+    /// but it should be true for the export and readonly built-ins to force
+    /// printing as they always modify the attributes.
+    pub builtin_is_significant: bool,
+
     /// Options that may be printed for the built-in
+    ///
+    /// When printing a command that invokes the built-in, the command may
+    /// include options that appear in this slice to re-set the attributes of
+    /// the variables or functions.
     pub options_allowed: &'a [OptionSpec<'a>],
 }
 
 /// Printing context for the typeset built-in
 pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "typeset",
+    builtin_is_significant: false,
     options_allowed: self::syntax::ALL_OPTIONS,
 };
 
