@@ -26,10 +26,11 @@
 //!
 //! # Description
 //!
-//! The export built-in (without the `-p` option) exports each of the specified
-//! names to the environment, with optional values. If no names are given, or if
-//! the `-p` option is given, the names and values of all exported variables are
-//! displayed.
+//! The export built-in (without the `-p` option) exports variables of the
+//! specified names to the environment, with optional values. If no names are
+//! given, or if the `-p` option is given, the names and values of all exported
+//! variables are displayed. If the `-p` option is given with operands, only the
+//! specified variables are displayed.
 //!
 //! # Options
 //!
@@ -42,8 +43,22 @@
 //!
 //! # Operands
 //!
-//! The operands are names of shell variables to be exported. Each name may
-//! optionally be followed by `=` and a *value* to assign to the variable.
+//! The operands are the names of shell variables to be exported or printed.
+//! When exporting, each name may optionally be followed by `=` and a *value* to
+//! assign to the variable.
+//!
+//! # Standard output
+//!
+//! When exporting variables, the export built-in does not produce any output.
+//!
+//! When printing variables, the built-in prints simple commands that invoke the
+//! export built-in to reexport the variables with the same values.
+//! Note that the commands do not include options to restore the attributes of
+//! the variables, such as the `-r` option to make variables read-only.
+//!
+//! For array variables, the export built-in invocation is preceded by a
+//! separate assignment command since the export built-in does not support
+//! assigning values to array variables.
 //!
 //! # Exit status
 //!
@@ -65,7 +80,11 @@
 //! # Implementation notes
 //!
 //! The implementation of this built-in depends on that of the
-//! [`typeset`](crate::typeset) built-in.
+//! [`typeset`](crate::typeset) built-in. The export built-in basically works
+//! like the typeset built-in with the `-gx` (`--global --export`) options,
+//! except that:
+//! - Printed commands name the export built-in instead of the typeset built-in.
+//! - Printed commands do not include options that modify variable attributes.
 
 use crate::common::output;
 use crate::common::report_error;
@@ -76,7 +95,7 @@ use crate::typeset::syntax::OptionSpec;
 use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::to_message;
 use crate::typeset::Command;
-use crate::typeset::PrintVariablesContext;
+use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
 use crate::typeset::VariableAttr::Export;
 use yash_env::option::State::On;
@@ -84,11 +103,12 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 
 /// List of portable options applicable to the export built-in
-pub static PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
+pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 
-/// Variable printing context for the export built-in
-pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
+/// Printing context for the export built-in
+pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "export",
+    builtin_is_significant: true,
     options_allowed: &[],
 };
 
@@ -109,7 +129,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                     Command::SetFunctions(sf) => unreachable!("{sf:?}"),
                     Command::PrintFunctions(pf) => unreachable!("{pf:?}"),
                 }
-                match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
+                match command.execute(env, &PRINT_CONTEXT) {
                     Ok(result) => output(env, &result).await,
                     Err(errors) => report_failure(env, to_message(&errors)).await,
                 }

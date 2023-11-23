@@ -23,7 +23,7 @@ impl PrintVariables {
     pub fn execute(
         self,
         variables: &VariableSet,
-        context: &PrintVariablesContext,
+        context: &PrintContext,
     ) -> Result<String, Vec<ExecuteError>> {
         let mut output = String::new();
         let mut errors = Vec::new();
@@ -57,7 +57,7 @@ fn print_one(
     name: &str,
     var: &Variable,
     filter_attrs: &[(VariableAttr, State)],
-    context: &PrintVariablesContext,
+    context: &PrintContext,
     output: &mut String,
 ) {
     // Skip if the variable does not match the filter.
@@ -89,7 +89,7 @@ fn print_one(
             writeln!(output, "{}={}", quoted_name, value.quote()).unwrap();
 
             let options = options.to_string();
-            if !options.is_empty() {
+            if !options.is_empty() || context.builtin_is_significant {
                 writeln!(
                     output,
                     "{} {}{}",
@@ -151,7 +151,7 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let output = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        let output = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
         assert_eq!(output, "typeset foo=value\n")
     }
 
@@ -174,7 +174,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset first=1\n\
              typeset second=2\n\
              typeset third=3\n",
@@ -193,7 +193,7 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        let result = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "a=(1 '2  2' 3)\n");
     }
 
@@ -207,7 +207,7 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        let result = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "typeset x\n");
     }
 
@@ -228,7 +228,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset 'valueless$'\n\
              typeset 'scalar$'='=;'\n\
              'array$'=('~' \"'\" '*?')\n",
@@ -254,7 +254,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&inner, &PRINT_CONTEXT).unwrap(),
             "typeset global='global value'\n\
              typeset local='local value'\n",
         );
@@ -278,7 +278,7 @@ mod tests {
             attrs: vec![],
             scope: Scope::Local,
         };
-        let output = pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap();
+        let output = pv.execute(&inner, &PRINT_CONTEXT).unwrap();
         assert_eq!(output, "typeset local='local value'\n");
 
         let pv = PrintVariables {
@@ -287,7 +287,7 @@ mod tests {
             scope: Scope::Local,
         };
         assert_eq!(
-            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap_err(),
+            pv.execute(&inner, &PRINT_CONTEXT).unwrap_err(),
             [ExecuteError::PrintUnsetVariable(Field::dummy("global"))]
         );
     }
@@ -315,7 +315,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&inner, &PRINT_CONTEXT).unwrap(),
             // sorted by name
             "typeset one=1\n\
              typeset three=3\n\
@@ -346,7 +346,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&inner, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&inner, &PRINT_CONTEXT).unwrap(),
             // sorted by name
             "typeset three=3\n\
              typeset two=2\n",
@@ -370,7 +370,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -x x\n\
              typeset -r y\n\
              typeset -r -x z\n",
@@ -397,7 +397,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -x x=X\n\
              typeset -r y=Y\n\
              typeset -r -x z=Z\n",
@@ -424,7 +424,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "x=(X)\n\
              typeset -x x\n\
              y=(Y)\n\
@@ -457,7 +457,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -r b\n\
              typeset -r -x c\n",
         );
@@ -473,7 +473,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -x a\n\
              typeset d\n",
         );
@@ -489,7 +489,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -x a\n\
              typeset -r -x c\n",
         );
@@ -505,7 +505,7 @@ mod tests {
         };
 
         assert_eq!(
-            pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap(),
+            pv.execute(&vars, &PRINT_CONTEXT).unwrap(),
             "typeset -r b\n\
              typeset d\n",
         );
@@ -520,7 +520,7 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let result = pv.execute(&vars, &PRINT_VARIABLES_CONTEXT).unwrap();
+        let result = pv.execute(&vars, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "typeset -r b\n");
     }
 
@@ -534,11 +534,8 @@ mod tests {
             scope: Scope::Global,
         };
 
-        let error = pv
-            .execute(&VariableSet::new(), &PRINT_VARIABLES_CONTEXT)
-            .unwrap_err();
         assert_eq!(
-            error,
+            pv.execute(&VariableSet::new(), &PRINT_CONTEXT).unwrap_err(),
             [
                 ExecuteError::PrintUnsetVariable(foo),
                 ExecuteError::PrintUnsetVariable(bar)
@@ -565,9 +562,9 @@ mod tests {
                 attrs: vec![],
                 scope: Scope::Global,
             };
-            let context = PrintVariablesContext {
+            let context = PrintContext {
                 builtin_name: "export",
-                ..PRINT_VARIABLES_CONTEXT
+                ..PRINT_CONTEXT
             };
 
             assert_eq!(
@@ -580,7 +577,60 @@ mod tests {
         }
 
         #[test]
-        fn attrs_to_print() {
+        fn builtin_is_significant() {
+            let mut vars = VariableSet::new();
+            vars.get_or_new("a", Scope::Global.into())
+                .assign(Value::array(["foo", "bar"]), None)
+                .unwrap();
+            let pv = PrintVariables {
+                variables: Field::dummies(["a"]),
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\n"
+            );
+
+            let context = PrintContext {
+                builtin_is_significant: true,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\ntypeset a\n"
+            );
+        }
+
+        #[test]
+        fn insignificant_builtin_with_attributed_array() {
+            let mut vars = VariableSet::new();
+            let a = &mut vars.get_or_new("a", Scope::Global.into());
+            a.assign(Value::array(["foo", "bar"]), None).unwrap();
+            a.make_read_only(Location::dummy("a location"));
+            let pv = PrintVariables {
+                variables: Field::dummies(["a"]),
+                attrs: vec![],
+                scope: Scope::Global,
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            assert_eq!(
+                pv.clone().execute(&vars, &context).unwrap(),
+                "a=(foo bar)\ntypeset -r a\n"
+            );
+        }
+
+        #[test]
+        fn options_allowed() {
             let mut vars = VariableSet::new();
             let mut a = vars.get_or_new("a", Scope::Global.into());
             a.assign("A", None).unwrap();
@@ -600,9 +650,9 @@ mod tests {
                 scope: Scope::Global,
             };
 
-            let context = PrintVariablesContext {
+            let context = PrintContext {
                 options_allowed: &[READONLY_OPTION],
-                ..PRINT_VARIABLES_CONTEXT
+                ..PRINT_CONTEXT
             };
             assert_eq!(
                 pv.clone().execute(&vars, &context).unwrap(),
@@ -612,9 +662,9 @@ mod tests {
                  typeset -r d=D\n",
             );
 
-            let context = PrintVariablesContext {
+            let context = PrintContext {
                 options_allowed: &[EXPORT_OPTION],
-                ..PRINT_VARIABLES_CONTEXT
+                ..PRINT_CONTEXT
             };
             assert_eq!(
                 pv.clone().execute(&vars, &context).unwrap(),
@@ -624,9 +674,9 @@ mod tests {
                  typeset -x d=D\n",
             );
 
-            let context = PrintVariablesContext {
+            let context = PrintContext {
                 options_allowed: &[],
-                ..PRINT_VARIABLES_CONTEXT
+                ..PRINT_CONTEXT
             };
             assert_eq!(
                 pv.execute(&vars, &context).unwrap(),

@@ -82,7 +82,8 @@
 //! shell code to recreate the variables.
 //! <!-- TODO: link to the eval built-in -->
 //! If there are no operands and the `-f` (`--functions`) option is not
-//! specified, the built-in prints all shell variables in the same format.
+//! specified, the built-in prints all shell variables in the same format in
+//! alphabetical order.
 //!
 //! ## Synopsis
 //!
@@ -123,11 +124,24 @@
 //! ## Standard output
 //!
 //! A command string that invokes the typeset built-in to recreate the variable
-//! is printed for each variable.
+//! is printed for each variable. Exceptionally, for array variables, the
+//! typeset command is preceded by a separate assignment command since the
+//! typeset built-in does not support assigning values to array variables. In
+//! this case, the typeset command is even omitted if no options are applied to
+//! the variable.
 //!
 //! Note that evaluating the printed commands in the current context may fail if
 //! variables are read-only since the read-only variables cannot be assigned
 //! values.
+//!
+//! Below is an example of the output of the typeset built-in that displays the
+//! variable `foo` and the read-only array variable `bar`:
+//!
+//! ```sh
+//! typeset foo='some value that contains spaces'
+//! bar=(this is a readonly array)
+//! typeset -r bar
+//! ```
 //!
 //! # Modifying functions
 //!
@@ -158,7 +172,7 @@
 //! are given, the built-in prints functions (see below).
 //!
 //! Note that the built-in operates on existing shell functions only. It cannot
-//! create new functions or change the contents of existing functions.
+//! create new functions or change the body of existing functions.
 //!
 //! ## Standard output
 //!
@@ -172,7 +186,8 @@
 //! recreate the functions.
 //! <!-- TODO: link to the eval built-in -->
 //! If there are no operands and the `-f` (`--functions`) option is specified,
-//! the built-in prints all shell functions in the same format.
+//! the built-in prints all shell functions in the same format in alphabetical
+//! order.
 //!
 //! ## Synopsis
 //!
@@ -221,6 +236,8 @@
 //! The read-only attribute cannot be removed from a variable or function. If a
 //! variable is already read-only, you cannot assign a value to it.
 //!
+//! It is an error to modify a non-existing function.
+//!
 //! When printing variables or functions, it is an error if an operand names a
 //! non-existing variable or function.
 //!
@@ -253,12 +270,12 @@
 //! # Implementation notes
 //!
 //! The implementation of this built-in is also used by the
-//! [`export`](crate::export) built-in. Functions that are common to both
-//! built-ins are parameterized to support the different behaviors of the
-//! built-ins. By customizing the contents of [`Command`] and the
-//! [`PrintVariablesContext`] passed to [`Command::execute`], you can even
-//! implement a new built-in that behaves differently from both `typeset` and
-//! `export`.
+//! [`export`](crate::export) and [`readonly`](crate::readonly) built-ins.
+//! Functions that are common to these built-ins and the typeset built-in are
+//! parameterized to support the different behaviors of the built-ins. By
+//! customizing the contents of [`Command`] and the [`PrintContext`] passed to
+//! [`Command::execute`], you can even implement a new built-in that behaves
+//! differently from all of them.
 
 use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
@@ -346,25 +363,6 @@ pub struct PrintVariables {
     pub scope: Scope,
 }
 
-/// Set of information used when printing variables
-///
-/// [`PrintVariables::execute`] prints a list of commands that invoke a built-in
-/// to recreate the variables. This context is used to determine the name of the
-/// built-in and the attributes possibly indicated as options to the built-in.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PrintVariablesContext<'a> {
-    /// Name of the built-in printed as the command name
-    pub builtin_name: &'a str,
-    /// Options that may be printed for the built-in
-    pub options_allowed: &'a [OptionSpec<'a>],
-}
-
-/// Variable printing context for the typeset built-in
-pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
-    builtin_name: "typeset",
-    options_allowed: self::syntax::ALL_OPTIONS,
-};
-
 /// Attribute that can be set on a function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -403,6 +401,47 @@ pub struct PrintFunctions {
     /// Attributes to select the functions to be printed
     pub attrs: Vec<(FunctionAttr, State)>,
 }
+
+/// Set of information used when printing variables or functions
+///
+/// [`PrintVariables::execute`] and [`PrintFunctions::execute`] print a list of
+/// commands that invoke a built-in to recreate variables and functions,
+/// respectively. This context is used to control the details of the commands.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintContext<'a> {
+    /// Name of the built-in printed as part of the commands to recreate the
+    /// variables or functions
+    pub builtin_name: &'a str,
+
+    /// Whether the command that invokes the built-in should always be printed
+    ///
+    /// The typeset built-in does not itself modify the attributes of variables
+    /// or functions when invoked simply with a name operand. If a separate
+    /// array assignment or function definition command is sufficient to
+    /// reproduce an array variable or function, the command that invokes the
+    /// typeset built-in may be omitted. This field indicates whether the
+    /// command should always be printed regardless of the attributes of the
+    /// variables or functions.
+    ///
+    /// This field should be false for the typeset built-in to allow omitting,
+    /// but it should be true for the export and readonly built-ins to force
+    /// printing as they always modify the attributes.
+    pub builtin_is_significant: bool,
+
+    /// Options that may be printed for the built-in
+    ///
+    /// When printing a command that invokes the built-in, the command may
+    /// include options that appear in this slice to re-set the attributes of
+    /// the variables or functions.
+    pub options_allowed: &'a [OptionSpec<'a>],
+}
+
+/// Printing context for the typeset built-in
+pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
+    builtin_name: "typeset",
+    builtin_is_significant: false,
+    options_allowed: self::syntax::ALL_OPTIONS,
+};
 
 /// Set of information that defines the behavior of a single invocation of the
 /// typeset built-in
@@ -452,15 +491,13 @@ impl Command {
     pub fn execute(
         self,
         env: &mut Env,
-        print_variables_context: &PrintVariablesContext,
+        print_context: &PrintContext,
     ) -> Result<String, Vec<ExecuteError>> {
         match self {
             Self::SetVariables(command) => command.execute(env),
-            Self::PrintVariables(command) => {
-                command.execute(&env.variables, print_variables_context)
-            }
+            Self::PrintVariables(command) => command.execute(&env.variables, print_context),
             Self::SetFunctions(command) => command.execute(&mut env.functions),
-            Self::PrintFunctions(command) => command.execute(&env.functions),
+            Self::PrintFunctions(command) => command.execute(&env.functions, print_context),
         }
     }
 }
@@ -618,7 +655,7 @@ pub fn to_message(errors: &[ExecuteError]) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
-            Ok(command) => match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
+            Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
                 Ok(result) => output(env, &result).await,
                 Err(errors) => report_failure(env, to_message(&errors)).await,
             },

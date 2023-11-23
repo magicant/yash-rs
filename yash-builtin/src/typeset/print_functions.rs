@@ -21,7 +21,11 @@ use yash_env::function::FunctionSet;
 
 impl PrintFunctions {
     /// Executes the command.
-    pub fn execute(self, functions: &FunctionSet) -> Result<String, Vec<ExecuteError>> {
+    pub fn execute(
+        self,
+        functions: &FunctionSet,
+        context: &PrintContext,
+    ) -> Result<String, Vec<ExecuteError>> {
         let mut output = String::new();
         let mut errors = Vec::new();
 
@@ -30,12 +34,12 @@ impl PrintFunctions {
             // TODO Honor the collation order in the locale.
             functions.sort_unstable_by_key(|function| &function.name);
             for function in functions {
-                print_one(function, &self.attrs, &mut output);
+                print_one(function, &self.attrs, context, &mut output);
             }
         } else {
             for name in self.functions {
                 match functions.get(&name.value) {
-                    Some(function) => print_one(function, &self.attrs, &mut output),
+                    Some(function) => print_one(function, &self.attrs, context, &mut output),
                     None => errors.push(ExecuteError::PrintUnsetFunction(name)),
                 }
             }
@@ -49,7 +53,12 @@ impl PrintFunctions {
     }
 }
 
-fn print_one(function: &Function, filter_attrs: &[(FunctionAttr, State)], output: &mut String) {
+fn print_one(
+    function: &Function,
+    filter_attrs: &[(FunctionAttr, State)],
+    context: &PrintContext,
+    output: &mut String,
+) {
     // Skip if the function does not match the filter.
     if filter_attrs
         .iter()
@@ -58,7 +67,7 @@ fn print_one(function: &Function, filter_attrs: &[(FunctionAttr, State)], output
         return;
     }
 
-    // Do the formatting.
+    // Print the function body.
     let name = yash_quote::quoted(&function.name);
     if name.needs_quoting() {
         output.push_str("function ");
@@ -66,8 +75,24 @@ fn print_one(function: &Function, filter_attrs: &[(FunctionAttr, State)], output
     // TODO multiline pretty printing
     writeln!(output, "{}() {}", name, function.body).unwrap();
 
-    if function.is_read_only() {
-        writeln!(output, "typeset -fr {}", name).unwrap();
+    // Print a command to set the function attributes.
+    let mut options_to_print = String::new();
+    for option in context.options_allowed {
+        if let Some(attr) = option.attr {
+            if let Ok(attr) = FunctionAttr::try_from(attr) {
+                if attr.test(function).into() {
+                    options_to_print.push(option.short);
+                }
+            }
+        }
+    }
+    if !options_to_print.is_empty() || context.builtin_is_significant {
+        writeln!(
+            output,
+            "{} -f{} {}",
+            context.builtin_name, options_to_print, name
+        )
+        .unwrap();
     }
 }
 
@@ -98,7 +123,7 @@ mod tests {
             attrs: vec![],
         };
 
-        let result = pf.execute(&functions).unwrap();
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "foo() { echo; }\n");
     }
 
@@ -122,7 +147,7 @@ mod tests {
         };
 
         assert_eq!(
-            pf.execute(&functions).unwrap(),
+            pf.execute(&functions, &PRINT_CONTEXT).unwrap(),
             "foo1() { echo 1; }\nfoo2() { echo 2; }\nfoo3() { echo 3; }\n",
         );
     }
@@ -148,7 +173,7 @@ mod tests {
 
         // The result is sorted by function name.
         assert_eq!(
-            pf.execute(&functions).unwrap(),
+            pf.execute(&functions, &PRINT_CONTEXT).unwrap(),
             "foo1() { echo 1; }\nfoo2() { echo 2; }\nfoo3() { echo 3; }\nfoo4() { echo 4; }\n",
         );
     }
@@ -167,7 +192,7 @@ mod tests {
             attrs: vec![],
         };
 
-        let result = pf.execute(&functions).unwrap();
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "function 'a/b$'() { echo; }\n");
     }
 
@@ -186,7 +211,7 @@ mod tests {
             attrs: vec![],
         };
 
-        let result = pf.execute(&functions).unwrap();
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "foo() { echo; }\ntypeset -fr foo\n");
     }
 
@@ -211,7 +236,7 @@ mod tests {
             attrs: vec![(FunctionAttr::ReadOnly, On)],
         };
 
-        let result = pf.execute(&functions).unwrap();
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "bar() { ls; }\ntypeset -fr bar\n");
     }
 
@@ -236,7 +261,7 @@ mod tests {
             attrs: vec![(FunctionAttr::ReadOnly, Off)],
         };
 
-        let result = pf.execute(&functions).unwrap();
+        let result = pf.execute(&functions, &PRINT_CONTEXT).unwrap();
         assert_eq!(result, "foo() { echo; }\n");
     }
 
@@ -250,11 +275,121 @@ mod tests {
         };
 
         assert_eq!(
-            pf.execute(&FunctionSet::new()).unwrap_err(),
+            pf.execute(&FunctionSet::new(), &PRINT_CONTEXT).unwrap_err(),
             [
                 ExecuteError::PrintUnsetFunction(foo),
                 ExecuteError::PrintUnsetFunction(bar),
             ],
         );
+    }
+
+    mod non_default_context {
+        use super::*;
+        use crate::typeset::syntax::READONLY_OPTION;
+
+        #[test]
+        fn builtin_name() {
+            let mut functions = FunctionSet::new();
+            let foo = Function::new(
+                "foo",
+                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("definition location"),
+            )
+            .make_read_only(Location::dummy("readonly location"));
+            functions.define(foo).unwrap();
+            let pf = PrintFunctions {
+                functions: Field::dummies(["foo"]),
+                attrs: vec![],
+            };
+            let context = PrintContext {
+                builtin_name: "readonly",
+                ..PRINT_CONTEXT
+            };
+
+            let result = pf.execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\nreadonly -fr foo\n");
+        }
+
+        #[test]
+        fn builtin_is_significant() {
+            let mut functions = FunctionSet::new();
+            let foo = Function::new(
+                "foo",
+                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("definition location"),
+            );
+            functions.define(foo).unwrap();
+            let pf = PrintFunctions {
+                functions: Field::dummies(["foo"]),
+                attrs: vec![],
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            let result = pf.clone().execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\n");
+
+            let context = PrintContext {
+                builtin_is_significant: true,
+                ..PRINT_CONTEXT
+            };
+            let result = pf.execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\ntypeset -f foo\n");
+        }
+
+        #[test]
+        fn insignificant_builtin_with_attributed_function() {
+            let mut functions = FunctionSet::new();
+            let foo = Function::new(
+                "foo",
+                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("definition location"),
+            )
+            .make_read_only(Location::dummy("readonly location"));
+            functions.define(foo).unwrap();
+            let pf = PrintFunctions {
+                functions: Field::dummies(["foo"]),
+                attrs: vec![],
+            };
+
+            let context = PrintContext {
+                builtin_is_significant: false,
+                ..PRINT_CONTEXT
+            };
+            let result = pf.clone().execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\ntypeset -fr foo\n");
+        }
+
+        #[test]
+        fn options_allowed() {
+            let mut functions = FunctionSet::new();
+            let foo = Function::new(
+                "foo",
+                "{ echo; }".parse::<FullCompoundCommand>().unwrap(),
+                Location::dummy("definition location"),
+            )
+            .make_read_only(Location::dummy("readonly location"));
+            functions.define(foo).unwrap();
+            let pf = PrintFunctions {
+                functions: Field::dummies(["foo"]),
+                attrs: vec![],
+            };
+
+            let context = PrintContext {
+                options_allowed: &[],
+                ..PRINT_CONTEXT
+            };
+            let result = pf.clone().execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\n");
+
+            let context = PrintContext {
+                options_allowed: &[READONLY_OPTION],
+                ..PRINT_CONTEXT
+            };
+            let result = pf.execute(&functions, &context).unwrap();
+            assert_eq!(result, "foo() { echo; }\ntypeset -fr foo\n");
+        }
     }
 }

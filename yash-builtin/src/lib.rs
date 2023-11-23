@@ -144,7 +144,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "readonly",
         Builtin {
             r#type: Special,
-            execute: |env, args| Box::pin(ready(readonly::main(env, args))),
+            execute: |env, args| Box::pin(readonly::main(env, args)),
         },
     ),
     (
