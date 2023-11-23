@@ -26,10 +26,11 @@
 //!
 //! # Description
 //!
-//! The export built-in (without the `-p` option) exports each of the specified
-//! names to the environment, with optional values. If no names are given, or if
-//! the `-p` option is given, the names and values of all exported variables are
-//! displayed.
+//! The export built-in (without the `-p` option) exports variables of the
+//! specified names to the environment, with optional values. If no names are
+//! given, or if the `-p` option is given, the names and values of all exported
+//! variables are displayed. If the `-p` option is given with operands, only the
+//! specified variables are displayed.
 //!
 //! # Options
 //!
@@ -42,8 +43,18 @@
 //!
 //! # Operands
 //!
-//! The operands are names of shell variables to be exported. Each name may
-//! optionally be followed by `=` and a *value* to assign to the variable.
+//! The operands are the names of shell variables to be exported or printed.
+//! When exporting, each name may optionally be followed by `=` and a *value* to
+//! assign to the variable.
+//!
+//! # Standard output
+//!
+//! When exporting variables, the export built-in does not produce any output.
+//!
+//! When printing variables, the built-in prints simple commands that invoke the
+//! export built-in to reexport the variables with the same values.
+//! Note that the commands do not include options to restore the attributes of
+//! the variables, such as the `-r` option to make variables read-only.
 //!
 //! # Exit status
 //!
@@ -65,7 +76,11 @@
 //! # Implementation notes
 //!
 //! The implementation of this built-in depends on that of the
-//! [`typeset`](crate::typeset) built-in.
+//! [`typeset`](crate::typeset) built-in. The export built-in basically works
+//! like the typeset built-in with the `-gx` (`--global --export`) options,
+//! except that:
+//! - Printed commands name the export built-in instead of the typeset built-in.
+//! - Printed commands do not include options that modify variable attributes.
 
 use crate::common::output;
 use crate::common::report_error;

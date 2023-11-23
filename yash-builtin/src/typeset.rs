@@ -82,7 +82,8 @@
 //! shell code to recreate the variables.
 //! <!-- TODO: link to the eval built-in -->
 //! If there are no operands and the `-f` (`--functions`) option is not
-//! specified, the built-in prints all shell variables in the same format.
+//! specified, the built-in prints all shell variables in the same format in
+//! alphabetical order.
 //!
 //! ## Synopsis
 //!
@@ -158,7 +159,7 @@
 //! are given, the built-in prints functions (see below).
 //!
 //! Note that the built-in operates on existing shell functions only. It cannot
-//! create new functions or change the contents of existing functions.
+//! create new functions or change the body of existing functions.
 //!
 //! ## Standard output
 //!
@@ -172,7 +173,8 @@
 //! recreate the functions.
 //! <!-- TODO: link to the eval built-in -->
 //! If there are no operands and the `-f` (`--functions`) option is specified,
-//! the built-in prints all shell functions in the same format.
+//! the built-in prints all shell functions in the same format in alphabetical
+//! order.
 //!
 //! ## Synopsis
 //!
@@ -221,6 +223,8 @@
 //! The read-only attribute cannot be removed from a variable or function. If a
 //! variable is already read-only, you cannot assign a value to it.
 //!
+//! It is an error to modify a non-existing function.
+//!
 //! When printing variables or functions, it is an error if an operand names a
 //! non-existing variable or function.
 //!
@@ -253,12 +257,12 @@
 //! # Implementation notes
 //!
 //! The implementation of this built-in is also used by the
-//! [`export`](crate::export) built-in. Functions that are common to both
-//! built-ins are parameterized to support the different behaviors of the
-//! built-ins. By customizing the contents of [`Command`] and the
-//! [`PrintVariablesContext`] passed to [`Command::execute`], you can even
-//! implement a new built-in that behaves differently from both `typeset` and
-//! `export`.
+//! [`export`](crate::export) and [`readonly`](crate::readonly) built-ins.
+//! Functions that are common to these built-ins and the typeset built-in are
+//! parameterized to support the different behaviors of the built-ins. By
+//! customizing the contents of [`Command`] and the [`PrintVariablesContext`]
+//! passed to [`Command::execute`], you can even implement a new built-in that
+//! behaves differently from all of them.
 
 use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
