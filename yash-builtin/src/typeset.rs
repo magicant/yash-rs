@@ -134,6 +134,15 @@
 //! variables are read-only since the read-only variables cannot be assigned
 //! values.
 //!
+//! Below is an example of the output of the typeset built-in that displays the
+//! variable `foo` and the read-only array variable `bar`:
+//!
+//! ```sh
+//! typeset foo='some value that contains spaces'
+//! bar=(this is a readonly array)
+//! typeset -r bar
+//! ```
+//!
 //! # Modifying functions
 //!
 //! If the `-f` (`--functions`) option is specified, the `-p` (`--print`) option
