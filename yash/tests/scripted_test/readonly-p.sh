@@ -5,17 +5,29 @@ posix="true"
 test_o -d -e n 'making one variable read-only'
 readonly a=bar
 echo $a
-a=X && test "$a" = bar
+a=X # This should fail, and the shell should exit.
+echo not reached
 __IN__
 bar
 __OUT__
 
-test_o -d -e n 'making many variables read-only'
+test_o -d 'making many variables read-only'
 a=X b=B c=X
 readonly a=A b c=C
 echo $a $b $c
-a=X || b=Y || c=Z && test "$a/$b/$c" = A/B/C
+(
+    a=X # This should fail, and the subshell should exit.
+    echo not reached
+) || (
+    b=Y # This should fail, and the subshell should exit.
+    echo not reached
+) || (
+    c=Z # This should fail, and the subshell should exit.
+    echo not reached
+) ||
+echo $a $b $c # This should print the values passed to the readonly built-in.
 __IN__
+A B C
 A B C
 __OUT__
 
