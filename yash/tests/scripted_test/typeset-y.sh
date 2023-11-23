@@ -52,7 +52,6 @@ __IN__
 a=unset b=unset
 __OUT__
 
-: TODO Needs the readonly built-in <<\__OUT__
 test_oE -e 0 'printing all variables (no option)' -e
 typeset >/dev/null
 typeset | grep -q '^typeset -x PATH='
@@ -146,7 +145,6 @@ __OUT__
 
 )
 
-: TODO Needs the readonly built-in <<\__OUT__
 test_oE -e 0 'printing all variables (-p)' -e
 typeset -p >/dev/null
 typeset -p | grep -q '^typeset -x PATH='
