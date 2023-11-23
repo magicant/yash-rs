@@ -463,7 +463,7 @@ impl Command {
             Self::SetVariables(command) => command.execute(env),
             Self::PrintVariables(command) => command.execute(&env.variables, print_context),
             Self::SetFunctions(command) => command.execute(&mut env.functions),
-            Self::PrintFunctions(command) => command.execute(&env.functions),
+            Self::PrintFunctions(command) => command.execute(&env.functions, print_context),
         }
     }
 }
