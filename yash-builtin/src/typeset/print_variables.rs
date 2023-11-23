@@ -577,7 +577,7 @@ mod tests {
         }
 
         #[test]
-        fn attrs_to_print() {
+        fn options_allowed() {
             let mut vars = VariableSet::new();
             let mut a = vars.get_or_new("a", Scope::Global.into());
             a.assign("A", None).unwrap();
