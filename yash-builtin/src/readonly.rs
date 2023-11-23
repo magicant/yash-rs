@@ -18,6 +18,8 @@
 //!
 //! The **`readonly`** built-in behaves differently depending on the arguments.
 //!
+//! TODO: **Only portable features are implemented for now.**
+//!
 //! # Making variables read-only
 //!
 //! If the `-p` (`--print`) or `-f` (`--functions`) option is not specified and
@@ -183,49 +185,69 @@
 //! - Printed commands name the readonly built-in instead of the typeset built-in.
 //! - Printed commands do not include options that modify variable attributes.
 
+use crate::common::output;
+use crate::common::report_error;
+use crate::common::report_failure;
+use crate::typeset::syntax::interpret;
+use crate::typeset::syntax::parse;
+use crate::typeset::syntax::OptionSpec;
+use crate::typeset::syntax::PRINT_OPTION;
+use crate::typeset::to_message;
+use crate::typeset::Command;
+use crate::typeset::FunctionAttr;
+use crate::typeset::PrintContext;
+use crate::typeset::Scope::Global;
+use crate::typeset::VariableAttr;
 use yash_env::builtin::Result;
-use yash_env::semantics::ExitStatus;
+use yash_env::option::State::On;
 use yash_env::semantics::Field;
-use yash_env::variable::Scope;
 use yash_env::Env;
+
+/// List of portable options applicable to the readonly built-in
+pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
+
+/// Printing context for the readonly built-in
+pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
+    builtin_name: "readonly",
+    options_allowed: &[],
+};
 
 // TODO Split into syntax and semantics submodules
 
 /// Entry point for executing the `readonly` built-in
-pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    // TODO support options
-    // TODO print read-only variables if there are no operands
-
-    for Field { value, origin } in args {
-        if let Some(eq_index) = value.find('=') {
-            let var_value = value[eq_index + 1..].to_owned();
-
-            let mut name = value;
-            name.truncate(eq_index);
-            // TODO reject invalid name
-
-            let mut var = env.get_or_create_variable(name.clone(), Scope::Global);
-            match var.assign(var_value, origin.clone()) {
-                Ok(_) => var.make_read_only(origin),
-                Err(_) => {
-                    // TODO Better error message
-                    // TODO Use Env rather than printing directly to stderr
-                    eprintln!("cannot assign to read-only variable {name}");
-                    return ExitStatus::FAILURE.into();
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    match parse(PORTABLE_OPTIONS, args) {
+        Ok((options, operands)) => match interpret(options, operands) {
+            Ok(mut command) => {
+                match &mut command {
+                    Command::SetVariables(sv) => {
+                        sv.attrs.push((VariableAttr::ReadOnly, On));
+                        sv.scope = Global;
+                    }
+                    Command::PrintVariables(pv) => {
+                        pv.attrs.push((VariableAttr::ReadOnly, On));
+                        pv.scope = Global;
+                    }
+                    Command::SetFunctions(sf) => sf.attrs.push((FunctionAttr::ReadOnly, On)),
+                    Command::PrintFunctions(pf) => pf.attrs.push((FunctionAttr::ReadOnly, On)),
+                }
+                match command.execute(env, &PRINT_CONTEXT) {
+                    Ok(result) => output(env, &result).await,
+                    Err(errors) => report_failure(env, to_message(&errors)).await,
                 }
             }
-        } else {
-            // TODO Make an existing variable read-only or create a new value-less variable
-        }
+            Err(error) => report_error(env, &error).await,
+        },
+        Err(error) => report_error(env, &error).await,
     }
-
-    ExitStatus::SUCCESS.into()
 }
 
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt;
+    use yash_env::semantics::ExitStatus;
     use yash_env::variable::Value;
     use yash_env::Env;
 
@@ -235,7 +257,7 @@ mod tests {
         let args = Field::dummies(["foo=bar baz"]);
         let location = args[0].origin.clone();
 
-        let result = main(&mut env, args);
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let v = env.variables.get("foo").unwrap();
