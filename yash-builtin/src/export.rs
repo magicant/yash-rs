@@ -91,7 +91,7 @@ use crate::typeset::syntax::OptionSpec;
 use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::to_message;
 use crate::typeset::Command;
-use crate::typeset::PrintVariablesContext;
+use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
 use crate::typeset::VariableAttr::Export;
 use yash_env::option::State::On;
@@ -101,8 +101,8 @@ use yash_env::Env;
 /// List of portable options applicable to the export built-in
 pub static PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 
-/// Variable printing context for the export built-in
-pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
+/// Printing context for the export built-in
+pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "export",
     options_allowed: &[],
 };
@@ -124,7 +124,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                     Command::SetFunctions(sf) => unreachable!("{sf:?}"),
                     Command::PrintFunctions(pf) => unreachable!("{pf:?}"),
                 }
-                match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
+                match command.execute(env, &PRINT_CONTEXT) {
                     Ok(result) => output(env, &result).await,
                     Err(errors) => report_failure(env, to_message(&errors)).await,
                 }

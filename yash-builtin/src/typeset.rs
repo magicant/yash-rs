@@ -260,9 +260,9 @@
 //! [`export`](crate::export) and [`readonly`](crate::readonly) built-ins.
 //! Functions that are common to these built-ins and the typeset built-in are
 //! parameterized to support the different behaviors of the built-ins. By
-//! customizing the contents of [`Command`] and the [`PrintVariablesContext`]
-//! passed to [`Command::execute`], you can even implement a new built-in that
-//! behaves differently from all of them.
+//! customizing the contents of [`Command`] and the [`PrintContext`] passed to
+//! [`Command::execute`], you can even implement a new built-in that behaves
+//! differently from all of them.
 
 use self::syntax::OptionSpec;
 use crate::common::{output, report_error, report_failure};
@@ -350,25 +350,6 @@ pub struct PrintVariables {
     pub scope: Scope,
 }
 
-/// Set of information used when printing variables
-///
-/// [`PrintVariables::execute`] prints a list of commands that invoke a built-in
-/// to recreate the variables. This context is used to determine the name of the
-/// built-in and the attributes possibly indicated as options to the built-in.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PrintVariablesContext<'a> {
-    /// Name of the built-in printed as the command name
-    pub builtin_name: &'a str,
-    /// Options that may be printed for the built-in
-    pub options_allowed: &'a [OptionSpec<'a>],
-}
-
-/// Variable printing context for the typeset built-in
-pub const PRINT_VARIABLES_CONTEXT: PrintVariablesContext<'static> = PrintVariablesContext {
-    builtin_name: "typeset",
-    options_allowed: self::syntax::ALL_OPTIONS,
-};
-
 /// Attribute that can be set on a function
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -407,6 +388,26 @@ pub struct PrintFunctions {
     /// Attributes to select the functions to be printed
     pub attrs: Vec<(FunctionAttr, State)>,
 }
+
+/// Set of information used when printing variables or functions
+///
+/// [`PrintVariables::execute`] and [`PrintFunctions::execute`] print a list of
+/// commands that invoke a built-in to recreate variables and functions,
+/// respectively. This context is used to determine the name of the printed
+/// built-in and the attributes possibly indicated as options to the built-in.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrintContext<'a> {
+    /// Name of the built-in printed as part of the commands
+    pub builtin_name: &'a str,
+    /// Options that may be printed for the built-in
+    pub options_allowed: &'a [OptionSpec<'a>],
+}
+
+/// Printing context for the typeset built-in
+pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
+    builtin_name: "typeset",
+    options_allowed: self::syntax::ALL_OPTIONS,
+};
 
 /// Set of information that defines the behavior of a single invocation of the
 /// typeset built-in
@@ -456,13 +457,11 @@ impl Command {
     pub fn execute(
         self,
         env: &mut Env,
-        print_variables_context: &PrintVariablesContext,
+        print_context: &PrintContext,
     ) -> Result<String, Vec<ExecuteError>> {
         match self {
             Self::SetVariables(command) => command.execute(env),
-            Self::PrintVariables(command) => {
-                command.execute(&env.variables, print_variables_context)
-            }
+            Self::PrintVariables(command) => command.execute(&env.variables, print_context),
             Self::SetFunctions(command) => command.execute(&mut env.functions),
             Self::PrintFunctions(command) => command.execute(&env.functions),
         }
@@ -622,7 +621,7 @@ pub fn to_message(errors: &[ExecuteError]) -> Message {
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
-            Ok(command) => match command.execute(env, &PRINT_VARIABLES_CONTEXT) {
+            Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
                 Ok(result) => output(env, &result).await,
                 Err(errors) => report_failure(env, to_message(&errors)).await,
             },
