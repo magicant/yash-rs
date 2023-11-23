@@ -158,6 +158,11 @@ fn quotation() {
 }
 
 #[test]
+fn readonly_builtin() {
+    run("readonly-p.sh")
+}
+
+#[test]
 fn redirection() {
     run("redir-p.sh")
 }
