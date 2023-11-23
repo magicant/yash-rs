@@ -99,7 +99,7 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 
 /// List of portable options applicable to the export built-in
-pub static PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
+pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 
 /// Printing context for the export built-in
 pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
