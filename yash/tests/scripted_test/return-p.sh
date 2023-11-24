@@ -149,15 +149,17 @@ test_OE -e 17 'specifying exit status in returning from dot script'
 . ./exitstatus17
 __IN__
 
-: TODO Needs the colon built-in <<\__OUT__
 test_oE -e 0 'default exit status in function in trap'
+# In this test case the return built-in exits from the function, but not from
+# the trap. The exit status of the return built-in is just as if it were not
+# in a trap. See https://www.austingroupbugs.net/view.php?id=1602#c6012
 fn() { true; return; }
 trap 'fn; echo trapped $?' USR1
 (exit 19)
 (kill -s USR1 $$; exit 19)
 : # null command to ensure the trap to be handled
 __IN__
-trapped 19
+trapped 0
 __OUT__
 
 test_oE -e 0 'default exit status in trap in function'
