@@ -49,6 +49,8 @@ pub mod colon;
 pub mod common;
 pub mod r#continue;
 #[cfg(feature = "yash-semantics")]
+pub mod eval;
+#[cfg(feature = "yash-semantics")]
 pub mod exec;
 pub mod exit;
 pub mod export;
@@ -110,6 +112,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(r#continue::main(env, args)),
+        },
+    ),
+    #[cfg(feature = "yash-semantics")]
+    (
+        "eval",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(eval::main(env, args)),
         },
     ),
     #[cfg(feature = "yash-semantics")]

@@ -97,6 +97,11 @@ fn continue_builtin() {
 }
 
 #[test]
+fn eval_builtin() {
+    run("eval-p.sh")
+}
+
+#[test]
 fn exec_builtin() {
     run("exec-p.sh")
 }

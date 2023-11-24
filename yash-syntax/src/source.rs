@@ -30,25 +30,25 @@ use std::num::NonZeroU64;
 use std::ops::Range;
 use std::rc::Rc;
 
-/// Origin of source code.
+/// Origin of source code
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Source {
-    /// Source code of unknown origin.
+    /// Source code of unknown origin
     ///
     /// Normally you should not use this value, but it may be useful for quick debugging.
     Unknown,
 
-    /// Standard input.
+    /// Standard input
     Stdin,
 
-    /// Command string specified with the `-c` option on the shell startup.
+    /// Command string specified with the `-c` option on the shell startup
     CommandString,
 
-    /// File specified on the shell startup.
+    /// File specified on the shell startup
     CommandFile { path: String },
 
-    /// Alias substitution.
+    /// Alias substitution
     ///
     /// This applies to a code fragment that replaced another as a result of alias substitution.
     Alias {
@@ -58,13 +58,16 @@ pub enum Source {
         alias: Rc<Alias>,
     },
 
-    /// Command substitution.
+    /// Command substitution
     CommandSubst { original: Location },
 
-    /// Arithmetic expansion.
+    /// Arithmetic expansion
     Arith { original: Location },
 
-    /// Trap command.
+    /// Command string executed by the `eval` built-in
+    Eval { original: Location },
+
+    /// Trap command
     Trap {
         /// Trap condition name, typically the signal name.
         condition: String,
@@ -144,6 +147,7 @@ impl Source {
             Alias { .. } => "<alias>",
             CommandSubst { .. } => "<command_substitution>",
             Arith { .. } => "<arith>",
+            Eval { .. } => "<eval>",
             Trap { condition, .. } => condition,
         }
     }

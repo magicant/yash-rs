@@ -381,9 +381,8 @@ for i in 1; do
 done
 __IN__
 
-: TODO Needs the eval built-in <<\__IN__
 # This is a questionable case. Is this really a "lexically enclosing" loop as
-# defined in POSIX? Most shells (other than mksh) support this case.
+# defined in POSIX? Most shells do support this case.
 test_OE 'breaking out of eval'
 for i in 1; do
     eval break

@@ -317,11 +317,10 @@ __IN__
 function "f=/'g"() { :; }
 __OUT__
 
-: TODO Needs the eval built-in <<\__OUT__
 test_oE 'printing function with command substitution with subshell (-fp)' -e
 eval "$(
     print_foo() {
-	echo "$((echo foo) )"
+        echo "$((echo foo) )"
     }
     typeset -fp print_foo
 )"

@@ -21,7 +21,6 @@ __IN__
 2 A B C
 __OUT__
 
-: TODO Needs the eval built-in <<\__OUT__
 test_oE -e 0 'reusing printed exported variables'
 export a=A
 e="$(export -p)"

@@ -72,7 +72,7 @@ pub enum Frame {
 
     /// Trap
     Trap(crate::trap::Condition),
-    // TODO dot script, eval
+    // TODO dot script, function
 }
 
 impl From<Builtin> for Frame {

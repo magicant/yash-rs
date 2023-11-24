@@ -174,7 +174,6 @@ __IN__
 Z 2
 __OUT__
 
-: TODO Needs the eval built-in <<\__IN__
 test_OE 'returning out of eval'
 fn() {
     eval return

@@ -123,6 +123,14 @@ impl super::Source {
                     original,
                 )));
             }
+            Eval { original } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    "command passed to the eval built-in here".into(),
+                    original,
+                )));
+            }
             Trap { origin, .. } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation::new(

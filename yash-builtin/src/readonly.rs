@@ -55,9 +55,8 @@
 //!
 //! If the `-p` (`--print`) option is specified and the `-f` (`--functions`)
 //! option is not specified, the built-in prints the names and values of the
-//! variables named by the operands in the format that can be evaluated as shell
-//! code to recreate the variables.
-//! <!-- TODO: link to the eval built-in -->
+//! variables named by the operands in the format that can be
+//! [evaluated](crate::eval) as shell code to recreate the variables.
 //! If there are no operands and the `-f` (`--functions`) option is not
 //! specified, the built-in prints all read-only variables in the same format.
 //!
@@ -124,9 +123,8 @@
 //!
 //! If the `-f` (`--functions`) and `-p` (`--print`) options are specified, the
 //! built-in prints the attributes and definitions of the shell functions named
-//! by the operands in the format that can be evaluated as shell code to
-//! recreate the functions.
-//! <!-- TODO: link to the eval built-in -->
+//! by the operands in the format that can be [evaluated](crate::eval) as shell
+//! code to recreate the functions.
 //! If there are no operands and the `-f` (`--functions`) option is specified,
 //! the built-in prints all read-only functions in the same format.
 //!
