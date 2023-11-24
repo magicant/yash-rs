@@ -30,7 +30,6 @@ __IN__
 [/tilde/expansion/][/tilde/expansion/slash]
 __OUT__
 
-: TODO Needs the colon built-in <<\__IN__
 test_OE -e 0 'exit status of successful unnamed tilde expansion (in command word)'
 : ~ ~/ ~/foo
 __IN__
@@ -146,7 +145,6 @@ __IN__
 [$HOME/][$HOME/foo]
 __OUT__
 
-: TODO Needs the colon built-in <<\__IN__
 testcase "$LINENO" -e 0 \
     'exit status of successful named tilde expansion (in command word)' \
     3<<__IN__ 4</dev/null 5</dev/null
