@@ -136,6 +136,11 @@ fn if_command() {
     run("if-p.sh")
 }
 
+#[test]
+fn nop_builtins() {
+    run("nop-p.sh")
+}
+
 // a.k.a. globbing
 #[test]
 fn pathname_expansion() {

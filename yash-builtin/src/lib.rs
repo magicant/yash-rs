@@ -45,6 +45,7 @@
 pub mod alias;
 pub mod r#break;
 pub mod cd;
+pub mod colon;
 pub mod common;
 pub mod r#continue;
 #[cfg(feature = "yash-semantics")]
@@ -76,6 +77,13 @@ use Type::{Elective, Mandatory, Special};
 ///
 /// The array items are ordered alphabetically.
 pub const BUILTINS: &[(&str, Builtin)] = &[
+    (
+        ":",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(ready(colon::main(env, args))),
+        },
+    ),
     (
         "alias",
         Builtin {
