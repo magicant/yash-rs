@@ -86,10 +86,6 @@
 //! to. If omitted, the value of `$HOME` is used. If the operand is a single
 //! hyphen (`-`), the value of `$OLDPWD` is used.
 //!
-//! # Exit Status
-//!
-//! Zero if the working directory was successfully changed; non-zero otherwise.
-//!
 //! # Errors
 //!
 //! This built-in may fail with a non-zero exit status when:
@@ -104,6 +100,10 @@
 //!
 //! - The new working directory cannot be written to the standard output.
 //! - `$PWD` or `$OLDPWD` is read-only.
+//!
+//! # Exit Status
+//!
+//! Zero if the working directory was successfully changed; non-zero otherwise.
 //!
 //! # Security considerations
 //!

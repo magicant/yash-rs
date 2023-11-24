@@ -29,13 +29,13 @@
 //! The colon built-in is a dummy command that does nothing.
 //! Any arguments are ignored.
 //!
-//! # Exit status
-//!
-//! Zero.
-//!
 //! # Errors
 //!
 //! None.
+//!
+//! # Exit status
+//!
+//! Zero.
 //!
 //! # Portability
 //!

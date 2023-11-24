@@ -41,6 +41,16 @@
 //! The optional ***exit_status*** operand, if given, should be a non-negative
 //! decimal integer and will be the exit status of the built-in.
 //!
+//! # Errors
+//!
+//! If the *exit_status* operand is given but not a valid non-negative integer,
+//! it is a syntax error.
+//!
+//! This implementation treats an *exit_status* value greater than 2147483647 as
+//! a syntax error.
+//!
+//! TODO: What if there is no function or script to return from?
+//!
 //! # Exit status
 //!
 //! The *exit_status* operand will be the exit status of the built-in.
@@ -50,16 +60,7 @@
 //! script and the built-in returns from that function or script, the exit
 //! status will be the value of `$?` before entering the trap.
 //!
-//! # Errors
-//!
-//! If the *exit_status* operand is given but not a valid non-negative integer,
-//! it is a syntax error. In that case, an error message is printed, and the
-//! exit status will be 2 ([`ExitStatus::ERROR`]).
-//!
-//! This implementation treats an *exit_status* value greater than 2147483647 as
-//! a syntax error.
-//!
-//! TODO: What if there is no function or script to return from?
+//! In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
 //!
 //! # Portability
 //!

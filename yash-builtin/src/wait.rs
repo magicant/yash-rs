@@ -57,6 +57,10 @@
 //! current environment, the built-in treats it as an existing job that has
 //! already finished with exit status 127.
 //!
+//! # Errors
+//!
+//! TBD
+//!
 //! # Exit status
 //!
 //! If you specify one or more operands, the built-in returns the exit status of
@@ -65,10 +69,6 @@
 //!
 //! If the built-in was interrupted by a signal, the exit status indicates the
 //! signal.
-//!
-//! # Errors
-//!
-//! TBD
 //!
 //! # Portability
 //!

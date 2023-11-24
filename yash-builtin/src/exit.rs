@@ -41,6 +41,14 @@
 //! The optional ***exit_status*** operand, if given, should be a non-negative
 //! decimal integer and will be the exit status of the exiting shell process.
 //!
+//! # Errors
+//!
+//! If the *exit_status* operand is given but not a valid non-negative integer,
+//! it is a syntax error.
+//!
+//! This implementation treats an *exit_status* value greater than 2147483647 as
+//! a syntax error.
+//!
 //! # Exit status
 //!
 //! The *exit_status* operand specifies the exit status of the exiting shell.
@@ -49,14 +57,7 @@
 //! (`$?`). If the built-in is invoked in a trap, the exit status will be the
 //! value of `$?` before entering the trap.
 //!
-//! # Errors
-//!
-//! If the *exit_status* operand is given but not a valid non-negative integer,
-//! it is a syntax error. In that case, an error message is printed, and the
-//! exit status will be 2 ([`ExitStatus::ERROR`]).
-//!
-//! This implementation treats an *exit_status* value greater than 2147483647 as
-//! a syntax error.
+//! In case of an error, the exit status is 2 ([`ExitStatus::ERROR`]).
 //!
 //! # Portability
 //!

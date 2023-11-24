@@ -42,16 +42,16 @@
 //!
 //! Operands are the names of shell variables or functions to unset.
 //!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
 //! # Errors
 //!
 //! Unsetting a read-only variable or function is an error.
 //!
 //! It is not an error to unset a variable or function that is not set.
 //! The built-in ignores such operands.
+//!
+//! # Exit status
+//!
+//! Zero unless an error occurs.
 //!
 //! # Portability
 //!

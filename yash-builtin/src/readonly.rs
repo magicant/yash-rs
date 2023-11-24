@@ -160,10 +160,6 @@
 //! Note that executing the printed commands in the current context will fail
 //! because the function is already defined and read-only.
 //!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
 //! # Errors
 //!
 //! When making a variable read-only with a value, it is an error if the
@@ -173,6 +169,10 @@
 //!
 //! When printing variables or functions, it is an error if an operand names a
 //! non-existing variable or function.
+//!
+//! # Exit status
+//!
+//! Zero unless an error occurs.
 //!
 //! # Portability
 //!

@@ -39,14 +39,14 @@
 //! be a non-negative decimal integer less than or equal to the number of
 //! positional parameters.
 //!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
 //! # Errors
 //!
 //! It is an error to try to remove more than the number of existing positional
 //! parameters.
+//!
+//! # Exit status
+//!
+//! Zero unless an error occurs.
 //!
 //! # Portability
 //!

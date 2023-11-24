@@ -60,10 +60,6 @@
 //! separate assignment command since the export built-in does not support
 //! assigning values to array variables.
 //!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
 //! # Errors
 //!
 //! When exporting a variable with a value, it is an error if the variable is
@@ -71,6 +67,10 @@
 //!
 //! When printing variables, it is an error if an operand names a non-existing
 //! variable.
+//!
+//! # Exit status
+//!
+//! Zero unless an error occurs.
 //!
 //! # Portability
 //!
