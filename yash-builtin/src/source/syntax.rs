@@ -90,4 +90,24 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn no_file() {
+        let env = Env::new_virtual();
+        let args = vec![];
+        assert_eq!(parse(&env, args), Err(Error::MissingFile));
+    }
+
+    #[test]
+    fn unknown_short_option() {
+        let env = Env::new_virtual();
+        let args = Field::dummies(["-@", "foo"]);
+        assert_eq!(
+            parse(&env, args),
+            Err(Error::CommonError(ParseError::UnknownShortOption(
+                '@',
+                Field::dummy("-@"),
+            ))),
+        );
+    }
 }
