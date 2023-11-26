@@ -22,6 +22,8 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow;
+use std::os::unix::ffi::OsStringExt as _;
+use std::path::PathBuf;
 use yash_env::input::FdReader;
 use yash_env::io::Fd;
 use yash_env::semantics::Divert;
@@ -49,7 +51,7 @@ impl Command {
     pub async fn execute(self, env: &mut Env) -> crate::Result {
         let env = &mut env.push_frame(Frame::DotScript);
 
-        let fd = match find_and_open_file(env, &self.file) {
+        let fd = match find_and_open_file(env, &self.file.value) {
             Ok(fd) => fd,
             Err(errno) => return report_find_and_open_file_failure(env, &self.file, errno).await,
         };
@@ -75,10 +77,31 @@ impl Command {
 }
 
 /// Finds and opens the file to be executed.
-fn find_and_open_file(env: &mut Env, name: &Field) -> Result<Fd, Errno> {
-    // TODO Search PATH
-    let path = CString::new(name.value.as_bytes()).map_err(|_| Errno::EILSEQ)?;
-    open_file(&mut env.system, &path)
+///
+/// If the name does not contain a slash, this function searches the file in the
+/// `$PATH` variable.
+fn find_and_open_file(env: &mut Env, filename: &str) -> Result<Fd, Errno> {
+    let dirs: Box<dyn Iterator<Item = &str>> = if filename.contains('/') {
+        Box::new(std::iter::once("."))
+    } else {
+        env.variables
+            .get("PATH")
+            .and_then(|v| v.value.as_ref())
+            .map_or(Box::new(std::iter::empty()), |v| Box::new(v.split()))
+        // TODO If not in POSIX mode, search in the current working directory too
+    };
+
+    // Iterate over the directories trying to open the file in each directory
+    // and return the first successfully opened file descriptor.
+    dirs.filter_map(|dir| {
+        let path = PathBuf::from_iter([dir, filename])
+            .into_os_string()
+            .into_vec();
+        let c_path = CString::new(path).ok()?;
+        open_file(&mut env.system, &c_path).ok()
+    })
+    .next()
+    .ok_or(Errno::ENOENT)
 }
 
 /// Opens the file to be executed.
@@ -134,6 +157,7 @@ mod tests {
     use yash_env::io::MIN_INTERNAL_FD;
     use yash_env::system::r#virtual::INode;
     use yash_env::system::FdFlag;
+    use yash_env::variable::Scope;
     use yash_env::VirtualSystem;
 
     fn system_with_file<P: AsRef<Path>, C: Into<Vec<u8>>>(path: P, content: C) -> VirtualSystem {
@@ -143,6 +167,69 @@ mod tests {
         state.file_system.save(path, content).unwrap();
         drop(state);
         system
+    }
+
+    #[test]
+    fn no_path_search_with_pathname_containing_slash() {
+        let system = VirtualSystem::new();
+        let i_node = Rc::new(RefCell::new(INode::new("")));
+        {
+            let mut state = system.state.borrow_mut();
+            let content = Rc::new(RefCell::new(INode::new("")));
+            state.file_system.save("/bar/file", content).unwrap();
+            let content = Rc::new(RefCell::new(INode::new("")));
+            state.file_system.save("/baz/file", content).unwrap();
+            let content = Rc::clone(&i_node);
+            state.file_system.save("/file", content).unwrap();
+        }
+        let mut env = Env::with_system(Box::new(system.clone()));
+        env.variables
+            .get_or_new("PATH", Scope::Global)
+            .assign("/foo:/bar:/baz", None)
+            .unwrap();
+
+        // The pathname parameter contains a slash, so the file is not searched
+        // in the $PATH variable.
+        let result = find_and_open_file(&mut env, "./file");
+
+        // The expected file is "/file" since the default working directory is
+        // "/".
+        let fd = result.unwrap();
+        _ = system.with_open_file_description(fd, |ofd| {
+            assert!(Rc::ptr_eq(&ofd.file, &i_node));
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn file_found_in_path() {
+        let system = VirtualSystem::new();
+        let i_node = Rc::new(RefCell::new(INode::new("")));
+        {
+            let mut state = system.state.borrow_mut();
+            let content = Rc::clone(&i_node);
+            state.file_system.save("/bar/file", content).unwrap();
+            let content = Rc::new(RefCell::new(INode::new("")));
+            state.file_system.save("/baz/file", content).unwrap();
+            let content = Rc::new(RefCell::new(INode::new("")));
+            state.file_system.save("/file", content).unwrap();
+        }
+        let mut env = Env::with_system(Box::new(system.clone()));
+        env.variables
+            .get_or_new("PATH", Scope::Global)
+            .assign("/foo:/bar:/baz", None)
+            .unwrap();
+
+        // The pathname parameter does not contain a slash, so the file is
+        // searched in the $PATH variable.
+        let result = find_and_open_file(&mut env, "file");
+
+        // The expected file is "/bar/file".
+        let fd = result.unwrap();
+        _ = system.with_open_file_description(fd, |ofd| {
+            assert!(Rc::ptr_eq(&ofd.file, &i_node));
+            Ok(())
+        });
     }
 
     #[test]

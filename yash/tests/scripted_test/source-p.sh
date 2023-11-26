@@ -38,8 +38,6 @@ out
 __OUT__
 
 (
-skip="true" # TODO: Skip tests for unimplemented features
-
 # Ensure $PWD is safe to assign to $PATH
 case $PWD in (*[:%]*)
     skip="true"
@@ -69,6 +67,7 @@ test_O -d -e n 'dot script not found, in $PATH, subshell, exit status'
 (. _no_such_file_)
 __IN__
 
+: TODO interactive shell behavior not implemented <<\__OUT__
 test_o -d 'dot script not found, in $PATH, interactive shell, no exiting' -i +m
 . _no_such_file_
 PATH=$savepath
