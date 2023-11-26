@@ -70,9 +70,12 @@ pub enum Frame {
     /// Built-in utility
     Builtin(Builtin),
 
+    /// Shell script file executed by the `.` built-in
+    DotScript,
+
     /// Trap
     Trap(crate::trap::Condition),
-    // TODO dot script, function
+    // TODO function
 }
 
 impl From<Builtin> for Frame {

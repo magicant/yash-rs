@@ -131,6 +131,14 @@ impl super::Source {
                     original,
                 )));
             }
+            DotScript { name, origin } => {
+                // TODO Use Extend::extend_one
+                result.extend(std::iter::once(Annotation::new(
+                    AnnotationType::Info,
+                    format!("script `{name}` was sourced here",).into(),
+                    origin,
+                )));
+            }
             Trap { origin, .. } => {
                 // TODO Use Extend::extend_one
                 result.extend(std::iter::once(Annotation::new(
