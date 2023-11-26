@@ -40,7 +40,9 @@
 //! crate, which is enabled by default. If you disable the `yash-semantics`
 //! feature, the following built-ins will be unavailable:
 //!
+//! - `eval`
 //! - `exec`
+//! - `source`
 
 pub mod alias;
 pub mod r#break;
@@ -60,6 +62,8 @@ pub mod readonly;
 pub mod r#return;
 pub mod set;
 pub mod shift;
+#[cfg(feature = "yash-semantics")]
+pub mod source;
 pub mod trap;
 pub mod typeset;
 pub mod unset;
@@ -79,6 +83,14 @@ use Type::{Elective, Mandatory, Special};
 ///
 /// The array items are ordered alphabetically.
 pub const BUILTINS: &[(&str, Builtin)] = &[
+    #[cfg(feature = "yash-semantics")]
+    (
+        ".",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(source::main(env, args)),
+        },
+    ),
     (
         ":",
         Builtin {
@@ -184,6 +196,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(shift::main(env, args)),
+        },
+    ),
+    #[cfg(feature = "yash-semantics")]
+    (
+        "source",
+        Builtin {
+            r#type: Special,
+            execute: |env, args| Box::pin(source::main(env, args)),
         },
     ),
     (

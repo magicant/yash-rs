@@ -67,11 +67,19 @@ pub enum Source {
     /// Command string executed by the `eval` built-in
     Eval { original: Location },
 
+    /// File executed by the `.` (`source`) built-in
+    DotScript {
+        /// Pathname of the file
+        name: String,
+        /// Location of the simple command that invoked the `.` built-in
+        origin: Location,
+    },
+
     /// Trap command
     Trap {
-        /// Trap condition name, typically the signal name.
+        /// Trap condition name, typically the signal name
         condition: String,
-        /// Location of the simple command that has set this trap command.
+        /// Location of the simple command that has set this trap command
         origin: Location,
     },
     // TODO More Source types
@@ -148,6 +156,7 @@ impl Source {
             CommandSubst { .. } => "<command_substitution>",
             Arith { .. } => "<arith>",
             Eval { .. } => "<eval>",
+            DotScript { name, .. } => name,
             Trap { condition, .. } => condition,
         }
     }

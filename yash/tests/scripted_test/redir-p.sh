@@ -542,7 +542,7 @@ __OUT__
     echo 'END'
 } >longhere
 
-: TODO Needs the source built-in <<\__IN__
+: TODO Needs the read built-in <<\__IN__
 test_OE -e 0 'long here-document' -e
 . ./longhere |
 while read -r i; do

@@ -193,6 +193,11 @@ fn simple_command() {
 }
 
 #[test]
+fn source_builtin() {
+    run("source-p.sh")
+}
+
+#[test]
 fn startup() {
     run("startup-p.sh")
 }

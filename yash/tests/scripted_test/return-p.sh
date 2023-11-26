@@ -55,7 +55,6 @@ fn
 echo after function
 __END__
 
-: TODO Needs the source built-in <<\__OUT__
 test_oE 'returning from function, nested in dot script'
 . ./fn
 echo after dot
@@ -71,7 +70,6 @@ return
 echo out return, not reached
 __END__
 
-: TODO Needs the source built-in <<\__OUT__
 test_oE 'returning from dot script, unnested'
 . ./return
 echo after .
@@ -86,7 +84,6 @@ echo in outer
 echo out outer
 __END__
 
-: TODO Needs the source built-in <<\__OUT__
 test_oE 'returning from dot script, nested in another dot script'
 . ./outer
 echo after .
@@ -97,7 +94,6 @@ out outer
 after .
 __OUT__
 
-: TODO Needs the source built-in <<\__OUT__
 test_oE 'returning from dot script, nested in function'
 fn() {
     echo in function
@@ -126,7 +122,6 @@ cat <<\__END__ >exitstatus
 return
 __END__
 
-: TODO Needs the source built-in <<\__IN__
 test_OE -e 17 'default exit status of returning from dot script'
 . ./exitstatus
 __IN__
@@ -144,7 +139,6 @@ cat <<\__END__ >exitstatus17
 return 17
 __END__
 
-: TODO Needs the source built-in <<\__IN__
 test_OE -e 17 'specifying exit status in returning from dot script'
 . ./exitstatus17
 __IN__

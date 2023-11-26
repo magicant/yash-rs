@@ -70,9 +70,12 @@ pub enum Frame {
     /// Built-in utility
     Builtin(Builtin),
 
+    /// Shell script file executed by the `.` built-in
+    DotScript,
+
     /// Trap
     Trap(crate::trap::Condition),
-    // TODO dot script, function
+    // TODO function
 }
 
 impl From<Builtin> for Frame {
@@ -140,7 +143,7 @@ impl Stack {
     /// This function returns the number of lexically enclosing `for`, `while`,
     /// and `until` loops in the current execution environment. That is, the
     /// result is the count of `Frame::Loop`s pushed after the last
-    /// `Frame::Subshell`.
+    /// `Frame::Subshell` or `Frame::DotScript`.
     ///
     /// The function stops counting when `max_count` is reached. The parameter
     /// is useful if you don't have to count more than a specific number.
@@ -150,7 +153,7 @@ impl Stack {
         self.inner
             .iter()
             .rev()
-            .take_while(|&frame| frame != &Frame::Subshell)
+            .take_while(|&frame| !matches!(frame, Frame::Subshell | Frame::DotScript))
             .filter(|&frame| frame == &Frame::Loop)
             .take(max_count)
             .count()
@@ -290,6 +293,22 @@ mod tests {
         let mut stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 2);
         let mut stack = stack.push(Frame::Subshell);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+    }
+
+    #[test]
+    fn loop_count_with_dot_scripts() {
+        let mut stack = Stack::default();
+        let mut stack = stack.push(Frame::Loop);
+        let mut stack = stack.push(Frame::DotScript);
+        assert_eq!(stack.loop_count(usize::MAX), 0);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 1);
+        let mut stack = stack.push(Frame::Loop);
+        assert_eq!(stack.loop_count(usize::MAX), 2);
+        let mut stack = stack.push(Frame::DotScript);
         assert_eq!(stack.loop_count(usize::MAX), 0);
         let stack = stack.push(Frame::Loop);
         assert_eq!(stack.loop_count(usize::MAX), 1);
