@@ -174,3 +174,5 @@
 //! modify the `$OPTIND` variable until the built-in finishes parsing all
 //! options. The implementation may be changed in the future to check these
 //! conditions.
+
+pub mod model;
