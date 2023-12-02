@@ -158,6 +158,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         },
     ),
     (
+        "getopts",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(getopts::main(env, args)),
+        },
+    ),
+    (
         "jobs",
         Builtin {
             r#type: Mandatory,

@@ -175,4 +175,127 @@
 //! options. The implementation may be changed in the future to check these
 //! conditions.
 
+use crate::common::report_error;
+use crate::common::report_simple_error;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
+use std::num::NonZeroUsize;
+use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Field;
+use yash_env::variable::Value;
+use yash_env::Env;
+
 pub mod model;
+pub mod report;
+
+/// Computes the `arg_index` and `char_index` parameters of the
+/// [`next`](self::model::next) function from the `$OPTIND` value.
+fn indexes_from_optind(optind: &str) -> (NonZeroUsize, NonZeroUsize) {
+    const DEFAULT: NonZeroUsize = NonZeroUsize::MIN;
+    let mut iter = optind.split(':');
+    let arg_index = iter.next().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT);
+    let char_index = iter.next().and_then(|s| s.parse().ok()).unwrap_or(DEFAULT);
+    (arg_index, char_index)
+}
+
+/// Computes the `$OPTIND` value from the `arg_index` and `char_index`.
+fn indexes_to_optind(arg_index: NonZeroUsize, char_index: NonZeroUsize) -> String {
+    if char_index == NonZeroUsize::MIN {
+        format!("{arg_index}")
+    } else {
+        format!("{arg_index}:{char_index}")
+    }
+}
+
+/// Entry point of the getopts built-in
+pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+    let operands = match parse_arguments(&[], Mode::with_env(env), args) {
+        Ok((_, operands)) => operands,
+        Err(error) => return report_error(env, &error).await,
+    };
+    if operands.len() < 2 {
+        let message = format!(
+            "insufficient operands (2 or more required, {} given)",
+            operands.len()
+        );
+        return report_simple_error(env, &message).await;
+    }
+
+    let spec = model::OptionSpec::from(&operands[0].value);
+
+    let args: Box<dyn Iterator<Item = &str>> = if operands.len() > 2 {
+        Box::new(operands[2..].iter().map(|f| f.value.as_str()))
+    } else {
+        let params = &env.variables.positional_params().values;
+        Box::new(params.iter().map(|v| v.as_str()))
+    };
+
+    let optind = env
+        .variables
+        .get("OPTIND")
+        .and_then(|v| match &v.value {
+            Some(Value::Scalar(value)) => Some(value.as_str()),
+            _ => None,
+        })
+        .unwrap_or("");
+    let (arg_index, char_index) = indexes_from_optind(optind);
+
+    match model::next(args, spec, arg_index, char_index) {
+        None => ExitStatus::FAILURE.into(),
+        Some(result) => {
+            let colon = spec.as_raw().starts_with(':');
+            let option_var = { operands }.swap_remove(1);
+            match result.report(env, colon, option_var) {
+                Ok(message) => {
+                    env.system.print_error(&message).await;
+                    ExitStatus::SUCCESS.into()
+                }
+                Err(error) => report_error(env, error.to_message()).await,
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn non_zero(i: usize) -> NonZeroUsize {
+        NonZeroUsize::new(i).unwrap()
+    }
+
+    #[test]
+    fn indexes_from_optind_with_normal_values() {
+        assert_eq!(indexes_from_optind("1"), (non_zero(1), non_zero(1)));
+        assert_eq!(indexes_from_optind("2"), (non_zero(2), non_zero(1)));
+        assert_eq!(indexes_from_optind("3"), (non_zero(3), non_zero(1)));
+        assert_eq!(indexes_from_optind("1:2"), (non_zero(1), non_zero(2)));
+        assert_eq!(indexes_from_optind("1:3"), (non_zero(1), non_zero(3)));
+        assert_eq!(indexes_from_optind("2:4"), (non_zero(2), non_zero(4)));
+    }
+
+    #[test]
+    fn indexes_from_optind_with_abnormal_values() {
+        assert_eq!(indexes_from_optind(""), (non_zero(1), non_zero(1)));
+        assert_eq!(indexes_from_optind("0"), (non_zero(1), non_zero(1)));
+        assert_eq!(indexes_from_optind("2:0"), (non_zero(2), non_zero(1)));
+        assert_eq!(indexes_from_optind("2:3:4"), (non_zero(2), non_zero(3)));
+    }
+
+    #[test]
+    fn indexes_to_optind_with_min_char_index() {
+        assert_eq!(indexes_to_optind(non_zero(1), non_zero(1)), "1");
+        assert_eq!(indexes_to_optind(non_zero(2), non_zero(1)), "2");
+        assert_eq!(indexes_to_optind(non_zero(4), non_zero(1)), "4");
+        assert_eq!(indexes_to_optind(non_zero(10), non_zero(1)), "10");
+    }
+
+    #[test]
+    fn indexes_to_optind_with_large_char_index() {
+        assert_eq!(indexes_to_optind(non_zero(1), non_zero(2)), "1:2");
+        assert_eq!(indexes_to_optind(non_zero(1), non_zero(3)), "1:3");
+        assert_eq!(indexes_to_optind(non_zero(2), non_zero(2)), "2:2");
+        assert_eq!(indexes_to_optind(non_zero(2), non_zero(4)), "2:4");
+        assert_eq!(indexes_to_optind(non_zero(10), non_zero(13)), "10:13");
+    }
+}
