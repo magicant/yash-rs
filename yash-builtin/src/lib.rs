@@ -56,6 +56,7 @@ pub mod eval;
 pub mod exec;
 pub mod exit;
 pub mod export;
+pub mod getopts;
 pub mod jobs;
 pub mod pwd;
 pub mod readonly;
