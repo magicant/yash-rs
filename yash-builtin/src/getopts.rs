@@ -186,6 +186,8 @@
 use yash_env::semantics::Field;
 use yash_env::Env;
 
+pub mod model;
+
 /// Entry point of the getopts built-in
 pub async fn main(_env: &mut Env, _args: Vec<Field>) -> crate::Result {
     todo!()
