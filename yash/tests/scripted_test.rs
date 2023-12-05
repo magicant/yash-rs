@@ -132,6 +132,11 @@ fn function() {
 }
 
 #[test]
+fn getopts_builtin() {
+    run("getopts-p.sh")
+}
+
+#[test]
 fn grouping() {
     run("grouping-p.sh")
 }
