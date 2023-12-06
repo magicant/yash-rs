@@ -140,6 +140,9 @@ impl model::Result {
     /// empty string. If the result is not an option, this method returns
     /// `Ok(None)`. In case of an error in updating the variables, this method
     /// returns an error value.
+    ///
+    /// If `env.getopts_state` is `Some`, this method also updates the `optind`
+    /// field of the state to match the new `$OPTIND` value.
     pub fn report(
         self,
         env: &mut Env,
@@ -196,8 +199,12 @@ impl model::Result {
 
         let optind = indexes_to_optind(self.next_arg_index, self.next_char_index);
         env.get_or_create_variable("OPTIND", Scope::Global)
-            .assign(optind, location)
+            .assign(optind.clone(), location)
             .map_err(|e| Error::with_name_and_assign_error("OPTIND".to_string(), e))?;
+
+        if let Some(state) = &mut env.getopts_state {
+            state.optind = optind;
+        }
 
         Ok(message)
     }
@@ -208,6 +215,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use std::num::NonZeroUsize;
+    use yash_env::builtin::getopts::GetoptsState;
+    use yash_env::builtin::getopts::Origin;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
     use yash_env::variable::Value;
@@ -338,6 +347,29 @@ mod tests {
         let optind = env.variables.get("OPTARG").unwrap();
         assert_matches!(&optind.value, Some(Value::Scalar(s)) if s == "some argument");
         assert_eq!(optind.last_assigned_location, Some(location));
+    }
+
+    #[test]
+    fn report_updates_optind_of_getopts_state() {
+        let mut env = env_with_dummy_arg0_and_optarg();
+        env.getopts_state = Some(GetoptsState {
+            args: vec!["-a".to_string(), "-b".to_string()],
+            origin: Origin::DirectArgs,
+            optind: "1".to_string(),
+        });
+        let result = model::Result {
+            option: Some(model::OptionOccurrence {
+                option: 'a',
+                argument: None,
+                error: None,
+            }),
+            next_arg_index: non_zero(2),
+            next_char_index: non_zero(1),
+        };
+
+        _ = result.report(&mut env, false, Field::dummy("opt_var"));
+
+        assert_eq!(env.getopts_state.unwrap().optind, "2");
     }
 
     #[test]

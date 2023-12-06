@@ -106,6 +106,7 @@
 //! - The built-in is re-invoked with different arguments or a different value
 //!   of `$OPTIND` than the previous invocation (except when `$OPTIND` is reset
 //!   to `1`).
+//! - The value of `$OPTIND` is not `1` on the first invocation.
 //!
 //! # Exit status
 //!
@@ -189,6 +190,7 @@ use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use either::Either::{Left, Right};
 use std::num::NonZeroUsize;
+use yash_env::builtin::getopts::Origin;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::variable::Value;
@@ -196,6 +198,7 @@ use yash_env::Env;
 
 pub mod model;
 pub mod report;
+pub mod verify;
 
 /// Computes the `arg_index` and `char_index` parameters of the
 /// [`next`](self::model::next) function from the `$OPTIND` value.
@@ -218,6 +221,7 @@ fn indexes_to_optind(arg_index: NonZeroUsize, char_index: NonZeroUsize) -> Strin
 
 /// Entry point of the getopts built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+    // Parse arguments
     let operands = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok((_, operands)) => operands,
         Err(error) => return report_error(env, &error).await,
@@ -232,15 +236,17 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 
     let spec = model::OptionSpec::from(&operands[0].value);
 
-    // TODO verify that the arguments & $OPTIND are the same as the previous invocation
-
-    let args = if operands.len() > 2 {
-        Left(operands[2..].iter().map(|f| f.value.as_str()))
+    // Get the arguments to parse
+    let (args, arg_origin) = if operands.len() > 2 {
+        let iter = operands[2..].iter().map(|f| f.value.as_str());
+        (Left(iter), Origin::DirectArgs)
     } else {
         let params = &env.variables.positional_params().values;
-        Right(params.iter().map(|v| v.as_str()))
+        let iter = params.iter().map(|v| v.as_str());
+        (Right(iter), Origin::PositionalParams)
     };
 
+    // Get the `$OPTIND` value
     let optind = env
         .variables
         .get("OPTIND")
@@ -251,7 +257,30 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         .unwrap_or("");
     let (arg_index, char_index) = indexes_from_optind(optind);
 
+    // Verify the state
+    let current = verify::GetoptsStateRef {
+        args: args.clone(),
+        origin: arg_origin,
+        optind,
+    };
+    if let Some(previous) = &env.getopts_state {
+        match current.verify(previous) {
+            Ok(None) => {}
+            Ok(Some(current)) => env.getopts_state = Some(current.into_state()),
+            Err(e) => return report_simple_error(env, &e.to_string()).await,
+        }
+    } else {
+        if optind != "1" {
+            let message = format!("unexpected $OPTIND value `{optind}`");
+            return report_simple_error(env, &message).await;
+        }
+        env.getopts_state = Some(current.into_state());
+    }
+
+    // Parse the next option
     let result = model::next(args, spec, arg_index, char_index);
+
+    // Report the result
     let colon = spec.as_raw().starts_with(':');
     let option_var = { operands }.swap_remove(1);
     match result.report(env, colon, option_var) {
