@@ -56,6 +56,7 @@ pub mod eval;
 pub mod exec;
 pub mod exit;
 pub mod export;
+pub mod getopts;
 pub mod jobs;
 pub mod pwd;
 pub mod readonly;
@@ -154,6 +155,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(export::main(env, args)),
+        },
+    ),
+    (
+        "getopts",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(getopts::main(env, args)),
         },
     ),
     (

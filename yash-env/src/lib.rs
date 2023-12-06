@@ -31,6 +31,7 @@
 //! the underlying system. [`VirtualSystem`] is a dummy for simulating the
 //! system's behavior without affecting the actual system.
 
+use self::builtin::getopts::GetoptsState;
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
@@ -83,41 +84,44 @@ use yash_syntax::alias::AliasSet;
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct Env {
-    /// Aliases defined in the environment.
+    /// Aliases defined in the environment
     pub aliases: AliasSet,
 
-    /// Name of the current shell executable or shell script.
+    /// Name of the current shell executable or shell script
     ///
     /// Special parameter `0` expands to this value.
     pub arg0: String,
 
-    /// Built-in utilities available in the environment.
+    /// Built-in utilities available in the environment
     pub builtins: HashMap<&'static str, Builtin>,
 
-    /// Exit status of the last executed command.
+    /// Exit status of the last executed command
     pub exit_status: ExitStatus,
 
-    /// Functions defined in the environment.
+    /// Functions defined in the environment
     pub functions: FunctionSet,
 
-    /// Jobs managed in the environment.
+    /// State of the previous invocation of the `getopts` built-in
+    pub getopts_state: Option<GetoptsState>,
+
+    /// Jobs managed in the environment
     pub jobs: JobSet,
 
-    /// Process group ID of the main shell process.
+    /// Process group ID of the main shell process
     pub main_pgid: Pid,
 
-    /// Process ID of the main shell process.
+    /// Process ID of the main shell process
     ///
     /// This PID represents the value of the `$` special parameter.
     pub main_pid: Pid,
 
-    /// Shell option settings.
+    /// Shell option settings
     pub options: OptionSet,
 
-    /// Runtime execution context stack.
+    /// Runtime execution context stack
     pub stack: Stack,
 
-    /// Traps defined in the environment.
+    /// Traps defined in the environment
     pub traps: TrapSet,
 
     /// File descriptor to the controlling terminal
@@ -126,10 +130,10 @@ pub struct Env {
     /// you don't have to prepare it yourself.
     pub tty: Option<Fd>,
 
-    /// Variables and positional parameters defined in the environment.
+    /// Variables and positional parameters defined in the environment
     pub variables: VariableSet,
 
-    /// Interface to the system-managed parts of the environment.
+    /// Interface to the system-managed parts of the environment
     pub system: SharedSystem,
 }
 
@@ -147,6 +151,7 @@ impl Env {
             builtins: Default::default(),
             exit_status: Default::default(),
             functions: Default::default(),
+            getopts_state: Default::default(),
             jobs: Default::default(),
             main_pgid: system.getpgrp(),
             main_pid: system.getpid(),
@@ -178,6 +183,7 @@ impl Env {
             builtins: self.builtins.clone(),
             exit_status: self.exit_status,
             functions: self.functions.clone(),
+            getopts_state: self.getopts_state.clone(),
             jobs: self.jobs.clone(),
             main_pgid: self.main_pgid,
             main_pid: self.main_pid,

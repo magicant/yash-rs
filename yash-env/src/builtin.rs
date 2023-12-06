@@ -31,6 +31,8 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 
+pub mod getopts;
+
 /// Types of built-in utilities.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Type {
