@@ -87,10 +87,42 @@
 //! Reading from an unseekable input may be slow because the built-in reads the
 //! input byte by byte to make sure it does not read past the end of the line.
 
+use crate::common::report_error;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
+pub mod assigning;
+pub mod input;
+pub mod prompt;
+pub mod syntax;
+
+/// Abstract command line arguments of the `read` built-in
+///
+/// An instance of this struct is created by parsing command line arguments
+/// using the [`syntax`] module.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Command {
+    /// Whether the `-r` option is specified
+    ///
+    /// If this field is `true`, backslashes are not interpreted.
+    pub is_raw: bool,
+
+    /// Names of variables to be assigned, except the last one
+    pub variables: Vec<Field>,
+
+    /// Name of the last variable to be assigned
+    ///
+    /// The last variable receives all remaining fields, including the
+    /// intermediate (but not trailing) field separators.
+    pub last_variable: Field,
+}
+
 /// Entry point of the `read` built-in
-pub async fn main(_env: &mut Env, _args: Vec<Field>) -> crate::Result {
-    todo!()
+pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+    match syntax::parse(env, args) {
+        Ok(command) => todo!("{command:?}"),
+
+        Err(error) => report_error(env, &error).await,
+    }
 }
