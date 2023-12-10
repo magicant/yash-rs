@@ -24,6 +24,7 @@ use yash_env::Env;
 use yash_semantics::expansion::attr::AttrChar;
 use yash_semantics::expansion::attr_strip::Strip as _;
 use yash_semantics::expansion::quote_removal::skip_quotes;
+use yash_semantics::expansion::split::Class;
 use yash_semantics::expansion::split::Ifs;
 use yash_syntax::source::pretty::Message;
 use yash_syntax::source::pretty::MessageBase as _;
@@ -44,9 +45,9 @@ pub fn to_message(errors: &[Error]) -> Option<Message> {
 ///
 /// This function performs field splitting on the text and assigns the resulting
 /// fields to the variables. When there are more fields than variables, the last
-/// variable receives all remaining fields, including the intermediate (but not
-/// trailing) field separators. When there are fewer fields than variables, the
-/// remaining variables are set to empty strings.
+/// variable receives all remaining fields, including the field separators, but
+/// not trailing whitespace separators. When there are fewer fields than
+/// variables, the remaining variables are set to empty strings.
 ///
 /// The return value is a vector of errors that occurred while assigning the
 /// variables. The vector is empty if no error occurred.
@@ -79,9 +80,16 @@ pub fn assign(
     // Assign the last
     let range = match ranges.next() {
         None => 0..0,
-        Some(range) => match ranges.last() {
+        Some(range) => match ranges.next() {
             None => range,
-            Some(range_2) => range.start..range_2.end,
+            Some(_range) => {
+                let end = text
+                    .iter()
+                    .rposition(|&c| ifs.classify_attr(c) != Class::IfsWhitespace)
+                    .unwrap()
+                    + 1;
+                range.start..end
+            }
         },
     };
     let last_result = assign_one(env, last_variable, &text[range]);
@@ -291,7 +299,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "to be implemented"]
     fn non_default_ifs_delimiting_last_field_extra() {
         let mut env = Env::new_virtual();
         env.get_or_create_variable("IFS", Scope::Global)

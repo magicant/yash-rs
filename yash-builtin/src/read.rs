@@ -31,8 +31,8 @@
 //! read to produce as many fields as there are variables. If there are fewer
 //! fields than variables, the remaining variables are set to empty strings. If
 //! there are more fields than variables, the last variable receives all
-//! remaining fields, including the intermediate (but not trailing) field
-//! separators.
+//! remaining fields, including the field separators, but not trailing
+//! whitespace separators.
 //!
 //! ## Escaping
 //!
