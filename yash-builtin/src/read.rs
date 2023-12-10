@@ -88,6 +88,7 @@
 //! input byte by byte to make sure it does not read past the end of the line.
 
 use crate::common::report_error;
+use crate::common::report_failure;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
@@ -120,9 +121,20 @@ pub struct Command {
 
 /// Entry point of the `read` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    match syntax::parse(env, args) {
-        Ok(command) => todo!("{command:?}"),
+    let command = match syntax::parse(env, args) {
+        Ok(command) => command,
+        Err(error) => return report_error(env, &error).await,
+    };
 
-        Err(error) => report_error(env, &error).await,
+    let input = match input::read(env, command.is_raw).await {
+        Ok(input) => input,
+        Err(error) => return report_failure(env, &error).await,
+    };
+
+    let errors = assigning::assign(env, &input, command.variables, command.last_variable);
+    let message = assigning::to_message(&errors);
+    match message {
+        None => crate::Result::default(),
+        Some(message) => report_failure(env, message).await,
     }
 }
