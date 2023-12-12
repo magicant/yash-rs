@@ -42,6 +42,7 @@
 //!
 //! - `eval`
 //! - `exec`
+//! - `read`
 //! - `source`
 
 pub mod alias;
@@ -59,6 +60,8 @@ pub mod export;
 pub mod getopts;
 pub mod jobs;
 pub mod pwd;
+#[cfg(feature = "yash-semantics")]
+pub mod read;
 pub mod readonly;
 pub mod r#return;
 pub mod set;
@@ -176,6 +179,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(pwd::main(env, args)),
+        },
+    ),
+    #[cfg(feature = "yash-semantics")]
+    (
+        "read",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(read::main(env, args)),
         },
     ),
     (
