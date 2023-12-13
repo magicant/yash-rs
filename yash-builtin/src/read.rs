@@ -89,6 +89,7 @@
 
 use crate::common::report_error;
 use crate::common::report_failure;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
@@ -126,7 +127,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
         Err(error) => return report_error(env, &error).await,
     };
 
-    let input = match input::read(env, command.is_raw).await {
+    let (input, newline_found) = match input::read(env, command.is_raw).await {
         Ok(input) => input,
         Err(error) => return report_failure(env, &error).await,
     };
@@ -134,7 +135,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
     let message = assigning::to_message(&errors);
     match message {
-        None => crate::Result::default(),
+        None if newline_found => ExitStatus::SUCCESS.into(),
+        None => ExitStatus::FAILURE.into(),
         Some(message) => report_failure(env, message).await,
     }
 }

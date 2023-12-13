@@ -95,13 +95,18 @@ fn plain(value: char) -> AttrChar {
 /// reading the next line. When reading the second and subsequent lines, this
 /// function displays the value of the `PS2` variable as a prompt if the shell
 /// is interactive and the input is from a terminal.
-pub async fn read(env: &mut Env, is_raw: bool) -> Result<Vec<AttrChar>, Error> {
+///
+/// If successful, this function returns a vector of [`AttrChar`]s representing
+/// the line read and a boolean value indicating whether the line was terminated
+/// by a newline character.
+pub async fn read(env: &mut Env, is_raw: bool) -> Result<(Vec<AttrChar>, bool), Error> {
     let mut result = Vec::new();
 
-    loop {
+    let newline_found = loop {
         // TODO Read in bulk if the standard input is seekable
         match read_char(env).await? {
-            None | Some('\n') => break,
+            None => break false,
+            Some('\n') => break true,
 
             // Backslash escape
             Some('\\') if !is_raw => {
@@ -113,7 +118,7 @@ pub async fn read(env: &mut Env, is_raw: bool) -> Result<Vec<AttrChar>, Error> {
                 }
                 result.push(quoting('\\'));
                 match c {
-                    None => break,
+                    None => break false,
                     Some(c) => result.push(quoted(c)),
                 }
             }
@@ -121,9 +126,9 @@ pub async fn read(env: &mut Env, is_raw: bool) -> Result<Vec<AttrChar>, Error> {
             // Plain character
             Some(c) => result.push(plain(c)),
         }
-    }
+    };
 
-    Ok(result)
+    Ok((result, newline_found))
 }
 
 /// Reads one character from the standard input.
@@ -195,7 +200,7 @@ mod tests {
     fn empty_input() {
         in_virtual_system(|mut env, _| async move {
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(vec![]));
+            assert_eq!(result, Ok((vec![], false)));
         })
     }
 
@@ -205,13 +210,13 @@ mod tests {
             set_stdin(&system, "foo\nbar\n");
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(attr_chars("foo")));
+            assert_eq!(result, Ok((attr_chars("foo"), true)));
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(attr_chars("bar")));
+            assert_eq!(result, Ok((attr_chars("bar"), true)));
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(vec![]));
+            assert_eq!(result, Ok((vec![], false)));
         })
     }
 
@@ -221,10 +226,10 @@ mod tests {
             set_stdin(&system, "newline");
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(attr_chars("newline")));
+            assert_eq!(result, Ok((attr_chars("newline"), false)));
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(vec![]));
+            assert_eq!(result, Ok((vec![], false)));
         })
     }
 
@@ -234,10 +239,7 @@ mod tests {
             set_stdin(&system, "©⁉😀\n");
 
             let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(attr_chars("©⁉😀")));
-
-            let result = read(&mut env, false).await;
-            assert_eq!(result, Ok(vec![]));
+            assert_eq!(result, Ok((attr_chars("©⁉😀"), true)));
         })
     }
 
@@ -247,7 +249,7 @@ mod tests {
             set_stdin(&system, "\\foo\\\nbar\\\nbaz\n");
 
             let result = read(&mut env, true).await;
-            assert_eq!(result, Ok(attr_chars("\\foo\\")));
+            assert_eq!(result, Ok((attr_chars("\\foo\\"), true)));
         })
     }
 
@@ -259,18 +261,21 @@ mod tests {
             let result = read(&mut env, false).await;
             assert_eq!(
                 result,
-                Ok(vec![
-                    quoting('\\'),
-                    quoted('f'),
-                    plain('o'),
-                    plain('o'),
-                    plain('b'),
-                    plain('a'),
-                    plain('r'),
-                    plain('b'),
-                    plain('a'),
-                    plain('z'),
-                ]),
+                Ok((
+                    vec![
+                        quoting('\\'),
+                        quoted('f'),
+                        plain('o'),
+                        plain('o'),
+                        plain('b'),
+                        plain('a'),
+                        plain('r'),
+                        plain('b'),
+                        plain('a'),
+                        plain('z'),
+                    ],
+                    true,
+                )),
             );
         })
     }
@@ -283,7 +288,10 @@ mod tests {
             let result = read(&mut env, false).await;
             assert_eq!(
                 result,
-                Ok(vec![plain('f'), plain('o'), plain('o'), quoting('\\'),]),
+                Ok((
+                    vec![plain('f'), plain('o'), plain('o'), quoting('\\')],
+                    false,
+                )),
             );
         })
     }
