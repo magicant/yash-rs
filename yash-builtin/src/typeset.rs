@@ -537,6 +537,29 @@ impl From<AssignReadOnlyError> for yash_semantics::expansion::AssignReadOnlyErro
     }
 }
 
+impl MessageBase for AssignReadOnlyError {
+    fn message_title(&self) -> std::borrow::Cow<str> {
+        "cannot assign to read-only variable".into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        Annotation::new(
+            AnnotationType::Error,
+            self.to_string().into(),
+            &self.assigned_location,
+        )
+    }
+
+    fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
+        // TODO Use extend_one
+        results.extend(std::iter::once(Annotation::new(
+            AnnotationType::Info,
+            "the variable was made read-only here".into(),
+            &self.read_only_location,
+        )))
+    }
+}
+
 /// Error that occurs when trying to cancel the read-only attribute of a
 /// variable or function
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -568,7 +591,7 @@ pub enum ExecuteError {
 impl MessageBase for ExecuteError {
     fn message_title(&self) -> std::borrow::Cow<str> {
         match self {
-            Self::AssignReadOnlyVariable(_) => "cannot assign to read-only variable",
+            Self::AssignReadOnlyVariable(error) => return error.message_title(),
             Self::UndoReadOnlyVariable(_) => "cannot cancel read-only-ness of variable",
             Self::UndoReadOnlyFunction(_) => "cannot cancel read-only-ness of function",
             Self::ModifyUnsetFunction(_) => "cannot modify non-existing function",
@@ -580,7 +603,7 @@ impl MessageBase for ExecuteError {
 
     fn main_annotation(&self) -> Annotation<'_> {
         let (message, location) = match self {
-            Self::AssignReadOnlyVariable(error) => (error.to_string(), &error.assigned_location),
+            Self::AssignReadOnlyVariable(error) => return error.main_annotation(),
             Self::UndoReadOnlyVariable(error) => (
                 format!("read-only variable `{}`", error.name),
                 &error.name.origin,
@@ -601,13 +624,7 @@ impl MessageBase for ExecuteError {
 
     fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
         match self {
-            Self::AssignReadOnlyVariable(error) => {
-                results.extend(std::iter::once(Annotation::new(
-                    AnnotationType::Info,
-                    "the variable was made read-only here".into(),
-                    &error.read_only_location,
-                )))
-            }
+            Self::AssignReadOnlyVariable(error) => error.additional_annotations(results),
 
             Self::UndoReadOnlyVariable(error) => results.extend(std::iter::once(Annotation::new(
                 AnnotationType::Info,

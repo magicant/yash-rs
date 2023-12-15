@@ -173,6 +173,11 @@ fn quotation() {
 }
 
 #[test]
+fn read_builtin() {
+    run("read-p.sh")
+}
+
+#[test]
 fn readonly_builtin() {
     run("readonly-p.sh")
 }

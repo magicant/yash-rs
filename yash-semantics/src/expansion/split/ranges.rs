@@ -17,20 +17,10 @@
 //! Extracting ranges of split fields
 
 use super::super::attr::AttrChar;
-use super::super::attr::Origin;
-use super::ifs::Class;
 use super::ifs::Class::*;
 use super::ifs::Ifs;
 use std::iter::FusedIterator;
 use std::ops::Range;
-
-fn classify(c: AttrChar, ifs: &Ifs) -> Class {
-    if c.is_quoted || c.is_quoting || c.origin != Origin::SoftExpansion {
-        NonIfs
-    } else {
-        ifs.classify(c.value)
-    }
-}
 
 /// State of a field-splitting iterator
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -83,7 +73,7 @@ where
     fn next(&mut self) -> Option<Range<usize>> {
         while let Some(state) = self.state {
             let index = self.next_index;
-            let class = self.inner.next().map(|c| classify(c, self.ifs));
+            let class = self.inner.next().map(|c| self.ifs.classify_attr(c));
             self.next_index += 1;
 
             let (next_state, field_range) = match (state, class) {
@@ -148,6 +138,7 @@ impl<I> FusedIterator for Ranges<'_, I> where I: Iterator<Item = AttrChar> {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expansion::attr::Origin;
 
     fn attr_chars(s: &str) -> impl Iterator<Item = AttrChar> + '_ {
         s.chars().map(|c| AttrChar {

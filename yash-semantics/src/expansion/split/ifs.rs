@@ -16,6 +16,8 @@
 
 //! IFS parser
 
+use crate::expansion::attr::AttrChar;
+use crate::expansion::attr::Origin;
 use std::borrow::Cow;
 
 /// Type of characters that affect field splitting
@@ -183,6 +185,16 @@ impl Ifs<'_> {
             }
         } else {
             Class::NonIfs
+        }
+    }
+
+    /// Returns the type of the attributed character.
+    #[must_use]
+    pub fn classify_attr(&self, c: AttrChar) -> Class {
+        if c.is_quoted || c.is_quoting || c.origin != Origin::SoftExpansion {
+            Class::NonIfs
+        } else {
+            self.classify(c.value)
         }
     }
 }
