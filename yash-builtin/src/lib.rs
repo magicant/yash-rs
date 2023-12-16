@@ -70,6 +70,7 @@ pub mod shift;
 pub mod source;
 pub mod trap;
 pub mod typeset;
+pub mod unalias;
 pub mod unset;
 pub mod wait;
 
@@ -237,6 +238,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Elective,
             execute: |env, args| Box::pin(typeset::main(env, args)),
+        },
+    ),
+    (
+        "unalias",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(unalias::main(env, args)),
         },
     ),
     (
