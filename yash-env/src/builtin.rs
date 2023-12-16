@@ -202,15 +202,33 @@ impl Result {
     pub fn clear_redirs(&mut self) {
         self.should_retain_redirs = false;
     }
+
+    /// Merges two results by taking the maximum of each field.
+    pub fn max(self, other: Self) -> Self {
+        use std::ops::ControlFlow::{Break, Continue};
+        let divert = match (self.divert, other.divert) {
+            (Continue(()), other) => other,
+            (other, Continue(())) => other,
+            (Break(left), Break(right)) => Break(left.max(right)),
+        };
+
+        Self {
+            exit_status: self.exit_status.max(other.exit_status),
+            divert,
+            should_retain_redirs: self.should_retain_redirs.max(other.should_retain_redirs),
+        }
+    }
 }
 
 impl Default for Result {
+    #[inline]
     fn default() -> Self {
         Self::new(ExitStatus::default())
     }
 }
 
 impl From<ExitStatus> for Result {
+    #[inline]
     fn from(exit_status: ExitStatus) -> Self {
         Self::new(exit_status)
     }
