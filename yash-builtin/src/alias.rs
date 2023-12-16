@@ -59,11 +59,13 @@
 //! Some shells have a set of predefined aliases that are printed even if you
 //! don't define any explicitly.
 
+use crate::common::output;
+use crate::common::report_error;
+use crate::common::syntax::parse_arguments;
+use crate::common::syntax::Mode;
 use yash_env::builtin::Result;
-use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
-use yash_syntax::alias::HashEntry;
 
 /// Parsed command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -76,38 +78,30 @@ pub struct Command {
 pub mod semantics;
 
 /// Entry point for executing the `alias` built-in
-pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
+pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
+    let mode = Mode::with_env(env);
     // TODO support options
-    // TODO print alias definitions if there are no operands
-
-    if args.is_empty() {
-        for alias in &env.aliases {
-            // TODO should print via IoEnv rather than directly to stdout
-            println!("{}={}", &alias.0.name, &alias.0.replacement);
+    match parse_arguments(&[], mode, args) {
+        Ok((_options, operands)) => {
+            let command = Command { operands };
+            let (result, errors) = command.execute(env).await;
+            let mut result = output(env, &result).await;
+            for error in errors {
+                result = result.max(report_error(env, &error).await);
+            }
+            result
         }
-        return ExitStatus::SUCCESS.into();
-    }
 
-    for Field { value, origin } in args {
-        if let Some(eq_index) = value.find('=') {
-            let name = value[..eq_index].to_owned();
-            // TODO reject invalid name
-            let replacement = value[eq_index + 1..].to_owned();
-            let entry = HashEntry::new(name, replacement, false, origin);
-            env.aliases.replace(entry);
-        } else {
-            // TODO print alias definition
-        }
+        Err(e) => report_error(env, &e).await,
     }
-
-    ExitStatus::SUCCESS.into()
 }
 
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yash_syntax::source::Location;
+    use futures_util::FutureExt as _;
+    use yash_env::semantics::ExitStatus;
     use yash_syntax::source::Source;
 
     #[test]
@@ -115,7 +109,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=bar baz"]);
 
-        let result = main(&mut env, args);
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);
@@ -135,7 +129,7 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["abc=xyz", "yes=no", "ls=ls --color"]);
 
-        let result = main(&mut env, args);
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 3);
@@ -173,12 +167,12 @@ mod tests {
         let mut env = Env::new_virtual();
         let args = Field::dummies(["foo=1"]);
 
-        let result = main(&mut env, args);
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         let args = Field::dummies(["foo=2"]);
 
-        let result = main(&mut env, args);
+        let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
         assert_eq!(env.aliases.len(), 1);
@@ -191,22 +185,5 @@ mod tests {
         // assert_eq!(alias.global, true);
     }
 
-    #[test]
-    fn builtin_prints_all_aliases() {
-        let mut env = Env::new_virtual();
-        env.aliases.insert(HashEntry::new(
-            "foo".to_string(),
-            "bar".to_string(),
-            false,
-            Location::dummy(""),
-        ));
-        env.aliases.insert(HashEntry::new(
-            "hello".to_string(),
-            "world".to_string(),
-            false,
-            Location::dummy(""),
-        ));
-        // TODO builtin should print to IoEnv rather than real standard output
-    }
     // TODO test case with global aliases
 }

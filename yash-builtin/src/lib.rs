@@ -106,7 +106,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         "alias",
         Builtin {
             r#type: Mandatory,
-            execute: |env, args| Box::pin(ready(alias::main(env, args))),
+            execute: |env, args| Box::pin(alias::main(env, args)),
         },
     ),
     (
