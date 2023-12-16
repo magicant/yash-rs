@@ -65,7 +65,15 @@ use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::alias::HashEntry;
 
-// TODO Split into syntax and semantics submodules
+/// Parsed command line arguments
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Command {
+    /// Operands to the alias built-in
+    pub operands: Vec<Field>,
+}
+
+pub mod semantics;
 
 /// Entry point for executing the `alias` built-in
 pub fn main(env: &mut Env, args: Vec<Field>) -> Result {
