@@ -31,26 +31,22 @@ __IN__
 BCD
 __OUT__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE -e 0 'removing specific alias - exit status'
 alias true=false
 unalias true
 __IN__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE -e 0 'removing specific alias - removal'
 alias true=false
 unalias true
 true
 __IN__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE -e 0 'removing multiple aliases - exit status'
 alias true=a cat=b echo=c
 unalias true cat echo
 __IN__
 
-: TODO Needs the unalias built-in <<\__OUT__
 test_oE -e 0 'removing multiple aliases - removal'
 alias true=a cat=b echo=c
 unalias true cat echo
@@ -60,13 +56,11 @@ __IN__
 ok
 __OUT__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE -e 0 'removing all aliases - exit status'
 alias a=a b=b c=c
 unalias -a
 __IN__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE 'removing all aliases - removal'
 alias a=a b=b c=c
 unalias -a
@@ -77,7 +71,6 @@ test_OE -e 0 'printing specific alias'
 alias a | grep -q '^a='
 __IN__
 
-: TODO Needs the unalias built-in <<\__OUT__
 test_oE -e 0 'reusing printed alias (simple)'
 save="$(alias a)"
 unalias a
@@ -87,7 +80,6 @@ __IN__
 ABC
 __OUT__
 
-: TODO Needs the unalias built-in <<\__OUT__
 test_oE -e 0 'reusing printed alias (complex quotation)'
 alias a='printf %s\\n \"['\\\'{'\\'}\\\'']\"'
 save="$(alias a)"
@@ -98,7 +90,6 @@ __IN__
 "['{\}']"
 __OUT__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_OE -e 0 'printing all aliases'
 alias b=b c=c e='echo OK'
 alias >save_alias_1
@@ -121,13 +112,11 @@ __IN__
 ABC
 __OUT__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_O -d -e n 'printing undefined alias is error'
 unalias -a
 alias a
 __IN__
 
-: TODO Needs the unalias built-in <<\__IN__
 test_O -d -e n 'removing undefined alias is error'
 alias true=false
 unalias true
