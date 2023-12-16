@@ -52,6 +52,11 @@ fn run(name: &str) {
 }
 
 #[test]
+fn alias() {
+    run("alias-p.sh")
+}
+
+#[test]
 fn and_or_list() {
     run("andor-p.sh")
 }
