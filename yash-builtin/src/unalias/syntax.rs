@@ -73,6 +73,13 @@ impl Error {
     }
 }
 
+impl<'a> From<&'a Error> for Message<'a> {
+    #[inline]
+    fn from(e: &'a Error) -> Self {
+        e.to_message()
+    }
+}
+
 /// Parses command line arguments for the `unalias` built-in.
 pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
     let mode = Mode::with_env(env);
