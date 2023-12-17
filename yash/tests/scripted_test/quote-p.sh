@@ -428,7 +428,6 @@ __IN__
 echo ]]
 __OUT__
 
-: TODO Needs the unalias built-in <<\__OUT__
 test_oE 'aliases are ignored in command substitution in double quotes'
 alias echo=')'
 f() { bracket "$(echo x)"; }
