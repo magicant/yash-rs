@@ -56,8 +56,11 @@
 //! `unalias -a` may make such built-ins unavailable.
 
 use crate::common::report_error;
+use crate::common::report_failure;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 
 /// Parsed command arguments for the `unalias` built-in
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,19 +74,31 @@ pub enum Command {
 pub mod semantics;
 pub mod syntax;
 
+/// Converts a non-empty slice of errors to a message.
+///
+/// The first error's title is used as the message title. The other errors are
+/// added as annotations.
+///
+/// This is a utility for printing errors returned by [`Command::execute`].
+/// The returned message can be passed to [`report_failure`].
+#[must_use]
+pub fn to_message(errors: &[semantics::Error]) -> Option<Message> {
+    let mut message = Message::from(errors.first()?);
+    let other_errors = errors[1..].iter().map(MessageBase::main_annotation);
+    message.annotations.extend(other_errors);
+    Some(message)
+}
+
 /// Entry point for executing the `unalias` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
         Ok(command) => {
             let errors = command.execute(env);
-
-            let mut result = crate::Result::default();
-            for error in errors {
-                result = result.max(report_error(env, &error).await);
+            match to_message(&{ errors }) {
+                None => crate::Result::default(),
+                Some(message) => report_failure(env, message).await,
             }
-            result
         }
-
         Err(e) => report_error(env, e.to_message()).await,
     }
 }
