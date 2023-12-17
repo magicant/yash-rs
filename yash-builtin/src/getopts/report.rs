@@ -194,7 +194,7 @@ impl model::Result {
                 .assign(value, location.clone())
                 .map_err(|e| Error::with_name_and_assign_error("OPTARG".to_string(), e))?;
         } else {
-            env.variables.unset(Scope::Global, "OPTARG")?;
+            env.variables.unset("OPTARG", Scope::Global)?;
         }
 
         let optind = indexes_to_optind(self.next_arg_index, self.next_char_index);

@@ -61,7 +61,7 @@ pub fn unset_variables<'a>(
 ) -> Result<(), Vec<UnsetVariablesError<'a>>> {
     let mut errors = Vec::new();
     for name in names {
-        match env.variables.unset(Global, &name.value) {
+        match env.variables.unset(&name.value, Global) {
             Ok(_) => (),
             Err(error) => errors.push(UnsetVariablesError {
                 name,

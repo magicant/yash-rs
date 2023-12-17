@@ -418,8 +418,8 @@ impl VariableSet {
     /// [volatile]: Context::Volatile
     pub fn unset<'a>(
         &'a mut self,
-        scope: Scope,
         name: &'a str,
+        scope: Scope,
     ) -> Result<Option<Variable>, UnsetError<'a>> {
         let Some(stack) = self.all_variables.get_mut(name) else {
             return Ok(None);
@@ -988,7 +988,7 @@ mod tests {
     #[test]
     fn unsetting_nonexisting_variable() {
         let mut variables = VariableSet::new();
-        let result = variables.unset(Scope::Global, "").unwrap();
+        let result = variables.unset("", Scope::Global).unwrap();
         assert_eq!(result, None);
     }
 
@@ -1000,7 +1000,7 @@ mod tests {
             .assign("X", None)
             .unwrap();
 
-        let result = variables.unset(Scope::Global, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Global).unwrap();
         assert_eq!(result, Some(Variable::new("X")));
         assert_eq!(variables.get("foo"), None);
     }
@@ -1023,7 +1023,7 @@ mod tests {
             .assign("Z", None)
             .unwrap();
 
-        let result = variables.unset(Scope::Global, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Global).unwrap();
         assert_eq!(result, Some(Variable::new("Z")));
         assert_eq!(variables.get("foo"), None);
     }
@@ -1052,7 +1052,7 @@ mod tests {
             .assign("D", None)
             .unwrap();
 
-        let result = variables.unset(Scope::Local, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Local).unwrap();
         assert_eq!(result, Some(Variable::new("D")));
         assert_eq!(variables.get("foo"), Some(&readonly_foo));
     }
@@ -1066,7 +1066,7 @@ mod tests {
             .unwrap();
         variables.push_context_impl(Context::default());
 
-        let result = variables.unset(Scope::Local, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Local).unwrap();
         assert_eq!(result, None);
         assert_eq!(variables.get("foo"), Some(&Variable::new("A")));
     }
@@ -1094,7 +1094,7 @@ mod tests {
             .assign("D", None)
             .unwrap();
 
-        let result = variables.unset(Scope::Volatile, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Volatile).unwrap();
         assert_eq!(result, Some(Variable::new("D")));
         assert_eq!(variables.get("foo"), Some(&Variable::new("B")));
     }
@@ -1108,7 +1108,7 @@ mod tests {
             .unwrap();
         variables.push_context_impl(Context::Volatile);
 
-        let result = variables.unset(Scope::Volatile, "foo").unwrap();
+        let result = variables.unset("foo", Scope::Volatile).unwrap();
         assert_eq!(result, None);
         assert_eq!(variables.get("foo"), Some(&Variable::new("A")));
     }
@@ -1131,7 +1131,7 @@ mod tests {
         let mut foo = variables.get_or_new("foo", Scope::Local);
         foo.assign("D", None).unwrap();
 
-        let error = variables.unset(Scope::Global, "foo").unwrap_err();
+        let error = variables.unset("foo", Scope::Global).unwrap_err();
         assert_eq!(
             error,
             UnsetError {
