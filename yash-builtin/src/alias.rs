@@ -61,11 +61,14 @@
 
 use crate::common::output;
 use crate::common::report_error;
+use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
 use yash_env::Env;
+use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 
 /// Parsed command line arguments
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -77,6 +80,21 @@ pub struct Command {
 
 pub mod semantics;
 
+/// Converts a non-empty slice of errors to a message.
+///
+/// The first error's title is used as the message title. The other errors are
+/// added as annotations.
+///
+/// This is a utility for printing errors returned by [`Command::execute`].
+/// The returned message can be passed to [`report_failure`].
+#[must_use]
+pub fn to_message(errors: &[semantics::Error]) -> Option<Message> {
+    let mut message = Message::from(errors.first()?);
+    let other_errors = errors[1..].iter().map(MessageBase::main_annotation);
+    message.annotations.extend(other_errors);
+    Some(message)
+}
+
 /// Entry point for executing the `alias` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     let mode = Mode::with_env(env);
@@ -86,8 +104,8 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             let command = Command { operands };
             let (result, errors) = command.execute(env).await;
             let mut result = output(env, &result).await;
-            for error in errors {
-                result = result.max(report_error(env, &error).await);
+            if let Some(message) = to_message(&errors) {
+                result = result.max(report_failure(env, message).await);
             }
             result
         }
