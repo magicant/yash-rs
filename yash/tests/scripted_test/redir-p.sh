@@ -523,6 +523,7 @@ __IN__
 here
 __OUT__
 
+export TRAILER=this_is_the_last_line
 {
     echo 'exec cat <<END'
     i=0
@@ -539,13 +540,28 @@ __OUT__
            $((i+48)) $((i+49))
        i=$((i+50))
     done
+    echo '$TRAILER'
     echo 'END'
 } >longhere
 
+{
+    i=0
+    while [ $i -lt 10000 ]; do
+       printf '%d\n' \
+           $((i   )) $((i+ 1)) $((i+ 2)) $((i+ 3)) $((i+ 4)) $((i+ 5)) \
+           $((i+ 6)) $((i+ 7)) $((i+ 8)) $((i+ 9)) $((i+10)) $((i+11)) \
+           $((i+12)) $((i+13)) $((i+14)) $((i+15)) $((i+16)) $((i+17)) \
+           $((i+18)) $((i+19)) $((i+20)) $((i+21)) $((i+22)) $((i+23)) \
+           $((i+24)) $((i+25)) $((i+26)) $((i+27)) $((i+28)) $((i+29)) \
+           $((i+30)) $((i+31)) $((i+32)) $((i+33)) $((i+34)) $((i+35)) \
+           $((i+36)) $((i+37)) $((i+38)) $((i+39)) $((i+40)) $((i+41)) \
+           $((i+42)) $((i+43)) $((i+44)) $((i+45)) $((i+46)) $((i+47)) \
+           $((i+48)) $((i+49))
+       i=$((i+50))
+    done
+    echo "$TRAILER"
+} >expected
+
 test_OE -e 0 'long here-document' -e
-. ./longhere |
-while read -r i; do
-    test "$i" -eq "${j:=0}"
-    j=$((j+1))
-done
+. ./longhere | diff - expected
 __IN__
