@@ -34,7 +34,8 @@
 //! which is not handled in this module.
 //!
 //! You can parse a job ID with [`parse`] or [`parse_tail`] and get a [`JobId`]
-//! as a result.
+//! as a result. Use the [`JobId::find`] method to find a job that matches the
+//! job ID.
 
 use super::Job;
 use super::JobSet;

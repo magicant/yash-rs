@@ -21,7 +21,7 @@
 //! # Synopsis
 //!
 //! ```sh
-//! wait [job_id_or_process_id...]
+//! wait [job_id_or_process_id…]
 //! ```
 //!
 //! # Description
@@ -42,24 +42,18 @@
 //! # Operands
 //!
 //! An operand can be a job ID or decimal process ID, specifying which job to
-//! wait for.
+//! wait for. A job ID must start with `%` and has the format described in the
+//! [`yash_env::job::id`] module documentation. A process ID is a non-negative
+//! decimal integer.
 //!
-//! ## Job ID
-//!
-//! A job ID must start with `%` and has the format described in the
-//! [`yash_env::job::id`] module documentation.
-//!
-//! ## Process ID
-//!
-//! A process ID is a non-negative decimal integer.
-//!
-//! If a process ID does not specify a job contained in the [`JobSet`] of the
-//! current environment, the built-in treats it as an existing job that has
-//! already finished with exit status 127.
+//! If there is no job matching the operand, the built-in assumes that the
+//! job has already finished with exit status 127.
 //!
 //! # Errors
 //!
-//! TBD
+//! It is an error if an operand is not a job ID or decimal process ID.
+//!
+//! It is an error if a job ID matches more than one job.
 //!
 //! # Exit status
 //!
@@ -70,12 +64,19 @@
 //! If the built-in was interrupted by a signal, the exit status indicates the
 //! signal.
 //!
+//! The exit status is between 1 and 126 (inclusive) for any other error.
+//!
 //! # Portability
 //!
 //! The wait built-in is contained in the POSIX standard.
 //!
 //! The exact value of an exit status resulting from a signal is
 //! implementation-dependent.
+//!
+//! Many existing shells behave differently on various errors. POSIX requires
+//! that an unknown process ID be treated as a process that has already exited
+//! with exit status 127, but the behavior for other errors should not be
+//! considered portable.
 
 use crate::common::report_error;
 use crate::common::syntax::parse_arguments;
