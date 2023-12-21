@@ -111,7 +111,7 @@ async fn report(
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
-/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };
 /// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
@@ -140,7 +140,7 @@ where
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
-/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };
 /// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
@@ -164,6 +164,7 @@ pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builti
         r#type: AnnotationType::Error,
         title: title.into(),
         annotations: vec![],
+        footers: vec![],
     };
     report_error(env, message).await
 }
@@ -183,6 +184,7 @@ pub async fn syntax_error(
         r#type: AnnotationType::Error,
         title: "command argument syntax error".into(),
         annotations: vec![annotation],
+        footers: vec![],
     };
     report_error(env, message).await
 }
@@ -203,6 +205,7 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
                 r#type: AnnotationType::Error,
                 title: format!("error printing results to stdout: {errno}").into(),
                 annotations: vec![],
+                footers: vec![],
             };
             report_failure(env, message).await
         }
@@ -221,6 +224,7 @@ mod tests {
             r#type: AnnotationType::Error,
             title: "foo".into(),
             annotations: vec![],
+            footers: vec![],
         }
     }
 

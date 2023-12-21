@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Pretty-printing diagnostic messages containing references to source code.
+//! Pretty-printing diagnostic messages containing references to source code
 //!
 //! This module defines some data types for constructing intermediate data
 //! structures for printing diagnostic messages referencing source code
@@ -46,18 +46,18 @@ pub enum AnnotationType {
     Help,
 }
 
-/// Source code fragment annotated with a label.
+/// Source code fragment annotated with a label
 ///
 /// Annotations are part of an entire [`Message`].
 #[derive(Clone)]
 pub struct Annotation<'a> {
-    /// Type of annotation.
+    /// Type of annotation
     pub r#type: AnnotationType,
-    /// String that describes the annotated part of the source code.
+    /// String that describes the annotated part of the source code
     pub label: Cow<'a, str>,
-    /// Position of the annotated fragment in the source code.
+    /// Position of the annotated fragment in the source code
     pub location: &'a Location,
-    /// Annotated code string.
+    /// Annotated code string
     ///
     /// This value provides an access to the string held in
     /// `self.location.code.value`, which can only be accessed by a `Ref`.
@@ -90,15 +90,26 @@ impl<'a> Annotation<'a> {
     }
 }
 
-/// Entire diagnostic message.
+/// Additional text without associated source code
+#[derive(Clone, Debug)]
+pub struct Footer<'a> {
+    /// Type of this footer
+    pub r#type: AnnotationType,
+    /// Text of this footer
+    pub label: Cow<'a, str>,
+}
+
+/// Entire diagnostic message
 #[derive(Clone, Debug)]
 pub struct Message<'a> {
-    /// Type of this message.
+    /// Type of this message
     pub r#type: AnnotationType,
-    /// String that communicates the most important information in this message.
+    /// String that communicates the most important information in this message
     pub title: Cow<'a, str>,
-    /// References to source code fragments annotated with additional information.
+    /// References to source code fragments annotated with additional information
     pub annotations: Vec<Annotation<'a>>,
+    /// Additional text without associated source code
+    pub footers: Vec<Footer<'a>>,
 }
 
 impl super::Source {
@@ -209,6 +220,7 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
             r#type: base.message_type(),
             title: base.message_title(),
             annotations,
+            footers: vec![],
         }
     }
 }
@@ -277,6 +289,14 @@ mod annotate_snippets_support {
                 }
             }
 
+            for footer in &message.footers {
+                snippet.footer.push(annotate_snippets::Annotation {
+                    id: None,
+                    label: Some(&footer.label),
+                    annotation_type: footer.r#type.into(),
+                });
+            }
+
             snippet
         }
     }
@@ -287,6 +307,7 @@ mod annotate_snippets_support {
             r#type: AnnotationType::Error,
             title: "my title".into(),
             annotations: vec![],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         let title = snippet.title.unwrap();
@@ -296,6 +317,8 @@ mod annotate_snippets_support {
             title.annotation_type,
             annotate_snippets::AnnotationType::Error,
         );
+        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.footer);
+        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
     }
 
     #[test]
@@ -309,6 +332,7 @@ mod annotate_snippets_support {
                 "my label".into(),
                 &location,
             )],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         let title = snippet.title.unwrap();
@@ -329,6 +353,7 @@ mod annotate_snippets_support {
             snippet.slices[0].annotations[0].annotation_type,
             annotate_snippets::AnnotationType::Info,
         );
+        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
     }
 
     #[test]
@@ -349,6 +374,7 @@ mod annotate_snippets_support {
             r#type: AnnotationType::Warning,
             title: "".into(),
             annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].line_start, 128);
@@ -362,6 +388,7 @@ mod annotate_snippets_support {
             r#type: AnnotationType::Warning,
             title: "".into(),
             annotations: vec![Annotation::new(AnnotationType::Info, "".into(), &location)],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].annotations[0].range, (6, 9));
@@ -393,6 +420,7 @@ mod annotate_snippets_support {
                 "my label".into(),
                 &location,
             )],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         assert_eq!(snippet.slices[0].source, "substitution");
@@ -411,6 +439,7 @@ mod annotate_snippets_support {
                 Annotation::new(AnnotationType::Note, "my label 1".into(), &location_1),
                 Annotation::new(AnnotationType::Info, "my label 2".into(), &location_2),
             ],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         let title = snippet.title.unwrap();
@@ -437,6 +466,7 @@ mod annotate_snippets_support {
             snippet.slices[1].annotations[0].annotation_type,
             annotate_snippets::AnnotationType::Info,
         );
+        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
     }
 
     #[test]
@@ -453,6 +483,7 @@ mod annotate_snippets_support {
                 Annotation::new(AnnotationType::Info, "my label 1".into(), &location_3),
                 Annotation::new(AnnotationType::Help, "my label 2".into(), &location_1),
             ],
+            footers: vec![],
         };
         let snippet = Snippet::from(&message);
         let title = snippet.title.unwrap();
@@ -477,5 +508,82 @@ mod annotate_snippets_support {
             snippet.slices[0].annotations[1].annotation_type,
             annotate_snippets::AnnotationType::Help,
         );
+        assert_eq!(snippet.footer.len(), 0, "{:?}", snippet.footer);
+    }
+
+    #[test]
+    fn from_message_one_footer() {
+        let message = Message {
+            r#type: AnnotationType::Error,
+            title: "some title".into(),
+            annotations: vec![],
+            footers: vec![Footer {
+                r#type: AnnotationType::Note,
+                label: "footer text".into(),
+            }],
+        };
+        let snippet = Snippet::from(&message);
+        let title = snippet.title.unwrap();
+        assert_eq!(title.id, None);
+        assert_eq!(title.label, Some("some title"));
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
+        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.slices);
+        assert_eq!(snippet.footer.len(), 1, "{:?}", snippet.footer);
+        assert_eq!(
+            snippet.footer[0].annotation_type,
+            annotate_snippets::AnnotationType::Note,
+        );
+        assert_eq!(snippet.footer[0].label, Some("footer text"));
+    }
+
+    #[test]
+    fn from_message_many_footers() {
+        let message = Message {
+            r#type: AnnotationType::Error,
+            title: "some title".into(),
+            annotations: vec![],
+            footers: vec![
+                Footer {
+                    r#type: AnnotationType::Info,
+                    label: "footer 1".into(),
+                },
+                Footer {
+                    r#type: AnnotationType::Warning,
+                    label: "footer 2".into(),
+                },
+                Footer {
+                    r#type: AnnotationType::Error,
+                    label: "footer 3".into(),
+                },
+            ],
+        };
+        let snippet = Snippet::from(&message);
+        let title = snippet.title.unwrap();
+        assert_eq!(title.id, None);
+        assert_eq!(title.label, Some("some title"));
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
+        assert_eq!(snippet.slices.len(), 0, "{:?}", snippet.slices);
+        assert_eq!(snippet.footer.len(), 3, "{:?}", snippet.footer);
+        assert_eq!(
+            snippet.footer[0].annotation_type,
+            annotate_snippets::AnnotationType::Info,
+        );
+        assert_eq!(snippet.footer[0].label, Some("footer 1"));
+        assert_eq!(
+            snippet.footer[1].annotation_type,
+            annotate_snippets::AnnotationType::Warning,
+        );
+        assert_eq!(snippet.footer[1].label, Some("footer 2"));
+        assert_eq!(
+            snippet.footer[2].annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
+        assert_eq!(snippet.footer[2].label, Some("footer 3"));
     }
 }

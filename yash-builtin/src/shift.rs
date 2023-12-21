@@ -127,6 +127,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
             r#type: AnnotationType::Error,
             title: "cannot shift positional parameters".into(),
             annotations,
+            footers: vec![],
         };
         let (message, divert) = arrange_message_and_divert(env, message);
         env.system.print_error(&message).await;

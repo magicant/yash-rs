@@ -85,6 +85,7 @@ pub fn failure_message(
         r#type: AnnotationType::Error,
         title: "cannot change the working directory".into(),
         annotations: vec![error],
+        footers: vec![],
     };
     arrange_message_and_divert(env, message)
 }

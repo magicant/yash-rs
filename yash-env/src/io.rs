@@ -94,6 +94,7 @@ pub async fn print_error(
         r#type: AnnotationType::Error,
         title,
         annotations: a,
+        footers: vec![],
     };
     print_message(env, message).await;
 }

@@ -44,6 +44,7 @@ impl Error {
             r#type: AnnotationType::Error,
             title: self.to_string().into(),
             annotations: vec![],
+            footers: vec![],
         }
     }
 }

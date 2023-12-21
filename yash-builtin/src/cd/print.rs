@@ -57,6 +57,7 @@ async fn handle_print_error(env: &mut Env, errno: Errno) {
         r#type: AnnotationType::Warning,
         title: format!("cannot print new $PWD: {}", errno).into(),
         annotations: vec![],
+        footers: vec![],
     };
     let (message, _divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;

@@ -116,6 +116,7 @@ async fn report_semantics_error(env: &mut Env, error: &semantics::Error) -> Resu
         r#type: AnnotationType::Error,
         title: "cannot compute the working directory path".into(),
         annotations: vec![annotation],
+        footers: vec![],
     };
     let (message, divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;
