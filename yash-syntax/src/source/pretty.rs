@@ -20,8 +20,8 @@
 //! structures for printing diagnostic messages referencing source code
 //! fragments.  When you have an [`Error`](crate::parser::Error), you can
 //! convert it to a [`Message`]. Then, you can in turn convert it into
-//! `annotate_snippets::snippet::Snippet`, for example, and finally format a
-//! printable diagnostic message string.
+//! `annotate_snippets::Snippet`, for example, and finally format a printable
+//! diagnostic message string.
 //!
 //! When the `yash_syntax` crate is built with the `annotate-snippets` feature
 //! enabled, it supports conversion from `Message` to `Snippet`. If you would
@@ -216,23 +216,22 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
 #[cfg(feature = "annotate-snippets")]
 mod annotate_snippets_support {
     use super::*;
-    use annotate_snippets::snippet;
-    use annotate_snippets::snippet::Snippet;
+    use annotate_snippets::Snippet;
 
     /// Converts `yash_syntax::source::pretty::AnnotationType` into
     /// `annotate_snippets::snippet::AnnotationType`.
     ///
     /// This implementation is only available when the `yash_syntax` crate is
     /// built with the `annotate-snippets` feature enabled.
-    impl From<AnnotationType> for annotate_snippets::snippet::AnnotationType {
+    impl From<AnnotationType> for annotate_snippets::AnnotationType {
         fn from(r#type: AnnotationType) -> Self {
             use AnnotationType::*;
             match r#type {
-                Error => snippet::AnnotationType::Error,
-                Warning => snippet::AnnotationType::Warning,
-                Info => snippet::AnnotationType::Info,
-                Note => snippet::AnnotationType::Note,
-                Help => snippet::AnnotationType::Help,
+                Error => annotate_snippets::AnnotationType::Error,
+                Warning => annotate_snippets::AnnotationType::Warning,
+                Info => annotate_snippets::AnnotationType::Info,
+                Note => annotate_snippets::AnnotationType::Note,
+                Help => annotate_snippets::AnnotationType::Help,
             }
         }
     }
@@ -240,14 +239,13 @@ mod annotate_snippets_support {
     impl<'a> From<&'a Message<'a>> for Snippet<'a> {
         fn from(message: &'a Message<'a>) -> Self {
             let mut snippet = Snippet {
-                title: Some(snippet::Annotation {
+                title: Some(annotate_snippets::Annotation {
                     id: None,
                     label: Some(&message.title),
                     annotation_type: message.r#type.into(),
                 }),
                 footer: vec![],
                 slices: vec![],
-                opt: annotate_snippets::display_list::FormatOptions::default(),
             };
 
             let mut lines = vec![];
@@ -260,7 +258,7 @@ mod annotate_snippets_support {
                     .unwrap_or(usize::MAX);
                 let value = &annotation.code;
                 let range = &annotation.location.range;
-                let annotation = snippet::SourceAnnotation {
+                let annotation = annotate_snippets::SourceAnnotation {
                     range: (range.start, range.end),
                     label: &annotation.label,
                     annotation_type: annotation.r#type.into(),
@@ -268,7 +266,7 @@ mod annotate_snippets_support {
                 if let Some(i) = lines.iter().position(|l| l == code) {
                     snippet.slices[i].annotations.push(annotation);
                 } else {
-                    snippet.slices.push(snippet::Slice {
+                    snippet.slices.push(annotate_snippets::Slice {
                         source: value,
                         line_start,
                         origin: Some(code.source.label()),
@@ -294,7 +292,10 @@ mod annotate_snippets_support {
         let title = snippet.title.unwrap();
         assert_eq!(title.id, None);
         assert_eq!(title.label, Some("my title"));
-        assert_eq!(title.annotation_type, snippet::AnnotationType::Error);
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
     }
 
     #[test]
@@ -313,7 +314,10 @@ mod annotate_snippets_support {
         let title = snippet.title.unwrap();
         assert_eq!(title.id, None);
         assert_eq!(title.label, Some("my title"));
-        assert_eq!(title.annotation_type, snippet::AnnotationType::Warning);
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Warning,
+        );
         assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
         assert_eq!(snippet.slices[0].source, "my location");
         assert_eq!(snippet.slices[0].line_start, 1);
@@ -323,7 +327,7 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[0].annotations[0].label, "my label");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
-            snippet::AnnotationType::Info
+            annotate_snippets::AnnotationType::Info,
         );
     }
 
@@ -412,7 +416,10 @@ mod annotate_snippets_support {
         let title = snippet.title.unwrap();
         assert_eq!(title.id, None);
         assert_eq!(title.label, Some("some title"));
-        assert_eq!(title.annotation_type, snippet::AnnotationType::Error);
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
         assert_eq!(snippet.slices.len(), 2, "{:?}", snippet.slices);
         assert_eq!(snippet.slices[0].source, "my location 1");
         assert_eq!(snippet.slices[0].annotations.len(), 1);
@@ -420,7 +427,7 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
-            snippet::AnnotationType::Note
+            annotate_snippets::AnnotationType::Note,
         );
         assert_eq!(snippet.slices[1].source, "my location 2");
         assert_eq!(snippet.slices[1].annotations.len(), 1);
@@ -428,7 +435,7 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[1].annotations[0].label, "my label 2");
         assert_eq!(
             snippet.slices[1].annotations[0].annotation_type,
-            snippet::AnnotationType::Info
+            annotate_snippets::AnnotationType::Info,
         );
     }
 
@@ -451,7 +458,10 @@ mod annotate_snippets_support {
         let title = snippet.title.unwrap();
         assert_eq!(title.id, None);
         assert_eq!(title.label, Some("some title"));
-        assert_eq!(title.annotation_type, snippet::AnnotationType::Error);
+        assert_eq!(
+            title.annotation_type,
+            annotate_snippets::AnnotationType::Error,
+        );
         assert_eq!(snippet.slices.len(), 1, "{:?}", snippet.slices);
         assert_eq!(snippet.slices[0].source, "my location");
         assert_eq!(snippet.slices[0].annotations.len(), 2);
@@ -459,13 +469,13 @@ mod annotate_snippets_support {
         assert_eq!(snippet.slices[0].annotations[0].label, "my label 1");
         assert_eq!(
             snippet.slices[0].annotations[0].annotation_type,
-            snippet::AnnotationType::Info
+            annotate_snippets::AnnotationType::Info,
         );
         assert_eq!(snippet.slices[0].annotations[1].range, (0, 11));
         assert_eq!(snippet.slices[0].annotations[1].label, "my label 2");
         assert_eq!(
             snippet.slices[0].annotations[1].annotation_type,
-            snippet::AnnotationType::Help
+            annotate_snippets::AnnotationType::Help,
         );
     }
 }

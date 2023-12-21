@@ -40,8 +40,8 @@ pub mod syntax;
 /// If the environment is currently executing a built-in
 /// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
 /// appended to the given message. The message is then converted into a string
-/// using [`yash_env::io::to_string`] and returned along with an optional divert
-/// value.
+/// using [`yash_env::io::message_to_string`] and returned along with an
+/// optional divert value.
 ///
 /// The [`Divert`] value indicates whether the caller should divert the
 /// execution flow. If the current built-in is a special built-in, the second
@@ -77,7 +77,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
         is_special_builtin = false;
     }
 
-    let message = yash_env::io::to_string(env, message);
+    let message = yash_env::io::message_to_string(env, &message);
     let divert = if is_special_builtin {
         Break(Divert::Interrupt(None))
     } else {

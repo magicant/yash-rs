@@ -19,8 +19,8 @@
 #[cfg(doc)]
 use crate::system::SharedSystem;
 use crate::Env;
-use annotate_snippets::display_list::DisplayList;
-use annotate_snippets::snippet::Snippet;
+use annotate_snippets::Renderer;
+use annotate_snippets::Snippet;
 use std::borrow::Cow;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -50,16 +50,20 @@ pub const MIN_INTERNAL_FD: Fd = Fd(10);
 /// To print the returned string to the standard error, you can use
 /// [`SharedSystem::print_error`].
 #[must_use]
-pub fn to_string(env: &Env, message: Message<'_>) -> String {
-    let mut s = Snippet::from(&message);
-    s.opt.color = env.should_print_error_in_color();
-    format!("{}\n", DisplayList::from(s))
+pub fn message_to_string(env: &Env, message: &Message<'_>) -> String {
+    let s = Snippet::from(message);
+    let r = if env.should_print_error_in_color() {
+        Renderer::styled()
+    } else {
+        Renderer::plain()
+    };
+    format!("{}\n", r.render(s))
 }
 
 /// Convenience function for printing an error message.
 ///
 /// This function converts the `error` into a [`Message`] which in turn is
-/// converted into a string using [`to_string`].
+/// converted into a string using [`message_to_string`].
 /// The result is printed to the standard error.
 pub async fn print_message<'a, E>(env: &mut Env, error: E)
 where
@@ -67,7 +71,7 @@ where
 {
     async fn inner(env: &mut Env, message: Message<'_>) {
         env.system
-            .write_all(Fd::STDERR, to_string(env, message).as_bytes())
+            .write_all(Fd::STDERR, message_to_string(env, &message).as_bytes())
             .await
             .ok();
     }
