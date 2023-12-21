@@ -78,10 +78,34 @@
 //! with exit status 127, but the behavior for other errors should not be
 //! considered portable.
 
+use yash_env::job::Pid;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
 mod old;
+
+/// Job specification (job ID or process ID)
+///
+/// Each operand of the `wait` built-in is parsed into a `JobSpec` value.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JobSpec {
+    /// Process ID (non-negative decimal integer)
+    ProcessId(Pid),
+
+    /// Job ID (string of the form `%…`)
+    JobId(Field),
+}
+
+/// Parsed command line arguments to the `wait` built-in
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Command {
+    /// Operands that specify which jobs to wait for
+    ///
+    /// If empty, the built-in waits for all existing asynchronous jobs.
+    pub jobs: Vec<JobSpec>,
+}
+
+pub mod syntax;
 
 /// Entry point for executing the `wait` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
