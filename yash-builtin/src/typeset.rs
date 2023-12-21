@@ -276,14 +276,14 @@
 //! differently from all of them.
 
 use self::syntax::OptionSpec;
-use crate::common::{output, report_error, report_failure};
+use crate::common::{output, report_error, report_failure, to_single_message};
 use thiserror::Error;
 use yash_env::function::Function;
 use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::variable::{Value, Variable};
 use yash_env::Env;
-use yash_syntax::source::pretty::{Annotation, AnnotationType, Message, MessageBase};
+use yash_syntax::source::pretty::{Annotation, AnnotationType, MessageBase};
 use yash_syntax::source::Location;
 
 mod print_functions;
@@ -651,28 +651,13 @@ impl std::fmt::Display for ExecuteError {
     }
 }
 
-/// Converts a non-empty slice of errors to a message.
-///
-/// The first error's title is used as the message title. The other errors are
-/// added as annotations.
-///
-/// This is a utility for printing errors returned by [`Command::execute`].
-/// The returned message can be passed to [`report_failure`].
-#[must_use]
-pub fn to_message(errors: &[ExecuteError]) -> Message {
-    let mut message = Message::from(&errors[0]);
-    let other_errors = errors[1..].iter().map(ExecuteError::main_annotation);
-    message.annotations.extend(other_errors);
-    message
-}
-
 /// Entry point of the typeset built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
     match syntax::parse(syntax::ALL_OPTIONS, args) {
         Ok((options, operands)) => match syntax::interpret(options, operands) {
             Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
                 Ok(result) => output(env, &result).await,
-                Err(errors) => report_failure(env, to_message(&errors)).await,
+                Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
             },
             Err(error) => report_error(env, &error).await,
         },

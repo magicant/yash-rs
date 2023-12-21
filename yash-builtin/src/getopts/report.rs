@@ -122,6 +122,7 @@ impl Error {
             r#type: AnnotationType::Error,
             title: self.to_string().into(),
             annotations,
+            footers: vec![],
         }
     }
 }

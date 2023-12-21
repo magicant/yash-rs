@@ -69,6 +69,7 @@ impl Error {
             r#type: AnnotationType::Error,
             title,
             annotations,
+            footers: vec![],
         }
     }
 }

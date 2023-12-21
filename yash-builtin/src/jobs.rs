@@ -157,6 +157,7 @@ fn find_error_message(error: FindError, operand: &Field) -> Message {
             format!("{:?}: {}", &operand.value, error).into(),
             &operand.origin,
         )],
+        footers: vec![],
     }
 }
 

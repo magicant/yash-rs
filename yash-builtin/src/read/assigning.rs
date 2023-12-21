@@ -26,20 +26,8 @@ use yash_semantics::expansion::attr_strip::Strip as _;
 use yash_semantics::expansion::quote_removal::skip_quotes;
 use yash_semantics::expansion::split::Class;
 use yash_semantics::expansion::split::Ifs;
-use yash_syntax::source::pretty::Message;
-use yash_syntax::source::pretty::MessageBase as _;
 
 pub use crate::typeset::AssignReadOnlyError as Error;
-
-/// Converts errors to a message.
-///
-/// Returns `None` if `errors` is empty.
-pub fn to_message(errors: &[Error]) -> Option<Message> {
-    let mut message = Message::from(errors.first()?);
-    let other_errors = errors[1..].iter().map(Error::main_annotation);
-    message.annotations.extend(other_errors);
-    Some(message)
-}
 
 /// Assigns the text to variables.
 ///

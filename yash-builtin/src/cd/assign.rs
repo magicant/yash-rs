@@ -76,6 +76,7 @@ async fn handle_assign_error(env: &mut Env, name: &str, error: AssignError) {
             "the variable was made read-only here".into(),
             &error.read_only_location,
         )],
+        footers: vec![],
     };
     let (message, _divert) = arrange_message_and_divert(env, message);
     env.system.print_error(&message).await;

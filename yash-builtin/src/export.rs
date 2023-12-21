@@ -89,11 +89,11 @@
 use crate::common::output;
 use crate::common::report_error;
 use crate::common::report_failure;
+use crate::common::to_single_message;
 use crate::typeset::syntax::interpret;
 use crate::typeset::syntax::parse;
 use crate::typeset::syntax::OptionSpec;
 use crate::typeset::syntax::PRINT_OPTION;
-use crate::typeset::to_message;
 use crate::typeset::Command;
 use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
@@ -131,7 +131,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result 
                 }
                 match command.execute(env, &PRINT_CONTEXT) {
                     Ok(result) => output(env, &result).await,
-                    Err(errors) => report_failure(env, to_message(&errors)).await,
+                    Err(errors) => report_failure(env, to_single_message(&errors).unwrap()).await,
                 }
             }
             Err(error) => report_error(env, &error).await,

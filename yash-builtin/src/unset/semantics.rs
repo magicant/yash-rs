@@ -105,6 +105,7 @@ pub fn unset_variables_error_message(
         r#type: AnnotationType::Error,
         title: "cannot unset variable".into(),
         annotations,
+        footers: vec![],
     };
     arrange_message_and_divert(env, message)
 }
@@ -187,6 +188,7 @@ pub fn unset_functions_error_message(
         r#type: AnnotationType::Error,
         title: "cannot unset function".into(),
         annotations,
+        footers: vec![],
     };
     arrange_message_and_divert(env, message)
 }

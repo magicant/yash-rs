@@ -16,7 +16,7 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-annotate-snippets = "0.9.1"
+annotate-snippets = "0.10.0"
 async-trait = "0.1.73"
 either = "1.9.0"
 enumset = "1.1.2"

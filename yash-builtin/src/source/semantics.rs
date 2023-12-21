@@ -142,6 +142,7 @@ async fn report_find_and_open_file_failure(
             format!("`{}` ({errno})", name.value).into(),
             &name.origin,
         )],
+        footers: vec![],
     };
     report_failure(env, message).await
 }

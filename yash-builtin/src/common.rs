@@ -31,6 +31,7 @@ use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
 
 pub mod syntax;
@@ -40,8 +41,8 @@ pub mod syntax;
 /// If the environment is currently executing a built-in
 /// ([`Stack::current_builtin`]), an annotation indicating the built-in name is
 /// appended to the given message. The message is then converted into a string
-/// using [`yash_env::io::to_string`] and returned along with an optional divert
-/// value.
+/// using [`yash_env::io::message_to_string`] and returned along with an
+/// optional divert value.
 ///
 /// The [`Divert`] value indicates whether the caller should divert the
 /// execution flow. If the current built-in is a special built-in, the second
@@ -77,7 +78,7 @@ pub fn arrange_message_and_divert<'e: 'm, 'm>(
         is_special_builtin = false;
     }
 
-    let message = yash_env::io::to_string(env, message);
+    let message = yash_env::io::message_to_string(env, &message);
     let divert = if is_special_builtin {
         Break(Divert::Interrupt(None))
     } else {
@@ -111,7 +112,7 @@ async fn report(
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
-/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };
 /// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::FAILURE, divert)
@@ -140,7 +141,7 @@ where
 /// # use yash_syntax::syntax::Fd;
 /// # async {
 /// # let mut env = yash_env::Env::new_virtual();
-/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![] };
+/// # let message = Message { r#type: AnnotationType::Error, title: "".into(), annotations: vec![], footers: vec![] };
 /// let (message, divert) = arrange_message_and_divert(&env, message);
 /// env.system.print_error(&message).await;
 /// Result::with_exit_status_and_divert(ExitStatus::ERROR, divert)
@@ -164,6 +165,7 @@ pub async fn report_simple_error(env: &mut Env, title: &str) -> yash_env::builti
         r#type: AnnotationType::Error,
         title: title.into(),
         annotations: vec![],
+        footers: vec![],
     };
     report_error(env, message).await
 }
@@ -183,6 +185,7 @@ pub async fn syntax_error(
         r#type: AnnotationType::Error,
         title: "command argument syntax error".into(),
         annotations: vec![annotation],
+        footers: vec![],
     };
     report_error(env, message).await
 }
@@ -203,10 +206,30 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
                 r#type: AnnotationType::Error,
                 title: format!("error printing results to stdout: {errno}").into(),
                 annotations: vec![],
+                footers: vec![],
             };
             report_failure(env, message).await
         }
     }
+}
+
+/// Converts errors to a single message.
+///
+/// If the given iterator is empty, this function returns `None`. Otherwise,
+/// the first error's title is used as the message title. The other errors are
+/// added as additional annotations.
+#[must_use]
+pub fn to_single_message<'a, I, M>(errors: I) -> Option<Message<'a>>
+where
+    I: IntoIterator<Item = &'a M>,
+    M: MessageBase + 'a,
+{
+    let mut errors = errors.into_iter();
+    let first = errors.next()?;
+    let mut message = Message::from(first);
+    let other_errors = errors.map(MessageBase::main_annotation);
+    message.annotations.extend(other_errors);
+    Some(message)
 }
 
 #[cfg(test)]
@@ -221,6 +244,7 @@ mod tests {
             r#type: AnnotationType::Error,
             title: "foo".into(),
             annotations: vec![],
+            footers: vec![],
         }
     }
 
