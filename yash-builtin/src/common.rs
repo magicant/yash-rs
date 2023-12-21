@@ -31,6 +31,7 @@ use yash_env::SharedSystem;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::Message;
+use yash_syntax::source::pretty::MessageBase;
 use yash_syntax::source::Location;
 
 pub mod syntax;
@@ -210,6 +211,25 @@ pub async fn output(env: &mut Env, content: &str) -> yash_env::builtin::Result {
             report_failure(env, message).await
         }
     }
+}
+
+/// Converts errors to a single message.
+///
+/// If the given iterator is empty, this function returns `None`. Otherwise,
+/// the first error's title is used as the message title. The other errors are
+/// added as additional annotations.
+#[must_use]
+pub fn to_single_message<'a, I, M>(errors: I) -> Option<Message<'a>>
+where
+    I: IntoIterator<Item = &'a M>,
+    M: MessageBase + 'a,
+{
+    let mut errors = errors.into_iter();
+    let first = errors.next()?;
+    let mut message = Message::from(first);
+    let other_errors = errors.map(MessageBase::main_annotation);
+    message.annotations.extend(other_errors);
+    Some(message)
 }
 
 #[cfg(test)]

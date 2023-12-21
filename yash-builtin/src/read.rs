@@ -89,6 +89,7 @@
 
 use crate::common::report_error;
 use crate::common::report_failure;
+use crate::common::to_single_message;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
@@ -133,7 +134,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     let errors = assigning::assign(env, &input, command.variables, command.last_variable);
-    let message = assigning::to_message(&errors);
+    let message = to_single_message(&errors);
     match message {
         None if newline_found => ExitStatus::SUCCESS.into(),
         None => ExitStatus::FAILURE.into(),
