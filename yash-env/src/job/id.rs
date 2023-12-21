@@ -82,6 +82,8 @@ impl Display for JobId<'_> {
 }
 
 /// Error that may occur in job ID [parsing](parse)
+///
+/// This error occurs when a job ID string does not start with a `%`.
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
 #[error("a job ID must start with a '%'")]
 pub struct ParseError;

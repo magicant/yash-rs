@@ -105,6 +105,7 @@ pub struct Command {
     pub jobs: Vec<JobSpec>,
 }
 
+pub mod search;
 pub mod syntax;
 
 /// Entry point for executing the `wait` built-in
