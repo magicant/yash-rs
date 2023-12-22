@@ -44,6 +44,7 @@
 //! - `exec`
 //! - `read`
 //! - `source`
+//! - `wait`
 
 pub mod alias;
 pub mod r#break;
@@ -72,6 +73,7 @@ pub mod trap;
 pub mod typeset;
 pub mod unalias;
 pub mod unset;
+#[cfg(feature = "yash-semantics")]
 pub mod wait;
 
 #[doc(no_inline)]
@@ -254,6 +256,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
             execute: |env, args| Box::pin(unset::main(env, args)),
         },
     ),
+    #[cfg(feature = "yash-semantics")]
     (
         "wait",
         Builtin {

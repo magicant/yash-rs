@@ -105,6 +105,7 @@ pub struct Command {
     pub jobs: Vec<JobSpec>,
 }
 
+pub mod core;
 pub mod search;
 pub mod syntax;
 
