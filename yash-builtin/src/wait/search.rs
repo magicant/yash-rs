@@ -39,7 +39,7 @@ impl MessageBase for AmbiguousJobId {
     fn main_annotation(&self) -> Annotation<'_> {
         Annotation::new(
             AnnotationType::Error,
-            self.0.value.as_str().into(),
+            format!("job ID `{}` matches more than one job", self.0.value).into(),
             &self.0.origin,
         )
     }
