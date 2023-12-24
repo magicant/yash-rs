@@ -50,6 +50,7 @@ use yash_env::trap::TrapSet;
 use yash_env::Env;
 
 mod signal;
+pub use signal::run_trap_if_caught;
 pub use signal::run_traps_for_caught_signals;
 
 mod exit;

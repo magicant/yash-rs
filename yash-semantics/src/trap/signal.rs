@@ -20,15 +20,56 @@ use crate::ReadEvalLoop;
 use std::future::Future;
 use std::ops::ControlFlow::Continue;
 use std::pin::Pin;
+use std::rc::Rc;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
+use yash_env::trap::Signal;
 #[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_syntax::parser::lex::Lexer;
+use yash_syntax::source::Location;
 use yash_syntax::source::Source;
+
+/// Runs a trap action for a signal.
+///
+/// This function is a helper function for [`run_trap_if_caught`] and
+/// [`run_traps_for_caught_signals`].
+#[must_use]
+async fn run_trap(env: &mut Env, signal: Signal, code: Rc<str>, origin: Location) -> Result {
+    let condition = signal.to_string();
+    let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
+    let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
+    let previous_exit_status = env.exit_status;
+    // Boxing needed for recursion
+    let future: Pin<Box<dyn Future<Output = Result>>> =
+        Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
+    let result = future.await;
+    env.exit_status = previous_exit_status;
+    result
+}
+
+/// Runs a trap action for a signal if it has been caught.
+///
+/// This function is similar to [`run_traps_for_caught_signals`], but this
+/// function operates only on a single signal. Unlike
+/// `run_traps_for_caught_signals`, this function runs a trap action even if
+/// we are already running a trap action.
+///
+/// Returns `None` if the signal has not been caught. Otherwise, returns the
+/// result of running the trap action.
+#[must_use]
+pub async fn run_trap_if_caught(env: &mut Env, signal: Signal) -> Option<Result> {
+    let trap_state = env.traps.take_signal_if_caught(signal)?;
+    let Action::Command(command) = &trap_state.action else {
+        return None;
+    };
+    let code = Rc::clone(command);
+    let origin = trap_state.origin.clone();
+    Some(run_trap(env, signal, code, origin).await)
+}
 
 fn in_trap(env: &Env) -> bool {
     env.stack
@@ -58,22 +99,12 @@ pub async fn run_traps_for_caught_signals(env: &mut Env) -> Result {
     }
 
     while let Some((signal, state)) = env.traps.take_caught_signal() {
-        let code = if let Action::Command(command) = &state.action {
-            command.clone()
-        } else {
+        let Action::Command(command) = &state.action else {
             continue;
         };
-        let condition = signal.to_string();
+        let code = Rc::clone(command);
         let origin = state.origin.clone();
-        let mut lexer = Lexer::from_memory(&code, Source::Trap { condition, origin });
-        let mut env = env.push_frame(Frame::Trap(Condition::Signal(signal)));
-        let previous_exit_status = env.exit_status;
-        // Boxing needed for recursion
-        let future: Pin<Box<dyn Future<Output = Result>>> =
-            Box::pin(ReadEvalLoop::new(&mut env, &mut lexer).run());
-        let result = future.await;
-        env.exit_status = previous_exit_status;
-        result?;
+        run_trap(env, signal, code, origin).await?;
     }
 
     Continue(())

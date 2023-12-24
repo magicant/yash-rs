@@ -508,6 +508,7 @@ dependencies = [
  "either",
  "futures-executor",
  "futures-util",
+ "itertools",
  "thiserror",
  "yash-env",
  "yash-quote",

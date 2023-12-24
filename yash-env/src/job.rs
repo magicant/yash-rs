@@ -250,6 +250,13 @@ impl Default for JobSet {
 }
 
 impl JobSet {
+    /// Creates an empty job set.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Returns the job at the specified index.
     ///
     /// The result is `None` if there is no job for the index.

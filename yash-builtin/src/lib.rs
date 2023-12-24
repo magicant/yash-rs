@@ -44,6 +44,7 @@
 //! - `exec`
 //! - `read`
 //! - `source`
+//! - `wait`
 
 pub mod alias;
 pub mod r#break;
@@ -72,6 +73,7 @@ pub mod trap;
 pub mod typeset;
 pub mod unalias;
 pub mod unset;
+#[cfg(feature = "yash-semantics")]
 pub mod wait;
 
 #[doc(no_inline)]
@@ -254,6 +256,7 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
             execute: |env, args| Box::pin(unset::main(env, args)),
         },
     ),
+    #[cfg(feature = "yash-semantics")]
     (
         "wait",
         Builtin {
@@ -268,15 +271,19 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalSpawner;
     use futures_util::task::LocalSpawnExt;
+    #[cfg(feature = "yash-semantics")]
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::future::Future;
     use std::pin::Pin;
+    #[cfg(feature = "yash-semantics")]
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::SystemState;
+    #[cfg(feature = "yash-semantics")]
     use yash_env::Env;
+    #[cfg(feature = "yash-semantics")]
     use yash_env::VirtualSystem;
 
     #[derive(Clone, Debug)]
@@ -294,6 +301,7 @@ pub(crate) mod tests {
     }
 
     /// Helper function to perform a test in a virtual system with an executor.
+    #[cfg(feature = "yash-semantics")]
     pub fn in_virtual_system<F, Fut>(f: F)
     where
         F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,

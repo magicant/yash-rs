@@ -34,7 +34,8 @@
 //! which is not handled in this module.
 //!
 //! You can parse a job ID with [`parse`] or [`parse_tail`] and get a [`JobId`]
-//! as a result.
+//! as a result. Use the [`JobId::find`] method to find a job that matches the
+//! job ID.
 
 use super::Job;
 use super::JobSet;
@@ -81,6 +82,8 @@ impl Display for JobId<'_> {
 }
 
 /// Error that may occur in job ID [parsing](parse)
+///
+/// This error occurs when a job ID string does not start with a `%`.
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
 #[error("a job ID must start with a '%'")]
 pub struct ParseError;

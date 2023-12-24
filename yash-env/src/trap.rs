@@ -258,6 +258,15 @@ impl TrapSet {
         }
     }
 
+    /// Resets the `pending` flag of the [`TrapState`] for the specified signal.
+    ///
+    /// Returns the [`TrapState`] if the flag was set.
+    pub fn take_signal_if_caught(&mut self, signal: Signal) -> Option<&TrapState> {
+        self.traps
+            .get_mut(&signal.into())
+            .and_then(|state| state.handle_if_caught())
+    }
+
     /// Returns a signal that has been [caught](Self::catch_signal).
     ///
     /// This function clears the `pending` flag of the [`TrapState`] for the
@@ -1133,6 +1142,28 @@ mod tests {
         assert!(trap_state.pending, "trap_state = {trap_state:?}");
         let trap_state = trap_set.get_state(Signal::SIGTERM).0.unwrap();
         assert!(!trap_state.pending, "trap_state = {trap_state:?}");
+    }
+
+    #[test]
+    fn taking_signal_if_caught() {
+        let mut system = DummySystem::default();
+        let mut trap_set = TrapSet::default();
+        let command = Action::Command("echo INT".into());
+        let origin = Location::dummy("origin");
+        trap_set
+            .set_action(&mut system, Signal::SIGINT, command, origin, false)
+            .unwrap();
+
+        let result = trap_set.take_signal_if_caught(Signal::SIGINT);
+        assert_eq!(result, None);
+
+        trap_set.catch_signal(Signal::SIGINT);
+
+        let result = trap_set.take_signal_if_caught(Signal::SIGINT);
+        assert!(!result.unwrap().pending);
+
+        let result = trap_set.take_signal_if_caught(Signal::SIGINT);
+        assert_eq!(result, None);
     }
 
     #[test]
