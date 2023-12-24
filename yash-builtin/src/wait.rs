@@ -93,8 +93,6 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
-mod old;
-
 /// Job specification (job ID or process ID)
 ///
 /// Each operand of the `wait` built-in is parsed into a `JobSpec` value.
