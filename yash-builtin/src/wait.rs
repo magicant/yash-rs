@@ -107,6 +107,7 @@ pub struct Command {
 
 pub mod core;
 pub mod search;
+pub mod status;
 pub mod syntax;
 
 /// Entry point for executing the `wait` built-in
