@@ -126,6 +126,21 @@ where
     report(env, message.into(), ExitStatus::FAILURE).await
 }
 
+/// Prints a simple failure message.
+///
+/// This function constructs a [`Message`] with the given title and prints it
+/// using [`report_failure`]. The message has no annotations except for the
+/// built-in name which is added by [`arrange_message_and_divert`].
+pub async fn report_simple_failure(env: &mut Env, title: &str) -> yash_env::builtin::Result {
+    let message = Message {
+        r#type: AnnotationType::Error,
+        title: title.into(),
+        annotations: vec![],
+        footers: vec![],
+    };
+    report_failure(env, message).await
+}
+
 /// Prints an error message.
 ///
 /// This function is only usable when the `message` argument does not contain

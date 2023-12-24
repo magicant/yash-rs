@@ -51,9 +51,14 @@
 //!
 //! # Errors
 //!
-//! It is an error if an operand is not a job ID or decimal process ID.
+//! The following error conditions causes the built-in to return a non-zero exit
+//! status without waiting for any job:
 //!
-//! It is an error if a job ID matches more than one job.
+//! - An operand is not a job ID or decimal process ID.
+//! - A job ID matches more than one job.
+//! - The shell receives a signal that has a [trap](yash_env::trap) action set.
+//!
+//! The trap action for the signal is executed before the built-in returns.
 //!
 //! # Exit status
 //!
@@ -78,7 +83,13 @@
 //! with exit status 127, but the behavior for other errors should not be
 //! considered portable.
 
+use crate::common::report_error;
+use crate::common::report_simple_failure;
+use crate::common::to_single_message;
+use itertools::Itertools as _;
 use yash_env::job::Pid;
+use yash_env::option::Option::Monitor;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
@@ -110,7 +121,61 @@ pub mod search;
 pub mod status;
 pub mod syntax;
 
+impl Command {
+    /// Waits for jobs specified by the indexes.
+    ///
+    /// If `indexes` is empty, waits for all jobs.
+    async fn await_jobs<I>(env: &mut Env, indexes: I) -> Result<ExitStatus, core::Error>
+    where
+        I: IntoIterator<Item = Option<usize>>,
+    {
+        let job_control = env.options.get(Monitor);
+
+        // Await jobs specified by the indexes
+        let mut exit_status = None;
+        for index in indexes {
+            exit_status = Some(match index {
+                None => ExitStatus::NOT_FOUND,
+                Some(index) => {
+                    status::wait_while_running(env, &mut status::job_status(index, job_control))
+                        .await?
+                }
+            });
+        }
+        if let Some(exit_status) = exit_status {
+            return Ok(exit_status);
+        }
+
+        // If there were no indexes, await all jobs
+        status::wait_while_running(env, &mut status::any_job_is_running(job_control)).await
+    }
+
+    /// Executes the `wait` built-in.
+    pub async fn execute(self, env: &mut Env) -> crate::Result {
+        // Resolve job specifications to indexes
+        let jobs = self.jobs.into_iter();
+        let (indexes, errors): (Vec<_>, Vec<_>) = jobs
+            .map(|spec| search::resolve(&env.jobs, spec))
+            .partition_result();
+        if let Some(message) = to_single_message(&errors) {
+            return report_error(env, message).await;
+        }
+
+        // Await jobs specified by the indexes
+        match Self::await_jobs(env, indexes).await {
+            Ok(exit_status) => exit_status.into(),
+            Err(core::Error::Trapped(signal, divert)) => {
+                crate::Result::with_exit_status_and_divert(ExitStatus::from(signal), divert)
+            }
+            Err(error) => report_simple_failure(env, &error.to_string()).await,
+        }
+    }
+}
+
 /// Entry point for executing the `wait` built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
-    old::main(env, args).await
+    match syntax::parse(env, args) {
+        Ok(command) => command.execute(env).await,
+        Err(error) => report_error(env, &error).await,
+    }
 }
