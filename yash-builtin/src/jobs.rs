@@ -70,6 +70,10 @@
 //! jobs %sleep %sleep
 //! ```
 //!
+//! When the built-in is used in a subshell, the built-in reports not only jobs
+//! that were started in the subshell but also jobs that were started in the
+//! parent shell. This behavior is not portable and is subject to change.
+//!
 //! The POSIX standard only defines the `-l` and `-p` options. Other options are
 //! non-portable extensions.
 //!
