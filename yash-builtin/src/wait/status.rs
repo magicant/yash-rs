@@ -53,6 +53,10 @@ pub async fn wait_while_running(
 
 /// Returns a closure that tests if the job with the given index has finished.
 ///
+/// If the job at the given index is not found or is disowned, the closure
+/// returns [`ControlFlow::Break`] having [`ExitStatus::NOT_FOUND`].
+/// The disowned job is removed from the job set.
+///
 /// If the job has finished (either exited or signaled), the closure removes the
 /// job from the job set and returns [`ControlFlow::Break`] with the job's exit
 /// status. If `job_control` is `On` and the job has been stopped, the closure
@@ -67,6 +71,12 @@ pub fn job_status(
         let Some(job) = jobs.get(index) else {
             return ControlFlow::Break(ExitStatus::NOT_FOUND);
         };
+
+        if !job.is_owned {
+            jobs.remove(index);
+            return ControlFlow::Break(ExitStatus::NOT_FOUND);
+        }
+
         match job.status {
             WaitStatus::Exited(_pid, exit_status) => {
                 jobs.remove(index);
@@ -236,6 +246,20 @@ mod tests {
 
         assert_eq!(job_status(index, On)(&mut jobs), ControlFlow::Continue(()),);
         assert_eq!(jobs.get(index).unwrap().pid, Pid::from_raw(456));
+    }
+
+    #[test]
+    fn status_of_disowned_job() {
+        let mut jobs = JobSet::new();
+        let mut job = Job::new(Pid::from_raw(123));
+        job.is_owned = false;
+        let index = jobs.add(job);
+
+        assert_eq!(
+            job_status(index, Off)(&mut jobs),
+            ControlFlow::Break(ExitStatus::NOT_FOUND),
+        );
+        assert_eq!(jobs.get(index), None);
     }
 
     #[test]
