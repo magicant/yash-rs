@@ -481,6 +481,7 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "fuzed-iterator",
+ "nix",
  "tempfile",
  "thiserror",
  "yash-arith",

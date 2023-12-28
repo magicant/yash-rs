@@ -82,6 +82,11 @@
 //! that an unknown process ID be treated as a process that has already exited
 //! with exit status 127, but the behavior for other errors should not be
 //! considered portable.
+//!
+//! # Implementation notes
+//!
+//! The built-in treats disowned jobs as if they were finished with an exit
+//! status of 127.
 
 use crate::common::report_error;
 use crate::common::report_simple_failure;

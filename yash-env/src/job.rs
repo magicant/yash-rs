@@ -90,6 +90,13 @@ pub struct Job {
     /// last reported to the user.
     pub status_changed: bool,
 
+    /// Whether this job is a true child of the current shell
+    ///
+    /// When a subshell is created, the jobs inherited from the parent shell are
+    /// marked as not owned by the current shell. The shell cannot wait for
+    /// these jobs to finish.
+    pub is_owned: bool,
+
     /// String representation of this process
     pub name: String,
 }
@@ -105,6 +112,7 @@ impl Job {
             job_controlled: false,
             status: WaitStatus::StillAlive,
             status_changed: true,
+            is_owned: true,
             name: String::new(),
         }
     }
@@ -579,6 +587,15 @@ impl JobSet {
         }
         index
     }
+
+    /// Disowns all jobs.
+    ///
+    /// This function sets the `is_owned` flag of all jobs to `false`.
+    pub fn disown_all(&mut self) {
+        for (_, job) in &mut self.jobs {
+            job.is_owned = false;
+        }
+    }
 }
 
 /// Error type for [`JobSet::set_current_job`].
@@ -826,6 +843,21 @@ mod tests {
 
         assert_eq!(set.get(i10).unwrap().status, WaitStatus::StillAlive);
         assert_eq!(set.get(i30).unwrap().status, WaitStatus::StillAlive);
+    }
+
+    #[test]
+    #[allow(clippy::bool_assert_comparison)]
+    fn disowning_jobs() {
+        let mut set = JobSet::default();
+        let i10 = set.add(Job::new(Pid::from_raw(10)));
+        let i20 = set.add(Job::new(Pid::from_raw(20)));
+        let i30 = set.add(Job::new(Pid::from_raw(30)));
+
+        set.disown_all();
+
+        assert_eq!(set.get(i10).unwrap().is_owned, false);
+        assert_eq!(set.get(i20).unwrap().is_owned, false);
+        assert_eq!(set.get(i30).unwrap().is_owned, false);
     }
 
     #[test]

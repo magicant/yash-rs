@@ -187,6 +187,7 @@ where
                         }
                     }
                 }
+                env.jobs.disown_all();
 
                 env.traps.enter_subshell(
                     &mut env.system,
@@ -308,6 +309,7 @@ impl<'a> Drop for MaskGuard<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::job::Job;
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
@@ -377,6 +379,23 @@ mod tests {
             assert_eq!(env.stack[..], []);
 
             env.wait_for_subshell(pid).await.unwrap();
+        });
+    }
+
+    #[test]
+    fn jobs_disowned_in_subshell() {
+        in_virtual_system(|mut env, _state| async move {
+            let index = env.jobs.add(Job::new(Pid::from_raw(123)));
+            let subshell = Subshell::new(move |env, _job_control| {
+                Box::pin(async move {
+                    assert!(!env.jobs.get(index).unwrap().is_owned);
+                    Continue(())
+                })
+            });
+            let pid = subshell.start(&mut env).await.unwrap().0;
+            env.wait_for_subshell(pid).await.unwrap();
+
+            assert!(env.jobs.get(index).unwrap().is_owned);
         });
     }
 

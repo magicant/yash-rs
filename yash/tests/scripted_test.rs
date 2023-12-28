@@ -19,29 +19,43 @@
 //! examines the results. Test cases are written in script files named with the
 //! `-p.sh` or `-y.sh` suffix.
 
+use pty::run_with_pty;
+use std::os::unix::process::CommandExt as _;
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
 
+mod pty;
+
 const BIN: &str = env!("CARGO_BIN_EXE_yash");
 const TMPDIR: &str = env!("CARGO_TARGET_TMPDIR");
 
-fn run(name: &str) {
+/// Runs a test subject.
+///
+/// You would normally not use this function directly. Instead, use one of the
+/// [`run`] or [`run_with_pty`] functions.
+unsafe fn run_with_preexec<F>(name: &str, pre_exec: F)
+where
+    F: FnMut() -> std::io::Result<()> + Send + Sync + 'static,
+{
     // TODO Reset signal blocking mask
 
     let mut log_file = Path::new(TMPDIR).join(name);
     log_file.set_extension("log");
 
-    let result = Command::new("sh")
+    let mut command = Command::new("sh");
+    command
         .env("TMPDIR", TMPDIR)
         .current_dir("tests/scripted_test")
         .stdin(Stdio::null())
         .arg("./run-test.sh")
         .arg(BIN)
         .arg(name)
-        .arg(&log_file)
-        .output()
-        .unwrap();
+        .arg(&log_file);
+    unsafe {
+        command.pre_exec(pre_exec);
+    }
+    let result = command.output().unwrap();
     assert!(result.status.success(), "{:?}", result);
 
     // The `run-test.sh` script returns a successful exit status even if there
@@ -49,6 +63,14 @@ fn run(name: &str) {
 
     let log = std::fs::read_to_string(&log_file).unwrap();
     assert!(!log.contains("FAILED"), "{}", log);
+}
+
+/// Runs a test subject.
+///
+/// This function runs the test subject in the current session. To run it in a
+/// separate session, use [`run_with_pty`].
+fn run(name: &str) {
+    unsafe { run_with_preexec(name, || Ok(())) }
 }
 
 #[test]
@@ -235,6 +257,11 @@ fn unset_builtin() {
 #[test]
 fn until_loop() {
     run("until-p.sh")
+}
+
+#[test]
+fn wait_builtin() {
+    run_with_pty("wait-p.sh")
 }
 
 #[test]
