@@ -182,7 +182,7 @@ impl TrapSet {
     ///
     /// ## Resetting non-ignore traps
     ///
-    /// POSIX requires that traps other than `Trap::Ignore` be reset when
+    /// POSIX requires that traps other than `Action::Ignore` be reset when
     /// entering a subshell. This function achieves that effect.
     ///
     /// The trap set will remember the original trap states as the parent
