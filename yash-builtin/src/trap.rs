@@ -16,7 +16,108 @@
 
 //! Trap built-in.
 //!
-//! TODO Elaborate
+//! The **`trap`** built-in sets or prints [traps](yash_env::trap).
+//!
+//! # Synopsis
+//!
+//! ```sh
+//! trap
+//! ```
+//!
+//! ```sh
+//! trap [action] condition…
+//! ```
+//!
+//! # Description
+//!
+//! When the built-in is invoked with no operands, it prints the currently
+//! configured traps in the format `trap -- action condition` where *action* and
+//! *condition* are properly quoted so that the output can be read by the shell
+//! to restore the traps.
+//!
+//! When a [subshell](yash_env::subshell) is entered, traps other than
+//! `Action::Ignore` are reset to the default action. This behavior would make
+//! it impossible to save the current traps by using a command substitution as
+//! in `traps=$(trap)`. To avoid this, when the built-in is invoked in a
+//! subshell and no traps have been modified in the subshell, it prints the
+//! traps that were configured in the parent shell.
+//!
+//! When operands are given, the built-in sets the trap specified by *action*
+//! and *condition*. When there are more than one *condition*, the built-in sets
+//! the same *action* for all of them.
+//!
+//! # Options
+//!
+//! None.
+//!
+//! (TODO: `-p` option)
+//!
+//! # Operands
+//!
+//! An ***action*** specifies what to do when the trap condition is met. It may
+//! be one of the following:
+//!
+//! - `-` (hyphen) resets the trap to the default action.
+//! - An empty string ignores the trap.
+//! - Any other string is treated as a command to execute.
+//!
+//! The *action* may be omitted if the first *condition* is a non-negative
+//! decimal integer. In this case, the built-in resets the trap to the default
+//! action.
+//!
+//! A ***condition*** specifies when the action is triggered. It may be one of
+//! the following:
+//!
+//! - A symbolic name of a signal without the `SIG` prefix (e.g. `INT`, `QUIT`,
+//!   `TERM`)
+//!     - (TODO: Support names with `SIG` prefix)
+//!     - (TODO: Support non-uppercase names)
+//! - A positive decimal integer representing a signal number
+//! - The number `0` or the symbolic name `EXIT` representing the termination of
+//!   the main shell process
+//!     - This condition is not triggered when the shell exits due to a signal.
+//!
+//! # Errors
+//!
+//! Traps cannot be set to `SIGKILL` or `SIGSTOP`.
+//!
+//! Invalid *condition*s are reported with a non-zero exit status, but the
+//! built-in does not set `Divert::Interrupt` in the result.
+//!
+//! If a non-interactive shell inherited `Action::Ignore` for a signal, the
+//! action cannot be changed. However, in this implementation, this error is not
+//! reported and does not affect the exit status of the built-in.
+//!
+//! # Exit status
+//!
+//! Zero if successful, non-zero if an error is reported.
+//!
+//! # Portability
+//!
+//! Portable scripts should specify signals in uppercase letters without the
+//! `SIG` prefix. Specifying signals by numbers is discouraged as signal numbers
+//! vary among systems.
+//!
+//! The result of setting a trap to `SIGKILL` or `SIGSTOP` is undefined by
+//! POSIX.
+//!
+//! The mechanism for the built-in to print traps configured in the parent shell
+//! may vary among shells. This implementation remembers the old traps in the
+//! [`TrapSet`] when starting a subshell and prints them when the built-in is
+//! invoked in the subshell. POSIX allows another scheme: When starting a
+//! subshell, the shell checks if the subshell command contains only a single
+//! invocation of the `trap` built-in, in which case the shell skips resetting
+//! traps on the subshell entry so that the built-in can print the traps
+//! configured in the parent shell. The check may be done by a simple literal
+//! comparison, so you should not expect the shell to recognize complex
+//! expressions such as `cmd=trap; traps=$($cmd)`.
+//!
+//! # Implementation notes
+//!
+//! The [`TrapSet`] remembers the traps that were configured in the parent shell
+//! so that the built-in can print them when invoked in a subshell. Those traps
+//! are cleared when the built-in modifies any trap in the subshell. See
+//! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
 use crate::common::report_error;
 use crate::common::syntax::parse_arguments;
@@ -27,6 +128,8 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
+#[cfg(doc)]
+use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
 
