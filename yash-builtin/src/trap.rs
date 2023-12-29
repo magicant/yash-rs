@@ -128,17 +128,17 @@ use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
-#[cfg(doc)]
 use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
 
-// TODO Split into syntax and semantics submodules
-
-/// Prints the currently configured traps.
-pub async fn print_traps(env: &mut Env) -> Result {
+/// Returns a string that represents the currently configured traps.
+///
+/// The returned string is the whole output of the `trap` built-in
+/// without operands, including the trailing newline.
+pub fn display_traps(traps: &TrapSet) -> String {
     let mut output = String::new();
-    for (cond, current, parent) in env.traps.iter() {
+    for (cond, current, parent) in traps {
         let trap = match (current, parent) {
             (Some(trap), _) => trap,
             (None, Some(trap)) => trap,
@@ -151,7 +151,7 @@ pub async fn print_traps(env: &mut Env) -> Result {
         };
         writeln!(output, "trap -- {} {}", quoted(command), cond).ok();
     }
-    crate::common::output(env, &output).await
+    output
 }
 
 /// Entry point for executing the `trap` built-in
@@ -162,7 +162,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     };
 
     match operands.len() {
-        0 => return print_traps(env).await,
+        0 => {
+            let output = display_traps(&env.traps);
+            return crate::common::output(env, &output).await;
+        }
         2 => (),
         _ => return Result::new(ExitStatus::ERROR),
         // TODO Support full syntax
