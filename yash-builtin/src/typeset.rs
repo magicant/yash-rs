@@ -225,10 +225,6 @@
 //! may fail if functions are read-only since the read-only functions cannot be
 //! redefined.
 //!
-//! # Exit status
-//!
-//! Zero unless an error occurs.
-//!
 //! # Errors
 //!
 //! The read-only attribute cannot be removed from a variable or function. If a
@@ -238,6 +234,10 @@
 //!
 //! When printing variables or functions, it is an error if an operand names a
 //! non-existing variable or function.
+//!
+//! # Exit status
+//!
+//! Zero unless an error occurs.
 //!
 //! # Portability
 //!

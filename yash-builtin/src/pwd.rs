@@ -46,16 +46,16 @@
 //!
 //! None.
 //!
-//! # Exit Status
-//!
-//! Zero if the path was successfully printed; non-zero otherwise.
-//!
 //! # Errors
 //!
 //! This built-in may fail for various reasons. For example:
 //! - The working directory has been removed from the file system.
 //! - You do not have permission to access the ancestor directories of the working directory.
 //! - The standard output is not writable.
+//!
+//! # Exit Status
+//!
+//! Zero if the path was successfully printed; non-zero otherwise.
 //!
 //! # Portability
 //!
