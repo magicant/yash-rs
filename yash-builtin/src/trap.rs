@@ -132,6 +132,23 @@ use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
 
+/// Interpretation of command line arguments that selects the behavior of the
+/// `trap` built-in
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Command {
+    /// Print all traps
+    PrintAll,
+
+    /// Set an action for one or more conditions
+    SetAction {
+        action: Action,
+        conditions: Vec<(Condition, Field)>,
+    },
+}
+
+pub mod syntax;
+
 /// Returns a string that represents the currently configured traps.
 ///
 /// The returned string is the whole output of the `trap` built-in

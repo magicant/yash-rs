@@ -27,7 +27,7 @@ use thiserror::Error;
 use yash_syntax::source::Location;
 
 /// Action performed when a [`Condition`] is met
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub enum Action {
     /// Performs the default action.
     ///

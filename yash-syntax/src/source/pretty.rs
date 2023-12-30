@@ -204,6 +204,11 @@ pub trait MessageBase {
     fn additional_annotations<'a, T: Extend<Annotation<'a>>>(&'a self, results: &mut T) {
         let _ = results;
     }
+
+    /// Returns footers that are included in the message.
+    fn footers(&self) -> Vec<Footer> {
+        Vec::new()
+    }
 }
 
 /// Constructs a message based on the message base.
@@ -220,7 +225,7 @@ impl<'a, T: MessageBase> From<&'a T> for Message<'a> {
             r#type: base.message_type(),
             title: base.message_title(),
             annotations,
-            footers: vec![],
+            footers: base.footers(),
         }
     }
 }
