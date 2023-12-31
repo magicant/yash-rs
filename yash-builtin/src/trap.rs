@@ -120,17 +120,23 @@
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
 use crate::common::report_error;
+use crate::common::report_failure;
 use crate::common::syntax::parse_arguments;
 use crate::common::syntax::Mode;
+use crate::common::to_single_message;
+use std::borrow::Cow;
 use std::fmt::Write;
-use yash_env::builtin::Result;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::trap::Action;
 use yash_env::trap::Condition;
+use yash_env::trap::SetActionError;
 use yash_env::trap::TrapSet;
 use yash_env::Env;
 use yash_quote::quoted;
+use yash_syntax::source::pretty::Annotation;
+use yash_syntax::source::pretty::AnnotationType;
+use yash_syntax::source::pretty::MessageBase;
 
 /// Interpretation of command line arguments that selects the behavior of the
 /// `trap` built-in
@@ -171,43 +177,97 @@ pub fn display_traps(traps: &TrapSet) -> String {
     output
 }
 
+impl Command {
+    /// Executes the trap built-in.
+    ///
+    /// If successful, returns a string that should be printed to the standard
+    /// output. On failure, returns a non-empty list of errors.
+    pub fn execute(self, env: &mut Env) -> Result<String, Vec<(SetActionError, Condition, Field)>> {
+        match self {
+            Self::PrintAll => Ok(display_traps(&env.traps)),
+
+            Self::SetAction { action, conditions } => {
+                let mut errors = Vec::new();
+                for (cond, field) in conditions {
+                    if let Err(error) = env.traps.set_action(
+                        &mut env.system,
+                        cond,
+                        action.clone(),
+                        field.origin.clone(),
+                        // TODO an interactive shell can override originally ignored traps
+                        false,
+                    ) {
+                        errors.push((error, cond, field));
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(String::new())
+                } else {
+                    Err(errors)
+                }
+            }
+        }
+    }
+}
+
+/// Wrapper for creating an error message for a trap setting error
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct Error((SetActionError, Condition, Field));
+
+impl MessageBase for Error {
+    fn message_title(&self) -> Cow<str> {
+        "cannot update trap".into()
+    }
+
+    fn main_annotation(&self) -> Annotation<'_> {
+        let (error, cond, field) = &self.0;
+        let label = match error {
+            SetActionError::InitiallyIgnored => todo!(),
+            SetActionError::SIGKILL => "SIGKILL cannot be caught or ignored".into(),
+            SetActionError::SIGSTOP => "SIGSTOP cannot be caught or ignored".into(),
+            SetActionError::SystemError(errno) => {
+                format!("system error updating trap for `{cond}`: {errno}").into()
+            }
+        };
+        Annotation::new(AnnotationType::Error, label, &field.origin)
+    }
+}
+
 /// Entry point for executing the `trap` built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
-    let (_options, mut operands) = match parse_arguments(&[], Mode::with_env(env), args) {
+pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+    let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
     };
 
-    match operands.len() {
-        0 => {
-            let output = display_traps(&env.traps);
-            return crate::common::output(env, &output).await;
+    let command = match syntax::interpret(options, operands) {
+        Ok(command) => command,
+        Err(errors) => {
+            let is_soft_failure = errors
+                .iter()
+                .all(|e| matches!(e, syntax::Error::UnknownCondition(_)));
+            let message = to_single_message(&errors).unwrap();
+            let mut result = report_error(env, message).await;
+            if is_soft_failure {
+                result = crate::Result::from(ExitStatus::FAILURE);
+            }
+            return result;
         }
-        2 => (),
-        _ => return Result::new(ExitStatus::ERROR),
-        // TODO Support full syntax
-    }
-
-    let Field { value, origin } = operands.remove(0);
-
-    let cond = match operands[0].value.parse::<Condition>() {
-        Ok(cond) => cond,
-        // TODO Print error message for the unknown condition
-        Err(_) => return Result::new(ExitStatus::FAILURE),
-    };
-    let action = match value.as_str() {
-        "-" => Action::Default,
-        "" => Action::Ignore,
-        _ => Action::Command(value.into()),
     };
 
-    match env
-        .traps
-        .set_action(&mut env.system, cond, action, origin, false)
-    {
-        Ok(()) => Result::new(ExitStatus::SUCCESS),
-        // TODO Print error message
-        Err(_) => Result::new(ExitStatus::ERROR),
+    match command.execute(env) {
+        Ok(output) => crate::common::output(env, &output).await,
+        Err(mut errors) => {
+            // For now, we ignore the InitiallyIgnored error since it is not
+            // required by POSIX.
+            errors.retain(|(error, _, _)| *error != SetActionError::InitiallyIgnored);
+            let errors = errors.into_iter().map(Error).collect::<Vec<_>>();
+            match to_single_message(&{ errors }) {
+                None => crate::Result::default(),
+                Some(message) => report_failure(env, message).await,
+            }
+        }
     }
 }
 
@@ -216,8 +276,9 @@ mod tests {
     use super::*;
     use crate::tests::assert_stderr;
     use crate::tests::assert_stdout;
+    use crate::Result;
     use futures_util::future::FutureExt;
-    use std::ops::ControlFlow::Break;
+    use std::ops::ControlFlow::{Break, Continue};
     use std::rc::Rc;
     use yash_env::io::Fd;
     use yash_env::semantics::Divert;
@@ -331,6 +392,84 @@ mod tests {
         let _ = main(&mut env, args).now_or_never().unwrap();
 
         let actual_result = main(&mut env, vec![]).now_or_never().unwrap();
+        let expected_result = Result::with_exit_status_and_divert(
+            ExitStatus::FAILURE,
+            Break(Divert::Interrupt(None)),
+        );
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn unknown_condition() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo", "FOOBAR"]);
+
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::FAILURE, Continue(()));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn missing_condition() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo"]);
+
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::ERROR, Break(Divert::Interrupt(None)));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn ignoring_initially_ignored_signal() {
+        let mut system = VirtualSystem::new();
+        system
+            .current_process_mut()
+            .set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo", "INT"]);
+
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+        assert_eq!(
+            system.current_process().signal_handling(Signal::SIGINT),
+            SignalHandling::Ignore
+        );
+    }
+
+    #[test]
+    fn trying_to_trap_sigkill() {
+        let system = Box::new(VirtualSystem::new());
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(system);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo", "KILL"]);
+
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
         let expected_result = Result::with_exit_status_and_divert(
             ExitStatus::FAILURE,
             Break(Divert::Interrupt(None)),
