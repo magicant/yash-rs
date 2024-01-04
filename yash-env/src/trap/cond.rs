@@ -105,4 +105,5 @@ fn condition_from_str() {
 
     assert_eq!("XXXXX".parse::<Condition>(), Err(ParseConditionError));
     assert_eq!("999999999".parse::<Condition>(), Err(ParseConditionError));
+    assert_eq!("-123".parse::<Condition>(), Err(ParseConditionError));
 }
