@@ -173,6 +173,7 @@ impl TrapSet {
     /// The iterator yields tuples of the signal, the currently configured trap
     /// action, and the action set before
     /// [`enter_subshell`](Self::enter_subshell) was called.
+    #[inline]
     pub fn iter(&self) -> Iter<'_> {
         let inner = self.traps.iter();
         Iter { inner }
@@ -182,7 +183,7 @@ impl TrapSet {
     ///
     /// ## Resetting non-ignore traps
     ///
-    /// POSIX requires that traps other than `Trap::Ignore` be reset when
+    /// POSIX requires that traps other than `Action::Ignore` be reset when
     /// entering a subshell. This function achieves that effect.
     ///
     /// The trap set will remember the original trap states as the parent
@@ -379,6 +380,16 @@ impl TrapSet {
         self.disable_internal_handler(Signal::SIGCHLD, system)?;
         self.disable_terminator_handlers(system)?;
         self.disable_stopper_handlers(system)
+    }
+}
+
+impl<'a> IntoIterator for &'a TrapSet {
+    type Item = (&'a Condition, Option<&'a TrapState>, Option<&'a TrapState>);
+    type IntoIter = Iter<'a>;
+
+    #[inline(always)]
+    fn into_iter(self) -> Iter<'a> {
+        self.iter()
     }
 }
 

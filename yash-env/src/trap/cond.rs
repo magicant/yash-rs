@@ -18,6 +18,7 @@
 
 #[cfg(doc)]
 use super::state::Action;
+use std::ffi::c_int;
 // TODO Support real-time signals
 #[doc(no_inline)]
 pub use nix::sys::signal::Signal;
@@ -62,7 +63,8 @@ pub struct ParseConditionError;
 /// Conversion from `String` to `Condition`
 ///
 /// This implementation supports parsing uppercase strings like `"EXIT"` and
-/// `"TERM"`.
+/// `"TERM"` as well as signal numbers like `"9"` and `"15"`. The number `"0"`
+/// denotes [`Condition::Exit`].
 impl std::str::FromStr for Condition {
     type Err = ParseConditionError;
 
@@ -70,6 +72,17 @@ impl std::str::FromStr for Condition {
         // TODO Make case-insensitive
         // TODO Allow SIG-prefix
         // TODO Support real-time signals
+
+        if let Ok(number) = s.parse::<c_int>() {
+            if number == 0 {
+                return Ok(Self::Exit);
+            }
+            return match number.try_into() {
+                Ok(signal) => Ok(Self::Signal(signal)),
+                Err(_) => Err(ParseConditionError),
+            };
+        }
+
         match s {
             "EXIT" => Ok(Self::Exit),
             _ => match format!("SIG{s}").parse() {
@@ -78,4 +91,19 @@ impl std::str::FromStr for Condition {
             },
         }
     }
+}
+
+#[test]
+fn condition_from_str() {
+    assert_eq!("EXIT".parse(), Ok(Condition::Exit));
+    assert_eq!("TERM".parse(), Ok(Condition::Signal(Signal::SIGTERM)));
+    assert_eq!("INT".parse(), Ok(Condition::Signal(Signal::SIGINT)));
+
+    assert_eq!("0".parse(), Ok(Condition::Exit));
+    assert_eq!("1".parse(), Ok(Condition::Signal(Signal::SIGHUP)));
+    assert_eq!("9".parse(), Ok(Condition::Signal(Signal::SIGKILL)));
+
+    assert_eq!("XXXXX".parse::<Condition>(), Err(ParseConditionError));
+    assert_eq!("999999999".parse::<Condition>(), Err(ParseConditionError));
+    assert_eq!("-123".parse::<Condition>(), Err(ParseConditionError));
 }

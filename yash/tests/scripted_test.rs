@@ -244,6 +244,12 @@ fn tilde_expansion() {
     run("tilde-p.sh")
 }
 
+// This test case also covers the behavior of the trap execution.
+#[test]
+fn trap_builtin() {
+    run("trap-p.sh")
+}
+
 #[test]
 fn typeset_builtin() {
     run("typeset-y.sh")
