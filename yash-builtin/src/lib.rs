@@ -47,6 +47,7 @@
 //! - `wait`
 
 pub mod alias;
+pub mod bg;
 pub mod r#break;
 pub mod cd;
 pub mod colon;
@@ -58,6 +59,7 @@ pub mod eval;
 pub mod exec;
 pub mod exit;
 pub mod export;
+pub mod fg;
 pub mod getopts;
 pub mod jobs;
 pub mod pwd;
@@ -113,6 +115,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         },
     ),
     (
+        "bg",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(bg::main(env, args)),
+        },
+    ),
+    (
         "break",
         Builtin {
             r#type: Special,
@@ -161,6 +170,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Special,
             execute: |env, args| Box::pin(export::main(env, args)),
+        },
+    ),
+    (
+        "fg",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(fg::main(env, args)),
         },
     ),
     (
