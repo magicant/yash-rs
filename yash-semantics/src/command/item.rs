@@ -74,9 +74,12 @@ async fn execute_async(env: &mut Env, and_or: &Rc<AndOrList>, async_flag: &Locat
         .ignore_sigint_sigquit(true);
     match subshell.start(env).await {
         Ok((pid, job_control)) => {
-            debug_assert_ne!(job_control, Some(JobControl::Foreground));
             let mut job = Job::new(pid);
             job.name = and_or.to_string();
+            if let Some(job_control) = job_control {
+                debug_assert_eq!(job_control, JobControl::Background);
+                job.job_controlled = true;
+            }
             env.jobs.add(job);
             env.jobs.set_last_async_pid(pid);
             env.exit_status = ExitStatus::SUCCESS;
@@ -205,8 +208,10 @@ mod tests {
             item.execute(&mut env).await;
 
             let job = env.jobs.get(0).unwrap();
+            assert!(!job.job_controlled);
             assert!(job.status_changed);
             assert_eq!(job.status, WaitStatus::StillAlive);
+            assert_eq!(job.pid, env.jobs.last_async_pid());
             assert_eq!(job.name, "return -n 42");
         })
     }
@@ -266,6 +271,7 @@ mod tests {
             let state = state.borrow();
             let process = &state.processes[&env.jobs.last_async_pid()];
             assert_ne!(process.pgid(), env.main_pgid);
+            assert!(env.jobs.get(0).unwrap().job_controlled);
         })
     }
 
