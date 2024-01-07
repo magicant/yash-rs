@@ -94,6 +94,11 @@ fn asynchronous_list() {
 }
 
 #[test]
+fn bg_builtin() {
+    run_with_pty("bg-p.sh")
+}
+
+#[test]
 fn break_builtin() {
     run("break-p.sh")
 }
