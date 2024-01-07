@@ -73,16 +73,23 @@ impl WaitStatusEx for WaitStatus {
 #[non_exhaustive]
 pub struct Job {
     /// Process ID
+    ///
+    /// If the job is job-controlled, this is also the process group ID.
     pub pid: Pid,
 
     /// Whether the job is job-controlled.
     ///
-    /// If the job is job-controlled, the job process runs in its own process
+    /// If the job is job-controlled, the job processes run in their own process
     /// group.
     pub job_controlled: bool,
 
-    /// Status of the process
+    /// Current status of the process
     pub status: WaitStatus,
+
+    /// Status of the process expected in the next update
+    ///
+    /// See [`JobRefMut::expect`] and [`JobSet::update_status`] for details.
+    pub expected_status: Option<WaitStatus>,
 
     /// Indicator of status change
     ///
@@ -111,6 +118,7 @@ impl Job {
             pid,
             job_controlled: false,
             status: WaitStatus::StillAlive,
+            expected_status: None,
             status_changed: true,
             is_owned: true,
             name: String::new(),
@@ -124,15 +132,30 @@ impl Job {
 
 /// Partially mutable reference to [`Job`].
 ///
-/// This struct is a custom reference type for `Job`. It allows resetting the
-/// `status_changed` flag of the referenced job via the
-/// [`status_reported`](Self::status_reported) method, but does not provide any
-/// other mutability. Note that immutable access to the job is possible with the
-/// `Deref` implementation.
+/// This struct is a specialized reference type for `Job`. It provides limited
+/// mutability over the `Job` instance through its methods. It also allows
+/// unlimited immutable access through the `Deref` implementation.
 #[derive(Debug, Eq, PartialEq)]
 pub struct JobRefMut<'a>(&'a mut Job);
 
 impl JobRefMut<'_> {
+    /// Sets the `expected_status` of the job.
+    ///
+    /// This method remembers the argument as the expected status of the job.
+    /// If the job is [updated] with the same status, the `status_changed` flag
+    /// is not set then.
+    ///
+    /// This method may be used to suppress a change report of a job status,
+    /// especially when the status is reported before it is actually changed.
+    ///
+    /// [updated]: JobSet::update_status
+    pub fn expect<S>(&mut self, status: S)
+    where
+        S: Into<Option<WaitStatus>>,
+    {
+        self.0.expected_status = status.into();
+    }
+
     /// Clears the `status_changed` flag of the job.
     ///
     /// Normally, this method should be called when the shell printed a job
@@ -540,7 +563,10 @@ impl JobSet {
     ///
     /// The result of a `waitpid` call should be passed to this function.
     /// It updates the status of the job as indicated by `status`, and sets the
-    /// `status_changed` flag in the job.
+    /// `status_changed` flag in the job. As an exception, if `status` is equal
+    /// to the `expected_status` of the job, the `status_changed` flag is not
+    /// set. The `expected_status` is cleared in any case. (See also
+    /// [`JobRefMut::expect`] for the usage of `expected_status`.)
     ///
     /// Returns the index of the job updated. If `status` describes a process
     /// not managed in this job set, the result is `None`.
@@ -558,34 +584,34 @@ impl JobSet {
     ///   other than the current job, it becomes the previous job.
     pub fn update_status(&mut self, status: WaitStatus) -> Option<usize> {
         let pid = status.pid()?;
-        let index = self.find_by_pid(pid);
-        if let Some(index) = index {
-            // Update the job status.
-            let job = &mut self.jobs[index];
-            let was_suspended = job.is_suspended();
-            job.status = status;
-            job.status_changed = true;
+        let index = self.find_by_pid(pid)?;
 
-            // Reselect the current and previous job.
-            if !was_suspended && job.is_suspended() {
-                if index != self.current_job_index {
-                    self.previous_job_index = std::mem::replace(&mut self.current_job_index, index);
+        // Update the job status.
+        let job = &mut self.jobs[index];
+        let was_suspended = job.is_suspended();
+        job.status = status;
+        job.status_changed |= job.expected_status != Some(status);
+        job.expected_status = None;
+
+        // Reselect the current and previous job.
+        if !was_suspended && job.is_suspended() {
+            if index != self.current_job_index {
+                self.previous_job_index = std::mem::replace(&mut self.current_job_index, index);
+            }
+        } else if was_suspended && !job.is_suspended() {
+            if let Some(prev_index) = self.previous_job() {
+                let previous_job_becomes_current_job =
+                    index == self.current_job_index && self[prev_index].is_suspended();
+                if previous_job_becomes_current_job {
+                    self.current_job_index = prev_index;
                 }
-            } else if was_suspended && !job.is_suspended() {
-                if let Some(prev_index) = self.previous_job() {
-                    let previous_job_becomes_current_job =
-                        index == self.current_job_index && self[prev_index].is_suspended();
-                    if previous_job_becomes_current_job {
-                        self.current_job_index = prev_index;
-                    }
-                    if previous_job_becomes_current_job || index == prev_index {
-                        self.previous_job_index =
-                            self.any_suspended_job_but_current().unwrap_or(index);
-                    }
+                if previous_job_becomes_current_job || index == prev_index {
+                    self.previous_job_index = self.any_suspended_job_but_current().unwrap_or(index);
                 }
             }
         }
-        index
+
+        Some(index)
     }
 
     /// Disowns all jobs.
@@ -824,7 +850,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::bool_assert_comparison)]
-    fn updating_job_status() {
+    fn updating_job_status_without_expected_status() {
         let mut set = JobSet::default();
         let status = WaitStatus::Exited(Pid::from_raw(20), 15);
         assert_eq!(set.update_status(status), None);
@@ -843,6 +869,42 @@ mod tests {
 
         assert_eq!(set.get(i10).unwrap().status, WaitStatus::StillAlive);
         assert_eq!(set.get(i30).unwrap().status, WaitStatus::StillAlive);
+    }
+
+    #[test]
+    #[allow(clippy::bool_assert_comparison)]
+    fn updating_job_status_with_matching_expected_status() {
+        let mut set = JobSet::default();
+        let pid = Pid::from_raw(20);
+        let mut job = Job::new(pid);
+        job.expected_status = Some(WaitStatus::Continued(pid));
+        job.status_changed = false;
+        let i20 = set.add(job);
+
+        assert_eq!(set.update_status(WaitStatus::Continued(pid)), Some(i20));
+
+        let job = set.get(i20).unwrap();
+        assert_eq!(job.status, WaitStatus::Continued(pid));
+        assert_eq!(job.expected_status, None);
+        assert_eq!(job.status_changed, false);
+    }
+
+    #[test]
+    #[allow(clippy::bool_assert_comparison)]
+    fn updating_job_status_with_unmatched_expected_status() {
+        let mut set = JobSet::default();
+        let pid = Pid::from_raw(20);
+        let mut job = Job::new(pid);
+        job.expected_status = Some(WaitStatus::Continued(pid));
+        job.status_changed = false;
+        let i20 = set.add(job);
+
+        assert_eq!(set.update_status(WaitStatus::Exited(pid, 0)), Some(i20));
+
+        let job = set.get(i20).unwrap();
+        assert_eq!(job.status, WaitStatus::Exited(pid, 0));
+        assert_eq!(job.expected_status, None);
+        assert_eq!(job.status_changed, true);
     }
 
     #[test]

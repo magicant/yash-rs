@@ -71,7 +71,12 @@
 //! prevent unrelated processes that happen to have the same process IDs as the
 //! jobs from receiving the signal.
 //!
+//! The built-in sets the [expected status] of the resumed jobs to
+//! [`WaitStatus::Continued`] so that the status changes are not reported again
+//! on the next command prompt.
+//!
 //! [`Monitor`]: yash_env::option::Monitor
+//! [expected status]: yash_env::job::Job::expected_status
 
 use crate::common::report_error;
 use crate::common::report_failure;
@@ -157,7 +162,7 @@ const fn is_alive(status: WaitStatus) -> bool {
 ///
 /// This function panics if there is no job at the specified index.
 async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeError> {
-    let job = env.jobs.get_mut(index).unwrap();
+    let mut job = env.jobs.get_mut(index).unwrap();
     if !job.job_controlled {
         return Err(ResumeError::Unmonitored);
     }
@@ -173,13 +178,17 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
     if is_alive(job.status) {
         let pgid = Pid::from_raw(-job.pid.as_raw());
         env.system.kill(pgid, Signal::SIGCONT.into())?;
+
+        // We've just reported that the job is resumed, so there is no need to
+        // report the same thing in the usual pre-prompt message.
+        job.expect(WaitStatus::Continued(job.pid));
     }
 
     // The resumed job becomes the current job. This is only relevant when all
     // jobs are running since the current job is not changed if there is another
     // suspended job, but it is simpler to always update the current job.
     env.jobs.set_current_job(index).ok();
-    // TODO Update the job status but reset the status_changed flag.
+
     Ok(())
 }
 
@@ -293,6 +302,27 @@ mod tests {
             assert_eq!(stdout, "[1] echo my job\n");
         });
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn resume_job_by_index_sets_expected_status() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pid = Pid::from_raw(123);
+        let mut job = Job::new(pid);
+        job.job_controlled = true;
+        let index = env.jobs.add(job);
+        let mut process = Process::with_parent_and_group(system.process_id, pid);
+        _ = process.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pid, process);
+        }
+
+        _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+
+        let job = env.jobs.get(index).unwrap();
+        assert_eq!(job.expected_status, Some(WaitStatus::Continued(pid)));
     }
 
     #[test]
