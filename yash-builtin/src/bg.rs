@@ -205,4 +205,203 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     }
 }
 
-// TODO test
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
+    use futures_util::FutureExt as _;
+    use yash_env::job::Job;
+    use yash_env::semantics::ExitStatus;
+    use yash_env::system::r#virtual::Process;
+    use yash_env::system::r#virtual::ProcessState;
+    use yash_env::VirtualSystem;
+
+    #[test]
+    fn resume_job_by_index_sends_sigcont() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pgid = Pid::from_raw(123);
+        let child_id = Pid::from_raw(124);
+        let orphan_id = Pid::from_raw(456);
+        let mut job = Job::new(pgid);
+        let mut orphan = Job::new(orphan_id);
+        job.job_controlled = true;
+        orphan.job_controlled = true;
+        let index = env.jobs.add(job);
+        let _ = env.jobs.add(orphan);
+        let mut leader = Process::with_parent_and_group(system.process_id, pgid);
+        let mut child = Process::fork_from(pgid, &leader);
+        let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
+        _ = leader.set_state(ProcessState::Stopped(Signal::SIGTTIN));
+        _ = child.set_state(ProcessState::Stopped(Signal::SIGTSTP));
+        _ = orphan.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pgid, leader);
+            state.processes.insert(child_id, child);
+            state.processes.insert(orphan_id, orphan);
+        }
+
+        resume_job_by_index(&mut env, index)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let state = system.state.borrow();
+        // The process group leader should be resumed.
+        assert_eq!(state.processes[&pgid].state(), ProcessState::Running);
+        // The child should also be resumed as it belongs to the same process group.
+        assert_eq!(state.processes[&child_id].state(), ProcessState::Running);
+        // Unrelated processes should not be resumed.
+        assert_eq!(
+            state.processes[&orphan_id].state(),
+            ProcessState::Stopped(Signal::SIGSTOP),
+        );
+    }
+
+    #[test]
+    fn resume_job_by_index_prints_job_name() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut job = Job::new(Pid::from_raw(123));
+        job.job_controlled = true;
+        job.name = "echo my job".into();
+        let index = env.jobs.add(job);
+
+        _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "[1] echo my job\n");
+        });
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn resume_job_by_index_rejects_unmonitored_job() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let index = env.jobs.add(Job::new(Pid::from_raw(123)));
+
+        let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+        assert_eq!(result, Err(ResumeError::Unmonitored));
+    }
+
+    #[test]
+    fn main_without_operands_resumes_current_job() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pgid = Pid::from_raw(100);
+        let orphan_id = Pid::from_raw(200);
+        let mut job = Job::new(pgid);
+        let mut orphan = Job::new(orphan_id);
+        job.job_controlled = true;
+        orphan.job_controlled = true;
+        let _ = env.jobs.add(orphan);
+        let index = env.jobs.add(job);
+        env.jobs.set_current_job(index).unwrap();
+        let mut leader = Process::with_parent_and_group(system.process_id, pgid);
+        let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
+        _ = leader.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        _ = orphan.set_state(ProcessState::Stopped(Signal::SIGTTIN));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pgid, leader);
+            state.processes.insert(orphan_id, orphan);
+        }
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, crate::Result::default());
+
+        let state = system.state.borrow();
+        // The current job's process group leader should be resumed.
+        assert_eq!(state.processes[&pgid].state(), ProcessState::Running);
+        // Unrelated processes should not be resumed.
+        assert_eq!(
+            state.processes[&orphan_id].state(),
+            ProcessState::Stopped(Signal::SIGTTIN),
+        );
+        // No error message should be printed on success.
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    // TODO main_without_operands_fails_if_there_is_no_current_job
+
+    #[test]
+    fn main_with_operands_resumes_specified_jobs() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pgid1 = Pid::from_raw(100);
+        let pgid2 = Pid::from_raw(200);
+        let pgid3 = Pid::from_raw(300);
+        let mut job1 = Job::new(pgid1);
+        let mut job2 = Job::new(pgid2);
+        let mut job3 = Job::new(pgid3);
+        job1.job_controlled = true;
+        job2.job_controlled = true;
+        job3.job_controlled = true;
+        let _ = env.jobs.add(job1);
+        let _ = env.jobs.add(job2);
+        let _ = env.jobs.add(job3);
+        let mut process1 = Process::with_parent_and_group(system.process_id, pgid1);
+        let mut process2 = Process::with_parent_and_group(system.process_id, pgid2);
+        let mut process3 = Process::with_parent_and_group(system.process_id, pgid3);
+        _ = process1.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        _ = process2.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        _ = process3.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pgid1, process1);
+            state.processes.insert(pgid2, process2);
+            state.processes.insert(pgid3, process3);
+        }
+
+        let result = main(&mut env, Field::dummies(["%1", "%3"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::default());
+
+        let state = system.state.borrow();
+        // The specified jobs should be resumed.
+        assert_eq!(state.processes[&pgid1].state(), ProcessState::Running);
+        assert_eq!(state.processes[&pgid3].state(), ProcessState::Running);
+        // Unrelated processes should not be resumed.
+        assert_eq!(
+            state.processes[&pgid2].state(),
+            ProcessState::Stopped(Signal::SIGSTOP),
+        );
+        // No error message should be printed on success.
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn main_with_operands_tries_to_resume_all_jobs() {
+        // In this test case, only the second operand is valid. The main
+        // function fails on the first operand, but it should try to handle the
+        // remaining operands.
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pgid = Pid::from_raw(100);
+        let mut job = Job::new(pgid);
+        job.job_controlled = true;
+        let index = env.jobs.add(job);
+        env.jobs.set_current_job(index).unwrap();
+        let mut leader = Process::with_parent_and_group(system.process_id, pgid);
+        _ = leader.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pgid, leader);
+        }
+
+        let result = main(&mut env, Field::dummies(["%2", "%1", "%3"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+
+        let state = system.state.borrow();
+        // The job should be resumed.
+        assert_eq!(state.processes[&pgid].state(), ProcessState::Running);
+        // Some error messages should be printed for the invalid operands.
+        assert_stderr(&system.state, |stderr| assert_ne!(stderr, ""));
+    }
+}
