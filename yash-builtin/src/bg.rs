@@ -188,7 +188,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
                 Err(error) => report_simple_failure(env, &error.to_string()).await,
             }
         } else {
-            todo!("there is no job, error")
+            report_simple_failure(env, "there is no job").await
         }
     } else {
         let mut errors = Vec::new();
@@ -325,7 +325,18 @@ mod tests {
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
     }
 
-    // TODO main_without_operands_fails_if_there_is_no_current_job
+    #[test]
+    fn main_without_operands_fails_if_there_is_no_current_job() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("there is no job"), "{stderr:?}");
+        });
+    }
 
     #[test]
     fn main_with_operands_resumes_specified_jobs() {
