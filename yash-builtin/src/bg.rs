@@ -61,10 +61,15 @@
 //! Many implementations allow omitting the leading `%` from job IDs, though it
 //! is not required by POSIX.
 //!
+//! Some implementations (including the previous version of yash, but not this
+//! version) regard it is an error to resume a job that has already terminated.
+//!
 //! # Implementation notes
 //!
 //! This implementation sends the `SIGCONT` signal even to jobs that are already
-//! running.
+//! running. The signal is not sent to jobs that have already terminated, to
+//! prevent unrelated processes that happen to have the same process IDs as the
+//! jobs from receiving the signal.
 //!
 //! [`Monitor`]: yash_env::option::Monitor
 
@@ -85,6 +90,7 @@ use yash_env::job::id::ParseError;
 #[cfg(doc)]
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
+use yash_env::job::WaitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::trap::Signal;
@@ -139,6 +145,14 @@ impl MessageBase for OperandError {
     }
 }
 
+/// Tests if the specified wait status indicates that the job is still alive.
+const fn is_alive(status: WaitStatus) -> bool {
+    !matches!(
+        status,
+        WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)
+    )
+}
+
 /// Resumes the job at the specified index.
 ///
 /// This function panics if there is no job at the specified index.
@@ -156,9 +170,10 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
     let line = format!("[{}] {}\n", report.number(), job.name);
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
 
-    let pgid = Pid::from_raw(-job.pid.as_raw());
-    env.system.kill(pgid, Signal::SIGCONT.into())?;
-    // TODO Don't kill if the job is already dead.
+    if is_alive(job.status) {
+        let pgid = Pid::from_raw(-job.pid.as_raw());
+        env.system.kill(pgid, Signal::SIGCONT.into())?;
+    }
 
     // TODO env.jobs.set_current_job(index).ok();
     // TODO Update the job status but reset the status_changed flag.
@@ -275,6 +290,36 @@ mod tests {
             assert_eq!(stdout, "[1] echo my job\n");
         });
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pid = Pid::from_raw(123);
+        let mut job = Job::new(pid);
+        job.job_controlled = true;
+        job.status = WaitStatus::Exited(pid, 0);
+        let index = env.jobs.add(job);
+        // This process (irrelevant to the job) happens to have the same PID as the job.
+        let mut process = Process::with_parent_and_group(system.process_id, pid);
+        _ = process.set_state(ProcessState::Stopped(Signal::SIGSTOP));
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pid, process);
+        }
+
+        resume_job_by_index(&mut env, index)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let state = system.state.borrow();
+        // The process should not be resumed.
+        assert_eq!(
+            state.processes[&pid].state(),
+            ProcessState::Stopped(Signal::SIGSTOP),
+        );
     }
 
     #[test]
