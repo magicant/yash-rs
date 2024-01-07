@@ -175,7 +175,10 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
         env.system.kill(pgid, Signal::SIGCONT.into())?;
     }
 
-    // TODO env.jobs.set_current_job(index).ok();
+    // The resumed job becomes the current job. This is only relevant when all
+    // jobs are running since the current job is not changed if there is another
+    // suspended job, but it is simpler to always update the current job.
+    env.jobs.set_current_job(index).ok();
     // TODO Update the job status but reset the status_changed flag.
     Ok(())
 }
@@ -290,6 +293,37 @@ mod tests {
             assert_eq!(stdout, "[1] echo my job\n");
         });
         assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn resume_job_by_index_makes_target_current_job() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let pgid = Pid::from_raw(123);
+        let orphan_id = Pid::from_raw(456);
+        let mut job = Job::new(pgid);
+        let mut orphan = Job::new(orphan_id);
+        job.job_controlled = true;
+        orphan.job_controlled = true;
+        let index = env.jobs.add(job);
+        let orphan_index = env.jobs.add(orphan);
+        env.jobs.set_current_job(orphan_index).unwrap();
+        let mut leader = Process::with_parent_and_group(system.process_id, pgid);
+        let mut orphan = Process::with_parent_and_group(system.process_id, orphan_id);
+        _ = leader.set_state(ProcessState::Stopped(Signal::SIGTTIN));
+        _ = orphan.set_state(ProcessState::Running);
+        {
+            let mut state = system.state.borrow_mut();
+            state.processes.insert(pgid, leader);
+            state.processes.insert(orphan_id, orphan);
+        }
+
+        resume_job_by_index(&mut env, index)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(env.jobs.current_job(), Some(index));
     }
 
     #[test]
