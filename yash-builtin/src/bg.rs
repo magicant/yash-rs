@@ -48,9 +48,8 @@
 //!
 //! # Errors
 //!
-//! This built-in can be used only when the [`Monitor`] option is set.
-//!
-//! It is an error if the specified job is not found.
+//! It is an error if the specified job is not found, not job-controlled, or
+//! not [owned] by the current shell environment.
 //!
 //! # Exit status
 //!
@@ -75,7 +74,7 @@
 //! [`WaitStatus::Continued`] so that the status changes are not reported again
 //! on the next command prompt.
 //!
-//! [`Monitor`]: yash_env::option::Monitor
+//! [owned]: yash_env::job::Job::is_owned
 //! [expected status]: yash_env::job::Job::expected_status
 
 use crate::common::report_error;
@@ -109,6 +108,8 @@ use yash_syntax::syntax::Fd;
 /// Errors that may occur when resuming a job
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 enum ResumeError {
+    #[error("target job is not controlled by the current shell environment")]
+    Unowned,
     #[error("target job is not job-controlled")]
     Unmonitored,
     #[error("system error: {0}")]
@@ -163,6 +164,9 @@ const fn is_alive(status: WaitStatus) -> bool {
 /// This function panics if there is no job at the specified index.
 async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeError> {
     let mut job = env.jobs.get_mut(index).unwrap();
+    if !job.is_owned {
+        return Err(ResumeError::Unowned);
+    }
     if !job.job_controlled {
         return Err(ResumeError::Unmonitored);
     }
@@ -387,9 +391,20 @@ mod tests {
     }
 
     #[test]
+    fn resume_job_by_index_rejects_unowned_job() {
+        let mut env = Env::new_virtual();
+        let mut job = Job::new(Pid::from_raw(123));
+        job.job_controlled = true;
+        job.is_owned = false;
+        let index = env.jobs.add(job);
+
+        let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+        assert_eq!(result, Err(ResumeError::Unowned));
+    }
+
+    #[test]
     fn resume_job_by_index_rejects_unmonitored_job() {
-        let system = VirtualSystem::new();
-        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut env = Env::new_virtual();
         let index = env.jobs.add(Job::new(Pid::from_raw(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
