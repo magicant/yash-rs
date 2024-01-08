@@ -149,6 +149,11 @@ fn export_builtin() {
 }
 
 #[test]
+fn fg_builtin() {
+    run_with_pty("fg-p.sh")
+}
+
+#[test]
 fn fnmatch() {
     run("fnmatch-p.sh")
 }
