@@ -934,24 +934,24 @@ fn send_signal_to_processes(
     target_pgid: Option<Pid>,
     signal: Option<Signal>,
 ) -> nix::Result<()> {
-    let mut ppids = Vec::new();
+    let mut results = Vec::new();
 
     if let Some(signal) = signal {
         for (&_pid, process) in &mut state.processes {
             if target_pgid.map_or(true, |target_pgid| process.pgid == target_pgid) {
                 let result = process.raise_signal(signal);
-                if result.process_state_changed {
-                    ppids.push(process.ppid);
-                }
+                results.push((result, process.ppid));
             }
         }
     }
 
-    if ppids.is_empty() {
+    if results.is_empty() {
         Err(Errno::ESRCH)
     } else {
-        for ppid in ppids {
-            raise_sigchld(state, ppid);
+        for (result, ppid) in results {
+            if result.process_state_changed {
+                raise_sigchld(state, ppid);
+            }
         }
         Ok(())
     }
@@ -1761,6 +1761,27 @@ mod tests {
         assert_eq!(
             state.processes[&Pid::from_raw(21)].state,
             ProcessState::Signaled(Signal::SIGHUP)
+        );
+    }
+
+    #[test]
+    fn kill_returns_success_even_if_process_state_did_not_change() {
+        let mut system = VirtualSystem::new();
+        let pgid = system.current_process().pgid;
+        let mut state = system.state.borrow_mut();
+        state.processes.insert(
+            Pid::from_raw(10),
+            Process::with_parent_and_group(system.process_id, pgid),
+        );
+        drop(state);
+
+        system
+            .kill(Pid::from_raw(-pgid.as_raw()), Some(Signal::SIGCONT))
+            .unwrap();
+        let state = system.state.borrow();
+        assert_eq!(
+            state.processes[&Pid::from_raw(10)].state,
+            ProcessState::Running
         );
     }
 
