@@ -105,9 +105,11 @@ use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
 
+// Some definitions in this module are shared with the `fg` built-in.
+
 /// Errors that may occur when resuming a job
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-enum ResumeError {
+pub(crate) enum ResumeError {
     #[error("target job is not controlled by the current shell environment")]
     Unowned,
     #[error("target job is not job-controlled")]
@@ -118,7 +120,7 @@ enum ResumeError {
 
 /// Errors that may occur when processing an operand
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-enum OperandErrorKind {
+pub(crate) enum OperandErrorKind {
     /// The operand is not a job ID.
     #[error(transparent)]
     InvalidJobId(#[from] ParseError),
@@ -152,7 +154,7 @@ impl MessageBase for OperandError {
 }
 
 /// Tests if the specified wait status indicates that the job is still alive.
-const fn is_alive(status: WaitStatus) -> bool {
+pub(crate) const fn is_alive(status: WaitStatus) -> bool {
     !matches!(
         status,
         WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)

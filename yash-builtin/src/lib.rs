@@ -292,10 +292,10 @@ pub(crate) mod tests {
     use std::cell::RefCell;
     use std::future::Future;
     use std::pin::Pin;
-    #[cfg(feature = "yash-semantics")]
     use std::rc::Rc;
     use std::str::from_utf8;
     use yash_env::system::r#virtual::FileBody;
+    use yash_env::system::r#virtual::INode;
     use yash_env::system::r#virtual::SystemState;
     #[cfg(feature = "yash-semantics")]
     use yash_env::Env;
@@ -347,6 +347,14 @@ pub(crate) mod tests {
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
         }
+    }
+
+    pub fn stub_tty(state: &RefCell<SystemState>) {
+        state
+            .borrow_mut()
+            .file_system
+            .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
+            .unwrap();
     }
 
     /// Helper function for asserting on the content of /dev/stdout.
