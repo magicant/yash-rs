@@ -86,6 +86,7 @@ use crate::common::to_single_message;
 use std::borrow::Cow;
 use std::fmt::Display;
 use thiserror::Error;
+use yash_env::io::Fd;
 use yash_env::job::fmt::Marker;
 use yash_env::job::fmt::Report;
 use yash_env::job::id::parse;
@@ -103,7 +104,6 @@ use yash_env::System;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
 use yash_syntax::source::pretty::MessageBase;
-use yash_syntax::syntax::Fd;
 
 /// Errors that may occur when resuming a job
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -178,6 +178,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
     };
     let line = format!("[{}] {}\n", report.number(), job.name);
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
+    drop(line);
 
     if is_alive(job.status) {
         let pgid = Pid::from_raw(-job.pid.as_raw());
