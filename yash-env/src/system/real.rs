@@ -355,9 +355,9 @@ impl System for RealSystem {
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
-    /// parent and child process. In the parent, the `run` function of the
-    /// returned `ChildProcess` ignores arguments and returns the child process
-    /// ID. In the child, the `run` function runs the task and exits the
+    /// parent and child process. In the parent, the returned
+    /// `ChildProcessStarter` ignores any arguments and returns the child
+    /// process ID. In the child, the starter runs the task and exits the
     /// process.
     fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         use nix::unistd::ForkResult::*;
