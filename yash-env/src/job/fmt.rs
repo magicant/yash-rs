@@ -130,13 +130,25 @@ pub struct Report<'a> {
     pub job: &'a Job,
 }
 
+impl Report<'_> {
+    /// Returns the job number of the job.
+    ///
+    /// The job number is a positive integer that is one greater than the index
+    /// of the job in its containing job set. Rather than the raw index, the job
+    /// number should be displayed to the user.
+    #[must_use]
+    pub fn number(&self) -> usize {
+        self.index + 1
+    }
+}
+
 /// Formats a job status report.
 ///
 /// The `fmt` method will **panic** if `self.index` does not name an existing
 /// job in `self.jobs`.
 impl Display for Report<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let number = self.index + 1;
+        let number = self.number();
         let marker = self.marker;
         let status = FormatStatus(self.job.status);
         let name = &self.job.name;
