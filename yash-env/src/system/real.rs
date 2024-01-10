@@ -50,10 +50,12 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::future::Future;
 use std::io::SeekFrom;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
+use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
@@ -309,8 +311,13 @@ impl System for RealSystem {
         signals
     }
 
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
-        nix::sys::signal::kill(target, signal)
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+        let result = nix::sys::signal::kill(target, signal);
+        Box::pin(std::future::ready(result))
     }
 
     fn select(

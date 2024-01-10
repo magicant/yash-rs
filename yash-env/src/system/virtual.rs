@@ -625,8 +625,15 @@ impl System for VirtualSystem {
         std::mem::take(&mut self.current_process_mut().caught_signals)
     }
 
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
-        match target.as_raw() {
+    /// Sends a signal to the target process.
+    ///
+    /// TODO Elaborate
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+        let result = match target.as_raw() {
             0 => {
                 let target_pgid = self.current_process().pgid;
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
@@ -655,7 +662,9 @@ impl System for VirtualSystem {
                 let target_pgid = Pid::from_raw(-negative_pgid);
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
             }
-        }
+        };
+
+        Box::pin(std::future::ready(result))
     }
 
     /// Waits for a next event.
@@ -1145,6 +1154,7 @@ mod tests {
     use crate::Env;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
+    use futures_util::FutureExt;
     use std::ffi::CString;
     use std::ffi::OsString;
     use std::future::pending;
@@ -1702,12 +1712,19 @@ mod tests {
     #[test]
     fn kill_process() {
         let mut system = VirtualSystem::new();
-        system.kill(system.process_id, None).unwrap();
+        system
+            .kill(system.process_id, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.current_process().state(), ProcessState::Running);
 
         system
             .kill(system.process_id, Some(Signal::SIGINT))
+            .now_or_never()
+            .unwrap()
             .unwrap();
+        // TODO Killing the current process should make the future pending
         assert_eq!(
             system.current_process().state(),
             ProcessState::Signaled(Signal::SIGINT)
@@ -1718,6 +1735,8 @@ mod tests {
         drop(state);
         let e = system
             .kill(Pid::from_raw(max_pid + 1), Some(Signal::SIGINT))
+            .now_or_never()
+            .unwrap()
             .unwrap_err();
         assert_eq!(e, Errno::ESRCH);
     }
@@ -1743,7 +1762,10 @@ mod tests {
 
         system
             .kill(Pid::from_raw(-1), Some(Signal::SIGTERM))
+            .now_or_never()
+            .unwrap()
             .unwrap();
+        // TODO Killing the current process should make the future pending
         let state = system.state.borrow();
         for process in state.processes.values() {
             assert_eq!(process.state, ProcessState::Signaled(Signal::SIGTERM));
@@ -1771,7 +1793,10 @@ mod tests {
 
         system
             .kill(Pid::from_raw(0), Some(Signal::SIGQUIT))
+            .now_or_never()
+            .unwrap()
             .unwrap();
+        // TODO Killing the current process should make the future pending
         let state = system.state.borrow();
         assert_eq!(
             state.processes[&system.process_id].state,
@@ -1812,6 +1837,8 @@ mod tests {
 
         system
             .kill(Pid::from_raw(-21), Some(Signal::SIGHUP))
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let state = system.state.borrow();
         assert_eq!(
@@ -1845,6 +1872,8 @@ mod tests {
 
         system
             .kill(Pid::from_raw(-pgid.as_raw()), Some(Signal::SIGCONT))
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let state = system.state.borrow();
         assert_eq!(

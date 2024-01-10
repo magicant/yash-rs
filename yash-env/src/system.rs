@@ -258,7 +258,15 @@ pub trait System: Debug {
     /// Sends a signal.
     ///
     /// This is a thin wrapper around the `kill` system call.
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()>;
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<dyn Future<Output = nix::Result<()>>>>;
 
     /// Waits for a next event.
     ///
@@ -871,7 +879,11 @@ impl System for SharedSystem {
     fn caught_signals(&mut self) -> Vec<Signal> {
         self.0.borrow_mut().caught_signals()
     }
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
     fn select(

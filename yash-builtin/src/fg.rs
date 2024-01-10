@@ -143,7 +143,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     env.system.tcsetpgrp_without_block(tty, job.pid)?;
 
     let pgid = Pid::from_raw(-job.pid.as_raw());
-    env.system.kill(pgid, Signal::SIGCONT.into())?;
+    env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
     // Wait for the job to finish (or suspend again).
     let status = wait_while_running(env, job.pid).await?;

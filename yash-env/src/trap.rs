@@ -1011,7 +1011,10 @@ mod tests {
                     false,
                 )
                 .unwrap();
-            env.system.kill(env.main_pid, Some(Signal::SIGINT)).unwrap();
+            env.system
+                .kill(env.main_pid, Some(Signal::SIGINT))
+                .await
+                .unwrap();
             env.traps.enter_subshell(&mut env.system, true, false);
 
             let state = state.borrow();
@@ -1038,6 +1041,7 @@ mod tests {
                 .unwrap();
             env.system
                 .kill(env.main_pid, Some(Signal::SIGQUIT))
+                .await
                 .unwrap();
             env.traps.enter_subshell(&mut env.system, true, false);
 
@@ -1076,7 +1080,7 @@ mod tests {
             }
             env.traps.enable_stopper_handlers(&mut env.system).unwrap();
             for signal in [Signal::SIGTSTP, Signal::SIGTTIN, Signal::SIGTTOU] {
-                env.system.kill(env.main_pid, Some(signal)).unwrap();
+                env.system.kill(env.main_pid, Some(signal)).await.unwrap();
             }
             env.traps.enter_subshell(&mut env.system, false, true);
 

@@ -22,7 +22,6 @@ use futures_util::task::LocalSpawnExt;
 use itertools::Itertools;
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::future::pending;
 use std::future::ready;
 use std::future::Future;
 use std::ops::ControlFlow::Break;
@@ -217,10 +216,13 @@ fn suspend_builtin_main(
     env: &mut Env,
     _args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-    env.system
-        .kill(Pid::from_raw(0), Some(Signal::SIGSTOP))
-        .unwrap();
-    Box::pin(pending())
+    Box::pin(async move {
+        env.system
+            .kill(Pid::from_raw(0), Some(Signal::SIGSTOP))
+            .await
+            .unwrap();
+        yash_env::builtin::Result::default()
+    })
 }
 
 /// Returns a minimal implementation of the `suspend` built-in.
