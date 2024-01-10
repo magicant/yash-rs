@@ -64,6 +64,7 @@ use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
+use super::SignalStatus;
 use super::TimeSpec;
 use super::AT_FDCWD;
 use crate::io::Fd;
@@ -90,11 +91,14 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::ops::DerefMut as _;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::task::Context;
+use std::task::Poll;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -824,14 +828,23 @@ impl System for VirtualSystem {
                 }
 
                 let run_task_and_set_exit_status = Box::pin(async move {
-                    task(&mut child_env).await;
+                    let mut runner = ProcessRunner {
+                        task: task(&mut child_env),
+                        state,
+                        process_id,
+                        signal_status: None,
+                    };
+                    (&mut runner).await;
 
+                    let ProcessRunner { state, .. } = { runner };
                     let mut state = state.borrow_mut();
                     let process = state
                         .processes
                         .get_mut(&process_id)
                         .expect("missing child process");
-                    if process.set_state(ProcessState::Exited(child_env.exit_status)) {
+                    if process.state == ProcessState::Running
+                        && process.set_state(ProcessState::Exited(child_env.exit_status))
+                    {
                         let ppid = process.ppid;
                         raise_sigchld(&mut state, ppid);
                     }
@@ -1068,6 +1081,61 @@ pub trait Executor: Debug {
         &self,
         task: Pin<Box<dyn Future<Output = ()>>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+/// Concurrent task that manages the execution of a process.
+///
+/// This struct is a helper for [`VirtualSystem::new_child_process`].
+/// It basically runs the given task, but pauses or cancels it depending on
+/// the state of the process.
+struct ProcessRunner<'a> {
+    task: Pin<Box<dyn Future<Output = ()> + 'a>>,
+    state: Rc<RefCell<SystemState>>,
+    process_id: Pid,
+
+    /// Retains the waker of this task that is waiting for signals.
+    signal_status: Option<Rc<RefCell<SignalStatus>>>,
+}
+
+impl Future for ProcessRunner<'_> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.deref_mut();
+
+        this.signal_status = None;
+
+        let state = this.state.borrow();
+        let process = state
+            .processes
+            .get(&this.process_id)
+            .expect("missing process");
+        if process.state == ProcessState::Running {
+            drop(state);
+            if this.task.as_mut().poll(cx) == Poll::Ready(()) {
+                return Poll::Ready(());
+            }
+        }
+
+        let state = this.state.borrow();
+        let process = state
+            .processes
+            .get(&this.process_id)
+            .expect("missing process");
+        match process.state {
+            ProcessState::Running => Poll::Pending,
+
+            ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Ready(()),
+
+            ProcessState::Stopped(_) => {
+                let sig_system = process.selector.upgrade().expect("select system missing");
+                let sig_status = sig_system.borrow_mut().signal.wait_for_signals();
+                *sig_status.borrow_mut() = SignalStatus::Expected(Some(cx.waker().clone()));
+                this.signal_status = Some(sig_status);
+                Poll::Pending
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2218,6 +2286,12 @@ mod tests {
 
         let result = env.system.wait(pid);
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
+    }
+
+    #[test]
+    #[ignore = "not implemented, kill has to be async"]
+    fn wait_for_signaled_child() {
+        // TODO wait_for_signaled_child
     }
 
     #[test]
