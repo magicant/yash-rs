@@ -129,7 +129,7 @@ fn exit_builtin_main(
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
     let exit_status = args
-        .get(0)
+        .first()
         .map(|field| ExitStatus(field.value.parse().unwrap_or(2)));
     let result = yash_env::builtin::Result::with_exit_status_and_divert(
         env.exit_status,
@@ -176,7 +176,7 @@ fn break_builtin_main(
     _env: &mut Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-    let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
+    let count = args.first().map_or(1, |field| field.value.parse().unwrap());
     let result = yash_env::builtin::Result::with_exit_status_and_divert(
         ExitStatus::SUCCESS,
         Break(Divert::Break { count: count - 1 }),
@@ -196,7 +196,7 @@ fn continue_builtin_main(
     _env: &mut Env,
     args: Vec<Field>,
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result>>> {
-    let count = args.get(0).map_or(1, |field| field.value.parse().unwrap());
+    let count = args.first().map_or(1, |field| field.value.parse().unwrap());
     let result = yash_env::builtin::Result::with_exit_status_and_divert(
         ExitStatus::SUCCESS,
         Break(Divert::Continue { count: count - 1 }),
