@@ -88,6 +88,7 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
@@ -270,6 +271,37 @@ impl VirtualSystem {
         }
 
         Err(Errno::ELOOP)
+    }
+
+    /// Blocks the calling thread until the current process is running.
+    async fn block_until_running(&self) {
+        let mut signal_status = None;
+
+        poll_fn(|cx| {
+            signal_status = None;
+
+            let mut state = self.state.borrow_mut();
+            let Some(process) = state.processes.get_mut(&self.process_id) else {
+                return Poll::Ready(());
+            };
+
+            match process.state {
+                ProcessState::Running => Poll::Ready(()),
+
+                ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Pending,
+
+                ProcessState::Stopped(_) => {
+                    let Some(sig_system) = process.selector.upgrade() else {
+                        return Poll::Ready(());
+                    };
+                    let sig_status = sig_system.borrow_mut().signal.wait_for_signals();
+                    *sig_status.borrow_mut() = SignalStatus::Expected(Some(cx.waker().clone()));
+                    signal_status = Some(sig_status);
+                    Poll::Pending
+                }
+            }
+        })
+        .await
     }
 }
 
@@ -627,7 +659,12 @@ impl System for VirtualSystem {
 
     /// Sends a signal to the target process.
     ///
-    /// TODO Elaborate
+    /// This function returns a future that enables the executor to block the
+    /// calling thread until the current process is ready to proceed. If the
+    /// signal is sent to the current process and it causes the process to stop,
+    /// the future will be ready only when the process is resumed. Similarly, if
+    /// the signal causes the current process to terminate, the future will
+    /// never be ready.
     fn kill(
         &mut self,
         target: Pid,
@@ -664,7 +701,11 @@ impl System for VirtualSystem {
             }
         };
 
-        Box::pin(std::future::ready(result))
+        let system = self.clone();
+        Box::pin(async move {
+            system.block_until_running().await;
+            result
+        })
     }
 
     /// Waits for a next event.
@@ -1719,17 +1760,17 @@ mod tests {
             .unwrap();
         assert_eq!(system.current_process().state(), ProcessState::Running);
 
-        system
+        let result = system
             .kill(system.process_id, Some(Signal::SIGINT))
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        // TODO Killing the current process should make the future pending
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         assert_eq!(
             system.current_process().state(),
             ProcessState::Signaled(Signal::SIGINT)
         );
 
+        let mut system = VirtualSystem::new();
         let state = system.state.borrow();
         let max_pid = state.processes.keys().max().unwrap().as_raw();
         drop(state);
@@ -1760,12 +1801,11 @@ mod tests {
         );
         drop(state);
 
-        system
+        let result = system
             .kill(Pid::from_raw(-1), Some(Signal::SIGTERM))
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        // TODO Killing the current process should make the future pending
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         let state = system.state.borrow();
         for process in state.processes.values() {
             assert_eq!(process.state, ProcessState::Signaled(Signal::SIGTERM));
@@ -1791,12 +1831,11 @@ mod tests {
         );
         drop(state);
 
-        system
+        let result = system
             .kill(Pid::from_raw(0), Some(Signal::SIGQUIT))
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-        // TODO Killing the current process should make the future pending
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         let state = system.state.borrow();
         assert_eq!(
             state.processes[&system.process_id].state,
@@ -2318,9 +2357,56 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented, kill has to be async"]
     fn wait_for_signaled_child() {
-        // TODO wait_for_signaled_child
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGKILL)).await;
+                    unreachable!("kill returned {result:?}");
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(
+            result,
+            Ok(WaitStatus::Signaled(pid, Signal::SIGKILL, false))
+        );
+    }
+
+    #[test]
+    fn wait_for_stopped_child() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    unreachable!("kill returned {result:?}");
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Stopped(pid, Signal::SIGSTOP)));
     }
 
     #[test]
