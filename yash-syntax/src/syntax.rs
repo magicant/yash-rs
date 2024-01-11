@@ -859,7 +859,7 @@ impl fmt::Display for HereDoc {
         f.write_str(if self.remove_tabs { "<<-" } else { "<<" })?;
 
         // This space is to disambiguate `<< --` and `<<- -`
-        if let Some(Unquoted(Literal('-'))) = self.delimiter.units.get(0) {
+        if let Some(Unquoted(Literal('-'))) = self.delimiter.units.first() {
             f.write_char(' ')?;
         }
 
