@@ -857,30 +857,24 @@ impl System for VirtualSystem {
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
             Box::pin(async move {
-                let system = VirtualSystem { state, process_id };
-                let state = Rc::clone(&system.state);
-                let mut child_env = parent_env.clone_with_system(Box::new(system));
+                let mut system = VirtualSystem { state, process_id };
+                let mut child_env = parent_env.clone_with_system(Box::new(system.clone()));
 
                 {
-                    let mut state = state.borrow_mut();
-                    let process = state
-                        .processes
-                        .get_mut(&process_id)
-                        .expect("missing child process");
+                    let mut process = system.current_process_mut();
                     process.selector = Rc::downgrade(&child_env.system.0);
                 }
 
                 let run_task_and_set_exit_status = Box::pin(async move {
                     let mut runner = ProcessRunner {
                         task: task(&mut child_env),
-                        state,
-                        process_id,
+                        system,
                         waker: Rc::new(Cell::new(None)),
                     };
                     (&mut runner).await;
 
-                    let ProcessRunner { state, .. } = { runner };
-                    let mut state = state.borrow_mut();
+                    let ProcessRunner { system, .. } = { runner };
+                    let mut state = system.state.borrow_mut();
                     let process = state
                         .processes
                         .get_mut(&process_id)
@@ -1133,8 +1127,7 @@ pub trait Executor: Debug {
 /// the state of the process.
 struct ProcessRunner<'a> {
     task: Pin<Box<dyn Future<Output = ()> + 'a>>,
-    state: Rc<RefCell<SystemState>>,
-    process_id: Pid,
+    system: VirtualSystem,
 
     /// Waker that is woken up when the process is resumed.
     waker: Rc<Cell<Option<Waker>>>,
@@ -1146,13 +1139,7 @@ impl Future for ProcessRunner<'_> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let this = self.deref_mut();
 
-        let process_state = this
-            .state
-            .borrow()
-            .processes
-            .get(&this.process_id)
-            .expect("missing process")
-            .state;
+        let process_state = this.system.current_process().state;
         if process_state == ProcessState::Running {
             // Let the task make progress
             let poll = this.task.as_mut().poll(cx);
@@ -1161,11 +1148,7 @@ impl Future for ProcessRunner<'_> {
             }
         }
 
-        let mut state = this.state.borrow_mut();
-        let process = state
-            .processes
-            .get_mut(&this.process_id)
-            .expect("missing process");
+        let mut process = this.system.current_process_mut();
         match process.state {
             ProcessState::Running => Poll::Pending,
             ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Ready(()),
