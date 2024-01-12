@@ -27,6 +27,7 @@ use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -38,6 +39,7 @@ use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Weak;
+use std::task::Waker;
 
 /// Process in a virtual system.
 #[derive(Clone, Debug)]
@@ -63,6 +65,9 @@ pub struct Process {
     /// The change of `state` is reported when the parent `wait`s for this
     /// process.
     state_has_changed: bool,
+
+    /// Wakers waiting for the state of this process to change to `Running`.
+    resumption_awaiters: Vec<Weak<Cell<Option<Waker>>>>,
 
     /// Currently set signal handlers.
     ///
@@ -122,6 +127,7 @@ impl Process {
             cwd: PathBuf::new(),
             state: ProcessState::Running,
             state_has_changed: false,
+            resumption_awaiters: Vec::new(),
             signal_handlings: HashMap::new(),
             blocked_signals: SigSet::empty(),
             pending_signals: SigSet::empty(),
@@ -238,6 +244,21 @@ impl Process {
         self.cwd = path
     }
 
+    /// Registers a waker that will be woken up when this process resumes.
+    ///
+    /// The given waker will be woken up when this process is resumed by
+    /// [`set_state`](Self::set_state) or [`raise_signal`](Self::raise_signal).
+    /// A strong reference to the waker must be held by the caller until the
+    /// waker is woken up, when the waker is consumed and the `Cell` content is
+    /// set to `None`.
+    ///
+    /// This function does nothing if the process is not stopped.
+    pub fn wake_on_resumption(&mut self, waker: Weak<Cell<Option<Waker>>>) {
+        if matches!(self.state, ProcessState::Stopped(_)) {
+            self.resumption_awaiters.push(waker);
+        }
+    }
+
     /// Returns the process state.
     #[inline(always)]
     #[must_use]
@@ -262,8 +283,17 @@ impl Process {
             false
         } else {
             match state {
+                ProcessState::Running => {
+                    for weak in self.resumption_awaiters.drain(..) {
+                        if let Some(strong) = weak.upgrade() {
+                            if let Some(waker) = strong.take() {
+                                waker.wake();
+                            }
+                        }
+                    }
+                }
                 ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
-                _ => (),
+                ProcessState::Stopped(_) => (),
             }
             self.state_has_changed = true;
             true
@@ -506,9 +536,12 @@ mod tests {
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use crate::system::FdFlag;
-    use std::cell::RefCell;
+    use futures_util::task::LocalSpawnExt;
+    use futures_util::FutureExt;
     use std::collections::VecDeque;
+    use std::future::poll_fn;
     use std::rc::Rc;
+    use std::task::Poll;
 
     #[test]
     fn min_unused_fd_for_various_arguments() {
@@ -571,6 +604,33 @@ mod tests {
         let reader = process.open_fd(reader).unwrap();
         let writer = process.open_fd(writer).unwrap();
         (process, reader, writer)
+    }
+
+    #[test]
+    fn process_set_state_wakes_on_resumed() {
+        let mut process = Process::with_parent_and_group(Pid::from_raw(1), Pid::from_raw(2));
+        process.state = ProcessState::Stopped(Signal::SIGTSTP);
+        let process = Rc::new(RefCell::new(process));
+        let process2 = Rc::clone(&process);
+        let waker = Rc::new(Cell::new(None));
+        let task = poll_fn(move |cx| {
+            let mut process = process2.borrow_mut();
+            if process.state() == ProcessState::Running {
+                return Poll::Ready(());
+            }
+            waker.set(Some(cx.waker().clone()));
+            process.wake_on_resumption(Rc::downgrade(&waker));
+            Poll::Pending
+        });
+
+        let mut executor = futures_executor::LocalPool::new();
+        let mut handle = executor.spawner().spawn_local_with_handle(task).unwrap();
+        executor.run_until_stalled();
+        assert_eq!((&mut handle).now_or_never(), None);
+
+        _ = process.borrow_mut().set_state(ProcessState::Running);
+        assert!(executor.try_run_one());
+        assert_eq!(handle.now_or_never(), Some(()));
     }
 
     #[test]

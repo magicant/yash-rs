@@ -64,7 +64,6 @@ use super::OFlag;
 use super::SigSet;
 use super::SigmaskHow;
 use super::Signal;
-use super::SignalStatus;
 use super::TimeSpec;
 use super::AT_FDCWD;
 use crate::io::Fd;
@@ -75,6 +74,7 @@ use crate::SignalHandling;
 use crate::System;
 use nix::sys::stat::SFlag;
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -100,6 +100,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -275,11 +276,9 @@ impl VirtualSystem {
 
     /// Blocks the calling thread until the current process is running.
     async fn block_until_running(&self) {
-        let mut signal_status = None;
+        let waker = Rc::new(Cell::new(None));
 
         poll_fn(|cx| {
-            signal_status = None;
-
             let mut state = self.state.borrow_mut();
             let Some(process) = state.processes.get_mut(&self.process_id) else {
                 return Poll::Ready(());
@@ -287,16 +286,10 @@ impl VirtualSystem {
 
             match process.state {
                 ProcessState::Running => Poll::Ready(()),
-
                 ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Pending,
-
                 ProcessState::Stopped(_) => {
-                    let Some(sig_system) = process.selector.upgrade() else {
-                        return Poll::Ready(());
-                    };
-                    let sig_status = sig_system.borrow_mut().signal.wait_for_signals();
-                    *sig_status.borrow_mut() = SignalStatus::Expected(Some(cx.waker().clone()));
-                    signal_status = Some(sig_status);
+                    waker.set(Some(cx.waker().clone()));
+                    process.wake_on_resumption(Rc::downgrade(&waker));
                     Poll::Pending
                 }
             }
@@ -882,7 +875,7 @@ impl System for VirtualSystem {
                         task: task(&mut child_env),
                         state,
                         process_id,
-                        signal_status: None,
+                        waker: Rc::new(Cell::new(None)),
                     };
                     (&mut runner).await;
 
@@ -1143,8 +1136,8 @@ struct ProcessRunner<'a> {
     state: Rc<RefCell<SystemState>>,
     process_id: Pid,
 
-    /// Retains the waker of this task that is waiting for signals.
-    signal_status: Option<Rc<RefCell<SignalStatus>>>,
+    /// Waker that is woken up when the process is resumed.
+    waker: Rc<Cell<Option<Waker>>>,
 }
 
 impl Future for ProcessRunner<'_> {
@@ -1153,35 +1146,32 @@ impl Future for ProcessRunner<'_> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let this = self.deref_mut();
 
-        this.signal_status = None;
-
-        let state = this.state.borrow();
-        let process = state
+        let process_state = this
+            .state
+            .borrow()
             .processes
             .get(&this.process_id)
-            .expect("missing process");
-        if process.state == ProcessState::Running {
-            drop(state);
-            if this.task.as_mut().poll(cx) == Poll::Ready(()) {
+            .expect("missing process")
+            .state;
+        if process_state == ProcessState::Running {
+            // Let the task make progress
+            let poll = this.task.as_mut().poll(cx);
+            if poll == Poll::Ready(()) {
                 return Poll::Ready(());
             }
         }
 
-        let state = this.state.borrow();
+        let mut state = this.state.borrow_mut();
         let process = state
             .processes
-            .get(&this.process_id)
+            .get_mut(&this.process_id)
             .expect("missing process");
         match process.state {
             ProcessState::Running => Poll::Pending,
-
             ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Ready(()),
-
             ProcessState::Stopped(_) => {
-                let sig_system = process.selector.upgrade().expect("select system missing");
-                let sig_status = sig_system.borrow_mut().signal.wait_for_signals();
-                *sig_status.borrow_mut() = SignalStatus::Expected(Some(cx.waker().clone()));
-                this.signal_status = Some(sig_status);
+                this.waker.set(Some(cx.waker().clone()));
+                process.wake_on_resumption(Rc::downgrade(&this.waker));
                 Poll::Pending
             }
         }
@@ -2407,6 +2397,43 @@ mod tests {
 
         let result = env.system.wait(pid);
         assert_eq!(result, Ok(WaitStatus::Stopped(pid, Signal::SIGSTOP)));
+    }
+
+    #[test]
+    fn wait_for_resumed_child() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    assert_eq!(result, Ok(()));
+                    env.exit_status = ExitStatus(123);
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        env.system
+            .kill(pid, Some(Signal::SIGCONT))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Continued(pid)));
+
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Exited(pid, 123)));
     }
 
     #[test]
