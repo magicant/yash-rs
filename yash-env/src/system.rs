@@ -320,6 +320,11 @@ pub trait System: Debug {
     /// This is a thin wrapper around the `setpgid` system call.
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()>;
 
+    /// Returns the current foreground process group ID.
+    ///
+    /// This is a thin wrapper around the `tcgetpgrp` system call.
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid>;
+
     /// Switches the foreground process group.
     ///
     /// This is a thin wrapper around the `tcsetpgrp` system call.
@@ -906,6 +911,9 @@ impl System for SharedSystem {
     }
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().setpgid(pid, pgid)
+    }
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        self.0.borrow().tcgetpgrp(fd)
     }
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)

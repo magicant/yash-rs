@@ -355,6 +355,10 @@ impl System for RealSystem {
         nix::unistd::setpgid(pid, pgid)
     }
 
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        nix::unistd::tcgetpgrp(fd.0)
+    }
+
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         nix::unistd::tcsetpgrp(fd.0, pgid)
     }

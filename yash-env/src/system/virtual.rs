@@ -811,6 +811,17 @@ impl System for VirtualSystem {
         // TODO Support sessions
     }
 
+    /// Returns the current foreground process group ID.
+    ///
+    /// The current implementation does not yet support the concept of
+    /// controlling terminals and sessions. It accepts any open file descriptor.
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        // Make sure the FD is open
+        self.with_open_file_description(fd, |_| Ok(()))?;
+
+        self.state.borrow().foreground.ok_or(Errno::ENOTTY)
+    }
+
     /// Switches the foreground process.
     ///
     /// The current implementation does not yet support the concept of
