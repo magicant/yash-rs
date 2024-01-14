@@ -184,7 +184,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
 
     if is_alive(job.status) {
         let pgid = Pid::from_raw(-job.pid.as_raw());
-        env.system.kill(pgid, Signal::SIGCONT.into())?;
+        env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
         // We've just reported that the job is resumed, so there is no need to
         // report the same thing in the usual pre-prompt message.

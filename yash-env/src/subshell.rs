@@ -671,8 +671,16 @@ mod tests {
             .await
             .unwrap();
 
-            parent_env.system.kill(child_pid, Some(SIGINT)).unwrap();
-            parent_env.system.kill(child_pid, Some(SIGQUIT)).unwrap();
+            parent_env
+                .system
+                .kill(child_pid, Some(SIGINT))
+                .await
+                .unwrap();
+            parent_env
+                .system
+                .kill(child_pid, Some(SIGQUIT))
+                .await
+                .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
             assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));

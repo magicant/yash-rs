@@ -287,7 +287,6 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalSpawner;
     use futures_util::task::LocalSpawnExt;
-    #[cfg(feature = "yash-semantics")]
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::future::Future;
@@ -297,9 +296,7 @@ pub(crate) mod tests {
     use yash_env::system::r#virtual::FileBody;
     use yash_env::system::r#virtual::INode;
     use yash_env::system::r#virtual::SystemState;
-    #[cfg(feature = "yash-semantics")]
     use yash_env::Env;
-    #[cfg(feature = "yash-semantics")]
     use yash_env::VirtualSystem;
 
     #[derive(Clone, Debug)]
@@ -317,7 +314,6 @@ pub(crate) mod tests {
     }
 
     /// Helper function to perform a test in a virtual system with an executor.
-    #[cfg(feature = "yash-semantics")]
     pub fn in_virtual_system<F, Fut>(f: F)
     where
         F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,

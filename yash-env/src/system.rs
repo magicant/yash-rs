@@ -21,6 +21,10 @@ pub mod real;
 pub mod r#virtual;
 
 use self::fd_set::FdSet;
+#[cfg(doc)]
+use self::r#virtual::VirtualSystem;
+#[cfg(doc)]
+use self::real::RealSystem;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
@@ -76,11 +80,9 @@ use std::time::Instant;
 ///
 /// The `System` trait defines a collection of methods to access the underlying
 /// operating system from the shell as an application program. There are two
-/// substantial implementors for this trait:
-/// [`RealSystem`](self::real::RealSystem) and
-/// [`VirtualSystem`](self::virtual::VirtualSystem). Another implementor
-/// is [`SharedSystem`], which wraps a `System` instance to extend the interface
-/// with asynchronous methods.
+/// substantial implementors for this trait: [`RealSystem`] and
+/// [`VirtualSystem`]. Another implementor is [`SharedSystem`], which wraps a
+/// `System` instance to extend the interface with asynchronous methods.
 pub trait System: Debug {
     /// Retrieves metadata of a file.
     fn fstat(&self, fd: Fd) -> nix::Result<FileStat>;
@@ -256,7 +258,15 @@ pub trait System: Debug {
     /// Sends a signal.
     ///
     /// This is a thin wrapper around the `kill` system call.
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()>;
+    ///
+    /// The virtual system version of this function blocks the calling thread if
+    /// the signal stops or terminates the current process, hence returning a
+    /// future. See [`VirtualSystem::kill`] for details.
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<dyn Future<Output = nix::Result<()>>>>;
 
     /// Waits for a next event.
     ///
@@ -309,6 +319,11 @@ pub trait System: Debug {
     ///
     /// This is a thin wrapper around the `setpgid` system call.
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()>;
+
+    /// Returns the current foreground process group ID.
+    ///
+    /// This is a thin wrapper around the `tcgetpgrp` system call.
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid>;
 
     /// Switches the foreground process group.
     ///
@@ -395,8 +410,17 @@ pub type ChildProcessTask =
 /// [`System::new_child_process`] returns a child process starter. You need to
 /// pass the parent environment and a task to run in the child.
 ///
-/// When called in the parent process, this function returns the process ID of
-/// the child. When in the child, this function never returns.
+/// [`RealSystem`]'s `new_child_process` performs a `fork` system call and
+/// returns a starter in the parent and child processes. When the starter is
+/// called in the parent, it just returns the child process ID. The starter in
+/// the child process runs the task and exits the process with the exit status
+/// of the task.
+///
+/// For [`VirtualSystem`], no real child process is created. Instead, the
+/// starter runs the task concurrently in the current process using the executor
+/// contained in the system. A new [`Process`](virtual::Process) is added to the
+/// system to represent the child process. The starter returns its process ID.
+/// See also [`VirtualSystem::new_child_process`].
 ///
 /// This function only starts the child, which continues to run asynchronously
 /// after the function returns its PID. To wait for the child to finish and
@@ -586,8 +610,7 @@ impl<T: System + ?Sized> SystemEx for T {}
 /// assert_eq!(number, 123);
 /// ```
 ///
-/// If there is a child process in the [`VirtualSystem`](crate::VirtualSystem),
-/// you should call
+/// If there is a child process in the [`VirtualSystem`], you should call
 /// [`SystemState::select_all`](self::virtual::SystemState::select_all) in
 /// addition to [`SharedSystem::select`] so that the child process task is woken
 /// up when needed.
@@ -861,7 +884,11 @@ impl System for SharedSystem {
     fn caught_signals(&mut self) -> Vec<Signal> {
         self.0.borrow_mut().caught_signals()
     }
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
         self.0.borrow_mut().kill(target, signal)
     }
     fn select(
@@ -884,6 +911,9 @@ impl System for SharedSystem {
     }
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().setpgid(pid, pgid)
+    }
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        self.0.borrow().tcgetpgrp(fd)
     }
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         self.0.borrow_mut().tcsetpgrp(fd, pgid)

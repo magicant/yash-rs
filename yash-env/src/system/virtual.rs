@@ -74,6 +74,7 @@ use crate::SignalHandling;
 use crate::System;
 use nix::sys::stat::SFlag;
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -87,14 +88,19 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fmt::Debug;
+use std::future::poll_fn;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::mem::MaybeUninit;
+use std::ops::DerefMut as _;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -266,6 +272,29 @@ impl VirtualSystem {
         }
 
         Err(Errno::ELOOP)
+    }
+
+    /// Blocks the calling thread until the current process is running.
+    async fn block_until_running(&self) {
+        let waker = Rc::new(Cell::new(None));
+
+        poll_fn(|cx| {
+            let mut state = self.state.borrow_mut();
+            let Some(process) = state.processes.get_mut(&self.process_id) else {
+                return Poll::Ready(());
+            };
+
+            match process.state {
+                ProcessState::Running => Poll::Ready(()),
+                ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Pending,
+                ProcessState::Stopped(_) => {
+                    waker.set(Some(cx.waker().clone()));
+                    process.wake_on_resumption(Rc::downgrade(&waker));
+                    Poll::Pending
+                }
+            }
+        })
+        .await
     }
 }
 
@@ -621,8 +650,20 @@ impl System for VirtualSystem {
         std::mem::take(&mut self.current_process_mut().caught_signals)
     }
 
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
-        match target.as_raw() {
+    /// Sends a signal to the target process.
+    ///
+    /// This function returns a future that enables the executor to block the
+    /// calling thread until the current process is ready to proceed. If the
+    /// signal is sent to the current process and it causes the process to stop,
+    /// the future will be ready only when the process is resumed. Similarly, if
+    /// the signal causes the current process to terminate, the future will
+    /// never be ready.
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+        let result = match target.as_raw() {
             0 => {
                 let target_pgid = self.current_process().pgid;
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
@@ -651,7 +692,13 @@ impl System for VirtualSystem {
                 let target_pgid = Pid::from_raw(-negative_pgid);
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
             }
-        }
+        };
+
+        let system = self.clone();
+        Box::pin(async move {
+            system.block_until_running().await;
+            result
+        })
     }
 
     /// Waits for a next event.
@@ -764,6 +811,17 @@ impl System for VirtualSystem {
         // TODO Support sessions
     }
 
+    /// Returns the current foreground process group ID.
+    ///
+    /// The current implementation does not yet support the concept of
+    /// controlling terminals and sessions. It accepts any open file descriptor.
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        // Make sure the FD is open
+        self.with_open_file_description(fd, |_| Ok(()))?;
+
+        self.state.borrow().foreground.ok_or(Errno::ENOTTY)
+    }
+
     /// Switches the foreground process.
     ///
     /// The current implementation does not yet support the concept of
@@ -810,28 +868,31 @@ impl System for VirtualSystem {
         let state = Rc::clone(&self.state);
         Ok(Box::new(move |parent_env, task| {
             Box::pin(async move {
-                let system = VirtualSystem { state, process_id };
-                let state = Rc::clone(&system.state);
-                let mut child_env = parent_env.clone_with_system(Box::new(system));
+                let mut system = VirtualSystem { state, process_id };
+                let mut child_env = parent_env.clone_with_system(Box::new(system.clone()));
 
                 {
-                    let mut state = state.borrow_mut();
-                    let process = state
-                        .processes
-                        .get_mut(&process_id)
-                        .expect("missing child process");
+                    let mut process = system.current_process_mut();
                     process.selector = Rc::downgrade(&child_env.system.0);
                 }
 
                 let run_task_and_set_exit_status = Box::pin(async move {
-                    task(&mut child_env).await;
+                    let mut runner = ProcessRunner {
+                        task: task(&mut child_env),
+                        system,
+                        waker: Rc::new(Cell::new(None)),
+                    };
+                    (&mut runner).await;
 
-                    let mut state = state.borrow_mut();
+                    let ProcessRunner { system, .. } = { runner };
+                    let mut state = system.state.borrow_mut();
                     let process = state
                         .processes
                         .get_mut(&process_id)
                         .expect("missing child process");
-                    if process.set_state(ProcessState::Exited(child_env.exit_status)) {
+                    if process.state == ProcessState::Running
+                        && process.set_state(ProcessState::Exited(child_env.exit_status))
+                    {
                         let ppid = process.ppid;
                         raise_sigchld(&mut state, ppid);
                     }
@@ -1070,6 +1131,47 @@ pub trait Executor: Debug {
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
+/// Concurrent task that manages the execution of a process.
+///
+/// This struct is a helper for [`VirtualSystem::new_child_process`].
+/// It basically runs the given task, but pauses or cancels it depending on
+/// the state of the process.
+struct ProcessRunner<'a> {
+    task: Pin<Box<dyn Future<Output = ()> + 'a>>,
+    system: VirtualSystem,
+
+    /// Waker that is woken up when the process is resumed.
+    waker: Rc<Cell<Option<Waker>>>,
+}
+
+impl Future for ProcessRunner<'_> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.deref_mut();
+
+        let process_state = this.system.current_process().state;
+        if process_state == ProcessState::Running {
+            // Let the task make progress
+            let poll = this.task.as_mut().poll(cx);
+            if poll == Poll::Ready(()) {
+                return Poll::Ready(());
+            }
+        }
+
+        let mut process = this.system.current_process_mut();
+        match process.state {
+            ProcessState::Running => Poll::Pending,
+            ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Ready(()),
+            ProcessState::Stopped(_) => {
+                this.waker.set(Some(cx.waker().clone()));
+                process.wake_on_resumption(Rc::downgrade(&this.waker));
+                Poll::Pending
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1077,6 +1179,7 @@ mod tests {
     use crate::Env;
     use assert_matches::assert_matches;
     use futures_executor::LocalPool;
+    use futures_util::FutureExt;
     use std::ffi::CString;
     use std::ffi::OsString;
     use std::future::pending;
@@ -1634,22 +1737,31 @@ mod tests {
     #[test]
     fn kill_process() {
         let mut system = VirtualSystem::new();
-        system.kill(system.process_id, None).unwrap();
+        system
+            .kill(system.process_id, None)
+            .now_or_never()
+            .unwrap()
+            .unwrap();
         assert_eq!(system.current_process().state(), ProcessState::Running);
 
-        system
+        let result = system
             .kill(system.process_id, Some(Signal::SIGINT))
-            .unwrap();
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         assert_eq!(
             system.current_process().state(),
             ProcessState::Signaled(Signal::SIGINT)
         );
 
+        let mut system = VirtualSystem::new();
         let state = system.state.borrow();
         let max_pid = state.processes.keys().max().unwrap().as_raw();
         drop(state);
         let e = system
             .kill(Pid::from_raw(max_pid + 1), Some(Signal::SIGINT))
+            .now_or_never()
+            .unwrap()
             .unwrap_err();
         assert_eq!(e, Errno::ESRCH);
     }
@@ -1673,9 +1785,11 @@ mod tests {
         );
         drop(state);
 
-        system
+        let result = system
             .kill(Pid::from_raw(-1), Some(Signal::SIGTERM))
-            .unwrap();
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         let state = system.state.borrow();
         for process in state.processes.values() {
             assert_eq!(process.state, ProcessState::Signaled(Signal::SIGTERM));
@@ -1701,9 +1815,11 @@ mod tests {
         );
         drop(state);
 
-        system
+        let result = system
             .kill(Pid::from_raw(0), Some(Signal::SIGQUIT))
-            .unwrap();
+            .now_or_never();
+        // The future should be pending because the current process has been killed
+        assert_eq!(result, None);
         let state = system.state.borrow();
         assert_eq!(
             state.processes[&system.process_id].state,
@@ -1744,6 +1860,8 @@ mod tests {
 
         system
             .kill(Pid::from_raw(-21), Some(Signal::SIGHUP))
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let state = system.state.borrow();
         assert_eq!(
@@ -1777,6 +1895,8 @@ mod tests {
 
         system
             .kill(Pid::from_raw(-pgid.as_raw()), Some(Signal::SIGCONT))
+            .now_or_never()
+            .unwrap()
             .unwrap();
         let state = system.state.borrow();
         assert_eq!(
@@ -2218,6 +2338,96 @@ mod tests {
 
         let result = env.system.wait(pid);
         assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
+    }
+
+    #[test]
+    fn wait_for_signaled_child() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGKILL)).await;
+                    unreachable!("kill returned {result:?}");
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(
+            result,
+            Ok(WaitStatus::Signaled(pid, Signal::SIGKILL, false))
+        );
+    }
+
+    #[test]
+    fn wait_for_stopped_child() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    unreachable!("kill returned {result:?}");
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Stopped(pid, Signal::SIGSTOP)));
+    }
+
+    #[test]
+    fn wait_for_resumed_child() {
+        let (mut system, mut executor) = virtual_system_with_executor();
+
+        let child_process = system.new_child_process();
+
+        let mut env = Env::with_system(Box::new(system));
+        let child_process = child_process.unwrap();
+        let future = child_process(
+            &mut env,
+            Box::new(|env| {
+                Box::pin(async move {
+                    let pid = env.system.getpid();
+                    let result = env.system.kill(pid, Some(Signal::SIGSTOP)).await;
+                    assert_eq!(result, Ok(()));
+                    env.exit_status = ExitStatus(123);
+                })
+            }),
+        );
+        let pid = executor.run_until(future);
+        executor.run_until_stalled();
+
+        env.system
+            .kill(pid, Some(Signal::SIGCONT))
+            .now_or_never()
+            .unwrap()
+            .unwrap();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Continued(pid)));
+
+        executor.run_until_stalled();
+
+        let result = env.system.wait(pid);
+        assert_eq!(result, Ok(WaitStatus::Exited(pid, 123)));
     }
 
     #[test]

@@ -50,10 +50,12 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::future::Future;
 use std::io::SeekFrom;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::Path;
+use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::compiler_fence;
 use std::sync::atomic::AtomicIsize;
@@ -309,8 +311,13 @@ impl System for RealSystem {
         signals
     }
 
-    fn kill(&mut self, target: Pid, signal: Option<Signal>) -> nix::Result<()> {
-        nix::sys::signal::kill(target, signal)
+    fn kill(
+        &mut self,
+        target: Pid,
+        signal: Option<Signal>,
+    ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
+        let result = nix::sys::signal::kill(target, signal);
+        Box::pin(std::future::ready(result))
     }
 
     fn select(
@@ -348,6 +355,10 @@ impl System for RealSystem {
         nix::unistd::setpgid(pid, pgid)
     }
 
+    fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
+        nix::unistd::tcgetpgrp(fd.0)
+    }
+
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
         nix::unistd::tcsetpgrp(fd.0, pgid)
     }
@@ -355,9 +366,9 @@ impl System for RealSystem {
     /// Creates a new child process.
     ///
     /// This implementation calls the `fork` system call and returns both in the
-    /// parent and child process. In the parent, the `run` function of the
-    /// returned `ChildProcess` ignores arguments and returns the child process
-    /// ID. In the child, the `run` function runs the task and exits the
+    /// parent and child process. In the parent, the returned
+    /// `ChildProcessStarter` ignores any arguments and returns the child
+    /// process ID. In the child, the starter runs the task and exits the
     /// process.
     fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         use nix::unistd::ForkResult::*;

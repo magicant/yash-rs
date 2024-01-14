@@ -30,6 +30,7 @@
 //! execution by sending the `SIGCONT` signal to it. The built-in then waits for
 //! the job to finish (or suspend again).
 //!
+//! If the resumed job finishes, it is removed from the [job set](JobSet).
 //! If the job gets suspended again, it is set as the [current
 //! job](JobSet::current_job).
 //!
@@ -143,10 +144,15 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     env.system.tcsetpgrp_without_block(tty, job.pid)?;
 
     let pgid = Pid::from_raw(-job.pid.as_raw());
-    env.system.kill(pgid, Signal::SIGCONT.into())?;
+    env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
     // Wait for the job to finish (or suspend again).
     let status = wait_while_running(env, job.pid).await?;
+
+    // Remove the job if it has finished.
+    if !is_alive(status) {
+        env.jobs.remove(index);
+    }
 
     // Move the shell back to the foreground.
     env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
@@ -196,46 +202,177 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
 mod tests {
     use super::*;
     use crate::tests::assert_stderr;
+    use crate::tests::assert_stdout;
+    use crate::tests::in_virtual_system;
     use crate::tests::stub_tty;
+    use assert_matches::assert_matches;
     use futures_util::FutureExt as _;
+    use std::cell::Cell;
+    use std::ops::ControlFlow::Continue;
+    use std::rc::Rc;
     use yash_env::job::Job;
+    use yash_env::option::Option::Monitor;
+    use yash_env::option::State::On;
+    use yash_env::subshell::JobControl;
+    use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::Process;
     use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
-    #[test]
-    #[ignore = "not implemented"]
-    fn resume_job_by_index_moves_job_to_foreground() {
-        // TODO Test resume_job_by_index_moves_job_to_foreground
+    async fn suspend(env: &mut Env) {
+        env.system
+            .kill(env.system.getpid(), Some(Signal::SIGSTOP))
+            .await
+            .unwrap();
     }
 
     #[test]
-    #[ignore = "not implemented"]
-    fn resume_job_by_index_sends_sigcont() {
-        // TODO Test resume_job_by_index_sends_sigcont
+    fn resume_job_by_index_resumes_job_in_foreground() {
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            let reached = Rc::new(Cell::new(false));
+            let reached2 = Rc::clone(&reached);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+
+                    // When resumed, the subshell should be in the foreground.
+                    let tty = env.get_tty().unwrap();
+                    assert_eq!(env.system.tcgetpgrp(tty).unwrap(), env.system.getpid());
+                    reached2.set(true);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index = env.jobs.add(job);
+
+            resume_job_by_index(&mut env, index).await.unwrap();
+
+            assert!(reached.get());
+        })
     }
 
     #[test]
     fn resume_job_by_index_prints_job_name() {
-        // TODO Test resume_job_by_index_prints_job_name
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            job.name = "my job name".to_owned();
+            let index = env.jobs.add(job);
+
+            resume_job_by_index(&mut env, index).await.unwrap();
+
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "my job name\n"));
+        })
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn resume_job_by_index_returns_after_job_exits() {
-        // TODO Test resume_job_by_index_returns_after_job_exits
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    env.exit_status = ExitStatus(42);
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index = env.jobs.add(job);
+
+            let result = resume_job_by_index(&mut env, index).await.unwrap();
+
+            assert_eq!(result, WaitStatus::Exited(pid, 42));
+            let state = state.borrow().processes[&pid].state();
+            assert_eq!(state, ProcessState::Exited(ExitStatus(42)));
+            // The finished job should be removed from the job set.
+            assert_eq!(env.jobs.get(index), None);
+        })
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn resume_job_by_index_returns_after_job_suspends() {
-        // TODO Test resume_job_by_index_returns_after_job_suspends
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    suspend(env).await;
+                    unreachable!("child process should not be resumed twice");
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index = env.jobs.add(job);
+
+            let result = resume_job_by_index(&mut env, index).await.unwrap();
+
+            assert_eq!(result, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            let job_status = env.jobs.get(index).unwrap().status;
+            assert_eq!(job_status, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            let state = state.borrow().processes[&pid].state();
+            assert_eq!(state, ProcessState::Stopped(Signal::SIGSTOP));
+        })
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn resume_job_by_index_moves_shell_back_to_foreground() {
-        // TODO resume_job_by_index_moves_shell_back_to_foreground
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index = env.jobs.add(job);
+
+            _ = resume_job_by_index(&mut env, index).await.unwrap();
+
+            let foreground = state.borrow().foreground;
+            assert_eq!(foreground, Some(env.main_pgid));
+        })
     }
 
     #[test]
@@ -295,9 +432,51 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn main_without_operands_resumes_current_job() {
-        // TODO Test main_without_operands_resumes_current_job
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            // previous job
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    unreachable!("previous job should not be resumed");
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid1 =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid1);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            env.jobs.add(job);
+            // current job
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid2 =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid2);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index2 = env.jobs.add(job);
+            env.jobs.set_current_job(index2).unwrap();
+
+            let result = main(&mut env, vec![]).await;
+
+            assert_eq!(result, crate::Result::default());
+            // The finished job should be removed from the job set.
+            assert_eq!(env.jobs.get(index2), None);
+            // The previous job should still be there.
+            let state = state.borrow().processes[&pid1].state();
+            assert_eq!(state, ProcessState::Stopped(Signal::SIGSTOP));
+        })
     }
 
     #[test]
@@ -306,18 +485,78 @@ mod tests {
         let mut env = Env::with_system(Box::new(system.clone()));
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
-        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
 
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
         assert_stderr(&system.state, |stderr| {
             assert!(stderr.contains("there is no job"), "{stderr:?}");
         });
     }
 
     #[test]
-    #[ignore = "not implemented"]
     fn main_with_operand_resumes_specified_job() {
-        // TODO Test main_with_operands_resumes_specified_job
+        in_virtual_system(|mut env, state| async move {
+            stub_tty(&state);
+            env.options.set(Monitor, On);
+            // previous job
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    Continue(())
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid1 =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid1);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            job.name = "previous job".to_string();
+            let index1 = env.jobs.add(job);
+            // current job
+            let subshell = Subshell::new(|env, _| {
+                Box::pin(async move {
+                    suspend(env).await;
+                    unreachable!("current job should not be resumed");
+                })
+            })
+            .job_control(JobControl::Foreground);
+            let subshell_status = subshell.start_and_wait(&mut env).await.unwrap();
+            let pid2 =
+                assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
+            let mut job = Job::new(pid2);
+            job.job_controlled = true;
+            job.status = subshell_status;
+            let index2 = env.jobs.add(job);
+            env.jobs.set_current_job(index2).unwrap();
+
+            let result = main(&mut env, Field::dummies(["%prev"])).await;
+
+            assert_eq!(result, crate::Result::default());
+            // The finished job should be removed from the job set.
+            assert_eq!(env.jobs.get(index1), None);
+            // The previous job should still be there.
+            let state = state.borrow().processes[&pid2].state();
+            assert_eq!(state, ProcessState::Stopped(Signal::SIGSTOP));
+        })
     }
 
-    // TODO error cases with operands
+    #[test]
+    fn main_with_operand_fails_if_jobs_is_not_found() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Box::new(system.clone()));
+        let mut job = Job::new(Pid::from_raw(123));
+        job.job_controlled = true;
+        job.name = "foo".to_string();
+        env.jobs.add(job);
+
+        let result = main(&mut env, Field::dummies(["%bar"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("not found"), "{stderr:?}");
+        });
+    }
 }
