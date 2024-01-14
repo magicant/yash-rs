@@ -30,6 +30,7 @@
 //! execution by sending the `SIGCONT` signal to it. The built-in then waits for
 //! the job to finish (or suspend again).
 //!
+//! If the resumed job finishes, it is removed from the [job set](JobSet).
 //! If the job gets suspended again, it is set as the [current
 //! job](JobSet::current_job).
 //!
@@ -147,6 +148,11 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
 
     // Wait for the job to finish (or suspend again).
     let status = wait_while_running(env, job.pid).await?;
+
+    // Remove the job if it has finished.
+    if !is_alive(status) {
+        env.jobs.remove(index);
+    }
 
     // Move the shell back to the foreground.
     env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
