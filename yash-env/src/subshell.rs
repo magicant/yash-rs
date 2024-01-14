@@ -523,11 +523,7 @@ mod tests {
     fn tty_after_starting_foreground_subshell() {
         in_virtual_system(|mut parent_env, state| async move {
             parent_env.options.set(Monitor, On);
-            state
-                .borrow_mut()
-                .file_system
-                .save("/dev/tty", Rc::new(RefCell::new(INode::new([]))))
-                .unwrap();
+            stub_tty(&state);
 
             let _ = Subshell::new(move |_, _| Box::pin(std::future::ready(Continue(()))))
                 .job_control(JobControl::Foreground)
