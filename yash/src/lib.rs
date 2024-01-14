@@ -125,10 +125,8 @@ pub fn bin_main() -> i32 {
     use env::Env;
     use env::RealSystem;
     use env::System;
-    use futures_util::task::LocalSpawnExt;
-    use std::cell::Cell;
-    use std::rc::Rc;
-    use std::task::Poll;
+    use futures_util::task::LocalSpawnExt as _;
+    use futures_util::FutureExt as _;
 
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
@@ -143,20 +141,11 @@ pub fn bin_main() -> i32 {
     let system = env.system.clone();
     let mut pool = futures_executor::LocalPool::new();
     let task = parse_and_print(env);
-    let result = Rc::new(Cell::new(Poll::Pending));
-    let result_2 = Rc::clone(&result);
-    pool.spawner()
-        .spawn_local(async move {
-            let result = task.await;
-            result_2.set(Poll::Ready(result));
-        })
-        .unwrap();
-
+    let mut task = pool.spawner().spawn_local_with_handle(task).unwrap();
     loop {
         pool.run_until_stalled();
-        match result.get() {
-            Poll::Ready(result) => return result,
-            Poll::Pending => (),
+        if let Some(exit_status) = (&mut task).now_or_never() {
+            return exit_status;
         }
         system.select(false).ok();
     }
