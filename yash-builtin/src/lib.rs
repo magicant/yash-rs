@@ -286,8 +286,8 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
 pub(crate) mod tests {
     use assert_matches::assert_matches;
     use futures_executor::LocalSpawner;
-    use futures_util::task::LocalSpawnExt;
-    use std::cell::Cell;
+    use futures_util::task::LocalSpawnExt as _;
+    use futures_util::FutureExt as _;
     use std::cell::RefCell;
     use std::future::Future;
     use std::pin::Pin;
@@ -314,10 +314,11 @@ pub(crate) mod tests {
     }
 
     /// Helper function to perform a test in a virtual system with an executor.
-    pub fn in_virtual_system<F, Fut>(f: F)
+    pub fn in_virtual_system<F, Fut, T>(f: F) -> T
     where
         F: FnOnce(Env, Rc<RefCell<SystemState>>) -> Fut,
-        Fut: Future<Output = ()> + 'static,
+        Fut: Future<Output = T> + 'static,
+        T: 'static,
     {
         let system = VirtualSystem::new();
         let state = Rc::clone(&system.state);
@@ -327,18 +328,11 @@ pub(crate) mod tests {
         let env = Env::with_system(Box::new(system));
         let shared_system = env.system.clone();
         let task = f(env, Rc::clone(&state));
-        let done = Rc::new(Cell::new(false));
-        let done_2 = Rc::clone(&done);
-
-        executor
-            .spawner()
-            .spawn_local(async move {
-                task.await;
-                done.set(true);
-            })
-            .unwrap();
-
-        while !done_2.get() {
+        let mut task = executor.spawner().spawn_local_with_handle(task).unwrap();
+        loop {
+            if let Some(result) = (&mut task).now_or_never() {
+                return result;
+            }
             executor.run_until_stalled();
             shared_system.select(false).unwrap();
             SystemState::select_all(&state);
