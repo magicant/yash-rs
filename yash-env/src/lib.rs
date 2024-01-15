@@ -339,13 +339,10 @@ impl Env {
         self.traps.enable_sigchld_handler(&mut self.system)?;
 
         loop {
-            match self.system.wait(target) {
-                Ok(WaitStatus::StillAlive) => {}
-                Ok(status) => {
-                    self.jobs.update_status(status);
-                    return Ok(status);
-                }
-                result => return result,
+            if let Some((pid, state)) = self.system.wait(target)? {
+                let status = state.to_wait_status(pid);
+                self.jobs.update_status(status);
+                return Ok(status);
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
@@ -379,12 +376,8 @@ impl Env {
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
     pub fn update_all_subshell_statuses(&mut self) {
-        loop {
-            match self.system.wait(Pid::from_raw(-1)) {
-                Ok(WaitStatus::StillAlive) => break,
-                Ok(status) => self.jobs.update_status(status),
-                Err(_) => break,
-            };
+        while let Ok(Some((pid, state))) = self.system.wait(Pid::from_raw(-1)) {
+            self.jobs.update_status(state.to_wait_status(pid));
         }
     }
 

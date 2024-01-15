@@ -22,7 +22,6 @@
 
 use thiserror::Error;
 use yash_env::job::Pid;
-use yash_env::job::WaitStatus;
 use yash_env::system::Errno;
 use yash_env::trap::Signal;
 use yash_env::Env;
@@ -66,7 +65,7 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
         // Poll for a job status change. Note that this `wait` call returns
         // immediately regardless of whether there is a new job status.
         match env.system.wait(Pid::from_raw(-1)) {
-            Ok(WaitStatus::StillAlive) => {
+            Ok(None) => {
                 // The current process has child processes, but none of them has
                 // changed its status. Wait for a signal.
                 let signals = env.wait_for_signals().await;
@@ -77,9 +76,9 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
                 }
             }
 
-            Ok(status) => {
-                // Some job has changed its status.
-                env.jobs.update_status(status);
+            Ok(Some((pid, state))) => {
+                // Some job has changed its state.
+                env.jobs.update_status(state.to_wait_status(pid));
                 return Ok(());
             }
 
@@ -103,6 +102,7 @@ mod tests {
     use std::pin::pin;
     use std::task::Poll;
     use yash_env::job::Job;
+    use yash_env::job::WaitStatus;
     use yash_env::subshell::Subshell;
     use yash_env::trap::Action;
     use yash_env::variable::Value;

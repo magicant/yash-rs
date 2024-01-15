@@ -69,7 +69,6 @@ use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
 use crate::job::ProcessState;
-use crate::job::WaitStatus;
 use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
 use crate::System;
@@ -911,14 +910,14 @@ impl System for VirtualSystem {
     /// Waits for a child.
     ///
     /// TODO: Currently, this function only supports `target == -1 || target > 0`.
-    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
         let parent_pid = self.process_id;
         let mut state = self.state.borrow_mut();
         if let Some((pid, process)) = state.child_to_wait_for(parent_pid, target) {
             if process.state_has_changed() {
-                Ok(process.take_state().to_wait_status(pid))
+                Ok(Some((pid, process.take_state())))
             } else if process.state().is_alive() {
-                Ok(WaitStatus::StillAlive)
+                Ok(None)
             } else {
                 Err(Errno::ECHILD)
             }
@@ -2315,7 +2314,7 @@ mod tests {
         let pid = executor.run_until(future);
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(WaitStatus::StillAlive))
+        assert_eq!(result, Ok(None))
     }
 
     #[test]
@@ -2338,7 +2337,7 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(WaitStatus::Exited(pid, 5)))
+        assert_eq!(result, Ok(Some((pid, ProcessState::Exited(ExitStatus(5))))));
     }
 
     #[test]
@@ -2365,7 +2364,7 @@ mod tests {
         let result = env.system.wait(pid);
         assert_eq!(
             result,
-            Ok(WaitStatus::Signaled(pid, Signal::SIGKILL, false))
+            Ok(Some((pid, ProcessState::Signaled(Signal::SIGKILL))))
         );
     }
 
@@ -2391,7 +2390,10 @@ mod tests {
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(WaitStatus::Stopped(pid, Signal::SIGSTOP)));
+        assert_eq!(
+            result,
+            Ok(Some((pid, ProcessState::Stopped(Signal::SIGSTOP))))
+        );
     }
 
     #[test]
@@ -2423,12 +2425,15 @@ mod tests {
             .unwrap();
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(WaitStatus::Continued(pid)));
+        assert_eq!(result, Ok(Some((pid, ProcessState::Running))));
 
         executor.run_until_stalled();
 
         let result = env.system.wait(pid);
-        assert_eq!(result, Ok(WaitStatus::Exited(pid, 123)));
+        assert_eq!(
+            result,
+            Ok(Some((pid, ProcessState::Exited(ExitStatus(123)))))
+        );
     }
 
     #[test]

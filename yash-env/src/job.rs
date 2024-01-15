@@ -64,6 +64,7 @@ pub enum ProcessState {
     Exited(ExitStatus),
     /// The process has been terminated by a signal.
     Signaled(Signal),
+    // TODO Indicate whether the core dump is generated
 }
 
 impl ProcessState {
@@ -84,6 +85,24 @@ impl ProcessState {
             ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
             ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
             ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
+        }
+    }
+
+    /// Converts `WaitStatus` to `ProcessState`.
+    ///
+    /// If the given `WaitStatus` represents a change in the process state, this
+    /// function returns the new state with the process ID. Otherwise, it
+    /// returns `None`.
+    #[must_use]
+    pub fn from_wait_status(status: WaitStatus) -> Option<(Pid, Self)> {
+        match status {
+            WaitStatus::Continued(pid) => Some((pid, ProcessState::Running)),
+            WaitStatus::Exited(pid, exit_status) => {
+                Some((pid, ProcessState::Exited(ExitStatus(exit_status))))
+            }
+            WaitStatus::Stopped(pid, signal) => Some((pid, ProcessState::Stopped(signal))),
+            WaitStatus::Signaled(pid, signal, _) => Some((pid, ProcessState::Signaled(signal))),
+            _ => None,
         }
     }
 }
