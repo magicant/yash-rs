@@ -246,9 +246,9 @@ mod tests {
     use crate::tests::assert_stdout;
     use futures_util::FutureExt as _;
     use yash_env::job::Job;
+    use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
-    use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
     #[test]

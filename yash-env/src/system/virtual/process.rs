@@ -19,13 +19,12 @@
 use super::io::FdBody;
 use super::signal::SignalEffect;
 use crate::io::Fd;
-use crate::semantics::ExitStatus;
+use crate::job::ProcessState;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -466,37 +465,6 @@ impl Process {
     }
 }
 
-/// State of a process.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProcessState {
-    Running,
-    Stopped(Signal),
-    Exited(ExitStatus),
-    Signaled(Signal),
-}
-
-impl ProcessState {
-    /// Whether the process is not yet terminated.
-    #[must_use]
-    pub fn is_alive(&self) -> bool {
-        match self {
-            ProcessState::Running | ProcessState::Stopped(_) => true,
-            ProcessState::Exited(_) | ProcessState::Signaled(_) => false,
-        }
-    }
-
-    /// Converts `ProcessState` to `WaitStatus`.
-    #[must_use]
-    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
-        match self {
-            ProcessState::Running => WaitStatus::Continued(pid),
-            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
-            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
-            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
-        }
-    }
-}
-
 /// Result of operations that may deliver a signal to a process.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -533,6 +501,7 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::semantics::ExitStatus;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use crate::system::FdFlag;

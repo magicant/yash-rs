@@ -41,6 +41,8 @@
 //! last executed asynchronous command, which will be the value of the `$!`
 //! special parameter.
 
+use crate::semantics::ExitStatus;
+use crate::trap::Signal;
 #[doc(no_inline)]
 pub use nix::sys::wait::WaitStatus;
 #[doc(no_inline)]
@@ -50,6 +52,41 @@ use std::collections::HashMap;
 use std::iter::FusedIterator;
 use std::ops::Deref;
 use thiserror::Error;
+
+/// Execution state of a process
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProcessState {
+    /// The process is running.
+    Running,
+    /// The process is stopped by a signal.
+    Stopped(Signal),
+    /// The process has exited.
+    Exited(ExitStatus),
+    /// The process has been terminated by a signal.
+    Signaled(Signal),
+}
+
+impl ProcessState {
+    /// Whether the process is not yet terminated.
+    #[must_use]
+    pub fn is_alive(&self) -> bool {
+        match self {
+            ProcessState::Running | ProcessState::Stopped(_) => true,
+            ProcessState::Exited(_) | ProcessState::Signaled(_) => false,
+        }
+    }
+
+    /// Converts `ProcessState` to `WaitStatus`.
+    #[must_use]
+    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
+        match self {
+            ProcessState::Running => WaitStatus::Continued(pid),
+            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
+            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
+            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
+        }
+    }
+}
 
 /// Trait for adding some methods to [`WaitStatus`]
 pub trait WaitStatusEx {

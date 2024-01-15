@@ -87,10 +87,10 @@ mod tests {
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
+    use yash_env::job::ProcessState;
     use yash_env::job::WaitStatus;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
-    use yash_env::system::r#virtual::ProcessState;
     use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;

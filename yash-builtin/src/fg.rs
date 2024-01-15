@@ -211,12 +211,12 @@ mod tests {
     use std::ops::ControlFlow::Continue;
     use std::rc::Rc;
     use yash_env::job::Job;
+    use yash_env::job::ProcessState;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::subshell::JobControl;
     use yash_env::subshell::Subshell;
     use yash_env::system::r#virtual::Process;
-    use yash_env::system::r#virtual::ProcessState;
     use yash_env::VirtualSystem;
 
     async fn suspend(env: &mut Env) {

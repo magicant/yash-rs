@@ -396,7 +396,7 @@ impl<'a> IntoIterator for &'a TrapSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system::r#virtual::ProcessState;
+    use crate::job::ProcessState;
     use crate::tests::in_virtual_system;
     use crate::System;
     use std::collections::HashMap;

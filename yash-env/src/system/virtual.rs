@@ -68,6 +68,7 @@ use super::TimeSpec;
 use super::AT_FDCWD;
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::ProcessState;
 use crate::job::WaitStatus;
 use crate::system::ChildProcessStarter;
 use crate::SignalHandling;
