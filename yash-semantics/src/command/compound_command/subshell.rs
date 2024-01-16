@@ -22,6 +22,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
+use yash_env::job::ProcessState;
 use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -39,10 +40,10 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
-            if let Stopped(pid, _signal) = wait_status {
+            if let Stopped(pid, signal) = wait_status {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.status = wait_status;
+                job.state = ProcessState::Stopped(signal);
                 job.name = body.to_string();
                 env.jobs.add(job);
             }
@@ -88,7 +89,6 @@ mod tests {
     use std::pin::Pin;
     use std::rc::Rc;
     use yash_env::job::ProcessState;
-    use yash_env::job::WaitStatus;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
     use yash_env::trap::Signal;
@@ -208,7 +208,7 @@ mod tests {
             let job = env.jobs.iter().next().unwrap().1;
             assert_eq!(job.pid, pid);
             assert!(job.job_controlled);
-            assert_eq!(job.status, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
             assert!(job.status_changed);
             assert_eq!(job.name, "suspend foo");
         })

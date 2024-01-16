@@ -24,6 +24,7 @@ use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
+use yash_env::job::ProcessState;
 use yash_env::job::WaitStatus::Stopped;
 use yash_env::option::Option::Exec;
 use yash_env::option::State::Off;
@@ -132,10 +133,10 @@ async fn execute_job_controlled_pipeline(
 
     match subshell.start_and_wait(env).await {
         Ok(wait_status) => {
-            if let Stopped(pid, _signal) = wait_status {
+            if let Stopped(pid, signal) = wait_status {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.status = wait_status;
+                job.state = ProcessState::Stopped(signal);
                 job.name = to_job_name(commands);
                 env.jobs.add(job);
             }
@@ -336,7 +337,6 @@ mod tests {
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::job::ProcessState;
-    use yash_env::job::WaitStatus;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::semantics::Field;
@@ -611,7 +611,7 @@ mod tests {
             assert_eq!(env.jobs.len(), 1);
             let job = env.jobs.iter().next().unwrap().1;
             assert!(job.job_controlled);
-            assert_eq!(job.status, WaitStatus::Stopped(job.pid, Signal::SIGSTOP));
+            assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
             assert!(job.status_changed);
             assert_eq!(job.name, "return -n 0 | suspend x");
         })

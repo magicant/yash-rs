@@ -153,14 +153,6 @@ impl MessageBase for OperandError {
     }
 }
 
-/// Tests if the specified wait status indicates that the job is still alive.
-pub(crate) const fn is_alive(status: WaitStatus) -> bool {
-    !matches!(
-        status,
-        WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _)
-    )
-}
-
 /// Resumes the job at the specified index.
 ///
 /// This function panics if there is no job at the specified index.
@@ -182,7 +174,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
     drop(line);
 
-    if is_alive(job.status) {
+    if job.state.is_alive() {
         let pgid = Pid::from_raw(-job.pid.as_raw());
         env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
@@ -370,7 +362,7 @@ mod tests {
         let pid = Pid::from_raw(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
-        job.status = WaitStatus::Exited(pid, 0);
+        job.state = ProcessState::Exited(ExitStatus::SUCCESS);
         let index = env.jobs.add(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);

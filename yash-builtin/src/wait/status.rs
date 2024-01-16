@@ -29,7 +29,7 @@ use super::core::wait_for_any_job_or_trap;
 use super::core::Error;
 use std::ops::ControlFlow;
 use yash_env::job::JobSet;
-use yash_env::job::WaitStatus;
+use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
 use yash_env::Env;
@@ -77,16 +77,16 @@ pub fn job_status(
             return ControlFlow::Break(ExitStatus::NOT_FOUND);
         }
 
-        match job.status {
-            WaitStatus::Exited(_pid, exit_status) => {
+        match job.state {
+            ProcessState::Exited(exit_status) => {
                 jobs.remove(index);
-                ControlFlow::Break(ExitStatus(exit_status))
+                ControlFlow::Break(exit_status)
             }
-            WaitStatus::Signaled(_pid, signal, _core_dumped) => {
+            ProcessState::Signaled(signal /*, _core_dumped*/) => {
                 jobs.remove(index);
                 ControlFlow::Break(ExitStatus::from(signal))
             }
-            WaitStatus::Stopped(_pid, signal) if job_control.into() => {
+            ProcessState::Stopped(signal) if job_control.into() => {
                 ControlFlow::Break(ExitStatus::from(signal))
             }
             _ => ControlFlow::Continue(()),
@@ -144,7 +144,7 @@ mod tests {
     fn status_of_exited_job() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Exited(Pid::from_raw(123), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         let index = jobs.add(job);
 
         assert_eq!(
@@ -154,7 +154,7 @@ mod tests {
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Exited(Pid::from_raw(456), 42);
+        job.state = ProcessState::Exited(ExitStatus(42));
         let index = jobs.add(job);
 
         assert_eq!(
@@ -168,7 +168,7 @@ mod tests {
     fn status_of_signaled_job() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Signaled(Pid::from_raw(123), Signal::SIGHUP, false);
+        job.state = ProcessState::Signaled(Signal::SIGHUP /*, false*/);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Signaled(Pid::from_raw(456), Signal::SIGTERM, true);
+        job.state = ProcessState::Signaled(Signal::SIGTERM /*, true*/);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -192,14 +192,14 @@ mod tests {
     fn status_of_stopped_job_without_job_control() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Stopped(Pid::from_raw(123), Signal::SIGTSTP);
+        job.state = ProcessState::Stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
         assert_eq!(jobs.get(index).unwrap().pid, Pid::from_raw(123));
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Stopped(Pid::from_raw(456), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
@@ -210,7 +210,7 @@ mod tests {
     fn status_of_stopped_job_with_job_control() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Stopped(Pid::from_raw(123), Signal::SIGTSTP);
+        job.state = ProcessState::Stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(jobs.get(index).unwrap().pid, Pid::from_raw(123));
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Stopped(Pid::from_raw(456), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(
@@ -234,17 +234,17 @@ mod tests {
     fn status_of_continued_job() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Continued(Pid::from_raw(123));
+        job.state = ProcessState::Running;
         let index = jobs.add(job);
 
-        assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
+        assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()));
         assert_eq!(jobs.get(index).unwrap().pid, Pid::from_raw(123));
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Continued(Pid::from_raw(456));
+        job.state = ProcessState::Running;
         let index = jobs.add(job);
 
-        assert_eq!(job_status(index, On)(&mut jobs), ControlFlow::Continue(()),);
+        assert_eq!(job_status(index, On)(&mut jobs), ControlFlow::Continue(()));
         assert_eq!(jobs.get(index).unwrap().pid, Pid::from_raw(456));
     }
 
@@ -279,7 +279,7 @@ mod tests {
     fn any_job_is_running_with_exited_jobs() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.status = WaitStatus::Exited(Pid::from_raw(123), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         jobs.add(job);
 
         assert_eq!(
@@ -288,7 +288,7 @@ mod tests {
         );
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.status = WaitStatus::Exited(Pid::from_raw(456), 42);
+        job.state = ProcessState::Exited(ExitStatus(42));
         jobs.add(job);
 
         assert_eq!(
@@ -313,7 +313,7 @@ mod tests {
 
         // Exited jobs are ignored
         let mut job = Job::new(Pid::from_raw(789));
-        job.status = WaitStatus::Exited(Pid::from_raw(789), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         jobs.add(job);
 
         assert_eq!(any_job_is_running(On)(&mut jobs), ControlFlow::Continue(()),);

@@ -26,6 +26,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
+use yash_env::job::ProcessState;
 use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
@@ -70,10 +71,10 @@ pub async fn execute_absent_target(
 
         match subshell.start_and_wait(env).await {
             Ok(wait_status) => {
-                if let Stopped(pid, _signal) = wait_status {
+                if let Stopped(pid, signal) = wait_status {
                     let mut job = Job::new(pid);
                     job.job_controlled = true;
-                    job.status = wait_status;
+                    job.state = ProcessState::Stopped(signal);
                     job.name = redirs
                         .iter()
                         .format_with(" ", |redir, f| f(&format_args!("{redir}")))

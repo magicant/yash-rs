@@ -454,6 +454,7 @@ mod tests {
     use super::*;
     use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
+    use crate::job::ProcessState;
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
@@ -619,7 +620,7 @@ mod tests {
             let job_index = env.jobs.add(job.clone());
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
-            job.status = WaitStatus::Exited(pid, 42);
+            job.state = ProcessState::Exited(ExitStatus(42));
             assert_eq!(env.jobs.get(job_index), Some(&job));
         });
     }
@@ -650,7 +651,7 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
 
-        let [(pid_1, job_1), (pid_2, job_2), (_pid_3, job_3)] = executor.run_until(async {
+        let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.
             let subshell_1 = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
@@ -687,29 +688,29 @@ mod tests {
             let job_1 = env.jobs.add(Job::new(pid_1));
             let job_2 = env.jobs.add(Job::new(pid_2));
             let job_3 = env.jobs.add(Job::new(pid_3));
-            [(pid_1, job_1), (pid_2, job_2), (pid_3, job_3)]
+            [job_1, job_2, job_3]
         });
 
         // Let the jobs (except job_3) finish.
         executor.run_until_stalled();
 
         // We're not yet updated.
-        assert_eq!(env.jobs.get(job_1).unwrap().status, WaitStatus::StillAlive);
-        assert_eq!(env.jobs.get(job_2).unwrap().status, WaitStatus::StillAlive);
-        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_1).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs.get(job_2).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
 
         env.update_all_subshell_statuses();
 
         // Now we have the results.
         assert_eq!(
-            env.jobs.get(job_1).unwrap().status,
-            WaitStatus::Exited(pid_1, 12)
+            env.jobs.get(job_1).unwrap().state,
+            ProcessState::Exited(ExitStatus(12))
         );
         assert_eq!(
-            env.jobs.get(job_2).unwrap().status,
-            WaitStatus::Exited(pid_2, 35)
+            env.jobs.get(job_2).unwrap().state,
+            ProcessState::Exited(ExitStatus(35))
         );
-        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
     }
 
     #[test]

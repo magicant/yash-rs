@@ -28,6 +28,7 @@ use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 use yash_env::io::print_error;
 use yash_env::job::Job;
+use yash_env::job::ProcessState;
 use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -93,10 +94,10 @@ pub async fn execute_external_utility(
 
     match subshell.start_and_wait(&mut env).await {
         Ok(wait_status) => {
-            if let Stopped(pid, _signal) = wait_status {
+            if let Stopped(pid, signal) = wait_status {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.status = wait_status;
+                job.state = ProcessState::Stopped(signal);
                 job.name = job_name;
                 env.jobs.add(job);
             }

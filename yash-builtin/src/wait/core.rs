@@ -102,7 +102,8 @@ mod tests {
     use std::pin::pin;
     use std::task::Poll;
     use yash_env::job::Job;
-    use yash_env::job::WaitStatus;
+    use yash_env::job::ProcessState;
+    use yash_env::semantics::ExitStatus;
     use yash_env::subshell::Subshell;
     use yash_env::trap::Action;
     use yash_env::variable::Value;
@@ -135,8 +136,8 @@ mod tests {
             assert_eq!(result, Ok(()));
             // The job status is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().status,
-                WaitStatus::Exited(pid, 0),
+                env.jobs.get(index).unwrap().state,
+                ProcessState::Exited(ExitStatus::default()),
             );
         });
     }
@@ -156,8 +157,8 @@ mod tests {
             assert_eq!(result, Ok(()));
             // The job status is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().status,
-                WaitStatus::Stopped(pid, Signal::SIGSTOP),
+                env.jobs.get(index).unwrap().state,
+                ProcessState::Stopped(Signal::SIGSTOP),
             );
         });
     }

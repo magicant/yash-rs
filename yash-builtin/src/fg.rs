@@ -80,7 +80,6 @@
 //!
 //! [owned]: yash_env::job::Job::is_owned
 
-use crate::bg::is_alive;
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
 use crate::common::report_error;
@@ -92,6 +91,7 @@ use yash_env::job::id::parse;
 #[cfg(doc)]
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
+use yash_env::job::ProcessState;
 use yash_env::job::WaitStatus;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -133,8 +133,8 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
     drop(line);
 
-    if !is_alive(job.status) {
-        return Ok(job.status);
+    if !job.state.is_alive() {
+        return Ok(job.state.to_wait_status(job.pid));
     }
 
     // TODO Should we save/restore the terminal state?
@@ -150,8 +150,10 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     let status = wait_while_running(env, job.pid).await?;
 
     // Remove the job if it has finished.
-    if !is_alive(status) {
-        env.jobs.remove(index);
+    if let Some((_, state)) = ProcessState::from_wait_status(status) {
+        if !state.is_alive() {
+            env.jobs.remove(index);
+        }
     }
 
     // Move the shell back to the foreground.
@@ -250,7 +252,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index = env.jobs.add(job);
 
             resume_job_by_index(&mut env, index).await.unwrap();
@@ -276,7 +278,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             job.name = "my job name".to_owned();
             let index = env.jobs.add(job);
 
@@ -304,7 +306,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index = env.jobs.add(job);
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
@@ -335,14 +337,14 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index = env.jobs.add(job);
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
             assert_eq!(result, WaitStatus::Stopped(pid, Signal::SIGSTOP));
-            let job_status = env.jobs.get(index).unwrap().status;
-            assert_eq!(job_status, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            let job_state = env.jobs.get(index).unwrap().state;
+            assert_eq!(job_state, ProcessState::Stopped(Signal::SIGSTOP));
             let state = state.borrow().processes[&pid].state();
             assert_eq!(state, ProcessState::Stopped(Signal::SIGSTOP));
         })
@@ -365,7 +367,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index = env.jobs.add(job);
 
             _ = resume_job_by_index(&mut env, index).await.unwrap();
@@ -383,7 +385,7 @@ mod tests {
         let pid = Pid::from_raw(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
-        job.status = WaitStatus::Exited(pid, 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         let index = env.jobs.add(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);
@@ -449,7 +451,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid1);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             env.jobs.add(job);
             // current job
             let subshell = Subshell::new(|env, _| {
@@ -464,7 +466,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid2);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index2 = env.jobs.add(job);
             env.jobs.set_current_job(index2).unwrap();
 
@@ -510,7 +512,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid1);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             job.name = "previous job".to_string();
             let index1 = env.jobs.add(job);
             // current job
@@ -526,7 +528,7 @@ mod tests {
                 assert_matches!(subshell_status, WaitStatus::Stopped(pid, Signal::SIGSTOP) => pid);
             let mut job = Job::new(pid2);
             job.job_controlled = true;
-            job.status = subshell_status;
+            job.state = ProcessState::from_wait_status(subshell_status).unwrap().1;
             let index2 = env.jobs.add(job);
             env.jobs.set_current_job(index2).unwrap();
 
