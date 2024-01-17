@@ -37,8 +37,7 @@ use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
 use self::job::Pid;
-use self::job::WaitStatus;
-use self::job::WaitStatusEx;
+use self::job::ProcessState;
 use self::option::On;
 use self::option::OptionSet;
 use self::option::{AllExport, ErrExit, Monitor};
@@ -333,16 +332,15 @@ impl Env {
     /// If the target subshell is not job-controlled, you may want to use
     /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
     /// instead.
-    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<(Pid, ProcessState)> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps.enable_sigchld_handler(&mut self.system)?;
 
         loop {
             if let Some((pid, state)) = self.system.wait(target)? {
-                let status = state.to_wait_status(pid);
                 self.jobs.update_status(pid, state);
-                return Ok(status);
+                return Ok((pid, state));
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
@@ -360,9 +358,9 @@ impl Env {
         target: Pid,
     ) -> nix::Result<(Pid, ExitStatus)> {
         loop {
-            let wait_status = self.wait_for_subshell(target).await?;
-            if wait_status.is_finished() {
-                return Ok((wait_status.pid().unwrap(), wait_status.try_into().unwrap()));
+            let (pid, state) = self.wait_for_subshell(target).await?;
+            if !state.is_alive() {
+                return Ok((pid, state.try_into().unwrap()));
             }
         }
     }
@@ -454,7 +452,6 @@ mod tests {
     use super::*;
     use crate::io::MIN_INTERNAL_FD;
     use crate::job::Job;
-    use crate::job::ProcessState;
     use crate::subshell::Subshell;
     use crate::system::r#virtual::INode;
     use crate::system::r#virtual::SystemState;
@@ -601,7 +598,7 @@ mod tests {
             });
             let (pid, _) = subshell.start(&mut env).await.unwrap();
             let result = env.wait_for_subshell(pid).await;
-            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+            assert_eq!(result, Ok((pid, ProcessState::Exited(ExitStatus(42)))));
         });
     }
 
@@ -619,7 +616,7 @@ mod tests {
             job.name = "my job".to_string();
             let job_index = env.jobs.add(job.clone());
             let result = env.wait_for_subshell(pid).await;
-            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+            assert_eq!(result, Ok((pid, ProcessState::Exited(ExitStatus(42)))));
             job.state = ProcessState::Exited(ExitStatus(42));
             assert_eq!(env.jobs.get(job_index), Some(&job));
         });

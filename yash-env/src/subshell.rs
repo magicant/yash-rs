@@ -241,7 +241,8 @@ where
     pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<WaitStatus> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
-            let wait_status = env.wait_for_subshell(pid).await?;
+            let (pid, state) = env.wait_for_subshell(pid).await?;
+            let wait_status = state.to_wait_status(pid);
             match wait_status {
                 WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _) => break Ok(wait_status),
                 WaitStatus::Stopped(_, _) if job_control.is_some() => break Ok(wait_status),
@@ -310,6 +311,7 @@ impl<'a> Drop for MaskGuard<'a> {
 mod tests {
     use super::*;
     use crate::job::Job;
+    use crate::job::ProcessState;
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
@@ -679,7 +681,10 @@ mod tests {
                 .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+            assert_eq!(
+                child_result,
+                (child_pid, ProcessState::Exited(ExitStatus(123)))
+            );
 
             let state = state.borrow();
             let parent_process = &state.processes[&parent_env.main_pid];
@@ -745,7 +750,10 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+            assert_eq!(
+                child_result,
+                (child_pid, ProcessState::Exited(ExitStatus(123)))
+            );
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -787,7 +795,10 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+            assert_eq!(
+                child_result,
+                (child_pid, ProcessState::Exited(ExitStatus(123)))
+            );
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -823,7 +834,10 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+            assert_eq!(
+                child_result,
+                (child_pid, ProcessState::Exited(ExitStatus(123)))
+            );
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];
@@ -859,7 +873,10 @@ mod tests {
             .unwrap();
 
             let child_result = parent_env.wait_for_subshell(child_pid).await.unwrap();
-            assert_eq!(child_result, WaitStatus::Exited(child_pid, 123));
+            assert_eq!(
+                child_result,
+                (child_pid, ProcessState::Exited(ExitStatus(123)))
+            );
 
             let state = state.borrow();
             let child_process = &state.processes[&child_pid];

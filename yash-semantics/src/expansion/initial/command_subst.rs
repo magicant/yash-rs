@@ -26,7 +26,6 @@ use crate::Handle;
 use crate::ReadEvalLoop;
 use yash_env::io::Fd;
 use yash_env::job::Pid;
-use yash_env::semantics::ExitStatus;
 use yash_env::subshell::JobControl;
 use yash_env::subshell::Subshell;
 use yash_env::system::Errno;
@@ -115,20 +114,15 @@ async fn expand_common(
     env.inner.system.close(reader).ok();
 
     // Wait for the subshell
-    // TODO What if the child process suspends?
-    use yash_env::job::WaitStatus::*;
-    let exit_status = match env.inner.wait_for_subshell(pid).await {
-        Ok(Exited(_pid, exit_status)) => ExitStatus(exit_status),
-        Ok(Signaled(_pid, signal, _core_dumped)) => ExitStatus::from(signal),
-        Ok(status) => todo!("unhandled wait status {:?}", status),
+    match env.inner.wait_for_subshell_to_finish(pid).await {
+        Ok((_pid, exit_status)) => env.last_command_subst_exit_status = Some(exit_status),
         Err(errno) => {
             return Err(Error {
                 cause: ErrorCause::CommandSubstError(errno),
                 location,
             })
         }
-    };
-    env.last_command_subst_exit_status = Some(exit_status);
+    }
 
     let mut result = String::from_utf8(result)
         .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).to_string());
@@ -156,6 +150,7 @@ mod tests {
     use crate::tests::in_virtual_system;
     use crate::tests::return_builtin;
     use futures_util::FutureExt;
+    use yash_env::semantics::ExitStatus;
     use yash_env::system::Errno;
 
     #[test]

@@ -104,10 +104,10 @@ use yash_env::Env;
 /// Waits for the specified job to finish (or suspend again).
 async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<WaitStatus, Errno> {
     loop {
-        let status = env.wait_for_subshell(pid).await?;
-        match status {
+        let (pid, state) = env.wait_for_subshell(pid).await?;
+        match state.to_wait_status(pid) {
             WaitStatus::Continued(_) | WaitStatus::StillAlive => (),
-            _ => return Ok(status),
+            status => return Ok(status),
         }
     }
 }
