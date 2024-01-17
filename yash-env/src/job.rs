@@ -142,10 +142,10 @@ pub struct Job {
     /// Current state of the process
     pub state: ProcessState,
 
-    /// Status of the process expected in the next update
+    /// State of the process expected in the next update
     ///
     /// See [`JobRefMut::expect`] and [`JobSet::update_status`] for details.
-    pub expected_status: Option<WaitStatus>,
+    pub expected_state: Option<ProcessState>,
 
     /// Indicator of status change
     ///
@@ -174,7 +174,7 @@ impl Job {
             pid,
             job_controlled: false,
             state: ProcessState::Running,
-            expected_status: None,
+            expected_state: None,
             status_changed: true,
             is_owned: true,
             name: String::new(),
@@ -195,21 +195,21 @@ impl Job {
 pub struct JobRefMut<'a>(&'a mut Job);
 
 impl JobRefMut<'_> {
-    /// Sets the `expected_status` of the job.
+    /// Sets the `expected_state` of the job.
     ///
-    /// This method remembers the argument as the expected status of the job.
-    /// If the job is [updated] with the same status, the `status_changed` flag
+    /// This method remembers the argument as the expected state of the job.
+    /// If the job is [updated] with the same state, the `status_changed` flag
     /// is not set then.
     ///
     /// This method may be used to suppress a change report of a job status,
     /// especially when the status is reported before it is actually changed.
     ///
     /// [updated]: JobSet::update_status
-    pub fn expect<S>(&mut self, status: S)
+    pub fn expect<S>(&mut self, state: S)
     where
-        S: Into<Option<WaitStatus>>,
+        S: Into<Option<ProcessState>>,
     {
-        self.0.expected_status = status.into();
+        self.0.expected_state = state.into();
     }
 
     /// Clears the `status_changed` flag of the job.
@@ -615,21 +615,21 @@ impl JobSet {
 }
 
 impl JobSet {
-    /// Updates the status of a job.
+    /// Updates the state of a job.
     ///
     /// The result of a `waitpid` call should be passed to this function.
-    /// It updates the status of the job as indicated by `status`, and sets the
+    /// It updates the state of the job as indicated by `status`, and sets the
     /// `status_changed` flag in the job. As an exception, if `status` is equal
-    /// to the `expected_status` of the job, the `status_changed` flag is not
-    /// set. The `expected_status` is cleared in any case. (See also
-    /// [`JobRefMut::expect`] for the usage of `expected_status`.)
+    /// to the `expected_state` of the job, the `status_changed` flag is not
+    /// set. The `expected_state` is cleared in any case. (See also
+    /// [`JobRefMut::expect`] for the usage of `expected_state`.)
     ///
     /// Returns the index of the job updated. If `status` describes a process
     /// not managed in this job set, the result is `None`.
     ///
     /// When a job is suspended (i.e., `status` is `Stopped`), the job becomes
     /// the [current job](Self::current_job) and the old current job becomes the
-    /// [previous job](Self::previous_job). When a suspended job gets a status
+    /// [previous job](Self::previous_job). When a suspended job gets a state
     /// update:
     ///
     /// - If the updated job is the current job and the previous job is
@@ -646,8 +646,8 @@ impl JobSet {
         let job = &mut self.jobs[index];
         let was_suspended = job.is_suspended();
         job.state = state;
-        job.status_changed |= job.expected_status != Some(status);
-        job.expected_status = None;
+        job.status_changed |= job.expected_state != Some(state);
+        job.expected_state = None;
 
         // Reselect the current and previous job.
         if !was_suspended && job.is_suspended() {
@@ -906,7 +906,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::bool_assert_comparison)]
-    fn updating_job_status_without_expected_status() {
+    fn updating_job_status_without_expected_state() {
         let mut set = JobSet::default();
         let status = WaitStatus::Exited(Pid::from_raw(20), 15);
         assert_eq!(set.update_status(status), None);
@@ -932,11 +932,11 @@ mod tests {
 
     #[test]
     #[allow(clippy::bool_assert_comparison)]
-    fn updating_job_status_with_matching_expected_status() {
+    fn updating_job_status_with_matching_expected_state() {
         let mut set = JobSet::default();
         let pid = Pid::from_raw(20);
         let mut job = Job::new(pid);
-        job.expected_status = Some(WaitStatus::Continued(pid));
+        job.expected_state = Some(ProcessState::Running);
         job.status_changed = false;
         let i20 = set.add(job);
 
@@ -944,17 +944,17 @@ mod tests {
 
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Running);
-        assert_eq!(job.expected_status, None);
+        assert_eq!(job.expected_state, None);
         assert_eq!(job.status_changed, false);
     }
 
     #[test]
     #[allow(clippy::bool_assert_comparison)]
-    fn updating_job_status_with_unmatched_expected_status() {
+    fn updating_job_status_with_unmatched_expected_state() {
         let mut set = JobSet::default();
         let pid = Pid::from_raw(20);
         let mut job = Job::new(pid);
-        job.expected_status = Some(WaitStatus::Continued(pid));
+        job.expected_state = Some(ProcessState::Running);
         job.status_changed = false;
         let i20 = set.add(job);
 
@@ -962,7 +962,7 @@ mod tests {
 
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Exited(ExitStatus(0)));
-        assert_eq!(job.expected_status, None);
+        assert_eq!(job.expected_state, None);
         assert_eq!(job.status_changed, true);
     }
 

@@ -70,12 +70,12 @@
 //! prevent unrelated processes that happen to have the same process IDs as the
 //! jobs from receiving the signal.
 //!
-//! The built-in sets the [expected status] of the resumed jobs to
-//! [`WaitStatus::Continued`] so that the status changes are not reported again
+//! The built-in sets the [expected state] of the resumed jobs to
+//! [`ProcessState::Running`] so that the status changes are not reported again
 //! on the next command prompt.
 //!
 //! [owned]: yash_env::job::Job::is_owned
-//! [expected status]: yash_env::job::Job::expected_status
+//! [expected state]: yash_env::job::Job::expected_state
 
 use crate::common::report_error;
 use crate::common::report_failure;
@@ -95,7 +95,7 @@ use yash_env::job::id::ParseError;
 #[cfg(doc)]
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
-use yash_env::job::WaitStatus;
+use yash_env::job::ProcessState;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::trap::Signal;
@@ -180,7 +180,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
 
         // We've just reported that the job is resumed, so there is no need to
         // report the same thing in the usual pre-prompt message.
-        job.expect(WaitStatus::Continued(job.pid));
+        job.expect(ProcessState::Running);
     }
 
     // The resumed job becomes the current job. This is only relevant when all
@@ -304,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn resume_job_by_index_sets_expected_status() {
+    fn resume_job_by_index_sets_expected_state() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
         let pid = Pid::from_raw(123);
@@ -321,7 +321,7 @@ mod tests {
         _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
         let job = env.jobs.get(index).unwrap();
-        assert_eq!(job.expected_status, Some(WaitStatus::Continued(pid)));
+        assert_eq!(job.expected_state, Some(ProcessState::Running));
     }
 
     #[test]
