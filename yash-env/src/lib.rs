@@ -341,7 +341,7 @@ impl Env {
         loop {
             if let Some((pid, state)) = self.system.wait(target)? {
                 let status = state.to_wait_status(pid);
-                self.jobs.update_status(status);
+                self.jobs.update_status(pid, state);
                 return Ok(status);
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
@@ -377,7 +377,7 @@ impl Env {
     /// lost when you call this function.
     pub fn update_all_subshell_statuses(&mut self) {
         while let Ok(Some((pid, state))) = self.system.wait(Pid::from_raw(-1)) {
-            self.jobs.update_status(state.to_wait_status(pid));
+            self.jobs.update_status(pid, state);
         }
     }
 

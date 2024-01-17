@@ -617,17 +617,18 @@ impl JobSet {
 impl JobSet {
     /// Updates the state of a job.
     ///
-    /// The result of a `waitpid` call should be passed to this function.
-    /// It updates the state of the job as indicated by `status`, and sets the
-    /// `state_changed` flag in the job. As an exception, if `status` is equal
-    /// to the `expected_state` of the job, the `state_changed` flag is not set.
-    /// The `expected_state` is cleared in any case. (See also
-    /// [`JobRefMut::expect`] for the usage of `expected_state`.)
+    /// The result of a [`wait`](crate::System::wait) call should be passed to
+    /// this function. It looks up the job for the given process ID, updates the
+    /// state of the job to the given `state`, and sets the `state_changed` flag
+    /// in the job. As an exception, if `state` is equal to the `expected_state`
+    /// of the job, the `state_changed` flag is not set. The `expected_state` is
+    /// cleared in any case. (See also [`JobRefMut::expect`] for the usage of
+    /// `expected_state`.)
     ///
-    /// Returns the index of the job updated. If `status` describes a process
-    /// not managed in this job set, the result is `None`.
+    /// Returns the index of the job updated. If there is no job for the given
+    /// process ID, the result is `None`.
     ///
-    /// When a job is suspended (i.e., `status` is `Stopped`), the job becomes
+    /// When a job is suspended (i.e., `state` is `Stopped`), the job becomes
     /// the [current job](Self::current_job) and the old current job becomes the
     /// [previous job](Self::previous_job). When a suspended job gets a state
     /// update:
@@ -638,11 +639,10 @@ impl JobSet {
     ///   suspended jobs, the new previous jobs is the old current job.
     /// - If the updated job is the previous job and there is a suspended job
     ///   other than the current job, it becomes the previous job.
-    pub fn update_status(&mut self, status: WaitStatus) -> Option<usize> {
-        let (pid, state) = ProcessState::from_wait_status(status)?;
+    pub fn update_status(&mut self, pid: Pid, state: ProcessState) -> Option<usize> {
         let index = self.find_by_pid(pid)?;
 
-        // Update the job status.
+        // Update the job state.
         let job = &mut self.jobs[index];
         let was_suspended = job.is_suspended();
         job.state = state;
@@ -908,8 +908,8 @@ mod tests {
     #[allow(clippy::bool_assert_comparison)]
     fn updating_job_status_without_expected_state() {
         let mut set = JobSet::default();
-        let status = WaitStatus::Exited(Pid::from_raw(20), 15);
-        assert_eq!(set.update_status(status), None);
+        let state = ProcessState::Exited(ExitStatus(15));
+        assert_eq!(set.update_status(Pid::from_raw(20), state), None);
 
         let i10 = set.add(Job::new(Pid::from_raw(10)));
         let i20 = set.add(Job::new(Pid::from_raw(20)));
@@ -919,7 +919,7 @@ mod tests {
         set.get_mut(i20).unwrap().state_reported();
         assert_eq!(set.get(i20).unwrap().state_changed, false);
 
-        assert_eq!(set.update_status(status), Some(i20));
+        assert_eq!(set.update_status(Pid::from_raw(20), state), Some(i20));
         assert_eq!(
             set.get(i20).unwrap().state,
             ProcessState::Exited(ExitStatus(15))
@@ -940,7 +940,7 @@ mod tests {
         job.state_changed = false;
         let i20 = set.add(job);
 
-        assert_eq!(set.update_status(WaitStatus::Continued(pid)), Some(i20));
+        assert_eq!(set.update_status(pid, ProcessState::Running), Some(i20));
 
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Running);
@@ -958,7 +958,8 @@ mod tests {
         job.state_changed = false;
         let i20 = set.add(job);
 
-        assert_eq!(set.update_status(WaitStatus::Exited(pid, 0)), Some(i20));
+        let result = set.update_status(pid, ProcessState::Exited(ExitStatus(0)));
+        assert_eq!(result, Some(i20));
 
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Exited(ExitStatus(0)));
@@ -1251,7 +1252,7 @@ mod tests {
         let running = Job::new(Pid::from_raw(20));
         let i10 = set.add(suspended);
         let i20 = set.add(running);
-        set.update_status(WaitStatus::Continued(Pid::from_raw(10)));
+        set.update_status(Pid::from_raw(10), ProcessState::Running);
         assert_eq!(set.current_job(), Some(i10));
         assert_eq!(set.previous_job(), Some(i20));
     }
@@ -1266,7 +1267,7 @@ mod tests {
         let i10 = set.add(suspended_1);
         let i20 = set.add(suspended_2);
         set.set_current_job(i10).unwrap();
-        set.update_status(WaitStatus::Continued(Pid::from_raw(10)));
+        set.update_status(Pid::from_raw(10), ProcessState::Running);
         // The current job must be a suspended job, if any.
         assert_eq!(set.current_job(), Some(i20));
         assert_eq!(set.previous_job(), Some(i10));
@@ -1287,7 +1288,7 @@ mod tests {
         let ex_current_job_pid = set[set.current_job().unwrap()].pid;
         let ex_previous_job_index = set.previous_job().unwrap();
 
-        set.update_status(WaitStatus::Continued(ex_current_job_pid));
+        set.update_status(ex_current_job_pid, ProcessState::Running);
         let now_current_job_index = set.current_job().unwrap();
         let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_previous_job_index);
@@ -1315,7 +1316,7 @@ mod tests {
         let ex_current_job_index = set.current_job().unwrap();
         let ex_previous_job_pid = set[set.previous_job().unwrap()].pid;
 
-        set.update_status(WaitStatus::Continued(ex_previous_job_pid));
+        set.update_status(ex_previous_job_pid, ProcessState::Running);
         let now_current_job_index = set.current_job().unwrap();
         let now_previous_job_index = set.previous_job().unwrap();
         assert_eq!(now_current_job_index, ex_current_job_index);
@@ -1342,7 +1343,7 @@ mod tests {
         let _i30 = set.add(suspended_3);
         set.set_current_job(i20).unwrap();
         set.set_current_job(i10).unwrap();
-        set.update_status(WaitStatus::Continued(Pid::from_raw(30)));
+        set.update_status(Pid::from_raw(30), ProcessState::Running);
         assert_eq!(set.current_job(), Some(i10));
         assert_eq!(set.previous_job(), Some(i20));
     }
@@ -1353,7 +1354,7 @@ mod tests {
         let i11 = set.add(Job::new(Pid::from_raw(11)));
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i11).unwrap();
-        set.update_status(WaitStatus::Stopped(Pid::from_raw(11), Signal::SIGTTOU));
+        set.update_status(Pid::from_raw(11), ProcessState::Stopped(Signal::SIGTTOU));
         assert_eq!(set.current_job(), Some(i11));
         assert_eq!(set.previous_job(), Some(i12));
     }
@@ -1364,7 +1365,7 @@ mod tests {
         let i11 = set.add(Job::new(Pid::from_raw(11)));
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i11).unwrap();
-        set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTOU));
+        set.update_status(Pid::from_raw(12), ProcessState::Stopped(Signal::SIGTTOU));
         assert_eq!(set.current_job(), Some(i12));
         assert_eq!(set.previous_job(), Some(i11));
     }
@@ -1376,7 +1377,7 @@ mod tests {
         let _i11 = set.add(Job::new(Pid::from_raw(11)));
         let i12 = set.add(Job::new(Pid::from_raw(12)));
         set.set_current_job(i10).unwrap();
-        set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTIN));
+        set.update_status(Pid::from_raw(12), ProcessState::Stopped(Signal::SIGTTIN));
         assert_eq!(set.current_job(), Some(i12));
         assert_eq!(set.previous_job(), Some(i10));
     }
@@ -1392,7 +1393,7 @@ mod tests {
         assert_eq!(set.current_job(), Some(i10));
         assert_eq!(set.previous_job(), Some(i11));
 
-        set.update_status(WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTTOU));
+        set.update_status(Pid::from_raw(12), ProcessState::Stopped(Signal::SIGTTOU));
         assert_eq!(set.current_job(), Some(i12));
         assert_eq!(set.previous_job(), Some(i10));
     }

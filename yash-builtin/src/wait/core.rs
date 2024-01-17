@@ -78,7 +78,7 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
 
             Ok(Some((pid, state))) => {
                 // Some job has changed its state.
-                env.jobs.update_status(state.to_wait_status(pid));
+                env.jobs.update_status(pid, state);
                 return Ok(());
             }
 
