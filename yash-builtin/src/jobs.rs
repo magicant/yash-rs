@@ -212,7 +212,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
         for index in accumulator.indices_reported {
             let mut job = env.jobs.get_mut(index).unwrap();
             if job.state.is_alive() {
-                job.status_reported();
+                job.state_reported();
             } else {
                 env.jobs.remove(index);
             }

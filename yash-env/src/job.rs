@@ -30,7 +30,7 @@
 //! child process, the caller should pass it to [`JobSet::update_status`], which
 //! modifies the status of the corresponding job. The `state_changed` flag of
 //! the job is set when the job is updated and should be
-//! [reset when reported](JobRefMut::status_reported).
+//! [reset when reported](JobRefMut::state_reported).
 //!
 //! The job set remembers the selection of two special jobs called the "current
 //! job" and "previous job." The previous job is chosen automatically, so there
@@ -216,7 +216,7 @@ impl JobRefMut<'_> {
     ///
     /// Normally, this method should be called when the shell printed a job
     /// status report.
-    pub fn status_reported(&mut self) {
+    pub fn state_reported(&mut self) {
         self.0.state_changed = false
     }
 }
@@ -573,7 +573,7 @@ impl JobSet {
     /// iterator. Otherwise, the job remains in the set.
     ///
     /// You can reset the `state_changed` flag of a job
-    /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
+    /// ([`JobRefMut::state_reported`]) regardless of whether you choose to
     /// remove it or not.
     ///
     /// This function is a simplified version of [`JobSet::extract_if`] that
@@ -592,7 +592,7 @@ impl JobSet {
     /// iterator. Otherwise, the job remains in the set.
     ///
     /// You can reset the `state_changed` flag of a job
-    /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
+    /// ([`JobRefMut::state_reported`]) regardless of whether you choose to
     /// remove it or not.
     ///
     /// If the returned iterator is dropped before iterating all jobs, the
@@ -885,7 +885,7 @@ mod tests {
         let mut i = set.extract_if(|index, mut job| {
             assert_ne!(index, i23);
             if index % 2 == 0 {
-                job.status_reported();
+                job.state_reported();
             }
             index == 0 || job.pid == Pid::from_raw(26)
         });
@@ -916,7 +916,7 @@ mod tests {
         let i30 = set.add(Job::new(Pid::from_raw(30)));
         assert_eq!(set.get(i20).unwrap().state, ProcessState::Running);
 
-        set.get_mut(i20).unwrap().status_reported();
+        set.get_mut(i20).unwrap().state_reported();
         assert_eq!(set.get(i20).unwrap().state_changed, false);
 
         assert_eq!(set.update_status(status), Some(i20));
