@@ -612,7 +612,7 @@ mod tests {
             let job = env.jobs.iter().next().unwrap().1;
             assert!(job.job_controlled);
             assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
-            assert!(job.status_changed);
+            assert!(job.state_changed);
             assert_eq!(job.name, "return -n 0 | suspend x");
         })
     }

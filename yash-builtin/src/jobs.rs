@@ -121,7 +121,6 @@ impl Accumulator {
     /// Processes one job.
     ///
     /// 1. Formats a job report in `self.print` so it can be printed later.
-    /// 1. Clears the `status_changed` flag of the job.
     /// 1. Remembers the job index in `self.indices_reported` so the job can be
     ///    removed later.
     fn report(&mut self, index: usize, job: &Job) {
@@ -468,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn report_clears_status_changed_flag() {
+    fn report_clears_state_changed_flag() {
         let mut env = Env::new_virtual();
         let mut job = Job::new(Pid::from_raw(42));
         job.name = "echo first".to_string();
@@ -482,12 +481,12 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
-        assert!(env.jobs[i42].status_changed);
-        assert!(!env.jobs[i72].status_changed);
+        assert!(env.jobs[i42].state_changed);
+        assert!(!env.jobs[i72].state_changed);
     }
 
     #[test]
-    fn status_changed_flag_not_cleared_in_case_of_error() {
+    fn state_changed_flag_not_cleared_in_case_of_error() {
         let mut system = Box::new(VirtualSystem::new());
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
@@ -499,7 +498,7 @@ mod tests {
         }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
-        assert!(env.jobs[i72].status_changed);
+        assert!(env.jobs[i72].state_changed);
     }
 
     #[test]

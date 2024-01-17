@@ -209,7 +209,7 @@ mod tests {
 
             let job = env.jobs.get(0).unwrap();
             assert!(!job.job_controlled);
-            assert!(job.status_changed);
+            assert!(job.state_changed);
             assert_eq!(job.state, ProcessState::Running);
             assert_eq!(job.pid, env.jobs.last_async_pid());
             assert_eq!(job.name, "return -n 42");

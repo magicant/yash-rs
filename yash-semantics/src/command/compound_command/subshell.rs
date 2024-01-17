@@ -209,7 +209,7 @@ mod tests {
             assert_eq!(job.pid, pid);
             assert!(job.job_controlled);
             assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
-            assert!(job.status_changed);
+            assert!(job.state_changed);
             assert_eq!(job.name, "suspend foo");
         })
     }

@@ -28,7 +28,7 @@
 //!
 //! When the [wait system call](crate::System::wait) returns a new status of a
 //! child process, the caller should pass it to [`JobSet::update_status`], which
-//! modifies the status of the corresponding job. The `status_changed` flag of
+//! modifies the status of the corresponding job. The `state_changed` flag of
 //! the job is set when the job is updated and should be
 //! [reset when reported](JobRefMut::status_reported).
 //!
@@ -151,7 +151,7 @@ pub struct Job {
     ///
     /// This flag is true if the `status` has been changed since the status was
     /// last reported to the user.
-    pub status_changed: bool,
+    pub state_changed: bool,
 
     /// Whether this job is a true child of the current shell
     ///
@@ -175,7 +175,7 @@ impl Job {
             job_controlled: false,
             state: ProcessState::Running,
             expected_state: None,
-            status_changed: true,
+            state_changed: true,
             is_owned: true,
             name: String::new(),
         }
@@ -198,11 +198,11 @@ impl JobRefMut<'_> {
     /// Sets the `expected_state` of the job.
     ///
     /// This method remembers the argument as the expected state of the job.
-    /// If the job is [updated] with the same state, the `status_changed` flag
+    /// If the job is [updated] with the same state, the `state_changed` flag
     /// is not set then.
     ///
-    /// This method may be used to suppress a change report of a job status,
-    /// especially when the status is reported before it is actually changed.
+    /// This method may be used to suppress a change report of a job state,
+    /// especially when the state is reported before it is actually changed.
     ///
     /// [updated]: JobSet::update_status
     pub fn expect<S>(&mut self, state: S)
@@ -212,12 +212,12 @@ impl JobRefMut<'_> {
         self.0.expected_state = state.into();
     }
 
-    /// Clears the `status_changed` flag of the job.
+    /// Clears the `state_changed` flag of the job.
     ///
     /// Normally, this method should be called when the shell printed a job
     /// status report.
     pub fn status_reported(&mut self) {
-        self.0.status_changed = false
+        self.0.state_changed = false
     }
 }
 
@@ -572,7 +572,7 @@ impl JobSet {
     /// remove jobs. If it returns true, the job is removed and yielded from the
     /// iterator. Otherwise, the job remains in the set.
     ///
-    /// You can reset the `status_changed` flag of a job
+    /// You can reset the `state_changed` flag of a job
     /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
     /// remove it or not.
     ///
@@ -591,7 +591,7 @@ impl JobSet {
     /// remove jobs. If it returns true, the job is removed and yielded from the
     /// iterator. Otherwise, the job remains in the set.
     ///
-    /// You can reset the `status_changed` flag of a job
+    /// You can reset the `state_changed` flag of a job
     /// ([`JobRefMut::status_reported`]) regardless of whether you choose to
     /// remove it or not.
     ///
@@ -619,9 +619,9 @@ impl JobSet {
     ///
     /// The result of a `waitpid` call should be passed to this function.
     /// It updates the state of the job as indicated by `status`, and sets the
-    /// `status_changed` flag in the job. As an exception, if `status` is equal
-    /// to the `expected_state` of the job, the `status_changed` flag is not
-    /// set. The `expected_state` is cleared in any case. (See also
+    /// `state_changed` flag in the job. As an exception, if `status` is equal
+    /// to the `expected_state` of the job, the `state_changed` flag is not set.
+    /// The `expected_state` is cleared in any case. (See also
     /// [`JobRefMut::expect`] for the usage of `expected_state`.)
     ///
     /// Returns the index of the job updated. If `status` describes a process
@@ -646,7 +646,7 @@ impl JobSet {
         let job = &mut self.jobs[index];
         let was_suspended = job.is_suspended();
         job.state = state;
-        job.status_changed |= job.expected_state != Some(state);
+        job.state_changed |= job.expected_state != Some(state);
         job.expected_state = None;
 
         // Reselect the current and previous job.
@@ -891,7 +891,7 @@ mod tests {
         });
 
         let mut expected_job_21 = Job::new(Pid::from_raw(21));
-        expected_job_21.status_changed = false;
+        expected_job_21.state_changed = false;
         assert_eq!(i.next(), Some((i21, expected_job_21)));
         assert_eq!(i.next(), Some((i26, Job::new(Pid::from_raw(26)))));
         assert_eq!(i.next(), None);
@@ -899,9 +899,9 @@ mod tests {
 
         let indices: Vec<usize> = set.iter().map(|(index, _)| index).collect();
         assert_eq!(indices, [i22, i24, i25]);
-        assert!(set[i22].status_changed);
-        assert!(set[i24].status_changed);
-        assert!(!set[i25].status_changed);
+        assert!(set[i22].state_changed);
+        assert!(set[i24].state_changed);
+        assert!(!set[i25].state_changed);
     }
 
     #[test]
@@ -917,14 +917,14 @@ mod tests {
         assert_eq!(set.get(i20).unwrap().state, ProcessState::Running);
 
         set.get_mut(i20).unwrap().status_reported();
-        assert_eq!(set.get(i20).unwrap().status_changed, false);
+        assert_eq!(set.get(i20).unwrap().state_changed, false);
 
         assert_eq!(set.update_status(status), Some(i20));
         assert_eq!(
             set.get(i20).unwrap().state,
             ProcessState::Exited(ExitStatus(15))
         );
-        assert_eq!(set.get(i20).unwrap().status_changed, true);
+        assert_eq!(set.get(i20).unwrap().state_changed, true);
 
         assert_eq!(set.get(i10).unwrap().state, ProcessState::Running);
         assert_eq!(set.get(i30).unwrap().state, ProcessState::Running);
@@ -937,7 +937,7 @@ mod tests {
         let pid = Pid::from_raw(20);
         let mut job = Job::new(pid);
         job.expected_state = Some(ProcessState::Running);
-        job.status_changed = false;
+        job.state_changed = false;
         let i20 = set.add(job);
 
         assert_eq!(set.update_status(WaitStatus::Continued(pid)), Some(i20));
@@ -945,7 +945,7 @@ mod tests {
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Running);
         assert_eq!(job.expected_state, None);
-        assert_eq!(job.status_changed, false);
+        assert_eq!(job.state_changed, false);
     }
 
     #[test]
@@ -955,7 +955,7 @@ mod tests {
         let pid = Pid::from_raw(20);
         let mut job = Job::new(pid);
         job.expected_state = Some(ProcessState::Running);
-        job.status_changed = false;
+        job.state_changed = false;
         let i20 = set.add(job);
 
         assert_eq!(set.update_status(WaitStatus::Exited(pid, 0)), Some(i20));
@@ -963,7 +963,7 @@ mod tests {
         let job = set.get(i20).unwrap();
         assert_eq!(job.state, ProcessState::Exited(ExitStatus(0)));
         assert_eq!(job.expected_state, None);
-        assert_eq!(job.status_changed, true);
+        assert_eq!(job.state_changed, true);
     }
 
     #[test]
