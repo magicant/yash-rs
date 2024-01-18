@@ -43,8 +43,7 @@
 
 use crate::semantics::ExitStatus;
 use crate::trap::Signal;
-#[doc(no_inline)]
-pub use nix::sys::wait::WaitStatus;
+use nix::sys::wait::WaitStatus;
 #[doc(no_inline)]
 pub use nix::unistd::Pid;
 use slab::Slab;
