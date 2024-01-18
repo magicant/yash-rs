@@ -27,7 +27,6 @@ use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::job::ProcessState;
-use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -70,11 +69,11 @@ pub async fn execute_absent_target(
         .job_control(JobControl::Foreground);
 
         match subshell.start_and_wait(env).await {
-            Ok(wait_status) => {
-                if let Stopped(pid, signal) = wait_status {
+            Ok((pid, state)) => {
+                if let ProcessState::Stopped(_) = state {
                     let mut job = Job::new(pid);
                     job.job_controlled = true;
-                    job.state = ProcessState::Stopped(signal);
+                    job.state = state;
                     job.name = redirs
                         .iter()
                         .format_with(" ", |redir, f| f(&format_args!("{redir}")))
@@ -82,7 +81,7 @@ pub async fn execute_absent_target(
                     env.jobs.add(job);
                 }
 
-                wait_status.try_into().unwrap()
+                state.try_into().unwrap()
             }
             Err(errno) => {
                 print_error(

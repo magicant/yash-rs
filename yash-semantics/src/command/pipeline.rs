@@ -25,7 +25,6 @@ use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
 use yash_env::job::ProcessState;
-use yash_env::job::WaitStatus::Stopped;
 use yash_env::option::Option::Exec;
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert;
@@ -132,16 +131,16 @@ async fn execute_job_controlled_pipeline(
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(env).await {
-        Ok(wait_status) => {
-            if let Stopped(pid, signal) = wait_status {
+        Ok((pid, state)) => {
+            if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.state = ProcessState::Stopped(signal);
+                job.state = state;
                 job.name = to_job_name(commands);
                 env.jobs.add(job);
             }
 
-            env.exit_status = wait_status.try_into().unwrap();
+            env.exit_status = state.try_into().unwrap();
             Continue(())
         }
         Err(errno) => {

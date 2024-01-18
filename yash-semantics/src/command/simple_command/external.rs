@@ -29,7 +29,6 @@ use std::ops::ControlFlow::Continue;
 use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::job::ProcessState;
-use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::semantics::Result;
@@ -93,16 +92,16 @@ pub async fn execute_external_utility(
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(&mut env).await {
-        Ok(wait_status) => {
-            if let Stopped(pid, signal) = wait_status {
+        Ok((pid, state)) => {
+            if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.state = ProcessState::Stopped(signal);
+                job.state = state;
                 job.name = job_name;
                 env.jobs.add(job);
             }
 
-            env.exit_status = wait_status.try_into().unwrap();
+            env.exit_status = state.try_into().unwrap();
         }
         Err(errno) => {
             print_error(

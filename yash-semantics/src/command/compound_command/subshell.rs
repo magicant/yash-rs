@@ -23,7 +23,6 @@ use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
 use yash_env::job::ProcessState;
-use yash_env::job::WaitStatus::Stopped;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -39,16 +38,16 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
-        Ok(wait_status) => {
-            if let Stopped(pid, signal) = wait_status {
+        Ok((pid, state)) => {
+            if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.state = ProcessState::Stopped(signal);
+                job.state = state;
                 job.name = body.to_string();
                 env.jobs.add(job);
             }
 
-            env.exit_status = wait_status.try_into().unwrap();
+            env.exit_status = state.try_into().unwrap();
             env.apply_errexit()
         }
         Err(errno) => {

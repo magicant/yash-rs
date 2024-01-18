@@ -27,7 +27,7 @@
 //! properly.
 
 use crate::job::Pid;
-use crate::job::WaitStatus;
+use crate::job::ProcessState;
 use crate::stack::Frame;
 use crate::system::ChildProcessTask;
 use crate::system::SigSet;
@@ -226,10 +226,10 @@ where
     /// subshell is job-controlled, the function also returns when the job is
     /// suspended.
     ///
-    /// If the subshell started successfully, the return value is the wait
-    /// status of the subshell, which is `Exited`, `Signaled`, or `Stopped`. If
-    /// there was an error starting the subshell, this function returns the
-    /// error.
+    /// If the subshell started successfully, the return value is the process ID
+    /// and the process state of the subshell, which is `Exited`, `Signaled`, or
+    /// `Stopped`. If there was an error starting the subshell, this function
+    /// returns the error.
     ///
     /// If you set [`job_control`](Self::job_control) to
     /// `JobControl::Foreground` and job control is effective as per
@@ -238,15 +238,17 @@ where
     ///
     /// When a job-controlled subshell suspends, this function does not add it
     /// to `env.jobs`. You have to do it for yourself if necessary.
-    pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<WaitStatus> {
+    pub async fn start_and_wait(self, env: &mut Env) -> nix::Result<(Pid, ProcessState)> {
         let (pid, job_control) = self.start(env).await?;
         let result = loop {
             let (pid, state) = env.wait_for_subshell(pid).await?;
-            let wait_status = state.to_wait_status(pid);
-            match wait_status {
-                WaitStatus::Exited(_, _) | WaitStatus::Signaled(_, _, _) => break Ok(wait_status),
-                WaitStatus::Stopped(_, _) if job_control.is_some() => break Ok(wait_status),
-                _ => (),
+            let is_done = match state {
+                ProcessState::Running => false,
+                ProcessState::Stopped(_) => job_control.is_some(),
+                ProcessState::Exited(_) | ProcessState::Signaled(_) => true,
+            };
+            if is_done {
+                break Ok((pid, state));
             }
         };
 
@@ -311,7 +313,6 @@ impl<'a> Drop for MaskGuard<'a> {
 mod tests {
     use super::*;
     use crate::job::Job;
-    use crate::job::ProcessState;
     use crate::option::Option::{Interactive, Monitor};
     use crate::option::State::On;
     use crate::semantics::ExitStatus;
@@ -605,8 +606,8 @@ mod tests {
                     Continue(())
                 })
             });
-            let result = subshell.start_and_wait(&mut env).await.unwrap();
-            assert_matches!(result, WaitStatus::Exited(_pid, 42));
+            let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(process_state, ProcessState::Exited(ExitStatus(42)));
         });
     }
 
@@ -623,8 +624,8 @@ mod tests {
                 })
             })
             .job_control(JobControl::Foreground);
-            let result = subshell.start_and_wait(&mut env).await.unwrap();
-            assert_matches!(result, WaitStatus::Exited(_pid, 123));
+            let (_pid, process_state) = subshell.start_and_wait(&mut env).await.unwrap();
+            assert_eq!(process_state, ProcessState::Exited(ExitStatus(123)));
             assert_eq!(state.borrow().foreground, Some(env.main_pgid));
         });
     }
