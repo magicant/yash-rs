@@ -92,7 +92,6 @@ use yash_env::job::id::parse;
 use yash_env::job::JobSet;
 use yash_env::job::Pid;
 use yash_env::job::ProcessState;
-use yash_env::job::WaitStatus;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
@@ -102,12 +101,14 @@ use yash_env::trap::Signal;
 use yash_env::Env;
 
 /// Waits for the specified job to finish (or suspend again).
-async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<WaitStatus, Errno> {
+async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<ProcessState, Errno> {
     loop {
-        let (pid, state) = env.wait_for_subshell(pid).await?;
-        match state.to_wait_status(pid) {
-            WaitStatus::Continued(_) | WaitStatus::StillAlive => (),
-            status => return Ok(status),
+        let (_pid, state) = env.wait_for_subshell(pid).await?;
+        match state {
+            ProcessState::Running => (),
+            ProcessState::Stopped(_) | ProcessState::Exited(_) | ProcessState::Signaled(_) => {
+                return Ok(state)
+            }
         }
     }
 }
@@ -118,7 +119,7 @@ async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<WaitStatus, Errno
 /// signal to it. It then waits for the job to finish (or suspend again).
 ///
 /// This function panics if there is no job at the specified index.
-async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, ResumeError> {
+async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState, ResumeError> {
     let tty = env.get_tty()?;
 
     let job = env.jobs.get(index).unwrap();
@@ -134,7 +135,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     drop(line);
 
     if !job.state.is_alive() {
-        return Ok(job.state.to_wait_status(job.pid));
+        return Ok(job.state);
     }
 
     // TODO Should we save/restore the terminal state?
@@ -147,23 +148,21 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<WaitStatus, 
     env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
     // Wait for the job to finish (or suspend again).
-    let status = wait_while_running(env, job.pid).await?;
+    let state = wait_while_running(env, job.pid).await?;
 
     // Remove the job if it has finished.
-    if let Some((_, state)) = ProcessState::from_wait_status(status) {
-        if !state.is_alive() {
-            env.jobs.remove(index);
-        }
+    if !state.is_alive() {
+        env.jobs.remove(index);
     }
 
     // Move the shell back to the foreground.
     env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
 
-    Ok(status)
+    Ok(state)
 }
 
 /// Resumes the job specified by the operand.
-async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<WaitStatus, OperandErrorKind> {
+async fn resume_job_by_id(env: &mut Env, job_id: &str) -> Result<ProcessState, OperandErrorKind> {
     let job_id = parse(job_id)?;
     let index = job_id.find(&env.jobs)?;
     Ok(resume_job_by_index(env, index).await?)
@@ -191,11 +190,7 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     };
 
     match result {
-        Ok(WaitStatus::Exited(_, exit_status)) => crate::Result::from(ExitStatus(exit_status)),
-        Ok(WaitStatus::Signaled(_, signal, _)) | Ok(WaitStatus::Stopped(_, signal)) => {
-            crate::Result::from(ExitStatus::from(signal))
-        }
-        Ok(wait_status) => unreachable!("unexpected wait status: {wait_status:?}"),
+        Ok(state) => ExitStatus::try_from(state).unwrap().into(),
         Err(error) => report_simple_failure(env, &error.to_string()).await,
     }
 }
@@ -307,7 +302,7 @@ mod tests {
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
-            assert_eq!(result, WaitStatus::Exited(pid, 42));
+            assert_eq!(result, ProcessState::Exited(ExitStatus(42)));
             let state = state.borrow().processes[&pid].state();
             assert_eq!(state, ProcessState::Exited(ExitStatus(42)));
             // The finished job should be removed from the job set.
@@ -337,7 +332,7 @@ mod tests {
 
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
-            assert_eq!(result, WaitStatus::Stopped(pid, Signal::SIGSTOP));
+            assert_eq!(result, ProcessState::Stopped(Signal::SIGSTOP));
             let job_state = env.jobs.get(index).unwrap().state;
             assert_eq!(job_state, ProcessState::Stopped(Signal::SIGSTOP));
             let state = state.borrow().processes[&pid].state();
