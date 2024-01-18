@@ -128,18 +128,6 @@ impl TryFrom<ProcessState> for ExitStatus {
     }
 }
 
-/// Trait for adding some methods to [`WaitStatus`]
-pub trait WaitStatusEx {
-    /// Returns true if the status indicates that the process is finished.
-    fn is_finished(&self) -> bool;
-}
-
-impl WaitStatusEx for WaitStatus {
-    fn is_finished(&self) -> bool {
-        matches!(*self, WaitStatus::Exited(..) | WaitStatus::Signaled(..))
-    }
-}
-
 /// Set of one or more processes executing a pipeline
 ///
 /// In the current implementation, a job contains the process ID of one child
