@@ -82,7 +82,7 @@ pub fn job_status(
                 jobs.remove(index);
                 ControlFlow::Break(exit_status)
             }
-            ProcessState::Signaled(signal /*, _core_dumped*/) => {
+            ProcessState::Signaled { signal, .. } => {
                 jobs.remove(index);
                 ControlFlow::Break(ExitStatus::from(signal))
             }
@@ -168,7 +168,10 @@ mod tests {
     fn status_of_signaled_job() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid::from_raw(123));
-        job.state = ProcessState::Signaled(Signal::SIGHUP /*, false*/);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGHUP,
+            core_dump: false,
+        };
         let index = jobs.add(job);
 
         assert_eq!(
@@ -178,12 +181,15 @@ mod tests {
         assert_eq!(jobs.get(index), None);
 
         let mut job = Job::new(Pid::from_raw(456));
-        job.state = ProcessState::Signaled(Signal::SIGTERM /*, true*/);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGABRT,
+            core_dump: true,
+        };
         let index = jobs.add(job);
 
         assert_eq!(
             job_status(index, On)(&mut jobs),
-            ControlFlow::Break(ExitStatus::from(Signal::SIGTERM)),
+            ControlFlow::Break(ExitStatus::from(Signal::SIGABRT)),
         );
         assert_eq!(jobs.get(index), None);
     }

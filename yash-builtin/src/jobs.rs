@@ -297,12 +297,18 @@ mod tests {
         let i14 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(15));
-        job.state = ProcessState::Signaled(Signal::SIGINT /*, false*/);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGINT,
+            core_dump: false,
+        };
         job.name = "echo signaled".to_string();
         let i15 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(16));
-        job.state = ProcessState::Signaled(Signal::SIGQUIT /*, true*/);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
         job.name = "echo core dumped".to_string();
         let i16 = env.jobs.add(job);
 

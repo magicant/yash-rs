@@ -62,8 +62,7 @@ pub enum ProcessState {
     /// The process has exited.
     Exited(ExitStatus),
     /// The process has been terminated by a signal.
-    Signaled(Signal),
-    // TODO Indicate whether the core dump is generated
+    Signaled { signal: Signal, core_dump: bool },
 }
 
 impl ProcessState {
@@ -72,7 +71,7 @@ impl ProcessState {
     pub fn is_alive(&self) -> bool {
         match self {
             ProcessState::Running | ProcessState::Stopped(_) => true,
-            ProcessState::Exited(_) | ProcessState::Signaled(_) => false,
+            ProcessState::Exited(_) | ProcessState::Signaled { .. } => false,
         }
     }
 
@@ -83,7 +82,9 @@ impl ProcessState {
             ProcessState::Running => WaitStatus::Continued(pid),
             ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
             ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
-            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
+            ProcessState::Signaled { signal, core_dump } => {
+                WaitStatus::Signaled(pid, signal, core_dump)
+            }
         }
     }
 
@@ -100,7 +101,9 @@ impl ProcessState {
                 Some((pid, ProcessState::Exited(ExitStatus(exit_status))))
             }
             WaitStatus::Stopped(pid, signal) => Some((pid, ProcessState::Stopped(signal))),
-            WaitStatus::Signaled(pid, signal, _) => Some((pid, ProcessState::Signaled(signal))),
+            WaitStatus::Signaled(pid, signal, core_dump) => {
+                Some((pid, ProcessState::Signaled { signal, core_dump }))
+            }
             _ => None,
         }
     }
@@ -120,7 +123,7 @@ impl TryFrom<ProcessState> for ExitStatus {
     fn try_from(state: ProcessState) -> Result<Self, RunningProcess> {
         match state {
             ProcessState::Exited(exit_status) => Ok(exit_status),
-            ProcessState::Signaled(signal) | ProcessState::Stopped(signal) => {
+            ProcessState::Signaled { signal, .. } | ProcessState::Stopped(signal) => {
                 Ok(ExitStatus::from(signal))
             }
             ProcessState::Running => Err(RunningProcess),

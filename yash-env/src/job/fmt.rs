@@ -233,7 +233,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs the core dumped flag in ProcessState::Signaled"]
     fn report_standard() {
         let index = 0;
         let marker = Marker::CurrentJob;
@@ -258,7 +257,10 @@ mod tests {
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[6]   Stopped(SIGSTOP)     echo ok");
 
-        job.state = ProcessState::Signaled(Signal::SIGQUIT /*, true */);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
         job.name = "exit 0".to_string();
         let report = Report { index, marker, job };
         assert_eq!(

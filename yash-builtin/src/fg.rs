@@ -106,7 +106,7 @@ async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<ProcessState, Err
         let (_pid, state) = env.wait_for_subshell(pid).await?;
         match state {
             ProcessState::Running => (),
-            ProcessState::Stopped(_) | ProcessState::Exited(_) | ProcessState::Signaled(_) => {
+            ProcessState::Stopped(_) | ProcessState::Exited(_) | ProcessState::Signaled { .. } => {
                 return Ok(state)
             }
         }

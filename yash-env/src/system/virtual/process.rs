@@ -291,7 +291,7 @@ impl Process {
                         }
                     }
                 }
-                ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
+                ProcessState::Exited(_) | ProcessState::Signaled { .. } => self.close_fds(),
                 ProcessState::Stopped(_) => (),
             }
             self.state_has_changed = true;
@@ -401,8 +401,8 @@ impl Process {
             SignalHandling::Default => {
                 let process_state_changed = match SignalEffect::of(signal) {
                     SignalEffect::None | SignalEffect::Resume => false,
-                    SignalEffect::Terminate { core_dump: _ } => {
-                        self.set_state(ProcessState::Signaled(signal))
+                    SignalEffect::Terminate { core_dump } => {
+                        self.set_state(ProcessState::Signaled { signal, core_dump })
                     }
                     SignalEffect::Suspend => self.set_state(ProcessState::Stopped(signal)),
                 };
@@ -612,7 +612,10 @@ mod tests {
     #[test]
     fn process_set_state_closes_all_fds_on_signaled() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        assert!(process.set_state(ProcessState::Signaled(Signal::SIGINT)));
+        assert!(process.set_state(ProcessState::Signaled {
+            signal: Signal::SIGINT,
+            core_dump: false
+        }));
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 
@@ -746,7 +749,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGTERM));
+        assert_eq!(
+            process.state(),
+            ProcessState::Signaled {
+                signal: Signal::SIGTERM,
+                core_dump: false
+            }
+        );
         assert_eq!(process.caught_signals, []);
     }
 
@@ -762,7 +771,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGABRT));
+        assert_eq!(
+            process.state(),
+            ProcessState::Signaled {
+                signal: Signal::SIGABRT,
+                core_dump: true
+            }
+        );
         assert_eq!(process.caught_signals, []);
         // TODO Check if core dump file has been created
     }

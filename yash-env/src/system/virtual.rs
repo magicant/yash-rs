@@ -286,7 +286,7 @@ impl VirtualSystem {
 
             match process.state {
                 ProcessState::Running => Poll::Ready(()),
-                ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Pending,
+                ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Pending,
                 ProcessState::Stopped(_) => {
                     waker.set(Some(cx.waker().clone()));
                     process.wake_on_resumption(Rc::downgrade(&waker));
@@ -1162,7 +1162,7 @@ impl Future for ProcessRunner<'_> {
         let mut process = this.system.current_process_mut();
         match process.state {
             ProcessState::Running => Poll::Pending,
-            ProcessState::Exited(_) | ProcessState::Signaled(_) => Poll::Ready(()),
+            ProcessState::Exited(_) | ProcessState::Signaled { .. } => Poll::Ready(()),
             ProcessState::Stopped(_) => {
                 this.waker.set(Some(cx.waker().clone()));
                 process.wake_on_resumption(Rc::downgrade(&this.waker));
@@ -1751,7 +1751,10 @@ mod tests {
         assert_eq!(result, None);
         assert_eq!(
             system.current_process().state(),
-            ProcessState::Signaled(Signal::SIGINT)
+            ProcessState::Signaled {
+                signal: Signal::SIGINT,
+                core_dump: false
+            }
         );
 
         let mut system = VirtualSystem::new();
@@ -1792,7 +1795,13 @@ mod tests {
         assert_eq!(result, None);
         let state = system.state.borrow();
         for process in state.processes.values() {
-            assert_eq!(process.state, ProcessState::Signaled(Signal::SIGTERM));
+            assert_eq!(
+                process.state,
+                ProcessState::Signaled {
+                    signal: Signal::SIGTERM,
+                    core_dump: false
+                }
+            );
         }
     }
 
@@ -1823,15 +1832,24 @@ mod tests {
         let state = system.state.borrow();
         assert_eq!(
             state.processes[&system.process_id].state,
-            ProcessState::Signaled(Signal::SIGQUIT)
+            ProcessState::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            }
         );
         assert_eq!(
             state.processes[&Pid::from_raw(10)].state,
-            ProcessState::Signaled(Signal::SIGQUIT)
+            ProcessState::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            }
         );
         assert_eq!(
             state.processes[&Pid::from_raw(11)].state,
-            ProcessState::Signaled(Signal::SIGQUIT)
+            ProcessState::Signaled {
+                signal: Signal::SIGQUIT,
+                core_dump: true
+            }
         );
         assert_eq!(
             state.processes[&Pid::from_raw(21)].state,
@@ -1874,11 +1892,17 @@ mod tests {
         );
         assert_eq!(
             state.processes[&Pid::from_raw(11)].state,
-            ProcessState::Signaled(Signal::SIGHUP)
+            ProcessState::Signaled {
+                signal: Signal::SIGHUP,
+                core_dump: false
+            }
         );
         assert_eq!(
             state.processes[&Pid::from_raw(21)].state,
-            ProcessState::Signaled(Signal::SIGHUP)
+            ProcessState::Signaled {
+                signal: Signal::SIGHUP,
+                core_dump: false
+            }
         );
     }
 
@@ -2364,7 +2388,13 @@ mod tests {
         let result = env.system.wait(pid);
         assert_eq!(
             result,
-            Ok(Some((pid, ProcessState::Signaled(Signal::SIGKILL))))
+            Ok(Some((
+                pid,
+                ProcessState::Signaled {
+                    signal: Signal::SIGKILL,
+                    core_dump: false
+                }
+            )))
         );
     }
 

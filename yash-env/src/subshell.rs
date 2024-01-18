@@ -245,7 +245,7 @@ where
             let is_done = match state {
                 ProcessState::Running => false,
                 ProcessState::Stopped(_) => job_control.is_some(),
-                ProcessState::Exited(_) | ProcessState::Signaled(_) => true,
+                ProcessState::Exited(_) | ProcessState::Signaled { .. } => true,
             };
             if is_done {
                 break Ok((pid, state));
