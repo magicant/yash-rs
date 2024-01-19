@@ -136,8 +136,9 @@ impl Report<'_> {
     /// The job number is a positive integer that is one greater than the index
     /// of the job in its containing job set. Rather than the raw index, the job
     /// number should be displayed to the user.
+    #[inline]
     #[must_use]
-    pub fn number(&self) -> usize {
+    pub const fn number(&self) -> usize {
         self.index + 1
     }
 }
