@@ -55,27 +55,41 @@
 //! ```
 
 use super::Job;
-use super::WaitStatus;
+use super::ProcessState;
+use crate::semantics::ExitStatus;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-/// Wrapper for formatting `WaitStatus`
+/// Formats a process state into a string.
 ///
-/// This type is a thin wrapper of `WaitStatus` that implements the `Display`
-/// trait to format the wait status.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct FormatStatus(WaitStatus);
-
-impl Display for FormatStatus {
+/// Process states are formatted as follows:
+///
+/// - `Running` for a running process
+/// - `Stopped(SIG…)` for a stopped process that has been stopped by the signal
+///   `SIG…`
+/// - `Done` for a process that exited with exit status 0
+/// - `Done(…)` for a process that exited with a non-zero exit status where
+///   `…` is the exit status
+/// - `Killed(SIG…)` for a process that was terminated by the signal `SIG…`
+///   without a core dump
+/// - `Killed(SIG…: core dumped)` for a process that was terminated by the
+///   signal `SIG…` with a core dump
+impl Display for ProcessState {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let s = match self.0 {
-            WaitStatus::Stopped(_, signal) => format!("Stopped({signal})"),
-            WaitStatus::Exited(_, 0) => return f.pad("Done"),
-            WaitStatus::Exited(_, exit_status) => format!("Done({exit_status})"),
-            WaitStatus::Signaled(_, signal, false) => format!("Killed({signal})"),
-            WaitStatus::Signaled(_, signal, true) => format!("Killed({signal}: core dumped)"),
-            _ => return f.pad("Running"),
+        let s = match self {
+            ProcessState::Running => return f.pad("Running"),
+            ProcessState::Stopped(signal) => format!("Stopped({signal})"),
+            ProcessState::Exited(ExitStatus(0)) => return f.pad("Done"),
+            ProcessState::Exited(exit_status) => format!("Done({exit_status})"),
+            ProcessState::Signaled {
+                signal,
+                core_dump: false,
+            } => format!("Killed({signal})"),
+            ProcessState::Signaled {
+                signal,
+                core_dump: true,
+            } => format!("Killed({signal}: core dumped)"),
         };
         f.pad(&s)
     }
@@ -150,7 +164,7 @@ impl Display for Report<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let number = self.number();
         let marker = self.marker;
-        let status = FormatStatus(self.job.state.to_wait_status(self.job.pid));
+        let status = self.job.state;
         let name = &self.job.name;
         if f.alternate() {
             let pid = self.job.pid;
@@ -170,66 +184,60 @@ mod tests {
     use crate::trap::Signal;
 
     #[test]
-    fn format_status_running() {
-        let fs = FormatStatus(WaitStatus::StillAlive);
-        assert_eq!(fs.to_string(), "Running");
-        let fs = FormatStatus(WaitStatus::Continued(Pid::from_raw(0)));
-        assert_eq!(fs.to_string(), "Running");
+    fn process_state_display_running() {
+        let state = ProcessState::Running;
+        assert_eq!(state.to_string(), "Running");
     }
 
     #[test]
-    fn format_status_stopped() {
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(0), Signal::SIGSTOP));
-        assert_eq!(fs.to_string(), "Stopped(SIGSTOP)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(1), Signal::SIGTSTP));
-        assert_eq!(fs.to_string(), "Stopped(SIGTSTP)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(2), Signal::SIGTTIN));
-        assert_eq!(fs.to_string(), "Stopped(SIGTTIN)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(2), Signal::SIGTTOU));
-        assert_eq!(fs.to_string(), "Stopped(SIGTTOU)");
+    fn process_state_display_stopped() {
+        let state = ProcessState::Stopped(Signal::SIGSTOP);
+        assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
+        let state = ProcessState::Stopped(Signal::SIGTSTP);
+        assert_eq!(state.to_string(), "Stopped(SIGTSTP)");
+        let state = ProcessState::Stopped(Signal::SIGTTIN);
+        assert_eq!(state.to_string(), "Stopped(SIGTTIN)");
+        let state = ProcessState::Stopped(Signal::SIGTTOU);
+        assert_eq!(state.to_string(), "Stopped(SIGTTOU)");
     }
 
     #[test]
-    fn format_status_exited() {
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(10), 0));
-        assert_eq!(fs.to_string(), "Done");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(11), 1));
-        assert_eq!(fs.to_string(), "Done(1)");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(12), 2));
-        assert_eq!(fs.to_string(), "Done(2)");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(12), 253));
-        assert_eq!(fs.to_string(), "Done(253)");
+    fn process_state_display_exited() {
+        let state = ProcessState::Exited(ExitStatus(0));
+        assert_eq!(state.to_string(), "Done");
+        let state = ProcessState::Exited(ExitStatus(1));
+        assert_eq!(state.to_string(), "Done(1)");
+        let state = ProcessState::Exited(ExitStatus(2));
+        assert_eq!(state.to_string(), "Done(2)");
+        let state = ProcessState::Exited(ExitStatus(253));
+        assert_eq!(state.to_string(), "Done(253)");
     }
 
     #[test]
-    fn format_status_signaled() {
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(0),
-            Signal::SIGKILL,
-            false,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGKILL)");
+    fn process_state_display_signaled() {
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGKILL,
+            core_dump: false,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGKILL)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(10),
-            Signal::SIGKILL,
-            true,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGKILL: core dumped)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGKILL,
+            core_dump: true,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGKILL: core dumped)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(20),
-            Signal::SIGTERM,
-            false,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGTERM)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGTERM,
+            core_dump: false,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGTERM)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(30),
-            Signal::SIGQUIT,
-            true,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGQUIT: core dumped)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");
     }
 
     #[test]
