@@ -18,7 +18,7 @@ EOF
 
 update_workspace_member yash-arith
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.58.0 test --package yash-arith -- $quiet
+cargo +1.65.0 test --package yash-arith -- $quiet
 
 update_workspace_member yash-builtin
 cargo +nightly update -Z direct-minimal-versions
@@ -34,7 +34,7 @@ cargo +1.65.0 test --package yash-fnmatch -- $quiet
 
 update_workspace_member yash-quote
 cargo +nightly update -Z direct-minimal-versions
-cargo +1.56.0 test --package yash-quote -- $quiet
+cargo +1.65.0 test --package yash-quote -- $quiet
 
 update_workspace_member yash-semantics
 cargo +nightly update -Z direct-minimal-versions
