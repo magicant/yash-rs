@@ -134,29 +134,28 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState
     env.system.write_all(Fd::STDOUT, line.as_bytes()).await?;
     drop(line);
 
-    if !job.state.is_alive() {
-        return Ok(job.state);
+    let mut state = job.state;
+    if state.is_alive() {
+        // TODO Should we save/restore the terminal state?
+
+        // Make sure to put the target job in the foreground before sending the
+        // SIGCONT signal, or the job may be immediately re-suspended.
+        env.system.tcsetpgrp_without_block(tty, job.pid)?;
+
+        let pgid = -job.pid;
+        env.system.kill(pgid, Signal::SIGCONT.into()).await?;
+
+        // Wait for the job to finish (or suspend again).
+        state = wait_while_running(env, job.pid).await?;
+
+        // Move the shell back to the foreground.
+        env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
     }
-
-    // TODO Should we save/restore the terminal state?
-
-    // Make sure to put the target job in the foreground before sending the
-    // SIGCONT signal, or the job may be immediately re-suspended.
-    env.system.tcsetpgrp_without_block(tty, job.pid)?;
-
-    let pgid = -job.pid;
-    env.system.kill(pgid, Signal::SIGCONT.into()).await?;
-
-    // Wait for the job to finish (or suspend again).
-    let state = wait_while_running(env, job.pid).await?;
 
     // Remove the job if it has finished.
     if !state.is_alive() {
         env.jobs.remove(index);
     }
-
-    // Move the shell back to the foreground.
-    env.system.tcsetpgrp_with_block(tty, env.main_pgid)?;
 
     Ok(state)
 }
@@ -374,7 +373,7 @@ mod tests {
         let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
-        job.state = ProcessState::Exited(ExitStatus(0));
+        job.state = ProcessState::Exited(ExitStatus(12));
         let index = env.jobs.add(job);
         // This process (irrelevant to the job) happens to have the same PID as the job.
         let mut process = Process::with_parent_and_group(system.process_id, pid);
@@ -384,10 +383,11 @@ mod tests {
             state.processes.insert(pid, process);
         }
 
-        resume_job_by_index(&mut env, index)
-            .now_or_never()
-            .unwrap()
-            .unwrap();
+        let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
+
+        assert_eq!(result, Ok(ProcessState::Exited(ExitStatus(12))));
+        // The finished job should be removed from the job set.
+        assert_eq!(env.jobs.get(index), None);
 
         let state = system.state.borrow();
         // The process should not be resumed.
