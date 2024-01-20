@@ -271,10 +271,10 @@ impl Process {
     /// process are closed.
     ///
     /// This function returns whether the state did change. If true, the
-    /// [`state_has_changed`](Self::state_has_changed) flag is set and  the
-    /// caller must notify the status update by sending `SIGCHLD` to the parent
+    /// [`state_has_changed`](Self::state_has_changed) flag is set and the
+    /// caller must notify the state change by sending `SIGCHLD` to the parent
     /// process.
-    #[must_use = "You must send SIGCHLD to the parent"]
+    #[must_use = "You must send SIGCHLD to the parent if set_state returns true"]
     pub fn set_state(&mut self, state: ProcessState) -> bool {
         let old_state = std::mem::replace(&mut self.state, state);
 

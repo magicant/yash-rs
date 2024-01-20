@@ -41,7 +41,7 @@
 //! [`yash_env::job::fmt`] module. You can use two options to change the output.
 //!
 //! The **`-l`** (**`--verbose`**) option uses the alternate format, which
-//! inserts the process ID before each job status. The **`-p`**
+//! inserts the process ID before each job state. The **`-p`**
 //! (**`--pgid-only`**) option only prints the process ID of each job.
 //!
 //! ## Filtering

@@ -26,10 +26,10 @@
 //! job](JobSet::remove). Note that the job set may reuse the index of a removed
 //! job for another job added later.
 //!
-//! When the [wait system call](crate::System::wait) returns a new status of a
+//! When the [wait system call](crate::System::wait) returns a new state of a
 //! child process, the caller should pass it to [`JobSet::update_status`], which
-//! modifies the status of the corresponding job. The `state_changed` flag of
-//! the job is set when the job is updated and should be
+//! modifies the state of the corresponding job. The `state_changed` flag of the
+//! job is set when the job is updated and should be
 //! [reset when reported](JobRefMut::state_reported).
 //!
 //! The job set remembers the selection of two special jobs called the "current
@@ -76,6 +76,9 @@ impl ProcessState {
     }
 
     /// Converts `ProcessState` to `WaitStatus`.
+    ///
+    /// This function returns a type defined in the `nix` crate, which is not
+    /// covered by the semantic versioning policy of this crate.
     #[must_use]
     pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
         match self {
@@ -93,6 +96,9 @@ impl ProcessState {
     /// If the given `WaitStatus` represents a change in the process state, this
     /// function returns the new state with the process ID. Otherwise, it
     /// returns `None`.
+    ///
+    /// The `WaitStatus` type is defined in the `nix` crate, which is not
+    /// covered by the semantic versioning policy of this crate.
     #[must_use]
     pub fn from_wait_status(status: WaitStatus) -> Option<(Pid, Self)> {
         match status {
@@ -159,9 +165,9 @@ pub struct Job {
     /// See [`JobRefMut::expect`] and [`JobSet::update_status`] for details.
     pub expected_state: Option<ProcessState>,
 
-    /// Indicator of status change
+    /// Indicator of state change
     ///
-    /// This flag is true if the `status` has been changed since the status was
+    /// This flag is true if the `state` has been changed since the state was
     /// last reported to the user.
     pub state_changed: bool,
 

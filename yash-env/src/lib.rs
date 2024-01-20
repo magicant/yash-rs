@@ -314,7 +314,7 @@ impl Env {
 
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
-    /// This function waits for a subshell to change its execution status. The
+    /// This function waits for a subshell to change its execution state. The
     /// `target` parameter specifies which child to wait for:
     ///
     /// - `-1`: any child
@@ -322,7 +322,7 @@ impl Env {
     /// - `pid`: the child whose process ID is `pid`
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
-    /// When [`self.system.wait`](System::wait) returned a new status of the
+    /// When [`self.system.wait`](System::wait) returned a new state of the
     /// target, it is sent to `self.jobs` ([`JobSet::update_status`]) before
     /// being returned from this function.
     ///

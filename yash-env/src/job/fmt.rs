@@ -21,14 +21,14 @@
 //! job status report printed between commands in an interactive shell.
 //!
 //! The format includes the job number, an optional marker representing the
-//! current or previous job, the current status, and the job name, in this
-//! order. An example of a formatted job is:
+//! current or previous job, the current state, and the job name, in this order.
+//! An example of a formatted job is:
 //!
 //! ```text
 //! [2] + Running              cat foo bar | grep baz
 //! ```
 //!
-//! The process ID is inserted before the current status when the alternate mode
+//! The process ID is inserted before the current state when the alternate mode
 //! flag (`#`) is used:
 //!
 //! ```text
@@ -55,6 +55,8 @@
 //! ```
 
 use super::Job;
+#[cfg(doc)]
+use super::JobSet;
 use super::ProcessState;
 use crate::semantics::ExitStatus;
 use std::fmt::Display;
@@ -125,14 +127,15 @@ impl Display for Marker {
 
 /// Wrapper for implementing job status formatting
 ///
-/// This type is a thin wrapper of a job that implements the `Display` trait to
-/// format a job status report. See the [module documentation](self) for details.
+/// This wrapper contains the information necessary to format a job status
+/// report, which can be produced by the `Display` trait's method.
+/// See the [module documentation](self) for details.
 #[derive(Clone, Copy, Debug)]
 pub struct Report<'a> {
     /// Index of the job
     ///
     /// This value should be the index at which the job appears in its
-    /// containing job set.
+    /// containing [`JobSet`].
     ///
     /// Note that the index is the job number minus one.
     pub index: usize,
@@ -148,8 +151,8 @@ impl Report<'_> {
     /// Returns the job number of the job.
     ///
     /// The job number is a positive integer that is one greater than the index
-    /// of the job in its containing job set. Rather than the raw index, the job
-    /// number should be displayed to the user.
+    /// of the job in its containing [`JobSet`]. Rather than the raw index, the job
+    /// number is included in the formatted report.
     #[must_use]
     pub fn number(&self) -> usize {
         self.index + 1
@@ -157,9 +160,6 @@ impl Report<'_> {
 }
 
 /// Formats a job status report.
-///
-/// The `fmt` method will **panic** if `self.index` does not name an existing
-/// job in `self.jobs`.
 impl Display for Report<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let number = self.number();
