@@ -22,7 +22,6 @@
 
 use thiserror::Error;
 use yash_env::job::Pid;
-use yash_env::job::WaitStatus;
 use yash_env::system::Errno;
 use yash_env::trap::Signal;
 use yash_env::Env;
@@ -51,8 +50,9 @@ pub enum Error {
 /// returns `Ok(())`. Otherwise, this function performs the trap action and
 /// returns the signal and the result of the trap action.
 ///
-/// Note that this function returns on a job status change of any kind. You need
-/// to call this function repeatedly until the desired job status change occurs.
+/// Note that this function returns on a job state change of any kind. You need
+/// to call this function repeatedly until the job state becomes the one you
+/// want.
 ///
 /// If there is no job to wait for, this function returns
 /// `Err(Error::NothingToWait)` immediately.
@@ -63,12 +63,12 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
     env.traps.enable_sigchld_handler(&mut env.system)?;
 
     loop {
-        // Poll for a job status change. Note that this `wait` call returns
-        // immediately regardless of whether there is a new job status.
+        // Poll for a job state change. Note that this `wait` call returns
+        // immediately regardless of whether there is a new job state.
         match env.system.wait(Pid::from_raw(-1)) {
-            Ok(WaitStatus::StillAlive) => {
+            Ok(None) => {
                 // The current process has child processes, but none of them has
-                // changed its status. Wait for a signal.
+                // changed its state. Wait for a signal.
                 let signals = env.wait_for_signals().await;
                 for signal in signals.iter().cloned() {
                     if let Some(result) = run_trap_if_caught(env, signal).await {
@@ -77,9 +77,9 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
                 }
             }
 
-            Ok(status) => {
-                // Some job has changed its status.
-                env.jobs.update_status(status);
+            Ok(Some((pid, state))) => {
+                // Some job has changed its state.
+                env.jobs.update_status(pid, state);
                 return Ok(());
             }
 
@@ -103,6 +103,8 @@ mod tests {
     use std::pin::pin;
     use std::task::Poll;
     use yash_env::job::Job;
+    use yash_env::job::ProcessState;
+    use yash_env::semantics::ExitStatus;
     use yash_env::subshell::Subshell;
     use yash_env::trap::Action;
     use yash_env::variable::Value;
@@ -133,10 +135,10 @@ mod tests {
             // The job is finished, so the function returns immediately.
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
-            // The job status is updated.
+            // The job state is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().status,
-                WaitStatus::Exited(pid, 0),
+                env.jobs.get(index).unwrap().state,
+                ProcessState::Exited(ExitStatus::default()),
             );
         });
     }
@@ -154,10 +156,10 @@ mod tests {
             // The job is suspended, so the function returns immediately.
             let result = wait_for_any_job_or_trap(&mut env).await;
             assert_eq!(result, Ok(()));
-            // The job status is updated.
+            // The job state is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().status,
-                WaitStatus::Stopped(pid, Signal::SIGSTOP),
+                env.jobs.get(index).unwrap().state,
+                ProcessState::Stopped(Signal::SIGSTOP),
             );
         });
     }

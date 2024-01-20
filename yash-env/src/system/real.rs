@@ -35,6 +35,7 @@ use super::System;
 use super::TimeSpec;
 use crate::io::Fd;
 use crate::job::Pid;
+use crate::job::ProcessState;
 use crate::SignalHandling;
 use nix::libc::DIR;
 use nix::libc::{S_IFDIR, S_IFMT, S_IFREG};
@@ -385,10 +386,10 @@ impl System for RealSystem {
         }
     }
 
-    fn wait(&mut self, target: Pid) -> nix::Result<super::WaitStatus> {
+    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        nix::sys::wait::waitpid(target, options.into())
+        nix::sys::wait::waitpid(target, options.into()).map(ProcessState::from_wait_status)
     }
 
     fn execve(

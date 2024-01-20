@@ -19,13 +19,12 @@
 use super::io::FdBody;
 use super::signal::SignalEffect;
 use crate::io::Fd;
-use crate::semantics::ExitStatus;
+use crate::job::ProcessState;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -272,10 +271,10 @@ impl Process {
     /// process are closed.
     ///
     /// This function returns whether the state did change. If true, the
-    /// [`state_has_changed`](Self::state_has_changed) flag is set and  the
-    /// caller must notify the status update by sending `SIGCHLD` to the parent
+    /// [`state_has_changed`](Self::state_has_changed) flag is set and the
+    /// caller must notify the state change by sending `SIGCHLD` to the parent
     /// process.
-    #[must_use = "You must send SIGCHLD to the parent"]
+    #[must_use = "You must send SIGCHLD to the parent if set_state returns true"]
     pub fn set_state(&mut self, state: ProcessState) -> bool {
         let old_state = std::mem::replace(&mut self.state, state);
 
@@ -292,7 +291,7 @@ impl Process {
                         }
                     }
                 }
-                ProcessState::Exited(_) | ProcessState::Signaled(_) => self.close_fds(),
+                ProcessState::Exited(_) | ProcessState::Signaled { .. } => self.close_fds(),
                 ProcessState::Stopped(_) => (),
             }
             self.state_has_changed = true;
@@ -402,8 +401,8 @@ impl Process {
             SignalHandling::Default => {
                 let process_state_changed = match SignalEffect::of(signal) {
                     SignalEffect::None | SignalEffect::Resume => false,
-                    SignalEffect::Terminate { core_dump: _ } => {
-                        self.set_state(ProcessState::Signaled(signal))
+                    SignalEffect::Terminate { core_dump } => {
+                        self.set_state(ProcessState::Signaled { signal, core_dump })
                     }
                     SignalEffect::Suspend => self.set_state(ProcessState::Stopped(signal)),
                 };
@@ -466,37 +465,6 @@ impl Process {
     }
 }
 
-/// State of a process.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProcessState {
-    Running,
-    Stopped(Signal),
-    Exited(ExitStatus),
-    Signaled(Signal),
-}
-
-impl ProcessState {
-    /// Whether the process is not yet terminated.
-    #[must_use]
-    pub fn is_alive(&self) -> bool {
-        match self {
-            ProcessState::Running | ProcessState::Stopped(_) => true,
-            ProcessState::Exited(_) | ProcessState::Signaled(_) => false,
-        }
-    }
-
-    /// Converts `ProcessState` to `WaitStatus`.
-    #[must_use]
-    pub fn to_wait_status(self, pid: Pid) -> WaitStatus {
-        match self {
-            ProcessState::Running => WaitStatus::Continued(pid),
-            ProcessState::Exited(exit_status) => WaitStatus::Exited(pid, exit_status.0),
-            ProcessState::Stopped(signal) => WaitStatus::Stopped(pid, signal),
-            ProcessState::Signaled(signal) => WaitStatus::Signaled(pid, signal, false),
-        }
-    }
-}
-
 /// Result of operations that may deliver a signal to a process.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -533,6 +501,7 @@ impl BitOrAssign for SignalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::semantics::ExitStatus;
     use crate::system::r#virtual::file_system::{FileBody, INode, Mode};
     use crate::system::r#virtual::io::OpenFileDescription;
     use crate::system::FdFlag;
@@ -643,7 +612,10 @@ mod tests {
     #[test]
     fn process_set_state_closes_all_fds_on_signaled() {
         let (mut process, _reader, _writer) = process_with_pipe();
-        assert!(process.set_state(ProcessState::Signaled(Signal::SIGINT)));
+        assert!(process.set_state(ProcessState::Signaled {
+            signal: Signal::SIGINT,
+            core_dump: false
+        }));
         assert!(process.fds().is_empty(), "{:?}", process.fds());
     }
 
@@ -777,7 +749,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGTERM));
+        assert_eq!(
+            process.state(),
+            ProcessState::Signaled {
+                signal: Signal::SIGTERM,
+                core_dump: false
+            }
+        );
         assert_eq!(process.caught_signals, []);
     }
 
@@ -793,7 +771,13 @@ mod tests {
                 process_state_changed: true,
             }
         );
-        assert_eq!(process.state(), ProcessState::Signaled(Signal::SIGABRT));
+        assert_eq!(
+            process.state(),
+            ProcessState::Signaled {
+                signal: Signal::SIGABRT,
+                core_dump: true
+            }
+        );
         assert_eq!(process.caught_signals, []);
         // TODO Check if core dump file has been created
     }

@@ -131,7 +131,7 @@ mod tests {
     use futures_util::FutureExt;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use yash_env::job::WaitStatus;
+    use yash_env::job::ProcessState;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::system::r#virtual::FileBody;
@@ -209,8 +209,8 @@ mod tests {
 
             let job = env.jobs.get(0).unwrap();
             assert!(!job.job_controlled);
-            assert!(job.status_changed);
-            assert_eq!(job.status, WaitStatus::StillAlive);
+            assert!(job.state_changed);
+            assert_eq!(job.state, ProcessState::Running);
             assert_eq!(job.pid, env.jobs.last_async_pid());
             assert_eq!(job.name, "return -n 42");
         })

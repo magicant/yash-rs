@@ -21,14 +21,14 @@
 //! job status report printed between commands in an interactive shell.
 //!
 //! The format includes the job number, an optional marker representing the
-//! current or previous job, the current status, and the job name, in this
-//! order. An example of a formatted job is:
+//! current or previous job, the current state, and the job name, in this order.
+//! An example of a formatted job is:
 //!
 //! ```text
 //! [2] + Running              cat foo bar | grep baz
 //! ```
 //!
-//! The process ID is inserted before the current status when the alternate mode
+//! The process ID is inserted before the current state when the alternate mode
 //! flag (`#`) is used:
 //!
 //! ```text
@@ -55,27 +55,43 @@
 //! ```
 
 use super::Job;
-use super::WaitStatus;
+#[cfg(doc)]
+use super::JobSet;
+use super::ProcessState;
+use crate::semantics::ExitStatus;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-/// Wrapper for formatting `WaitStatus`
+/// Formats a process state into a string.
 ///
-/// This type is a thin wrapper of `WaitStatus` that implements the `Display`
-/// trait to format the wait status.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct FormatStatus(WaitStatus);
-
-impl Display for FormatStatus {
+/// Process states are formatted as follows:
+///
+/// - `Running` for a running process
+/// - `Stopped(SIG…)` for a stopped process that has been stopped by the signal
+///   `SIG…`
+/// - `Done` for a process that exited with exit status 0
+/// - `Done(…)` for a process that exited with a non-zero exit status where
+///   `…` is the exit status
+/// - `Killed(SIG…)` for a process that was terminated by the signal `SIG…`
+///   without a core dump
+/// - `Killed(SIG…: core dumped)` for a process that was terminated by the
+///   signal `SIG…` with a core dump
+impl Display for ProcessState {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let s = match self.0 {
-            WaitStatus::Stopped(_, signal) => format!("Stopped({signal})"),
-            WaitStatus::Exited(_, 0) => return f.pad("Done"),
-            WaitStatus::Exited(_, exit_status) => format!("Done({exit_status})"),
-            WaitStatus::Signaled(_, signal, false) => format!("Killed({signal})"),
-            WaitStatus::Signaled(_, signal, true) => format!("Killed({signal}: core dumped)"),
-            _ => return f.pad("Running"),
+        let s = match self {
+            ProcessState::Running => return f.pad("Running"),
+            ProcessState::Stopped(signal) => format!("Stopped({signal})"),
+            ProcessState::Exited(ExitStatus(0)) => return f.pad("Done"),
+            ProcessState::Exited(exit_status) => format!("Done({exit_status})"),
+            ProcessState::Signaled {
+                signal,
+                core_dump: false,
+            } => format!("Killed({signal})"),
+            ProcessState::Signaled {
+                signal,
+                core_dump: true,
+            } => format!("Killed({signal}: core dumped)"),
         };
         f.pad(&s)
     }
@@ -111,14 +127,15 @@ impl Display for Marker {
 
 /// Wrapper for implementing job status formatting
 ///
-/// This type is a thin wrapper of a job that implements the `Display` trait to
-/// format a job status report. See the [module documentation](self) for details.
+/// This wrapper contains the information necessary to format a job status
+/// report, which can be produced by the `Display` trait's method.
+/// See the [module documentation](self) for details.
 #[derive(Clone, Copy, Debug)]
 pub struct Report<'a> {
     /// Index of the job
     ///
     /// This value should be the index at which the job appears in its
-    /// containing job set.
+    /// containing [`JobSet`].
     ///
     /// Note that the index is the job number minus one.
     pub index: usize,
@@ -134,8 +151,8 @@ impl Report<'_> {
     /// Returns the job number of the job.
     ///
     /// The job number is a positive integer that is one greater than the index
-    /// of the job in its containing job set. Rather than the raw index, the job
-    /// number should be displayed to the user.
+    /// of the job in its containing [`JobSet`]. Rather than the raw index, the job
+    /// number is included in the formatted report.
     #[inline]
     #[must_use]
     pub const fn number(&self) -> usize {
@@ -144,14 +161,11 @@ impl Report<'_> {
 }
 
 /// Formats a job status report.
-///
-/// The `fmt` method will **panic** if `self.index` does not name an existing
-/// job in `self.jobs`.
 impl Display for Report<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let number = self.number();
         let marker = self.marker;
-        let status = FormatStatus(self.job.status);
+        let status = self.job.state;
         let name = &self.job.name;
         if f.alternate() {
             let pid = self.job.pid;
@@ -167,69 +181,64 @@ mod tests {
     use super::super::Job;
     use super::super::Pid;
     use super::*;
+    use crate::job::ProcessState;
     use crate::trap::Signal;
 
     #[test]
-    fn format_status_running() {
-        let fs = FormatStatus(WaitStatus::StillAlive);
-        assert_eq!(fs.to_string(), "Running");
-        let fs = FormatStatus(WaitStatus::Continued(Pid::from_raw(0)));
-        assert_eq!(fs.to_string(), "Running");
+    fn process_state_display_running() {
+        let state = ProcessState::Running;
+        assert_eq!(state.to_string(), "Running");
     }
 
     #[test]
-    fn format_status_stopped() {
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(0), Signal::SIGSTOP));
-        assert_eq!(fs.to_string(), "Stopped(SIGSTOP)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(1), Signal::SIGTSTP));
-        assert_eq!(fs.to_string(), "Stopped(SIGTSTP)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(2), Signal::SIGTTIN));
-        assert_eq!(fs.to_string(), "Stopped(SIGTTIN)");
-        let fs = FormatStatus(WaitStatus::Stopped(Pid::from_raw(2), Signal::SIGTTOU));
-        assert_eq!(fs.to_string(), "Stopped(SIGTTOU)");
+    fn process_state_display_stopped() {
+        let state = ProcessState::Stopped(Signal::SIGSTOP);
+        assert_eq!(state.to_string(), "Stopped(SIGSTOP)");
+        let state = ProcessState::Stopped(Signal::SIGTSTP);
+        assert_eq!(state.to_string(), "Stopped(SIGTSTP)");
+        let state = ProcessState::Stopped(Signal::SIGTTIN);
+        assert_eq!(state.to_string(), "Stopped(SIGTTIN)");
+        let state = ProcessState::Stopped(Signal::SIGTTOU);
+        assert_eq!(state.to_string(), "Stopped(SIGTTOU)");
     }
 
     #[test]
-    fn format_status_exited() {
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(10), 0));
-        assert_eq!(fs.to_string(), "Done");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(11), 1));
-        assert_eq!(fs.to_string(), "Done(1)");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(12), 2));
-        assert_eq!(fs.to_string(), "Done(2)");
-        let fs = FormatStatus(WaitStatus::Exited(Pid::from_raw(12), 253));
-        assert_eq!(fs.to_string(), "Done(253)");
+    fn process_state_display_exited() {
+        let state = ProcessState::Exited(ExitStatus(0));
+        assert_eq!(state.to_string(), "Done");
+        let state = ProcessState::Exited(ExitStatus(1));
+        assert_eq!(state.to_string(), "Done(1)");
+        let state = ProcessState::Exited(ExitStatus(2));
+        assert_eq!(state.to_string(), "Done(2)");
+        let state = ProcessState::Exited(ExitStatus(253));
+        assert_eq!(state.to_string(), "Done(253)");
     }
 
     #[test]
-    fn format_status_signaled() {
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(0),
-            Signal::SIGKILL,
-            false,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGKILL)");
+    fn process_state_display_signaled() {
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGKILL,
+            core_dump: false,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGKILL)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(10),
-            Signal::SIGKILL,
-            true,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGKILL: core dumped)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGKILL,
+            core_dump: true,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGKILL: core dumped)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(20),
-            Signal::SIGTERM,
-            false,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGTERM)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGTERM,
+            core_dump: false,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGTERM)");
 
-        let fs = FormatStatus(WaitStatus::Signaled(
-            Pid::from_raw(30),
-            Signal::SIGQUIT,
-            true,
-        ));
-        assert_eq!(fs.to_string(), "Killed(SIGQUIT: core dumped)");
+        let state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
+        assert_eq!(state.to_string(), "Killed(SIGQUIT: core dumped)");
     }
 
     #[test]
@@ -241,7 +250,7 @@ mod tests {
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Running              echo ok");
 
-        job.status = WaitStatus::Stopped(Pid::from_raw(42), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Stopped(SIGSTOP)     echo ok");
 
@@ -257,7 +266,10 @@ mod tests {
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[6]   Stopped(SIGSTOP)     echo ok");
 
-        job.status = WaitStatus::Signaled(Pid::from_raw(16), Signal::SIGQUIT, true);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
         job.name = "exit 0".to_string();
         let report = Report { index, marker, job };
         assert_eq!(

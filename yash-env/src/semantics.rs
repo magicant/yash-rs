@@ -18,7 +18,6 @@
 
 use crate::Env;
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
 use std::ffi::c_int;
 use std::ops::ControlFlow::{self, Break};
 use std::process::ExitCode;
@@ -117,26 +116,6 @@ impl From<Signal> for ExitStatus {
 impl Termination for ExitStatus {
     fn report(self) -> ExitCode {
         (self.0 as u8).into()
-    }
-}
-
-/// Error returned when a [`WaitStatus`] could not be converted to an
-/// [`ExitStatus`]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StillAliveError;
-
-/// Converts a `WaitStatus` to an `ExitStatus` if the status is `Exited`,
-/// `Signaled`, or `Stopped`.
-impl TryFrom<WaitStatus> for ExitStatus {
-    type Error = StillAliveError;
-    fn try_from(status: WaitStatus) -> std::result::Result<Self, StillAliveError> {
-        match status {
-            WaitStatus::Exited(_, exit_status) => Ok(ExitStatus(exit_status)),
-            WaitStatus::Signaled(_, signal, _) | WaitStatus::Stopped(_, signal) => {
-                Ok(ExitStatus::from(signal))
-            }
-            _ => Err(StillAliveError),
-        }
     }
 }
 

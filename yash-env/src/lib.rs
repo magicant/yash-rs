@@ -37,8 +37,7 @@ use self::function::FunctionSet;
 use self::io::Fd;
 use self::job::JobSet;
 use self::job::Pid;
-use self::job::WaitStatus;
-use self::job::WaitStatusEx;
+use self::job::ProcessState;
 use self::option::On;
 use self::option::OptionSet;
 use self::option::{AllExport, ErrExit, Monitor};
@@ -315,7 +314,7 @@ impl Env {
 
     /// Waits for a subshell to terminate, suspend, or resume.
     ///
-    /// This function waits for a subshell to change its execution status. The
+    /// This function waits for a subshell to change its execution state. The
     /// `target` parameter specifies which child to wait for:
     ///
     /// - `-1`: any child
@@ -323,7 +322,7 @@ impl Env {
     /// - `pid`: the child whose process ID is `pid`
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
-    /// When [`self.system.wait`](System::wait) returned a new status of the
+    /// When [`self.system.wait`](System::wait) returned a new state of the
     /// target, it is sent to `self.jobs` ([`JobSet::update_status`]) before
     /// being returned from this function.
     ///
@@ -333,19 +332,15 @@ impl Env {
     /// If the target subshell is not job-controlled, you may want to use
     /// [`wait_for_subshell_to_finish`](Self::wait_for_subshell_to_finish)
     /// instead.
-    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+    pub async fn wait_for_subshell(&mut self, target: Pid) -> nix::Result<(Pid, ProcessState)> {
         // We need to set the signal handling before calling `wait` so we don't
         // miss any `SIGCHLD` that may arrive between `wait` and `wait_for_signal`.
         self.traps.enable_sigchld_handler(&mut self.system)?;
 
         loop {
-            match self.system.wait(target) {
-                Ok(WaitStatus::StillAlive) => {}
-                Ok(status) => {
-                    self.jobs.update_status(status);
-                    return Ok(status);
-                }
-                result => return result,
+            if let Some((pid, state)) = self.system.wait(target)? {
+                self.jobs.update_status(pid, state);
+                return Ok((pid, state));
             }
             self.wait_for_signal(Signal::SIGCHLD).await;
         }
@@ -363,9 +358,9 @@ impl Env {
         target: Pid,
     ) -> nix::Result<(Pid, ExitStatus)> {
         loop {
-            let wait_status = self.wait_for_subshell(target).await?;
-            if wait_status.is_finished() {
-                return Ok((wait_status.pid().unwrap(), wait_status.try_into().unwrap()));
+            let (pid, state) = self.wait_for_subshell(target).await?;
+            if !state.is_alive() {
+                return Ok((pid, state.try_into().unwrap()));
             }
         }
     }
@@ -379,12 +374,8 @@ impl Env {
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
     pub fn update_all_subshell_statuses(&mut self) {
-        loop {
-            match self.system.wait(Pid::from_raw(-1)) {
-                Ok(WaitStatus::StillAlive) => break,
-                Ok(status) => self.jobs.update_status(status),
-                Err(_) => break,
-            };
+        while let Ok(Some((pid, state))) = self.system.wait(Pid::from_raw(-1)) {
+            self.jobs.update_status(pid, state);
         }
     }
 
@@ -607,7 +598,7 @@ mod tests {
             });
             let (pid, _) = subshell.start(&mut env).await.unwrap();
             let result = env.wait_for_subshell(pid).await;
-            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
+            assert_eq!(result, Ok((pid, ProcessState::Exited(ExitStatus(42)))));
         });
     }
 
@@ -625,8 +616,8 @@ mod tests {
             job.name = "my job".to_string();
             let job_index = env.jobs.add(job.clone());
             let result = env.wait_for_subshell(pid).await;
-            assert_eq!(result, Ok(WaitStatus::Exited(pid, 42)));
-            job.status = WaitStatus::Exited(pid, 42);
+            assert_eq!(result, Ok((pid, ProcessState::Exited(ExitStatus(42)))));
+            job.state = ProcessState::Exited(ExitStatus(42));
             assert_eq!(env.jobs.get(job_index), Some(&job));
         });
     }
@@ -657,7 +648,7 @@ mod tests {
 
         let mut env = Env::with_system(Box::new(system));
 
-        let [(pid_1, job_1), (pid_2, job_2), (_pid_3, job_3)] = executor.run_until(async {
+        let [job_1, job_2, job_3] = executor.run_until(async {
             // Run a subshell.
             let subshell_1 = Subshell::new(|env, _job_control| {
                 Box::pin(async move {
@@ -694,29 +685,29 @@ mod tests {
             let job_1 = env.jobs.add(Job::new(pid_1));
             let job_2 = env.jobs.add(Job::new(pid_2));
             let job_3 = env.jobs.add(Job::new(pid_3));
-            [(pid_1, job_1), (pid_2, job_2), (pid_3, job_3)]
+            [job_1, job_2, job_3]
         });
 
         // Let the jobs (except job_3) finish.
         executor.run_until_stalled();
 
         // We're not yet updated.
-        assert_eq!(env.jobs.get(job_1).unwrap().status, WaitStatus::StillAlive);
-        assert_eq!(env.jobs.get(job_2).unwrap().status, WaitStatus::StillAlive);
-        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_1).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs.get(job_2).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
 
         env.update_all_subshell_statuses();
 
         // Now we have the results.
         assert_eq!(
-            env.jobs.get(job_1).unwrap().status,
-            WaitStatus::Exited(pid_1, 12)
+            env.jobs.get(job_1).unwrap().state,
+            ProcessState::Exited(ExitStatus(12))
         );
         assert_eq!(
-            env.jobs.get(job_2).unwrap().status,
-            WaitStatus::Exited(pid_2, 35)
+            env.jobs.get(job_2).unwrap().state,
+            ProcessState::Exited(ExitStatus(35))
         );
-        assert_eq!(env.jobs.get(job_3).unwrap().status, WaitStatus::StillAlive);
+        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
     }
 
     #[test]

@@ -28,7 +28,7 @@ use self::real::RealSystem;
 use crate::io::Fd;
 use crate::io::MIN_INTERNAL_FD;
 use crate::job::Pid;
-use crate::job::WaitStatus;
+use crate::job::ProcessState;
 #[cfg(doc)]
 use crate::subshell::Subshell;
 use crate::trap::Signal;
@@ -353,7 +353,13 @@ pub trait System: Debug {
     /// `waitpid(target, ..., WUNTRACED | WCONTINUED | WNOHANG)`.
     /// Despite the name, this function does not block: it returns the result
     /// immediately.
-    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus>;
+    ///
+    /// This function returns a pair of the process ID and the process state if
+    /// a process matching `target` is found and its state has changed. If all
+    /// the processes matching `target` have not changed their states, this
+    /// function returns `Ok(None)`. If an error occurs, this function returns
+    /// `Err(_)`.
+    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>>;
 
     // TODO Consider passing raw pointers for optimization
     /// Replaces the current process with an external utility.
@@ -921,7 +927,7 @@ impl System for SharedSystem {
     fn new_child_process(&mut self) -> nix::Result<ChildProcessStarter> {
         self.0.borrow_mut().new_child_process()
     }
-    fn wait(&mut self, target: Pid) -> nix::Result<WaitStatus> {
+    fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
         self.0.borrow_mut().wait(target)
     }
     fn execve(

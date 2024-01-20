@@ -24,7 +24,7 @@ use std::rc::Rc;
 use yash_env::io::Fd;
 use yash_env::job::Job;
 use yash_env::job::Pid;
-use yash_env::job::WaitStatus::Stopped;
+use yash_env::job::ProcessState;
 use yash_env::option::Option::Exec;
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert;
@@ -131,16 +131,16 @@ async fn execute_job_controlled_pipeline(
     .job_control(JobControl::Foreground);
 
     match subshell.start_and_wait(env).await {
-        Ok(wait_status) => {
-            if let Stopped(pid, _signal) = wait_status {
+        Ok((pid, state)) => {
+            if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.status = wait_status;
+                job.state = state;
                 job.name = to_job_name(commands);
                 env.jobs.add(job);
             }
 
-            env.exit_status = wait_status.try_into().unwrap();
+            env.exit_status = state.try_into().unwrap();
             Continue(())
         }
         Err(errno) => {
@@ -335,12 +335,11 @@ mod tests {
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
-    use yash_env::job::WaitStatus;
+    use yash_env::job::ProcessState;
     use yash_env::option::Option::Monitor;
     use yash_env::option::State::On;
     use yash_env::semantics::Field;
     use yash_env::system::r#virtual::FileBody;
-    use yash_env::system::r#virtual::ProcessState;
     use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
 
@@ -611,8 +610,8 @@ mod tests {
             assert_eq!(env.jobs.len(), 1);
             let job = env.jobs.iter().next().unwrap().1;
             assert!(job.job_controlled);
-            assert_eq!(job.status, WaitStatus::Stopped(job.pid, Signal::SIGSTOP));
-            assert!(job.status_changed);
+            assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
+            assert!(job.state_changed);
             assert_eq!(job.name, "return -n 0 | suspend x");
         })
     }

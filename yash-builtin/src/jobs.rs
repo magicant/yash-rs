@@ -41,7 +41,7 @@
 //! [`yash_env::job::fmt`] module. You can use two options to change the output.
 //!
 //! The **`-l`** (**`--verbose`**) option uses the alternate format, which
-//! inserts the process ID before each job status. The **`-p`**
+//! inserts the process ID before each job state. The **`-p`**
 //! (**`--pgid-only`**) option only prints the process ID of each job.
 //!
 //! ## Filtering
@@ -95,7 +95,6 @@ use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
 use yash_env::job::id::FindError;
 use yash_env::job::Job;
-use yash_env::job::WaitStatusEx;
 use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_syntax::source::pretty::Annotation;
@@ -122,7 +121,6 @@ impl Accumulator {
     /// Processes one job.
     ///
     /// 1. Formats a job report in `self.print` so it can be printed later.
-    /// 1. Clears the `status_changed` flag of the job.
     /// 1. Remembers the job index in `self.indices_reported` so the job can be
     ///    removed later.
     fn report(&mut self, index: usize, job: &Job) {
@@ -213,10 +211,10 @@ pub async fn main(env: &mut Env, args: Vec<Field>) -> Result {
     if result.exit_status().is_successful() {
         for index in accumulator.indices_reported {
             let mut job = env.jobs.get_mut(index).unwrap();
-            if job.status.is_finished() {
-                env.jobs.remove(index);
+            if job.state.is_alive() {
+                job.state_reported();
             } else {
-                job.status_reported();
+                env.jobs.remove(index);
             }
         }
     }
@@ -235,7 +233,7 @@ mod tests {
     use yash_env::io::Fd;
     use yash_env::job::Job;
     use yash_env::job::Pid;
-    use yash_env::job::WaitStatus;
+    use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
@@ -261,7 +259,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -284,27 +282,33 @@ mod tests {
         let i11 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(12));
-        job.status = WaitStatus::Stopped(Pid::from_raw(12), Signal::SIGTSTP);
+        job.state = ProcessState::Stopped(Signal::SIGTSTP);
         job.name = "echo stopped".to_string();
         let i12 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(13));
-        job.status = WaitStatus::Continued(Pid::from_raw(13));
+        job.state = ProcessState::Running;
         job.name = "echo continued".to_string();
         let i13 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(14));
-        job.status = WaitStatus::Exited(Pid::from_raw(14), 42);
+        job.state = ProcessState::Exited(ExitStatus(42));
         job.name = "echo exited".to_string();
         let i14 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(15));
-        job.status = WaitStatus::Signaled(Pid::from_raw(15), Signal::SIGINT, false);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGINT,
+            core_dump: false,
+        };
         job.name = "echo signaled".to_string();
         let i15 = env.jobs.add(job);
 
         let mut job = Job::new(Pid::from_raw(16));
-        job.status = WaitStatus::Signaled(Pid::from_raw(16), Signal::SIGQUIT, true);
+        job.state = ProcessState::Signaled {
+            signal: Signal::SIGQUIT,
+            core_dump: true,
+        };
         job.name = "echo core dumped".to_string();
         let i16 = env.jobs.add(job);
 
@@ -328,7 +332,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid::from_raw(100)));
@@ -355,13 +359,13 @@ mod tests {
 
         // job that will be removed because it's finished
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Exited(Pid::from_raw(72), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         job.name = "echo second".to_string();
         let i72 = env.jobs.add(job);
 
         // This one is also finished, but not removed because it's not reported.
         let mut job = Job::new(Pid::from_raw(102));
-        job.status = WaitStatus::Exited(Pid::from_raw(102), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         job.name = "echo third".to_string();
         let i102 = env.jobs.add(job);
 
@@ -383,7 +387,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid::from_raw(100)));
@@ -428,7 +432,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
         env.jobs.add(Job::new(Pid::from_raw(100)));
@@ -453,7 +457,7 @@ mod tests {
         let mut env = Env::with_system(system);
 
         let mut job = Job::new(Pid::from_raw(10));
-        job.status = WaitStatus::Exited(Pid::from_raw(10), 0);
+        job.state = ProcessState::Exited(ExitStatus(0));
         job.name = "exit 0".to_string();
         let i10 = env.jobs.add(job);
 
@@ -463,19 +467,19 @@ mod tests {
         }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
-        assert_matches!(env.jobs.get(i10), Some(&Job { status, .. }) => {
-            assert_eq!(status, WaitStatus::Exited(Pid::from_raw(10), 0));
+        assert_matches!(env.jobs.get(i10), Some(&Job { state, .. }) => {
+            assert_eq!(state, ProcessState::Exited(ExitStatus(0)));
         });
     }
 
     #[test]
-    fn report_clears_status_changed_flag() {
+    fn report_clears_state_changed_flag() {
         let mut env = Env::new_virtual();
         let mut job = Job::new(Pid::from_raw(42));
         job.name = "echo first".to_string();
         let i42 = env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         let i72 = env.jobs.add(job);
 
@@ -483,12 +487,12 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
 
-        assert!(env.jobs[i42].status_changed);
-        assert!(!env.jobs[i72].status_changed);
+        assert!(env.jobs[i42].state_changed);
+        assert!(!env.jobs[i72].state_changed);
     }
 
     #[test]
-    fn status_changed_flag_not_cleared_in_case_of_error() {
+    fn state_changed_flag_not_cleared_in_case_of_error() {
         let mut system = Box::new(VirtualSystem::new());
         system.current_process_mut().close_fd(Fd::STDOUT);
         let mut env = Env::with_system(system);
@@ -500,7 +504,7 @@ mod tests {
         }));
         let result = main(&mut env, vec![]).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::FAILURE));
-        assert!(env.jobs[i72].status_changed);
+        assert!(env.jobs[i72].state_changed);
     }
 
     #[test]
@@ -512,7 +516,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -539,7 +543,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -560,7 +564,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -579,7 +583,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 
@@ -599,7 +603,7 @@ mod tests {
         job.name = "echo first".to_string();
         env.jobs.add(job);
         let mut job = Job::new(Pid::from_raw(72));
-        job.status = WaitStatus::Stopped(Pid::from_raw(72), Signal::SIGSTOP);
+        job.state = ProcessState::Stopped(Signal::SIGSTOP);
         job.name = "echo second".to_string();
         env.jobs.add(job);
 

@@ -22,7 +22,7 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::io::print_error;
 use yash_env::job::Job;
-use yash_env::job::WaitStatus::Stopped;
+use yash_env::job::ProcessState;
 use yash_env::semantics::Divert;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -38,16 +38,16 @@ pub async fn execute(env: &mut Env, body: Rc<List>, location: &Location) -> Resu
     let subshell = Subshell::new(|sub_env, _job_control| Box::pin(subshell_main(sub_env, body_2)));
     let subshell = subshell.job_control(JobControl::Foreground);
     match subshell.start_and_wait(env).await {
-        Ok(wait_status) => {
-            if let Stopped(pid, _signal) = wait_status {
+        Ok((pid, state)) => {
+            if let ProcessState::Stopped(_) = state {
                 let mut job = Job::new(pid);
                 job.job_controlled = true;
-                job.status = wait_status;
+                job.state = state;
                 job.name = body.to_string();
                 env.jobs.add(job);
             }
 
-            env.exit_status = wait_status.try_into().unwrap();
+            env.exit_status = state.try_into().unwrap();
             env.apply_errexit()
         }
         Err(errno) => {
@@ -87,10 +87,9 @@ mod tests {
     use std::future::Future;
     use std::pin::Pin;
     use std::rc::Rc;
-    use yash_env::job::WaitStatus;
+    use yash_env::job::ProcessState;
     use yash_env::option::Option::{ErrExit, Monitor};
     use yash_env::option::State::On;
-    use yash_env::system::r#virtual::ProcessState;
     use yash_env::trap::Signal;
     use yash_env::VirtualSystem;
     use yash_syntax::syntax::CompoundCommand;
@@ -208,8 +207,8 @@ mod tests {
             let job = env.jobs.iter().next().unwrap().1;
             assert_eq!(job.pid, pid);
             assert!(job.job_controlled);
-            assert_eq!(job.status, WaitStatus::Stopped(pid, Signal::SIGSTOP));
-            assert!(job.status_changed);
+            assert_eq!(job.state, ProcessState::Stopped(Signal::SIGSTOP));
+            assert!(job.state_changed);
             assert_eq!(job.name, "suspend foo");
         })
     }
