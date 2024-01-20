@@ -76,20 +76,20 @@ mod tests {
     #[test]
     fn process_id_unique_match() {
         let mut jobs = JobSet::new();
-        let job1 = jobs.add(Job::new(Pid::from_raw(123)));
-        let job2 = jobs.add(Job::new(Pid::from_raw(456)));
+        let job1 = jobs.add(Job::new(Pid(123)));
+        let job2 = jobs.add(Job::new(Pid(456)));
 
-        let result1 = resolve(&jobs, JobSpec::ProcessId(Pid::from_raw(123)));
+        let result1 = resolve(&jobs, JobSpec::ProcessId(Pid(123)));
         assert_eq!(result1, Ok(Some(job1)));
-        let result2 = resolve(&jobs, JobSpec::ProcessId(Pid::from_raw(456)));
+        let result2 = resolve(&jobs, JobSpec::ProcessId(Pid(456)));
         assert_eq!(result2, Ok(Some(job2)));
     }
 
     #[test]
     fn job_id_unique_match() {
         let mut jobs = JobSet::new();
-        let job1 = jobs.add(Job::new(Pid::from_raw(123)));
-        let job2 = jobs.add(Job::new(Pid::from_raw(456)));
+        let job1 = jobs.add(Job::new(Pid(123)));
+        let job2 = jobs.add(Job::new(Pid(456)));
 
         let result1 = resolve(&jobs, JobSpec::JobId(Field::dummy("%1")));
         assert_eq!(result1, Ok(Some(job1)));
@@ -101,9 +101,9 @@ mod tests {
     fn process_id_not_found() {
         let jobs = JobSet::new();
 
-        let result1 = resolve(&jobs, JobSpec::ProcessId(Pid::from_raw(123)));
+        let result1 = resolve(&jobs, JobSpec::ProcessId(Pid(123)));
         assert_eq!(result1, Ok(None));
-        let result2 = resolve(&jobs, JobSpec::ProcessId(Pid::from_raw(456)));
+        let result2 = resolve(&jobs, JobSpec::ProcessId(Pid(456)));
         assert_eq!(result2, Ok(None));
     }
 
@@ -120,10 +120,10 @@ mod tests {
     #[test]
     fn job_id_ambiguous() {
         let mut jobs = JobSet::new();
-        let mut job1 = Job::new(Pid::from_raw(123));
+        let mut job1 = Job::new(Pid(123));
         job1.name = "sleep 1".into();
         jobs.add(job1);
-        let mut job2 = Job::new(Pid::from_raw(456));
+        let mut job2 = Job::new(Pid(456));
         job2.name = "sleep 2".into();
         jobs.add(job2);
 

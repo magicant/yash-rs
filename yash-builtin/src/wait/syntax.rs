@@ -69,7 +69,7 @@ impl TryFrom<Field> for JobSpec {
             return Ok(Self::JobId(field));
         }
         match field.value.parse() {
-            Ok(int) if int >= 0 => Ok(Self::ProcessId(Pid::from_raw(int))),
+            Ok(int) if int >= 0 => Ok(Self::ProcessId(Pid(int))),
             Ok(_) => Err(Error::NonPositive(field)),
             Err(error) => Err(Error::ParseInt(field, error)),
         }
@@ -95,10 +95,10 @@ mod tests {
     #[test]
     fn non_negative_process_ids() {
         let result = JobSpec::try_from(Field::dummy("123"));
-        assert_eq!(result, Ok(JobSpec::ProcessId(Pid::from_raw(123))));
+        assert_eq!(result, Ok(JobSpec::ProcessId(Pid(123))));
 
         let result = JobSpec::try_from(Field::dummy("0"));
-        assert_eq!(result, Ok(JobSpec::ProcessId(Pid::from_raw(0))));
+        assert_eq!(result, Ok(JobSpec::ProcessId(Pid(0))));
     }
 
     #[test]

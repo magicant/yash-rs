@@ -317,7 +317,7 @@ impl System for RealSystem {
         target: Pid,
         signal: Option<Signal>,
     ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
-        let result = nix::sys::signal::kill(target, signal);
+        let result = nix::sys::signal::kill(target.into(), signal);
         Box::pin(std::future::ready(result))
     }
 
@@ -341,27 +341,27 @@ impl System for RealSystem {
     }
 
     fn getpid(&self) -> Pid {
-        nix::unistd::getpid()
+        nix::unistd::getpid().into()
     }
 
     fn getppid(&self) -> Pid {
-        nix::unistd::getppid()
+        nix::unistd::getppid().into()
     }
 
     fn getpgrp(&self) -> Pid {
-        nix::unistd::getpgrp()
+        nix::unistd::getpgrp().into()
     }
 
     fn setpgid(&mut self, pid: Pid, pgid: Pid) -> nix::Result<()> {
-        nix::unistd::setpgid(pid, pgid)
+        nix::unistd::setpgid(pid.into(), pgid.into())
     }
 
     fn tcgetpgrp(&self, fd: Fd) -> nix::Result<Pid> {
-        nix::unistd::tcgetpgrp(fd.0)
+        nix::unistd::tcgetpgrp(fd.0).map(Into::into)
     }
 
     fn tcsetpgrp(&mut self, fd: Fd, pgid: Pid) -> nix::Result<()> {
-        nix::unistd::tcsetpgrp(fd.0, pgid)
+        nix::unistd::tcsetpgrp(fd.0, pgid.into())
     }
 
     /// Creates a new child process.
@@ -376,7 +376,9 @@ impl System for RealSystem {
         // SAFETY: As stated on RealSystem::new, the caller is responsible for
         // making only one instance of RealSystem in the process.
         match unsafe { nix::unistd::fork()? } {
-            Parent { child } => Ok(Box::new(move |_env, _task| Box::pin(async move { child }))),
+            Parent { child } => Ok(Box::new(move |_env, _task| {
+                Box::pin(async move { child.into() })
+            })),
             Child => Ok(Box::new(|env, task| {
                 Box::pin(async move {
                     task(env).await;
@@ -389,7 +391,8 @@ impl System for RealSystem {
     fn wait(&mut self, target: Pid) -> nix::Result<Option<(Pid, ProcessState)>> {
         use nix::sys::wait::WaitPidFlag;
         let options = WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED | WaitPidFlag::WNOHANG;
-        nix::sys::wait::waitpid(target, options.into()).map(ProcessState::from_wait_status)
+        nix::sys::wait::waitpid(Some(target.into()), options.into())
+            .map(ProcessState::from_wait_status)
     }
 
     fn execve(

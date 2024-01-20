@@ -19,13 +19,13 @@
 use super::io::FdBody;
 use super::signal::SignalEffect;
 use crate::io::Fd;
+use crate::job::Pid;
 use crate::job::ProcessState;
 use crate::system::SelectSystem;
 use crate::SignalHandling;
 use nix::sys::signal::SigSet;
 use nix::sys::signal::SigmaskHow;
 use nix::sys::signal::Signal;
-use nix::unistd::Pid;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -536,7 +536,7 @@ mod tests {
     }
 
     fn process_with_pipe() -> (Process, Fd, Fd) {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
 
         let file = Rc::new(RefCell::new(INode {
             body: FileBody::Fifo {
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn process_set_state_wakes_on_resumed() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(1), Pid::from_raw(2));
+        let mut process = Process::with_parent_and_group(Pid(1), Pid(2));
         process.state = ProcessState::Stopped(Signal::SIGTSTP);
         let process = Rc::new(RefCell::new(process));
         let process2 = Rc::clone(&process);
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn process_default_signal_blocking_mask() {
-        let process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
+        let process = Process::with_parent_and_group(Pid(10), Pid(11));
         let initial_set = process.blocked_signals();
         for signal in Signal::iterator() {
             assert!(!initial_set.contains(signal), "contained signal {signal}");
@@ -630,7 +630,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_setmask() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_block() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -682,7 +682,7 @@ mod tests {
 
     #[test]
     fn process_sigmask_unblock() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(10), Pid(11));
         let mut some_set = SigSet::empty();
         some_set.add(Signal::SIGINT);
         some_set.add(Signal::SIGCHLD);
@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn process_set_signal_handling() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(100), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(100), Pid(11));
         let old_handling = process.set_signal_handling(Signal::SIGINT, SignalHandling::Ignore);
         assert_eq!(old_handling, SignalHandling::Default);
         let old_handling = process.set_signal_handling(Signal::SIGTERM, SignalHandling::Catch);
@@ -724,7 +724,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_nop() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let result = process.raise_signal(Signal::SIGCHLD);
         assert_eq!(
             result,
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_terminating() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let result = process.raise_signal(Signal::SIGTERM);
         assert_eq!(
             result,
@@ -761,7 +761,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_aborting() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let result = process.raise_signal(Signal::SIGABRT);
         assert_eq!(
             result,
@@ -784,7 +784,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_stopping() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let result = process.raise_signal(Signal::SIGTSTP);
         assert_eq!(
             result,
@@ -800,7 +800,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_default_continuing() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
         let result = process.raise_signal(Signal::SIGCONT);
         assert_eq!(
@@ -817,7 +817,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_ignored() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Ignore);
         let result = process.raise_signal(Signal::SIGCHLD);
         assert_eq!(
@@ -834,7 +834,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_ignored_and_blocked_sigcont() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         let _ = process.set_state(ProcessState::Stopped(Signal::SIGTTOU));
         let _ = process.set_signal_handling(Signal::SIGCONT, SignalHandling::Ignore);
         let _ = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCONT]));
@@ -854,7 +854,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_caught() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
         let result = process.raise_signal(Signal::SIGCHLD);
         assert_eq!(
@@ -880,7 +880,7 @@ mod tests {
 
     #[test]
     fn process_raise_signal_blocked() {
-        let mut process = Process::with_parent_and_group(Pid::from_raw(42), Pid::from_raw(11));
+        let mut process = Process::with_parent_and_group(Pid(42), Pid(11));
         process.set_signal_handling(Signal::SIGCHLD, SignalHandling::Catch);
         let result = process.block_signals(SigmaskHow::SIG_BLOCK, &to_set([Signal::SIGCHLD]));
         assert_eq!(

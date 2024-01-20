@@ -142,7 +142,7 @@ impl VirtualSystem {
     /// `/tmp`.
     pub fn new() -> VirtualSystem {
         let mut state = SystemState::default();
-        let mut process = Process::with_parent_and_group(Pid::from_raw(1), Pid::from_raw(1));
+        let mut process = Process::with_parent_and_group(Pid(1), Pid(1));
 
         let mut set_std_fd = |path, fd| {
             let file = Rc::new(RefCell::new(INode::new([])));
@@ -176,7 +176,7 @@ impl VirtualSystem {
             )
             .unwrap();
 
-        let process_id = Pid::from_raw(2);
+        let process_id = Pid(2);
         state.processes.insert(process_id, process);
 
         let state = Rc::new(RefCell::new(state));
@@ -663,15 +663,15 @@ impl System for VirtualSystem {
         target: Pid,
         signal: Option<Signal>,
     ) -> Pin<Box<(dyn Future<Output = nix::Result<()>>)>> {
-        let result = match target.as_raw() {
-            0 => {
+        let result = match target {
+            Pid::MY_PROCESS_GROUP => {
                 let target_pgid = self.current_process().pgid;
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
             }
 
-            -1 => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
+            Pid::ALL => send_signal_to_processes(&mut self.state.borrow_mut(), None, signal),
 
-            raw_pid if raw_pid >= 0 => {
+            Pid(raw_pid) if raw_pid >= 0 => {
                 let mut state = self.state.borrow_mut();
                 match state.processes.get_mut(&target) {
                     Some(process) => {
@@ -688,8 +688,8 @@ impl System for VirtualSystem {
                 }
             }
 
-            negative_pgid => {
-                let target_pgid = Pid::from_raw(-negative_pgid);
+            Pid(negative_pgid) => {
+                let target_pgid = Pid(-negative_pgid);
                 send_signal_to_processes(&mut self.state.borrow_mut(), Some(target_pgid), signal)
             }
         };
@@ -784,13 +784,13 @@ impl System for VirtualSystem {
     ///
     /// The current implementation does not yet support the concept of sessions.
     fn setpgid(&mut self, mut pid: Pid, mut pgid: Pid) -> nix::Result<()> {
-        if pgid.as_raw() < 0 {
+        if pgid.0 < 0 {
             return Err(Errno::EINVAL);
         }
-        if pid.as_raw() == 0 {
+        if pid.0 == 0 {
             pid = self.process_id;
         }
-        if pgid.as_raw() == 0 {
+        if pgid.0 == 0 {
             pgid = pid;
         }
 
@@ -859,7 +859,7 @@ impl System for VirtualSystem {
             .processes
             .keys()
             .max()
-            .map_or(Pid::from_raw(2), |pid| Pid::from_raw(pid.as_raw() + 1));
+            .map_or(Pid(2), |pid| Pid(pid.0 + 1));
         let parent_process = &state.processes[&self.process_id];
         let child_process = Process::fork_from(self.process_id, parent_process);
         state.processes.insert(process_id, child_process);
@@ -1084,7 +1084,7 @@ impl SystemState {
     ///
     /// This is a helper function for `VirtualSystem::wait`.
     fn child_to_wait_for(&mut self, parent_pid: Pid, target: Pid) -> Option<(Pid, &mut Process)> {
-        match target.as_raw() {
+        match target.0 {
             0 => todo!("wait target {}", target),
             -1 => {
                 // any child
@@ -1759,10 +1759,10 @@ mod tests {
 
         let mut system = VirtualSystem::new();
         let state = system.state.borrow();
-        let max_pid = state.processes.keys().max().unwrap().as_raw();
+        let max_pid = *state.processes.keys().max().unwrap();
         drop(state);
         let e = system
-            .kill(Pid::from_raw(max_pid + 1), Some(Signal::SIGINT))
+            .kill(Pid(max_pid.0 + 1), Some(Signal::SIGINT))
             .now_or_never()
             .unwrap()
             .unwrap_err();
@@ -1775,22 +1775,19 @@ mod tests {
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
-            Pid::from_raw(10),
+            Pid(10),
             Process::with_parent_and_group(system.process_id, pgid),
         );
         state.processes.insert(
-            Pid::from_raw(11),
+            Pid(11),
             Process::with_parent_and_group(system.process_id, pgid),
         );
-        state.processes.insert(
-            Pid::from_raw(21),
-            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
-        );
+        state
+            .processes
+            .insert(Pid(21), Process::with_parent_and_group(Pid(10), Pid(21)));
         drop(state);
 
-        let result = system
-            .kill(Pid::from_raw(-1), Some(Signal::SIGTERM))
-            .now_or_never();
+        let result = system.kill(Pid::ALL, Some(Signal::SIGTERM)).now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
         let state = system.state.borrow();
@@ -1811,21 +1808,20 @@ mod tests {
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
-            Pid::from_raw(10),
+            Pid(10),
             Process::with_parent_and_group(system.process_id, pgid),
         );
         state.processes.insert(
-            Pid::from_raw(11),
+            Pid(11),
             Process::with_parent_and_group(system.process_id, pgid),
         );
-        state.processes.insert(
-            Pid::from_raw(21),
-            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
-        );
+        state
+            .processes
+            .insert(Pid(21), Process::with_parent_and_group(Pid(10), Pid(21)));
         drop(state);
 
         let result = system
-            .kill(Pid::from_raw(0), Some(Signal::SIGQUIT))
+            .kill(Pid::MY_PROCESS_GROUP, Some(Signal::SIGQUIT))
             .now_or_never();
         // The future should be pending because the current process has been killed
         assert_eq!(result, None);
@@ -1838,23 +1834,20 @@ mod tests {
             }
         );
         assert_eq!(
-            state.processes[&Pid::from_raw(10)].state,
+            state.processes[&Pid(10)].state,
             ProcessState::Signaled {
                 signal: Signal::SIGQUIT,
                 core_dump: true
             }
         );
         assert_eq!(
-            state.processes[&Pid::from_raw(11)].state,
+            state.processes[&Pid(11)].state,
             ProcessState::Signaled {
                 signal: Signal::SIGQUIT,
                 core_dump: true
             }
         );
-        assert_eq!(
-            state.processes[&Pid::from_raw(21)].state,
-            ProcessState::Running
-        );
+        assert_eq!(state.processes[&Pid(21)].state, ProcessState::Running);
     }
 
     #[test]
@@ -1863,21 +1856,20 @@ mod tests {
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
-            Pid::from_raw(10),
+            Pid(10),
             Process::with_parent_and_group(system.process_id, pgid),
         );
         state.processes.insert(
-            Pid::from_raw(11),
-            Process::with_parent_and_group(system.process_id, Pid::from_raw(21)),
+            Pid(11),
+            Process::with_parent_and_group(system.process_id, Pid(21)),
         );
-        state.processes.insert(
-            Pid::from_raw(21),
-            Process::with_parent_and_group(Pid::from_raw(10), Pid::from_raw(21)),
-        );
+        state
+            .processes
+            .insert(Pid(21), Process::with_parent_and_group(Pid(10), Pid(21)));
         drop(state);
 
         system
-            .kill(Pid::from_raw(-21), Some(Signal::SIGHUP))
+            .kill(Pid(-21), Some(Signal::SIGHUP))
             .now_or_never()
             .unwrap()
             .unwrap();
@@ -1886,19 +1878,16 @@ mod tests {
             state.processes[&system.process_id].state,
             ProcessState::Running
         );
+        assert_eq!(state.processes[&Pid(10)].state, ProcessState::Running);
         assert_eq!(
-            state.processes[&Pid::from_raw(10)].state,
-            ProcessState::Running
-        );
-        assert_eq!(
-            state.processes[&Pid::from_raw(11)].state,
+            state.processes[&Pid(11)].state,
             ProcessState::Signaled {
                 signal: Signal::SIGHUP,
                 core_dump: false
             }
         );
         assert_eq!(
-            state.processes[&Pid::from_raw(21)].state,
+            state.processes[&Pid(21)].state,
             ProcessState::Signaled {
                 signal: Signal::SIGHUP,
                 core_dump: false
@@ -1912,21 +1901,18 @@ mod tests {
         let pgid = system.current_process().pgid;
         let mut state = system.state.borrow_mut();
         state.processes.insert(
-            Pid::from_raw(10),
+            Pid(10),
             Process::with_parent_and_group(system.process_id, pgid),
         );
         drop(state);
 
         system
-            .kill(Pid::from_raw(-pgid.as_raw()), Some(Signal::SIGCONT))
+            .kill(-pgid, Some(Signal::SIGCONT))
             .now_or_never()
             .unwrap()
             .unwrap();
         let state = system.state.borrow();
-        assert_eq!(
-            state.processes[&Pid::from_raw(10)].state,
-            ProcessState::Running
-        );
+        assert_eq!(state.processes[&Pid(10)].state, ProcessState::Running);
     }
 
     #[test]
@@ -2138,7 +2124,7 @@ mod tests {
             &mut env,
             Box::new(|child_env| {
                 Box::pin(async move {
-                    let result = child_env.system.setpgid(Pid::from_raw(0), Pid::from_raw(0));
+                    let result = child_env.system.setpgid(Pid(0), Pid(0));
                     assert_eq!(result, Ok(()));
                 })
             }),
@@ -2181,12 +2167,12 @@ mod tests {
         let pid = executor.run_until(future);
         executor.run_until_stalled();
 
-        let dummy_pid = Pid::from_raw(123);
+        let dummy_pid = Pid(123);
         let result = env.system.setpgid(dummy_pid, dummy_pid);
         assert_eq!(result, Err(Errno::ESRCH));
 
         let pgid = state.borrow().processes[&pid].pgid();
-        assert_eq!(pgid, Pid::from_raw(1));
+        assert_eq!(pgid, Pid(1));
     }
 
     #[test]
@@ -2200,7 +2186,7 @@ mod tests {
             &mut env,
             Box::new(move |child_env| {
                 Box::pin(async move {
-                    let result = child_env.system.setpgid(parent_pid, Pid::from_raw(0));
+                    let result = child_env.system.setpgid(parent_pid, Pid(0));
                     assert_eq!(result, Err(Errno::ESRCH));
                 })
             }),
@@ -2209,7 +2195,7 @@ mod tests {
         executor.run_until_stalled();
 
         let pgid = state.borrow().processes[&parent_pid].pgid();
-        assert_eq!(pgid, Pid::from_raw(1));
+        assert_eq!(pgid, Pid(1));
     }
 
     #[test]
@@ -2243,7 +2229,7 @@ mod tests {
         assert_eq!(result, Err(Errno::EACCES));
 
         let pgid = state.borrow().processes[&pid].pgid();
-        assert_eq!(pgid, Pid::from_raw(1));
+        assert_eq!(pgid, Pid(1));
     }
 
     #[test]
@@ -2264,15 +2250,15 @@ mod tests {
         assert_eq!(result, Err(Errno::EPERM));
 
         let pgid = state.borrow().processes[&pid_2].pgid();
-        assert_eq!(pgid, Pid::from_raw(1));
+        assert_eq!(pgid, Pid(1));
     }
 
     #[test]
     fn tcsetpgrp_success() {
         let mut system = VirtualSystem::new();
-        let pid = Pid::from_raw(10);
+        let pid = Pid(10);
         let ppid = system.process_id;
-        let pgid = Pid::from_raw(9);
+        let pgid = Pid(9);
         system
             .state
             .borrow_mut()
@@ -2288,14 +2274,14 @@ mod tests {
     #[test]
     fn tcsetpgrp_with_invalid_fd() {
         let mut system = VirtualSystem::new();
-        let result = system.tcsetpgrp(Fd(100), Pid::from_raw(2));
+        let result = system.tcsetpgrp(Fd(100), Pid(2));
         assert_eq!(result, Err(Errno::EBADF));
     }
 
     #[test]
     fn tcsetpgrp_with_nonexisting_pgrp() {
         let mut system = VirtualSystem::new();
-        let result = system.tcsetpgrp(Fd::STDIN, Pid::from_raw(100));
+        let result = system.tcsetpgrp(Fd::STDIN, Pid(100));
         assert_eq!(result, Err(Errno::EPERM));
     }
 
@@ -2323,7 +2309,7 @@ mod tests {
         let child_process = result.unwrap();
         let future = child_process(&mut env, Box::new(|_env| Box::pin(async {})));
         let pid = executor.run_until(future);
-        assert_eq!(pid, Pid::from_raw(3));
+        assert_eq!(pid, Pid(3));
     }
 
     #[test]
@@ -2469,17 +2455,17 @@ mod tests {
     #[test]
     fn wait_without_child() {
         let mut system = VirtualSystem::new();
-        let result = system.wait(Pid::from_raw(-1));
+        let result = system.wait(Pid::ALL);
         assert_eq!(result, Err(Errno::ECHILD));
         // TODO
-        // let result = system.wait(Pid::from_raw(0));
+        // let result = system.wait(Pid::MY_PROCESS_GROUP);
         // assert_eq!(result, Err(Errno::ECHILD));
         let result = system.wait(system.process_id);
         assert_eq!(result, Err(Errno::ECHILD));
-        let result = system.wait(Pid::from_raw(1234));
+        let result = system.wait(Pid(1234));
         assert_eq!(result, Err(Errno::ECHILD));
         // TODO
-        // let result = system.wait(Pid::from_raw(-1234));
+        // let result = system.wait(Pid(-1234));
         // assert_eq!(result, Err(Errno::ECHILD));
     }
 

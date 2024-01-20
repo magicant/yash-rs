@@ -168,7 +168,7 @@ where
         let keeps_stopper_handlers = job_control.is_none();
 
         // Define the child process task
-        const ME: Pid = Pid::from_raw(0);
+        const ME: Pid = Pid(0);
         let task: ChildProcessTask = Box::new(move |env| {
             Box::pin(async move {
                 let mut env = env.push_frame(Frame::Subshell);
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn jobs_disowned_in_subshell() {
         in_virtual_system(|mut env, _state| async move {
-            let index = env.jobs.add(Job::new(Pid::from_raw(123)));
+            let index = env.jobs.add(Job::new(Pid(123)));
             let subshell = Subshell::new(move |env, _job_control| {
                 Box::pin(async move {
                     assert!(!env.jobs.get(index).unwrap().is_owned);

@@ -212,7 +212,7 @@ fn suspend_builtin_main(
 ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
     Box::pin(async move {
         env.system
-            .kill(Pid::from_raw(0), Some(Signal::SIGSTOP))
+            .kill(Pid(0), Some(Signal::SIGSTOP))
             .await
             .unwrap();
         yash_env::builtin::Result::default()

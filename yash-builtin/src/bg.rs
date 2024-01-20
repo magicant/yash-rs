@@ -94,7 +94,6 @@ use yash_env::job::id::FindError;
 use yash_env::job::id::ParseError;
 #[cfg(doc)]
 use yash_env::job::JobSet;
-use yash_env::job::Pid;
 use yash_env::job::ProcessState;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
@@ -175,7 +174,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<(), ResumeEr
     drop(line);
 
     if job.state.is_alive() {
-        let pgid = Pid::from_raw(-job.pid.as_raw());
+        let pgid = -job.pid;
         env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
         // We've just reported that the job is resumed, so there is no need to
@@ -238,6 +237,7 @@ mod tests {
     use crate::tests::assert_stdout;
     use futures_util::FutureExt as _;
     use yash_env::job::Job;
+    use yash_env::job::Pid;
     use yash_env::job::ProcessState;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::r#virtual::Process;
@@ -247,9 +247,9 @@ mod tests {
     fn resume_job_by_index_sends_sigcont() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pgid = Pid::from_raw(123);
-        let child_id = Pid::from_raw(124);
-        let orphan_id = Pid::from_raw(456);
+        let pgid = Pid(123);
+        let child_id = Pid(124);
+        let orphan_id = Pid(456);
         let mut job = Job::new(pgid);
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
@@ -290,7 +290,7 @@ mod tests {
     fn resume_job_by_index_prints_job_name() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let mut job = Job::new(Pid::from_raw(123));
+        let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "echo my job".into();
         let index = env.jobs.add(job);
@@ -307,7 +307,7 @@ mod tests {
     fn resume_job_by_index_sets_expected_state() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pid = Pid::from_raw(123);
+        let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
         let index = env.jobs.add(job);
@@ -328,8 +328,8 @@ mod tests {
     fn resume_job_by_index_makes_target_current_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pgid = Pid::from_raw(123);
-        let orphan_id = Pid::from_raw(456);
+        let pgid = Pid(123);
+        let orphan_id = Pid(456);
         let mut job = Job::new(pgid);
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
@@ -359,7 +359,7 @@ mod tests {
     fn resume_job_by_index_sends_no_sigcont_to_dead_process() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pid = Pid::from_raw(123);
+        let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
         job.state = ProcessState::Exited(ExitStatus::SUCCESS);
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_rejects_unowned_job() {
         let mut env = Env::new_virtual();
-        let mut job = Job::new(Pid::from_raw(123));
+        let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
         let index = env.jobs.add(job);
@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn resume_job_by_index_rejects_unmonitored_job() {
         let mut env = Env::new_virtual();
-        let index = env.jobs.add(Job::new(Pid::from_raw(123)));
+        let index = env.jobs.add(Job::new(Pid(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unmonitored));
@@ -410,8 +410,8 @@ mod tests {
     fn main_without_operands_resumes_current_job() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pgid = Pid::from_raw(100);
-        let orphan_id = Pid::from_raw(200);
+        let pgid = Pid(100);
+        let orphan_id = Pid(200);
         let mut job = Job::new(pgid);
         let mut orphan = Job::new(orphan_id);
         job.job_controlled = true;
@@ -461,9 +461,9 @@ mod tests {
     fn main_with_operands_resumes_specified_jobs() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pgid1 = Pid::from_raw(100);
-        let pgid2 = Pid::from_raw(200);
-        let pgid3 = Pid::from_raw(300);
+        let pgid1 = Pid(100);
+        let pgid2 = Pid(200);
+        let pgid3 = Pid(300);
         let mut job1 = Job::new(pgid1);
         let mut job2 = Job::new(pgid2);
         let mut job3 = Job::new(pgid3);
@@ -511,7 +511,7 @@ mod tests {
         // remaining operands.
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pgid = Pid::from_raw(100);
+        let pgid = Pid(100);
         let mut job = Job::new(pgid);
         job.job_controlled = true;
         let index = env.jobs.add(job);

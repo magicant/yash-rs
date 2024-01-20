@@ -374,7 +374,7 @@ impl Env {
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
     pub fn update_all_subshell_statuses(&mut self) {
-        while let Ok(Some((pid, state))) = self.system.wait(Pid::from_raw(-1)) {
+        while let Ok(Some((pid, state))) = self.system.wait(Pid::ALL) {
             self.jobs.update_status(pid, state);
         }
     }
@@ -629,7 +629,7 @@ mod tests {
         system.state.borrow_mut().executor = Some(Rc::new(executor.spawner()));
         let mut env = Env::with_system(Box::new(system));
         executor.run_until(async move {
-            let result = env.wait_for_subshell(Pid::from_raw(-1)).await;
+            let result = env.wait_for_subshell(Pid::ALL).await;
             assert_eq!(result, Err(Errno::ECHILD));
         });
     }

@@ -194,7 +194,7 @@ mod tests {
         let result = resolve(Name::Special('$'), &env, &loc);
         assert_eq!(result, Expansion::Scalar("2".into()));
 
-        env.main_pid = Pid::from_raw(12345);
+        env.main_pid = Pid(12345);
         let result = resolve(Name::Special('$'), &env, &loc);
         assert_eq!(result, Expansion::Scalar("12345".into()));
     }
@@ -206,7 +206,7 @@ mod tests {
         let result = resolve(Name::Special('!'), &env, &loc);
         assert_eq!(result, Expansion::Scalar("0".into()));
 
-        env.jobs.set_last_async_pid(Pid::from_raw(72));
+        env.jobs.set_last_async_pid(Pid(72));
         let result = resolve(Name::Special('!'), &env, &loc);
         assert_eq!(result, Expansion::Scalar("72".into()));
     }

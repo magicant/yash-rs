@@ -144,7 +144,7 @@ async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState
     // SIGCONT signal, or the job may be immediately re-suspended.
     env.system.tcsetpgrp_without_block(tty, job.pid)?;
 
-    let pgid = Pid::from_raw(-job.pid.as_raw());
+    let pgid = -job.pid;
     env.system.kill(pgid, Signal::SIGCONT.into()).await?;
 
     // Wait for the job to finish (or suspend again).
@@ -371,7 +371,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system.clone()));
-        let pid = Pid::from_raw(123);
+        let pid = Pid(123);
         let mut job = Job::new(pid);
         job.job_controlled = true;
         job.state = ProcessState::Exited(ExitStatus(0));
@@ -402,7 +402,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let mut job = Job::new(Pid::from_raw(123));
+        let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
         let index = env.jobs.add(job);
@@ -416,7 +416,7 @@ mod tests {
         let system = VirtualSystem::new();
         stub_tty(&system.state);
         let mut env = Env::with_system(Box::new(system));
-        let index = env.jobs.add(Job::new(Pid::from_raw(123)));
+        let index = env.jobs.add(Job::new(Pid(123)));
 
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
         assert_eq!(result, Err(ResumeError::Unmonitored));
@@ -532,7 +532,7 @@ mod tests {
     fn main_with_operand_fails_if_jobs_is_not_found() {
         let system = VirtualSystem::new();
         let mut env = Env::with_system(Box::new(system.clone()));
-        let mut job = Job::new(Pid::from_raw(123));
+        let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.name = "foo".to_string();
         env.jobs.add(job);

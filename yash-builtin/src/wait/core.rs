@@ -65,7 +65,7 @@ pub async fn wait_for_any_job_or_trap(env: &mut Env) -> Result<(), Error> {
     loop {
         // Poll for a job state change. Note that this `wait` call returns
         // immediately regardless of whether there is a new job state.
-        match env.system.wait(Pid::from_raw(-1)) {
+        match env.system.wait(Pid::ALL) {
             Ok(None) => {
                 // The current process has child processes, but none of them has
                 // changed its state. Wait for a signal.

@@ -41,7 +41,7 @@
 //! ```
 //! use yash_env::job::{Job, Pid};
 //! use yash_env::job::fmt::{Marker, Report};
-//! let mut job = Job::new(Pid::from_raw(123));
+//! let mut job = Job::new(Pid(123));
 //! job.name = "sleep 10".to_string();
 //! let report = Report {
 //!     index: 2,
@@ -245,7 +245,7 @@ mod tests {
     fn report_standard() {
         let index = 0;
         let marker = Marker::CurrentJob;
-        let job = &mut Job::new(Pid::from_raw(42));
+        let job = &mut Job::new(Pid(42));
         job.name = "echo ok".to_string();
         let report = Report { index, marker, job };
         assert_eq!(report.to_string(), "[1] + Running              echo ok");
@@ -282,7 +282,7 @@ mod tests {
     fn report_alternate() {
         let index = 0;
         let marker = Marker::CurrentJob;
-        let job = &mut Job::new(Pid::from_raw(42));
+        let job = &mut Job::new(Pid(42));
         job.name = "echo ok".to_string();
         let report = Report { index, marker, job };
         assert_eq!(
@@ -290,7 +290,7 @@ mod tests {
             "[1] +    42 Running              echo ok"
         );
 
-        job.pid = Pid::from_raw(123456);
+        job.pid = Pid(123456);
         let report = Report { index, marker, job };
         assert_eq!(
             format!("{report:#}"),

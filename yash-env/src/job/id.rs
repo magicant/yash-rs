@@ -219,15 +219,15 @@ mod tests {
     fn sample_job_set() -> JobSet {
         let mut set = JobSet::default();
 
-        let mut job = Job::new(Pid::from_raw(10));
+        let mut job = Job::new(Pid(10));
         job.name = "first job".to_string();
         set.add(job);
 
-        let mut job = Job::new(Pid::from_raw(11));
+        let mut job = Job::new(Pid(11));
         job.name = "job 2".to_string();
         set.add(job);
 
-        let mut job = Job::new(Pid::from_raw(12));
+        let mut job = Job::new(Pid(12));
         job.name = "last one".to_string();
         set.add(job);
 
@@ -325,7 +325,7 @@ mod tests {
     fn find_ambiguous_prefix() {
         let mut set = sample_job_set();
 
-        let mut job = Job::new(Pid::from_raw(20));
+        let mut job = Job::new(Pid(20));
         job.name = "job 3".to_string();
         set.add(job);
 

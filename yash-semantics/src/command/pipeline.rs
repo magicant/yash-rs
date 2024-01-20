@@ -568,7 +568,7 @@ mod tests {
             env: &mut Env,
             _args: Vec<Field>,
         ) -> Pin<Box<dyn Future<Output = yash_env::builtin::Result> + '_>> {
-            let pgid = env.system.getpgrp().as_raw() as _;
+            let pgid = env.system.getpgrp().0 as _;
             Box::pin(async move { yash_env::builtin::Result::new(ExitStatus(pgid)) })
         }
 
@@ -587,7 +587,7 @@ mod tests {
             let pipeline: syntax::Pipeline = "foo | foo".parse().unwrap();
             let result = pipeline.execute(&mut env).await;
             assert_eq!(result, Continue(()));
-            assert_ne!(env.exit_status, ExitStatus(env.main_pgid.as_raw() as _));
+            assert_ne!(env.exit_status, ExitStatus(env.main_pgid.0 as _));
 
             // The shell should come back to the foreground after running the pipeline
             assert_eq!(state.borrow().foreground, Some(env.main_pgid));
