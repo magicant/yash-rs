@@ -23,7 +23,7 @@ use super::Phrase;
 use crate::expansion::attr::Origin;
 use crate::expansion::attr_strip::Strip;
 use crate::expansion::expand_word;
-use crate::expansion::initial::expand;
+use crate::expansion::initial::Expand as _;
 use crate::expansion::quote_removal::skip_quotes;
 use crate::expansion::AssignReadOnlyError;
 use crate::expansion::ErrorCause;
@@ -183,7 +183,7 @@ async fn assign(
             return Err(Error { cause, location });
         }
     };
-    let value_phrase = attribute(expand(env, value).await?);
+    let value_phrase = attribute(value.expand(env).await?);
     let joined_value = value_phrase.clone().ifs_join(&env.inner.variables);
     let final_value = skip_quotes(joined_value).strip().collect::<String>();
     env.inner
@@ -249,7 +249,7 @@ pub async fn apply(
     let cond = ValueCondition::with(switch.condition, ValueState::of(&*value));
     match (switch.r#type, cond) {
         (Alter, Unset(_)) | (Default, Set) | (Assign, Set) | (Error, Set) => None,
-        (Alter, Set) | (Default, Unset(_)) => Some(expand(env, &switch.word).await.map(attribute)),
+        (Alter, Set) | (Default, Unset(_)) => Some(switch.word.expand(env).await.map(attribute)),
         (Assign, Unset(_)) => Some(assign(env, name, &switch.word, location.clone()).await),
         (Error, Unset(state)) => Some(Err(empty_expansion_error(
             env,

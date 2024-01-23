@@ -108,16 +108,14 @@ pub trait Expand {
         env: &mut Env<'_>,
         interim: Self::Interim,
     ) -> Result<Phrase, Error>;
-}
 
-/// Performs initial expansion.
-///
-/// This is a convenience function that calls [`Expand`]'s methods to obtain an
-/// expansion result.
-pub async fn expand<E: Expand>(env: &mut Env<'_>, e: &E) -> Result<Phrase, Error> {
-    match e.quick_expand(env) {
-        QuickExpand::Ready(result) => result,
-        QuickExpand::Interim(interim) => e.async_expand(env, interim).await,
+    /// Performs initial expansion.
+    #[allow(async_fn_in_trait)] // We don't support Send
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+        match self.quick_expand(env) {
+            QuickExpand::Ready(result) => result,
+            QuickExpand::Interim(interim) => self.async_expand(env, interim).await,
+        }
     }
 }
 
