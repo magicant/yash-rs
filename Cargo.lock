@@ -476,7 +476,6 @@ name = "yash"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
- "async-trait",
  "futures-executor",
  "futures-util",
  "fuzed-iterator",
@@ -504,7 +503,6 @@ name = "yash-builtin"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
- "async-trait",
  "either",
  "futures-executor",
  "futures-util",
