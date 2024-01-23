@@ -18,6 +18,7 @@ publish = false
 [dependencies]
 assert_matches = "1.5.0"
 async-trait = "0.1.73"
+futures-util = "0.3.28"
 itertools = "0.11.0"
 thiserror = "1.0.47"
 yash-arith = { path = "../yash-arith", version = "0.2.1" }

@@ -24,18 +24,18 @@ mod pipeline;
 pub mod simple_command;
 
 use crate::trap::run_traps_for_caught_signals;
-use async_trait::async_trait;
+use futures_util::FutureExt as _;
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::semantics::Result;
 use yash_env::Env;
 use yash_syntax::syntax;
 
 /// Syntactic construct that can be executed.
-#[async_trait(?Send)]
 pub trait Command {
     /// Executes this command.
     ///
     /// TODO Elaborate: The exit status must be updated during execution.
+    #[allow(async_fn_in_trait)] // We don't support Send
     async fn execute(&self, env: &mut Env) -> Result;
 }
 
@@ -44,7 +44,6 @@ pub trait Command {
 /// After executing the command body, the `execute` function [runs
 /// traps](run_traps_for_caught_signals) if any caught signals are pending, and
 /// [updates subshell statuses](Env::update_all_subshell_statuses).
-#[async_trait(?Send)]
 impl Command for syntax::Command {
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::Command::*;
@@ -70,13 +69,16 @@ impl Command for syntax::Command {
 /// The list is executed by executing each item in sequence. If any item results
 /// in a [`Divert`](yash_env::semantics::Divert), the remaining items are not
 /// executed.
-#[async_trait(?Send)]
 impl Command for syntax::List {
     async fn execute(&self, env: &mut Env) -> Result {
-        for item in &self.0 {
-            item.execute(env).await?
+        async move {
+            for item in &self.0 {
+                item.execute(env).await?
+            }
+            Continue(())
         }
-        Continue(())
+        .boxed_local() // Boxing needed for recursion
+        .await
     }
 }
 

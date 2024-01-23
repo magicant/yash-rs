@@ -17,7 +17,6 @@
 //! Implementation of pipeline semantics.
 
 use super::Command;
-use async_trait::async_trait;
 use itertools::Itertools;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
@@ -75,7 +74,6 @@ use yash_syntax::syntax;
 ///
 /// if `self.negation` is true, [`Frame::Condition`] is pushed to the
 /// environment's stack while the pipeline is executed.
-#[async_trait(?Send)]
 impl Command for syntax::Pipeline {
     async fn execute(&self, env: &mut Env) -> Result {
         if env.options.get(Exec) == Off {

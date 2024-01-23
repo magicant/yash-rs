@@ -20,7 +20,6 @@ use crate::command::Command;
 use crate::expansion::expand_word;
 use crate::expansion::Field;
 use crate::Handle;
-use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use std::rc::Rc;
 use yash_env::function::Function;
@@ -39,7 +38,6 @@ use yash_syntax::syntax;
 /// execution ends with an exit status of zero.
 ///
 /// The `ErrExit` shell option is [applied](Env::apply_errexit) on error.
-#[async_trait(?Send)]
 impl Command for syntax::FunctionDefinition {
     async fn execute(&self, env: &mut Env) -> Result {
         define_function(env, self).await?;

@@ -17,7 +17,6 @@
 //! Implementation of the and-or list semantics.
 
 use super::Command;
-use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::Result;
 use yash_env::stack::Frame;
@@ -39,7 +38,6 @@ use yash_syntax::syntax::Pipeline;
 ///
 /// [`Frame::Condition`] is pushed to the environment's stack while the
 /// execution of the pipelines except for the last.
-#[async_trait(?Send)]
 impl Command for AndOrList {
     async fn execute(&self, env: &mut Env) -> Result {
         if self.rest.is_empty() {
