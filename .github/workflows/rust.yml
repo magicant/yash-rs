@@ -19,6 +19,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
+    - name: Build
+      run: cargo build
     - name: Run basic tests
       run: ./check.sh -v
   clippy:
