@@ -16,7 +16,6 @@ categories = ["command-line-utilities"]
 publish = false
 
 [dependencies]
-annotate-snippets = "0.10.0"
 async-trait = "0.1.73"
 futures-executor = "0.3.28"
 futures-util = { version = "0.3.28", features = ["channel"] }

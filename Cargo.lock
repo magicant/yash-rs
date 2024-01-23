@@ -475,7 +475,6 @@ checksum = "dff9641d1cd4be8d1a070daf9e3773c5f67e78b4d9d42263020c057706765c04"
 name = "yash"
 version = "0.1.0"
 dependencies = [
- "annotate-snippets",
  "assert_matches",
  "async-trait",
  "futures-executor",
