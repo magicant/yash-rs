@@ -151,6 +151,65 @@ impl Expand for TextUnit {
             }
         }
     }
+
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+        match self {
+            &Literal(value) => Ok(Phrase::Char(AttrChar {
+                value,
+                origin: Origin::Literal,
+                is_quoted: false,
+                is_quoting: false,
+            })),
+
+            &Backslashed(value) => {
+                let bs = AttrChar {
+                    value: '\\',
+                    origin: Origin::Literal,
+                    is_quoted: false,
+                    is_quoting: true,
+                };
+                let c = AttrChar {
+                    value,
+                    origin: Origin::Literal,
+                    is_quoted: true,
+                    is_quoting: false,
+                };
+                Ok(Phrase::Field(vec![bs, c]))
+            }
+
+            RawParam { name, location } => {
+                let modifier = &yash_syntax::syntax::Modifier::None;
+                let param = ParamRef {
+                    name,
+                    modifier,
+                    location,
+                };
+                param.expand(env).boxed_local().await // Boxing needed for recursion
+            }
+
+            BracedParam(param) => {
+                ParamRef::from(param).expand(env).boxed_local().await // Boxing needed for recursion
+            }
+
+            CommandSubst { content, location } => {
+                let command = content.clone();
+                let location = location.clone();
+                super::command_subst::expand(command, location, env).await
+            }
+
+            Backquote { content, location } => {
+                let command = content.unquote().0;
+                let location = location.clone();
+                super::command_subst::expand(command, location, env).await
+            }
+
+            Arith { content, location } => {
+                super::arith::expand(content, location, env)
+                    .boxed_local() // Boxing needed for recursion
+                    .await
+            }
+        }
+    }
 }
 
 /// Expands a text.
@@ -172,6 +231,10 @@ impl Expand for Text {
     ) -> Result<Phrase, Error> {
         self.0.async_expand(env, interim).await
     }
+
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+        self.0.expand(env).await
+    }
 }
 
 #[cfg(test)]
@@ -179,7 +242,6 @@ mod tests {
     use super::*;
     use crate::tests::echo_builtin;
     use crate::tests::in_virtual_system;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_env::variable::Scope;
     use yash_syntax::source::Location;
@@ -190,36 +252,36 @@ mod tests {
     fn literal() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        assert_matches!(Literal('L').quick_expand(&mut env), Ready(result) => {
-            let c = AttrChar {
-                value: 'L',
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: false,
-            };
-            assert_eq!(result, Ok(Phrase::Char(c)));
-        });
+        let result = Literal('L').expand(&mut env).now_or_never().unwrap();
+
+        let c = AttrChar {
+            value: 'L',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
     }
 
     #[test]
     fn backslashed() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
-        assert_matches!(Backslashed('L').quick_expand(&mut env), Ready(result) => {
-            let bs = AttrChar {
-                value: '\\',
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: true,
-            };
-            let c = AttrChar {
-                value: 'L',
-                origin: Origin::Literal,
-                is_quoted: true,
-                is_quoting: false,
-            };
-            assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
-        });
+        let result = Backslashed('L').expand(&mut env).now_or_never().unwrap();
+
+        let bs = AttrChar {
+            value: '\\',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: true,
+        };
+        let c = AttrChar {
+            value: 'L',
+            origin: Origin::Literal,
+            is_quoted: true,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Field(vec![bs, c])));
     }
 
     #[test]
@@ -233,8 +295,8 @@ mod tests {
         let name = "foo".to_string();
         let location = Location::dummy("");
         let param = RawParam { name, location };
-        assert_matches!(param.quick_expand(&mut env), Interim(()));
-        let result = param.async_expand(&mut env, ()).now_or_never().unwrap();
+        let result = param.expand(&mut env).now_or_never().unwrap();
+
         let c = AttrChar {
             value: 'x',
             origin: Origin::SoftExpansion,
@@ -257,8 +319,8 @@ mod tests {
             modifier: Modifier::None,
             location: Location::dummy(""),
         });
-        assert_matches!(param.quick_expand(&mut env), Interim(()));
-        let result = param.async_expand(&mut env, ()).now_or_never().unwrap();
+        let result = param.expand(&mut env).now_or_never().unwrap();
+
         let c = AttrChar {
             value: 'x',
             origin: Origin::SoftExpansion,
@@ -277,8 +339,8 @@ mod tests {
                 content: "echo .".into(),
                 location: Location::dummy(""),
             };
-            assert_matches!(subst.quick_expand(&mut env), Interim(()));
-            let result = subst.async_expand(&mut env, ()).await;
+            let result = subst.expand(&mut env).await;
+
             let c = AttrChar {
                 value: '.',
                 origin: Origin::SoftExpansion,
@@ -307,8 +369,8 @@ mod tests {
                 ],
                 location: Location::dummy(""),
             };
-            assert_matches!(subst.quick_expand(&mut env), Interim(()));
-            let result = subst.async_expand(&mut env, ()).await;
+            let result = subst.expand(&mut env).await;
+
             let c = AttrChar {
                 value: '\\',
                 origin: Origin::SoftExpansion,
@@ -327,8 +389,8 @@ mod tests {
             content: "1+2*3".parse().unwrap(),
             location: Location::dummy(""),
         };
-        assert_matches!(arith.quick_expand(&mut env), Interim(()));
-        let result = arith.async_expand(&mut env, ()).now_or_never().unwrap();
+        let result = arith.expand(&mut env).now_or_never().unwrap();
+
         let c = AttrChar {
             value: '7',
             origin: Origin::SoftExpansion,
