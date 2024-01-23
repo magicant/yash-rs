@@ -127,6 +127,23 @@ impl Expand for WordUnit {
             Tilde(_name) => unimplemented!("async_expand not expecting Tilde"),
         }
     }
+
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+        match self {
+            Unquoted(text_unit) => text_unit.expand(env).await,
+            SingleQuote(value) => Ok(expand_single_quote(value)),
+            DoubleQuote(text) => {
+                let would_split = std::mem::replace(&mut env.will_split, false);
+                let result = text.expand(env).await;
+                env.will_split = would_split;
+
+                let mut phrase = result?;
+                double_quote(&mut phrase);
+                Ok(phrase)
+            }
+            Tilde(name) => Ok(super::tilde::expand(name, env.inner).into()),
+        }
+    }
 }
 
 /// Expands a word.
