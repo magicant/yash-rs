@@ -20,15 +20,6 @@ use super::super::Error;
 use super::Env;
 use super::Expand;
 use super::Phrase;
-use super::QuickExpand::{self, Interim, Ready};
-use std::fmt::Debug;
-
-#[derive(Debug)]
-pub struct SliceExpandInterim<T: Debug> {
-    phrase: Phrase,
-    index: usize,
-    item_interim: T,
-}
 
 /// Expands a slice of expandable items.
 ///
@@ -39,57 +30,6 @@ pub struct SliceExpandInterim<T: Debug> {
 /// If the slice has no item, the result is [one empty
 /// field](Phrase::one_empty_field).
 impl<T: Expand> Expand for [T] {
-    type Interim = SliceExpandInterim<<T as Expand>::Interim>;
-
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim> {
-        if self.is_empty() {
-            return Ready(Ok(Phrase::one_empty_field()));
-        }
-
-        let mut phrase = Phrase::zero_fields();
-        for (index, item) in self.iter().enumerate() {
-            match item.quick_expand(env) {
-                Ready(Ok(item_phrase)) => phrase += item_phrase,
-                Ready(Err(error)) => return Ready(Err(error)),
-                Interim(item_interim) => {
-                    return Interim(SliceExpandInterim {
-                        phrase,
-                        index,
-                        item_interim,
-                    })
-                }
-            }
-        }
-        Ready(Ok(phrase))
-    }
-
-    async fn async_expand(
-        &self,
-        env: &mut Env<'_>,
-        interim: Self::Interim,
-    ) -> Result<Phrase, Error> {
-        let SliceExpandInterim {
-            mut phrase,
-            index,
-            item_interim,
-        } = interim;
-
-        let mut iter = self[index..].iter();
-        let item = iter
-            .next()
-            .expect("quick_expand and async_expand should be called on the same slice");
-        phrase += item.async_expand(env, item_interim).await?;
-
-        for item in iter {
-            match item.quick_expand(env) {
-                Ready(Ok(item_phrase)) => phrase += item_phrase,
-                Ready(Err(error)) => return Err(error),
-                Interim(item_interim) => phrase += item.async_expand(env, item_interim).await?,
-            }
-        }
-        Ok(phrase)
-    }
-
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         if self.is_empty() {
             return Ok(Phrase::one_empty_field());
@@ -130,8 +70,6 @@ mod tests {
     }
 
     impl Expand for Stub {
-        type Interim = ();
-
         async fn expand(&self, _: &mut Env<'_>) -> Result<Phrase, Error> {
             self.0.take().expect("expand should be called only once")
         }

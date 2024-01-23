@@ -22,7 +22,6 @@ use super::super::Error;
 use super::Env;
 use super::Expand;
 use super::Phrase;
-use super::QuickExpand::{self, Interim, Ready};
 use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit::{self, *};
 
@@ -99,35 +98,6 @@ fn double_quote(phrase: &mut Phrase) {
 ///
 /// TODO: `~+`, `~-`, `~+n`, `~-n`
 impl Expand for WordUnit {
-    type Interim = ();
-
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<()> {
-        match self {
-            Unquoted(text_unit) => text_unit.quick_expand(env),
-            SingleQuote(value) => Ready(Ok(expand_single_quote(value))),
-            // TODO Can we call text.quick_expand here?
-            DoubleQuote(_text) => Interim(()),
-            Tilde(name) => Ready(Ok(super::tilde::expand(name, env.inner).into())),
-        }
-    }
-
-    async fn async_expand(&self, env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
-        match self {
-            Unquoted(text_unit) => text_unit.async_expand(env, ()).await,
-            SingleQuote(_value) => unimplemented!("async_expand not expecting SingleQuote"),
-            DoubleQuote(text) => {
-                let would_split = std::mem::replace(&mut env.will_split, false);
-                let result = text.expand(env).await;
-                env.will_split = would_split;
-
-                let mut phrase = result?;
-                double_quote(&mut phrase);
-                Ok(phrase)
-            }
-            Tilde(_name) => unimplemented!("async_expand not expecting Tilde"),
-        }
-    }
-
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         match self {
             Unquoted(text_unit) => text_unit.expand(env).await,
@@ -150,8 +120,6 @@ impl Expand for WordUnit {
 ///
 /// This implementation delegates to `[WordUnit] as Expand`.
 impl Expand for Word {
-    type Interim = <[WordUnit] as Expand>::Interim;
-
     #[inline]
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         self.units.expand(env).await

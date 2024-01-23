@@ -23,7 +23,6 @@ use super::param::ParamRef;
 use super::Env;
 use super::Expand;
 use super::Phrase;
-use super::QuickExpand::{self, Interim, Ready};
 use futures_util::FutureExt;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
@@ -80,78 +79,6 @@ use yash_syntax::syntax::Unquote;
 ///
 /// TODO Elaborate on index and modifiers
 impl Expand for TextUnit {
-    type Interim = ();
-
-    fn quick_expand(&self, _env: &mut Env<'_>) -> QuickExpand<()> {
-        match self {
-            &Literal(value) => Ready(Ok(Phrase::Char(AttrChar {
-                value,
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: false,
-            }))),
-            &Backslashed(value) => Ready(Ok(Phrase::Field(vec![
-                AttrChar {
-                    value: '\\',
-                    origin: Origin::Literal,
-                    is_quoted: false,
-                    is_quoting: true,
-                },
-                AttrChar {
-                    value,
-                    origin: Origin::Literal,
-                    is_quoted: true,
-                    is_quoting: false,
-                },
-            ]))),
-            RawParam { .. }
-            | BracedParam(_)
-            | CommandSubst { .. }
-            | Backquote { .. }
-            | Arith { .. } => Interim(()),
-        }
-    }
-
-    async fn async_expand(&self, env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
-        match self {
-            Literal(_) => unimplemented!("async_expand not expecting Literal"),
-
-            Backslashed(_) => unimplemented!("async_expand not expecting Backslashed"),
-
-            RawParam { name, location } => {
-                let modifier = &yash_syntax::syntax::Modifier::None;
-                let param = ParamRef {
-                    name,
-                    modifier,
-                    location,
-                };
-                param.expand(env).boxed_local().await // Boxing needed for recursion
-            }
-
-            BracedParam(param) => {
-                ParamRef::from(param).expand(env).boxed_local().await // Boxing needed for recursion
-            }
-
-            CommandSubst { content, location } => {
-                let command = content.clone();
-                let location = location.clone();
-                super::command_subst::expand(command, location, env).await
-            }
-
-            Backquote { content, location } => {
-                let command = content.unquote().0;
-                let location = location.clone();
-                super::command_subst::expand(command, location, env).await
-            }
-
-            Arith { content, location } => {
-                super::arith::expand(content, location, env)
-                    .boxed_local() // Boxing needed for recursion
-                    .await
-            }
-        }
-    }
-
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         match self {
             &Literal(value) => Ok(Phrase::Char(AttrChar {
@@ -216,22 +143,6 @@ impl Expand for TextUnit {
 ///
 /// This implementation delegates to `[TextUnit] as Expand`.
 impl Expand for Text {
-    type Interim = <[TextUnit] as Expand>::Interim;
-
-    #[inline]
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim> {
-        self.0.quick_expand(env)
-    }
-
-    #[inline]
-    async fn async_expand(
-        &self,
-        env: &mut Env<'_>,
-        interim: Self::Interim,
-    ) -> Result<Phrase, Error> {
-        self.0.async_expand(env, interim).await
-    }
-
     async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         self.0.expand(env).await
     }

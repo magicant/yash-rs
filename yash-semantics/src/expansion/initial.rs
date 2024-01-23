@@ -59,64 +59,15 @@ impl<'a> Env<'a> {
     }
 }
 
-/// Return value of [`Expand::quick_expand`].
-#[derive(Debug)]
-pub enum QuickExpand<T: Debug> {
-    /// Variant returned if the expansion is complete.
-    Ready(Result<Phrase, Error>),
-    /// Variant returned if the expansion needs to be resumed.
-    Interim(T),
-}
-
 /// Syntactic construct that can be subjected to the word expansion.
 ///
 /// Syntactic elements like [`TextUnit`](yash_syntax::syntax::TextUnit) and
-/// [`Word`](yash_syntax::syntax::Word) implement this trait to expand
-/// themselves to a [`Phrase`].
-///
-/// This trait defines two functions. You first call
-/// [`quick_expand`](Self::quick_expand) to start the expansion. It immediately
-/// returns the result as `QuickExpand::Ready(_)` if it completes without any
-/// asynchronous operation (either successfully or in failure). If the expansion
-/// requires an asynchronous computation, `quick_expand` returns
-/// `QuickExpand::Interim(_)` containing interim data. You continue the
-/// expansion by passing the data to [`async_expand`](Self::async_expand), which
-/// produces a future that will yield the final result. This two-step procedure
-/// works around a limitation imposed by the current Rust compiler
-/// (cf. [#68117](https://github.com/rust-lang/rust/issues/68117)).
+/// [`Word`](yash_syntax::syntax::Word) implement this trait to
+/// [`expand`](Self::expand) themselves to a [`Phrase`].
 pub trait Expand {
-    /// Data passed from [`quick_expand`](Self::quick_expand) to
-    /// [`async_expand`](Self::async_expand).
-    type Interim: Debug;
-
-    /// Starts the initial expansion.
-    ///
-    /// If the expansion completes without an asynchronous operation, the result
-    /// is returned in `QuickExpand::Ready(_)`. Otherwise, the result is
-    /// `QuickExpand::Interim(_)` containing interim data that should be passed
-    /// to [`async_expand`](Self::async_expand).
-    fn quick_expand(&self, _: &mut Env<'_>) -> QuickExpand<Self::Interim> {
-        todo!("remove this function")
-    }
-
-    /// Continues the initial expansion.
-    ///
-    /// You should call this function if [`quick_expand`](Self::quick_expand)
-    /// returns `Err(interim)`. This function returns a boxed future that will
-    /// produce a final result.
-    #[allow(async_fn_in_trait)] // We don't support Send
-    async fn async_expand(&self, _: &mut Env<'_>, _: Self::Interim) -> Result<Phrase, Error> {
-        todo!("remove this function")
-    }
-
     /// Performs initial expansion.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
-        match self.quick_expand(env) {
-            QuickExpand::Ready(result) => result,
-            QuickExpand::Interim(interim) => self.async_expand(env, interim).await,
-        }
-    }
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error>;
 }
 
 mod arith;
