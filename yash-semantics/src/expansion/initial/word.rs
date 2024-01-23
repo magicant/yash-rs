@@ -136,17 +136,8 @@ impl Expand for Word {
     type Interim = <[WordUnit] as Expand>::Interim;
 
     #[inline]
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim> {
-        self.units.quick_expand(env)
-    }
-
-    #[inline]
-    async fn async_expand(
-        &self,
-        env: &mut Env<'_>,
-        interim: Self::Interim,
-    ) -> Result<Phrase, Error> {
-        self.units.async_expand(env, interim).await
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+        self.units.expand(env).await
     }
 }
 
@@ -155,7 +146,6 @@ mod tests {
     use super::super::param::tests::env_with_positional_params_and_ifs;
     use super::super::param::tests::param;
     use super::*;
-    use assert_matches::assert_matches;
     use futures_util::FutureExt;
     use yash_syntax::syntax::Text;
     use yash_syntax::syntax::TextUnit;
@@ -251,15 +241,15 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let unit: WordUnit = "x".parse().unwrap();
-        assert_matches!(unit.quick_expand(&mut env), Ready(result) => {
-            let c = AttrChar {
-                value: 'x',
-                origin: Origin::Literal,
-                is_quoted: false,
-                is_quoting: false,
-            };
-            assert_eq!(result, Ok(Phrase::Char(c)));
-        });
+        let result = unit.expand(&mut env).now_or_never().unwrap();
+
+        let c = AttrChar {
+            value: 'x',
+            origin: Origin::Literal,
+            is_quoted: false,
+            is_quoting: false,
+        };
+        assert_eq!(result, Ok(Phrase::Char(c)));
     }
 
     #[test]
@@ -294,12 +284,12 @@ mod tests {
     }
 
     #[test]
-    fn async_double_quote() {
+    fn expand_double_quote() {
         let mut env = yash_env::Env::new_virtual();
         let mut env = Env::new(&mut env);
         let unit = DoubleQuote(Text(vec![TextUnit::Literal('X')]));
-        assert_matches!(unit.quick_expand(&mut env), Interim(()));
-        let result = unit.async_expand(&mut env, ()).now_or_never().unwrap();
+        let result = unit.expand(&mut env).now_or_never().unwrap();
+
         let quote = AttrChar {
             value: '"',
             origin: Origin::Literal,
@@ -320,8 +310,7 @@ mod tests {
         let mut env = env_with_positional_params_and_ifs();
         let mut env = Env::new(&mut env);
         let unit = DoubleQuote(Text(vec![TextUnit::BracedParam(param("*"))]));
-        assert_matches!(unit.quick_expand(&mut env), Interim(()));
-        let result = unit.async_expand(&mut env, ()).now_or_never().unwrap();
+        let result = unit.expand(&mut env).now_or_never().unwrap();
 
         assert!(env.will_split);
         let quote = AttrChar {

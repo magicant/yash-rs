@@ -95,7 +95,9 @@ pub trait Expand {
     /// is returned in `QuickExpand::Ready(_)`. Otherwise, the result is
     /// `QuickExpand::Interim(_)` containing interim data that should be passed
     /// to [`async_expand`](Self::async_expand).
-    fn quick_expand(&self, env: &mut Env<'_>) -> QuickExpand<Self::Interim>;
+    fn quick_expand(&self, _: &mut Env<'_>) -> QuickExpand<Self::Interim> {
+        todo!("remove this function")
+    }
 
     /// Continues the initial expansion.
     ///
@@ -103,11 +105,9 @@ pub trait Expand {
     /// returns `Err(interim)`. This function returns a boxed future that will
     /// produce a final result.
     #[allow(async_fn_in_trait)] // We don't support Send
-    async fn async_expand(
-        &self,
-        env: &mut Env<'_>,
-        interim: Self::Interim,
-    ) -> Result<Phrase, Error>;
+    async fn async_expand(&self, _: &mut Env<'_>, _: Self::Interim) -> Result<Phrase, Error> {
+        todo!("remove this function")
+    }
 
     /// Performs initial expansion.
     #[allow(async_fn_in_trait)] // We don't support Send
