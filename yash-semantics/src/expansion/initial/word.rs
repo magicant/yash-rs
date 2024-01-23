@@ -24,7 +24,6 @@ use super::Env;
 use super::Expand;
 use super::Phrase;
 use super::QuickExpand::{self, Interim, Ready};
-use async_trait::async_trait;
 use yash_syntax::syntax::Word;
 use yash_syntax::syntax::WordUnit::{self, *};
 
@@ -100,7 +99,6 @@ fn double_quote(phrase: &mut Phrase) {
 /// `Tilde(user)` expands to the `user`'s home directory.
 ///
 /// TODO: `~+`, `~-`, `~+n`, `~-n`
-#[async_trait(?Send)]
 impl Expand for WordUnit {
     type Interim = ();
 
@@ -135,7 +133,6 @@ impl Expand for WordUnit {
 /// Expands a word.
 ///
 /// This implementation delegates to `[WordUnit] as Expand`.
-#[async_trait(?Send)]
 impl Expand for Word {
     type Interim = <[WordUnit] as Expand>::Interim;
 

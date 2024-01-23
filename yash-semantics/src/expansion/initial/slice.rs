@@ -21,7 +21,6 @@ use super::Env;
 use super::Expand;
 use super::Phrase;
 use super::QuickExpand::{self, Interim, Ready};
-use async_trait::async_trait;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -39,7 +38,6 @@ pub struct SliceExpandInterim<T: Debug> {
 ///
 /// If the slice has no item, the result is [one empty
 /// field](Phrase::one_empty_field).
-#[async_trait(?Send)]
 impl<T: Expand> Expand for [T] {
     type Interim = SliceExpandInterim<<T as Expand>::Interim>;
 
@@ -136,7 +134,6 @@ mod tests {
         }
     }
 
-    #[async_trait(?Send)]
     impl Expand for Stub {
         type Interim = ();
 

@@ -21,7 +21,6 @@
 
 use super::phrase::Phrase;
 use super::Error;
-use async_trait::async_trait;
 use std::fmt::Debug;
 use yash_env::semantics::ExitStatus;
 
@@ -85,7 +84,6 @@ pub enum QuickExpand<T: Debug> {
 /// produces a future that will yield the final result. This two-step procedure
 /// works around a limitation imposed by the current Rust compiler
 /// (cf. [#68117](https://github.com/rust-lang/rust/issues/68117)).
-#[async_trait(?Send)]
 pub trait Expand {
     /// Data passed from [`quick_expand`](Self::quick_expand) to
     /// [`async_expand`](Self::async_expand).
@@ -104,6 +102,7 @@ pub trait Expand {
     /// You should call this function if [`quick_expand`](Self::quick_expand)
     /// returns `Err(interim)`. This function returns a boxed future that will
     /// produce a final result.
+    #[allow(async_fn_in_trait)] // We don't support Send
     async fn async_expand(
         &self,
         env: &mut Env<'_>,

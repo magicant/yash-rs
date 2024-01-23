@@ -24,7 +24,7 @@ use super::Env;
 use super::Expand;
 use super::Phrase;
 use super::QuickExpand::{self, Interim, Ready};
-use async_trait::async_trait;
+use futures_util::FutureExt;
 use yash_syntax::syntax::Text;
 use yash_syntax::syntax::TextUnit::{self, *};
 use yash_syntax::syntax::Unquote;
@@ -79,7 +79,6 @@ use yash_syntax::syntax::Unquote;
 ///   ([`Env::arg0`](yash_env::Env::arg0)).
 ///
 /// TODO Elaborate on index and modifiers
-#[async_trait(?Send)]
 impl Expand for TextUnit {
     type Interim = ();
 
@@ -116,7 +115,9 @@ impl Expand for TextUnit {
     async fn async_expand(&self, env: &mut Env<'_>, (): ()) -> Result<Phrase, Error> {
         match self {
             Literal(_) => unimplemented!("async_expand not expecting Literal"),
+
             Backslashed(_) => unimplemented!("async_expand not expecting Backslashed"),
+
             RawParam { name, location } => {
                 let modifier = &yash_syntax::syntax::Modifier::None;
                 let param = ParamRef {
@@ -124,20 +125,30 @@ impl Expand for TextUnit {
                     modifier,
                     location,
                 };
-                param.expand(env).await
+                param.expand(env).boxed_local().await // Boxing needed for recursion
             }
-            BracedParam(param) => ParamRef::from(param).expand(env).await,
+
+            BracedParam(param) => {
+                ParamRef::from(param).expand(env).boxed_local().await // Boxing needed for recursion
+            }
+
             CommandSubst { content, location } => {
                 let command = content.clone();
                 let location = location.clone();
                 super::command_subst::expand(command, location, env).await
             }
+
             Backquote { content, location } => {
                 let command = content.unquote().0;
                 let location = location.clone();
                 super::command_subst::expand(command, location, env).await
             }
-            Arith { content, location } => super::arith::expand(content, location, env).await,
+
+            Arith { content, location } => {
+                super::arith::expand(content, location, env)
+                    .boxed_local() // Boxing needed for recursion
+                    .await
+            }
         }
     }
 }
@@ -145,7 +156,6 @@ impl Expand for TextUnit {
 /// Expands a text.
 ///
 /// This implementation delegates to `[TextUnit] as Expand`.
-#[async_trait(?Send)]
 impl Expand for Text {
     type Interim = <[TextUnit] as Expand>::Interim;
 
