@@ -51,10 +51,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
-    - uses: dtolnay/rust-toolchain@1.56.0
-    - uses: dtolnay/rust-toolchain@1.58.0
     - uses: dtolnay/rust-toolchain@1.65.0
     - uses: dtolnay/rust-toolchain@1.70.0
+    - uses: dtolnay/rust-toolchain@1.75.0
     - uses: Swatinem/rust-cache@v2
     - name: Run tests with MSRV
       run: ./check-msrv.sh -v

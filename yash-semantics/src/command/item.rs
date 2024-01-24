@@ -17,7 +17,6 @@
 //! Implementation for Item.
 
 use super::Command;
-use async_trait::async_trait;
 use std::ffi::CStr;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
@@ -54,7 +53,6 @@ use yash_syntax::syntax::AndOrList;
 ///
 /// TODO: If the `monitor` option is off, the standard input of the asynchronous
 /// and-or list is implicitly redirected to `/dev/null`.
-#[async_trait(?Send)]
 impl Command for syntax::Item {
     async fn execute(&self, env: &mut Env) -> Result {
         match &self.async_flag {

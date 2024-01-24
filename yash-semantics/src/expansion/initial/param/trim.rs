@@ -20,7 +20,7 @@ use super::Env;
 use super::Error;
 use crate::expansion::attr::fnmatch::apply_escapes;
 use crate::expansion::attr::fnmatch::to_pattern_chars;
-use crate::expansion::initial::expand;
+use crate::expansion::initial::Expand as _;
 use yash_env::variable::Value::{self, Array, Scalar};
 use yash_fnmatch::Config;
 use yash_fnmatch::Pattern;
@@ -42,7 +42,7 @@ fn trim_value(pattern: &Pattern, value: &mut String) {
 
 /// Applies the trim modifier to the value.
 pub async fn apply(env: &mut Env<'_>, trim: &Trim, value: &mut Value) -> Result<(), Error> {
-    let expansion = expand(env, &trim.pattern).await?;
+    let expansion = trim.pattern.expand(env).await?;
     let mut pattern = expansion.ifs_join(&env.inner.variables);
     apply_escapes(&mut pattern);
 

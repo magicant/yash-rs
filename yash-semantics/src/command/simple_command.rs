@@ -26,7 +26,6 @@ use crate::command_search::search;
 use crate::expansion::expand_words;
 use crate::xtrace::XTrace;
 use crate::Handle;
-use async_trait::async_trait;
 use std::ffi::CString;
 use std::ops::ControlFlow::Continue;
 #[cfg(doc)]
@@ -161,7 +160,6 @@ use yash_syntax::syntax::Assign;
 ///
 /// POSIX leaves many aspects of the simple command execution unspecified. The
 /// detail semantics may differ in other shell implementations.
-#[async_trait(?Send)]
 impl Command for syntax::SimpleCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let (fields, exit_status) = match expand_words(env, &self.words).await {

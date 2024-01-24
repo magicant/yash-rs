@@ -21,7 +21,6 @@ use crate::redir::RedirGuard;
 use crate::xtrace::finish;
 use crate::xtrace::XTrace;
 use crate::Handle;
-use async_trait::async_trait;
 use std::ops::ControlFlow::Continue;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Result;
@@ -62,7 +61,6 @@ mod while_loop;
 /// The redirections are performed, if any, before executing the command body.
 /// Redirection errors are subject to the `ErrExit` option
 /// (`Env::apply_errexit`).
-#[async_trait(?Send)]
 impl Command for syntax::FullCompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         let mut env = RedirGuard::new(env);
@@ -126,7 +124,6 @@ impl Command for syntax::FullCompoundCommand {
 ///
 /// POSIX does not specify the order in which the shell tests multiple patterns
 /// in an item. This implementation tries them in the order of appearance.
-#[async_trait(?Send)]
 impl Command for syntax::CompoundCommand {
     async fn execute(&self, env: &mut Env) -> Result {
         use syntax::CompoundCommand::*;

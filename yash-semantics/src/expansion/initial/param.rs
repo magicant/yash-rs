@@ -22,6 +22,7 @@ use super::super::Error;
 use super::super::ErrorCause;
 use super::super::Origin;
 use super::Env;
+use super::Expand;
 use yash_env::option::Option::Unset;
 use yash_env::option::State::Off;
 use yash_env::variable::Expansion;
@@ -57,9 +58,9 @@ pub use switch::EmptyError;
 pub use switch::NonassignableError;
 pub use switch::ValueState;
 
-impl ParamRef<'_> {
+impl Expand for ParamRef<'_> {
     /// Performs parameter expansion.
-    pub async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
+    async fn expand(&self, env: &mut Env<'_>) -> Result<Phrase, Error> {
         // TODO Expand and parse Index
 
         // Lookup //

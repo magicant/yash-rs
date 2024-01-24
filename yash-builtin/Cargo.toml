@@ -3,7 +3,7 @@ name = "yash-builtin"
 version = "0.1.0"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.75.0"
 description = "Implementation of the built-in utilities of yash"
 # documentation = "https://yash.osdn.jp/doc/"
 # readme = "README.md"
@@ -19,7 +19,6 @@ publish = false
 default = ["yash-semantics"]
 
 [dependencies]
-async-trait = "0.1.73"
 either = "1.9.0"
 itertools = "0.11.0"
 thiserror = "1.0.47"
