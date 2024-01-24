@@ -51,8 +51,10 @@ use yash_syntax::syntax::AndOrList;
 /// exit status does not reflect the results of the and-or list; the exit status
 /// is always 0.
 ///
-/// TODO: If the `monitor` option is off, the standard input of the asynchronous
+/// If the [`Monitor`] option is off, the standard input of the asynchronous
 /// and-or list is implicitly redirected to `/dev/null`.
+///
+/// [`Monitor`]: yash_env::option::Option::Monitor
 impl Command for syntax::Item {
     async fn execute(&self, env: &mut Env) -> Result {
         match &self.async_flag {
