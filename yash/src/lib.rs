@@ -16,35 +16,36 @@
 
 //! TODO Elaborate
 
-pub use yash_arith as arith;
-pub use yash_builtin as builtin;
-pub use yash_env as env;
-pub use yash_fnmatch as fnmatch;
-pub use yash_quote as quote;
-pub use yash_semantics as semantics;
-#[doc(no_inline)]
-pub use yash_syntax::{alias, parser, source, syntax};
-
 pub mod startup;
 // mod runner;
 
-async fn print_version(env: &mut env::Env) -> i32 {
+use futures_util::task::LocalSpawnExt as _;
+use futures_util::FutureExt as _;
+use startup::args::Parse;
+use startup::prepare_input;
+use std::num::NonZeroU64;
+use std::ops::ControlFlow::{Break, Continue};
+use yash_builtin::BUILTINS;
+use yash_env::option::Option::{Interactive, Monitor, Stdin};
+use yash_env::option::State::On;
+use yash_env::system::SignalHandling;
+use yash_env::trap::Signal::SIGPIPE;
+use yash_env::Env;
+use yash_env::RealSystem;
+use yash_env::System;
+use yash_semantics::trap::run_exit_trap;
+use yash_semantics::Divert;
+use yash_semantics::ExitStatus;
+use yash_semantics::ReadEvalLoop;
+use yash_syntax::parser::lex::Lexer;
+
+async fn print_version(env: &mut Env) -> i32 {
     let version = env!("CARGO_PKG_VERSION");
-    let result = builtin::common::output(env, &format!("yash {}\n", version)).await;
+    let result = yash_builtin::common::output(env, &format!("yash {}\n", version)).await;
     result.exit_status().0
 }
 
-async fn parse_and_print(mut env: env::Env) -> i32 {
-    use env::option::Option::{Interactive, Monitor};
-    use env::option::State::On;
-    use semantics::trap::run_exit_trap;
-    use semantics::Divert;
-    use semantics::ExitStatus;
-    use startup::args::Parse;
-    use startup::prepare_input;
-    use std::num::NonZeroU64;
-    use std::ops::ControlFlow::{Break, Continue};
-
+async fn parse_and_print(mut env: Env) -> i32 {
     let run = match startup::args::parse(std::env::args()) {
         Ok(Parse::Help) => todo!("print help"),
         Ok(Parse::Version) => return print_version(&mut env).await,
@@ -59,7 +60,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         env.options.set(Interactive, On);
     }
     if run.source == startup::args::Source::Stdin {
-        env.options.set(env::option::Stdin, On);
+        env.options.set(Stdin, On);
     }
     for &(option, state) in &run.options {
         env.options.set(option, state);
@@ -78,7 +79,7 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         }
     }
 
-    env.builtins.extend(builtin::BUILTINS.iter().cloned());
+    env.builtins.extend(BUILTINS.iter().cloned());
 
     env.variables.extend_env(std::env::vars());
     env.init_variables();
@@ -98,10 +99,10 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
         }
     };
     let line = NonZeroU64::new(1).unwrap();
-    let mut lexer = parser::lex::Lexer::new(input.input, line, input.source);
+    let mut lexer = Lexer::new(input.input, line, input.source);
 
     // Run the read-eval loop
-    let mut rel = semantics::ReadEvalLoop::new(&mut env, &mut lexer);
+    let mut rel = ReadEvalLoop::new(&mut env, &mut lexer);
     rel.set_verbose(input.verbose);
     let result = rel.run().await;
     env.apply_result(result);
@@ -120,14 +121,6 @@ async fn parse_and_print(mut env: env::Env) -> i32 {
 }
 
 pub fn bin_main() -> i32 {
-    use env::system::SignalHandling;
-    use env::trap::Signal::SIGPIPE;
-    use env::Env;
-    use env::RealSystem;
-    use env::System;
-    use futures_util::task::LocalSpawnExt as _;
-    use futures_util::FutureExt as _;
-
     // SAFETY: This is the only instance of RealSystem we create in the whole
     // process.
     let system = unsafe { RealSystem::new() };

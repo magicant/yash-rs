@@ -482,11 +482,8 @@ dependencies = [
  "nix",
  "tempfile",
  "thiserror",
- "yash-arith",
  "yash-builtin",
  "yash-env",
- "yash-fnmatch",
- "yash-quote",
  "yash-semantics",
  "yash-syntax",
 ]
