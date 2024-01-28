@@ -62,6 +62,7 @@ pub mod export;
 pub mod fg;
 pub mod getopts;
 pub mod jobs;
+pub mod kill;
 pub mod pwd;
 #[cfg(feature = "yash-semantics")]
 pub mod read;
@@ -191,6 +192,13 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(jobs::main(env, args)),
+        },
+    ),
+    (
+        "kill",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(kill::main(env, args)),
         },
     ),
     (
