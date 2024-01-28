@@ -144,12 +144,39 @@
 //! Some implementations print `0` or `EXIT` for `kill -l 0` or `kill -l EXIT`
 //! while this implementation regards them as invalid operands.
 
+use crate::common::report_error;
 use yash_env::semantics::Field;
+use yash_env::trap::Signal;
 use yash_env::Env;
+
+/// Parsed command line arguments
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Command {
+    /// Sends a signal to processes
+    Send {
+        /// Signal to send
+        signal: Option<Signal>,
+        /// Target processes
+        targets: Vec<Field>,
+    },
+    /// Lists signal names or descriptions
+    Print {
+        /// Signal names or descriptions to list
+        ///
+        /// If empty, all signals are listed.
+        signals: Vec<Signal>,
+        /// Whether to print descriptions
+        verbose: bool,
+    },
+}
+
+pub mod syntax;
 
 /// Entry point of the kill built-in
 pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
-    _ = env;
-    _ = args;
-    todo!()
+    match syntax::parse(env, args) {
+        Ok(command) => todo!("{command:?}"),
+        Err(error) => report_error(env, error.to_message()).await,
+    }
 }
