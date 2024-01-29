@@ -55,7 +55,7 @@
 //! The **`-v`** option lists signal descriptions. This works like the `-l`
 //! option, but prints the signal number, name, and description instead of
 //! just the name. The `-v` option may be used with the `-l` option, in which
-//! case the `-l` option is ignored.
+//! case the `-l` option is ignored. (TODO: The description is not yet printed)
 //!
 //! # Operands
 //!
@@ -171,12 +171,23 @@ pub enum Command {
     },
 }
 
+pub mod print;
 pub mod syntax;
 
+impl Command {
+    /// Executes the built-in.
+    pub async fn execute(&self, env: &mut Env) -> crate::Result {
+        match self {
+            Self::Send { signal, targets } => todo!("{signal:?} {targets:?}"),
+            Self::Print { signals, verbose } => print::execute(env, signals, *verbose).await,
+        }
+    }
+}
+
 /// Entry point of the kill built-in
-pub async fn main(env: &mut Env, args: Vec<Field>) -> yash_env::builtin::Result {
+pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
-        Ok(command) => todo!("{command:?}"),
+        Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, error.to_message()).await,
     }
 }
