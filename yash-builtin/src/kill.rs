@@ -172,13 +172,14 @@ pub enum Command {
 }
 
 pub mod print;
+pub mod send;
 pub mod syntax;
 
 impl Command {
     /// Executes the built-in.
     pub async fn execute(&self, env: &mut Env) -> crate::Result {
         match self {
-            Self::Send { signal, targets } => todo!("{signal:?} {targets:?}"),
+            Self::Send { signal, targets } => send::execute(env, *signal, targets).await,
             Self::Print { signals, verbose } => print::execute(env, signals, *verbose).await,
         }
     }
