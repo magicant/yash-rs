@@ -34,7 +34,6 @@ sh -c 'kill -s STOP $$; ...'
 fg >/dev/null
 __IN__
 
-: TODO Needs the kill built-in <<\__IN__
 test_x -e 127 'resumed job is disowned unless suspended again' -m
 cat fifo >/dev/null &
 exec 3>fifo
