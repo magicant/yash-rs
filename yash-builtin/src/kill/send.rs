@@ -48,6 +48,9 @@ pub enum Error {
     /// The job ID specifies a job that is not job-controlled.
     #[error("target job is not job-controlled")]
     Unmonitored,
+    /// The target job has finished.
+    #[error("target job has finished")]
+    Finished,
     /// An error occurred in the underlying system call.
     #[error(transparent)]
     System(#[from] Errno),
@@ -66,6 +69,8 @@ pub fn resolve_target(jobs: &JobSet, target: &str) -> Result<Pid, Error> {
             Err(Error::Unowned)
         } else if !job.job_controlled {
             Err(Error::Unmonitored)
+        } else if !job.state.is_alive() {
+            Err(Error::Finished)
         } else {
             Ok(-job.pid)
         }
@@ -124,6 +129,7 @@ mod tests {
     use assert_matches::assert_matches;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
+    use yash_semantics::ExitStatus;
 
     #[test]
     fn resolve_target_process_ids() {
@@ -183,6 +189,20 @@ mod tests {
 
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Err(Error::Unmonitored));
+    }
+
+    #[test]
+    fn resolve_target_finished() {
+        let mut jobs = JobSet::new();
+        let mut job = Job::new(Pid(123));
+        job.job_controlled = true;
+        job.is_owned = true;
+        job.state = ProcessState::Exited(ExitStatus(0));
+        job.name = "my job".into();
+        jobs.add(job);
+
+        let result = resolve_target(&jobs, "%my");
+        assert_eq!(result, Err(Error::Finished));
     }
 
     #[test]
