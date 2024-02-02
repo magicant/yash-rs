@@ -42,6 +42,9 @@ pub enum Error {
     /// The specified job ID did not uniquely identify a job.
     #[error(transparent)]
     JobId(#[from] FindError),
+    /// The target job is not controlled by the current shell environment.
+    #[error("target job is not controlled by the current shell environment")]
+    Unowned,
     /// The job ID specifies a job that is not job-controlled.
     #[error("target job is not job-controlled")]
     Unmonitored,
@@ -59,10 +62,12 @@ pub fn resolve_target(jobs: &JobSet, target: &str) -> Result<Pid, Error> {
         let job_id = parse_tail(tail);
         let index = job_id.find(jobs)?;
         let job = &jobs[index];
-        if job.job_controlled {
-            Ok(-job.pid)
-        } else {
+        if !job.is_owned {
+            Err(Error::Unowned)
+        } else if !job.job_controlled {
             Err(Error::Unmonitored)
+        } else {
+            Ok(-job.pid)
         }
     } else {
         Ok(Pid(target.parse()?))
@@ -118,6 +123,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use yash_env::job::Job;
+    use yash_env::job::ProcessState;
 
     #[test]
     fn resolve_target_process_ids() {
@@ -135,6 +141,8 @@ mod tests {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
+        job.is_owned = true;
+        job.state = ProcessState::Running;
         job.name = "my job".into();
         jobs.add(job);
 
@@ -150,10 +158,26 @@ mod tests {
     }
 
     #[test]
+    fn resolve_target_unowned() {
+        let mut jobs = JobSet::new();
+        let mut job = Job::new(Pid(123));
+        job.job_controlled = true;
+        job.is_owned = false;
+        job.state = ProcessState::Running;
+        job.name = "my job".into();
+        jobs.add(job);
+
+        let result = resolve_target(&jobs, "%my");
+        assert_eq!(result, Err(Error::Unowned));
+    }
+
+    #[test]
     fn resolve_target_unmonitored() {
         let mut jobs = JobSet::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = false;
+        job.is_owned = true;
+        job.state = ProcessState::Running;
         job.name = "my job".into();
         jobs.add(job);
 
