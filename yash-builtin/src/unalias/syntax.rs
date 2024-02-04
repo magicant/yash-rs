@@ -40,7 +40,7 @@ pub enum Error {
 
     /// The `-a` option was specified with other operands.
     #[error("cannot specify `-a` with other operands")]
-    ExclusiveOptionAndOperand(Location),
+    ConflictingOptionAndOperand(Location),
 
     /// No option or operand was specified.
     #[error("no option or operand specified")]
@@ -53,7 +53,7 @@ impl Error {
         let (title, annotations) = match self {
             Error::CommonError(e) => return e.into(),
 
-            Error::ExclusiveOptionAndOperand(location) => (
+            Error::ConflictingOptionAndOperand(location) => (
                 "cannot specify `-a` with other operands".into(),
                 vec![Annotation::new(
                     AnnotationType::Error,
@@ -94,7 +94,7 @@ pub fn parse(env: &Env, args: Vec<Field>) -> Result<Command, Error> {
         (None, true) => Err(Error::MissingArgument),
         (None, false) => Ok(Command::Remove(operands)),
         (Some(_), true) => Ok(Command::RemoveAll),
-        (Some(option), false) => Err(Error::ExclusiveOptionAndOperand(option.location)),
+        (Some(option), false) => Err(Error::ConflictingOptionAndOperand(option.location)),
     }
 }
 
@@ -131,7 +131,7 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Err(Error::ExclusiveOptionAndOperand(Location::dummy("-a"))),
+            Err(Error::ConflictingOptionAndOperand(Location::dummy("-a"))),
         );
     }
 }
