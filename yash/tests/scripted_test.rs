@@ -184,6 +184,26 @@ fn if_command() {
 }
 
 #[test]
+fn kill_builtin_1() {
+    run("kill1-p.sh")
+}
+
+#[test]
+fn kill_builtin_2() {
+    run("kill2-p.sh")
+}
+
+#[test]
+fn kill_builtin_3() {
+    run("kill3-p.sh")
+}
+
+#[test]
+fn kill_builtin_4() {
+    run_with_pty("kill4-p.sh")
+}
+
+#[test]
 fn nop_builtins() {
     run("nop-p.sh")
 }

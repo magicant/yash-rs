@@ -29,7 +29,6 @@ __IN__
 1
 __OUT__
 
-: TODO Needs the kill built-in <<\__IN__
 test_OE 'already running job is ignored' -m
 while kill -s CONT $$; do sleep 1; done &
 bg >/dev/null
