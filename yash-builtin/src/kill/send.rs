@@ -25,7 +25,7 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::job::id::parse_tail;
 use yash_env::job::Pid;
-use yash_env::job::{id::FindError, JobSet};
+use yash_env::job::{id::FindError, JobList};
 use yash_env::semantics::Field;
 use yash_env::system::Errno;
 use yash_env::trap::Signal;
@@ -60,7 +60,7 @@ pub enum Error {
 ///
 /// The target may be specified as a job ID, a process ID, or a process group
 /// ID. In case of a process group ID, the value should be negative.
-pub fn resolve_target(jobs: &JobSet, target: &str) -> Result<Pid, Error> {
+pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
     if let Some(tail) = target.strip_prefix('%') {
         let job_id = parse_tail(tail);
         let index = job_id.find(jobs)?;
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn resolve_target_process_ids() {
-        let jobs = JobSet::new();
+        let jobs = JobList::new();
 
         let result = resolve_target(&jobs, "123");
         assert_eq!(result, Ok(Pid(123)));
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn resolve_target_job_id() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = true;
@@ -158,14 +158,14 @@ mod tests {
 
     #[test]
     fn resolve_target_job_find_error() {
-        let jobs = JobSet::new();
+        let jobs = JobList::new();
         let result = resolve_target(&jobs, "%my");
         assert_eq!(result, Err(Error::JobId(FindError::NotFound)));
     }
 
     #[test]
     fn resolve_target_unowned() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = false;
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn resolve_target_unmonitored() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = false;
         job.is_owned = true;
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn resolve_target_finished() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.job_controlled = true;
         job.is_owned = true;
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn resolve_target_invalid_string() {
-        let jobs = JobSet::new();
+        let jobs = JobList::new();
         let result = resolve_target(&jobs, "abc");
         assert_matches!(result, Err(Error::ProcessId(_)));
     }

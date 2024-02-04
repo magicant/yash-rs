@@ -17,11 +17,12 @@
 //! Job ID parsing
 //!
 //! This module provides functionalities to parse job IDs and find jobs by using
-//! them. A job ID is a string that identifies a job contained in a job set. The
-//! string can take several forms:
+//! them. A job ID is a string that identifies a job contained in a job list.
+//! The string can take several forms:
 //!
-//! - Job IDs `%`, `%%`, and `%+` denote the [current job](JobSet::current_job).
-//! - Job ID `%-` specifies the [previous job](JobSet::previous_job).
+//! - Job IDs `%`, `%%`, and `%+` denote the
+//!   [current job](JobList::current_job).
+//! - Job ID `%-` specifies the [previous job](JobList::previous_job).
 //! - A job ID of the form `%n` (where `n` is a positive integer) refers to the
 //!   job with the specified job number, that is, the job with index `n-1`.
 //! - A job ID of the form `%name` (where `name` is a string not starting with a
@@ -38,7 +39,7 @@
 //! job ID.
 
 use super::Job;
-use super::JobSet;
+use super::JobList;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::num::NonZeroUsize;
@@ -166,9 +167,9 @@ impl JobId<'_> {
     ///
     /// This function succeeds if there is exactly one job that matches the job
     /// ID. Otherwise, the result is a `FindError`.
-    pub fn find(&self, jobs: &JobSet) -> Result<usize, FindError> {
+    pub fn find(&self, jobs: &JobList) -> Result<usize, FindError> {
         fn find_one(
-            jobs: &JobSet,
+            jobs: &JobList,
             pred: &mut dyn FnMut(&(usize, &Job)) -> bool,
         ) -> Result<usize, FindError> {
             let mut i = jobs.iter().filter(pred).map(|(index, _)| index);
@@ -216,127 +217,127 @@ mod tests {
         assert_eq!(JobId::NameSubstring("bar").to_string(), "%?bar");
     }
 
-    fn sample_job_set() -> JobSet {
-        let mut set = JobSet::default();
+    fn sample_job_list() -> JobList {
+        let mut list = JobList::default();
 
         let mut job = Job::new(Pid(10));
         job.name = "first job".to_string();
-        set.add(job);
+        list.add(job);
 
         let mut job = Job::new(Pid(11));
         job.name = "job 2".to_string();
-        set.add(job);
+        list.add(job);
 
         let mut job = Job::new(Pid(12));
         job.name = "last one".to_string();
-        set.add(job);
+        list.add(job);
 
-        set
+        list
     }
 
     #[test]
     fn find_unique_current_job() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::CurrentJob;
-        let current_job_index = set.current_job().unwrap();
-        assert_eq!(job_id.find(&set), Ok(current_job_index));
+        let current_job_index = list.current_job().unwrap();
+        assert_eq!(job_id.find(&list), Ok(current_job_index));
     }
 
     #[test]
     fn find_unique_previous_job() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::PreviousJob;
-        let previous_job_index = set.previous_job().unwrap();
-        assert_eq!(job_id.find(&set), Ok(previous_job_index));
+        let previous_job_index = list.previous_job().unwrap();
+        assert_eq!(job_id.find(&list), Ok(previous_job_index));
     }
 
     #[test]
     fn find_unique_job_by_job_number() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::JobNumber(NonZeroUsize::new(1).unwrap());
-        assert_eq!(job_id.find(&set), Ok(0));
+        assert_eq!(job_id.find(&list), Ok(0));
         let job_id = JobId::JobNumber(NonZeroUsize::new(2).unwrap());
-        assert_eq!(job_id.find(&set), Ok(1));
+        assert_eq!(job_id.find(&list), Ok(1));
         let job_id = JobId::JobNumber(NonZeroUsize::new(3).unwrap());
-        assert_eq!(job_id.find(&set), Ok(2));
+        assert_eq!(job_id.find(&list), Ok(2));
     }
 
     #[test]
     fn find_unique_job_by_name_prefix() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::NamePrefix("first");
-        assert_eq!(job_id.find(&set), Ok(0));
+        assert_eq!(job_id.find(&list), Ok(0));
 
         let job_id = JobId::NamePrefix("job");
-        assert_eq!(job_id.find(&set), Ok(1));
+        assert_eq!(job_id.find(&list), Ok(1));
     }
 
     #[test]
     fn find_unique_job_by_name_substring() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::NameSubstring("one");
-        assert_eq!(job_id.find(&set), Ok(2));
+        assert_eq!(job_id.find(&list), Ok(2));
     }
 
     #[test]
     fn find_no_current_job() {
-        let set = JobSet::default();
+        let list = JobList::default();
         let job_id = JobId::CurrentJob;
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
     }
 
     #[test]
     fn find_no_previous_job() {
-        let set = JobSet::default();
+        let list = JobList::default();
         let job_id = JobId::PreviousJob;
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
     }
 
     #[test]
     fn find_no_job_for_job_number() {
-        let set = JobSet::default();
+        let list = JobList::default();
         let job_id = JobId::JobNumber(NonZeroUsize::new(1).unwrap());
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
         let job_id = JobId::JobNumber(NonZeroUsize::new(2).unwrap());
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
         let job_id = JobId::JobNumber(NonZeroUsize::new(3).unwrap());
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
     }
 
     #[test]
     fn find_no_job_for_prefix() {
-        let set = JobSet::default();
+        let list = JobList::default();
         let job_id = JobId::NamePrefix("first");
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
 
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::NamePrefix("one");
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
     }
 
     #[test]
     fn find_no_job_for_substring() {
-        let set = JobSet::default();
+        let list = JobList::default();
         let job_id = JobId::NameSubstring("foo");
-        assert_eq!(job_id.find(&set), Err(FindError::NotFound));
+        assert_eq!(job_id.find(&list), Err(FindError::NotFound));
     }
 
     #[test]
     fn find_ambiguous_prefix() {
-        let mut set = sample_job_set();
+        let mut list = sample_job_list();
 
         let mut job = Job::new(Pid(20));
         job.name = "job 3".to_string();
-        set.add(job);
+        list.add(job);
 
         let job_id = JobId::NamePrefix("job");
-        assert_eq!(job_id.find(&set), Err(FindError::Ambiguous));
+        assert_eq!(job_id.find(&list), Err(FindError::Ambiguous));
     }
 
     #[test]
     fn find_ambiguous_substring() {
-        let set = sample_job_set();
+        let list = sample_job_list();
         let job_id = JobId::NameSubstring("job");
-        assert_eq!(job_id.find(&set), Err(FindError::Ambiguous));
+        assert_eq!(job_id.find(&list), Err(FindError::Ambiguous));
     }
 }

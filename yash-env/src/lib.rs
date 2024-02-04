@@ -35,7 +35,7 @@ use self::builtin::getopts::GetoptsState;
 use self::builtin::Builtin;
 use self::function::FunctionSet;
 use self::io::Fd;
-use self::job::JobSet;
+use self::job::JobList;
 use self::job::Pid;
 use self::job::ProcessState;
 use self::option::On;
@@ -104,7 +104,7 @@ pub struct Env {
     pub getopts_state: Option<GetoptsState>,
 
     /// Jobs managed in the environment
-    pub jobs: JobSet,
+    pub jobs: JobList,
 
     /// Process group ID of the main shell process
     pub main_pgid: Pid,
@@ -323,7 +323,7 @@ impl Env {
     /// - `-pgid`: any child in the process group whose process group ID is `pgid`
     ///
     /// When [`self.system.wait`](System::wait) returned a new state of the
-    /// target, it is sent to `self.jobs` ([`JobSet::update_status`]) before
+    /// target, it is sent to `self.jobs` ([`JobList::update_status`]) before
     /// being returned from this function.
     ///
     /// If there is no matching target, this function returns
@@ -369,7 +369,7 @@ impl Env {
     ///
     /// This function calls [`self.system.wait`](System::wait) repeatedly until
     /// all status updates available are applied to `self.jobs`
-    /// ([`JobSet::update_status`]).
+    /// ([`JobList::update_status`]).
     ///
     /// Note that updates of subshells that are not managed in `self.jobs` are
     /// lost when you call this function.
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn start_and_wait_for_subshell_with_job_set() {
+    fn start_and_wait_for_subshell_with_job_list() {
         in_virtual_system(|mut env, _state| async move {
             let subshell = Subshell::new(|env, _job_control| {
                 Box::pin(async move {

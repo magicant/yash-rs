@@ -37,7 +37,7 @@
 //!
 //! Operands specify which jobs to resume. See the module documentation of
 //! [`yash_env::job::id`] for the format of job IDs. If omitted, the built-in
-//! resumes the [current job](JobSet::current_job).
+//! resumes the [current job](JobList::current_job).
 //!
 //! (TODO: allow omitting the leading `%`)
 //!
@@ -93,7 +93,7 @@ use yash_env::job::id::parse;
 use yash_env::job::id::FindError;
 use yash_env::job::id::ParseError;
 #[cfg(doc)]
-use yash_env::job::JobSet;
+use yash_env::job::JobList;
 use yash_env::job::ProcessState;
 use yash_env::semantics::Field;
 use yash_env::system::Errno;

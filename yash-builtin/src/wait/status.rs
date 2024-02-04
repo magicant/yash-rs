@@ -28,7 +28,7 @@
 use super::core::wait_for_any_job_or_trap;
 use super::core::Error;
 use std::ops::ControlFlow;
-use yash_env::job::JobSet;
+use yash_env::job::JobList;
 use yash_env::job::ProcessState;
 use yash_env::option::State;
 use yash_env::semantics::ExitStatus;
@@ -41,7 +41,7 @@ use yash_env::Env;
 /// function.
 pub async fn wait_while_running(
     env: &mut Env,
-    job_status: &mut dyn FnMut(&mut JobSet) -> ControlFlow<ExitStatus>,
+    job_status: &mut dyn FnMut(&mut JobList) -> ControlFlow<ExitStatus>,
 ) -> Result<ExitStatus, Error> {
     loop {
         if let ControlFlow::Break(exit_status) = job_status(&mut env.jobs) {
@@ -55,10 +55,10 @@ pub async fn wait_while_running(
 ///
 /// If the job at the given index is not found or is disowned, the closure
 /// returns [`ControlFlow::Break`] having [`ExitStatus::NOT_FOUND`].
-/// The disowned job is removed from the job set.
+/// The disowned job is removed from the job list.
 ///
 /// If the job has finished (either exited or signaled), the closure removes the
-/// job from the job set and returns [`ControlFlow::Break`] with the job's exit
+/// job from the job list and returns [`ControlFlow::Break`] with the job's exit
 /// status. If `job_control` is `On` and the job has been stopped, the closure
 /// returns [`ControlFlow::Break`] with an exit status that indicates the signal
 /// that stopped the job.
@@ -66,7 +66,7 @@ pub async fn wait_while_running(
 pub fn job_status(
     index: usize,
     job_control: State,
-) -> impl FnMut(&mut JobSet) -> ControlFlow<ExitStatus> {
+) -> impl FnMut(&mut JobList) -> ControlFlow<ExitStatus> {
     move |jobs| {
         let Some(job) = jobs.get(index) else {
             return ControlFlow::Break(ExitStatus::NOT_FOUND);
@@ -96,12 +96,12 @@ pub fn job_status(
 
 /// Returns a closure that tests if any job is running.
 ///
-/// The closure applies [`job_status`] to each job in the job set. If all jobs
+/// The closure applies [`job_status`] to each job in the job list. If all jobs
 /// have finished, the closure returns [`ControlFlow::Break`] with the exit
 /// status of 0. Otherwise, the closure returns [`ControlFlow::Continue`].
 pub fn any_job_is_running(
     job_control: State,
-) -> impl FnMut(&mut JobSet) -> ControlFlow<ExitStatus> {
+) -> impl FnMut(&mut JobList) -> ControlFlow<ExitStatus> {
     move |jobs| {
         let Some((max_index, _)) = jobs.iter().next_back() else {
             return ControlFlow::Break(ExitStatus::SUCCESS);
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn status_of_unknown_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         assert_eq!(
             job_status(0, Off)(&mut jobs),
             ControlFlow::Break(ExitStatus::NOT_FOUND),
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn status_of_exited_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Exited(ExitStatus(0));
         let index = jobs.add(job);
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn status_of_signaled_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Signaled {
             signal: Signal::SIGHUP,
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn status_of_stopped_job_without_job_control() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn status_of_stopped_job_with_job_control() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Stopped(Signal::SIGTSTP);
         let index = jobs.add(job);
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn status_of_continued_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Running;
         let index = jobs.add(job);
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn status_of_disowned_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.is_owned = false;
         let index = jobs.add(job);
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn any_job_is_running_with_no_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         assert_eq!(
             any_job_is_running(Off)(&mut jobs),
             ControlFlow::Break(ExitStatus::SUCCESS),
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn any_job_is_running_with_exited_jobs() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job = Job::new(Pid(123));
         job.state = ProcessState::Exited(ExitStatus(0));
         jobs.add(job);
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn any_job_is_running_with_running_job() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         jobs.add(Job::new(Pid(123)));
 
         assert_eq!(

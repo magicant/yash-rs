@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use yash_env::job::id::FindError;
 use yash_env::job::id::JobId;
 use yash_env::job::id::ParseError;
-use yash_env::job::JobSet;
+use yash_env::job::JobList;
 use yash_env::semantics::Field;
 use yash_syntax::source::pretty::Annotation;
 use yash_syntax::source::pretty::AnnotationType;
@@ -45,7 +45,7 @@ impl MessageBase for AmbiguousJobId {
     }
 }
 
-/// Resolves a job ID to the index of the job in the job set.
+/// Resolves a job ID to the index of the job in the job list.
 ///
 /// If the job specification identifies a job, returns `Ok(Some(index))`.
 /// If the job is not found, returns `Ok(None)`.
@@ -53,7 +53,7 @@ impl MessageBase for AmbiguousJobId {
 ///
 /// This function assumes that a `JobSpec::JobId` has a valid job ID that starts
 /// with `%`. If the job ID lacks a leading `%`, this function panics.
-pub fn resolve(jobs: &JobSet, spec: JobSpec) -> Result<Option<usize>, AmbiguousJobId> {
+pub fn resolve(jobs: &JobList, spec: JobSpec) -> Result<Option<usize>, AmbiguousJobId> {
     match spec {
         JobSpec::ProcessId(pid) => Ok(jobs.find_by_pid(pid)),
 
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn process_id_unique_match() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let job1 = jobs.add(Job::new(Pid(123)));
         let job2 = jobs.add(Job::new(Pid(456)));
 
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn job_id_unique_match() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let job1 = jobs.add(Job::new(Pid(123)));
         let job2 = jobs.add(Job::new(Pid(456)));
 
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn process_id_not_found() {
-        let jobs = JobSet::new();
+        let jobs = JobList::new();
 
         let result1 = resolve(&jobs, JobSpec::ProcessId(Pid(123)));
         assert_eq!(result1, Ok(None));
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn job_id_not_found() {
-        let jobs = JobSet::new();
+        let jobs = JobList::new();
 
         let result1 = resolve(&jobs, JobSpec::JobId(Field::dummy("%1")));
         assert_eq!(result1, Ok(None));
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn job_id_ambiguous() {
-        let mut jobs = JobSet::new();
+        let mut jobs = JobList::new();
         let mut job1 = Job::new(Pid(123));
         job1.name = "sleep 1".into();
         jobs.add(job1);

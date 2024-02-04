@@ -593,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn job_controlled_suspended_pipeline_in_job_set() {
+    fn job_controlled_suspended_pipeline_in_job_list() {
         in_virtual_system(|mut env, state| async move {
             env.builtins.insert("return", return_builtin());
             env.builtins.insert("suspend", suspend_builtin());

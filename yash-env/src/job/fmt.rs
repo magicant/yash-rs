@@ -56,7 +56,7 @@
 
 use super::Job;
 #[cfg(doc)]
-use super::JobSet;
+use super::JobList;
 use super::ProcessState;
 use crate::semantics::ExitStatus;
 use std::fmt::Display;
@@ -135,7 +135,7 @@ pub struct Report<'a> {
     /// Index of the job
     ///
     /// This value should be the index at which the job appears in its
-    /// containing [`JobSet`].
+    /// containing [`JobList`].
     ///
     /// Note that the index is the job number minus one.
     pub index: usize,
@@ -151,8 +151,8 @@ impl Report<'_> {
     /// Returns the job number of the job.
     ///
     /// The job number is a positive integer that is one greater than the index
-    /// of the job in its containing [`JobSet`]. Rather than the raw index, the job
-    /// number is included in the formatted report.
+    /// of the job in its containing [`JobList`]. Rather than the raw index, the
+    /// job number is included in the formatted report.
     #[inline]
     #[must_use]
     pub const fn number(&self) -> usize {

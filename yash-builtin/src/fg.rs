@@ -30,9 +30,9 @@
 //! execution by sending the `SIGCONT` signal to it. The built-in then waits for
 //! the job to finish (or suspend again).
 //!
-//! If the resumed job finishes, it is removed from the [job set](JobSet).
+//! If the resumed job finishes, it is removed from the [job list](JobList).
 //! If the job gets suspended again, it is set as the [current
-//! job](JobSet::current_job).
+//! job](JobList::current_job).
 //!
 //! # Options
 //!
@@ -42,7 +42,7 @@
 //!
 //! Operand *job_id* specifies which job to resume. See the module documentation
 //! of [`yash_env::job::id`] for the format of job IDs. If omitted, the built-in
-//! resumes the [current job](JobSet::current_job).
+//! resumes the [current job](JobList::current_job).
 //!
 //! (TODO: allow omitting the leading `%`)
 //! (TODO: allow multiple operands)
@@ -89,7 +89,7 @@ use crate::common::syntax::Mode;
 use yash_env::io::Fd;
 use yash_env::job::id::parse;
 #[cfg(doc)]
-use yash_env::job::JobSet;
+use yash_env::job::JobList;
 use yash_env::job::Pid;
 use yash_env::job::ProcessState;
 use yash_env::semantics::ExitStatus;
@@ -304,7 +304,7 @@ mod tests {
             assert_eq!(result, ProcessState::Exited(ExitStatus(42)));
             let state = state.borrow().processes[&pid].state();
             assert_eq!(state, ProcessState::Exited(ExitStatus(42)));
-            // The finished job should be removed from the job set.
+            // The finished job should be removed from the job list.
             assert_eq!(env.jobs.get(index), None);
         })
     }
@@ -386,7 +386,7 @@ mod tests {
         let result = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
         assert_eq!(result, Ok(ProcessState::Exited(ExitStatus(12))));
-        // The finished job should be removed from the job set.
+        // The finished job should be removed from the job list.
         assert_eq!(env.jobs.get(index), None);
 
         let state = system.state.borrow();
@@ -460,7 +460,7 @@ mod tests {
             let result = main(&mut env, vec![]).await;
 
             assert_eq!(result, crate::Result::default());
-            // The finished job should be removed from the job set.
+            // The finished job should be removed from the job list.
             assert_eq!(env.jobs.get(index2), None);
             // The previous job should still be there.
             let state = state.borrow().processes[&pid1].state();
@@ -520,7 +520,7 @@ mod tests {
             let result = main(&mut env, Field::dummies(["%prev"])).await;
 
             assert_eq!(result, crate::Result::default());
-            // The finished job should be removed from the job set.
+            // The finished job should be removed from the job list.
             assert_eq!(env.jobs.get(index1), None);
             // The previous job should still be there.
             let state = state.borrow().processes[&pid2].state();

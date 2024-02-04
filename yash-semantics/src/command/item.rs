@@ -45,7 +45,7 @@ use yash_syntax::syntax::AndOrList;
 ///
 /// If the item has an `async_flag` set, the and-or list is executed
 /// asynchronously in a subshell, whose process ID is [set to the job
-/// set](yash_env::job::JobSet::set_last_async_pid) in the environment.
+/// list](yash_env::job::JobList::set_last_async_pid) in the environment.
 ///
 /// Since this function finishes before the asynchronous execution finishes, the
 /// exit status does not reflect the results of the and-or list; the exit status
