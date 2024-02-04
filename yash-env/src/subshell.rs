@@ -391,14 +391,14 @@ mod tests {
             let index = env.jobs.add(Job::new(Pid(123)));
             let subshell = Subshell::new(move |env, _job_control| {
                 Box::pin(async move {
-                    assert!(!env.jobs.get(index).unwrap().is_owned);
+                    assert!(!env.jobs[index].is_owned);
                     Continue(())
                 })
             });
             let pid = subshell.start(&mut env).await.unwrap().0;
             env.wait_for_subshell(pid).await.unwrap();
 
-            assert!(env.jobs.get(index).unwrap().is_owned);
+            assert!(env.jobs[index].is_owned);
         });
     }
 

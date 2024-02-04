@@ -207,7 +207,7 @@ mod tests {
             };
             item.execute(&mut env).await;
 
-            let job = env.jobs.get(0).unwrap();
+            let job = &env.jobs[0];
             assert!(!job.job_controlled);
             assert!(job.state_changed);
             assert_eq!(job.state, ProcessState::Running);
@@ -271,7 +271,7 @@ mod tests {
             let state = state.borrow();
             let process = &state.processes[&env.jobs.last_async_pid()];
             assert_ne!(process.pgid(), env.main_pgid);
-            assert!(env.jobs.get(0).unwrap().job_controlled);
+            assert!(env.jobs[0].job_controlled);
         })
     }
 

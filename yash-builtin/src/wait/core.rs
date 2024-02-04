@@ -137,7 +137,7 @@ mod tests {
             assert_eq!(result, Ok(()));
             // The job state is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().state,
+                env.jobs[index].state,
                 ProcessState::Exited(ExitStatus::default()),
             );
         });
@@ -158,7 +158,7 @@ mod tests {
             assert_eq!(result, Ok(()));
             // The job state is updated.
             assert_eq!(
-                env.jobs.get(index).unwrap().state,
+                env.jobs[index].state,
                 ProcessState::Stopped(Signal::SIGSTOP),
             );
         });

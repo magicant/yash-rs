@@ -122,7 +122,7 @@ async fn wait_while_running(env: &mut Env, pid: Pid) -> Result<ProcessState, Err
 async fn resume_job_by_index(env: &mut Env, index: usize) -> Result<ProcessState, ResumeError> {
     let tty = env.get_tty()?;
 
-    let job = env.jobs.get(index).unwrap();
+    let job = &env.jobs[index];
     if !job.is_owned {
         return Err(ResumeError::Unowned);
     }
@@ -332,7 +332,7 @@ mod tests {
             let result = resume_job_by_index(&mut env, index).await.unwrap();
 
             assert_eq!(result, ProcessState::Stopped(Signal::SIGSTOP));
-            let job_state = env.jobs.get(index).unwrap().state;
+            let job_state = env.jobs[index].state;
             assert_eq!(job_state, ProcessState::Stopped(Signal::SIGSTOP));
             let state = state.borrow().processes[&pid].state();
             assert_eq!(state, ProcessState::Stopped(Signal::SIGSTOP));

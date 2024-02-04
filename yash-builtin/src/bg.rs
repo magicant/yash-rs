@@ -320,8 +320,7 @@ mod tests {
 
         _ = resume_job_by_index(&mut env, index).now_or_never().unwrap();
 
-        let job = env.jobs.get(index).unwrap();
-        assert_eq!(job.expected_state, Some(ProcessState::Running));
+        assert_eq!(env.jobs[index].expected_state, Some(ProcessState::Running));
     }
 
     #[test]

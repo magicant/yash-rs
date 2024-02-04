@@ -618,7 +618,7 @@ mod tests {
             let result = env.wait_for_subshell(pid).await;
             assert_eq!(result, Ok((pid, ProcessState::Exited(ExitStatus(42)))));
             job.state = ProcessState::Exited(ExitStatus(42));
-            assert_eq!(env.jobs.get(job_index), Some(&job));
+            assert_eq!(env.jobs[job_index], job);
         });
     }
 
@@ -692,22 +692,16 @@ mod tests {
         executor.run_until_stalled();
 
         // We're not yet updated.
-        assert_eq!(env.jobs.get(job_1).unwrap().state, ProcessState::Running);
-        assert_eq!(env.jobs.get(job_2).unwrap().state, ProcessState::Running);
-        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs[job_1].state, ProcessState::Running);
+        assert_eq!(env.jobs[job_2].state, ProcessState::Running);
+        assert_eq!(env.jobs[job_3].state, ProcessState::Running);
 
         env.update_all_subshell_statuses();
 
         // Now we have the results.
-        assert_eq!(
-            env.jobs.get(job_1).unwrap().state,
-            ProcessState::Exited(ExitStatus(12))
-        );
-        assert_eq!(
-            env.jobs.get(job_2).unwrap().state,
-            ProcessState::Exited(ExitStatus(35))
-        );
-        assert_eq!(env.jobs.get(job_3).unwrap().state, ProcessState::Running);
+        assert_eq!(env.jobs[job_1].state, ProcessState::Exited(ExitStatus(12)));
+        assert_eq!(env.jobs[job_2].state, ProcessState::Exited(ExitStatus(35)));
+        assert_eq!(env.jobs[job_3].state, ProcessState::Running);
     }
 
     #[test]

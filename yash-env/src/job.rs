@@ -945,7 +945,7 @@ mod tests {
         job.name = "second job".to_string();
         let i_second = set.add(job);
 
-        let job = set.get(i_second).unwrap();
+        let job = &set[i_second];
         assert_eq!(job.pid, Pid(10));
         assert_eq!(job.name, "second job");
 
@@ -998,20 +998,17 @@ mod tests {
         let i10 = set.add(Job::new(Pid(10)));
         let i20 = set.add(Job::new(Pid(20)));
         let i30 = set.add(Job::new(Pid(30)));
-        assert_eq!(set.get(i20).unwrap().state, ProcessState::Running);
+        assert_eq!(set[i20].state, ProcessState::Running);
 
         set.get_mut(i20).unwrap().state_reported();
-        assert_eq!(set.get(i20).unwrap().state_changed, false);
+        assert_eq!(set[i20].state_changed, false);
 
         assert_eq!(set.update_status(Pid(20), state), Some(i20));
-        assert_eq!(
-            set.get(i20).unwrap().state,
-            ProcessState::Exited(ExitStatus(15))
-        );
-        assert_eq!(set.get(i20).unwrap().state_changed, true);
+        assert_eq!(set[i20].state, ProcessState::Exited(ExitStatus(15)));
+        assert_eq!(set[i20].state_changed, true);
 
-        assert_eq!(set.get(i10).unwrap().state, ProcessState::Running);
-        assert_eq!(set.get(i30).unwrap().state, ProcessState::Running);
+        assert_eq!(set[i10].state, ProcessState::Running);
+        assert_eq!(set[i30].state, ProcessState::Running);
     }
 
     #[test]
@@ -1026,7 +1023,7 @@ mod tests {
 
         assert_eq!(set.update_status(pid, ProcessState::Running), Some(i20));
 
-        let job = set.get(i20).unwrap();
+        let job = &set[i20];
         assert_eq!(job.state, ProcessState::Running);
         assert_eq!(job.expected_state, None);
         assert_eq!(job.state_changed, false);
@@ -1045,7 +1042,7 @@ mod tests {
         let result = set.update_status(pid, ProcessState::Exited(ExitStatus(0)));
         assert_eq!(result, Some(i20));
 
-        let job = set.get(i20).unwrap();
+        let job = &set[i20];
         assert_eq!(job.state, ProcessState::Exited(ExitStatus(0)));
         assert_eq!(job.expected_state, None);
         assert_eq!(job.state_changed, true);
@@ -1061,9 +1058,9 @@ mod tests {
 
         set.disown_all();
 
-        assert_eq!(set.get(i10).unwrap().is_owned, false);
-        assert_eq!(set.get(i20).unwrap().is_owned, false);
-        assert_eq!(set.get(i30).unwrap().is_owned, false);
+        assert_eq!(set[i10].is_owned, false);
+        assert_eq!(set[i20].is_owned, false);
+        assert_eq!(set[i30].is_owned, false);
     }
 
     #[test]

@@ -202,14 +202,14 @@ mod tests {
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(123));
+        assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
         job.state = ProcessState::Stopped(Signal::SIGSTOP);
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()),);
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(456));
+        assert_eq!(jobs[index].pid, Pid(456));
     }
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
             job_status(index, On)(&mut jobs),
             ControlFlow::Break(ExitStatus::from(Signal::SIGTSTP)),
         );
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(123));
+        assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
         job.state = ProcessState::Stopped(Signal::SIGSTOP);
@@ -233,7 +233,7 @@ mod tests {
             job_status(index, On)(&mut jobs),
             ControlFlow::Break(ExitStatus::from(Signal::SIGSTOP)),
         );
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(456));
+        assert_eq!(jobs[index].pid, Pid(456));
     }
 
     #[test]
@@ -244,14 +244,14 @@ mod tests {
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, Off)(&mut jobs), ControlFlow::Continue(()));
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(123));
+        assert_eq!(jobs[index].pid, Pid(123));
 
         let mut job = Job::new(Pid(456));
         job.state = ProcessState::Running;
         let index = jobs.add(job);
 
         assert_eq!(job_status(index, On)(&mut jobs), ControlFlow::Continue(()));
-        assert_eq!(jobs.get(index).unwrap().pid, Pid(456));
+        assert_eq!(jobs[index].pid, Pid(456));
     }
 
     #[test]
