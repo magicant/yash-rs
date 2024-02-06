@@ -40,6 +40,7 @@
 //! crate, which is enabled by default. If you disable the `yash-semantics`
 //! feature, the following built-ins will be unavailable:
 //!
+//! - `command`
 //! - `eval`
 //! - `exec`
 //! - `read`
@@ -51,6 +52,8 @@ pub mod bg;
 pub mod r#break;
 pub mod cd;
 pub mod colon;
+#[cfg(feature = "yash-semantics")]
+pub mod command;
 pub mod common;
 pub mod r#continue;
 #[cfg(feature = "yash-semantics")]
@@ -134,6 +137,14 @@ pub const BUILTINS: &[(&str, Builtin)] = &[
         Builtin {
             r#type: Mandatory,
             execute: |env, args| Box::pin(cd::main(env, args)),
+        },
+    ),
+    #[cfg(feature = "yash-semantics")]
+    (
+        "command",
+        Builtin {
+            r#type: Mandatory,
+            execute: |env, args| Box::pin(command::main(env, args)),
         },
     ),
     (
