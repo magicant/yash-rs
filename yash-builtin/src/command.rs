@@ -100,10 +100,126 @@
 //! print an error message to the standard output while others to the standard
 //! error.
 
+use enumset::EnumSet;
+use enumset::EnumSetType;
 use yash_env::semantics::Field;
 use yash_env::Env;
 
+/// Category of command name resolution
+///
+/// Used to specify the acceptable categories in [`Search`].
+#[derive(Clone, Copy, Debug, EnumSetType, Eq, Hash, PartialEq)]
+#[enumset(no_super_impls)]
+#[non_exhaustive]
+pub enum Category {
+    Alias,
+    Builtin,
+    ExternalUtility,
+    Function,
+    Keyword,
+}
+
+/// Set of parameters that specify how to resolve a command name
+///
+/// Used in [`Invoke`] and [`Identify`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct Search {
+    /// Whether to search for the utility in the standard search path
+    ///
+    /// If `true`, the built-in searches for the utility in the standard search
+    /// path instead of the current `$PATH`. The standard path is obtained from
+    /// TBD.
+    pub standard_path: bool,
+
+    /// Acceptable categories of the command name resolution
+    pub categories: EnumSet<Category>,
+}
+
+impl Search {
+    /// Creates a new `Search` with the default parameters for [`Invoke`].
+    #[must_use]
+    pub fn default_for_invoke() -> Self {
+        Self {
+            standard_path: false,
+            categories: Category::Builtin | Category::ExternalUtility,
+        }
+    }
+
+    /// Creates a new `Search` with the default parameters for [`Identify`].
+    #[must_use]
+    pub fn default_for_identify() -> Self {
+        Self {
+            standard_path: false,
+            categories: EnumSet::all(),
+        }
+    }
+}
+
+/// Parameters to invoke a utility
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Invoke {
+    /// Command name and arguments
+    pub fields: Vec<Field>,
+    /// Search parameters
+    pub search: Search,
+}
+
+impl Default for Invoke {
+    fn default() -> Self {
+        Self {
+            fields: Vec::default(),
+            search: Search::default_for_invoke(),
+        }
+    }
+}
+
+/// Parameters to identify a utility
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Identify {
+    /// Command names
+    pub names: Vec<Field>,
+    /// Search parameters
+    pub search: Search,
+    /// Whether to print a detailed description
+    pub verbose: bool,
+}
+
+impl Default for Identify {
+    fn default() -> Self {
+        Self {
+            names: Vec::default(),
+            search: Search::default_for_identify(),
+            verbose: false,
+        }
+    }
+}
+
+/// Parsed command line arguments of the `command` built-in
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Command {
+    /// Invokes the utility specified by the operands.
+    Invoke(Invoke),
+    /// Identifies the type and location of the utility.
+    Identify(Identify),
+}
+
+impl From<Invoke> for Command {
+    fn from(invoke: Invoke) -> Self {
+        Self::Invoke(invoke)
+    }
+}
+
+impl From<Identify> for Command {
+    fn from(identify: Identify) -> Self {
+        Self::Identify(identify)
+    }
+}
+
 /// Entry point of the `command` built-in
+///
+/// This function parses the arguments into [`Command`] and executes it.
 pub async fn main(_env: &mut Env, _args: Vec<Field>) -> crate::Result {
     todo!()
 }
