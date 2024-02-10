@@ -100,6 +100,7 @@
 //! print an error message to the standard output while others to the standard
 //! error.
 
+use crate::common::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::semantics::Field;
@@ -217,9 +218,14 @@ impl From<Identify> for Command {
     }
 }
 
+pub mod syntax;
+
 /// Entry point of the `command` built-in
 ///
 /// This function parses the arguments into [`Command`] and executes it.
-pub async fn main(_env: &mut Env, _args: Vec<Field>) -> crate::Result {
-    todo!()
+pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
+    match syntax::parse(env, args) {
+        Ok(command) => todo!("execute {command:?}"),
+        Err(error) => report_error(env, &error).await,
+    }
 }
