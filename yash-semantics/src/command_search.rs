@@ -35,7 +35,6 @@
 //! specified in the `$PATH` variable.
 
 use assert_matches::assert_matches;
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStringExt;
@@ -101,8 +100,9 @@ pub trait PathEnv {
 
 /// Part of the shell execution environment command search depends on.
 pub trait SearchEnv: PathEnv {
-    /// Accesses the built-in set in the environment.
-    fn builtins(&self) -> &HashMap<&'static str, Builtin>;
+    /// Retrieves the built-in by name.
+    #[must_use]
+    fn builtin(&self, name: &str) -> Option<Builtin>;
     /// Accesses the function set in the environment.
     fn functions(&self) -> &FunctionSet;
 }
@@ -117,8 +117,8 @@ impl PathEnv for Env {
 }
 
 impl SearchEnv for Env {
-    fn builtins(&self) -> &HashMap<&'static str, Builtin> {
-        &self.builtins
+    fn builtin(&self, name: &str) -> Option<Builtin> {
+        self.builtins.get(name).copied()
     }
     fn functions(&self) -> &FunctionSet {
         &self.functions
@@ -140,7 +140,7 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
         };
     }
 
-    let builtin = env.builtins().get(name).copied();
+    let builtin = env.builtin(name);
     if let Some(builtin) = builtin {
         if builtin.r#type == Special {
             return Some(builtin.into());
@@ -195,6 +195,7 @@ pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use std::collections::HashMap;
     use std::collections::HashSet;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
@@ -222,8 +223,8 @@ mod tests {
     }
 
     impl SearchEnv for DummyEnv {
-        fn builtins(&self) -> &HashMap<&'static str, Builtin> {
-            &self.builtins
+        fn builtin(&self, name: &str) -> Option<Builtin> {
+            self.builtins.get(name).copied()
         }
         fn functions(&self) -> &FunctionSet {
             &self.functions

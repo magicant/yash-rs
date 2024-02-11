@@ -21,7 +21,6 @@
 //! the ability to select the category of the command to search for.
 
 use super::Search;
-use std::collections::HashMap;
 use std::ffi::CStr;
 use yash_env::builtin::Builtin;
 use yash_env::function::FunctionSet;
@@ -53,10 +52,8 @@ impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
 }
 
 impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
-    fn builtins(&self) -> &HashMap<&'static str, Builtin> {
-        // TODO Can we change this trait function to take a built-in name and
-        // return a reference to the built-in?
-        todo!()
+    fn builtin(&self, name: &str) -> Option<Builtin> {
+        todo!("return built-in {name}")
     }
 
     fn functions(&self) -> &FunctionSet {
