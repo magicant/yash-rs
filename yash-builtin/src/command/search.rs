@@ -22,8 +22,9 @@
 
 use super::Search;
 use std::ffi::CStr;
+use std::rc::Rc;
 use yash_env::builtin::Builtin;
-use yash_env::function::FunctionSet;
+use yash_env::function::Function;
 use yash_env::variable::Variable;
 use yash_env::Env;
 
@@ -56,9 +57,7 @@ impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
         todo!("return built-in {name}")
     }
 
-    fn functions(&self) -> &FunctionSet {
-        // TODO Can we change this trait function to take a function name and
-        // return a reference to the function?
-        todo!()
+    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        todo!("return function {name}")
     }
 }

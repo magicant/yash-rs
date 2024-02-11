@@ -43,7 +43,6 @@ use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
-use yash_env::function::FunctionSet;
 use yash_env::variable::Variable;
 use yash_env::Env;
 use yash_env::System;
@@ -103,8 +102,10 @@ pub trait SearchEnv: PathEnv {
     /// Retrieves the built-in by name.
     #[must_use]
     fn builtin(&self, name: &str) -> Option<Builtin>;
-    /// Accesses the function set in the environment.
-    fn functions(&self) -> &FunctionSet;
+
+    /// Retrieves the function by name.
+    #[must_use]
+    fn function(&self, name: &str) -> Option<&Rc<Function>>;
 }
 
 impl PathEnv for Env {
@@ -120,8 +121,10 @@ impl SearchEnv for Env {
     fn builtin(&self, name: &str) -> Option<Builtin> {
         self.builtins.get(name).copied()
     }
-    fn functions(&self) -> &FunctionSet {
-        &self.functions
+
+    #[inline]
+    fn function(&self, name: &str) -> Option<&Rc<Function>> {
+        self.functions.get(name)
     }
 }
 
@@ -147,7 +150,7 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
         }
     }
 
-    if let Some(function) = env.functions().get(name) {
+    if let Some(function) = env.function(name) {
         return Some(Rc::clone(function).into());
     }
 
@@ -197,6 +200,7 @@ mod tests {
     use assert_matches::assert_matches;
     use std::collections::HashMap;
     use std::collections::HashSet;
+    use yash_env::function::FunctionSet;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -226,8 +230,8 @@ mod tests {
         fn builtin(&self, name: &str) -> Option<Builtin> {
             self.builtins.get(name).copied()
         }
-        fn functions(&self) -> &FunctionSet {
-            &self.functions
+        fn function(&self, name: &str) -> Option<&Rc<Function>> {
+            self.functions.get(name)
         }
     }
 
