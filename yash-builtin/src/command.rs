@@ -218,6 +218,7 @@ impl From<Identify> for Command {
     }
 }
 
+pub mod search;
 pub mod syntax;
 
 /// Entry point of the `command` built-in
