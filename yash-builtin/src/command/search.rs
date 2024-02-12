@@ -25,7 +25,7 @@ use std::ffi::CStr;
 use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::function::Function;
-use yash_env::variable::Variable;
+use yash_env::variable::Expansion;
 use yash_env::Env;
 
 /// Environment adapter for applying the search parameters
@@ -40,9 +40,7 @@ pub struct SearchEnv<'a> {
 }
 
 impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
-    fn path(&self) -> Option<&Variable> {
-        // TODO Seems like this trait function needs to be changed to return
-        // something more abstract so that we can return the result of confstr.
+    fn path(&self) -> Expansion<'_> {
         todo!()
     }
 

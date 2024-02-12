@@ -43,7 +43,7 @@ use std::rc::Rc;
 use yash_env::builtin::Builtin;
 use yash_env::builtin::Type::{Elective, Extension, Mandatory, Special, Substitutive};
 use yash_env::function::Function;
-use yash_env::variable::Variable;
+use yash_env::variable::Expansion;
 use yash_env::Env;
 use yash_env::System;
 
@@ -91,8 +91,15 @@ impl From<Rc<Function>> for Target {
 /// Part of the shell execution environment command path search depends on.
 pub trait PathEnv {
     /// Accesses the `$PATH` variable in the environment.
-    fn path(&self) -> Option<&Variable>;
+    ///
+    /// This function returns an `Expansion` rather than a reference to a
+    /// variable value because the path may be dynamically computed in the
+    /// function.
+    #[must_use]
+    fn path(&self) -> Expansion;
+
     /// Whether there is an executable file at the specified path.
+    #[must_use]
     fn is_executable_file(&self, path: &CStr) -> bool;
     // TODO Cache the results of external utility search
 }
@@ -109,9 +116,20 @@ pub trait SearchEnv: PathEnv {
 }
 
 impl PathEnv for Env {
-    fn path(&self) -> Option<&Variable> {
-        self.variables.get("PATH")
+    /// Returns the value of the `$PATH` variable.
+    ///
+    /// This function assumes that the `$PATH` variable has no quirks. If the
+    /// variable has a quirk, the function panics.
+    fn path(&self) -> Expansion<'_> {
+        self.variables
+            .get("PATH")
+            .and_then(|var| {
+                assert_eq!(var.quirk, None, "PATH does not support quirks");
+                var.value.as_ref()
+            })
+            .into()
     }
+
     fn is_executable_file(&self, path: &CStr) -> bool {
         self.system.is_executable_file(path)
     }
@@ -174,23 +192,15 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
 
 /// Searches the `$PATH` for an executable file.
 ///
-/// Returns the path if successful. Note that the returned path may not be
-/// absolute if the `$PATH` contains a relative path.
+/// Returns the path to the executable if found. Note that the returned path may
+/// not be absolute if the `$PATH` contains a relative path.
 pub fn search_path<E: PathEnv>(env: &mut E, name: &str) -> Option<CString> {
-    if let Some(path) = env.path().and_then(|v| v.value.as_ref()) {
-        for dir in path.split() {
-            let mut file = PathBuf::new();
-            file.push(dir);
-            file.push(name);
-            if let Ok(file) = CString::new(file.into_os_string().into_vec()) {
-                if env.is_executable_file(&file) {
-                    return Some(file);
-                }
-            }
-        }
-    }
-
-    None
+    env.path()
+        .split()
+        .filter_map(|dir| {
+            CString::new(PathBuf::from_iter([dir, name]).into_os_string().into_vec()).ok()
+        })
+        .find(|path| env.is_executable_file(path))
 }
 
 #[allow(clippy::field_reassign_with_default)]
@@ -201,6 +211,7 @@ mod tests {
     use std::collections::HashMap;
     use std::collections::HashSet;
     use yash_env::function::FunctionSet;
+    use yash_env::variable::Value;
     use yash_syntax::source::Location;
     use yash_syntax::syntax::CompoundCommand;
     use yash_syntax::syntax::FullCompoundCommand;
@@ -209,12 +220,12 @@ mod tests {
     struct DummyEnv {
         builtins: HashMap<&'static str, Builtin>,
         functions: FunctionSet,
-        path: Option<Variable>,
+        path: Expansion<'static>,
         executables: HashSet<String>,
     }
 
     impl PathEnv for DummyEnv {
-        fn path(&self) -> Option<&Variable> {
+        fn path(&self) -> Expansion {
             self.path.as_ref()
         }
         fn is_executable_file(&self, path: &CStr) -> bool {
@@ -434,7 +445,7 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
@@ -463,7 +474,7 @@ mod tests {
             execute: |_, _| unreachable!(),
         };
         env.builtins.insert("foo", builtin);
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         let function = Rc::new(Function::new(
@@ -481,7 +492,7 @@ mod tests {
     #[test]
     fn external_utility_is_found_if_external_executable_exists() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/bin").export());
+        env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
@@ -501,7 +512,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_scalar() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/usr/local/bin:/usr/bin:/bin").export());
+        env.path = Expansion::from("/usr/local/bin:/usr/bin:/bin");
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -519,7 +530,7 @@ mod tests {
     #[test]
     fn external_target_is_first_executable_found_in_path_array() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new_array(["/usr/local/bin", "/usr/bin", "/bin"]).export());
+        env.path = Expansion::from(Value::array(["/usr/local/bin", "/usr/bin", "/bin"]));
         env.executables.insert("/usr/bin/foo".to_string());
         env.executables.insert("/bin/foo".to_string());
 
@@ -537,7 +548,7 @@ mod tests {
     #[test]
     fn empty_string_in_path_names_current_directory() {
         let mut env = DummyEnv::default();
-        env.path = Some(Variable::new("/x::/y").export());
+        env.path = Expansion::from("/x::/y");
         env.executables.insert("foo".to_string());
 
         assert_matches!(search(&mut env, "foo"), Some(Target::External { path }) => {
