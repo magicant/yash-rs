@@ -87,6 +87,7 @@ use std::ffi::c_int;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fmt::Debug;
 use std::future::poll_fn;
 use std::future::Future;
@@ -988,6 +989,19 @@ impl System for VirtualSystem {
         let state = self.state.borrow();
         Ok(state.home_dirs.get(name).cloned())
     }
+
+    /// Returns the standard path for the system.
+    ///
+    /// This function returns the value of [`SystemState::path`]. If it is empty,
+    /// it returns the `ENOSYS` error.
+    fn confstr_path(&self) -> nix::Result<OsString> {
+        let path = self.state.borrow().path.clone();
+        if path.is_empty() {
+            Err(Errno::ENOSYS)
+        } else {
+            Ok(path)
+        }
+    }
 }
 
 fn send_signal_to_processes(
@@ -1055,6 +1069,9 @@ pub struct SystemState {
     /// [`VirtualSystem::getpwnam_dir`] looks up its argument in this
     /// dictionary.
     pub home_dirs: HashMap<String, PathBuf>,
+
+    /// Standard path returned by [`VirtualSystem::confstr_path`]
+    pub path: OsString,
 }
 
 impl SystemState {
