@@ -77,7 +77,11 @@ impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
     }
 
     fn function(&self, name: &str) -> Option<&Rc<Function>> {
-        todo!("return function {name}")
+        if self.params.categories.contains(Category::Function) {
+            self.env.function(name)
+        } else {
+            None
+        }
     }
 }
 
@@ -92,6 +96,8 @@ mod tests {
     use yash_env::variable::Scope;
     use yash_semantics::command_search::PathEnv as _;
     use yash_semantics::command_search::SearchEnv as _;
+    use yash_syntax::source::Location;
+    use yash_syntax::syntax::FullCompoundCommand;
 
     #[test]
     fn standard_path() {
@@ -215,6 +221,42 @@ mod tests {
         let search_env = SearchEnv { env, params };
 
         let result = search_env.builtin(":");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn function_on() {
+        let env = &mut Env::new_virtual();
+        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
+        let location = Location::dummy("f");
+        env.functions
+            .define(Function::new("f", command, location))
+            .unwrap();
+        let params = &Search {
+            categories: Category::Function.into(),
+            ..Search::default_for_invoke()
+        };
+        let search_env = SearchEnv { env, params };
+
+        let result = search_env.function("f");
+        assert_eq!(result, env.functions.get("f"));
+    }
+
+    #[test]
+    fn function_off() {
+        let env = &mut Env::new_virtual();
+        let command: FullCompoundCommand = "{ :; }".parse().unwrap();
+        let location = Location::dummy("f");
+        env.functions
+            .define(Function::new("f", command, location))
+            .unwrap();
+        let params = &Search {
+            categories: EnumSet::empty(),
+            ..Search::default_for_invoke()
+        };
+        let search_env = SearchEnv { env, params };
+
+        let result = search_env.function("f");
         assert_eq!(result, None);
     }
 }
