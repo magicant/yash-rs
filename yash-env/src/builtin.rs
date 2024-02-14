@@ -34,7 +34,7 @@ use std::pin::Pin;
 pub mod getopts;
 
 /// Types of built-in utilities.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Type {
     /// Special built-in
     ///
@@ -243,7 +243,7 @@ impl From<ExitStatus> for Result {
 pub type Main = fn(&mut Env, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
 /// Built-in utility definition.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Builtin {
     /// Type of the built-in.
     pub r#type: Type,

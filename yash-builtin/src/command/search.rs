@@ -20,6 +20,7 @@
 //! It is based on the [`yash_semantics::command_search`] module, but it adds
 //! the ability to select the category of the command to search for.
 
+use super::Category;
 use super::Search;
 use std::ffi::CStr;
 use std::rc::Rc;
@@ -68,7 +69,11 @@ impl yash_semantics::command_search::PathEnv for SearchEnv<'_> {
 
 impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
     fn builtin(&self, name: &str) -> Option<Builtin> {
-        todo!("return built-in {name}")
+        if self.params.categories.contains(Category::Builtin) {
+            self.env.builtin(name)
+        } else {
+            None
+        }
     }
 
     fn function(&self, name: &str) -> Option<&Rc<Function>> {
@@ -79,11 +84,14 @@ impl yash_semantics::command_search::SearchEnv for SearchEnv<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use enumset::EnumSet;
     use std::ffi::OsString;
     use std::os::unix::ffi::OsStringExt as _;
+    use yash_env::builtin::Type::Special;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::variable::Scope;
     use yash_semantics::command_search::PathEnv as _;
+    use yash_semantics::command_search::SearchEnv as _;
 
     #[test]
     fn standard_path() {
@@ -172,5 +180,41 @@ mod tests {
 
         let result = search_env.path();
         assert_eq!(result, Expansion::from(array));
+    }
+
+    #[test]
+    fn builtin_on() {
+        let env = &mut Env::new_virtual();
+        let builtin = Builtin {
+            r#type: Special,
+            execute: |_, _| unreachable!(),
+        };
+        env.builtins.insert(":", builtin);
+        let params = &Search {
+            categories: Category::Builtin.into(),
+            ..Search::default_for_invoke()
+        };
+        let search_env = SearchEnv { env, params };
+
+        let result = search_env.builtin(":");
+        assert_eq!(result, Some(builtin));
+    }
+
+    #[test]
+    fn builtin_off() {
+        let env = &mut Env::new_virtual();
+        let builtin = Builtin {
+            r#type: Special,
+            execute: |_, _| unreachable!(),
+        };
+        env.builtins.insert(":", builtin);
+        let params = &Search {
+            categories: EnumSet::empty(),
+            ..Search::default_for_invoke()
+        };
+        let search_env = SearchEnv { env, params };
+
+        let result = search_env.builtin(":");
+        assert_eq!(result, None);
     }
 }
