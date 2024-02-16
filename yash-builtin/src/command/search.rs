@@ -35,9 +35,9 @@ use yash_env::Env;
 /// This type implements the [`yash_semantics::command_search::SearchEnv`] trait
 /// by extracting results from the environment filtered by the search
 /// parameters.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct SearchEnv<'a> {
-    pub env: &'a Env,
+    pub env: &'a mut Env,
     pub params: &'a Search,
 }
 
@@ -122,7 +122,7 @@ mod tests {
     fn standard_path_with_confstr_error() {
         let system = Box::new(VirtualSystem::new());
         system.state.borrow_mut().path = "".into();
-        let env = &Env::with_system(system);
+        let env = &mut Env::with_system(system);
         let params = &Search {
             standard_path: true,
             ..Search::default_for_invoke()
@@ -137,7 +137,7 @@ mod tests {
     fn standard_path_with_invalid_utf8() {
         let system = Box::new(VirtualSystem::new());
         system.state.borrow_mut().path = OsString::from_vec(vec![0x80]);
-        let env = &Env::with_system(system);
+        let env = &mut Env::with_system(system);
         let params = &Search {
             standard_path: true,
             ..Search::default_for_invoke()
@@ -229,9 +229,8 @@ mod tests {
         let env = &mut Env::new_virtual();
         let command: FullCompoundCommand = "{ :; }".parse().unwrap();
         let location = Location::dummy("f");
-        env.functions
-            .define(Function::new("f", command, location))
-            .unwrap();
+        let function = Rc::new(Function::new("f", command, location));
+        env.functions.define(Rc::clone(&function)).unwrap();
         let params = &Search {
             categories: Category::Function.into(),
             ..Search::default_for_invoke()
@@ -239,7 +238,7 @@ mod tests {
         let search_env = SearchEnv { env, params };
 
         let result = search_env.function("f");
-        assert_eq!(result, env.functions.get("f"));
+        assert_eq!(result, Some(&function));
     }
 
     #[test]

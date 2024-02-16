@@ -64,8 +64,8 @@
 //! When the `-v` option is given, the built-in prints the following:
 //!
 //! - The absolute pathname of the utility, if found in the search path.
-//! - The utility name itself, if it is a special built-in, function, or shell
-//!   reserved word, hence not subject to search.
+//! - The utility name itself, if it is a non-substitutive built-in, function,
+//!   or shell reserved word, hence not subject to search.
 //! - A command line that would redefine the alias, if the name is an alias.
 //!
 //! When the `-V` option is given, the built-in describes the utility in a more
@@ -218,6 +218,16 @@ impl From<Identify> for Command {
     }
 }
 
+impl Command {
+    pub async fn execute(&self, env: &mut Env) -> crate::Result {
+        match self {
+            Self::Invoke(invoke) => todo!("{invoke:?}"), // invoke.execute(env).await,
+            Self::Identify(identify) => identify.execute(env).await,
+        }
+    }
+}
+
+pub mod identify;
 pub mod search;
 pub mod syntax;
 
@@ -226,7 +236,7 @@ pub mod syntax;
 /// This function parses the arguments into [`Command`] and executes it.
 pub async fn main(env: &mut Env, args: Vec<Field>) -> crate::Result {
     match syntax::parse(env, args) {
-        Ok(command) => todo!("execute {command:?}"),
+        Ok(command) => command.execute(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }
