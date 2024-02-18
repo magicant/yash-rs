@@ -16,18 +16,19 @@
 
 //! Command invoking semantics
 
-use crate::common::report_failure;
-
 use super::identify::NotFound;
 use super::search::SearchEnv;
 use super::Invoke;
+use crate::common::report_failure;
 use yash_env::semantics::ExitStatus;
+use yash_env::semantics::Field;
 use yash_env::Env;
 use yash_semantics::command_search::search;
+use yash_semantics::command_search::Target;
 
 impl Invoke {
     /// Execute the command
-    pub async fn execute(&self, env: &mut Env) -> crate::Result {
+    pub async fn execute(self, env: &mut Env) -> crate::Result {
         let Some(name) = self.fields.first() else {
             return crate::Result::default();
         };
@@ -40,7 +41,30 @@ impl Invoke {
             return result;
         };
 
-        todo!()
+        invoke_target(env, target, self.fields).await
+    }
+}
+
+/// Invokes the target with the given fields.
+///
+/// This function is called after the command is found. The first field must be
+/// the command name that was searched for. The rest of the fields are the
+/// arguments to the command.
+async fn invoke_target(env: &mut Env, target: Target, mut fields: Vec<Field>) -> crate::Result {
+    match target {
+        Target::Builtin { builtin, .. } => {
+            let frame = yash_env::stack::Builtin {
+                name: fields.remove(0),
+                // Any built-in is considered non-special in the command built-in.
+                is_special: false,
+            };
+            let mut env = env.push_frame(frame.into());
+            (builtin.execute)(&mut env, fields).await
+        }
+
+        Target::Function(_) => todo!(),
+
+        Target::External { .. } => todo!(),
     }
 }
 
@@ -52,11 +76,13 @@ mod tests {
     use crate::tests::assert_stdout;
     use enumset::EnumSet;
     use futures_util::FutureExt as _;
+    use std::ops::ControlFlow::Break;
     use std::rc::Rc;
     use yash_env::builtin::Builtin;
     use yash_env::builtin::Type::Special;
     use yash_env::semantics::Field;
     use yash_env::VirtualSystem;
+    use yash_semantics::Divert::Return;
 
     #[test]
     fn empty_command_invocation() {
@@ -92,5 +118,35 @@ mod tests {
         assert_stderr(&state, |stderr| {
             assert!(stderr.contains("not found"), "stderr: {stderr:?}");
         });
+    }
+
+    #[test]
+    fn invoking_builtin() {
+        fn make_result() -> yash_env::builtin::Result {
+            let mut result = crate::Result::default();
+            result.set_exit_status(ExitStatus(79));
+            result.set_divert(Break(Return(None)));
+            result.retain_redirs();
+            result
+        }
+
+        let mut env = Env::new_virtual();
+        let target = Target::Builtin {
+            builtin: Builtin {
+                r#type: Special,
+                execute: |_, args| {
+                    Box::pin(async move {
+                        assert_eq!(args, Field::dummies(["bar", "baz"]));
+                        make_result()
+                    })
+                },
+            },
+            path: None,
+        };
+
+        let result = invoke_target(&mut env, target, Field::dummies(["foo", "bar", "baz"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, make_result());
     }
 }

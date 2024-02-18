@@ -226,7 +226,7 @@ impl From<Identify> for Command {
 }
 
 impl Command {
-    pub async fn execute(&self, env: &mut Env) -> crate::Result {
+    pub async fn execute(self, env: &mut Env) -> crate::Result {
         match self {
             Self::Invoke(invoke) => invoke.execute(env).await,
             Self::Identify(identify) => identify.execute(env).await,
