@@ -99,11 +99,18 @@
 //! When the utility is not found with the `-V` option, some implementations
 //! print an error message to the standard output while others to the standard
 //! error.
+//!
+//! # Implementation notes
+//!
+//! The `-p` option depends on [`System::confstr_path`] to obtain the standard
+//! search path. See [`RealSystem::confstr_path`] for the supported platforms.
 
 use crate::common::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
 use yash_env::semantics::Field;
+#[cfg(doc)]
+use yash_env::system::{real::RealSystem, System};
 use yash_env::Env;
 
 /// Category of command name resolution
