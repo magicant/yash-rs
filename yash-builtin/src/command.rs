@@ -228,13 +228,14 @@ impl From<Identify> for Command {
 impl Command {
     pub async fn execute(&self, env: &mut Env) -> crate::Result {
         match self {
-            Self::Invoke(invoke) => todo!("{invoke:?}"), // invoke.execute(env).await,
+            Self::Invoke(invoke) => invoke.execute(env).await,
             Self::Identify(identify) => identify.execute(env).await,
         }
     }
 }
 
 pub mod identify;
+mod invoke;
 pub mod search;
 pub mod syntax;
 
