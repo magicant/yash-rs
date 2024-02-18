@@ -170,7 +170,7 @@ impl Command for syntax::SimpleCommand {
         use crate::command_search::Target::{Builtin, External, Function};
         if let Some(name) = fields.first() {
             match search(env, &name.value) {
-                Some(Builtin(builtin)) => {
+                Some(Builtin { builtin, .. }) => {
                     execute_builtin(env, builtin, &self.assigns, fields, &self.redirs).await
                 }
                 Some(Function(function)) => {

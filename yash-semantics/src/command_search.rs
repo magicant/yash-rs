@@ -47,18 +47,32 @@ use yash_env::variable::Expansion;
 use yash_env::Env;
 use yash_env::System;
 
-/// Target of a simple command execution.
+/// Target of a simple command execution
 ///
 /// This is the result of the [command search](search).
 #[derive(Clone, Debug)]
 pub enum Target {
-    /// Built-in utility.
-    Builtin(Builtin),
-    /// Function.
+    /// Built-in utility
+    Builtin {
+        /// Definition of the built-in
+        builtin: Builtin,
+        /// Path to the external utility that is shadowed by the substitutive
+        /// built-in
+        ///
+        /// The path may not necessarily be absolute. If the `$PATH` variable
+        /// contains a relative directory name and the external utility is found
+        /// in that directory, the path will be relative.
+        ///
+        /// The path will be `None` if the built-in is not substitutive.
+        path: Option<CString>,
+    },
+
+    /// Function
     Function(Rc<Function>),
-    /// External utility.
+
+    /// External utility
     External {
-        /// Path to the external utility.
+        /// Path to the external utility
         ///
         /// The path may not necessarily be absolute. If the `$PATH` variable
         /// contains a relative directory name and the external utility is found
@@ -72,15 +86,17 @@ pub enum Target {
     },
 }
 
-impl From<Builtin> for Target {
-    fn from(builtin: Builtin) -> Target {
-        Target::Builtin(builtin)
+impl From<Rc<Function>> for Target {
+    #[inline]
+    fn from(function: Rc<Function>) -> Target {
+        Target::Function(function)
     }
 }
 
-impl From<Rc<Function>> for Target {
-    fn from(function: Rc<Function>) -> Target {
-        Target::Function(function)
+impl From<Function> for Target {
+    #[inline]
+    fn from(function: Function) -> Target {
+        Target::Function(function.into())
     }
 }
 
@@ -164,7 +180,8 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     let builtin = env.builtin(name);
     if let Some(builtin) = builtin {
         if builtin.r#type == Special {
-            return Some(builtin.into());
+            let path = None;
+            return Some(Target::Builtin { builtin, path });
         }
     }
 
@@ -175,14 +192,16 @@ pub fn search<E: SearchEnv>(env: &mut E, name: &str) -> Option<Target> {
     if let Some(builtin) = builtin {
         if builtin.r#type != Substitutive {
             assert_matches!(builtin.r#type, Mandatory | Elective | Extension);
-            return Some(builtin.into());
+            let path = None;
+            return Some(Target::Builtin { builtin, path });
         }
     }
 
     if let Some(path) = search_path(env, name) {
         if let Some(builtin) = builtin {
             assert_eq!(builtin.r#type, Substitutive);
-            return Some(builtin.into());
+            let path = Some(path);
+            return Some(Target::Builtin { builtin, path });
         }
         return Some(Target::External { path });
     }
@@ -286,9 +305,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -321,9 +343,12 @@ mod tests {
         );
         env.functions.define(function).unwrap();
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -335,9 +360,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -349,9 +377,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -363,9 +394,12 @@ mod tests {
         };
         env.builtins.insert("foo", builtin);
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: None }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+            }
+        );
     }
 
     #[test]
@@ -448,9 +482,13 @@ mod tests {
         env.path = Expansion::from("/bin");
         env.executables.insert("/bin/foo".to_string());
 
-        assert_matches!(search(&mut env, "foo"), Some(Target::Builtin(result)) => {
-            assert_eq!(result.r#type, builtin.r#type);
-        });
+        assert_matches!(
+            search(&mut env, "foo"),
+            Some(Target::Builtin { builtin: result, path: Some(path) }) => {
+                assert_eq!(result.r#type, builtin.r#type);
+                assert_eq!(path.to_bytes(), b"/bin/foo");
+            }
+        );
     }
 
     #[test]

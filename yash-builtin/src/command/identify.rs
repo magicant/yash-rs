@@ -65,8 +65,8 @@ where
     W: std::fmt::Write,
 {
     match target {
-        // TODO Needs the path to the built-in
-        Target::Builtin(builtin) => {
+        Target::Builtin { builtin, path } => {
+            let path = path.as_ref().map(|p| p.to_string_lossy());
             if verbose {
                 let desc = match builtin.r#type {
                     Type::Special => "special built-in",
@@ -75,9 +75,14 @@ where
                     Type::Extension => "extension built-in",
                     Type::Substitutive => "substitutive built-in",
                 };
-                writeln!(result, "{}: {}", name.value, desc).unwrap();
+                write!(result, "{}: {}", name.value, desc).unwrap();
+                if let Some(path) = path {
+                    write!(result, " at {}", quoted(&path)).unwrap();
+                }
+                writeln!(result).unwrap();
             } else {
-                writeln!(result, "{}", name.value).unwrap();
+                let output = path.as_deref().unwrap_or(&name.value);
+                writeln!(result, "{}", output).unwrap();
             }
             Ok(())
         }
@@ -310,10 +315,13 @@ mod tests {
     #[test]
     fn identify_builtin_without_path() {
         let name = &Field::dummy(":");
-        let target = &Target::Builtin(Builtin {
-            r#type: Type::Special,
-            execute: |_, _| unreachable!(),
-        });
+        let target = &Target::Builtin {
+            builtin: Builtin {
+                r#type: Type::Special,
+                execute: |_, _| unreachable!(),
+            },
+            path: None,
+        };
 
         let mut output = String::new();
         identify_target(target, name, false, &mut output).unwrap();
@@ -324,7 +332,25 @@ mod tests {
         assert_eq!(output, ":: special built-in\n");
     }
 
-    // TODO identify_builtin_with_path
+    #[test]
+    fn identify_builtin_with_path() {
+        let name = &Field::dummy("echo");
+        let target = &Target::Builtin {
+            builtin: Builtin {
+                r#type: Type::Substitutive,
+                execute: |_, _| unreachable!(),
+            },
+            path: Some(CString::new("/bin/echo").unwrap()),
+        };
+
+        let mut output = String::new();
+        identify_target(target, name, false, &mut output).unwrap();
+        assert_eq!(output, "/bin/echo\n");
+
+        let mut output = String::new();
+        identify_target(target, name, true, &mut output).unwrap();
+        assert_eq!(output, "echo: substitutive built-in at /bin/echo\n");
+    }
 
     #[test]
     fn identify_function() {
